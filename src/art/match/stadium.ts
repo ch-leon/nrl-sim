@@ -21,6 +21,7 @@
 // the top-left: faces toward +gx (screen bottom-right) are the darker side.
 import { mix, noise2, shade } from '../pixel';
 import { FIELD_LONG, FIELD_WIDE, IN_GOAL_DEPTH, TEN_METRES, bonusZoneGrid } from '../../scenes/matchField';
+import { FIELD_LENGTH } from '../../match/core/field';
 import { Canvas3D, isoProject, isoUnproject, noiseTile, sampleTile, whiteTile, type NoiseTile, type P3 } from './iso3d';
 import { drawText, textWidth } from './font';
 import type { Kit } from './kit';
@@ -148,8 +149,8 @@ function snap(v: number): number {
   return Math.round(v * 64) / 64;
 }
 
-const TEN_M_LINES = Array.from({ length: 9 }, (_, i) => snap(TRY_A + (i + 1) * TEN_METRES));
-const HALFWAY = snap(TRY_A + 5 * TEN_METRES);
+const TEN_M_LINES = Array.from({ length: FIELD_LENGTH / 10 - 1 }, (_, i) => snap(TRY_A + (i + 1) * TEN_METRES));
+const HALFWAY = snap((TRY_A + TRY_B) / 2);
 
 /**
  * Is this field pixel on a white marking? Works in the "n = sx + 2sy" lattice so
@@ -165,7 +166,7 @@ function onMarking(gx: number, gy: number): boolean {
   if (gx < THICK || Math.abs(gx - FIELD_LONG) < THICK) return true;
   if (Math.abs(gx - HALFWAY) < THICK) return true;
   const k = Math.round((gx - TRY_A) / TEN_METRES);
-  const L = k >= 1 && k <= 9 ? TEN_M_LINES[k - 1]! : -99;
+  const L = k >= 1 && k <= TEN_M_LINES.length ? TEN_M_LINES[k - 1]! : -99;
   if (Math.abs(gx - L) < THIN) return true;
   // Touchlines (constant gy), full length incl. in-goal.
   if (gy < THICK || Math.abs(gy - FIELD_WIDE) < THICK) return true;

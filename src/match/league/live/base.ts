@@ -1,7 +1,7 @@
 import type { ControlInput } from '../controls';
 import { makeRng, type Rng } from '../../../utils/rng';
 import type { TeamSheet } from '../../../sim/events';
-import { FIELD_LENGTH, MID_Y, clampToGround } from '../../core/field';
+import { FIELD_LENGTH, MID_X, MID_Y, clampToGround } from '../../core/field';
 import { makeBody, maxSpeedFor } from '../../core/body';
 import { flightAt, type BallState } from '../../core/ball';
 import type { Side, SimEvent } from '../../core/snapshot';
@@ -55,7 +55,7 @@ export abstract class LiveBase {
   protected tackles = 0;
   protected lastPlay = false;
   /** Where the play-the-ball is / was (the line forms off it). */
-  protected mark: Vec = { x: 50, y: MID_Y };
+  protected mark: Vec = { x: MID_X, y: MID_Y };
   /** The defensive line's x. */
   protected lineX = 60;
   /** The last ruck's fixed legal line; reaching it once releases each non-marker. */
@@ -363,7 +363,7 @@ export abstract class LiveBase {
         energy: 1,
         drain: drainRate(stamina, traits),
         gassed: false,
-        body: makeBody({ x: 50, y: MID_Y }, maxSpeedFor(stats.speed), { x: this.dirOf(side), y: 0 }),
+        body: makeBody({ x: MID_X, y: MID_Y }, maxSpeedFor(stats.speed), { x: this.dirOf(side), y: 0 }),
         pose: 'idle',
         poseUntil: 0,
         lockUntil: 0,
@@ -382,14 +382,14 @@ export abstract class LiveBase {
         decided: false,
         steppedOn: -1,
         jink: null,
-        target: { x: 50, y: MID_Y },
+        target: { x: MID_X, y: MID_Y },
         through: false,
         subFor: null,
         subAt: 0,
-        subSpot: { x: 50, y: 1 },
+        subSpot: { x: MID_X, y: 1 },
         subFresh: false,
         binUntilS: -1,
-        binSpot: { x: 50, y: 1 },
+        binSpot: { x: MID_X, y: 1 },
       };
     });
   }

@@ -9,13 +9,18 @@ import { makeRng } from '../../utils/rng';
 import type { RosterEntry, TeamSheet } from '../../sim/events';
 import { DEFAULT_TACTICS, type TeamTactics } from '../league/presets';
 import { PLAYS, stylePlays } from '../league/plays';
+import { MATCH_PREVIEW } from '../preview';
+import { previewSheet } from './previewSheets';
 
 export interface LabClub {
   id: string;
   name: string;
 }
 
-export const LAB_CLUBS: readonly LabClub[] = RIVAL_CLUBS.map((c) => ({ id: c.id, name: c.name }));
+export const LAB_CLUBS: readonly LabClub[] = [
+  ...(MATCH_PREVIEW ? [{ id: 'preview-home', name: 'Even Home (60)' }, { id: 'preview-away', name: 'Even Away (60)' }] : []),
+  ...RIVAL_CLUBS.map((c) => ({ id: c.id, name: c.name })),
+];
 
 export const DEFAULT_HOME = LAB_CLUBS[0]?.id ?? 'home';
 export const DEFAULT_AWAY = LAB_CLUBS[1]?.id ?? 'away';
@@ -32,7 +37,7 @@ export const isTraitMode = (s: string | null | undefined): s is TraitMode => TRA
 export function labSheet(clubId: string, traits: TraitMode = 'gen', tactics: Partial<TeamTactics> = {}): TeamSheet {
   const club = RIVAL_CLUBS.find((c) => c.id === clubId) ?? RIVAL_CLUBS[0];
   if (!club) throw new Error('no clubs defined');
-  const base = teamSheetFromRival(club);
+  const base = (MATCH_PREVIEW && previewSheet(clubId)) || teamSheetFromRival(club);
   const sheet: TeamSheet = { ...base, tactics: { ...(base.tactics ?? { attack: 'balanced', defence: 'slide' }), ...stripUndefined(tactics) } };
   if (traits === 'gen' || !sheet.roster) return sheet;
   return {

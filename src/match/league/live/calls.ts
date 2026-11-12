@@ -11,7 +11,7 @@ import { bootMult } from '../traits';
 import { pickFreshLegs } from '../bench';
 import { GOALS } from '../goals';
 import { CALLS, CALL_LABEL, callIsBench, callIsDefence, callIsPenalty, callIsPlay, callScope, paidOffText, penaltyChoiceOf, type CallVerdict, type CoachCall } from '../calls';
-import { FORTY_TWENTY_INTO_M, TOUCH } from '../touch';
+import { FORTY_TWENTY_ENABLED, FORTY_TWENTY_INTO_M, TOUCH } from '../touch';
 import type { PlayId } from '../../../data/plays';
 import { LIVE } from './knobs';
 import { other, type Player } from './types';
@@ -104,6 +104,7 @@ export abstract class LiveCalls extends LiveBase {
     if ((call === 'grubber' || call === 'forty-twenty') && this.pendingKick) return 'the kick’s away';
     if (call === 'grubber' && this.toLineFor(side, this.ballPos()) > CALLS.grubberInsideM) return 'not inside their 25';
     if (call === 'forty-twenty' && this.toLineFor(side, this.ballPos()) < CALLS.fortyTwentyFromM) return 'not behind your 40';
+    if (call === 'forty-twenty' && !FORTY_TWENTY_ENABLED) return '40/20 off on this field';
     if (call === 'forty-twenty' && this.toLineFor(side, this.ballPos()) > this.fortyTwentyReach(side)) return 'out of reach of their 20';
     if (call === 'field-goal') {
       const h = this.holder();

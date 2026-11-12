@@ -19,6 +19,10 @@ import { SprintLayer } from '../view/sprintLayer';
 import { LegsLayer } from '../view/legsLayer';
 import { FATIGUE } from '../league/fatigue';
 import type { LabController } from './controller';
+import { MATCH_PREVIEW } from '../preview';
+import { blendPace, KeyMoments, playbackPace } from '../view/livePlayback';
+import { NINES } from '../league/rules';
+import type { LiveSim } from '../league/live';
 
 export interface LabSceneData {
   home: TeamSheet;
@@ -43,6 +47,9 @@ export class LabScene extends MatchScene {
   private legsLayer: LegsLayer | null = null;
   private ids!: Record<Side, string>;
   private closeupUntil = 0;
+  private previewPace = 1;
+  private previewMoments = new KeyMoments();
+  private previewTick = 0;
 
   constructor() {
     super('Lab');
@@ -86,12 +93,13 @@ export class LabScene extends MatchScene {
   private onSimEvents(events: readonly SimEvent[]): void {
     const r = this.controller.runner;
     for (const e of events) {
+      if (MATCH_PREVIEW) this.previewMoments.note(e);
       this.contest?.note(e, r.cur);
       const p = popupFor(e);
       if (p && e.side !== undefined && e.slot !== undefined) {
         this.popups?.show(p, e.side, e.slot);
         if (p.big) {
-          r.slowMo(SLOWMO_MS, SLOWMO_FACTOR);
+          if (!MATCH_PREVIEW) r.slowMo(SLOWMO_MS, SLOWMO_FACTOR);
           this.closeupUntil = this.time.now + CLOSEUP_MS;
         }
       }
@@ -104,8 +112,22 @@ export class LabScene extends MatchScene {
 
   override update(time: number, delta: number): void {
     const r = this.controller.runner;
-    r.update(delta);
-    this.view?.draw(r.prev, r.cur, r.alpha, r.playing ? r.speed : 0.001);
+    let shownSpeed = r.speed;
+    if (MATCH_PREVIEW) {
+      if (r.tick < this.previewTick) { this.previewMoments = new KeyMoments(); this.previewPace = 1; }
+      const phase = (r.current as LiveSim).phaseKind;
+      const chosen = r.speed;
+      this.previewMoments.phase(phase);
+      this.previewPace = blendPace(this.previewPace, playbackPace(phase), delta);
+      const cap = this.previewMoments.cap(r.cur.clock, NINES.halfMinutes);
+      shownSpeed = Math.min(chosen * this.previewPace, cap ?? Infinity);
+      this.controller.watchClock?.advance(delta, r.cur.clock?.half ?? 1, chosen, phase, r.playing);
+      r.setSpeed(shownSpeed);
+      r.update(delta);
+      r.setSpeed(chosen);
+      this.previewTick = r.tick;
+    } else r.update(delta);
+    this.view?.draw(r.prev, r.cur, r.alpha, r.playing ? shownSpeed : 0.001);
     // The close-up MatchScene picked for a big moment eases back out after a beat.
     if (this.closeupUntil && time > this.closeupUntil) {
       this.closeupUntil = 0;

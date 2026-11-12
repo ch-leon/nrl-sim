@@ -9,6 +9,7 @@ import type { Side, SimEvent } from '../core/snapshot';
 import type { KickoffCall } from './kickoff';
 import type { AttackPlan, DefencePlan, DefencePreset } from './presets';
 import { PLAYS_BY_ID, type PlayId } from '../../data/plays';
+import { FIELD_LENGTH } from '../core/field';
 
 export type CoachCall =
   | 'hit-up' | 'shift-left' | 'shift-right' // attack, the next play
@@ -86,7 +87,7 @@ export const CALLS = {
   /** Grubber (#396): from tackle 4 (`lastFrom`), with the ball this close to their line (m). */
   grubberInsideM: 25,
   /** 40/20 (#396): from tackle 4, with the ball at least this far from their line (behind his own 40). */
-  fortyTwentyFromM: 60,
+  fortyTwentyFromM: FIELD_LENGTH - 40,
   /**
    * …and the kick goes no further than this (× Big Boot distance), a little past a touch-finder's 32 m, so
    * from deep it is a kick for touch that can't reach their 20; it is scattered this much (× the kicker's

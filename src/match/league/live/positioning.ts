@@ -1,6 +1,6 @@
 import { SET_TACKLES } from '../../../config';
 import { TICK_S } from '../../core/engine';
-import { FIELD_LENGTH, FIELD_WIDTH, MID_Y, clampToGround } from '../../core/field';
+import { FIELD_LENGTH, FIELD_WIDTH, MID_X, MID_Y, clampToGround } from '../../core/field';
 import { BODY_RADIUS, arrive, integrate, separate, speedOf, type Body } from '../../core/body';
 import type { Side } from '../../core/snapshot';
 import { add, clamp, dist, type Vec } from '../../core/vec';
@@ -210,9 +210,9 @@ export abstract class LivePositioning extends LiveContact {
         if (!this.onField(p)) continue;
         const role = ROLES[p.slot]!;
         if (p.side === kicking) {
-          p.target = p === this.kicker(kicking) ? { x: 50 - rd * 1, y: MID_Y } : { x: 50 - rd * (3 + role.def * 0.15), y: role.lane };
+          p.target = p === this.kicker(kicking) ? { x: MID_X - rd * 1, y: MID_Y } : { x: MID_X - rd * (3 + role.def * 0.15), y: role.lane };
         } else {
-          p.target = formationTarget(role, { x: 50 + rd * -22, y: MID_Y }, rd, true);
+          p.target = formationTarget(role, { x: rd > 0 ? 28 : FIELD_LENGTH - 28, y: MID_Y }, rd, true);
           p.target = { x: p.target.x + rd * 6, y: p.target.y }; // deep but not on the line
         }
         p.through = false;

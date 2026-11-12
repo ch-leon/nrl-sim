@@ -9,6 +9,7 @@ import { isLegs, type Legs } from '../league/fatigue';
 import { DEFAULT_ROTATION, isRotation, type Rotation } from '../league/bench';
 import type { WeatherKind } from '../../sim/events';
 import type { CallInput, CoachCall } from '../league/calls';
+import { MATCH_PREVIEW, PreviewWatchClock } from '../preview';
 
 /** Per-side preset overrides for the lab; a missing field keeps the club's own style. */
 export interface LabTactics {
@@ -128,6 +129,7 @@ export function isLabHash(hash: string): boolean {
 }
 
 export class LabController {
+  readonly watchClock = MATCH_PREVIEW ? new PreviewWatchClock() : null;
   readonly runner: Runner;
   readonly params: LabParams;
   /** Coach calls made in the lab, by tick: replayed when the match is rebuilt to seek (#73). */
@@ -136,7 +138,7 @@ export class LabController {
   constructor(factory: LabSimFactory, params: LabParams) {
     this.params = { ...params };
     this.runner = new Runner((seed) => factory(params.home, params.away, seed, params.traits, params.tactics, params.legs, params.bench ?? DEFAULT_ROTATION, params.weather ?? 'clear', this.calls), params.seed);
-    if (params.tick > 0) this.runner.seek(params.tick);
+    if (params.tick > 0) { this.runner.seek(params.tick); this.watchClock?.invalidate(); }
   }
 
   get seed(): number {
@@ -172,6 +174,7 @@ export class LabController {
     this.runner.toggle();
   }
   step(): void {
+    this.watchClock?.invalidate();
     this.runner.step();
   }
   setSpeed(s: RunSpeed): void {
@@ -179,12 +182,16 @@ export class LabController {
   }
   /** Jump ahead to the next half-time or full time. */
   skipToWhistle(): void {
+    this.watchClock?.invalidate();
     this.runner.skipUntil((s) => s.events.some((e) => e.kind === 'half-time' || e.kind === 'full-time'));
   }
   seek(tick: number): void {
+    if (tick === 0) this.watchClock?.reset();
+    else this.watchClock?.invalidate();
     this.runner.seek(tick);
   }
   reseed(seed: number): void {
+    this.watchClock?.reset();
     this.params.seed = seed;
     this.runner.reseed(seed);
   }
