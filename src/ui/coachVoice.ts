@@ -62,6 +62,15 @@ function ensureCoachStyles(): void {
 .nrl-summary > h2, .nrl-summary > .nrl-coach-line, .nrl-summary > .nrl-decisions-actions { flex-shrink: 0; }
 .nrl-summary > .nrl-coach-line { margin-bottom: 4px; }
 .nrl-summary-cols { min-height: 0; overflow-y: auto; }
+/* 956×330 (#610): the title and his line share a row, clear of the ✕. The 36px that frees is what an
+   ordinary week's lists were short by: "INJURIES & BANS" and "BOARD: HAPPY" showed with their lines hidden.
+   Not on a narrow phone (568px), where his line beside the title wraps to more than it saves. */
+@media (max-height: 340px) and (min-width: 640px) {
+  .nrl-summary { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; column-gap: 12px; }
+  .nrl-modal-has-x > .nrl-modal-scroll > .nrl-summary > h2:first-child { padding-right: 0; }
+  .nrl-summary > .nrl-coach-line { padding-right: 44px; }
+  .nrl-summary > .nrl-summary-cols, .nrl-summary > .nrl-decisions-actions { grid-column: 1 / -1; }
+}
 `;
   document.head.appendChild(style);
 }

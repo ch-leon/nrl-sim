@@ -13,7 +13,7 @@ import { roundLabel } from '../../systems/matchday';
 // match in a sheet of its own (#326). Saved at once, so a side picked and then
 // the app closed is not lost. DOM UI kit only; the rules are pure and tested
 // in systems/lineup.ts. No Phaser.
-import { el, button, openScreen, openModal, closeModal, screenHead, segmented } from '../dom';
+import { el, button, hintScroll, openScreen, openModal, closeModal, screenHead, segmented } from '../dom';
 import { getState, type Player, type Position } from '../../core/state';
 import { bus } from '../../core/events';
 import { overallRating } from '../../data/player';
@@ -379,6 +379,7 @@ export function openLineupScreen(): void {
   const kcRow = el('div', { class: 'nrl-lineup-kc' }, kBtn, cBtn);
   kcRow.hidden = true;
   const list = el('div', { class: 'nrl-lineup-list' });
+  hintScroll(list); // the squad runs past the sheet's foot (#610)
 
   // The plan (N11): attack and defence presets and the bench rotation, as the half-time sheet has them (3r).
   const rotation = segmented<Rotation>(ROTATIONS.map((r) => ({ id: r, label: ROTATION_LABEL[r], title: ROTATION_TIP[r] })), null,

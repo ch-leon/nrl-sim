@@ -491,6 +491,48 @@ export function armGuard(disarm: () => void): () => void {
   return drop;
 }
 
+/** The class a scrolling list wears while it has more below (#610): its foot fades out. */
+export const SCROLL_MORE_CLASS = 'nrl-scroll-more';
+
+/** Whether `box` has more below what it shows; a pixel's slack for heights that are not whole. */
+export function moreBelow(box: Pick<HTMLElement, 'scrollTop' | 'clientHeight' | 'scrollHeight'>): boolean {
+  return box.scrollTop + box.clientHeight < box.scrollHeight - 1;
+}
+
+/** Put the cue on `box`, or take it off. toggle, not add: it writes the class only on a change, so hintScroll's own observer is not woken by it. */
+function syncMore(box: HTMLElement): void {
+  box.classList.toggle(SCROLL_MORE_CLASS, moreBelow(box));
+}
+
+let moreWatch: ResizeObserver | null = null;
+/**
+ * Scroll cue (#610), opt-in: put it on a list that scrolls inside a sheet. A phone
+ * draws no scrollbar until a finger moves, and a list that ends on a whole row
+ * looked complete (a four-man squad). The list fades at its foot while there is
+ * more below, and not at the end or when it all fits. Looked at again on a scroll,
+ * when the box changes size (a hint closed, the phone turned; one observer for
+ * every list, as watchSeg has) and when its rows or its own class and style change
+ * (a redraw, a toast's reserve at its foot). A list that is replaced, not refilled
+ * (the ladder), is given it again as it is built. Returns the way to take it off.
+ */
+export function hintScroll(box: HTMLElement): () => void {
+  const check = (): void => syncMore(box);
+  box.addEventListener('scroll', check, { passive: true });
+  if (typeof ResizeObserver !== 'undefined') {
+    moreWatch ??= new ResizeObserver((entries) => { for (const e of entries) syncMore(e.target as HTMLElement); });
+    moreWatch.observe(box);
+  }
+  const redrawn = typeof MutationObserver === 'undefined' ? null : new MutationObserver(check);
+  redrawn?.observe(box, { childList: true, attributes: true, attributeFilter: ['class', 'style'] });
+  check();
+  return () => {
+    box.removeEventListener('scroll', check);
+    moreWatch?.unobserve(box);
+    redrawn?.disconnect();
+    box.classList.remove(SCROLL_MORE_CLASS);
+  };
+}
+
 /** Currently open modal overlay, if any (guards against stacking). */
 let openModalEl: HTMLElement | null = null;
 /**
@@ -1320,6 +1362,15 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
   gap: 8px;
   align-content: start;
 }
+/* A list with more below (#610, hintScroll): its foot fades out. A tap row deep (44px), so the
+   fade reaches the last whole row's words where the list ends between rows: 20px fell on the
+   empty top of the next row and showed nothing. A list of close lines sets less
+   (--nrl-scroll-fade). Under a third of a short box, which keeps it off a sticky header.
+   A still cue: it does not animate. */
+.nrl-scroll-more {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - min(var(--nrl-scroll-fade, 44px), 30%)), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - min(var(--nrl-scroll-fade, 44px), 30%)), transparent);
+}
 .nrl-screen-empty {
   color: var(--nrl-muted);
   padding: 24px;
@@ -1563,7 +1614,7 @@ body:has(.nrl-update-toast) .nrl-hub-chips { max-width: calc(100vw - 32px - 310p
    money and the board) so a typical week fits a phone on its side unscrolled. ── */
 .nrl-dialog-region .nrl-summary-modal { width: min(100%, 680px); }
 .nrl-summary h2 { margin: 0 0 8px; padding-right: 44px; min-height: 36px; display: flex; align-items: center; }
-.nrl-summary-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 6px 10px; }
+.nrl-summary-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 6px 10px; --nrl-scroll-fade: 24px; }
 .nrl-summary-col { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .nrl-summary-sec { padding: 6px 10px; border-radius: 8px; background: var(--nrl-raised); border-left: 3px solid var(--nrl-bench); font-size: 0.8125rem; }
 .nrl-summary-sec h3 { margin: 0 0 2px; }

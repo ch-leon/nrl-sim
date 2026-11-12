@@ -37,6 +37,7 @@ screen had (traits, training focus, the next-match preview, …) in the new look
 - **Menu sheets**: the content of every tab opens as a navy sheet **above the dock**.
   - Position: `top 12, left 12, right 12, bottom 88`; radius 16; bg `rgba(14,22,48,.97)`; padding 10 14; `overflow:hidden`.
   - Long lists scroll **inside** the sheet (`flex:1; min-height:0; overflow-y:auto`); the header row stays fixed.
+  - A list with more below fades out at its foot (#610, `hintScroll` in `src/ui/dom.ts`): the last 44px, or 24px where the lines are close (Finance's lines, the weekly summary), and never more than 30% of the box. No fade at the end of the list or when it all fits. A phone draws no scrollbar until a finger moves, so a list ending on a whole row looked complete. Squad, Lineup's players, Recruit, the ladder, Finance's THIS WEEK and the weekly summary's columns have it.
 - **Sub-navigation inside a sheet**: segmented control. Track #1b264a, radius 10, padding 3, gap 4. Items 36–38 tall, padding 0 12–14, Barlow Condensed 15–16. Selected item: bg #f4d03f, text #0e1630, 700, radius 8.
 - **One yellow primary action per screen.** Secondary buttons: bg #1f2b55, white text. Destructive: bg #1f2b55, text #f0a39b.
 - **Disabled stays visible and says why** (e.g. "Need $18k more" in #f4d03f; the tile at 55% opacity). Don't silently grey things out or hide them.
@@ -127,7 +128,7 @@ Each screen's mock is `docs/screenshots/broadcast-quiet/<id>_<name>.png` (render
   - NET WEEKLY (AVG), large Mono, in #6fd896 or #f0a39b.
   - NEXT HOME GATE.
   - A contracts-expiring alert with VIEW ▸.
-- **Right column**: segmented THIS WEEK / SEASON P&L / LEDGER, then line items (28 tall, Mono values, +green / −red) and a Net total row with a 2px #26325c top border.
+- **Right column**: segmented THIS WEEK / SEASON P&L / LEDGER, then line items (28 tall; 23 on a phone under 400px high and 20 under 340px, so all seven fit without scrolling, #610; Mono values, +green / −red) and a Net total row with a 2px #26325c top border.
 
 ### 3k Staff & Board
 - **Left (280)**: BOARD · SEASON 1, a patience bar (3/5), and objective rows with status (ON TRACK #6fd896 / AT RISK #f4d03f).

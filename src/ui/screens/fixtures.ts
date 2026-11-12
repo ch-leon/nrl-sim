@@ -17,7 +17,7 @@ import { resolveLineup, validTactics } from '../../systems/lineup';
 // No nav registration here — the orchestrator wires openFixturesScreen /
 // openLadderScreen into the nav bar (main.ts).
 
-import { el, button, openModal, openScreen, ensureStyles } from '../dom';
+import { el, button, hintScroll, openModal, openScreen, ensureStyles } from '../dom';
 import { getState, type GameState, type Fixture, type LadderRow, type RivalClub, type WeatherKind } from '../../core/state';
 import { bus } from '../../core/events';
 import { currentRound } from '../../core/season';
@@ -386,6 +386,7 @@ function buildLadder(state: GameState): LeagueColumn {
   }
   table.append(tbody);
   const scroll = el('div', { class: 'nrl-ladder-scroll' }, table);
+  hintScroll(scroll); // five rows of sixteen looked like the ladder (#610); each redraw's box gets its own
   col.append(scroll, el('div', { class: 'nrl-league-foot', text: `Top ${cut} make the finals · tap a club for its squad` }));
   return { el: col, ...columnScroll(scroll, () => centreIn(scroll, mine)) };
 }

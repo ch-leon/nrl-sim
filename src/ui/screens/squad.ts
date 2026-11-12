@@ -7,7 +7,7 @@
 // focus. A row opens the player's page, where Renew, Sell and Release live
 // (#336). DOM UI kit only; no Phaser.
 
-import { el, openScreen, screenHead, segmented } from '../dom';
+import { el, hintScroll, openScreen, screenHead, segmented } from '../dom';
 import { getState, type Player, type Position, type TrainingFocus } from '../../core/state';
 import { bus } from '../../core/events';
 import { save } from '../../core/save';
@@ -100,6 +100,7 @@ export function openSquadScreen(): void {
   ensureScreenStyles();
 
   const list = el('div', { class: 'nrl-grid-body' });
+  hintScroll(list); // four whole rows of twenty looked like the squad (#610)
   const sub = el('div', { class: 'nrl-screen-sub' });
 
   const sort = popMenu<SortKey>({

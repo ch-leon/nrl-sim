@@ -18,7 +18,7 @@ import { ECON, SEASON_ROUNDS, WEEKS_PER_SEASON } from '../../config';
 import { fmtMoney, fmtMoneyShort } from '../../utils/money';
 import { openHistoryScreen } from './history';
 import { openContractsScreen } from './contracts';
-import { el, button, openScreen, closeScreen, segmented, ensureStyles } from '../dom';
+import { el, button, hintScroll, openScreen, closeScreen, segmented, ensureStyles } from '../dom';
 
 /** Contracts whose remaining weeks are at most this are listed as expiring. */
 export const EXPIRY_WINDOW_WEEKS = 8;
@@ -460,17 +460,17 @@ function lineItem(label: string, value: number, opts: { signed?: boolean; cls?: 
  * the foot, which holds still while a short phone scrolls the lines above it.
  */
 function buildThisWeek(state: GameState, s: FinanceSummary): HTMLElement {
-  return el('div', { class: 'nrl-finance-weekly' },
-    el('div', { class: 'nrl-finance-lines' },
-      lineItem('Bank balance', s.money, { signed: false }),
-      lineItem('Wage bill', -s.wagesWeekly),
-      lineItem('Facility upkeep', -s.upkeepWeekly),
-      lineItem(overheadLabel(state), -s.overheadWeekly),
-      lineItem('Sponsor', s.sponsorWeekly),
-      lineItem('Grant', s.grantWeekly),
-      lineItem('Home gates (avg/wk)', s.gateWeekly)),
-    lineItem('Net', s.netWeekly, { cls: 'nrl-finance-net' }),
-  );
+  const lines = el('div', { class: 'nrl-finance-lines' },
+    lineItem('Bank balance', s.money, { signed: false }),
+    lineItem('Wage bill', -s.wagesWeekly),
+    lineItem('Facility upkeep', -s.upkeepWeekly),
+    lineItem(overheadLabel(state), -s.overheadWeekly),
+    lineItem('Sponsor', s.sponsorWeekly),
+    lineItem('Grant', s.grantWeekly),
+    lineItem('Home gates (avg/wk)', s.gateWeekly));
+  // Where the seven do not fit (a hint over the sheet, Larger text), the foot fades: a line hidden whole made the Net look wrong (#610).
+  hintScroll(lines);
+  return el('div', { class: 'nrl-finance-weekly' }, lines, lineItem('Net', s.netWeekly, { cls: 'nrl-finance-net' }));
 }
 
 /** A Mono money cell, red when negative; a dash for no season. */
@@ -628,7 +628,7 @@ button.nrl-finance-contracts:focus-visible { outline: 2px solid var(--nrl-accent
 .nrl-finance-right > .nrl-seg { align-self: flex-start; }
 .nrl-finance-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; }
 .nrl-finance-weekly { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
-.nrl-finance-lines { flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.nrl-finance-lines { flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; --nrl-scroll-fade: 24px; }
 .nrl-finance-pnl, .nrl-finance-ledger { flex: 0 0 auto; }
 /* THIS WEEK: 28px line items, Mono values, the net under a 2px rule. */
 .nrl-finance-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 28px; border-top: 1px solid var(--nrl-button); font-size: 0.8125rem; }
@@ -659,7 +659,12 @@ button.nrl-finance-contracts:focus-visible { outline: 2px solid var(--nrl-accent
   .nrl-finance-tile { padding: 6px 10px; }
   .nrl-finance-big, .nrl-finance-making .nrl-finance-big, .nrl-finance-losing .nrl-finance-big { font-size: 1.1875rem; line-height: 1.2; }
   .nrl-finance-note { line-height: 1.3; }
+  /* THIS WEEK's seven lines in its 180px (844×390; 171px over an iPhone's home bar): at 28 the last,
+     Home gates, showed 6px of itself (#610). */
+  .nrl-finance-row { min-height: 23px; }
 }
+/* 956×330: 162px for the seven, 147px over a home bar. */
+@media (max-height: 340px) { .nrl-finance-row { min-height: 20px; } }
 
 /* Contracts (under Finance): one row a player, soonest to end first. */
 .nrl-screen.nrl-contracts { display: flex; flex-direction: column; }
