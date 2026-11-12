@@ -218,8 +218,15 @@ export class LabPanel {
         : `Nines match: two ${NINES.halfMinutes}:00 halves, the clock in the label, ⏩ skips to the next break. ⚑ Flag anything that looks wrong.` }),
     );
     this.log.classList.add('nrl-lab-more');
+    if (MATCH_PREVIEW) {
+      this.root.setAttribute('data-preview', '');
+      for (const advanced of [step, whistle, this.scrub, this.stats, ...this.speedBtns.filter(b => b.textContent !== speedLabel(1))]) advanced.classList.add('nrl-lab-more');
+      const restart = button('Restart', () => { ctrl.seek(0); this.sync(); }, { class: 'nrl-lab-mini' });
+      this.playBtn.parentElement?.insertBefore(restart, this.playBtn.nextSibling);
+      this.playBtn.setAttribute('aria-label', 'Play or pause match');
+    }
     // A short screen (a phone on its side) starts with just the play controls; + opens the rest.
-    if (window.matchMedia?.(`(max-height: ${SHORT_SCREEN_PX}px)`).matches) {
+    if (MATCH_PREVIEW || window.matchMedia?.(`(max-height: ${SHORT_SCREEN_PX}px)`).matches) {
       this.root.setAttribute('data-collapsed', '');
       collapse.textContent = '+';
     }
@@ -319,6 +326,8 @@ function ensureLabStyles(): void {
 .nrl-lab-code { flex: 1 1 6rem; }
 .nrl-lab .nrl-btn { padding: 0.2rem 0.55rem; font-size: 0.8rem; border-radius: 8px; }
 .nrl-lab .nrl-lab-mini { padding: 0.15rem 0.4rem; }
+.nrl-lab[data-preview] .nrl-lab-mini, .nrl-lab[data-preview] a { min-width: 44px; min-height: 44px; }
+.nrl-lab[data-preview] a { color: #f4d03f; display: inline-flex; align-items: center; justify-content: center; }
 .nrl-lab-readout { margin-left: auto; font-family: var(--nrl-f-num); font-variant-numeric: tabular-nums; }
 .nrl-lab-scrub { width: 100%; margin: 0; accent-color: #f4d03f; }
 .nrl-lab-label { color: #9aa6c7; }
