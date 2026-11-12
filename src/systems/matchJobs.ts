@@ -5,6 +5,8 @@
 // soak have none and play them in place. A worker that fails or stays silent past a timeout is
 // dropped and everything it owed is played here; a post that throws plays that
 // request here. The same results either way, later.
+import { FIELD_LENGTH } from '../match/core/field';
+import { fieldWorkerName } from '../labs/fieldLength';
 import type { Snapshot } from '../match/core/snapshot';
 import type { LiveOptions } from '../match/league/live';
 import type { MatchResult, TeamSheet } from '../sim/events';
@@ -70,11 +72,11 @@ function laneWorker(name: MatchLane): Lane {
   if (had && had.ctor !== Worker) abandonWorker(name, had);
   const live = lanes.get(name);
   if (live) return live;
-  // Named for its lane, so the e2e playthrough can slow the rival round's alone. Vite
-  // wants the options written out, so one constructor per lane.
+  // Keep literal URLs for Vite's worker bundling. Its options evaluator cannot
+  // resolve the runtime name, so @vite-ignore skips only static option evaluation.
   const worker = name === 'skip'
-    ? new Worker(new URL('./matchWorker.ts', import.meta.url), { type: 'module', name: 'match-skip' })
-    : new Worker(new URL('./matchWorker.ts', import.meta.url), { type: 'module', name: 'match-background' });
+    ? new Worker(new URL('./matchWorker.ts', import.meta.url), { /* @vite-ignore */ type: 'module', name: fieldWorkerName('match-skip', FIELD_LENGTH) })
+    : new Worker(new URL('./matchWorker.ts', import.meta.url), { /* @vite-ignore */ type: 'module', name: fieldWorkerName('match-background', FIELD_LENGTH) });
   const s: Lane = { worker, ctor: Worker as unknown, queue: [] };
   worker.onmessage = (e: MessageEvent<MatchResult[]>) => {
     const p = s.queue.shift();
@@ -115,7 +117,7 @@ function replayWorker(): NonNullable<typeof replayLane> {
     stale.worker.terminate();
   }
   if (replayLane) return replayLane;
-  const worker = new Worker(new URL('./matchWorker.ts', import.meta.url), { type: 'module', name: 'match-replay' });
+  const worker = new Worker(new URL('./matchWorker.ts', import.meta.url), { /* @vite-ignore */ type: 'module', name: fieldWorkerName('match-replay', FIELD_LENGTH) });
   const lane = { worker, ctor: Worker as unknown, pending: null as ((snaps: Snapshot[] | null) => void) | null };
   worker.onmessage = (e: MessageEvent<ReplayResponse>) => {
     if (!e.data || e.data.kind !== 'replay') return;

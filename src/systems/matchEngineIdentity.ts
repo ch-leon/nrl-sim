@@ -2,6 +2,7 @@
 import { activePack } from '../content';
 import { ON_FIELD, SET_TACKLES } from '../config';
 import { NINES } from '../match/league/rules';
+import { FIELD_LENGTH } from '../match/core/field';
 import { cyrb53 } from '../utils/hash';
 
 /**
@@ -24,12 +25,13 @@ function canonical(value: unknown): string {
 
 /**
  * Cover the selected pack and the rules actually read by the sim (NINES), plus
- * field size/set length from config. Pack words, names, colours and art are not
- * reconstruction rules. Other default tuning/derivation changes bump revision.
+ * the frozen field size and set length from config. Pack words, names, colours
+ * and art are not reconstruction rules. Other default tuning/derivation changes
+ * bump revision.
  */
 export function matchEngineIdentity(): string {
   return `nrl-live-${MATCH_ENGINE_REVISION}-${cyrb53(canonical({
-    pack: activePack().id, rules: NINES, onField: ON_FIELD, setTackles: SET_TACKLES,
+    pack: activePack().id, rules: NINES, onField: ON_FIELD, setTackles: SET_TACKLES, fieldLength: FIELD_LENGTH,
   }))}`;
 }
 
