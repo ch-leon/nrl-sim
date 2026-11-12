@@ -1,0 +1,46 @@
+import { describe, expect, it } from 'vitest';
+import { FIELD_LENGTHS, isFieldLength, fieldWorkerName, fieldFromWorkerName } from '../../src/labs/fieldLength';
+import { __setLabs, readLabs, fieldLengthPreference, setFieldLengthPreference, turnAllOff } from '../../src/labs/flags';
+import { resolveBootField } from '../../src/match/fieldSettings';
+
+describe('field experiment settings', () => {
+  it('accepts exactly the three physical sizes, defaulting legacy and invalid settings to 100m', () => {
+    expect(FIELD_LENGTHS).toEqual([100, 80, 60]);
+    for (const x of ['80', 0, 70, null, undefined, Infinity]) expect(isFieldLength(x)).toBe(false);
+    for (const x of FIELD_LENGTHS) expect(isFieldLength(x)).toBe(true);
+    for (const fieldLength of [undefined, '80', 70, null]) {
+      __setLabs({ visible: true, on: {}, hintsSeen: [], fieldLength } as never);
+      expect(fieldLengthPreference()).toBe(100);
+    }
+    __setLabs(null);
+  });
+  it('keeps field length browser-local, visible in parsed settings and resettable', () => {
+    const state = { visible: true, on: {}, hintsSeen: [], fieldLength: 80 as const };
+    expect(readLabs(JSON.stringify(state))).toEqual(state);
+    __setLabs(state);
+    expect(fieldLengthPreference()).toBe(80);
+    turnAllOff();
+    expect(fieldLengthPreference()).toBe(100);
+    __setLabs(null);
+  });
+  it('refuses an unpersisted setting instead of pretending it applied', () => {
+    __setLabs({ visible: true, on: {}, hintsSeen: [] });
+    expect(setFieldLengthPreference(60)).toBe(false); // Node has no browser storage.
+    expect(fieldLengthPreference()).toBe(100);
+    __setLabs(null);
+  });
+  it('freezes the same validated choice for the page and every worker type', () => {
+    const stored = JSON.stringify({ visible: true, on: {}, hintsSeen: [], fieldLength: 60 });
+    expect(resolveBootField({ worker: false, stored })).toBe(60);
+    expect(resolveBootField({ worker: false, stored: stored.replace('true', 'false') })).toBe(100);
+    for (const length of FIELD_LENGTHS) for (const name of ['match-skip', 'match-background', 'match-replay', 'match-art']) {
+      const configured = fieldWorkerName(name, length);
+      expect(resolveBootField({ worker: true, workerName: configured, stored })).toBe(length);
+      expect(fieldFromWorkerName(configured)).toBe(length);
+      if (length === 100) expect(configured).toBe(name);
+    }
+    expect(fieldFromWorkerName('match-art--field-70')).toBe(100);
+    expect(fieldFromWorkerName('unrelated--field-80')).toBe(100);
+    expect(resolveBootField({ worker: true, stored })).toBe(100);
+  });
+});

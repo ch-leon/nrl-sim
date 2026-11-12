@@ -17,7 +17,7 @@ import { andList, callNames } from '../coachCallsText';
 /** The numbers the page quotes. Kept equal to the rule constants by a test. */
 export const NINES_FACTS = {
   aSide: 9,
-  halfMinutes: 7,
+  halfMinutes: 2.5,
   tackles: 5,
   tryPoints: 4,
   bonusTryPoints: 5,

@@ -3,9 +3,10 @@
 // 0..100 across) that the renderer, overlay and MatchEvents already use.
 import { clamp, type Vec } from './vec';
 import { MATCH_PREVIEW } from '../preview';
+import { bootFieldLength } from '../fieldSettings';
 
 /** Try-line to try-line. */
-export const FIELD_LENGTH = MATCH_PREVIEW?.fieldLength ?? 100;
+export const FIELD_LENGTH = MATCH_PREVIEW?.fieldLength ?? bootFieldLength();
 export const MID_X = FIELD_LENGTH / 2;
 /** Touchline to touchline. */
 export const FIELD_WIDTH = 68;

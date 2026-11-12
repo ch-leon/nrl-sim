@@ -21,7 +21,7 @@ import { MATCH_PREVIEW } from '../match/preview';
 // ── Field dimensions ─────────────────────────────────────────────────────────
 export const PLAY_LONG = 24 * (FIELD_LENGTH / 100); // fixed tiles per physical metre
 export const FIELD_WIDE = 18; // iso tiles touchline to touchline
-export const IN_GOAL_DEPTH = MATCH_PREVIEW ? IN_GOAL * 24 / 100 : 3;
+export const IN_GOAL_DEPTH = MATCH_PREVIEW || FIELD_LENGTH !== 100 ? IN_GOAL * 24 / 100 : 3;
 export const FIELD_LONG = PLAY_LONG + 2 * IN_GOAL_DEPTH;
 /** Tiles per 10 metres along the field (mowing stripes + 10m lines). */
 export const TEN_METRES = 24 / 10;
