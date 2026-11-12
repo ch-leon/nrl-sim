@@ -129,6 +129,43 @@ describe('LiveView', () => {
     expect(s.ball.depth).toBe(Math.round(w.y) + 2);
   });
 
+  it('the hand offset fades over two ticks after a release, so the ball does not hop sideways', () => {
+    const s = surface();
+    const view = new LiveView(s);
+    const held = { x: 50, y: 34, lift: 1, holder: { side: 'home' as const, slot: 0 } };
+    const loose = { x: 50, y: 34, lift: 1, holder: null };
+    const t0 = snap(0, [player({})], held);
+    const t1 = snap(1, [player({})], held);
+    const offsets: number[] = [];
+    const w = Math.round(fieldToWorldPoint(50, 50, fieldOffsetX()).x);
+    view.draw(t0, t1, 1);
+    offsets.push(Math.abs(s.ball.x - w));
+    let before = t1;
+    for (let t = 2; t <= 4; t++) {
+      const next = snap(t, [player({})], loose);
+      view.draw(before, next, 1);
+      offsets.push(Math.abs(s.ball.x - w));
+      before = next;
+    }
+    expect(offsets).toEqual([4, 4, 2, 0]);
+  });
+
+  it('tells the ball its heading on screen and the tick it is drawn at, for its turn and spin', () => {
+    const s = surface();
+    const motions: unknown[] = [];
+    s.ball.place = (_x, _y, _l, _d, m) => void motions.push(m);
+    const view = new LiveView(s);
+    const prev = snap(7, [], { x: 50, y: 34, lift: 0, holder: null });
+    const cur = snap(8, [], { x: 60, y: 34, lift: 2, holder: null });
+    view.draw(prev, cur, 0.5);
+    const m = motions[0] as { dx: number; dy: number; t: number };
+    expect(m.t).toBeCloseTo(7.5);
+    const a = fieldToWorldPoint(50, 50, fieldOffsetX());
+    const b = fieldToWorldPoint(60, 50, fieldOffsetX());
+    expect(m.dx).toBeCloseTo(b.x - a.x);
+    expect(m.dy).toBeCloseTo(b.y - a.y - 2 * LIFT_PX_PER_M);
+  });
+
   it('run cadence scales with ground speed and playback speed, within bounds', () => {
     const s = surface();
     const view = new LiveView(s);

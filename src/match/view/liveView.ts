@@ -20,8 +20,15 @@ export interface ActorView {
   setSpriteVisible?(visible: boolean): void;
 }
 
+/** Where the ball is heading on screen, per tick (world px, the climb included), and the tick it is drawn at (fractional): the flying ball turns to its heading and spins by it. */
+export interface BallMotion {
+  dx: number;
+  dy: number;
+  t: number;
+}
+
 export interface BallView {
-  place(x: number, y: number, lift: number, depth: number): void;
+  place(x: number, y: number, lift: number, depth: number, motion?: BallMotion): void;
   setRendered?(visible: boolean): void;
 }
 
@@ -40,6 +47,8 @@ export const LIFT_PX_PER_M = 10;
 function snap(p: { x: number; y: number }): { x: number; y: number } {
   return { x: Math.round(p.x), y: Math.round(p.y) };
 }
+/** Ticks over which the ball's ±4 px hand offset fades out after a release (the loose ball starts in the hand). */
+const HAND_BLEND_TICKS = 2;
 /** Run-cycle rate is 1 at this ground speed (m/s). */
 const CADENCE_SPEED = 7;
 
@@ -48,6 +57,8 @@ export class LiveView {
   /** +1 when increasing x moves right on screen. */
   private readonly screenDir: number;
   private contactState: ContactAnimation | null = null;
+  /** The last few ticks drawn: which hand held the ball (0 when nobody did), to fade the offset after a release. */
+  private readonly held = new Map<number, number>();
 
   constructor(surface: ViewSurface) {
     this.s = surface;
@@ -95,14 +106,27 @@ export class LiveView {
     const bf = toFieldPt({ x: pb.x + (cb.x - pb.x) * a, y: pb.y + (cb.y - pb.y) * a });
     const bw = snap(this.s.fieldToWorld(bf.fx, bf.fy));
     const lift = Math.round((pb.lift + (cb.lift - pb.lift) * a) * LIFT_PX_PER_M);
+    // Heading and flight time for the ball's turn and spin: its screen step this tick, the climb included.
+    const f0 = toFieldPt({ x: pb.x, y: pb.y });
+    const f1 = toFieldPt({ x: cb.x, y: cb.y });
+    const w0 = this.s.fieldToWorld(f0.fx, f0.fy);
+    const w1 = this.s.fieldToWorld(f1.fx, f1.fy);
+    const motion: BallMotion = { dx: w1.x - w0.x, dy: w1.y - w0.y - (cb.lift - pb.lift) * LIFT_PX_PER_M, t: prev.tick + a };
+    // Which hand holds it, remembered per tick: a release hands the offset back over HAND_BLEND_TICKS.
+    for (const s of [prev, cur]) {
+      const hh = s.ball.holder && s.players.find((q) => q.side === s.ball.holder!.side && q.slot === s.ball.holder!.slot);
+      this.held.set(s.tick, hh ? (screenFacing(hh, s === cur ? this.before(prev, hh) : hh, this.screenDir).left ? -4 : 4) : 0);
+    }
+    for (const k of this.held.keys()) if (k < cur.tick - 8 || k > cur.tick + 1) this.held.delete(k);
     if (cb.holder) {
       const h = cur.players.find((q) => q.side === cb.holder!.side && q.slot === cb.holder!.slot);
       const hand = h && screenFacing(h, this.before(prev, h), this.screenDir).left ? -4 : 4;
-      this.s.ball.place(bw.x + hand, bw.y, lift, bw.y + 1.01 + cb.holder.slot * 0.001);
+      this.s.ball.place(bw.x + hand, bw.y, lift, bw.y + 1.01 + cb.holder.slot * 0.001, motion);
       const drawn = layout?.feet.find(p => p.player.side === cb.holder!.side && p.player.slot === cb.holder!.slot);
       this.s.focus?.carrier({ side: cb.holder.side, x: drawn?.x ?? bw.x, y: drawn?.y ?? bw.y });
     } else {
-      this.s.ball.place(bw.x, bw.y, lift, bw.y + 2);
+      const hand = this.handAt(prev.tick) * (1 - a) + this.handAt(cur.tick) * a;
+      this.s.ball.place(bw.x + hand, bw.y, lift, bw.y + 2, motion);
       this.s.focus?.carrier(null);
     }
     // Held balls are painted once in the player's hands (or the shared tackle).
@@ -114,5 +138,16 @@ export class LiveView {
   private before(prev: Snapshot, c: PlayerSnap): PlayerSnap {
     const before = prev.players.find(p => p.side === c.side && p.slot === c.slot);
     return before && before.who === c.who ? before : c;
+  }
+
+  /** The hand offset still on the ball at `tick`: all of it while held and on the release, none HAND_BLEND_TICKS later. */
+  private handAt(tick: number): number {
+    const now = this.held.get(tick);
+    if (now) return now;
+    for (let n = 0; n < HAND_BLEND_TICKS; n++) {
+      const hand = this.held.get(tick - n - 1);
+      if (hand) return hand * (1 - n / HAND_BLEND_TICKS);
+    }
+    return 0;
   }
 }

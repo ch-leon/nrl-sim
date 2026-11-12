@@ -67,6 +67,8 @@ const ZONE_R = bonusZoneGrid(1);
 export const POST_GY = [ZONE_R.y0, ZONE_R.y1] as const;
 export const POST_GX = [TRY_A, TRY_B] as const;
 export const POST_H = 84;
+/** How far (grid tiles, along +gx) a post's shadow falls: the light's direction and slope, which every other shadow on the field follows. */
+export const POST_SHADOW_TILES = 2.6;
 export const CROSSBAR_Z = 30;
 
 // The painted extent: generous margins so the camera never shows the void.
@@ -211,7 +213,7 @@ function zoneMark(gx: number, gy: number): number {
 /** Long thin post shadows thrown toward +gx (light from the top-left). */
 function inPostShadow(gx: number, gy: number): boolean {
   for (const px of POST_GX) {
-    if (gx < px || gx > px + 2.6) continue;
+    if (gx < px || gx > px + POST_SHADOW_TILES) continue;
     for (const py of POST_GY) if (Math.abs(gy - py) < 0.05) return true;
     // Crossbar shadow: a band offset along +gx at crossbar height.
     if (Math.abs(gx - (px + 0.95)) < 0.05 && gy > POST_GY[0] && gy < POST_GY[1]) return true;

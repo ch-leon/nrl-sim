@@ -63,7 +63,9 @@ import {
   type CrowdSeat,
 } from '../art/match/stadium';
 import { fixtureArtKey, fixtureArtPieces, paintFixtureArt, type FixtureArt } from '../art/match/fixtureArt';
-import { CROSSBAR_AX, CROSSBAR_AY, UPRIGHT_H, UPRIGHT_W } from '../art/match/props';
+import { CROSSBAR_AX, CROSSBAR_AY, LIGHT_DX, LIGHT_DY, SHADOW_LENGTH, UPRIGHT_H, UPRIGHT_W } from '../art/match/props';
+import { lightingForFixture, type Lighting } from '../art/match/atmosphere';
+import type { BallMotion } from '../match/view/liveView';
 import {
   CROWD_BASE,
   CROWD_FW,
@@ -129,8 +131,13 @@ const CLOSEUP_LIMIT_MS = 4000;
 const TAG_LIFT = 39;
 /** How long a tap on a locked call's tile shows what unlocks it, in the tray's footer (ms). */
 const LOCKED_NOTE_MS = 2000;
-/** Ghost balls trailing a kicked ball. */
-const TRAIL_LEN = 5;
+/** A flying ball's shadow is half its size this many px of height up. */
+const BALL_SHADOW_REACH = 90;
+/** The ball's wobble about its heading (radians) and its rate (radians per tick): a spiral kick's precession. */
+const BALL_WOBBLE = 0.35;
+const BALL_WOBBLE_RATE = 1.3;
+/** Smallest turn the ball is drawn at (radians). */
+const BALL_TURN_STEP = Math.PI / 12;
 /** The in-match labels (name tag, "Kick-off…") in the HUD's label face (Broadcast Quiet). */
 const MATCH_LABEL_FONT = '"Barlow Condensed", "Arial Narrow", sans-serif';
 /** On screen while a live match waits for its art to be painted or uploaded (N10.5). */
@@ -140,8 +147,6 @@ export const KICK_OFF_TEXT = 'Kick-off…';
 function nextFrame(): Promise<void> {
   return new Promise((resolve) => requestAnimationFrame(() => resolve()));
 }
-/** A flight must rise this high (world px) before it counts as a kick and gets a trail. */
-const TRAIL_MIN_LIFT = 30;
 /** Crowd animation tick (real ms). */
 const CROWD_TICK_MS = 220;
 /** Width (world px) of the team ring under every player (#340); the carrier's ring is 22. */
@@ -157,54 +162,62 @@ export interface MatchSceneData {
   live?: LiveMatchData;
 }
 
-/** The ball sprite + its ground shadow (shown while in the air) + flight trail. */
+/** The ball sprite + its ground shadow (shown while in the air). A kick's one trail is the kick layer's (kickLayer.ts). */
 export class MatchBall implements PlaybackBall {
   readonly sprite: Phaser.GameObjects.Image;
   private readonly shadow: Phaser.GameObjects.Image;
-  private readonly trail: Phaser.GameObjects.Image[] = [];
-  private readonly recent: { x: number; y: number }[] = [];
-  /** This flight has gone high enough to be a kick (trail shown). */
-  private highFlight = false;
   /** Ground position — what the camera follows. */
   gx = 0;
   gy = 0;
 
-  constructor(scene: Phaser.Scene, key: string, shadowKey: string) {
+  /** Half the ball's height: it turns about its middle, so it sits that far above its (bottom) rest point. */
+  private readonly half: number;
+  /** How far the light throws the ball's shadow along the ground per px of height (the day's, dusk's or night's). */
+  private readonly throwX: number;
+  private readonly throwY: number;
+
+  constructor(scene: Phaser.Scene, key: string, shadowKey: string, lighting: Lighting = 'day') {
     this.shadow = scene.add.image(0, 0, shadowKey).setDepth(DEPTH_SHADOW + 1);
-    this.sprite = scene.add.image(0, 0, key).setOrigin(0.5, 1);
-    for (let i = 0; i < TRAIL_LEN; i++) {
-      this.trail.push(scene.add.image(0, 0, key).setOrigin(0.5, 1).setVisible(false));
-    }
+    this.sprite = scene.add.image(0, 0, key).setOrigin(0.5, 0.5);
+    this.half = this.sprite.height / 2;
+    this.throwX = LIGHT_DX * SHADOW_LENGTH[lighting];
+    this.throwY = LIGHT_DY * SHADOW_LENGTH[lighting];
   }
 
-  place(x: number, y: number, lift: number, depth: number): void {
+  place(x: number, y: number, lift: number, depth: number, motion?: BallMotion): void {
     this.gx = x;
     this.gy = y;
     const sy = y - lift + 2;
-    this.sprite.setPosition(x, sy).setDepth(depth);
-    this.shadow.setPosition(x, y).setVisible(lift > 3);
-    // Short trail while a KICK is in the air: fading ghosts of its last spots.
-    // Passes stay low and short; a trail on them just reads as blur (BAK-207).
-    if (lift <= 3) this.highFlight = false;
-    else if (lift > TRAIL_MIN_LIFT) this.highFlight = true;
-    const flying = lift > 3 && this.highFlight;
-    const last = this.recent[this.recent.length - 1];
-    if (!flying || (last && Math.hypot(x - last.x, sy - last.y) > 400)) this.recent.length = 0;
-    if (flying && (!last || Math.hypot(x - last.x, sy - last.y) >= 4)) {
-      this.recent.push({ x, y: sy });
-      if (this.recent.length > TRAIL_LEN) this.recent.shift();
+    this.sprite.setPosition(x, sy - this.half).setDepth(depth);
+    this.turn(motion);
+    // The shadow lies on the ground along the light, shrinking and paling as the ball climbs:
+    // a bomb's closes on its landing spot as it falls.
+    const near = 1 / (1 + lift / BALL_SHADOW_REACH);
+    this.shadow.setPosition(x + lift * this.throwX, y + lift * this.throwY).setScale(near).setAlpha(0.35 + 0.65 * near).setVisible(lift > 3);
+  }
+  /**
+   * Point the ball along its flight and wobble it with the tick (a pure function of the
+   * tick, so pause, seek and replay show the same ball). The ball is painted lit side up:
+   * heading left, it is flipped rather than turned upside down. Slow or still, it settles flat.
+   */
+  private turn(motion?: BallMotion): void {
+    const speed = motion ? Math.hypot(motion.dx, motion.dy) : 0;
+    if (!motion || speed < 0.3) {
+      this.sprite.setRotation(0).setFlipX(false);
+      return;
     }
-    this.trail.forEach((g, i) => {
-      const p = this.recent[this.recent.length - 2 - i];
-      if (!flying || !p) return void g.setVisible(false);
-      g.setPosition(p.x, p.y).setDepth(depth - 0.01).setAlpha(0.5 - i * 0.09).setScale(1 - i * 0.12).setVisible(true);
-    });
+    const left = motion.dx < 0;
+    const live = Math.min(1, speed / 2);
+    const heading = Math.atan2(left ? -motion.dy : motion.dy, Math.abs(motion.dx));
+    const wobble = BALL_WOBBLE * Math.sin(motion.t * BALL_WOBBLE_RATE) * live;
+    // Steps of 15°: a pixel sprite turned by any angle smears.
+    const angle = Math.round(((heading * live) + wobble) / BALL_TURN_STEP) * BALL_TURN_STEP;
+    this.sprite.setRotation(angle).setFlipX(left);
   }
   setRendered(visible: boolean): void {
     this.sprite.setVisible(visible);
-    if (!visible) { this.shadow.setVisible(false); for (const trail of this.trail) trail.setVisible(false); }
+    if (!visible) this.shadow.setVisible(false);
   }
-
 }
 
 /**
@@ -368,7 +381,11 @@ export class MatchScene extends Phaser.Scene {
     // Static stadium layers.
     this.art.layer(art.bg, DEPTH_BG);
     this.art.layer(art.fg, DEPTH_FG);
-    const props = this.art.props('match', kits.home);
+    // The fixture's light sets how long the shadows fall (the same choice the atmosphere makes).
+    let season = 1;
+    try { season = getState().season; } catch { /* the lab has no save */ }
+    const lighting = lightingForFixture(this.fixture, season);
+    const props = this.art.props('match', kits.home, lighting);
     this.spawnPosts(props.upright, props.crossbar);
     this.spawnCrowd(this.art.crowd('match-crowd', art.crowd));
 
@@ -381,7 +398,7 @@ export class MatchScene extends Phaser.Scene {
       this.players.home.push(new MatchActor(this, this.art, this.playerFrames, 'home', i, h?.id ?? h?.name ?? `home/${i}`, props.shadow, kits.rings.home, kits.ringStyles.home));
       this.players.away.push(new MatchActor(this, this.art, this.playerFrames, 'away', i, a?.id ?? a?.name ?? `away/${i}`, props.shadow, kits.rings.away, kits.ringStyles.away));
     }
-    this.ball = new MatchBall(this, props.ball, props.ballShadow);
+    this.ball = new MatchBall(this, props.ball, props.ballShadow, lighting);
     this.markerColors = { home: kits.rings.home, away: kits.rings.away };
     this.marker = this.add.graphics().setVisible(false);
     this.markerSide = null;

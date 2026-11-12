@@ -13,7 +13,7 @@ import {
   shirtForSeat,
   shirtSide,
 } from '../../../src/art/match/crowd';
-import { drawBall, drawCrossbar, drawShadow, drawUpright, UPRIGHT_H } from '../../../src/art/match/props';
+import { drawBall, drawCrossbar, drawPlayerShadow, drawShadow, drawUpright, LIGHT_DX, LIGHT_DY, SHADOW_LENGTH, UPRIGHT_H } from '../../../src/art/match/props';
 import { POST_H } from '../../../src/art/match/stadium';
 import { opaqueBounds } from '../../../src/art/match/players';
 import { drawText, textWidth } from '../../../src/art/match/font';
@@ -152,6 +152,35 @@ describe('props', () => {
     const s = drawShadow(12, 5, 0.3);
     expect(s.opaqueCount()).toBeGreaterThan(30);
     expect(s.get(6, 2).alpha).toBeLessThan(255);
+  });
+
+  it('a player’s shadow falls where the posts’ do, longer at dusk and night than by day, centred on the feet', () => {
+    // The slope of the light is the post's: 2.6 tiles along +gx for 84 px.
+    expect(LIGHT_DY / LIGHT_DX).toBeCloseTo(0.5);
+    expect(SHADOW_LENGTH.dusk).toBeGreaterThan(SHADOW_LENGTH.day);
+    expect(SHADOW_LENGTH.night).toBeGreaterThan(SHADOW_LENGTH.day);
+    const reach = (l: 'day' | 'dusk' | 'night'): number => {
+      const b = drawPlayerShadow(l);
+      let right = 0;
+      let left = 0;
+      let below = 0;
+      let above = 0;
+      for (let y = 0; y < b.h; y++) {
+        for (let x = 0; x < b.w; x++) {
+          if (b.get(x, y).alpha === 0) continue;
+          right = Math.max(right, x + 1 - b.w / 2);
+          left = Math.max(left, b.w / 2 - x);
+          below = Math.max(below, y + 1 - b.h / 2);
+          above = Math.max(above, b.h / 2 - y);
+        }
+      }
+      // Down and to the right of the feet (the buffer's centre), with a foot's width behind them.
+      expect(right).toBeGreaterThan(left);
+      expect(below).toBeGreaterThan(above);
+      return right;
+    };
+    expect(reach('dusk')).toBeGreaterThan(reach('day'));
+    expect(reach('night')).toBeGreaterThan(reach('day'));
   });
 });
 
