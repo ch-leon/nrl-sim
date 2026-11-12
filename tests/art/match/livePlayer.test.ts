@@ -3,7 +3,7 @@ import { ANIM_ORDER, opaqueBounds } from '../../../src/art/match/players';
 import { drawLivePlayer } from '../../../src/art/match/livePlayer';
 import { appearanceFor, castLooks } from '../../../src/art/prototype/player';
 import { buildKit } from '../../../src/art/match/kit';
-import { PlayerFrameCache } from '../../../src/scenes/matchPlayers';
+import { FRAME_CACHE_SIZE, PlayerFrameCache } from '../../../src/scenes/matchPlayers';
 const kit = buildKit(0xccbb22, 0x213344, 'v');
 describe('live match artwork', () => {
   it('supports every live-sim pose with the approved heads and bounded frames', () => {
@@ -19,8 +19,8 @@ describe('live match artwork', () => {
     const picture = { who: 'captain', action: 'carry' as const, frame: 2, facing: 'front' as const, left: false, possession: true };
     const before = cache.get('home', picture);
     expect(cache.get('home', picture)).toBe(before);
-    for (let i = 0; i < 600; i++) cache.get('home', { ...picture, who: `replacement-${i}` });
-    expect(cache.size).toBe(512);
+    for (let i = 0; i < FRAME_CACHE_SIZE + 100; i++) cache.get('home', { ...picture, who: `replacement-${i}` });
+    expect(cache.size).toBe(FRAME_CACHE_SIZE);
     expect(cache.get('home', picture).data).toEqual(before.data);
     cache.clear(); expect(cache.size).toBe(0);
   });

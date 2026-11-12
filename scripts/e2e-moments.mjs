@@ -26,7 +26,7 @@ try {
  };},ref);
  const samples=[['punt',0],['grubber',0],['drop',0],['high',1],['try',6],['try',14],['try',25]];
  for(const [name,offset] of samples){const ref=moments[name];await seek(ref.tick+offset);const first=await inspect(ref);
-  assert.equal(first.who,ref.who);assert.equal(first.separateBall,!first.held);assert.ok(first.cache<=512);
+  assert.equal(first.who,ref.who);assert.equal(first.separateBall,!first.held);assert.ok(first.cache<=768);
   assert.equal(first.y,first.ground-first.lift);assert.equal(first.ring,first.ground);
   if(name==='high')assert.equal(first.lift,6);
   await page.waitForTimeout(150);assert.equal((await inspect(ref)).pixels,first.pixels);
