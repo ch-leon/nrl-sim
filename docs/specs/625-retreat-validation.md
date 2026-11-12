@@ -68,3 +68,26 @@ a comparison rather than promising the old score distribution.
 Build with `npm run build:match-preview`. The build runs the geometry/rules and
 full-match regressions under each explicit compile flag before bundling it.
 No flag retains production rules and PWA behavior. Screenshots remain outside git.
+
+
+## Browser viewing evidence
+
+On the published preview’s source52030527, headless Chromium at844×390 watched
+seed1 at selected×1, with no pause, seek or speed change. Timers use elapsed
+wall time and exclude the automatic half-time break. All three reached full time
+without page errors. This is one seed, not a duration guarantee.
+
+| Field | Half1 watched | Half2 watched | Total watched | Score | Tries |
+|---|---:|---:|---:|---|---:|
+| 100m | 1:57.4 | 2:10.0 | 4:07.4 | 1–0 | 0 |
+| 80m | 2:15.8 | 1:59.7 | 4:15.5 | 4–0 | 1 |
+| 60m | 2:26.7 | 2:49.7 | 5:16.5 | 10–14 | 5 |
+
+The60m example exceeds the five-minute target because of scoring/stoppages and
+play-on after the siren. It is deliberately retained as the same-clock comparison
+for Leon’s choice, rather than quietly reducing just its clock.
+
+WebKit at844×390 also checked all three variant labels and compiled2.5-minute
+rules,44px play/restart/field controls, portrait pause/timer invalidation, and
+a pristine Restart. The comparison page was checked at390×844. Screenshots are
+local/CI artifacts, never committed.
