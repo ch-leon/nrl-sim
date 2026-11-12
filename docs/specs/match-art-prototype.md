@@ -38,6 +38,16 @@ and big-moment animation work follow that release and phone play-test.
   42-row frame with the boots on row 37, repeating or dropping shin rows; the shared
   contact picture lifts each upright man's skeleton the same way (`standTall`).
   All eleven head styles are reachable, about one player in eleven each.
+- A fend (#644) is drawn on the run cycle: the legs stride with the odometer while
+  the near arm locks out straight, palm first, and the ball goes under the far arm.
+  Away from the shared contact picture a tackle and a beaten or tackled man have
+  three beats over the pose's last frames (reach, wrap, drive low; jolt, rock back,
+  regather). The `sleeves` pattern has a trim cuff across the upper arm. From
+  behind, each player shows a 3×5 number (the hoarding digits in
+  `art/match/font.ts`) on a plain panel, painted after the arms so they pass behind
+  the jersey. Nothing in a save carries a jersey number, so `castLooks` gives each
+  man his place on the match's team sheet: starters by slot, the bench after them.
+  Ruck, kick and celebration poses keep the plain back.
   Simulation-tick frame selection keeps pauses and replays consistent. The CPU
   frame cache is capped at 512; each fixture owns one texture per player and one
   contact texture, all freed at scene shutdown.

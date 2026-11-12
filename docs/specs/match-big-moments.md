@@ -24,7 +24,7 @@ Teammates can react differently without inventing a paired interaction.
 - `moments.ts` paints punts, low grubber stabs, drop kicks, high takes, scored
   dives, recovery and individual celebrations. It reuses the approved head
   painter and short arm/leg solvers. Dives rotate the body and face together;
-  turf flecks mark the slide. All images fit the existing 44×40 texture.
+  turf flecks mark the slide. All images fit the 44×42 player texture (#643).
 - The kick sampler uses real start, strike and unlock ticks. Frames before the
   strike keep the ball embedded in the holder's hands; the strike and follow-
   through use the real flying ball. Immediate goal kicks begin at the strike,
@@ -40,9 +40,10 @@ Teammates can react differently without inventing a paired interaction.
 - The try phase identifies the actual scorer and his scoring side. The first
   ten ticks show the dive/grounding; the next ten bridge the sim's change from
   `dive` to `celebrate` with a rise. The scorer then joins the celebration.
-  Teammates choose stable fist-pump, pointing or arms-up reactions from player
-  identity and try time. No extra RNG, invented chest-bump partner or opponent
-  celebration is introduced. The holder keeps the only rendered ball.
+  Teammates choose stable fist-pump, pointing, arms-up or knee-slide (#644)
+  reactions from player identity and try time. No extra RNG, invented chest-bump
+  partner or opponent celebration is introduced: `chestBump` stays drawn but
+  unpicked, as it needs a partner. The holder keeps the only rendered ball.
 
 ## Snapshot contract and compatibility
 

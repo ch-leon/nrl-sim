@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ANIM_ORDER, opaqueBounds } from '../../../src/art/match/players';
 import { drawLivePlayer } from '../../../src/art/match/livePlayer';
-import { appearanceFor } from '../../../src/art/prototype/player';
+import { appearanceFor, castLooks } from '../../../src/art/prototype/player';
 import { buildKit } from '../../../src/art/match/kit';
 import { PlayerFrameCache } from '../../../src/scenes/matchPlayers';
 const kit = buildKit(0xccbb22, 0x213344, 'v');
@@ -70,5 +70,48 @@ describe('live match artwork', () => {
     const step = cache.get('home', { ...picture, strideFrame: 2 });
     expect(step.data).not.toEqual(first.data);
     expect(cache.get('home', picture)).toBe(first);
+  });
+  it('fends on the run: the legs keep striding under the straight arm (#644)', () => {
+    const look = appearanceFor('same-player');
+    const legs = (p: ReturnType<typeof drawLivePlayer>) => Array.from(p.data.subarray(p.w * 4 * 30)).join();
+    for (const facing of ['front', 'back'] as const) for (const f of [2, 4]) {
+      const strides = [0, 1, 2, 3, 4, 5].map(g => drawLivePlayer(look, kit, 'fend', f, facing, true, g));
+      expect(new Set(strides.map(legs)).size).toBe(6);
+      // The legs are the run cycle's; the arm is not the carry's tuck.
+      for (let g = 0; g < 6; g++) {
+        expect(legs(strides[g]!)).not.toBe(legs(drawLivePlayer(look, kit, 'fend', f, facing, true, (g + 3) % 6)));
+        expect(strides[g]!.data).not.toEqual(drawLivePlayer(look, kit, 'carry', g, facing, true, g).data);
+      }
+    }
+  });
+  it('gives the tackle and the beaten man a start, a middle and an end (#644)', () => {
+    const look = appearanceFor('same-player');
+    for (const action of ['tackle', 'tackled'] as const) for (const facing of ['front', 'back'] as const) {
+      const beats = [0, 2, 4].map(f => Array.from(drawLivePlayer(look, kit, action, f, facing, false).data).join());
+      expect(new Set(beats).size).toBe(3);
+      expect(drawLivePlayer(look, kit, action, 0, facing, false).data).toEqual(drawLivePlayer(look, kit, action, 1, facing, false).data);
+    }
+  });
+  it('shows a 3×5 back number from the team sheet and real sleeve cuffs (#644)', () => {
+    const look = castLooks([{ roster: [{ id: 'p-9', name: 'Nine', position: 'hooker' }, { id: 'p-13', name: 'Lock', position: 'lock' }] }]);
+    const sleeves = buildKit(0x1d2b5c, 0xe6b632, 'sleeves');
+    const count = (p: ReturnType<typeof drawLivePlayer>, colour: number) => {
+      let n = 0;
+      for (let i = 0; i < p.data.length; i += 4) if (p.data[i + 3] && (p.data[i]! << 16 | p.data[i + 1]! << 8 | p.data[i + 2]!) === colour) n++;
+      return n;
+    };
+    const plainKit = { ...kit, pattern: 'plain' as const };
+    const { number: _, ...unnumbered } = look('p-13');
+    const back = drawLivePlayer(look('p-13'), plainKit, 'idle', 0, 'back', false);
+    const bare = drawLivePlayer(unnumbered, plainKit, 'idle', 0, 'back', false);
+    // Second on the sheet wears 2: all eleven lit pixels of the glyph, in trim on a plain panel.
+    expect(look('p-13').number).toBe(2);
+    expect(count(back, kit.trim) - count(bare, kit.trim)).toBe(11);
+    expect(drawLivePlayer(look('p-9'), plainKit, 'idle', 0, 'back', false).data).not.toEqual(back.data);
+    expect(drawLivePlayer(look('p-13'), kit, 'idle', 0, 'front', false).data).toEqual(drawLivePlayer(unnumbered, kit, 'idle', 0, 'front', false).data);
+    for (const action of ['idle', 'run', 'carry', 'fend'] as const) {
+      const plain = drawLivePlayer(look('p-9'), { ...sleeves, pattern: 'plain' }, action, 1, 'front', true, 1);
+      expect(count(drawLivePlayer(look('p-9'), sleeves, action, 1, 'front', true, 1), sleeves.trim) - count(plain, sleeves.trim)).toBeGreaterThanOrEqual(6);
+    }
   });
 });

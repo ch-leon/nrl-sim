@@ -4,11 +4,12 @@ import { PixelBuffer, shade } from '../pixel';
 import { LOOKS, lookForPlayer } from '../match/players';
 import { hashString, OUTLINE, type Kit } from '../match/kit';
 import { drawHead, HEAD_OPTIONS, type Head, type Facing } from './head';
+import { drawText, textWidth } from '../match/font';
 import type { Position } from '../../core/state';
 export { HEAD_OPTIONS, type Head, type Facing } from './head';
 
 export type Build = 'lean' | 'athletic' | 'stocky';
-export type Action = 'idle' | 'run' | 'carry' | 'pass' | 'catch' | 'brace' | 'wrap' | 'ground' | 'ptb';
+export type Action = 'idle' | 'run' | 'carry' | 'pass' | 'catch' | 'brace' | 'wrap' | 'ground' | 'ptb' | 'fend';
 export interface Appearance {
   skin: number;
   hair: number;
@@ -19,6 +20,8 @@ export interface Appearance {
   boots: number;
   /** Rows taller (+) or shorter (−) than the approved figure, −2…2: the shins carry it. */
   stature: number;
+  /** The number on his back in this match (castLooks: his place on the team sheet); none outside a match. */
+  number?: number;
 }
 export const WIDTH = 44;
 /** The frame: two spare rows above the approved 40-row figure leave the tallest man his head. */
@@ -93,12 +96,17 @@ export function appearanceFor(id: string, position?: Position): Appearance {
 
 /** One match's cast: who (squad id, or name for a generated rival) → his look, by his own position. */
 export function castLooks(sheets: readonly { roster?: readonly CastEntry[]; bench?: readonly CastEntry[] }[]): (who: string) => Appearance {
-  const positions = new Map<string, Position>();
-  for (const sheet of sheets) for (const entry of [...sheet.roster ?? [], ...sheet.bench ?? []]) positions.set(entry.id ?? entry.name, entry.position);
+  // Nothing in a save carries a jersey number: starters wear their slot's number, the bench follows on.
+  const cast = new Map<string, { position: Position; number: number }>();
+  for (const sheet of sheets) [...sheet.roster ?? [], ...sheet.bench ?? []].forEach((entry, i) => cast.set(entry.id ?? entry.name, { position: entry.position, number: i + 1 }));
   const looks = new Map<string, Appearance>();
   return who => {
     let look = looks.get(who);
-    if (!look) { look = appearanceFor(who, positions.get(who)); looks.set(who, look); }
+    if (!look) {
+      const entry = cast.get(who);
+      look = { ...appearanceFor(who, entry?.position), ...(entry ? { number: entry.number } : {}) };
+      looks.set(who, look);
+    }
     return look;
   };
 }
@@ -164,17 +172,20 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action, fra
     return stand(b);
   }
 
-  const running = strideFrame !== -1 && (action === 'run' || action === 'carry' || action === 'catch' || (action === 'pass' && strideFrame !== undefined));
+  const running = strideFrame !== -1 && (action === 'run' || action === 'carry' || action === 'catch' || ((action === 'pass' || action === 'fend') && strideFrame !== undefined));
   const gait = strideFrame === undefined || strideFrame < 0 ? f : strideFrame % 6;
   const jog = running && strideFrame !== undefined && strideFrame >= 6;
   const legs = jog ? JOG_LEG : RUN_LEG;
-  // Arms pump with the legs except while the hands are busy catching or passing.
-  const swing = running && (action === 'run' || action === 'carry' || (strideFrame !== undefined && f === 5)) ? ARM_SWING[gait]! * (jog ? .5 : 1) : 0;
-  const crouch = action === 'brace' || action === 'wrap' ? 3 : action === 'ptb' ? [6, 6, 3, 1, 0, 0][f]! : 0;
+  // Arms pump with the legs except while the hands are busy catching, passing or fending.
+  const swing = running && (action === 'run' || action === 'carry' || (strideFrame !== undefined && f === 5 && action !== 'fend')) ? ARM_SWING[gait]! * (jog ? .5 : 1) : 0;
+  // Away from the shared contact picture a tackle and a beaten (or tackled) man each have a start,
+  // a middle and an end over the pose's last frames: reach, wrap, drive low; jolt, rock back, regather.
+  const beat = f < 2 ? 0 : f < 4 ? 1 : 2;
+  const crouch = action === 'wrap' ? [2, 3, 4][beat]! : action === 'brace' ? [3, 4, 1][beat]! : action === 'ptb' ? [6, 6, 3, 1, 0, 0][f]! : 0;
   const bob = running ? (jog ? JOG_BOB : RUN_BOB)[gait]! : 0;
   // Idle breathing: the chest rises a pixel on the in-breath; hips and boots stay put.
   const breath = action === 'idle' && f % 2 === 1 ? 1 : 0;
-  const lean = action === 'brace' || action === 'wrap' ? 3 : running ? 1 : action === 'ptb' ? 2 : 0;
+  const lean = action === 'wrap' ? [4, 3, 4][beat]! : action === 'brace' ? [3, -1, 1][beat]! : action === 'fend' ? 2 : running ? 1 : action === 'ptb' ? 2 : 0;
   const hipY = 27 + crouch + bob;
   const shoulderY = 20 + crouch + bob - breath;
   const left = CENTRE - Math.floor(bodyW / 2) + lean;
@@ -197,6 +208,8 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action, fra
     line(18, 30 + bob, 18, 34, kit.sock);
     b.fillRect(17, 34, 5, 2, shade(a.boots, .7));
   }
+  // The fend's ball goes under the far arm, out of the defender's reach.
+  if (action === 'fend' && possession) heldBall(left - 5, shoulderY + 2);
   if (swing > 0) {
     // Swung forward: the forearm comes up past the chest.
     line(left + 2, shoulderY + 1, left + 3, shoulderY + 5, skinDark, 2);
@@ -236,10 +249,6 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action, fra
   b.fillRect(CENTRE + lean, shoulderY - 2, 3, 3, skinDark);
   b.fillRect(CENTRE + lean - 1, shoulderY, 5, 1, kit.trim);
   b.blit(drawHead(a, kit, facing), CENTRE - 7 + lean, shoulderY - 17);
-  if (facing === 'back') {
-    // Small number block visible from behind, omitted on the front chest.
-    b.fillRect(left + 4, shoulderY + 2, 2, 4, kit.trim);
-  }
 
   const shX = left + bodyW - 2;
   const shY = shoulderY + 2;
@@ -263,8 +272,13 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action, fra
     line(shX - 3, shY + 1, handX, handY + 2, skinDark, 2);
     if (possession) heldBall(handX - 2, handY - 1);
     line(shX, shY, handX, handY, a.skin, 2);
+  } else if (action === 'fend') {
+    // A straight arm, palm out: cocked, locked out at the defender, then drawn back in.
+    handX = shX + [4, 6, 8, 8, 7, 4][f]!; handY = shY + [2, 1, 0, 0, 0, 1][f]!;
+    line(shX, shY, handX, handY, a.skin, 2);
+    b.fillRect(handX, handY - 1, 2, 3, a.skin);
   } else if (action === 'wrap') {
-    handX = shX + 7; handY = shY + 2;
+    handX = shX + [9, 7, 6][beat]!; handY = shY + [1, 2, 3][beat]!;
     line(shX - 4, shY + 1, handX - 1, handY + 4, skinDark, 2);
     line(shX, shY, handX - 2, shY - 1, a.skin);
     line(handX - 2, shY - 1, handX, handY, a.skin, 2);
@@ -282,9 +296,26 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action, fra
     line(handX - 1, handY - 2, handX, handY, a.skin, 2);
     if (action === 'ptb' && possession) heldBall(CENTRE + 2 - (f >= 4 ? 6 : 0), 30);
   }
-  if (kit.pattern === 'sleeves') b.fillRect(shX, shY - 1, 3, 3, kit.trim);
-  b.fillRect(shX, shY - 1, 3, 2, kit.pattern === 'sleeves' ? kit.trim : kit.jerseyShade);
+  b.fillRect(shX, shY - 1, 3, 2, kit.jerseyShade);
+  if (kit.pattern === 'sleeves') {
+    // A trim cuff across the upper arm, wherever the arm points.
+    const dx = handX - shX; const dy = handY - shY;
+    if (Math.abs(dx) > Math.abs(dy)) b.fillRect(shX + Math.sign(dx) * 2 + 1, shY - 1, 2, 3, kit.trim);
+    else b.fillRect(shX + Math.round(dx / Math.max(1, Math.abs(dy)) * 2), shY + 1, 3, 2, kit.trim);
+    b.fillRect(shX, shY - 1, 3, 1, kit.trim);
+  }
   if (a.tape) b.fillRect(handX, handY - 1, 2, 2, 0xf6edda);
+  if (facing === 'back' && a.number !== undefined) {
+    // The 3×5 hoarding digits, centred on the back; omitted on the front chest. Painted last:
+    // from behind the arms and a tucked ball pass behind the jersey, so they never cover it.
+    const digits = String(a.number);
+    const w = textWidth(digits);
+    const x0 = left + Math.floor((bodyW - w) / 2);
+    // A plain panel under the digits keeps them off hoops, stripes and the V.
+    const panel = Math.max(left, x0 - 1);
+    b.fillRect(panel, shoulderY + 1, Math.min(left + bodyW, x0 + w + 1) - panel, 5, kit.jersey);
+    drawText(digits, (x, y) => b.set(x0 + x, shoulderY + 1 + y, kit.trim));
+  }
   b.outline(OUTLINE);
   return stand(b, a.stature);
 }

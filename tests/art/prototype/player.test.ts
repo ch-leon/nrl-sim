@@ -31,11 +31,15 @@ describe('prototype appearance compatibility', () => {
     const squad = ids.map((id, i) => ({ id, name: `Name ${i}`, position: positions[i % 4]! }));
     const home = castLooks([{ roster: squad.slice(0, 150), bench: squad.slice(150) }]);
     const away = castLooks([{ roster: [] }, { roster: squad }]);
-    expect(JSON.stringify(ids.map(home))).toBe(snapshot);
-    expect(JSON.stringify(ids.map(away))).toBe(snapshot);
+    const look = ({ number: _, ...rest }: ReturnType<typeof home>) => rest;
+    expect(JSON.stringify(ids.map(id => look(home(id))))).toBe(snapshot);
+    expect(JSON.stringify(ids.map(id => look(away(id))))).toBe(snapshot);
+    // The back number is the match's team-sheet place: starters first, then the bench.
+    expect([home(ids[0]!).number, home(ids[149]!).number, home(ids[150]!).number]).toEqual([1, 150, 151]);
+    expect(appearanceFor(ids[0]!).number).toBeUndefined();
     expect(JSON.stringify(ids.map((id, i) => appearanceFor(id, positions[i % 4])))).toBe(snapshot);
     // A generated rival is keyed by name, as the live sim keys him.
-    expect(castLooks([{ roster: [{ name: 'Rival Prop', position: 'prop' }] }])('Rival Prop')).toEqual(appearanceFor('Rival Prop', 'prop'));
+    expect(castLooks([{ roster: [{ name: 'Rival Prop', position: 'prop' }] }])('Rival Prop')).toEqual({ ...appearanceFor('Rival Prop', 'prop'), number: 1 });
   });
   it('builds by position: props and locks stocky, outside backs lean, forwards taller than halves', () => {
     const ids = Array.from({ length: 200 }, (_, i) => `squad-${i}`);

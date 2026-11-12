@@ -77,12 +77,13 @@ export function playerPicture(p: PlayerSnap, previous: PlayerSnap, tick: number,
     action = tryAge < 10 ? 'dive' : 'tryRise';
     frame = clampFrame((tryAge % 10) * 6 / 10);
   } else if (p.celebrationTick !== undefined && tick >= p.celebrationTick && (p.pose === 'celebrate' || (p.pose === 'dive' && tryAge >= 20))) {
-    // Stable personal reactions, only after the engine has awarded the try.
-    action = (['fistPump', 'point', 'celebrate'] as const)[hashString(`${p.who ?? p.slot}/${p.celebrationTick}`) % 3]!;
+    // Stable personal reactions, only after the engine has awarded the try. chestBump stays out:
+    // it needs a partner, and big moments invent no paired interaction (match-big-moments.md).
+    action = (['fistPump', 'point', 'celebrate', 'kneeSlide'] as const)[hashString(`${p.who ?? p.slot}/${p.celebrationTick}`) % 4]!;
     frame = Math.floor((tick - p.celebrationTick) / 3 + p.slot) % 6;
   }
   const lift = MOMENT_ACTIONS.includes(action as MomentAction) ? momentLift(action as MomentAction, frame) : 0;
-  const strideFrame = ['run', 'carry', 'catch', 'pass', 'airCatch'].includes(action)
+  const strideFrame = ['run', 'carry', 'catch', 'pass', 'airCatch', 'fend'].includes(action)
     ? stride : undefined;
   return { who: p.who ?? `${p.side}/${p.slot}`, action, frame, lift, ...(strideFrame === undefined ? {} : { strideFrame }), ...screenFacing(p, previous, screenDir), possession };
 }
