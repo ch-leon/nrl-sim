@@ -600,7 +600,8 @@ export const LEAGUE_CSS = `
 /* The finals cut-off: a dashed line under the last place that makes it. */
 .nrl-ladder-table tr[data-cut] td { border-bottom: 1px dashed var(--nrl-accent); }
 .nrl-ladder-rival { cursor: pointer; }
-.nrl-ladder-rival:hover td { background: rgba(255, 255, 255, 0.04); }
+@media (hover: hover) and (pointer: fine) { .nrl-ladder-rival:hover td { background: rgba(255, 255, 255, 0.04); } }
+.nrl-ladder-rival:active td { background: rgba(255, 255, 255, 0.04); }
 .nrl-ladder-club {
   pointer-events: auto;
   font: inherit;
@@ -661,7 +662,8 @@ export const LEAGUE_CSS = `
   box-sizing: border-box;
 }
 button.nrl-fixture-row { pointer-events: auto; cursor: pointer; width: 100%; box-shadow: inset 0 0 0 1px rgba(244, 208, 63, 0.35); }
-button.nrl-fixture-row:hover { background: #1a2550; }
+@media (hover: hover) and (pointer: fine) { button.nrl-fixture-row:hover { background: #1a2550; } }
+button.nrl-fixture-row:active { background: #1a2550; }
 button.nrl-fixture-row:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 1px; }
 @media (pointer: coarse) { button.nrl-fixture-row { height: 44px; } }
 .nrl-fixture-rd { width: 24px; flex: 0 0 auto; font-family: var(--nrl-f-label); font-size: 0.875rem; font-weight: 600; color: var(--nrl-muted); }

@@ -35,6 +35,14 @@ describe('minifyCss', () => {
     expect(minifyCss('@media (prefers-reduced-motion: reduce) { :root { --nrl-rise: 0px; --nrl-pop: 1; } }'))
       .toBe('@media (prefers-reduced-motion:reduce){:root{--nrl-rise:0px;--nrl-pop:1}}');
   });
+  it('keeps the press rules whole (#604): a hover gated in its media block, a :has() on a child pressed', () => {
+    expect(minifyCss('@media (hover: hover) and (pointer: fine) { .a > .b:hover:not(:disabled) { background: #283669; } }'))
+      .toBe('@media (hover:hover) and (pointer:fine){.a>.b:hover:not(:disabled){background:#283669}}');
+    expect(minifyCss('.g:has(> .a:active:not(:disabled)) {\n  transform: scale(var(--nrl-press));\n}'))
+      .toBe('.g:has(>.a:active:not(:disabled)){transform:scale(var(--nrl-press))}');
+    expect(minifyCss('#ui-root :is(button, [role="button"]) { -webkit-user-select: none; }'))
+      .toBe('#ui-root :is(button,[role="button"]){-webkit-user-select:none}');
+  });
   it('keeps media queries and !important readable to a browser', () => {
     expect(minifyCss('@media (max-height: 500px) and (min-width: 600px) {\n  .a { b: c !important; }\n}'))
       .toBe('@media (max-height:500px) and (min-width:600px){.a{b:c !important}}');

@@ -102,7 +102,8 @@ const RIVAL_CSS = `
 .nrl-rival-table th:nth-child(n+2):nth-child(-n+4), .nrl-rival-table td:nth-child(n+2):nth-child(-n+4) { width: 48px; }
 .nrl-rival-table td { height: 34px; }
 .nrl-rival-table tbody tr.nrl-rival-row { cursor: pointer; }
-.nrl-rival-table tbody tr.nrl-rival-row:hover { background: rgba(255, 255, 255, 0.04); }
+@media (hover: hover) and (pointer: fine) { .nrl-rival-table tbody tr.nrl-rival-row:hover { background: rgba(255, 255, 255, 0.04); } }
+.nrl-rival-table tbody tr.nrl-rival-row:active { background: rgba(255, 255, 255, 0.04); }
 .nrl-rival-table tbody tr.nrl-rival-row:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: -2px; }
 @media (pointer: coarse) { .nrl-rival-table td { height: 44px; } }
 .nrl-rival-name { font-weight: 500; }

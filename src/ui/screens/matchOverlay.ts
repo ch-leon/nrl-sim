@@ -1866,7 +1866,7 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
   position: fixed; top: calc(12px + var(--nrl-safe-t)); left: calc(16px + var(--nrl-safe-l)); z-index: 15;
   pointer-events: auto; cursor: pointer; display: flex; flex-direction: column; margin: 0; padding: 0; border: 0;
   border-radius: 8px; overflow: hidden; background: var(--nrl-navy); color: var(--nrl-text); box-shadow: var(--nrl-shadow-chip);
-  font: inherit; text-align: left; -webkit-tap-highlight-color: transparent;
+  font: inherit; text-align: left;
 }
 .nrl-mo-scoreboard:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
 .nrl-mo-scoreboard[aria-expanded="true"]::after { content: ''; position: absolute; inset: 0; border-radius: 8px; box-shadow: inset 0 0 0 2px var(--nrl-accent); pointer-events: none; }
@@ -1939,6 +1939,8 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
   border-radius: 8px; overflow: hidden; background: rgba(14, 22, 48, 0.95); color: var(--nrl-text); box-shadow: var(--nrl-shadow-chip);
   font: inherit; text-align: left; cursor: pointer; pointer-events: auto;
 }
+/* Pressed, it shrinks about where it is centred (#604): the scale goes after the centring, not instead of it. */
+.nrl-mo-strip:active { transform: translateX(-50%) scale(var(--nrl-press)); transition: transform var(--nrl-dur-press) var(--nrl-ease-out); }
 .nrl-mo-strip:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
 .nrl-mo-strip-live { display: flex; align-items: center; padding: 0 10px; background: var(--nrl-accent); color: var(--nrl-on-accent); font-family: var(--nrl-f-label); font-size: 0.875rem; font-weight: 700; letter-spacing: 0.06em; }
 /* #433: a long typed name wraps onto a second line (the strip grows up, clear of the
@@ -1971,7 +1973,7 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 .nrl-mo-full-x::after { content: ''; position: absolute; inset: -4px; }
 .nrl-mo-filters { display: flex; gap: 4px; }
 .nrl-btn.nrl-mo-filter { position: relative; height: 30px; min-height: 30px; padding: 0 10px; border-radius: 6px; background: var(--nrl-raised); font-size: 0.8125rem; font-weight: 600; }
-.nrl-btn.nrl-mo-filter[data-active], .nrl-btn.nrl-mo-filter[data-active]:hover:not(:disabled) { background: var(--nrl-accent); color: var(--nrl-on-accent); font-weight: 700; }
+.nrl-btn.nrl-mo-filter[data-active], .nrl-btn.nrl-mo-filter[data-active]:hover:not(:disabled), .nrl-btn.nrl-mo-filter[data-active]:active:not(:disabled) { background: var(--nrl-accent); color: var(--nrl-on-accent); font-weight: 700; }
 .nrl-mo-filter::after { content: ''; position: absolute; inset: -7px 0; } /* a 44px hit area */
 .nrl-mo-feed { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; }
 .nrl-mo-line { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 8px; padding: 5px 0; border-top: 1px solid var(--nrl-button); font-size: 0.75rem; line-height: 1.35; }
@@ -1994,7 +1996,7 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 .nrl-mo-bar-gap { flex: 1 1 auto; }
 .nrl-mo-log-toggle, .nrl-mo-coach {
   pointer-events: auto; height: 56px; display: flex; align-items: center; margin: 0; border: 0; border-radius: 14px;
-  background: var(--nrl-navy); color: var(--nrl-text); box-shadow: var(--nrl-shadow-chip); cursor: pointer; -webkit-tap-highlight-color: transparent;
+  background: var(--nrl-navy); color: var(--nrl-text); box-shadow: var(--nrl-shadow-chip); cursor: pointer;
   font-family: var(--nrl-f-label); font-weight: 700; letter-spacing: 0.04em; white-space: nowrap;
 }
 .nrl-mo-log-toggle:focus-visible, .nrl-mo-coach:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
@@ -2056,12 +2058,11 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
   font-family: var(--nrl-f-body); font-size: 0.75rem; font-weight: 400; line-height: 1.2; color: var(--nrl-text-2);
 }
 /* The call just made (#608): the badge's "on" colours, at once, for the moment before the tray shuts. */
-.nrl-btn.nrl-mo-tray-call[data-called], .nrl-btn.nrl-mo-tray-call[data-called]:hover { background: var(--nrl-accent); color: var(--nrl-on-accent); transition-property: transform; }
+.nrl-btn.nrl-mo-tray-call[data-called], .nrl-btn.nrl-mo-tray-call[data-called]:hover, .nrl-btn.nrl-mo-tray-call[data-called]:active { background: var(--nrl-accent); color: var(--nrl-on-accent); transition-property: transform; }
 .nrl-mo-tray-call[data-called] span { color: var(--nrl-on-accent); }
 /* A locked call (the Coach's Office hasn't unlocked it): greyed, outlined rather than filled, its level as a
    small tag. aria-disabled, not disabled, so a tap can say what unlocks it; it never makes the call. */
-.nrl-btn.nrl-mo-tray-call.nrl-mo-tray-locked { background: transparent; box-shadow: inset 0 0 0 1px var(--nrl-line); color: var(--nrl-muted); cursor: default; }
-.nrl-btn.nrl-mo-tray-call.nrl-mo-tray-locked:hover { background: transparent; }
+.nrl-btn.nrl-mo-tray-call.nrl-mo-tray-locked, .nrl-btn.nrl-mo-tray-call.nrl-mo-tray-locked:hover, .nrl-btn.nrl-mo-tray-call.nrl-mo-tray-locked:active { background: transparent; box-shadow: inset 0 0 0 1px var(--nrl-line); color: var(--nrl-muted); cursor: default; }
 .nrl-mo-tray-locked span { color: var(--nrl-muted); font-family: var(--nrl-f-label); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; font-size: 0.6875rem; }
 /* #432: at Large and Larger the tray grows wider, so each caption still fits on one
    line inside the 44px tile (Normal is untouched). A short phone is already three
@@ -2147,10 +2148,12 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 .nrl-mo-controls .nrl-btn {
   width: 44px; min-width: 44px; height: 44px; min-height: 44px; padding: 0; border-radius: 22px; background: transparent;
   color: var(--nrl-text-2); font-size: 1.0625rem; font-weight: 700; letter-spacing: 0; text-transform: none;
+  transition-property: none; /* #604: the yellow circle and its digit change in the same frame */
 }
-.nrl-mo-controls .nrl-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.06); }
+@media (hover: hover) and (pointer: fine) { .nrl-mo-controls .nrl-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.06); } }
+.nrl-mo-controls .nrl-btn:active:not(:disabled) { background: rgba(255, 255, 255, 0.06); transition-property: transform; }
 .nrl-mo-controls .nrl-btn.nrl-mo-pause { width: 44px; color: var(--nrl-text); font-size: 0.8125rem; }
-.nrl-mo-controls .nrl-btn.nrl-mo-speed[aria-pressed="true"], .nrl-mo-controls .nrl-btn.nrl-mo-speed[aria-pressed="true"]:hover:not(:disabled) { background: var(--nrl-accent); color: var(--nrl-on-accent); }
+.nrl-mo-controls .nrl-btn.nrl-mo-speed[aria-pressed="true"], .nrl-mo-controls .nrl-btn.nrl-mo-speed[aria-pressed="true"]:hover:not(:disabled), .nrl-mo-controls .nrl-btn.nrl-mo-speed[aria-pressed="true"]:active:not(:disabled) { background: var(--nrl-accent); color: var(--nrl-on-accent); }
 .nrl-mo-pill-div { width: 1px; height: 28px; margin: 0 4px; background: var(--nrl-line); }
 .nrl-mo-controls .nrl-btn.nrl-mo-skip { width: auto; padding: 0 12px; color: var(--nrl-text); letter-spacing: 0.06em; text-transform: uppercase; }
 .nrl-mo-controls .nrl-btn.nrl-mo-skip[data-armed] { color: var(--nrl-accent); }
@@ -2208,7 +2211,7 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 @keyframes nrl-mo-in-left { from { opacity: 0; transform: translateX(calc(var(--nrl-rise) * -1)); } to { opacity: 1; transform: none; } }
 @keyframes nrl-mo-in-right { from { opacity: 0; transform: translateX(var(--nrl-rise)); } to { opacity: 1; transform: none; } }
 /* Replay (N15.5, #348 M5): a small chip under the banner, its seconds left beside it. Never
-   centred with a transform: the pressed nudge (.nrl-btn:active) would replace it. */
+   centred with a transform: the press's scale (.nrl-btn:active, #604) would replace it. */
 .nrl-mo-replay, .nrl-mo-replay-tag {
   position: fixed; left: calc(16px + var(--nrl-safe-l)); top: calc(var(--nrl-mo-board, 60px) + 70px);
   z-index: 26; pointer-events: auto; min-height: 44px;

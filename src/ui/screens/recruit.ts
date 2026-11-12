@@ -84,7 +84,8 @@ const SCREEN_CSS = `
   .nrl-grid-head { height: 20px; }
 }
 .nrl-row.nrl-card-open { cursor: pointer; }
-.nrl-row.nrl-card-open:hover { background: rgba(255, 255, 255, 0.04); }
+@media (hover: hover) and (pointer: fine) { .nrl-row.nrl-card-open:hover { background: rgba(255, 255, 255, 0.04); } }
+.nrl-row.nrl-card-open:active { background: rgba(255, 255, 255, 0.04); }
 .nrl-card-open:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: -2px; }
 /* Tappable rows are a finger tall on a touch screen. */
 @media (pointer: coarse) { .nrl-row.nrl-card-open { min-height: 44px; } }

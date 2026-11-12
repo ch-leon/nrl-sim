@@ -77,7 +77,7 @@ describe('the table at every width (#612)', () => {
 
   it('leaves the armed look to the shared button class', () => {
     expect(FINANCE_CSS).not.toContain('armed');
-    expect(CSS).toContain(`.nrl-btn.${ARMED_CLASS}, .nrl-btn.${ARMED_CLASS}:hover:not(:disabled) { background: var(--nrl-neg); color: var(--nrl-on-accent); }`);
+    expect(CSS).toContain(`.nrl-btn.${ARMED_CLASS}, .nrl-btn.${ARMED_CLASS}:hover:not(:disabled), .nrl-btn.${ARMED_CLASS}:active:not(:disabled) { background: var(--nrl-neg); color: var(--nrl-on-accent); }`);
   });
 });
 

@@ -349,8 +349,8 @@ export const BUILD_CSS = `
   box-sizing: border-box;
   transition: background-color var(--nrl-dur-press) ease;
 }
-.nrl-build-row:hover:not(.nrl-build-row-disabled) { background: #22305c; }
-.nrl-build-row:active:not(.nrl-build-row-disabled) { transform: translateY(1px); }
+@media (hover: hover) and (pointer: fine) { .nrl-build-row:hover:not(.nrl-build-row-disabled) { background: #22305c; } }
+.nrl-build-row:active:not(.nrl-build-row-disabled) { background: #22305c; }
 .nrl-build-row:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
 .nrl-build-row-disabled { cursor: default; opacity: 0.55; }
 .nrl-build-top { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }

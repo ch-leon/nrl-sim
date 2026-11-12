@@ -120,7 +120,7 @@ describe('Replay try chip (#348 M5, the try-replay e2e)', () => {
 
 describe('match screen readability (#348, Broadcast Quiet 3m)', () => {
   it('M3: the speed playing now is a yellow circle in the pill', () => {
-    expect(rule(OVERLAY_CSS, '.nrl-mo-controls .nrl-btn.nrl-mo-speed[aria-pressed="true"], .nrl-mo-controls .nrl-btn.nrl-mo-speed[aria-pressed="true"]:hover:not(:disabled)')).toContain('background: var(--nrl-accent)');
+    expect(rule(OVERLAY_CSS, '.nrl-mo-controls .nrl-btn.nrl-mo-speed[aria-pressed="true"], .nrl-mo-controls .nrl-btn.nrl-mo-speed[aria-pressed="true"]:hover:not(:disabled), .nrl-mo-controls .nrl-btn.nrl-mo-speed[aria-pressed="true"]:active:not(:disabled)')).toContain('background: var(--nrl-accent)');
   });
   it('M3: SKIP in the pill takes two taps; Save & exit stays in the pause sheet', () => {
     const scene = readFileSync('src/scenes/MatchScene.ts', 'utf8');
@@ -193,7 +193,7 @@ describe('match screen readability (#348, Broadcast Quiet 3m)', () => {
     expect(call.indexOf('pb.call(')).toBeLessThan(call.indexOf('this.shutTrayCalled('));
     expect(call).not.toContain('this.toggleTray(false)');
     // The badge's "on" colours, with no fade: the tile is lit for the whole of the moment.
-    const lit = rule(OVERLAY_CSS, '.nrl-btn.nrl-mo-tray-call[data-called], .nrl-btn.nrl-mo-tray-call[data-called]:hover');
+    const lit = rule(OVERLAY_CSS, '.nrl-btn.nrl-mo-tray-call[data-called], .nrl-btn.nrl-mo-tray-call[data-called]:hover, .nrl-btn.nrl-mo-tray-call[data-called]:active');
     expect(lit).toContain('background: var(--nrl-accent)');
     expect(lit).toContain('color: var(--nrl-on-accent)');
     expect(lit).toContain('transition-property: transform');

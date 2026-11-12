@@ -639,7 +639,35 @@ export function ensureStyles(): void {
   style.id = STYLE_ID;
   style.textContent = CSS;
   document.head.appendChild(style);
+  listenForPress();
 }
+
+let pressListening = false;
+/**
+ * iOS Safari applies :active on a touch only once something listens for touchstart (#604).
+ * One passive listener on the document, from here and from the title, which is up first.
+ */
+export function listenForPress(): void {
+  if (pressListening || typeof document === 'undefined' || typeof document.addEventListener !== 'function') return;
+  pressListening = true;
+  document.addEventListener('touchstart', () => {}, { passive: true });
+}
+
+/** Motion (#597): every entrance and transition in src/ui takes its time, curve and travel from these. */
+const MOTION_TOKENS = `--nrl-dur-press: 120ms;
+  --nrl-dur-fast: 150ms;
+  --nrl-dur-sheet: 180ms;
+  --nrl-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --nrl-ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --nrl-rise: 12px;
+  --nrl-pop: 0.97;
+  --nrl-press: 0.97;`;
+// The one reduced-motion rule (#597): travel and scale go, the fade stays. A keyframe that
+// moves does it by --nrl-rise (calc() for up, left and part-way), so it needs no rule of its own.
+const REDUCED_MOTION = '@media (prefers-reduced-motion: reduce) { :root { --nrl-rise: 0px; --nrl-pop: 1; --nrl-press: 1; } }';
+/** The same tokens for the title, whose sheet is up before this one is injected (#604). */
+export const MOTION_CSS = `:root { ${MOTION_TOKENS} }
+${REDUCED_MOTION}`;
 
 // Broadcast Quiet (docs/specs/ui-broadcast-quiet.md): navy sheets over the
 // grounds, Barlow Condensed caps for labels and buttons, IBM Plex Sans for body
@@ -687,19 +715,9 @@ export const CSS = `
   --nrl-f-label: 'Barlow Condensed', 'Arial Narrow', system-ui, sans-serif;
   --nrl-f-body: 'IBM Plex Sans', system-ui, sans-serif;
   --nrl-f-num: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
-  /* Motion (#597): every entrance and transition in src/ui takes its time, curve and travel from these. */
-  --nrl-dur-press: 120ms;
-  --nrl-dur-fast: 150ms;
-  --nrl-dur-sheet: 180ms;
-  --nrl-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-  --nrl-ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
-  --nrl-rise: 12px;
-  --nrl-pop: 0.97;
-  --nrl-press: 0.97;
+  ${MOTION_TOKENS}
 }
-/* The one reduced-motion rule (#597): travel and scale go, the fade stays. A keyframe that
-   moves does it by --nrl-rise (calc() for up, left and part-way), so it needs no rule of its own. */
-@media (prefers-reduced-motion: reduce) { :root { --nrl-rise: 0px; --nrl-pop: 1; --nrl-press: 1; } }
+${REDUCED_MOTION}
 .nrl-panel, .nrl-btn, .nrl-modal, .nrl-modal-backdrop, .nrl-dock, .nrl-screen {
   font-family: var(--nrl-f-body);
   box-sizing: border-box;
@@ -740,26 +758,53 @@ export const CSS = `
   min-width: 44px;
   line-height: 1.1;
   white-space: nowrap;
+  transition: background-color var(--nrl-dur-press) ease;
+}
+/* ── Press (#604) ─────────────────────────────────────────────────────────
+   A touch has no hover: a tap left :hover on what it touched, so every :hover in src/ui sits
+   in a (hover: hover) and (pointer: fine) block. A press shows under the finger instead, on
+   :active: the control's hover fill, and a button or a small tile shrinks to --nrl-press (1
+   under reduced motion). It eases in and snaps back on release, so a control measured just
+   after a tap is its whole size. Each hover rule below has its :active twin. */
+@media (hover: hover) and (pointer: fine) { .nrl-btn:hover:not(:disabled) { background: #283669; } }
+.nrl-btn:active:not(:disabled) {
+  background: #283669;
+  transform: scale(var(--nrl-press));
   transition: background-color var(--nrl-dur-press) ease, transform var(--nrl-dur-press) var(--nrl-ease-out);
 }
-.nrl-btn:hover:not(:disabled) { background: #283669; }
-.nrl-btn:active:not(:disabled) { transform: translateY(1px); }
+/* The browser's own tap box goes (the presses above replace it), and a control's label can't be
+   long-press selected, pop a callout or double-tap zoom. Fields, the Guide and News stay selectable. */
+#ui-root, #ui-root * { -webkit-tap-highlight-color: transparent; }
+#ui-root :is(button, [role="button"], summary, .nrl-dock, .nrl-seg, .nrl-toast, .nrl-ladder-rival) {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+}
+/* Tiles and chips that are not .nrl-btn shrink like one; full-width rows only take their fill. */
+:is(.nrl-lineup-tile, .nrl-lineup-play, button.nrl-club-home-row, .nrl-kit-swatch, button.nrl-finance-contracts,
+  button.nrl-dock-statusbox, .nrl-board-chip, .nrl-toast:not(.nrl-toast-action), .nrl-mo-coach, .nrl-mo-log-toggle, .nrl-mo-scoreboard):active {
+  transform: scale(var(--nrl-press));
+  transition: transform var(--nrl-dur-press) var(--nrl-ease-out);
+}
 .nrl-btn:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
 .nrl-btn.nrl-btn-primary { background: var(--nrl-accent); color: var(--nrl-on-accent); }
-.nrl-btn.nrl-btn-primary:hover:not(:disabled) { background: #f7da5e; }
+@media (hover: hover) and (pointer: fine) { .nrl-btn.nrl-btn-primary:hover:not(:disabled) { background: #f7da5e; } }
+.nrl-btn.nrl-btn-primary:active:not(:disabled) { background: #f7da5e; }
 .nrl-btn.nrl-btn-danger { background: var(--nrl-button); color: var(--nrl-neg); }
-.nrl-btn.nrl-btn-danger:hover:not(:disabled) { background: #283669; }
+@media (hover: hover) and (pointer: fine) { .nrl-btn.nrl-btn-danger:hover:not(:disabled) { background: #283669; } }
+.nrl-btn.nrl-btn-danger:active:not(:disabled) { background: #283669; }
 /* Armed (#612): a two-tap Sell or Release asking again is solid red, on every screen that asks. */
-.nrl-btn.nrl-btn-armed, .nrl-btn.nrl-btn-armed:hover:not(:disabled) { background: var(--nrl-neg); color: var(--nrl-on-accent); }
+.nrl-btn.nrl-btn-armed, .nrl-btn.nrl-btn-armed:hover:not(:disabled), .nrl-btn.nrl-btn-armed:active:not(:disabled) { background: var(--nrl-neg); color: var(--nrl-on-accent); }
 /* Disabled stays visible and says why (the reason is the label or the title). */
 .nrl-btn:disabled { cursor: default; opacity: 0.55; }
 .nrl-btn.nrl-btn-primary:disabled { background: var(--nrl-raised); color: var(--nrl-muted); opacity: 1; }
 /* One selected-chip look everywhere (sorts, filters, tabs, presets): yellow, navy text.
-   A touch leaves :hover on the last chip tapped; the selection wins over it. */
-.nrl-btn.nrl-sort-active, .nrl-btn.nrl-sort-active:hover:not(:disabled),
-.nrl-btn[data-active], .nrl-btn[data-active]:hover:not(:disabled),
-.nrl-seg > .nrl-btn[aria-pressed="true"], .nrl-seg > .nrl-btn[aria-pressed="true"]:hover:not(:disabled),
-.nrl-seg > .nrl-btn[aria-selected="true"], .nrl-seg > .nrl-btn[aria-selected="true"]:hover:not(:disabled) {
+   The selection wins over hover (a mouse) and over a press. */
+.nrl-btn.nrl-sort-active, .nrl-btn.nrl-sort-active:hover:not(:disabled), .nrl-btn.nrl-sort-active:active:not(:disabled),
+.nrl-btn[data-active], .nrl-btn[data-active]:hover:not(:disabled), .nrl-btn[data-active]:active:not(:disabled),
+.nrl-seg > .nrl-btn[aria-pressed="true"], .nrl-seg > .nrl-btn[aria-pressed="true"]:hover:not(:disabled), .nrl-seg > .nrl-btn[aria-pressed="true"]:active:not(:disabled),
+.nrl-seg > .nrl-btn[aria-selected="true"], .nrl-seg > .nrl-btn[aria-selected="true"]:hover:not(:disabled), .nrl-seg > .nrl-btn[aria-selected="true"]:active:not(:disabled) {
   background: var(--nrl-accent);
   color: var(--nrl-on-accent);
 }
@@ -794,8 +839,11 @@ export const CSS = `
   font-size: 1rem;
   font-weight: 700;
   letter-spacing: 0.06em;
+  /* #604: the pill and the label change in the same frame (a fading pill left navy text on navy). */
+  transition-property: none;
 }
-.nrl-seg > .nrl-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.06); }
+@media (hover: hover) and (pointer: fine) { .nrl-seg > .nrl-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.06); } }
+.nrl-seg > .nrl-btn:active:not(:disabled) { background: rgba(255, 255, 255, 0.06); transition-property: transform; }
 @media (pointer: coarse) { .nrl-seg > .nrl-btn { min-height: 44px; } }
 /* A small caps label (column heads, section titles). */
 .nrl-label {
@@ -881,10 +929,11 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
   gap: 6px;
   overflow: hidden;
 }
-.nrl-dock-tabs > .nrl-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.05); }
-/* The open sheet's tab (aria-current); a touch leaves :hover on it, the marker wins. */
-.nrl-dock-tabs > .nrl-btn[aria-current="page"], .nrl-dock-tabs > .nrl-btn[aria-current="page"]:hover:not(:disabled),
-.nrl-dock-tabs > .nrl-btn[aria-expanded="true"], .nrl-dock-tabs > .nrl-btn[aria-expanded="true"]:hover:not(:disabled) {
+@media (hover: hover) and (pointer: fine) { .nrl-dock-tabs > .nrl-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.05); } }
+.nrl-dock-tabs > .nrl-btn:active:not(:disabled) { background: rgba(255, 255, 255, 0.05); }
+/* The open sheet's tab (aria-current); the marker wins over hover and a press. */
+.nrl-dock-tabs > .nrl-btn[aria-current="page"], .nrl-dock-tabs > .nrl-btn[aria-current="page"]:hover:not(:disabled), .nrl-dock-tabs > .nrl-btn[aria-current="page"]:active:not(:disabled),
+.nrl-dock-tabs > .nrl-btn[aria-expanded="true"], .nrl-dock-tabs > .nrl-btn[aria-expanded="true"]:hover:not(:disabled), .nrl-dock-tabs > .nrl-btn[aria-expanded="true"]:active:not(:disabled) {
   background: var(--nrl-button);
   color: var(--nrl-accent);
   font-weight: 700;
@@ -920,7 +969,15 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
   background: transparent;
   color: var(--nrl-on-accent);
 }
-.nrl-dock-play-group > .nrl-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.18); }
+@media (hover: hover) and (pointer: fine) { .nrl-dock-play-group > .nrl-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.18); } }
+/* The yellow is the group's, so PLAY WEEK pressed shrinks the whole of it (#604); its buttons only take the fill. */
+.nrl-dock-play-group > .nrl-btn:active:not(:disabled) { background: rgba(255, 255, 255, 0.18); transform: none; }
+.nrl-dock-play-group:has(> .nrl-dock-advance:active:not(:disabled)) {
+  transform: scale(var(--nrl-press));
+  transition: transform var(--nrl-dur-press) var(--nrl-ease-out);
+}
+/* Navy inside the yellow: the accent ring was yellow on yellow, and the group's overflow cut it off. */
+.nrl-dock-play-group > .nrl-btn:focus-visible { outline-color: var(--nrl-on-accent); outline-offset: -4px; }
 .nrl-dock-advance { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: 0 16px; max-width: 15rem; }
 .nrl-dock-advance-label { font-family: var(--nrl-f-label); font-size: 1.1875rem; font-weight: 700; letter-spacing: 0.04em; line-height: 1; white-space: nowrap; }
 /* One line (#344): it may break anywhere, so its narrowest is a letter and PLAY WEEK's narrowest is its
@@ -1096,7 +1153,8 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
   letter-spacing: 0;
   overflow: hidden;
 }
-.nrl-nav-sheet > .nrl-btn:hover:not(:disabled) { background: #22305c; }
+@media (hover: hover) and (pointer: fine) { .nrl-nav-sheet > .nrl-btn:hover:not(:disabled) { background: #22305c; } }
+.nrl-nav-sheet > .nrl-btn:active:not(:disabled) { background: #22305c; }
 .nrl-nav-sheet > .nrl-btn[aria-current="page"] { box-shadow: inset 0 0 0 2px var(--nrl-accent); }
 /* #344: the tab's bar, under an open tile's name too. */
 .nrl-nav-sheet > .nrl-btn[aria-current="page"] .nrl-office-name { position: relative; padding-bottom: 5px; }
@@ -1577,7 +1635,8 @@ body:has(.nrl-update-toast) .nrl-hub-chips { max-width: calc(100vw - 32px - 310p
   white-space: normal;
   min-height: 48px;
 }
-.nrl-btn.nrl-event-choice:hover:not(:disabled) { background: #22305c; }
+@media (hover: hover) and (pointer: fine) { .nrl-btn.nrl-event-choice:hover:not(:disabled) { background: #22305c; } }
+.nrl-btn.nrl-event-choice:active:not(:disabled) { background: #22305c; }
 .nrl-event-choice-label { font-family: var(--nrl-f-label); font-size: 1.0625rem; font-weight: 700; letter-spacing: 0.02em; line-height: 1.2; color: var(--nrl-text); }
 .nrl-event-choice-hint { font-family: var(--nrl-f-body); font-size: 0.75rem; font-weight: 400; line-height: 1.35; color: var(--nrl-text-2); }
 /* #346: a risk is its own line, marked so it never reads as a sure cost. */
