@@ -342,7 +342,7 @@ export abstract class LiveCalls extends LiveBase {
       const p = this.at(side, pick.slot);
       const i = this.indexOf(p);
       const dh = p === this.dummyHalf(this.attacking) || (ph.handover && p === this.dummyHalf(other(this.attacking)));
-      if (p === this.holder() || i === ph.carrier || i === ph.tackler || this.markers.includes(i) || dh || this.locked(p)) continue;
+      if (p === this.holder() || i === ph.carrier || i === ph.tackler || this.markers.includes(i) || this.currentMarkers().includes(p) || dh || this.locked(p)) continue;
       fl.pending = false;
       this.swapIn(p, pick.bench, true);
     }

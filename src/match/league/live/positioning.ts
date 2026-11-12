@@ -74,7 +74,9 @@ export abstract class LivePositioning extends LiveContact {
     const t = this.players[ph.tackler]!;
     if (ph.kind === 'ruck' && this.retreat) return [...this.retreat.markers].filter(([p, key]) => this.onField(p) && p.key === key).map(([p]) => p);
     if (ph.kind === 'ruck' && ph.handover && ph.stage !== 'dh') {
-      return [...this.side(this.attacking)].sort((a, b) => dist(a.body.pos, this.mark) - dist(b.body.pos, this.mark)).slice(0, 2);
+      return this.side(this.attacking)
+        .filter(p => this.indexOf(p) !== ph.carrier && !this.locked(p))
+        .sort((a, b) => dist(a.body.pos, this.mark) - dist(b.body.pos, this.mark)).slice(0, 2);
     }
     const second = this.side(t.side)
       .filter((d) => d !== t && d !== this.fullback(t.side))

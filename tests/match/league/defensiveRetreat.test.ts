@@ -6,6 +6,7 @@ import { dist } from '../../../src/match/core/vec';
 import { FIELD_LENGTH } from '../../../src/match/core/field';
 import { LiveSim } from '../../../src/match/league/live';
 import { LIVE } from '../../../src/match/league/live/knobs';
+import { GOALS } from '../../../src/match/league/goals';
 import { TOUCH } from '../../../src/match/league/touch';
 import { DEFAULT_AWAY, DEFAULT_HOME, labSheet } from '../../../src/match/lab/sheets';
 import type { Player } from '../../../src/match/league/live/types';
@@ -78,12 +79,39 @@ class RetreatSim extends LiveSim {
     this.phase.stage = 'ptb'; this.phase.t0 = this.tick - LIVE.ptbTicks;
     this.stepRuck(this.phase);
   }
-  pendingPlayAtWhistle() {
+  pendingPlayAtWhistle(end: 'half' | 'full' | 'golden' = 'half') {
     this.callSetPlay('home', 'second-man');
     this.judge.make('home', 'hit-up', 'home', this.dir, this.spot);
     this.callAtk = this.attacking; this.callTackles = this.tackles;
-    this.endHalf(); this.expireCalls();
+    if (end === 'full') this.half = this.length.halves;
+    if (end === 'golden') this.endGoldenPoint('home');
+    else this.endHalf();
+    this.expireCalls();
     return this.pendingPlayOf('home');
+  }
+  countAcrossBreak() {
+    this.callAtk = this.attacking; this.callTackles = this.tackles;
+    const before = this.sets.home;
+    this.endHalf(); this.expireCalls(); this.expireCalls();
+    this.setForKickoff('home'); this.expireCalls();
+    return this.sets.home - before;
+  }
+  trySwapMarker() {
+    if (this.phase.kind !== 'ruck') throw Error('expected ruck');
+    this.phase.stage = 'ptb';
+    const p = this.players[1]!; p.energy = 0;
+    const key = p.key; this.freshLegs.home.pending = true;
+    this.landFreshLegs();
+    return p.key === key;
+  }
+  chargeDown(onside: boolean) {
+    this.release();
+    for (const p of this.side('away')) p.lockUntil = this.tick + 1000;
+    const d = this.players[14]!; d.lockUntil = 0;
+    if (onside) { this.position(10); this.eligible(); this.position(7); }
+    this.pendingGoal = { at: this.tick, kicker: 5 };
+    this.launchGoal();
+    return this.tickEvents.filter(e => e.kind === 'charge-down');
   }
   setPiecePtb() {
     this.startSetPiece('home', { x: this.spot, y: 34 }, 'ptb');
@@ -135,10 +163,11 @@ describe('defensive retreat', () => {
     });
     it(`appoints the new defence's two nearest markers at handover in direction ${dir}`, () => {
       const sim = new RetreatSim(dir, undefined, true);
-      expect(sim.handoverMarkers()).toEqual([7, 1]);
+      expect(sim.handoverMarkers()).toEqual([1, 2]);
       sim.heelHandover();
-      expect(sim.handoverMarkers()).toEqual([7, 1]);
-      expect(sim.markerExempt(7)).toBe(true); expect(sim.markerExempt(1)).toBe(true);
+      expect(sim.handoverMarkers()).toEqual([1, 2]);
+      expect(sim.markerExempt(7)).toBe(false);
+      expect(sim.markerExempt(1)).toBe(true); expect(sim.markerExempt(2)).toBe(true);
       expect(sim.shortHandover()).not.toBeNull();
     });
     it(`retires the future defence before the handover heel and preserves their history in direction ${dir}`, () => {
@@ -171,6 +200,27 @@ describe('defensive retreat', () => {
       expect(sim.pendingPlayAtWhistle()).toBeNull();
       expect(sim.verdicts).toContainEqual(expect.objectContaining({ call: 'set-play', play: 'second-man', how: 'lapsed' }));
       expect(sim.verdicts).toContainEqual(expect.objectContaining({ call: 'hit-up', paid: false }));
+    });
+    for (const end of ['full', 'golden'] as const) {
+      it(`settles pending plays and calls at ${end} time in direction ${dir}`, () => {
+        const sim = new RetreatSim(dir);
+        expect(sim.pendingPlayAtWhistle(end)).toBeNull();
+        expect(sim.verdicts).toContainEqual(expect.objectContaining({ call: 'set-play', how: 'lapsed' }));
+        expect(sim.verdicts).toContainEqual(expect.objectContaining({ call: 'hit-up', paid: false }));
+      });
+    }
+    it(`counts the interrupted set once across the half break in direction ${dir}`, () => {
+      expect(new RetreatSim(dir).countAcrossBreak()).toBe(1);
+    });
+    it(`keeps standing handover markers out of Fresh legs swaps in direction ${dir}`, () => {
+      expect(new RetreatSim(dir, undefined, true).trySwapMarker()).toBe(true);
+    });
+    it(`allows only an eligible standing defender to charge down in direction ${dir}`, () => {
+      const before = GOALS.chargeDown; GOALS.chargeDown = 1;
+      try {
+        expect(new RetreatSim(dir).chargeDown(false)).toHaveLength(0);
+        expect(new RetreatSim(dir).chargeDown(true)).toHaveLength(1);
+      } finally { GOALS.chargeDown = before; }
     });
     it(`starts fresh obligations at a handover in direction ${dir}`, () => {
       const sim = new RetreatSim(dir, undefined, true); sim.heelHandover(); expect(sim.shortHandover()).not.toBeNull();
@@ -207,7 +257,7 @@ class LabRetreatSim extends LiveSim {
     const dir = handover ? -this.dir : this.dir;
     const nearest = [...this.side(side)].sort((a, b) => dist(a.body.pos, this.mark) - dist(b.body.pos, this.mark));
     const tackler = this.players[ph.tackler]!;
-    const markers = handover ? nearest.slice(0, 2)
+    const markers = handover ? nearest.filter(p => this.indexOf(p) !== ph.carrier && !this.locked(p)).slice(0, 2)
       : [tackler, ...nearest.filter(p => p !== tackler && p !== this.fullback(side)).slice(0, 1)];
     super.startRetreat();
     this.audit = { side, dir, line: Math.max(0, Math.min(FIELD_LENGTH, this.mark.x + dir * LIVE.onsideM)),
