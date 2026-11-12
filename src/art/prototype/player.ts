@@ -142,8 +142,12 @@ const JOG_BOB = [0, 1, 0, 0, 1, 0];
 /** Arm swing, -2 (back) … 2 (forward), for the far arm; the near arm swings opposite. Arms oppose their own legs. */
 const ARM_SWING = [2, 1, -1, -2, -1, 1];
 
-/** Frames are sampled on a six-step cycle; directions are painted, never skewed. Idle breathes over frames 0–1. */
-export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action, frame: number, facing: Facing = 'front', possession = false, strideFrame?: number): PixelBuffer {
+/**
+ * Frames are sampled on a six-step cycle; directions are painted, never skewed. Idle breathes over frames 0–1.
+ * `tired` (#666): 1 on tired legs, 2 spent or blown. A tired man runs and stands lower and hunched,
+ * head down, without the lift into flight; spent, his arms barely pump. 0 is the fresh figure, unchanged.
+ */
+export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action, frame: number, facing: Facing = 'front', possession = false, strideFrame?: number, tired = 0): PixelBuffer {
   const b = new PixelBuffer(WIDTH, PAINT_H);
   const f = ((Math.floor(frame) % 6) + 6) % 6;
   const stocky = a.build === 'stocky';
@@ -177,17 +181,20 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action, fra
   const jog = running && strideFrame !== undefined && strideFrame >= 6;
   const legs = jog ? JOG_LEG : RUN_LEG;
   // Arms pump with the legs except while the hands are busy catching, passing or fending.
-  const swing = running && (action === 'run' || action === 'carry' || (strideFrame !== undefined && f === 5 && action !== 'fend')) ? ARM_SWING[gait]! * (jog ? .5 : 1) : 0;
+  const weary = action === 'run' || action === 'carry' || action === 'idle' ? Math.max(0, Math.min(2, tired)) : 0;
+  const swing = running && (action === 'run' || action === 'carry' || (strideFrame !== undefined && f === 5 && action !== 'fend')) ? ARM_SWING[gait]! * (jog ? .5 : 1) * (weary > 1 ? .5 : 1) : 0;
   // Away from the shared contact picture a tackle and a beaten (or tackled) man each have a start,
   // a middle and an end over the pose's last frames: reach, wrap, drive low; jolt, rock back, regather.
   const beat = f < 2 ? 0 : f < 4 ? 1 : 2;
   const crouch = action === 'wrap' ? [2, 3, 4][beat]! : action === 'brace' ? [3, 4, 1][beat]! : action === 'ptb' ? [6, 6, 3, 1, 0, 0][f]! : 0;
-  const bob = running ? (jog ? JOG_BOB : RUN_BOB)[gait]! : 0;
+  // Tired legs no longer lift him into flight: the bob only dips.
+  const bob = running ? Math.max(weary ? 0 : -1, (jog ? JOG_BOB : RUN_BOB)[gait]!) : 0;
   // Idle breathing: the chest rises a pixel on the in-breath; hips and boots stay put.
   const breath = action === 'idle' && f % 2 === 1 ? 1 : 0;
-  const lean = action === 'wrap' ? [4, 3, 4][beat]! : action === 'brace' ? [3, -1, 1][beat]! : action === 'fend' ? 2 : running ? 1 : action === 'ptb' ? 2 : 0;
+  const lean = (action === 'wrap' ? [4, 3, 4][beat]! : action === 'brace' ? [3, -1, 1][beat]! : action === 'fend' ? 2 : running ? 1 : action === 'ptb' ? 2 : 0) + weary;
   const hipY = 27 + crouch + bob;
-  const shoulderY = 20 + crouch + bob - breath;
+  // Tired, the hips keep the legs' reach and the shoulders sink toward them: a shorter, hunched trunk.
+  const shoulderY = 20 + crouch + bob - breath + weary;
   const left = CENTRE - Math.floor(bodyW / 2) + lean;
   /** One running leg from its hip: thigh, sock to the boot, boot (toe forward). */
   const runLeg = (hipX: number, top: number, beat: number, thigh: number, boot: number, band: number | null) => {
@@ -248,7 +255,8 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action, fra
 
   b.fillRect(CENTRE + lean, shoulderY - 2, 3, 3, skinDark);
   b.fillRect(CENTRE + lean - 1, shoulderY, 5, 1, kit.trim);
-  b.blit(drawHead(a, kit, facing), CENTRE - 7 + lean, shoulderY - 17);
+  // Head down and forward of the shoulders when tired: the neck sinks into the collar.
+  b.blit(drawHead(a, kit, facing), CENTRE - 7 + lean + (weary > 1 ? 1 : 0), shoulderY - 17 + weary);
 
   const shX = left + bodyW - 2;
   const shY = shoulderY + 2;

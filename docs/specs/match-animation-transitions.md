@@ -50,6 +50,16 @@ The sim remains the authority for movement, participants, timing and possession.
   5 m keeps the markers (1.8 and 3.6 m in front of the mark) as they were; the
   attack, runners and the sin-binned are unaffected. `pictureContext` reads the
   ruck once per snapshot, so the frame is a pure function of the tick.
+- **Exhaustion in the body (#666).** `tiredLevel` reads `legs` and `blown` on the
+  legs bar's bands (`legsBand`, `fatigue.tiredAt` / `spentAt`), so bar and body
+  agree: 1 when tired, 2 when spent or blown. A tired man's run, carry and stand
+  keep the hips (and so the legs' reach) but sink the shoulders and head by one
+  pixel per level and lean him forward; the bob loses its lift into flight, and
+  spent his arms pump half as far. Spent or blown and standing still (feet
+  planted, no ball, not in the bin, not set in the line) he goes hands on knees,
+  `blowing` (`moments.ts`): two frames, the back heaving every six ticks. A
+  blown sprinter slumps as he slows. The picture carries `tired`, which joins the
+  frame-cache key only when set, so a fresh man's frames and key are unchanged.
 
 No engine, save, appearance assignment, rules, odds, fatigue or RNG changes.
 The earlier ordinary-player art study keeps its old frame API; `/#lab` and career

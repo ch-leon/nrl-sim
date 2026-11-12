@@ -13,11 +13,11 @@ const BASIC: Partial<Record<LivePlayerAction, Action>> = {
   tackle: 'wrap', tackled: 'brace', down: 'ground', dive: 'ground', ptb: 'ptb', fend: 'fend',
 };
 
-export function drawLivePlayer(look: Appearance, kit: Kit, action: LivePlayerAction, frame: number, facing: Facing, possession: boolean, strideFrame?: number): PixelBuffer {
+export function drawLivePlayer(look: Appearance, kit: Kit, action: LivePlayerAction, frame: number, facing: Facing, possession: boolean, strideFrame?: number, tired = 0): PixelBuffer {
   if (action === 'ptb' || action === 'dummyHalf' || action === 'ready') return drawRuckPlayer(look, kit, action, frame, facing, possession);
   if (MOMENT_ACTIONS.includes(action as MomentAction)) return drawMomentPlayer(look, kit, action as MomentAction, frame, facing, possession, strideFrame);
   let basic = BASIC[action];
   if (possession && (basic === 'wrap' || basic === 'idle')) basic = 'carry';
   // Every pose maps to a painter; a fend keeps the run cycle's legs under the straight arm.
-  return drawPrototypePlayer(look, kit, basic ?? 'idle', frame, facing, possession, strideFrame);
+  return drawPrototypePlayer(look, kit, basic ?? 'idle', frame, facing, possession, strideFrame, tired);
 }

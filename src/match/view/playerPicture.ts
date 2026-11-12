@@ -6,12 +6,16 @@ import type { LivePlayerAction } from '../../art/match/livePlayer';
 import { hashString } from '../../art/match/kit';
 import { MOMENT_ACTIONS, momentLift, type MomentAction } from '../../art/match/moments';
 import { screenFacing } from './screenFacing';
+import { legsBand } from './legsLayer';
+import { FATIGUE } from '../league/fatigue';
 
 export interface PlayerPicture {
   /** -1 plants the feet; otherwise the continuing run cycle, independent of hand progress. */
   strideFrame?: number;
   /** Cosmetic jump height; shadow, possession ring and simulation position stay on the turf. */
   lift?: number;
+  /** Fatigue in the body (#666): 1 on tired legs, 2 spent or blown; absent when fresh. Part of the frame. */
+  tired?: 1 | 2;
   who: string; action: LivePlayerAction; frame: number; facing: Facing; left: boolean; possession: boolean;
 }
 
@@ -47,6 +51,16 @@ const MARKER_M = 5;
 const RISE_TICKS = 3;
 /** Ticks per bounce frame in the ready stance (on the toes, about two and a half bounces a second). */
 const READY_TICKS = 4;
+/** Ticks per heave of a spent man's back, hands on knees. */
+const BLOWING_TICKS = 6;
+
+/** How tired he looks (#666), on the legs bar's own bands so bar and body agree: 2 spent or blown, 1 tired, 0 fresh. */
+export function tiredLevel(p: PlayerSnap): 0 | 1 | 2 {
+  if (p.blown) return 2;
+  if (p.legs === undefined) return 0;
+  const band = legsBand(p.legs, FATIGUE);
+  return band === 'spent' ? 2 : band === 'tired' ? 1 : 0;
+}
 
 export function pictureContext(s: Snapshot): PictureContext {
   const ctx: PictureContext = {};
@@ -78,6 +92,12 @@ export function playerPicture(p: PlayerSnap, previous: PlayerSnap, tick: number,
   if (ruck && action === 'idle' && p.side === ruck.side && stride === -1 && !p.binned && Math.hypot(p.x - ruck.x, p.y - ruck.y) > MARKER_M) {
     action = 'ready';
     frame = ruck.rising ? 2 : Math.floor((tick + p.slot * 2) / READY_TICKS) % 2;
+  }
+  // Spent (or blown) and stood still with the ball elsewhere: hands on knees, sucking in air.
+  const weary = tiredLevel(p);
+  if (weary === 2 && action === 'idle' && stride === -1 && !p.binned) {
+    action = 'blowing';
+    frame = Math.floor((tick + p.slot * 3) / BLOWING_TICKS) % 2;
   }
   const clampFrame = (n: number) => Math.max(0, Math.min(5, Math.floor(n)));
   const catchAge = tick - (p.caughtTick ?? tick);
@@ -113,5 +133,6 @@ export function playerPicture(p: PlayerSnap, previous: PlayerSnap, tick: number,
   const lift = MOMENT_ACTIONS.includes(action as MomentAction) ? momentLift(action as MomentAction, frame) : 0;
   const strideFrame = ['run', 'carry', 'catch', 'pass', 'airCatch', 'fend'].includes(action)
     ? stride : undefined;
-  return { who: p.who ?? `${p.side}/${p.slot}`, action, frame, lift, ...(strideFrame === undefined ? {} : { strideFrame }), ...screenFacing(p, previous, screenDir), possession };
+  const tired = weary && (action === 'run' || action === 'carry' || action === 'idle') ? weary : 0;
+  return { who: p.who ?? `${p.side}/${p.slot}`, action, frame, lift, ...(strideFrame === undefined ? {} : { strideFrame }), ...(tired ? { tired } : {}), ...screenFacing(p, previous, screenDir), possession };
 }

@@ -982,7 +982,9 @@ landing joins the chase. The defensive line moves up at its preset's speed × `g
 `live.lineCruiseRef`, so the line slows with the runners when cruise comes down. The drain
 rate's Stamina slope and the contest's fatigue weights are knobs (§10). The lab draws a
 **legs bar under every player** (`src/match/view/legsLayer.ts`: green, amber under
-`fatigue.tiredAt`, red under `fatigue.spentAt`). No default moved.
+`fatigue.tiredAt`, red under `fatigue.spentAt`). No default moved. The same two thresholds
+set the body's posture in every match (#666, `playerPicture.ts` `tiredLevel`): hunched under
+`tiredAt`, more so under `spentAt` or blown, and hands on knees when spent and standing still.
 
 | Knob | File | Value | Effect |
 |---|---|---|---|

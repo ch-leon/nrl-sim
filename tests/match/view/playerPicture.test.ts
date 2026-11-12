@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { JOG_SPEED, STRIDE_METRES, pictureContext, playerPicture } from '../../../src/match/view/playerPicture';
+import { JOG_SPEED, STRIDE_METRES, pictureContext, playerPicture, tiredLevel } from '../../../src/match/view/playerPicture';
+import { FATIGUE } from '../../../src/match/league/fatigue';
 import type { PlayerSnap, Snapshot } from '../../../src/match/core/snapshot';
 import { LIVE } from '../../../src/match/league/live/knobs';
 import { FACING_BAND, screenFacing, screenHeading } from '../../../src/match/view/screenFacing';
@@ -128,6 +129,35 @@ describe('live player presentation', () => {
     expect(new Set(frames.map(f => f.frame))).toEqual(new Set([0, 1]));
     expect(frames.every(f => f.action === 'idle')).toBe(true);
     expect(playerPicture(still, still, 17, null, 1)).toEqual(frames[17]);
+  });
+  it('shows fatigue on the legs bar\'s own bands, and leaves the fresh exactly as they were (#666)', () => {
+    const runner = { ...p, odometer: 3 };
+    expect(tiredLevel({ ...runner, legs: FATIGUE.tiredAt })).toBe(0);
+    expect(tiredLevel({ ...runner, legs: FATIGUE.tiredAt - .01 })).toBe(1);
+    expect(tiredLevel({ ...runner, legs: FATIGUE.spentAt - .01 })).toBe(2);
+    expect(tiredLevel({ ...runner, legs: 1, blown: true })).toBe(2);
+    expect(tiredLevel(runner)).toBe(0);
+    for (const legs of [undefined, 1, FATIGUE.tiredAt]) {
+      const fresh = { ...runner, ...(legs === undefined ? {} : { legs }) };
+      expect(playerPicture(fresh, fresh, 50, null, 1)).toEqual(playerPicture(runner, runner, 50, null, 1));
+      expect('tired' in playerPicture(fresh, fresh, 50, null, 1)).toBe(false);
+    }
+    const tired = { ...runner, legs: .3 };
+    expect(playerPicture(tired, tired, 50, null, 1)).toMatchObject({ action: 'run', tired: 1 });
+    // A sprinter who has run his gas dry slumps on the run, whatever his legs.
+    const blown = { ...runner, blown: true, legs: .9 };
+    expect(playerPicture(blown, blown, 50, null, 1)).toMatchObject({ action: 'run', tired: 2 });
+    // Spent and stood still: hands on knees, two frames from the tick; not with the ball, not in the bin.
+    const still = { ...runner, pose: 'idle', speed: 0, legs: .1 };
+    const heaves = Array.from({ length: 24 }, (_, t) => playerPicture(still, still, t, null, 1));
+    expect(heaves.every(f => f.action === 'blowing' && f.tired === undefined)).toBe(true);
+    expect(new Set(heaves.map(f => f.frame))).toEqual(new Set([0, 1]));
+    expect(playerPicture(still, still, 5, { side: 'home', slot: 0 }, 1).action).toBe('carry');
+    expect(playerPicture({ ...still, binned: true }, still, 5, null, 1).action).toBe('idle');
+    expect(playerPicture({ ...still, legs: .3 }, still, 5, null, 1)).toMatchObject({ action: 'idle', tired: 1 });
+    // Other poses keep their frames: a tired man's pass or tackle is the same picture.
+    const passer = { ...tired, pose: 'pass', poseUntil: 60, caughtTick: 45 };
+    expect(playerPicture(passer, passer, 50, null, 1).tired).toBeUndefined();
   });
   it('sets the defensive line for the play-the-ball, not the markers or the attack (#665)', () => {
     const ptb: PlayerSnap = { ...p, side: 'away', slot: 4, x: 50, y: 30, pose: 'ptb', speed: 0, poseUntil: 110 };

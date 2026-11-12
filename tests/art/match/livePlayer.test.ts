@@ -63,6 +63,25 @@ describe('live match artwork', () => {
       expect(soles(idle[1]!)).toBe(ground);
     }
   });
+  it('runs and stands lower and hunched when tired, and is untouched when fresh (#666)', () => {
+    const look = appearanceFor('same-player');
+    const top = (p: ReturnType<typeof drawLivePlayer>) => opaqueBounds(p)!.y0;
+    for (const facing of ['front', 'back'] as const) for (const build of ['lean', 'athletic', 'stocky'] as const) {
+      const a = { ...look, build };
+      for (const gait of [-1, 0, 1, 2, 3, 4, 5, 8]) {
+        const action = gait < 0 ? 'idle' as const : 'run' as const;
+        const fresh = drawLivePlayer(a, kit, action, Math.max(0, gait) % 6, facing, false, gait < 0 ? undefined : gait);
+        expect(drawLivePlayer(a, kit, action, Math.max(0, gait) % 6, facing, false, gait < 0 ? undefined : gait, 0).data).toEqual(fresh.data);
+        const tired = [1, 2].map(t => drawLivePlayer(a, kit, action, Math.max(0, gait) % 6, facing, false, gait < 0 ? undefined : gait, t));
+        expect(top(tired[0]!)).toBeGreaterThan(top(fresh) - (gait === 2 || gait === 5 ? 1 : 0));
+        expect(top(tired[1]!)).toBeGreaterThan(top(tired[0]!));
+        for (const p of tired) {
+          const b = opaqueBounds(p)!;
+          expect(b.x0).toBeGreaterThan(0); expect(b.x1).toBeLessThan(p.w - 1); expect(b.y1).toBe(opaqueBounds(fresh)!.y1);
+        }
+      }
+    }
+  });
   it('caches hand progress and gait separately', () => {
     const cache = new PlayerFrameCache({ home: kit, away: kit });
     const picture = { who: 'captain', action: 'catch' as const, frame: 1, strideFrame: 0, facing: 'front' as const, left: false, possession: true };

@@ -6,8 +6,8 @@ import { add, body, blend, blendBody, contactPainter, type Body, type Point } fr
 import { tiltedHead } from '../prototype/contact';
 import { fitLegs, bentContactArm } from './limbs';
 
-export type MomentAction = 'kick' | 'grubberKick' | 'dropKick' | 'airCatch' | 'dive' | 'tryRise' | 'celebrate' | 'fistPump' | 'point' | 'kneeSlide' | 'chestBump';
-export const MOMENT_ACTIONS: readonly MomentAction[] = ['kick', 'grubberKick', 'dropKick', 'airCatch', 'dive', 'tryRise', 'celebrate', 'fistPump', 'point', 'kneeSlide', 'chestBump'];
+export type MomentAction = 'kick' | 'grubberKick' | 'dropKick' | 'airCatch' | 'dive' | 'tryRise' | 'celebrate' | 'fistPump' | 'point' | 'kneeSlide' | 'chestBump' | 'blowing';
+export const MOMENT_ACTIONS: readonly MomentAction[] = ['kick', 'grubberKick', 'dropKick', 'airCatch', 'dive', 'tryRise', 'celebrate', 'fistPump', 'point', 'kneeSlide', 'chestBump', 'blowing'];
 export interface MomentPose { pose: Body; ball: Point; near: Point; far: Point; tilt: number; lift: number }
 const stand = (crouch = 0, lean = 0) => body([19, 27 + crouch], [19 + lean, 20 + crouch], [12 + lean, 3 + crouch], [23, 31], [24, 35], [16, 31], [15, 35]);
 const landing = body([15, 32], [24, 30], [23, 16], [12, 33], [9, 35], [11, 32], [8, 33]);
@@ -50,6 +50,11 @@ export function momentPoseAt(action: MomentAction, frame: number, possession = f
       : blend([29, 30], [13, 24], rise);
     near = action === 'tryRise' ? blend([33, 33], [25, 27], rise) : add(ball, 4, 3);
     far = add(ball, 0, 2);
+  } else if (action === 'blowing') {
+    // Spent at a stoppage (#666): bent at the hips, hands on his knees, head hanging; the back heaves a pixel.
+    const heave = f % 2;
+    pose = body([17, 27], [22, 23 - heave], [21, 10 - heave], [25, 31], [24, 35], [16, 31], [15, 35]);
+    near = [27, 30]; far = [19, 30];
   } else {
     const crouch = action === 'kneeSlide' ? 4 : [0, 0, 1, 1, 0, 0][f]!;
     pose = stand(crouch, [0, 1, 1, 0, -1, -1][f]!);
