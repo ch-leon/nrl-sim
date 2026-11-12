@@ -30,7 +30,8 @@ import type { TeamTactics } from '../league/presets';
 import { NINES } from '../league/rules';
 import { LiveView, type ViewSurface } from './liveView';
 import { PopupLayer } from './popupLayer';
-import { SLOWMO_FACTOR, SLOWMO_MS, popupFor } from './popups';
+import { popupFor } from './popups';
+import { impactTier, playImpact } from './impact';
 import { SprintLayer } from './sprintLayer';
 import { WrestleBar } from './wrestleBar';
 import { ZoneLayer, bonusTryEnd } from './zoneLayer';
@@ -122,10 +123,15 @@ export function holdTackle(held: ShownTackle | null, phase: string, side: Side, 
 /** How quickly the pace eases between ×1 and ×2. Most of the gap closes in about 0.4 s, so a phase change does not lurch. */
 export const PACE_BLEND_MS = 400;
 
+/** A key moment's cap arrives quickly (#631): the time constant is 35 ms, so it has settled in about 100 ms and the break is not under way before the slow-down. */
+export const KEY_CAP_IN_MS = 35;
+/** And is released slowly, so the match does not lurch back up to speed. */
+export const KEY_CAP_OUT_MS = 600;
+
 /** Move `current` toward `target` over `deltaMs` of real time. A huge frame snaps; a 16 ms frame barely moves. */
-export function blendPace(current: number, target: number, deltaMs: number): number {
+export function blendPace(current: number, target: number, deltaMs: number, tauMs: number = PACE_BLEND_MS): number {
   if (!(deltaMs > 0)) return current;
-  const k = 1 - Math.exp(-deltaMs / PACE_BLEND_MS);
+  const k = 1 - Math.exp(-deltaMs / tauMs);
   return current + (target - current) * k;
 }
 
@@ -228,7 +234,7 @@ interface Sprite {
 /** What the live playback needs of the Match scene. */
 export interface LivePlaybackScene extends ViewSurface {
   players: Record<Side, readonly (ViewSurface['players'][Side][number] & { sprite: Sprite })[]>;
-  cameras: { main: { zoom: number; worldView: { x: number; y: number; width: number; height: number } } };
+  cameras: { main: { zoom: number; width?: number; worldView: { x: number; y: number; width: number; height: number }; shake?(ms: number, intensity: number): unknown } };
   /** The sides' colours (the carrier ring's), for the kick contest's rings. */
   readonly sideColors?: Readonly<Record<Side, number>>;
 }
@@ -633,8 +639,9 @@ export class LivePlayback {
     if (cap !== null || this.keySpeed !== null) {
       // Eased from the speed on screen to the cap, never above the speed it would play at anyway; then back up to it.
       const held = Math.min(this.keySpeed ?? free, free);
-      this.keySpeed = blendPace(held, cap === null ? free : Math.min(cap, free), deltaMs);
-      if (cap === null && this.keySpeed > free * 0.995) this.keySpeed = null;
+      const to = cap === null ? free : Math.min(cap, free);
+      this.keySpeed = blendPace(held, to, deltaMs, to < held ? KEY_CAP_IN_MS : KEY_CAP_OUT_MS);
+      if (cap === null && this.keySpeed > free * 0.99) this.keySpeed = null;
     }
     const attacking = this.opts.controlsSide && this.sim.inPossession === this.opts.controlsSide;
     this.runner.setSpeed(attacking ? Math.min(1, this.keySpeed ?? free) : this.keySpeed ?? free);
@@ -865,10 +872,8 @@ export class LivePlayback {
       if (end) this.zone.flash(end);
       if (p && e.side !== undefined && e.slot !== undefined) {
         this.popups.show(p, e.side, e.slot);
-        if (p.big) {
-          this.runner.slowMo(SLOWMO_MS, SLOWMO_FACTOR);
-          this.closeupUntil = this.now + CLOSEUP_MS;
-        }
+        const tier = impactTier(e, p);
+        if (tier && playImpact(tier, { runner: this.runner, camera: this.scene.cameras.main })) this.closeupUntil = this.now + CLOSEUP_MS;
       }
     }
     // The contract's events, recorded for the result and sent to the overlay and FX.

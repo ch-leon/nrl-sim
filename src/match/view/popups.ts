@@ -1,6 +1,6 @@
 // src/match/view/popups.ts — what to shout about (BAK-208 §6). Pure: maps a
 // sim event to the pop-up word over the player's head, its tone and whether it
-// is a big moment (slow-motion beat). popupLayer.ts draws them.
+// is a big moment (impact.ts gives it a tier). popupLayer.ts draws them.
 import { CALL_LABEL, isCoachCall } from '../league/calls';
 import { playOfDetail } from '../league/plays';
 import type { SimEvent } from '../core/snapshot';
@@ -12,7 +12,7 @@ export interface Popup {
   /** Second line: the player's surname (a bonus try's says where it was scored from). */
   sub: string;
   tone: PopupTone;
-  /** A big moment: larger text, slow-motion beat. */
+  /** A big moment: larger text, and an impact tier (impact.ts). */
   big: boolean;
   /** How long it stays up, real ms. */
   ms: number;
@@ -25,9 +25,7 @@ export const TRAIT_COLOR = '#d9a5ff';
 
 export const POPUP_MS = 1200;
 export const POPUP_BIG_MS = 1700;
-/** Slow-motion beat on a big moment: real ms and time factor. */
-export const SLOWMO_MS = 320;
-export const SLOWMO_FACTOR = 0.3;
+// What a big moment does to the clock and camera is impact.ts (#631).
 
 const WORDS: Readonly<Record<string, { word: string; tone: PopupTone; big?: boolean }>> = {
   'break-tackle': { word: 'BUST!', tone: 'attack', big: true },

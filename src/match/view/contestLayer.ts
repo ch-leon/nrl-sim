@@ -1,7 +1,8 @@
 // src/match/view/contestLayer.ts — the contest you can see (N15.6, BAK-206).
 // A line break flashes across the defensive line where it was broken. A big
 // hit, the tackle the sim drives backwards, leaves a dust puff a metre behind
-// the carrier. The bodies already moved (live.ts, LIVE.driveBack); this only
+// the carrier; so do a bust, a strip and an intercept, the other contact
+// moments (#631). The bodies already moved (live.ts, LIVE.driveBack); this only
 // draws. Pure over the event and the snapshot: no dice, nothing the sim reads.
 import type Phaser from 'phaser';
 import type { Side, SimEvent, Snapshot } from '../core/snapshot';
@@ -39,6 +40,9 @@ export function contestAlpha(ageMs: number): number {
   return (CONTEST_MS - ageMs) / FADE_MS;
 }
 
+/** The tier-2 contact moments (#631) that puff dust where the ball carrier was met. */
+const DUST_KINDS: ReadonlySet<string> = new Set(['big-hit', 'break-tackle', 'strip', 'intercept']);
+
 /**
  * The mark an event draws, or null. A line break flashes on the man who broke
  * it. A big hit puffs dust on the carrier the sim just drove back (the ball's
@@ -52,7 +56,7 @@ export function contestMarkFor(e: SimEvent, snap: Snapshot): ContestMark | null 
     if (!p) return null;
     return { kind: 'break', x: p.x, y: p.y, headX: p.headX || 1, side: p.side, slot: p.slot };
   }
-  if (e.kind === 'big-hit') {
+  if (DUST_KINDS.has(e.kind)) {
     const h = snap.ball.holder;
     const p = h
       ? snap.players.find((q) => q.side === h.side && q.slot === h.slot)

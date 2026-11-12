@@ -14,7 +14,8 @@ import { LiveView } from '../view/liveView';
 import { PopupLayer } from '../view/popupLayer';
 import { ContestLayer } from '../view/contestLayer';
 import { shownBreak } from '../view/lineBreak';
-import { SLOWMO_FACTOR, SLOWMO_MS, popupFor, type PopupView } from '../view/popups';
+import { popupFor, type PopupView } from '../view/popups';
+import { impactTier, playImpact } from '../view/impact';
 import { WrestleBar } from '../view/wrestleBar';
 import { SprintLayer } from '../view/sprintLayer';
 import { LegsLayer } from '../view/legsLayer';
@@ -92,10 +93,8 @@ export class LabScene extends MatchScene {
       const p = popupFor(e);
       if (p && e.side !== undefined && e.slot !== undefined) {
         this.popups?.show(p, e.side, e.slot);
-        if (p.big) {
-          r.slowMo(SLOWMO_MS, SLOWMO_FACTOR);
-          this.closeupUntil = this.time.now + CLOSEUP_MS;
-        }
+        const tier = impactTier(e, p);
+        if (tier && playImpact(tier, { runner: r, camera: this.cameras.main })) this.closeupUntil = this.time.now + CLOSEUP_MS;
       }
       // Light up the stadium the way a real match does: particles, crowd,
       // camera. The subscribers pick what they react to by event kind.

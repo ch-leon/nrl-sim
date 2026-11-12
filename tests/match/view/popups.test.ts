@@ -6,8 +6,6 @@ import {
   POPUP_EDGE,
   POPUP_LINE_H,
   POPUP_MS,
-  SLOWMO_FACTOR,
-  SLOWMO_MS,
   TONE_COLOR,
   POPUP_GAP,
   POPUP_HALF_W,
@@ -109,12 +107,8 @@ describe('popupFor', () => {
     const still = Math.abs(left.x - right.x) < POPUP_HALF_W * 2 && right.y > left.y - tall && right.y - tall < left.y;
     expect(still).toBe(false);
   });
-  it('big moments last longer and get a short slow-motion beat', () => {
+  it('big moments last longer', () => {
     expect(POPUP_BIG_MS).toBeGreaterThan(POPUP_MS);
-    expect(SLOWMO_MS).toBeGreaterThan(200);
-    expect(SLOWMO_MS).toBeLessThan(600);
-    expect(SLOWMO_FACTOR).toBeGreaterThan(0.1);
-    expect(SLOWMO_FACTOR).toBeLessThan(0.6);
     for (const tone of ['attack', 'defence', 'neutral', 'bad'] as const) expect(TONE_COLOR[tone]).toMatch(/^#[0-9a-f]{6}$/);
   });
 });

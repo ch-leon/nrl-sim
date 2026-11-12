@@ -309,8 +309,8 @@ and Tight kicks long more often and steps less; Kick-chase kicks more and bombs 
 
 | Event | Pop-up | Extra |
 |---|---|---|
-| Step / fend / bust / offload | word + player surname over his head, 1.2 s | 0.25 s slow-mo on bust |
-| Big hit | BIG HIT! | camera shake, 0.3 s slow-mo, crowd roar |
+| Step / fend / bust / offload | word + player surname over his head, 1.2 s | a bust is impact tier 2 (freeze, shake, dust); a clean line break shows LINE BREAK! (tier 1: 0.9 s eased slow-mo and the close-up, as do tries and 40/20s) |
+| Big hit | BIG HIT! | 90 ms freeze, camera shake (same size on screen at any zoom), dust at the contact, crowd roar (impact tier 2, #631) |
 | Intercept / strip | word + name | camera snaps to the ball |
 | Trait firing | "SIDESTEP II!" in the trait colour under the word | commentary names the trait; six moves draw on the pitch when the trait fired (N15.4): the fend's arm, the step's cut, Big Boot's wider trail, the Playmaker's line, the Wrecking Ball's drive, the Hitman's shock |
 | Kick | type (BOMB!, 40/20!) | wide camera, trail |

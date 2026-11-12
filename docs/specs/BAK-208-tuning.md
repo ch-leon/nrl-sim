@@ -209,7 +209,9 @@ Tests: `tests/match/league/presets.test.ts` (direction of each preset, §7 bands
 | Knob | File | Value | Effect |
 |---|---|---|---|
 | `POPUP_MS` / `POPUP_BIG_MS` | `src/match/view/popups.ts` | 1200 / 1700 ms | Pop-up life. |
-| `SLOWMO_MS` / `SLOWMO_FACTOR` | `popups.ts` | 320 ms × 0.3 | Slow-motion beat on big moments (bust, big hit, strip, intercept, regather, try). |
+| `TIER1_MS` / `TIER1_FACTOR` / `TIER1_RAMP_MS` | `impact.ts` | 900 ms × 0.35, 250 ms ramps | Tier 1 impact (#631): a try, a clean line break, a 40/20. Real time, so about 0.4 s of sim time. The factor eases down over the first 250 ms and back up over the last 250 ms (`slowFactorAt`), and the camera closes in. Replaces the single 320 ms × 0.3 beat. |
+| `FREEZE_MS` / `SHAKE_MS` / `SHAKE_PX` | `impact.ts` | 90 ms / 110 ms / 4 px | Tier 2 impact (#631): a big hit, a bust, a strip, an intercept. The freeze stops the sim clock for 90 real ms on the contact tick (`Runner.freeze`); the shake throws the picture 4 screen px at any zoom (`shakeIntensity` divides out Phaser's zoom²); the contest layer puffs dust at the contact point. Every other big pop-up (regather, run-down, penalty, field goal, charge-down, sin bin) is tier 3: the pop-up alone. Under prefers-reduced-motion none of the freeze, shake or slow-motion plays. |
+| `KEY_CAP_IN_MS` / `KEY_CAP_OUT_MS` | `livePlayback.ts` | 35 ms / 600 ms | Time constants of a key moment's speed cap (#631): it settles in about 100 ms, so a break is not under way before the slow-down, and is released over about 1.5 s. `PACE_BLEND_MS` still eases the ×1 / ×2 dead-time pace. |
 | `WORDS` / `KICK_WORDS` / `TRAIT_COLOR` | `popups.ts` | table / `#d9a5ff` | What is shouted, and the trait line's colour. |
 | `BASE_LIFT` / `DRIFT` / `POOL` | `src/match/view/popupLayer.ts` | 40 px / 12 px / 6 | Pop-up placement over the player and how many at once. |
 | `TRAIT_FONT_PX` / fade | `popupLayer.ts` | 16 / 13 px (big / small shout); shout fades from 66% of its life, the trait line from 82% | The trait line under a shout ("DON'T ARGUE II"). Was 14 / 11 px, fading with its shout (#348 M9: small and faded on a phone). |
