@@ -241,8 +241,12 @@ Tests: `tests/match/league/presets.test.ts` (direction of each preset, §7 bands
 | `REPLAY_BLOCK_MS` | `replay.ts` | 300 ms | The re-sim on the main thread, when no Worker is there, may block the page this long. The Worker path times only the hand-off. |
 | `POPUP_EDGE` / `POPUP_HALF_W` / `POPUP_LINE_H` / `POPUP_GAP` | `src/match/view/popups.ts` | 8 / 64 / 22 / 2 screen px | A pop-up is clamped inside the camera (N15.6, finding 4). The text hangs up from its anchor; at ×8 a 40 px lift over a man near the top used to leave the screen. Two shouts pulled onto the same edge drop apart by `POPUP_GAP`; a trait line stays on its shout. **Assumed (needs Leon)**: the inset. |
 | `CONTEST_MS` / `DRIVE_DUST_M` / `BREAK_SPAN_M` | `src/match/view/contestLayer.ts` | 800 ms / 1 m / 12 m | A big hit puffs dust a metre behind the carrier (the sim already drove him `LIVE.driveBack`, 2.5 m; the view does not move him again). A line break flashes across 12 m of the defensive line, on the point where it broke, not on the sprinter's feet as he runs off it. It fades over the last 280 ms. **Assumed (needs Leon)**: the look, and that the shove is the big hit rather than a new metre of wrestle. |
+| `REF.offM` / `REF.ballShare` / `REF.farRoomM` / `REF.swingM` | `src/match/view/officials.ts` | 6 m / 0.25 / 6 m / 10 m | The referee (#642), placed by a pure function of the snapshot (`refereeSpot`): 6 m off the play, which is a quarter the ball and three quarters the middle of all eighteen bodies (so a pass or a kick moves him at a man's pace). He stands on the far side of it (behind the ruck from the camera), and swings round to trail it along the field when play is within 6–16 m of the far touchline. Under 1.6 m a tick except when the ball or the sides are put on a mark. **Assumed (needs Leon)**: where he stands. |
+| `REF.clearM` / `REF.fadeM` | `officials.ts` | 3.5 m / 1.5 m | He is pushed off the carrier to 3.5 m; the push fades out within 1.5 m of him, so a ball running straight through his spot swings him round it instead of jumping him across (inside 3.5 m on about 2% of carried ticks). Should he stand over the carrier on screen, he is drawn behind him (`refCoversCarrier`, about 3% of carried ticks). Signals: an arm up while a try is given (a scorer has `tryTick`), pointing during a penalty. His strip is the one of `REFEREE_STRIPS` (lime, pink, cyan, orange, black) furthest from both kits worn (`refereeKit`, `src/art/match/bench.ts`). |
+| `BENCH.seatM` / `BENCH.seats` / `BENCH.fromHalfwayM` / `BENCH.backM` | `officials.ts` | 2.4 m / 5 / 5 m / 2.2 m | The benches on the near touchline, 2.2 m back on the apron: home short of halfway, away past it. The reserves sit on them seen from behind, numbers on their backs; whoever is on the sheet and not on the field sits there, so an interchange changes who is sitting (`benchSeated`). |
+| `BENCH.binGapM` / `BENCH.arrivedM` | `officials.ts` | 3.2 m / 2.5 m | Each side's sin bin, 3.2 m past the outer end of its bench: a yellow box and stool. A binned man walks off as the sim has him; once within 2.5 m of a touchline he is drawn sitting in his side's bin, a yellow card over him (`binnedSpot`; the one line in `liveView.ts`). |
 
-Tests: `tests/match/view/popups.test.ts`, `tests/match/lab/stats.test.ts`, `tests/match/view/wrestleBar.test.ts`, `tests/match/view/kickLayer.test.ts`, `tests/match/view/traitLayer.test.ts`, `tests/match/view/replay.test.ts`, `tests/match/view/contestLayer.test.ts`.
+Tests: `tests/match/view/popups.test.ts`, `tests/match/view/officials.test.ts`, `tests/match/lab/stats.test.ts`, `tests/match/view/wrestleBar.test.ts`, `tests/match/view/kickLayer.test.ts`, `tests/match/view/traitLayer.test.ts`, `tests/match/view/replay.test.ts`, `tests/match/view/contestLayer.test.ts`.
 
 ## 10. Legs (§8)
 
@@ -879,8 +883,9 @@ same share of a 14-minute match as five was of 18; not the thirteen-a-side ten; 
 offender's own 20 (a professional foul, the infringement that stops a try) and more again
 for every earlier penalty his side conceded there (repeated infringements), plus a little
 per level of Hitman and Hothead; a side never has two men off at once. He jogs to the
-nearest touchline and stands there (**SIN BIN!** over him, "X is sent to the sin bin —
-…" in the commentary, the lab's label reads `8 v 9`); his side plays a man short, and a
+nearest touchline (**SIN BIN!** over him, "X is sent to the sin bin —
+…" in the commentary, the lab's label reads `8 v 9`), and the picture then sits him in his side's sin bin by
+the bench under a yellow card (#642, §9); his side plays a man short, and a
 stand-in takes his duties (the five-eighth kicks for the halfback, the prop plays
 dummy-half for the hooker, a winger drops back for the fullback). A defence a man short
 is stretched: busts and steps against it are a little more likely on top of the gap in

@@ -43,6 +43,8 @@ export interface ViewSurface {
   cut?(): void;
   focus?: { carrier(t: { side: Side; x: number; y: number } | null): void };
   contact?: { paint(state: ContactAnimation | null, layout: ContactLayout | null, facing: 'front' | 'back'): void };
+  /** The referee, benches and sin bin (#642): where a binned man sits, and drawn from the same two ticks. */
+  officials?: { spot(p: PlayerSnap, s: Snapshot): { x: number; y: number } | null; draw(prev: Snapshot, cur: Snapshot, alpha: number): void };
 }
 
 /** World px per metre of lift (the ball sprite rises this much per metre). */
@@ -117,7 +119,8 @@ export class LiveView {
         const from = toFieldPt({ x: p.x + was.dx, y: p.y + was.dy }); const to = toFieldPt({ x: c.x + on.dx, y: c.y + on.dy });
         member.left = this.s.fieldToWorld(to.fx, to.fy).x < this.s.fieldToWorld(from.fx, from.fy).x;
       }
-      const f = toFieldPt({ x: p.x + was.dx + (c.x + on.dx - p.x - was.dx) * a, y: p.y + was.dy + (c.y + on.dy - p.y - was.dy) * a });
+      // A sin-binned man sits in his side's bin (#642); everyone else is where the sim (and a try's mob) has him.
+      const f = toFieldPt(this.s.officials?.spot(c, cur) ?? { x: p.x + was.dx + (c.x + on.dx - p.x - was.dx) * a, y: p.y + was.dy + (c.y + on.dy - p.y - was.dy) * a });
       const w = snap(this.s.fieldToWorld(f.fx, f.fy));
       // Feet y is the iso sort key; a tiny per-slot bias stops z-fighting flicker.
       actor.place(w.x, w.y, w.y + 1 + c.slot * 0.001 + (c.side === 'away' ? 0.0005 : 0));
@@ -177,6 +180,7 @@ export class LiveView {
       this.s.ball.place(bw.x + hand, bw.y, lift, bw.y + 2, motion);
       this.s.focus?.carrier(null);
     }
+    this.s.officials?.draw(prev, cur, a);
     if (placed >= CUT_BODIES) this.s.cut?.();
     // Held balls are painted once in the player's hands (or the shared tackle).
     const embedded = !!cb.holder && !!this.s.players[cb.holder.side][cb.holder.slot]?.paint;

@@ -79,6 +79,7 @@ import {
 import { isoProject } from '../art/match/iso3d';
 import { MatchArtRegistry } from './matchArt';
 import { MatchActor, MatchContactLayer, PlayerFrameCache } from './matchPlayers';
+import { MatchOfficials } from './matchOfficials';
 import { castLooks } from '../art/prototype/player';
 export { MatchActor } from './matchPlayers';
 import { fixtureArtFor, takeFixtureArt } from './matchArtAhead';
@@ -251,6 +252,8 @@ export class MatchScene extends Phaser.Scene {
   public readonly players: { home: MatchActor[]; away: MatchActor[] } = { home: [], away: [] };
   public ball!: MatchBall;
   public contact?: MatchContactLayer;
+  /** The referee, benches, sin bin and corner flags (#642), drawn by LiveView from the same ticks as the players. */
+  public officials?: MatchOfficials;
   private playerFrames: PlayerFrameCache | null = null;
   /** Readability hooks driven by playback (#17): name tags + carrier ring. */
   public readonly focus = {
@@ -429,6 +432,15 @@ export class MatchScene extends Phaser.Scene {
       this.players.away.push(new MatchActor(this, this.art, this.playerFrames, 'away', i, a?.id ?? a?.name ?? `away/${i}`, props.shadow, kits.rings.away, kits.ringStyles.away));
     }
     this.ball = new MatchBall(this, props.ball, props.ballShadow, lighting);
+    this.officials = new MatchOfficials(this, this.art, {
+      kits: { home: kits.home, away: kits.away },
+      sheets: { home: this.home, away: this.away },
+      look: looks,
+      toWorld: (fx, fy) => this.fieldToWorld(fx, fy),
+      shadowKey: props.shadow,
+      offsetX: this.offsetX,
+      carrierDepth: (side, slot) => this.players[side][slot]?.sprite.depth ?? null,
+    });
     this.markerColors = { home: kits.rings.home, away: kits.rings.away };
     this.marker = this.add.graphics().setVisible(false);
     this.markerSide = null;
@@ -1540,6 +1552,7 @@ export class MatchScene extends Phaser.Scene {
     this.playerFrames?.clear();
     this.playerFrames = null;
     delete this.contact;
+    delete this.officials;
     this.crowdBobs = [];
     this.players.home = [];
     this.players.away = [];
