@@ -112,6 +112,8 @@ const CSS = `
   background: var(--nrl-raised); color: var(--nrl-text); font: inherit; text-align: left; box-sizing: border-box; width: 100%;
 }
 button.nrl-club-home-row { cursor: pointer; }
+/* Pressed (#604): the raised tiles' pressed fill, so it shows under reduced motion too (dom.ts adds the scale). */
+button.nrl-club-home-row:active { background: #22305c; }
 button.nrl-club-home-row:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
 .nrl-club-home-k { font-family: var(--nrl-f-label); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); flex: 0 0 auto; }
 .nrl-club-home-v { flex: 1 1 auto; min-width: 0; font-size: 0.9375rem; overflow-wrap: anywhere; }

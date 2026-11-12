@@ -318,8 +318,13 @@ export function initToasts(root: HTMLElement, opts: { advancing?: () => boolean 
     }
     // A dialog up (a facility's popup over the grounds): the toast goes in the room beside it, so
     // an Undo is neither hidden under the dialog nor over its MOVE and DEMOLISH (#371, from #381's check).
-    const dialog = document.querySelector('.nrl-modal')?.getBoundingClientRect();
-    if (dialog && dialog.width > 0) {
+    const card = document.querySelector<HTMLElement>('.nrl-modal');
+    const box = card?.getBoundingClientRect();
+    if (card && box && box.width > 0) {
+      // The card's laid-out width about its middle, not the box its entrance has it in: a dialog
+      // grows in from --nrl-pop (#606), and a lane measured part-way would move when it settled.
+      const mid = (box.left + box.right) / 2;
+      const dialog = { left: mid - card.offsetWidth / 2, right: mid + card.offsetWidth / 2 };
       const leftRoom = Math.floor(dialog.left - 24);
       const rightRoom = Math.floor(window.innerWidth - dialog.right - 24);
       if (Math.max(leftRoom, rightRoom) >= MIN_LANE_PX) {

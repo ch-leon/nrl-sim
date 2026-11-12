@@ -22,6 +22,7 @@ import { cardById } from '../data/events';
 import { absWeek, chooseEvent, describeChoice, fillText } from '../systems/events';
 import { hasStaff } from '../systems/staff';
 import { NEW_CONTRACT_WEEKS } from '../systems/freeagency';
+import { fmtMoney } from '../utils/money';
 import { el, button, openModal, closeModal, activeScreen, dialogOpen } from './dom';
 import { ADVANCE_FAILED_TEXT } from './hud';
 import { demoBlocked } from '../commercial/demo';
@@ -77,7 +78,7 @@ export function decisionViews(state: GameState): DecisionView[] {
       choices: card.choices.map((c, index) => {
         const signs = ev.fee !== undefined && c.effects.some((e) => e.kind === 'signSubject');
         const split = signs
-          ? { sure: `−$${ev.fee!.toLocaleString('en-US')} fee, ${NEW_CONTRACT_WEEKS}-week deal`, risks: [] }
+          ? { sure: `−${fmtMoney(ev.fee!)} fee, ${NEW_CONTRACT_WEEKS}-week deal`, risks: [] }
           : describeChoice(c.effects, { welfare });
         return { index, label: c.label, ...split, isDefault: index === card.defaultChoice };
       }),

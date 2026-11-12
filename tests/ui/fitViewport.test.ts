@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { TUTORIAL_CSS } from '../../src/ui/tutorial';
 import { CSS } from '../../src/ui/dom';
+import { OVERLAY_CSS } from '../../src/ui/screens/matchOverlay';
 
 /** The declarations of the first rule whose selector is exactly `selector`. */
 function rule(css: string, selector: string): string {
@@ -61,5 +62,32 @@ describe('Guide keeps its foot in view (#206)', () => {
   });
   it('dialogs cap at the dynamic viewport', () => {
     expect(rule(CSS, '.nrl-modal')).toContain('max-height: 85dvh');
+  });
+});
+
+// #609: the same in the match. With Safari's toolbars up, 100vh is the height without them,
+// so the stats sheet ran under COACH and LOG and its last rows could not be reached.
+describe('the match sheets fit the viewport (#609)', () => {
+  it.each(['.nrl-mo-statsheet', '.nrl-mo-tray'])('%s caps its height to the dynamic viewport, with a vh fallback first', (sel) => {
+    const sheet = rule(OVERLAY_CSS, sel);
+    expect(sheet).toMatch(/max-height: calc\(100vh[^;]*;\s*max-height: calc\(100dvh/);
+    expect(sheet).toContain('overflow-y: auto');
+    // A drag past its end stays in the sheet.
+    expect(sheet).toContain('overscroll-behavior: contain');
+  });
+});
+
+// #609: iOS Safari zooms the page into a field whose text is under 16px, and stays zoomed.
+// `#ui-root input { font: inherit; }` out-ranks a field's own font-size, so the floor sits beside it.
+describe('fields you type in are 16px at the least (#609)', () => {
+  it('sets the floor after the inherit rule, in rem so Text size still scales it', () => {
+    const inherit = CSS.indexOf('#ui-root input, #ui-root select, #ui-root textarea { font: inherit; }');
+    const floor = CSS.indexOf('{ font-size: max(1rem, 16px); }');
+    expect(inherit).toBeGreaterThanOrEqual(0);
+    expect(floor).toBeGreaterThan(inherit);
+    const selector = CSS.slice(CSS.lastIndexOf('\n', floor) + 1, floor);
+    for (const field of ['[type="text"]', '[type="search"]', '[type="number"]', 'input:not([type])', 'textarea', 'select']) expect(selector).toContain(field);
+    // The match lab's dense panel keeps its own small fields.
+    expect(selector).toContain(':not(.nrl-lab *)');
   });
 });

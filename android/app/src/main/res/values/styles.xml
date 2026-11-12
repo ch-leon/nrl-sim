@@ -13,10 +13,16 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <!-- The WebView's colour until the first paint: navy, not white (#622). -->
+        <item name="android:windowBackground">@color/ic_launcher_background</item>
     </style>
 
 
+    <!-- Cold start: navy with the ball, then AppTheme.NoActionBar (#622). -->
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
-        <item name="android:background">@drawable/splash</item>
+        <item name="windowSplashScreenBackground">@color/ic_launcher_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
+        <item name="android:windowBackground">@drawable/launch_background</item>
     </style>
 </resources>

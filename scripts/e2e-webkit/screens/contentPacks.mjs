@@ -2,7 +2,7 @@
 // Screenshots are kept by the existing CI artifact, never committed.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { BASE, OUT_ROOT, openNav, closeWeekSummary, playTrials, log } from '../common.mjs';
+import { BASE, OUT_ROOT, openNav, closeWeekSummary, playTrials, log, skipFromPill } from '../common.mjs';
 
 export async function runContentPacks(browser) {
   const out = join(OUT_ROOT, 'webkit', 'content-packs');
@@ -57,9 +57,7 @@ export async function runContentPacks(browser) {
         const proceed = page.locator('[data-ask-proceed]');
         if (await proceed.isVisible()) await proceed.tap();
         await page.waitForSelector('.nrl-mo-controls', { timeout: 60000 });
-        await page.locator('.nrl-mo-controls [data-skip-pill]').tap();
-        await page.waitForSelector('[data-skip-pill][data-armed]');
-        await page.locator('.nrl-mo-controls [data-skip-pill]').tap();
+        await skipFromPill(page);
         await page.waitForSelector('.nrl-mo-ft [data-report]', { timeout: 120000 });
         await page.locator('.nrl-mo-ft [data-report]').tap();
         await page.locator('.nrl-report').waitFor();

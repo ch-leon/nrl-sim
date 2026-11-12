@@ -66,9 +66,10 @@ export const BRAND: Brand = {
     primary: COLOR_TOKENS.accent,
     onPrimary: COLOR_TOKENS.onAccent,
     text: COLOR_TOKENS.text,
-    // The theme has no token for these two: the manifest and the icons kept the
-    // pre-theme navy-black and the ball's leather. Moving them is the theme's call.
-    app: '#1a1a2e',
+    // The installed app is the page's navy, not the pre-theme navy-black it kept
+    // before (#622): one colour from the launcher to the first frame. The theme has
+    // no token for the ball's leather, so that one is the brand's own.
+    app: COLOR_TOKENS.navy,
     iconBall: '#e8e4d8',
   },
   logo: { kind: 'text' }, // DECISION (Leon): game name (logo art)

@@ -259,7 +259,7 @@ function buildRecords(state: GameState): HTMLElement {
     ['Career line breaks', fmt(r.careerLineBreaks)],
   ];
   return el('div', { class: 'nrl-history-records' },
-    ...rows.map(([label, value]) => el('div', { class: 'nrl-history-record' }, el('span', { class: 'nrl-label', text: label }), el('span', { text: value }))));
+    ...rows.map(([label, value]) => el('div', { class: 'nrl-history-record' }, el('span', { class: 'nrl-label', text: label }), el('span', { class: 'nrl-name-wrap', text: value }))));
 }
 
 /** Open the History sheet (3l): past seasons from GameState.history, and the club's records. */

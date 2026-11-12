@@ -15,9 +15,10 @@ import {
   classifyReason, stampMovement, type StandProjection,
 } from '../../systems/economy';
 import { ECON, SEASON_ROUNDS, WEEKS_PER_SEASON } from '../../config';
+import { fmtMoney, fmtMoneyShort } from '../../utils/money';
 import { openHistoryScreen } from './history';
 import { openContractsScreen } from './contracts';
-import { el, button, openScreen, closeScreen, segmented, ensureStyles } from '../dom';
+import { el, button, hintScroll, openScreen, closeScreen, segmented, ensureStyles } from '../dom';
 
 /** Contracts whose remaining weeks are at most this are listed as expiring. */
 export const EXPIRY_WINDOW_WEEKS = 8;
@@ -343,20 +344,16 @@ export function fmtNetClosing(b: Pick<SeasonBooks, 'net' | 'closing'>): string {
 
 // ── Formatting ─────────────────────────────────────────────────────────────────
 
-/** Whole dollars with thousands separators: 1234 → "$1,234", -50 → "-$50". */
-export function fmtMoney(n: number): string {
-  const r = Math.round(n);
-  const sign = r < 0 ? '-' : '';
-  const digits = Math.abs(r).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  return `${sign}$${digits}`;
-}
+// Whole dollars, "$1,234" and "-$50": the shared formatter (#615), re-exported for
+// the screens that take it from here.
+export { fmtMoney };
 
-/** Compact for narrow tables: 12345 → "$12.3k". Under 1000 it is whole dollars. */
+/**
+ * Compact for narrow tables: 12345 → "$12.3k", 1600000 → "$1.6m" (#615). Under
+ * 1000 it is whole dollars. The ".0" stays so a column lines up ("$25.0k").
+ */
 export function fmtMoneyCompact(n: number): string {
-  const sign = n < 0 ? '-' : '';
-  const abs = Math.abs(n);
-  if (abs < 1000) return fmtMoney(n);
-  return `${sign}$${(abs / 1000).toFixed(1)}k`;
+  return fmtMoneyShort(n, { places: 1, keepZero: true });
 }
 
 /** The next home crowd against the seats: "1,450 of 2,000 seats" or "Sold out · 2,000 seats" (#169). */
@@ -371,10 +368,9 @@ export function fmtCrowd(c: { attendance: number; capacity: number; soldOut: boo
  * one game's demand, which form and the opponent move.
  */
 export function fmtStand(p: StandProjection): { label: string; value: string } {
-  const gain = p.gain >= 1000 ? `$${Math.round(p.gain / 1000)}k` : fmtMoney(p.gain);
   return {
     label: `${p.level > 1 ? 'A bigger stand' : 'A stand'} would seat ${p.capacity.toLocaleString('en-US')}`,
-    value: `about +${gain} a game`,
+    value: `about +${fmtMoneyShort(p.gain)} a game`,
   };
 }
 
@@ -464,17 +460,17 @@ function lineItem(label: string, value: number, opts: { signed?: boolean; cls?: 
  * the foot, which holds still while a short phone scrolls the lines above it.
  */
 function buildThisWeek(state: GameState, s: FinanceSummary): HTMLElement {
-  return el('div', { class: 'nrl-finance-weekly' },
-    el('div', { class: 'nrl-finance-lines' },
-      lineItem('Bank balance', s.money, { signed: false }),
-      lineItem('Wage bill', -s.wagesWeekly),
-      lineItem('Facility upkeep', -s.upkeepWeekly),
-      lineItem(overheadLabel(state), -s.overheadWeekly),
-      lineItem('Sponsor', s.sponsorWeekly),
-      lineItem('Grant', s.grantWeekly),
-      lineItem('Home gates (avg/wk)', s.gateWeekly)),
-    lineItem('Net', s.netWeekly, { cls: 'nrl-finance-net' }),
-  );
+  const lines = el('div', { class: 'nrl-finance-lines' },
+    lineItem('Bank balance', s.money, { signed: false }),
+    lineItem('Wage bill', -s.wagesWeekly),
+    lineItem('Facility upkeep', -s.upkeepWeekly),
+    lineItem(overheadLabel(state), -s.overheadWeekly),
+    lineItem('Sponsor', s.sponsorWeekly),
+    lineItem('Grant', s.grantWeekly),
+    lineItem('Home gates (avg/wk)', s.gateWeekly));
+  // Where the seven do not fit (a hint over the sheet, Larger text), the foot fades: a line hidden whole made the Net look wrong (#610).
+  hintScroll(lines);
+  return el('div', { class: 'nrl-finance-weekly' }, lines, lineItem('Net', s.netWeekly, { cls: 'nrl-finance-net' }));
 }
 
 /** A Mono money cell, red when negative; a dash for no season. */
@@ -623,7 +619,8 @@ button.nrl-finance-contracts {
   flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px;
   font-family: var(--nrl-f-body);
 }
-button.nrl-finance-contracts:hover { background: #22305c; }
+@media (hover: hover) and (pointer: fine) { button.nrl-finance-contracts:hover { background: #22305c; } }
+button.nrl-finance-contracts:active { background: #22305c; }
 button.nrl-finance-contracts:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
 .nrl-finance-contracts-text { font-size: 0.75rem; color: var(--nrl-muted); }
 .nrl-finance-contracts-due .nrl-finance-contracts-text { color: var(--nrl-accent); }
@@ -632,7 +629,7 @@ button.nrl-finance-contracts:focus-visible { outline: 2px solid var(--nrl-accent
 .nrl-finance-right > .nrl-seg { align-self: flex-start; }
 .nrl-finance-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; }
 .nrl-finance-weekly { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
-.nrl-finance-lines { flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.nrl-finance-lines { flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; --nrl-scroll-fade: 24px; }
 .nrl-finance-pnl, .nrl-finance-ledger { flex: 0 0 auto; }
 /* THIS WEEK: 28px line items, Mono values, the net under a 2px rule. */
 .nrl-finance-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 28px; border-top: 1px solid var(--nrl-button); font-size: 0.8125rem; }
@@ -663,15 +660,23 @@ button.nrl-finance-contracts:focus-visible { outline: 2px solid var(--nrl-accent
   .nrl-finance-tile { padding: 6px 10px; }
   .nrl-finance-big, .nrl-finance-making .nrl-finance-big, .nrl-finance-losing .nrl-finance-big { font-size: 1.1875rem; line-height: 1.2; }
   .nrl-finance-note { line-height: 1.3; }
+  /* THIS WEEK's seven lines in its 180px (844×390; 171px over an iPhone's home bar): at 28 the last,
+     Home gates, showed 6px of itself (#610). */
+  .nrl-finance-row { min-height: 23px; }
 }
+/* 956×330: 162px for the seven, 147px over a home bar. */
+@media (max-height: 340px) { .nrl-finance-row { min-height: 20px; } }
 
 /* Contracts (under Finance): one row a player, soonest to end first. */
 .nrl-screen.nrl-contracts { display: flex; flex-direction: column; }
 .nrl-contracts-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; container-type: inline-size; }
-.nrl-table.nrl-contracts-table { min-width: 660px; }
 .nrl-contracts-table td { height: 44px; }
 .nrl-contracts-table td.nrl-num { font-weight: 500; }
+/* The name column takes what the others leave, at every width (#612: "…on a board loan" or a
+   24-letter name pushed SELL off an 844px sheet). A long line ends in "…"; the cell's title has it whole. */
+.nrl-contracts-table td.nrl-contract-info { max-width: 0; width: 100%; }
 .nrl-contract-who { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+.nrl-contract-name, .nrl-contract-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nrl-contract-name { font-weight: 600; }
 .nrl-contract-meta, .nrl-contract-pos { font-size: 0.6875rem; color: var(--nrl-muted); }
 .nrl-contract-pos { display: none; }
@@ -679,16 +684,12 @@ button.nrl-finance-contracts:focus-visible { outline: 2px solid var(--nrl-accent
 .nrl-contract-actions { display: flex; gap: 6px; justify-content: flex-end; }
 .nrl-contract-actions .nrl-btn { min-height: 36px; padding: 0 10px; font-size: 0.875rem; border-radius: 8px; text-transform: none; }
 @media (pointer: coarse) { .nrl-contract-actions .nrl-btn { min-height: 44px; } }
-.nrl-contract-actions .nrl-btn.nrl-contract-armed, .nrl-contract-actions .nrl-btn.nrl-contract-armed:hover:not(:disabled) { background: var(--nrl-neg); color: var(--nrl-on-accent); }
 .nrl-contract-gone td { color: var(--nrl-muted); }
-/* A narrow sheet (667px, or 844px between a notch's insets): the table fits without a sideways
-   scroll; who he is goes to the name's tooltip, and the name column takes what the others leave,
-   a long name ending in "…". On the sheet's own width, not the screen's, and in rem (760px at
-   Normal) so a larger Text size (#371) takes the narrow table sooner (#350: SELL ran off the sheet). */
+/* A narrow sheet (667px, or 844px between a notch's insets): who he is goes to the name's
+   tooltip, and the cells and buttons close up. On the sheet's own width, not the screen's, and
+   in rem (760px at Normal) so a larger Text size (#371) takes the narrow table sooner (#350:
+   SELL ran off the sheet). */
 @container (max-width: 47.5rem) {
-  .nrl-table.nrl-contracts-table { min-width: 0; }
-  .nrl-contracts-table td.nrl-contract-info { max-width: 0; width: 100%; }
-  .nrl-contract-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .nrl-contract-meta { display: none; }
   .nrl-contracts-table th, .nrl-contracts-table td { padding: 0 4px; }
   .nrl-contract-actions { gap: 4px; }

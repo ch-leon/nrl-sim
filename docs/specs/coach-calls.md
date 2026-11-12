@@ -277,7 +277,8 @@ Presentation only; a call is still made by the player and nothing here makes or 
   `calls.ts`): a penalty won (Take the two / Tap and go can be made), a restart (a kick-off
   call can be made), or the last tackle with a last-tackle call on (Run it, Bomb, Field goal,
   Grubber, 40/20). Never at another time, never while the tray is open or a call is made, and
-  not again until the moment has passed. Reduced motion: no animation.
+  not again until the moment has passed. The pulse is a ring that spreads and fades on the
+  motion tokens (#597); nothing moves or scales, so reduced motion keeps it.
 - **The open tray caps playback at ×1** (`LivePlayback.setCallsOpen`, through `keyCap`: eased
   down and back like a key moment, whatever the Key moments setting). The chosen speed is never
   rewritten and returns when the tray closes.

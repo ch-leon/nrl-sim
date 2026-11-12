@@ -85,6 +85,7 @@ export function openKitDesigner(): HTMLElement {
   let clubDraft = state.clubName;
   const clubNameRow = (): HTMLElement => nameField({
     value: clubDraft,
+    kept: getState().clubName,
     label: 'Club name',
     attr: 'data-club-rename',
     saveLabel: 'Rename',
