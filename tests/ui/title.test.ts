@@ -3,7 +3,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { stubLocalStorage } from '../commercial/memStorage';
 import { StubNode, stubDocument } from './stubDom';
-import { DIFFICULTY_BLURB, TITLE_CSS, showTitleFlow } from '../../src/ui/title';
+import { DIFFICULTY_BLURB, TITLE_CSS, showTitleFlow, type TitleChoice } from '../../src/ui/title';
+import { GROUND_MAX, NAME_MAX } from '../../src/data/names';
 import { DEFAULT_DIFFICULTY, DIFFICULTIES, DIFFICULTY } from '../../src/config';
 import { deleteSlot, writeSlot } from '../../src/core/save';
 import { createNewGame } from '../../src/core/state';
@@ -91,11 +92,8 @@ describe('optional coach name at setup (#475)', () => {
     ['', undefined],
     ['   ', undefined],
     ['  Sam   Hale  ', 'Sam Hale'],
-    ['Sam\u0000Hale', undefined],
-    ['Sam\u0085Hale', undefined],
-    ['S', undefined],
-    ['S'.repeat(25), undefined],
-  ])('starts with %j cleaned to %j without blocking Start', async (raw, expected) => {
+    ['S'.repeat(24), 'S'.repeat(24)],
+  ])('starts with %j cleaned to %j', async (raw, expected) => {
     const root = new StubNode('div');
     const result = showTitleFlow(root as unknown as HTMLElement);
     const name = root.querySelector('[data-nrl-coachname]')!;
@@ -110,6 +108,79 @@ describe('optional coach name at setup (#475)', () => {
     expect(choice.mode).toBe('new');
     expect(choice.coachName).toBe(expected);
     if (expected === undefined) expect(choice).not.toHaveProperty('coachName');
+  });
+});
+
+describe('one name limit at setup (#616)', () => {
+  beforeEach(() => { stubLocalStorage(); stubDocument(); });
+  afterEach(() => vi.unstubAllGlobals());
+
+  /** Type into a name box, tap Start, and say whether the career started. */
+  const tryStart = async (field: string, raw: string): Promise<{ root: StubNode; started: boolean; choice: Promise<TitleChoice> }> => {
+    const root = new StubNode('div');
+    const choice = showTitleFlow(root as unknown as HTMLElement);
+    let started = false;
+    void choice.then(() => { started = true; });
+    await vi.dynamicImportSettled();
+    root.querySelector(`[data-nrl-${field}]`)!.value = raw;
+    root.querySelector('[data-nrl-start]')!.click();
+    await Promise.resolve();
+    await Promise.resolve();
+    return { root, started, choice };
+  };
+
+  it('gives each name box room past the limit, so the reason shows instead of a silent cut', () => {
+    const root = new StubNode('div');
+    void showTitleFlow(root as unknown as HTMLElement);
+    expect(root.querySelector('[data-nrl-clubname]')!.getAttribute('maxlength')).toBe(String(NAME_MAX * 2));
+    expect(root.querySelector('[data-nrl-coachname]')!.getAttribute('maxlength')).toBe(String(NAME_MAX * 2));
+    expect(root.querySelector('[data-nrl-groundname]')!.getAttribute('maxlength')).toBe(String(GROUND_MAX * 2));
+  });
+
+  it.each([
+    ['clubname', 'W'.repeat(25), 'At most 24 characters'],
+    ['clubname', 'W', 'At least 2 characters'],
+    ['clubname', 'Bad\u0000Name', 'Letters, numbers and punctuation only'],
+    ['coachname', "Sione Taumalolo-Fa'asavalu", 'At most 24 characters'],
+    ['coachname', 'S', 'At least 2 characters'],
+    ['coachname', 'Sam\u0085Hale', 'Letters, numbers and punctuation only'],
+    ['groundname', 'G'.repeat(49), 'At most 48 characters'],
+  ])('%s %j holds Start and says why', async (field, raw, why) => {
+    const { root, started } = await tryStart(field, raw);
+    expect(started).toBe(false);
+    expect(root.querySelector(`[data-nrl-${field}]`)!.getAttribute('aria-invalid')).toBe('true');
+    expect(root.querySelector(`[data-nrl-${field}-why]`)!.textContent).toBe(why);
+    expect(root.querySelector(`[data-nrl-${field}]`)!.value).toBe(raw); // never cut
+  });
+
+  it('24 exactly starts, stored as typed (cleaned)', async () => {
+    const { started, choice } = await tryStart('clubname', `  ${'W'.repeat(12)}   ${'W'.repeat(11)} `);
+    expect(started).toBe(true);
+    expect((await choice).clubName).toBe(`${'W'.repeat(12)} ${'W'.repeat(11)}`);
+  });
+
+  it('a name fixed after a refused Start clears its reason and starts', async () => {
+    const { root, started, choice } = await tryStart('clubname', 'W'.repeat(25));
+    expect(started).toBe(false);
+    const box = root.querySelector('[data-nrl-clubname]')!;
+    const why = root.querySelector('[data-nrl-clubname-why]')!;
+    expect(why.textContent).toBe('At most 24 characters');
+    box.value = 'W'.repeat(24);
+    root.querySelector('[data-nrl-start]')!.click();
+    expect(why.textContent).toBe('');
+    expect(box.getAttribute('aria-invalid')).toBe('false');
+    expect((await choice).clubName).toBe('W'.repeat(24));
+  });
+
+  it('an empty club or ground name starts on the default', async () => {
+    const { started, choice } = await tryStart('clubname', '   ');
+    expect(started).toBe(true);
+    expect((await choice).clubName).toBe('Cavehole Crushers');
+  });
+
+  it('pins the reason line: the rename field\'s colour for a fault, gone while the name will do', () => {
+    expect(TITLE_CSS).toContain('.nrl-title-why:empty { display: none; }');
+    expect(TITLE_CSS).toContain('.nrl-title-input[aria-invalid="true"]');
   });
 });
 
@@ -204,6 +275,17 @@ describe('offline town setup (#485)', () => {
     root.querySelector('[data-nrl-groundname]')!.value = 'My Ground';
     root.querySelector('[data-nrl-start]')!.click();
     expect(await choice).toMatchObject({ clubName: 'My Club', groundName: 'My Ground', home: { town: 'Sample Bay', country: 'NZ', lat: -40, lon: 175 } });
+  });
+  it('a long town\'s default club name keeps inside the name limit, and starts (#616)', async () => {
+    const root = new StubNode('div');
+    const choice = showTitleFlow(root as unknown as HTMLElement);
+    await settleTowns();
+    (root.querySelector('[data-nrl-town]')! as InputNode).enter('Sydney Central Business District');
+    const club = root.querySelector('[data-nrl-clubname]')!.value;
+    expect(club).toMatch(/^Sydney (Wombats|Kestrels|Otters|Ironworkers)$/);
+    expect(root.querySelector('[data-nrl-clubname]')!.getAttribute('aria-invalid')).toBe('false');
+    root.querySelector('[data-nrl-start]')!.click();
+    expect((await choice).clubName).toBe(club);
   });
   it('typing an unlisted town starts without stale coordinates, region or country', async () => {
     const root = new StubNode('div');

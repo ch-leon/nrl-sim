@@ -136,6 +136,14 @@ describe('the full-time card (3s)', () => {
     expect(initials('Madonna')).toBe('MA');
     expect(initials('  ')).toBe('?');
   });
+  it('takes the badge by letter, not by UTF-16 unit (#616)', () => {
+    expect(initials('🦊 Fox')).toBe('FO'); // the emoji is no word: one word, its first two letters
+    expect(initials('Jo')).toBe('JO');
+    expect(initials('王秀英')).toBe('王秀');
+    expect(initials('Tāne 🏉 Whakarua')).toBe('TW');
+    expect(initials('🦊 🏉')).toBe('?');
+    expect(initials("O'Neill 9")).toBe('O9');
+  });
   it('his line leaves out the noughts', () => {
     const p = { name: 'Brayden Naden', teamId: 'player', score: 9, tries: 1, tackles: 31, lineBreaks: 0 };
     expect(fmtPotmShort(p)).toBe('1 try, 31 tackles');

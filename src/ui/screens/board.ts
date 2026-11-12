@@ -96,7 +96,7 @@ export function staffRows(state: GameState): HTMLElement[] {
       ? `${def.title}: ${member.name} · ${fmtMoney(member.wage)}/wk`
       : `${def.title} · ${fmtMoney(staffWage(state, role))}/wk`;
     const row = el('div', { class: 'nrl-staff-row', attrs: { 'data-staff': role } },
-      el('div', { class: 'nrl-staff-info' }, el('strong', { text: who }), el('span', { class: 'nrl-staff-blurb', text: def.blurb })),
+      el('div', { class: 'nrl-staff-info' }, el('strong', { class: 'nrl-name-wrap', text: who }), el('span', { class: 'nrl-staff-blurb', text: def.blurb })),
       member
         ? button('Release', () => { releaseStaff(role); }, { class: 'nrl-btn-danger' })
         : button('Hire', () => { hireStaff(role); }, { class: 'nrl-btn-primary' }),
@@ -121,7 +121,7 @@ export function attackCoachRow(state: GameState): HTMLElement {
     const def = ATTACK_COACHES[coach.speciality];
     return el('div', { class: 'nrl-staff-row', attrs: { 'data-staff': 'attackCoach', 'data-speciality': coach.speciality } },
       el('div', { class: 'nrl-staff-info' },
-        el('strong', { text: `${def.title}: ${coach.name} · ${fmtMoney(coach.wage)}/wk` }),
+        el('strong', { class: 'nrl-name-wrap', text: `${def.title}: ${coach.name} · ${fmtMoney(coach.wage)}/wk` }),
         el('span', { class: 'nrl-staff-blurb', text: `${def.blurb} Plays you buy stay if he goes.` })),
       button('Release', () => { releaseStaff('attackCoach'); }, { class: 'nrl-btn-danger' }));
   }

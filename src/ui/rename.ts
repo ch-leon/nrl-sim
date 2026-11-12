@@ -39,6 +39,8 @@ const RENAME_CSS = `
 export interface NameFieldOpts {
   /** The name as it stands; the box opens on it. */
   value: string;
+  /** The name as kept in the save (default `value`; a screen that keeps a draft says). Never a fault (#616). */
+  kept?: string;
   /** What is being named, for a screen reader ("Player name", "Club name"). */
   label: string;
   /** Keep the clean name; return a reason to show when it can't be kept, else null. */
@@ -72,6 +74,15 @@ export function nameField(opts: NameFieldOpts): HTMLElement {
   const save = button(opts.saveLabel ?? 'Save', () => submit(), { class: 'nrl-btn-primary nrl-rename-save' });
   const check = (): void => {
     const c = cleanName(input.value);
+    // The name as kept is not a fault (#616): a save can hold a club named before the
+    // rule (the title took 120 letters). It stays until a new name is saved; only a new one is checked.
+    if (!c.ok && input.value === (opts.kept ?? opts.value)) {
+      save.disabled = true;
+      input.setAttribute('aria-invalid', 'false');
+      why.className = 'nrl-rename-why';
+      why.textContent = `${NAME_MAX} characters at most`;
+      return;
+    }
     save.disabled = !c.ok;
     input.setAttribute('aria-invalid', String(!c.ok));
     why.className = `nrl-rename-why${c.ok ? '' : ' nrl-attn'}`;

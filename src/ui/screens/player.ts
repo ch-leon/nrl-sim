@@ -530,6 +530,7 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
       ? null
       : nameField({
         value: renaming,
+        kept: p.name,
         label: 'Player name',
         attr: 'data-player-rename',
         onDraft: (text) => { renaming = text; },

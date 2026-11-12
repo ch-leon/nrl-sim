@@ -1505,7 +1505,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   let batch: HTMLElement[] = [];
   let eventSince = false;
   const addLine = (text: string, kind = ''): HTMLElement => {
-    const line = el('div', { class: 'nrl-mo-line' }, el('span', { class: 'nrl-mo-line-t', text: clockEl.textContent ?? '' }), el('span', { class: 'nrl-mo-line-text', text }));
+    const line = el('div', { class: 'nrl-mo-line' }, el('span', { class: 'nrl-mo-line-t', text: clockEl.textContent ?? '' }), el('span', { class: 'nrl-mo-line-text nrl-name-wrap', text }));
     if (kind) line.dataset.kind = kind;
     feed.prepend(line);
     while (feed.childElementCount > MAX_LOG) {

@@ -184,10 +184,11 @@ export function planChangeLines(
 
 /** Two letters for the Player of the Match badge: "Brayden Naden" → BN. */
 export function initials(name: string): string {
-  const words = name.trim().split(/\s+/).filter(Boolean);
+  // By code point, letters and digits only (#616): "🦊 Fox" read "�F" when it took UTF-16 units.
+  const words = name.trim().split(/\s+/).map((w) => w.match(/\p{L}|\p{N}/gu) ?? []).filter((w) => w.length > 0);
   if (words.length === 0) return '?';
-  const first = words[0]![0] ?? '';
-  const last = words.length > 1 ? words[words.length - 1]![0] ?? '' : words[0]![1] ?? '';
+  const first = words[0]![0]!;
+  const last = words.length > 1 ? words[words.length - 1]![0]! : words[0]![1] ?? '';
   return `${first}${last}`.toUpperCase();
 }
 

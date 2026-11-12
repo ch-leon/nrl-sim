@@ -858,6 +858,8 @@ ${REDUCED_MOTION}
 .nrl-neg { color: var(--nrl-neg); }
 .nrl-attn { color: var(--nrl-accent); }
 .nrl-muted { color: var(--nrl-muted); }
+/* A name that may be 24 letters with no space (#616): it breaks inside its box, never past it. */
+.nrl-name-wrap { min-width: 0; overflow-wrap: anywhere; }
 
 /* ── Dock (the only navigation): status · tabs · PLAY WEEK ───────────────── */
 .nrl-dock-wrap {

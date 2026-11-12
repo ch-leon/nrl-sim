@@ -55,6 +55,12 @@ describe('save / load round-trip', () => {
     expect(storage.map.has(slotKey(1))).toBe(true);
     expect(JSON.parse(storage.map.get(slotKey(1))!)).toEqual(s);
   });
+
+  it('keeps a club name from before the 24-character rule as it is (#616)', () => {
+    const long = 'Sydney Central Business District Wombats';
+    save(createNewGame(long, 3));
+    expect(load()?.clubName).toBe(long);
+  });
 });
 
 describe('load absence & corruption', () => {

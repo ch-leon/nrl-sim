@@ -193,6 +193,17 @@ export function myFixtureRows(state: Pick<GameState, 'league' | 'week'>, names: 
 
 // ── DOM screens ────────────────────────────────────────────────────────────────
 
+/** One "Your fixtures" row's parts: round, opponent, H / A, result. */
+export function myFixtureParts(r: MyFixtureRow): HTMLElement[] {
+  return [
+    el('span', { class: 'nrl-fixture-rd', text: r.rd }),
+    // H / A beside the name, not in it (#616): a long opponent is cut, never the marker.
+    el('span', { class: 'nrl-fixture-opp', text: `v ${r.opponent}` }),
+    el('span', { class: 'nrl-fixture-ha', text: r.home ? 'H' : 'A', attrs: { title: r.home ? 'Home' : 'Away' } }),
+    el('span', { class: `nrl-fixture-res nrl-fixture-${r.tone}`, text: r.tone === 'next' ? 'NEXT ▸' : r.res }),
+  ];
+}
+
 /**
  * The forecast for the player's next match: state.weather between weeks is the
  * coming week's (rolled at the end of the last), so it counts only when the next
@@ -435,11 +446,7 @@ function buildFixtures(state: GameState): LeagueColumn {
       toggle.textContent = 'All games ▸';
       let lastPlayed: HTMLElement | null = null;
       for (const r of myFixtureRows(state, names)) {
-        const parts = [
-          el('span', { class: 'nrl-fixture-rd', text: r.rd }),
-          el('span', { class: 'nrl-fixture-opp' }, `v ${r.opponent} `, el('span', { class: 'nrl-fixture-ha', text: r.home ? 'H' : 'A', attrs: { title: r.home ? 'Home' : 'Away' } })),
-          el('span', { class: `nrl-fixture-res nrl-fixture-${r.tone}`, text: r.tone === 'next' ? 'NEXT ▸' : r.res }),
-        ];
+        const parts = myFixtureParts(r);
         // The coming match opens its preview: who, form, how they play, their best, head to head.
         const row = r.tone === 'next'
           ? el('button', { class: 'nrl-fixture-row nrl-fixture-mine', attrs: { type: 'button', 'data-next-row': '', 'aria-label': `Next: ${r.round <= 0 ? `trial ${r.round + 2}` : `round ${r.round}`} v ${r.opponent}, preview` }, onClick: () => openNextMatch() }, ...parts)
@@ -668,7 +675,7 @@ button.nrl-fixture-row:focus-visible { outline: 2px solid var(--nrl-accent); out
 @media (pointer: coarse) { button.nrl-fixture-row { height: 44px; } }
 .nrl-fixture-rd { width: 24px; flex: 0 0 auto; font-family: var(--nrl-f-label); font-size: 0.875rem; font-weight: 600; color: var(--nrl-muted); }
 .nrl-fixture-opp { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.nrl-fixture-ha { color: var(--nrl-muted); }
+.nrl-fixture-ha { flex: 0 0 auto; color: var(--nrl-muted); }
 .nrl-fixture-res { flex: 0 0 auto; font-family: var(--nrl-f-num); font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
 .nrl-fixture-W { color: var(--nrl-pos); }
 .nrl-fixture-L { color: var(--nrl-neg); }

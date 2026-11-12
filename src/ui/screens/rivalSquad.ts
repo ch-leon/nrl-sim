@@ -153,6 +153,7 @@ export function rivalClubEditor(
       el('div', { class: 'nrl-kit-label', text: 'Club name' }),
       nameField({
         value: d.name,
+        kept: club.name,
         label: 'Club name',
         attr: 'data-rival-rename',
         focus: false,
@@ -225,7 +226,7 @@ export function openRivalSquad(opened: RivalClub): HTMLElement {
     const theirs = rivalSheet(club, context).roster ?? [];
     const behind = hasStaff(getState(), 'analyst') ? whenBehindLine(style) : null;
     const line = (text: string, attrs: Record<string, string>): HTMLElement => el('p', { text, attrs: { ...attrs, title: text } });
-    const title = el('h2', { text: club.name });
+    const title = el('h2', { class: 'nrl-name-wrap', text: club.name });
     if (draft) {
       const chip = el('span', { class: 'nrl-rival-chip', attrs: { 'aria-hidden': 'true' } });
       chip.style.background = `linear-gradient(90deg, ${draft.colors[0]} 60%, ${draft.colors[1]} 60%)`;

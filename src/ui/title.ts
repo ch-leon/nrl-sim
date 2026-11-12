@@ -10,9 +10,9 @@
 import {
   deleteSlot, downloadOriginalSave, exportRecoverySaves, getSlotSummaries, installImportedSave, listSlotMeta, pickSaveFile, setActiveSlot, type SlotSummary,
 } from '../core/save';
-import { cleanName, NAME_MAX } from '../data/names';
+import { cleanName, GROUND_MAX, NAME_MAX } from '../data/names';
 import type { GameState } from '../core/state';
-import { colorsForTown, foldTown, groundForTown, townColorsAllowed, townHash, type Town } from '../data/townSetup';
+import { colorsForTown, defaultClubName, foldTown, groundForTown, townColorsAllowed, townHash, type Town } from '../data/townSetup';
 import { buildLabel } from './buildInfo';
 import {
   DEFAULT_DIFFICULTY, DEFAULT_PLAYER_COLORS, DIFFICULTIES, PLAYER_PRIMARY_COLORS,
@@ -153,6 +153,12 @@ ${MOTION_CSS}
 .nrl-title-input { min-height: 44px; padding: 0 12px; font: inherit; font-size: 1rem; flex: 1; min-width: 0; color: #fff;
   background: #1b264a; border: 2px solid #26325c; border-radius: 10px; }
 .nrl-title-input:focus { outline: none; border-color: #f4d03f; }
+/* A name box and, while the name won't do, why (#616): the rename field's rule and words. */
+.nrl-title-entry { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.nrl-title-entry > .nrl-title-input { flex: 0 0 auto; }
+.nrl-title-input[aria-invalid="true"] { border-color: #f0a39b; }
+.nrl-title-why { font-size: 0.6875rem; line-height: 1.2; color: #f0a39b; }
+.nrl-title-why:empty { display: none; }
 @media (pointer: coarse) { .nrl-title-swatch { width: 44px; height: 44px; } }
 @media (max-height: 500px) and (min-width: 521px) {
   /* Keep the coarse-pointer swatches on one row at 667px, leaving room for both guidance lines. */
@@ -447,6 +453,30 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
         row.appendChild(control);
         return row;
       };
+      // The club, coach and ground names take the rename rule (#616): a name that won't do
+      // says why under its box and holds Start, never cut short. Empty is fine (a default, or no coach).
+      const checks: (() => boolean)[] = [];
+      const reasons: HTMLElement[] = [];
+      const named = (box: HTMLInputElement, max: number, hook: string): HTMLElement => {
+        box.setAttribute('maxlength', String(max * 2)); // room past the limit, so the reason shows
+        const why = mk('div', 'nrl-title-why');
+        why.setAttribute('aria-live', 'polite');
+        why.setAttribute(hook, '');
+        const check = (): boolean => {
+          const c = box.value.trim() ? cleanName(box.value, max) : null;
+          const bad = c !== null && !c.ok;
+          box.setAttribute('aria-invalid', String(bad));
+          why.textContent = c && !c.ok ? c.why : '';
+          return !bad;
+        };
+        box.addEventListener('input', () => { check(); });
+        checks.push(check);
+        reasons.push(why);
+        const entry = mk('div', 'nrl-title-entry');
+        entry.appendChild(box);
+        entry.appendChild(why);
+        return entry;
+      };
 
       const townInput = mk('input', 'nrl-title-input');
       townInput.type = 'text';
@@ -481,17 +511,15 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
       input.value = DEFAULT_CLUB_NAME;
       input.setAttribute('data-nrl-clubname', '');
       input.setAttribute('aria-label', 'Club name');
-      input.setAttribute('maxlength', '120');
       const names = mk('div', 'nrl-title-names');
-      names.appendChild(field('Club name', input));
+      names.appendChild(field('Club name', named(input, NAME_MAX, 'data-nrl-clubname-why')));
 
       const coachInput = mk('input', 'nrl-title-input');
       coachInput.type = 'text';
       coachInput.setAttribute('data-nrl-coachname', '');
       coachInput.setAttribute('aria-label', 'Your name');
       coachInput.setAttribute('placeholder', 'Coach');
-      coachInput.setAttribute('maxlength', String(NAME_MAX));
-      names.appendChild(field('Your name', coachInput));
+      names.appendChild(field('Your name', named(coachInput, NAME_MAX, 'data-nrl-coachname-why')));
       details.appendChild(names);
 
       const ground = mk('input', 'nrl-title-input');
@@ -499,8 +527,7 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
       ground.type = 'text';
       ground.setAttribute('data-nrl-groundname', '');
       ground.setAttribute('aria-label', 'Ground name');
-      ground.setAttribute('maxlength', '120');
-      details.appendChild(field('Ground name', ground));
+      details.appendChild(field('Ground name', named(ground, GROUND_MAX, 'data-nrl-groundname-why')));
       // The phone keyboard (#609): names start with a capital and are not "corrected", and the
       // return key says what it does: on to the next name, then done (the keyboard goes away).
       const nameInputs = [townInput, input, coachInput, ground];
@@ -522,8 +549,9 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
           ?? towns.find(t => foldTown(t.name) === foldTown(value));
         const name = selected?.name ?? value;
         const nickname = selected?.nickname ?? ['Wombats', 'Kestrels', 'Otters', 'Ironworkers'][townHash(name) % 4];
-        input.value = name ? `${name} ${nickname}` : DEFAULT_CLUB_NAME;
+        input.value = name ? defaultClubName(name, nickname) : DEFAULT_CLUB_NAME;
         ground.value = name ? groundForTown(name, selected?.id ?? name) : '';
+        for (const check of checks) check();
         if (!townColorsAllowed(name, selected?.country, primary, secondary)) {
           [primary, secondary] = colorsForTown(name, selected?.country);
         }
@@ -606,23 +634,36 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
       refresh();
 
       const go = mk('div', 'nrl-title-go');
+      /** Every name passes (each says why when not); focus the first that doesn't. */
+      const namesOk = (): boolean => {
+        const bad = [0, 1, 2].filter((i) => !checks[i]!());
+        if (bad.length) {
+          [input, coachInput, ground][bad[0]!]!.focus();
+          // On a short phone the details scroll: bring the reason into view, not only the box.
+          reasons[bad[0]!]!.scrollIntoView?.({ block: 'nearest' });
+        }
+        return bad.length === 0;
+      };
       const begin = (): void => {
+        if (!namesOk()) return;
         if (s.status !== 'empty') deleteSlot(s.slot);
-        const name = input.value.trim() || DEFAULT_CLUB_NAME;
+        const club = cleanName(input.value);
+        const name = club.ok ? club.name : DEFAULT_CLUB_NAME;
         const coach = cleanName(coachInput.value);
         const town = selected?.name ?? townInput.value.trim();
+        const groundName = cleanName(ground.value, GROUND_MAX);
         const home = selected
           ? { town, region: selected.region, country: selected.country, lat: selected.lat, lon: selected.lon }
           : { town };
         finish(s.slot, { mode: 'new', seed, clubName: name, ...(coach.ok ? { coachName: coach.name } : {}), difficulty, ...(veteran.checked ? { openAll: true } : {}), colors: [primary, secondary],
-          home, groundName: ground.value.trim() || groundForTown(town || name, selected?.id ?? town) });
+          home, groundName: groundName.ok ? groundName.name : groundForTown(town || name, selected?.id ?? town) });
       };
       // Start waits for the town list, and says so while it does (#613).
       const start = mkButton('Loading towns…', 'data-nrl-start', 'nrl-title-btn-go');
       start.disabled = true;
       const ready = (): void => { start.textContent = 'Start'; start.disabled = false; };
       start.addEventListener('click', () => {
-        if (start.disabled) return;
+        if (start.disabled || !namesOk()) return;
         if (s.status === 'empty') return begin();
         // A season (or an unreadable save) is in this slot: say what Start replaces first.
         go.replaceChildren();
@@ -653,6 +694,7 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
         applyTown();
         if (editedClub !== undefined) input.value = editedClub;
         if (editedGround !== undefined) ground.value = editedGround;
+        for (const check of checks) check();
         ready();
       }).catch(() => {
         townNote.textContent = 'Town list unavailable. Type your own town to start.';
