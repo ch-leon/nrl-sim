@@ -2,7 +2,7 @@ import type { PlayerSnap, Side, Snapshot } from '../core/snapshot';
 import type { Facing } from '../../art/prototype/player';
 import { PLAYER_ANIMS, type PlayerAnim } from '../../art/match/players';
 import { LIVE } from '../league/live/knobs';
-import type { LivePlayerAction } from '../../art/match/livePlayer';
+import type { LivePlayerAction, Reaction } from '../../art/match/livePlayer';
 import { hashString } from '../../art/match/kit';
 import { MOMENT_ACTIONS, momentLift, type MomentAction } from '../../art/match/moments';
 import { screenFacing } from './screenFacing';
@@ -44,6 +44,28 @@ export function strideFor(p: PlayerSnap, previous: PlayerSnap, tick: number): nu
 export interface PictureContext {
   /** A play-the-ball in progress (#665): the side defending it, where the ball is, and whether it is coming out. */
   ruck?: { side: Side; x: number; y: number; rising: boolean };
+  /** Who has the ball and where (a reaction gives way to it when the man with it is close, #667). */
+  carrier?: { side: Side; x: number; y: number };
+}
+/** Ticks a reaction is shown for (#667), from the error, miss or bin: about a second at ×1. */
+export const REACT_HOLD_TICKS = 24;
+/** An opponent with the ball this close (m) needs him: no reaction. */
+const NEEDED_M = 8;
+/** Ticks per nod of a standing man's hands-on-head. */
+const NOD_TICKS = 8;
+
+/**
+ * The reaction to show (#667), if any: hands on head after an error or a missed goal, arms folded in
+ * the bin. Never with the ball, and never with an opponent carrying it close by: he is needed.
+ */
+export function reaction(p: PlayerSnap, tick: number, possession: boolean, carrier?: PictureContext['carrier']): Reaction | null {
+  if (possession) return null;
+  if (p.binned) return 'armsFolded';
+  if (p.reactTick === undefined || p.react === undefined || p.react === 'bin') return null;
+  const age = tick - p.reactTick;
+  if (age < 0 || age >= REACT_HOLD_TICKS) return null;
+  if (carrier && carrier.side !== p.side && Math.hypot(carrier.x - p.x, carrier.y - p.y) < NEEDED_M) return null;
+  return 'handsOnHead';
 }
 /** Markers stand 1.8 and 3.6 m in front of the mark (LIVE.markerStandM, markerGapM); the line is further back. */
 const MARKER_M = 5;
@@ -64,6 +86,8 @@ export function tiredLevel(p: PlayerSnap): 0 | 1 | 2 {
 
 export function pictureContext(s: Snapshot): PictureContext {
   const ctx: PictureContext = {};
+  const h = s.ball.holder && s.players.find(p => p.side === s.ball.holder!.side && p.slot === s.ball.holder!.slot);
+  if (h) ctx.carrier = { side: h.side, x: h.x, y: h.y };
   const r = s.players.find(p => p.pose === 'ptb' || p.pose === 'dummyHalf');
   if (r) {
     const picked = r.pose === 'dummyHalf' && s.ball.holder?.side === r.side && s.ball.holder.slot === r.slot;
@@ -92,6 +116,12 @@ export function playerPicture(p: PlayerSnap, previous: PlayerSnap, tick: number,
   if (ruck && action === 'idle' && p.side === ruck.side && stride === -1 && !p.binned && Math.hypot(p.x - ruck.x, p.y - ruck.y) > MARKER_M) {
     action = 'ready';
     frame = ruck.rising ? 2 : Math.floor((tick + p.slot * 2) / READY_TICKS) % 2;
+  }
+  // A reaction (#667) while he is free to show it: standing or jogging, without the ball, nobody of theirs on the ball near him.
+  const reacting = reaction(p, tick, possession, ctx.carrier);
+  if (reacting && (action === 'idle' || action === 'run')) {
+    action = reacting;
+    frame = stride >= 0 ? 0 : reacting === 'armsFolded' ? Math.floor((tick + p.slot * 5) / BREATH_TICKS) % 2 : Math.floor((tick - (p.reactTick ?? 0)) / NOD_TICKS) % 2;
   }
   // Spent (or blown) and stood still with the ball elsewhere: hands on knees, sucking in air.
   const weary = tiredLevel(p);
@@ -131,7 +161,7 @@ export function playerPicture(p: PlayerSnap, previous: PlayerSnap, tick: number,
     frame = Math.floor((tick - p.celebrationTick) / 3 + p.slot) % 6;
   }
   const lift = MOMENT_ACTIONS.includes(action as MomentAction) ? momentLift(action as MomentAction, frame) : 0;
-  const strideFrame = ['run', 'carry', 'catch', 'pass', 'airCatch', 'fend'].includes(action)
+  const strideFrame = ['run', 'carry', 'catch', 'pass', 'airCatch', 'fend', 'handsOnHead', 'handsOnHips', 'armsFolded'].includes(action)
     ? stride : undefined;
   const tired = weary && (action === 'run' || action === 'carry' || action === 'idle') ? weary : 0;
   return { who: p.who ?? `${p.side}/${p.slot}`, action, frame, lift, ...(strideFrame === undefined ? {} : { strideFrame }), ...(tired ? { tired } : {}), ...screenFacing(p, previous, screenDir), possession };

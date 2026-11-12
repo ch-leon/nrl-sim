@@ -42,6 +42,9 @@ export interface PlayerSnap {
   aerialCatchTick?: number;
   tryTick?: number;
   celebrationTick?: number;
+  /** His error (knock-on, spill, stripped), missed goal or sin bin, for a short reaction (#667): reported for REACT_SNAP_TICKS after it. Presentation only. */
+  reactTick?: number;
+  react?: 'error' | 'miss' | 'bin';
   /** Sprint and gas (BAK-208 §8.2): going flat out this tick, ran his gas dry, gas left 0..1. */
   sprint?: boolean;
   blown?: boolean;
@@ -51,6 +54,9 @@ export interface PlayerSnap {
   /** In the sin bin (#71): standing on the touchline, out of the play. */
   binned?: boolean;
 }
+
+/** Ticks a reaction stays on the snapshot (#667): the view holds it for less, once he is free to show it. */
+export const REACT_SNAP_TICKS = 40;
 
 export interface BallSnap {
   x: number;

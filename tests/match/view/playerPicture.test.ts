@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { JOG_SPEED, STRIDE_METRES, pictureContext, playerPicture, tiredLevel } from '../../../src/match/view/playerPicture';
+import { JOG_SPEED, REACT_HOLD_TICKS, STRIDE_METRES, pictureContext, playerPicture, reaction, tiredLevel } from '../../../src/match/view/playerPicture';
 import { FATIGUE } from '../../../src/match/league/fatigue';
 import type { PlayerSnap, Snapshot } from '../../../src/match/core/snapshot';
 import { LIVE } from '../../../src/match/league/live/knobs';
@@ -153,11 +153,38 @@ describe('live player presentation', () => {
     expect(heaves.every(f => f.action === 'blowing' && f.tired === undefined)).toBe(true);
     expect(new Set(heaves.map(f => f.frame))).toEqual(new Set([0, 1]));
     expect(playerPicture(still, still, 5, { side: 'home', slot: 0 }, 1).action).toBe('carry');
-    expect(playerPicture({ ...still, binned: true }, still, 5, null, 1).action).toBe('idle');
+    expect(playerPicture({ ...still, binned: true }, still, 5, null, 1).action).toBe('armsFolded');
     expect(playerPicture({ ...still, legs: .3 }, still, 5, null, 1)).toMatchObject({ action: 'idle', tired: 1 });
     // Other poses keep their frames: a tired man's pass or tackle is the same picture.
     const passer = { ...tired, pose: 'pass', poseUntil: 60, caughtTick: 45 };
     expect(playerPicture(passer, passer, 50, null, 1).tired).toBeUndefined();
+  });
+  it('shows a short reaction after an error or a missed goal, and folds the binned man\'s arms (#667)', () => {
+    const runner = { ...p, odometer: 3, reactTick: 200, react: 'error' as const };
+    const at = (q: PlayerSnap, tick: number, holder: Snapshot['ball']['holder'] = null, carrier?: { side: 'home' | 'away'; x: number; y: number }) =>
+      playerPicture(q, q, tick, holder, 1, carrier ? { carrier } : {});
+    // On the run: hands on head over the running legs, for REACT_HOLD_TICKS from the error, then the run again.
+    expect(at(runner, 200)).toMatchObject({ action: 'handsOnHead', frame: 0 });
+    expect(at(runner, 200).strideFrame).toBe(at({ ...p, odometer: 3 }, 200).strideFrame);
+    expect(at(runner, 200 + REACT_HOLD_TICKS - 1).action).toBe('handsOnHead');
+    expect(at(runner, 200 + REACT_HOLD_TICKS).action).toBe('run');
+    expect(at(runner, 199).action).toBe('run');
+    expect(at({ ...runner, react: 'miss' }, 205).action).toBe('handsOnHead');
+    // Standing, two frames nod; the same frame on every replay.
+    const still = { ...runner, pose: 'idle', speed: 0 };
+    expect(new Set(Array.from({ length: 20 }, (_, t) => at(still, 200 + t).frame))).toEqual(new Set([0, 1]));
+    expect(at(still, 209)).toEqual(at(still, 209));
+    // Never while he is needed: with the ball, in a tackle, or with an opponent carrying it close by.
+    expect(at(runner, 205, { side: 'home', slot: 0 }).action).toBe('carry');
+    expect(at({ ...runner, pose: 'tackled', poseUntil: 210 }, 205).action).toBe('tackled');
+    expect(at(runner, 205, null, { side: 'away', x: p.x + 3, y: p.y }).action).toBe('run');
+    expect(at(runner, 205, null, { side: 'away', x: p.x + 20, y: p.y }).action).toBe('handsOnHead');
+    expect(at(runner, 205, null, { side: 'home', x: p.x + 3, y: p.y }).action).toBe('handsOnHead');
+    // The sin bin: arms folded on the touchline for as long as he is there, standing or walking off.
+    const binned = { ...p, pose: 'idle', speed: 0, binned: true };
+    expect(at(binned, 5000).action).toBe('armsFolded');
+    expect(at({ ...binned, pose: 'run', speed: 2, odometer: 1 }, 5000)).toMatchObject({ action: 'armsFolded', frame: 0 });
+    expect(reaction({ ...p, reactTick: 10, react: 'bin' }, 12, false)).toBeNull();
   });
   it('sets the defensive line for the play-the-ball, not the markers or the attack (#665)', () => {
     const ptb: PlayerSnap = { ...p, side: 'away', slot: 4, x: 50, y: 30, pose: 'ptb', speed: 0, poseUntil: 110 };
@@ -172,7 +199,7 @@ describe('live player presentation', () => {
     expect(at(marker).action).toBe('idle');
     expect(at(mate).action).toBe('idle');
     expect(at({ ...line, speed: 3, pose: 'run' }).action).toBe('run');
-    expect(at({ ...line, binned: true }).action).toBe('idle');
+    expect(at({ ...line, binned: true }).action).toBe('armsFolded');
     // A two-frame bounce from the tick, the same on every replay.
     const bounce = Array.from({ length: 16 }, (_, t) => at(line, 100 + t).frame);
     expect(new Set(bounce)).toEqual(new Set([0, 1]));

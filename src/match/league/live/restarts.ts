@@ -359,6 +359,7 @@ export abstract class LiveRestarts extends LivePlay {
     if (pen) this.emit('penalty-goal', ph.good ? `${k.name} kicks the penalty goal — ${score}` : `${k.name} misses the penalty goal`, k);
     else this.emit('conversion', ph.good ? `${k.name} converts — ${score}` : `${k.name} misses the conversion`, k);
     this.events[this.events.length - 1]!.detail = ph.good ? 'good' : 'missed';
+    if (!ph.good) this.react(k, 'miss');
     if (pen && !ph.good) {
       // A missed penalty goal is dead: a 20 m restart for the defence.
       const def = other(ph.side);

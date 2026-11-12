@@ -412,6 +412,10 @@ export abstract class LiveBase {
   protected emit(kind: string, text: string, p?: Player, trait?: string): void {
     this.events.push({ tick: this.tick, kind, text, ...(p ? { side: p.side, slot: p.slot, player: p.name } : {}), ...(trait ? { trait } : {}) });
   }
+  /** Remember, for the picture only, that he just made the error, missed the goal or was binned (#667). */
+  protected react(p: Player, kind: 'error' | 'miss' | 'bin'): void {
+    p.react = { tick: this.tick, kind };
+  }
   /** Metres from the carrier to the line he is attacking. */
   protected toLine(p: Player): number {
     return this.dir > 0 ? FIELD_LENGTH - p.body.pos.x : p.body.pos.x;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ANIM_ORDER, opaqueBounds } from '../../../src/art/match/players';
 import { drawLivePlayer } from '../../../src/art/match/livePlayer';
-import { appearanceFor, castLooks } from '../../../src/art/prototype/player';
+import { HEAD_OPTIONS, appearanceFor, castLooks } from '../../../src/art/prototype/player';
 import { buildKit } from '../../../src/art/match/kit';
 import { FRAME_CACHE_SIZE, PlayerFrameCache } from '../../../src/scenes/matchPlayers';
 const kit = buildKit(0xccbb22, 0x213344, 'v');
@@ -79,6 +79,22 @@ describe('live match artwork', () => {
           const b = opaqueBounds(p)!;
           expect(b.x0).toBeGreaterThan(0); expect(b.x1).toBeLessThan(p.w - 1); expect(b.y1).toBe(opaqueBounds(fresh)!.y1);
         }
+      }
+    }
+  });
+  it('paints the reactions over standing or running legs, inside the frame (#667)', () => {
+    const look = appearanceFor('same-player');
+    const legs = (p: ReturnType<typeof drawLivePlayer>) => Array.from(p.data.subarray(p.w * 4 * 36)).join();
+    for (const action of ['handsOnHead', 'handsOnHips', 'armsFolded'] as const) for (const head of HEAD_OPTIONS) for (const facing of ['front', 'back'] as const) for (const build of ['lean', 'athletic', 'stocky'] as const) {
+      const a = { ...look, head, build };
+      for (const stride of [-1, 0, 2, 5, 8]) for (const frame of [0, 1]) {
+        const pic = drawLivePlayer(a, kit, action, frame, facing, false, stride);
+        const b = opaqueBounds(pic)!;
+        expect(b.x0).toBeGreaterThan(0); expect(b.y0).toBeGreaterThan(0);
+        expect(b.x1).toBeLessThan(pic.w - 1); expect(b.y1).toBeLessThan(pic.h - 1);
+        // The legs are the run's (or the stand's): only the arms and head change.
+        if (stride >= 0) expect(legs(pic)).toEqual(legs(drawLivePlayer(a, kit, 'run', 0, facing, false, stride)));
+        expect(pic.data).not.toEqual(drawLivePlayer(a, kit, stride >= 0 ? 'run' : 'idle', frame, facing, false, stride >= 0 ? stride : undefined).data);
       }
     }
   });

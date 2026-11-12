@@ -2,15 +2,17 @@
 import type { PixelBuffer } from '../pixel';
 import type { Kit } from './kit';
 import type { PlayerAnim } from './players';
-import { drawPrototypePlayer, type Appearance, type Action, type Facing } from '../prototype/player';
+import { drawPrototypePlayer, type Appearance, type Action, type ReactAction, type Facing } from '../prototype/player';
 import { drawRuckPlayer } from './ruck';
 import { MOMENT_ACTIONS, drawMomentPlayer, type MomentAction } from './moments';
 
-/** `ready`: a defender set for the play-the-ball (#665). */
-export type LivePlayerAction = PlayerAnim | 'carry' | 'ready' | MomentAction;
-const BASIC: Partial<Record<LivePlayerAction, Action>> = {
+/** `ready`: a defender set for the play-the-ball (#665). The reactions (#667): standing or on the run. */
+export type Reaction = 'handsOnHead' | 'handsOnHips' | 'armsFolded';
+export type LivePlayerAction = PlayerAnim | 'carry' | 'ready' | Reaction | MomentAction;
+const BASIC: Partial<Record<LivePlayerAction, Action | ReactAction>> = {
   idle: 'idle', run: 'run', carry: 'carry', pass: 'pass', catch: 'catch',
   tackle: 'wrap', tackled: 'brace', down: 'ground', dive: 'ground', ptb: 'ptb', fend: 'fend',
+  handsOnHead: 'headHands', handsOnHips: 'hips', armsFolded: 'fold',
 };
 
 export function drawLivePlayer(look: Appearance, kit: Kit, action: LivePlayerAction, frame: number, facing: Facing, possession: boolean, strideFrame?: number, tired = 0): PixelBuffer {

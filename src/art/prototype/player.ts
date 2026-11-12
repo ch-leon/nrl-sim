@@ -10,6 +10,8 @@ export { HEAD_OPTIONS, type Head, type Facing } from './head';
 
 export type Build = 'lean' | 'athletic' | 'stocky';
 export type Action = 'idle' | 'run' | 'carry' | 'pass' | 'catch' | 'brace' | 'wrap' | 'ground' | 'ptb' | 'fend';
+/** Reactions (#667): the arms held still over standing or running legs. */
+export type ReactAction = 'headHands' | 'hips' | 'fold';
 export interface Appearance {
   skin: number;
   hair: number;
@@ -147,7 +149,7 @@ const ARM_SWING = [2, 1, -1, -2, -1, 1];
  * `tired` (#666): 1 on tired legs, 2 spent or blown. A tired man runs and stands lower and hunched,
  * head down, without the lift into flight; spent, his arms barely pump. 0 is the fresh figure, unchanged.
  */
-export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action, frame: number, facing: Facing = 'front', possession = false, strideFrame?: number, tired = 0): PixelBuffer {
+export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action | ReactAction, frame: number, facing: Facing = 'front', possession = false, strideFrame?: number, tired = 0): PixelBuffer {
   const b = new PixelBuffer(WIDTH, PAINT_H);
   const f = ((Math.floor(frame) % 6) + 6) % 6;
   const stocky = a.build === 'stocky';
@@ -176,7 +178,9 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action, fra
     return stand(b);
   }
 
-  const running = strideFrame !== -1 && (action === 'run' || action === 'carry' || action === 'catch' || ((action === 'pass' || action === 'fend') && strideFrame !== undefined));
+  // Reactions (#667) hold the arms still over standing or running legs: hands on head, hands on hips, arms folded.
+  const react = action === 'headHands' || action === 'hips' || action === 'fold';
+  const running = strideFrame !== -1 && (action === 'run' || action === 'carry' || action === 'catch' || ((action === 'pass' || action === 'fend' || react) && strideFrame !== undefined));
   const gait = strideFrame === undefined || strideFrame < 0 ? f : strideFrame % 6;
   const jog = running && strideFrame !== undefined && strideFrame >= 6;
   const legs = jog ? JOG_LEG : RUN_LEG;
@@ -190,12 +194,17 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action, fra
   // Tired legs no longer lift him into flight: the bob only dips.
   const bob = running ? Math.max(weary ? 0 : -1, (jog ? JOG_BOB : RUN_BOB)[gait]!) : 0;
   // Idle breathing: the chest rises a pixel on the in-breath; hips and boots stay put.
-  const breath = action === 'idle' && f % 2 === 1 ? 1 : 0;
+  const breath = (action === 'idle' || (action === 'fold' && !running)) && f % 2 === 1 ? 1 : 0;
+  // Dejected, the head drops (and nods a pixel on frame 1 when he stands); a man with hands on hips hangs it lower.
+  const hang = action === 'headHands' ? 1 + (running ? 0 : f % 2) : action === 'hips' ? 2 + (running ? 0 : f % 2) : 0;
   const lean = (action === 'wrap' ? [4, 3, 4][beat]! : action === 'brace' ? [3, -1, 1][beat]! : action === 'fend' ? 2 : running ? 1 : action === 'ptb' ? 2 : 0) + weary;
   const hipY = 27 + crouch + bob;
   // Tired, the hips keep the legs' reach and the shoulders sink toward them: a shorter, hunched trunk.
   const shoulderY = 20 + crouch + bob - breath + weary;
   const left = CENTRE - Math.floor(bodyW / 2) + lean;
+  // Head down and forward of the shoulders when tired or dejected: the neck sinks into the collar.
+  const headX = CENTRE - 7 + lean + (weary > 1 || hang > 1 ? 1 : 0);
+  const headY = shoulderY - 17 + weary + hang;
   /** One running leg from its hip: thigh, sock to the boot, boot (toe forward). */
   const runLeg = (hipX: number, top: number, beat: number, thigh: number, boot: number, band: number | null) => {
     const [kx, ky, fx, lift] = legs[beat]!;
@@ -217,7 +226,16 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action, fra
   }
   // The fend's ball goes under the far arm, out of the defender's reach.
   if (action === 'fend' && possession) heldBall(left - 5, shoulderY + 2);
-  if (swing > 0) {
+  if (action === 'headHands') {
+    // Hands clasped behind his head: only the elbows show, flared out beside it.
+    line(left + 2, shoulderY + 1, headX - 1, headY + 12, skinDark, 2);
+    line(headX - 1, headY + 12, headX + 4, headY + 7, skinDark, 2);
+  } else if (action === 'hips') {
+    line(left + 2, shoulderY + 1, left - 3, shoulderY + 3, skinDark, 2);
+    line(left - 3, shoulderY + 3, left, hipY - 1, skinDark, 2);
+  } else if (action === 'fold') {
+    // Folded arms are painted over the chest below.
+  } else if (swing > 0) {
     // Swung forward: the forearm comes up past the chest.
     line(left + 2, shoulderY + 1, left + 3, shoulderY + 5, skinDark, 2);
     line(left + 3, shoulderY + 5, left + bodyW + (swing > 1 ? 1 : -1), shoulderY + (swing > 1 ? 3 : 5), skinDark, 2);
@@ -255,14 +273,30 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action, fra
 
   b.fillRect(CENTRE + lean, shoulderY - 2, 3, 3, skinDark);
   b.fillRect(CENTRE + lean - 1, shoulderY, 5, 1, kit.trim);
-  // Head down and forward of the shoulders when tired: the neck sinks into the collar.
-  b.blit(drawHead(a, kit, facing), CENTRE - 7 + lean + (weary > 1 ? 1 : 0), shoulderY - 17 + weary);
-
   const shX = left + bodyW - 2;
   const shY = shoulderY + 2;
+  // The near elbow goes behind the head too, so the head covers both hands.
+  if (action === 'headHands') {
+    line(shX, shY, headX + 16, headY + 12, a.skin, 2);
+    line(headX + 16, headY + 12, headX + 11, headY + 7, a.skin, 2);
+  }
+  b.blit(drawHead(a, kit, facing), headX, headY);
+
   let handX = shX + 1;
   let handY = shY + 6;
-  if (action === 'carry' || action === 'brace' || (action === 'catch' && strideFrame !== undefined && f === 5)) {
+  if (action === 'headHands') {
+    handX = headX + 16; handY = headY + 12;
+  } else if (action === 'hips') {
+    handX = shX; handY = hipY;
+    line(shX, shY, shX + 4, shY + 3, a.skin, 2);
+    line(shX + 4, shY + 3, handX, handY, a.skin, 2);
+  } else if (action === 'fold') {
+    // Forearms crossed over the chest: the far one under, the near one on top.
+    line(left, shoulderY + 3, left + bodyW - 2, shoulderY + 3, skinDark, 2);
+    handX = left + 1; handY = shoulderY + 5;
+    line(shX + 1, shY - 1, shX + 1, shoulderY + 5, a.skin, 2);
+    line(shX + 1, shoulderY + 5, handX, handY, a.skin, 2);
+  } else if (action === 'carry' || action === 'brace' || (action === 'catch' && strideFrame !== undefined && f === 5)) {
     handX = shX + 2; handY = shY + 4;
     if (possession) heldBall(shX - 1, shY + 2);
     line(shX, shY, shX - 1, shY + 6, a.skin);
@@ -312,7 +346,7 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action, fra
     else b.fillRect(shX + Math.round(dx / Math.max(1, Math.abs(dy)) * 2), shY + 1, 3, 2, kit.trim);
     b.fillRect(shX, shY - 1, 3, 1, kit.trim);
   }
-  if (a.tape) b.fillRect(handX, handY - 1, 2, 2, 0xf6edda);
+  if (a.tape && action !== 'headHands') b.fillRect(handX, handY - 1, 2, 2, 0xf6edda);
   if (facing === 'back' && a.number !== undefined) {
     // The 3×5 hoarding digits, centred on the back; omitted on the front chest. Painted last:
     // from behind the arms and a tucked ball pass behind the jersey, so they never cover it.

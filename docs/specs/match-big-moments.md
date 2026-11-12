@@ -60,6 +60,34 @@ appearance assignments change. The frame cache remains bounded (768 since #646) 
 frames, with one reusable GPU texture per actor. Pause and seek sample from the
 snapshot alone; no wall-clock animation state is accumulated.
 
+## Reactions (#667)
+
+The big moments are no longer only the scoring side's. `PlayerSnap` adds
+`reactTick` and `react` (`error`, `miss`, `bin`), the same kind of
+presentation fact as `tryTick` and `celebrationTick`: stamped (`react()` in
+`live/base.ts`) beside an event the sim already emits, never read back by the
+sim, no RNG, and reported for `REACT_SNAP_TICKS` (40) after it. Nothing is
+invented for the view; each stamp is a fact the sim has just announced:
+
+| Event (emit) | Who | Reaction |
+| --- | --- | --- |
+| `error` (knock-on on a pass, ball lost in the tackle) | the man who lost it | hands on head |
+| `drop` (a spilled kick) | the catcher | hands on head |
+| `strip` | the carrier stripped (the event names the tackler) | hands on head |
+| `conversion`, `penalty-goal`, `field-goal` missed | the kicker | hands on head |
+| `sin-bin` | the culprit | arms folded, while `binned` |
+
+`playerPicture` holds hands on head for `REACT_HOLD_TICKS` (24, about a second
+at ×1) from the stamp, over his standing or running legs, and only while he is
+free: not holding the ball, not in a tackle or other locked pose, and with no
+opponent carrying the ball within 8 m (he is needed). A man stood still nods it
+over two frames. The binned man folds his arms for as long as `binned` is set,
+walking off or on the touchline; where he stands is the stadium's. A missed
+tackle that led to a break is left out: the line-break event names only the
+breaker, and the beaten tackler named by `break-tackle` is immediately chasing,
+so there is no fact that says he missed *and* is free. Hands on hips, head
+down, is painted for the conceding side after a try (#668).
+
 ## Review
 
 `match-moments-comparison.html` is a standalone offline comparison with shared

@@ -72,6 +72,8 @@ export interface Player {
   catchTick: number;
   /** Last successful airborne kick reception, for the renderer only. */
   aerialCatchTick?: number;
+  /** His last error, missed goal or sin bin and its tick (#667), for the renderer only: nothing in the sim reads it. */
+  react?: { tick: number; kind: 'error' | 'miss' | 'bin' };
   /** Already chose pass-or-carry for this possession (decided once, at engagement). */
   decided: boolean;
   /** Defender index this carrier has already tried to step this possession. */
