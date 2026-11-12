@@ -7,6 +7,8 @@ import { describe, it, expect } from 'vitest';
 import { foldMomentum, momentumLabel, momentumLeader, momentumShapes, momentumWindow, MOMENTUM_STEP_MIN, MOMENTUM_WINDOW_MIN, type MomentumEvent } from '../../../src/match/view/momentum';
 import { MOMENTUM_BIGHIT, MOMENTUM_ERROR, MOMENTUM_TRY } from '../../../src/sim/weather';
 import { runMatch } from '../../../src/match/league/match';
+import { LiveSim } from '../../../src/match/league/live';
+import { toMatchEvent } from '../../../src/match/league/events';
 import { sideSheet } from '../../../src/match/balance/measure';
 
 const ev = (at: number, kind: MomentumEvent['kind'], teamId: 'H' | 'A'): MomentumEvent => ({ at, kind, teamId });
@@ -38,12 +40,23 @@ describe('momentumWindow (#366)', () => {
     const away = sideSheet('A', { rating: 55 });
     for (const seed of [1, 2, 3]) {
       const res = runMatch(home, away, { seed, weather: 'clear' });
-      // The recorder reads each minute as the clock turns it: the events stamped before it.
-      const seen = res.events.map((e) => ({ at: e.t, kind: e.kind, teamId: e.teamId }));
+      // Contract events retain only whole minutes. Replaying the same seed gives
+      // the overlay's precise time, including events on a minute boundary (#618).
+      const sim = new LiveSim(home, away, seed, { weather: 'clear' });
+      const seen: MomentumEvent[] = [];
+      while (!sim.finished) {
+        sim.step();
+        if (!sim.tickEvents.length) continue;
+        const snap = sim.snapshot();
+        for (const e of sim.tickEvents) {
+          const mapped = toMatchEvent(e, snap, { home: 'H', away: 'A' });
+          if (mapped) seen.push({ at: sim.matchSeconds / 60, kind: mapped.kind, teamId: mapped.teamId });
+        }
+      }
       for (const r of res.momentumTimeline) {
         if (r.t === 0) continue;
         let m = 0;
-        for (const e of seen) if (e.at < r.t) m = foldMomentum(m, e.kind, e.teamId === 'H');
+        for (const e of seen) if (e.at <= r.t) m = foldMomentum(m, e.kind, e.teamId === 'H');
         expect(Math.round(m), `seed ${seed} minute ${r.t}`).toBe(r.value);
       }
       let all = 0;

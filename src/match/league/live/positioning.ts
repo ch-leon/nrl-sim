@@ -385,7 +385,8 @@ export abstract class LivePositioning extends LiveContact {
         p.wantsSprint = broken || dist(p.body.pos, target.body.pos) < LIVE.sprintCloseM;
       } else if (markers.includes(p)) {
         const k = markers.indexOf(p);
-        p.target = clampToGround({ x: this.mark.x + this.dir * 0.8, y: this.mark.y + (k === 0 ? -0.9 : 0.9) }, 0.5);
+        // Square at the play-the-ball, one behind the other toward their own goal line.
+        p.target = clampToGround({ x: this.mark.x + this.dir * (LIVE.markerStandM + k * LIVE.markerGapM), y: this.mark.y }, 0.5);
       } else if (p === this.fullback(def)) {
         // The last line: deeper still on the last tackle, and once the kicker
         // shapes to kick he reads it and goes to where it will land.

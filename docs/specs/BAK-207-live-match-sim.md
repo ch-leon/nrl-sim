@@ -91,7 +91,9 @@ Every transition is a thing that physically happens on the field; nothing is imp
 - **Support:** two runners hold lines either side of the carrier; wingers stay wide;
   fullback trails.
 - **Defence:** line holds 10 m back from the ruck and re-forms each tackle; two markers
-  at the ruck; line slides with the ball; defenders inside `RUSH_M` of the carrier commit;
+  at the ruck, square with the play-the-ball and one behind the other toward their
+  own goal line (1.8 m from the mark, then 1.8 m between markers); line slides with
+  the ball; defenders inside `RUSH_M` of the carrier commit;
   a tackle is **attempted** when within reach.
 - **Contest:** tackler strength+tackling vs carrier strength+evasion+momentum → `held`,
   `big-hit` (driven back), `broken` (carrier continues), `fend`, `offload`. Each result is
