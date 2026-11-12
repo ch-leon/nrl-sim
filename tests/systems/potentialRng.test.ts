@@ -38,7 +38,9 @@ import { contractsEndingSoon } from '../../src/systems/contracts';
 // Previous pin: 1788836146.
 // #618: square marker positions change match outcomes and subsequent season draws.
 // UI-read and no-read seasons must still agree. Previous pin: 1597012555.
-const MAIN_SEED_AFTER_SEASON = 1788836146;
+// #625: completed retreats, including handovers, change match outcomes and later
+// season draws. UI-read and no-read seasons still agree. Previous pin: 1788836146.
+const MAIN_SEED_AFTER_SEASON = 417849572;
 
 describe('the rng stream (#369)', () => {
   it.each([0, 1])('weekly potential and dot reads preserve the season stream with habit AI=%i', (ai) => {

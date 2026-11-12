@@ -6,9 +6,11 @@ import { playerPicture } from '../../../src/match/view/playerPicture';
 describe('moment presentation facts', () => {
   it('reports actual kicks, successful high takes and the scored try, without render reads affecting play', () => {
     const home = labSheet(DEFAULT_HOME); const away = labSheet(DEFAULT_AWAY);
-    const sim = new LiveSim(home, away, 1); const control = new LiveSim(home, away, 1);
+    const sim = new LiveSim(home, away, 2); const control = new LiveSim(home, away, 2);
     const found = new Set<string>();
-    for (let i = 0; i < 2600; i++) {
+    // Seed 2 includes every presentation fact after retreat completion (#625).
+    // Observe its whole match rather than depending on the opening carries.
+    while (!sim.finished) {
       sim.step(); control.step();
       const s = sim.snapshot(); sim.snapshot();
       expect(s).toEqual(control.snapshot());

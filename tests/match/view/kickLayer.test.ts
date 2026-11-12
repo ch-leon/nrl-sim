@@ -336,7 +336,8 @@ describe('kicks in real matches', () => {
     const types = new Set<string>();
     const done: Kick[] = [];
     const aimed = new Map<Kick, { x: number; y: number }>();
-    for (const seed of [31, 32]) {
+    // Include a third trajectory for enough ground landings after completed retreats (#625).
+    for (const seed of [31, 32, 33]) {
       const sim = new LiveSim(sideSheet('H', { rating: 60 }), sideSheet('A', { rating: 60 }), seed);
       const w = new KickWatch();
       let open: Kick | null = null;

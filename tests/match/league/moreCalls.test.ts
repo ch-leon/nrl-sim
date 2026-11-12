@@ -44,10 +44,10 @@ interface Played {
 /**
  * Seeds for the penalty pair: a home penalty in range is rare in a 6-minute half,
  * and one the captain doesn't tap himself (Tap and go's moment) rarer still.
- * The square-marker alignment reshuffled the previous fixtures: seed 49 has
- * Take the two on at tick 910; seed 29 has Tap and go on at tick 7847.
+ * The completed retreat (#625) reshuffled the previous fixtures: seed 23 has
+ * Take the two on at tick 2496; seed 60 has Tap and go on at tick 8447.
  */
-const PENALTY_SEEDS = [29, 49];
+const PENALTY_SEEDS = [23, 60];
 
 /** Play with the home coach making `call` whenever he may (as a player at the tray does: a tap, in on the next tick). */
 function play(seed: number, call: CoachCall | null, minutes = 6, side: 'home' | 'away' = 'home'): Played {
