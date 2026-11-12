@@ -8,6 +8,7 @@ import { bus } from '../core/events';
 import { earnMoney, spendMoney } from '../data/club';
 import { marketWage, overallRating } from '../data/player';
 import { BOARD, CONTRACTS, MORALE, SQUAD_MIN, difficultyMultipliers } from '../config';
+import { fmtMoney } from '../utils/money';
 import { REP_BASELINE, REP_MAX } from './league';
 import type { SignResult } from './freeagency';
 import { hasStaff, WELFARE_RENEWAL_CUT } from './staff';
@@ -136,7 +137,7 @@ export function renewEarly(state: GameState, playerId: string): SignResult {
   });
   bus.emit('ui:notify', {
     text: onLoan
-      ? `Re-signed ${p.name} for ${CONTRACTS.NEW_CONTRACT_WEEKS} weeks on a board loan of $${fee.toLocaleString()}, repaid at the season's end`
+      ? `Re-signed ${p.name} for ${CONTRACTS.NEW_CONTRACT_WEEKS} weeks on a board loan of ${fmtMoney(fee)}, repaid at the season's end`
       : `Re-signed ${p.name} for ${CONTRACTS.NEW_CONTRACT_WEEKS} weeks`,
     kind: 'success',
   });
@@ -152,7 +153,7 @@ export function sellPlayer(state: GameState, playerId: string): SignResult {
   const fee = transferFee(p);
   setState({ squad: state.squad.filter((x) => x.id !== playerId) });
   earnMoney(fee, `sell:${playerId}`);
-  bus.emit('ui:notify', { text: `Sold ${p.name} for $${fee.toLocaleString()}`, kind: 'success' });
+  bus.emit('ui:notify', { text: `Sold ${p.name} for ${fmtMoney(fee)}`, kind: 'success' });
   return { ok: true };
 }
 

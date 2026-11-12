@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { packForCountry, preparePack } from './content';
 import './ui/fonts';
+import { BRAND } from './brand';
 import { BootScene } from './scenes/BootScene';
 import { GroundsScene } from './scenes/GroundsScene';
 import { MatchScene } from './scenes/MatchScene';
@@ -78,7 +79,7 @@ import { initGameAnalytics } from './analytics/gameEvents';
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
   parent: 'game-root',
-  backgroundColor: '#1a1a2e',
+  backgroundColor: BRAND.colors.app, // the page's navy (#622)
   pixelArt: true,
   roundPixels: true,
   scale: {

@@ -150,6 +150,35 @@ const screenListeners = new Set<(key: string | null) => void>();
 
 /** Attribute naming which nav destination an open screen belongs to (the nav marks that tab). */
 export const SCREEN_KEY_ATTR = 'data-screen-key';
+/**
+ * On a sheet that took another's place (#605). It has no entrance: the rise starts from
+ * nothing, so between two sheets the grounds showed through for its first frames.
+ */
+export const SCREEN_SWAP_ATTR = 'data-swap';
+
+// The turn a sheet last came down in (#605). A sheet opened in that same turn takes its
+// place: nothing was drawn between the two. For a screen that closes before it opens the
+// next (History's ◂ back), and for Club home upright, which opens a tick after the sheet
+// over it closes.
+let sheetLeftAt: number | null = null;
+
+/**
+ * The document timeline's clock: it holds still through a turn of the event loop (a tap's
+ * handlers and the microtasks after them) and moves on with the frames, so two equal reads
+ * have no frame between them. Null where there is none (the unit tests).
+ */
+function turnClock(): number | null {
+  const t = document.timeline?.currentTime;
+  return typeof t === 'number' ? t : null;
+}
+
+/**
+ * A sheet has just come down, or Office's tiles (nav.ts): a sheet that opens in the same
+ * turn is a swap, with no entrance (#605).
+ */
+export function sheetLeaving(): void {
+  sheetLeftAt = turnClock();
+}
 
 function emitScreenChange(): void {
   const key = screenKey();
@@ -162,15 +191,20 @@ function emitScreenChange(): void {
  * runs when the screen is closed by any route (its own Close button calling
  * closeScreen(), another screen opening, or a match starting). `key` is the nav
  * destination it belongs to ('squad', 'finance', …), so the nav can mark it open
- * (#344). Returns `node`.
+ * (#344). A sheet opened on the bare grounds rises in; one that takes another's
+ * place, or Office's, is there at once (#605). Returns `node`.
  */
 export function openScreen(node: HTMLElement, onClose?: () => void, key?: string): HTMLElement {
   ensureStyles();
   closeModal();
   node.classList.add('nrl-screen-region');
   if (key) node.setAttribute(SCREEN_KEY_ATTR, key);
+  // Read before the slot closes the sheet that is up; a sheet opened on the bare grounds keeps its rise.
+  const turn = turnClock();
+  node.toggleAttribute(SCREEN_SWAP_ATTR, screenSlot.active !== null || (turn !== null && turn === sheetLeftAt));
   screenSlot.open(node, () => {
     node.remove();
+    sheetLeaving();
     onClose?.();
     if (screenSlot.active === null) emitScreenChange();
   });
@@ -272,9 +306,69 @@ export function segmented<T extends string>(
   const set = (id: T | null): void => {
     current = id;
     for (const [k, b] of buttons) b.setAttribute('aria-pressed', String(k === id));
+    revealSeg(track);
   };
   set(selected);
+  watchSeg(track);
   return { el: track, buttons, set };
+}
+
+/** The fade on a track's cut side, and how far clear of it the selection is brought, in px (the CSS below says 24px too). */
+const SEG_PEEK = 24;
+
+/**
+ * Where a track that scrolls sideways should scroll to so the selected button
+ * (`left` and `width`, in the track's content) is wholly on show with SEG_PEEK of
+ * its neighbour beside it, or null when it already is (#611). Pure.
+ */
+export function segScrollLeft(view: { scrollLeft: number; room: number; full: number }, left: number, width: number): number | null {
+  const from = Math.max(0, left - SEG_PEEK);
+  const to = Math.min(view.full, left + width + SEG_PEEK);
+  if (from >= view.scrollLeft - 1 && to <= view.scrollLeft + view.room + 1) return null;
+  return from < view.scrollLeft ? from : Math.max(0, Math.min(left, to - view.room));
+}
+
+/** The side(s) a scrolled track is cut on, for its edge fade; null when it all fits (#611). Pure. */
+export function segCut(view: { scrollLeft: number; room: number; full: number }): 'start' | 'end' | 'both' | null {
+  const start = view.scrollLeft > 1;
+  const end = view.scrollLeft + view.room < view.full - 1;
+  return start && end ? 'both' : start ? 'start' : end ? 'end' : null;
+}
+
+/** Mark the track's cut sides (data-cut) and, with `behavior`, bring its selected button into it. */
+function syncSeg(track: HTMLElement, behavior?: ScrollBehavior): void {
+  if (!track.clientWidth) return; // not on the page (or not shown) yet
+  const view = { scrollLeft: track.scrollLeft, room: track.clientWidth, full: track.scrollWidth };
+  const b = behavior ? track.querySelector<HTMLElement>('[aria-pressed="true"]') : null;
+  // On the track itself, never scrollIntoView: that scrolls the sheet and the page too.
+  const left = b ? segScrollLeft(view, b.offsetLeft - (b.offsetParent === track ? 0 : track.offsetLeft), b.offsetWidth) : null;
+  if (left !== null && behavior) track.scrollTo({ left, behavior });
+  const cut = segCut({ ...view, scrollLeft: track.scrollLeft });
+  if (cut === track.getAttribute('data-cut')) return;
+  if (cut) track.setAttribute('data-cut', cut);
+  else track.removeAttribute('data-cut');
+}
+
+/** Bring a `.nrl-seg` track's selected button into it (#611): a glide, or at once under reduced motion. */
+export function revealSeg(track: HTMLElement): void {
+  syncSeg(track, typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth');
+}
+
+let segWatch: ResizeObserver | null = null;
+/**
+ * Keep a `.nrl-seg` track's cut sides faded as it scrolls and resizes, and its
+ * selection in view when it lands on the page (set() runs before that) or changes
+ * size (#611). One observer for every track: it is handed the track that changed
+ * and keeps none, and a track stays watched off the page, as Settings builds its
+ * popup once and mounts it again each time.
+ */
+export function watchSeg(track: HTMLElement): void {
+  if (typeof ResizeObserver === 'undefined') return;
+  track.addEventListener('scroll', () => syncSeg(track), { passive: true });
+  segWatch ??= new ResizeObserver((entries) => {
+    for (const e of entries) syncSeg(e.target as HTMLElement, 'auto');
+  });
+  segWatch.observe(track);
 }
 
 /** A "◂ SQUAD" button back to the screen this one was opened from. */
@@ -337,13 +431,133 @@ export function trackChromeInset(node: HTMLElement, cssVar: string): () => void 
   };
 }
 
+/** The double-tap guard's reach (#598): a repeat inside 400ms and 32px of the last tap it let through. */
+export const DOUBLE_TAP = { ms: 400, px: 32 } as const;
+
+/**
+ * Double-tap guard (#598), opt-in: put it on the node whose content a tap redraws
+ * (Recruit's list, Staff's list, the facility card, the Playbook's body). A tap
+ * that signs or hires redraws the list, a different action then sits under the
+ * finger, and the second tap of a double tap fired it: SIGN signed the next
+ * player, HIRE turned into RELEASE. So a click is dropped when it lands within
+ * DOUBLE_TAP of the last click let through AND `container`'s content has
+ * changed since that click: nodes added, removed or re-labelled, whether the
+ * tapped button was replaced or rewritten in place (a MutationObserver, read at
+ * the click with takeRecords; without one, the tapped node having left the
+ * document). A repeat on content that held still goes through. So does a tap
+ * somewhere else, a tap later (a second signing half a second on), and a
+ * keyboard or scripted click (detail 0: no finger). A dropped click does not
+ * restart the window. Not global: decision cards are answered in one spot, one
+ * after another.
+ */
+export function guardDoubleTap(container: HTMLElement): void {
+  let last: { t: number; x: number; y: number; target: EventTarget | null } | null = null;
+  let changed = false;
+  const seen = typeof MutationObserver === 'undefined' ? null : new MutationObserver(() => { changed = true; });
+  seen?.observe(container, { childList: true, characterData: true, subtree: true });
+  container.addEventListener('click', (e) => {
+    if (e.detail === 0) return;
+    if (seen && seen.takeRecords().length > 0) changed = true;
+    const redrawn = changed || (last?.target as Node | null | undefined)?.isConnected === false;
+    if (last && redrawn && e.timeStamp - last.t < DOUBLE_TAP.ms
+      && Math.hypot(e.clientX - last.x, e.clientY - last.y) <= DOUBLE_TAP.px) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    last = { t: e.timeStamp, x: e.clientX, y: e.clientY, target: e.target };
+    changed = false;
+  }, true);
+}
+
+/** A two-tap Sell or Release waiting for its second tap (#612): the class its button wears, and how long it waits. */
+export const ARMED_CLASS = 'nrl-btn-armed';
+export const ARMED_MS = 4000;
+/** A tap this soon after the one that armed the button is the same stab at the screen, not an answer (#617; as SKIP, #601). */
+export const ARMED_REPEAT_MS = 300;
+
+/** Whether a tap on an armed button confirms. `armedForMs` is how long it has been armed. */
+export function armedTap(armedForMs: number): boolean {
+  return armedForMs >= ARMED_REPEAT_MS;
+}
+
+/**
+ * Start an armed button's wait (#612; Contracts and the player page). `disarm` runs
+ * once: after ARMED_MS, or on a pointerdown anywhere but the armed button, which
+ * is found by ARMED_CLASS so a re-render may swap the node. `disarm` puts the
+ * button back in place rather than re-rendering: the tap that disarmed it still
+ * lands on what it was aimed at. The returned function calls the wait off (the
+ * second tap, or the screen closing).
+ */
+export function armGuard(disarm: () => void): () => void {
+  const drop = (): void => { clearTimeout(timer); document.removeEventListener('pointerdown', onDown, true); };
+  const fire = (): void => { drop(); disarm(); };
+  const onDown = (e: Event): void => { if (!(e.target as Element | null)?.closest?.(`.${ARMED_CLASS}`)) fire(); };
+  const timer = setTimeout(fire, ARMED_MS);
+  document.addEventListener('pointerdown', onDown, true);
+  return drop;
+}
+
+/** The class a scrolling list wears while it has more below (#610): its foot fades out. */
+export const SCROLL_MORE_CLASS = 'nrl-scroll-more';
+
+/** Whether `box` has more below what it shows; a pixel's slack for heights that are not whole. */
+export function moreBelow(box: Pick<HTMLElement, 'scrollTop' | 'clientHeight' | 'scrollHeight'>): boolean {
+  return box.scrollTop + box.clientHeight < box.scrollHeight - 1;
+}
+
+/** Put the cue on `box`, or take it off. toggle, not add: it writes the class only on a change, so hintScroll's own observer is not woken by it. */
+function syncMore(box: HTMLElement): void {
+  box.classList.toggle(SCROLL_MORE_CLASS, moreBelow(box));
+}
+
+let moreWatch: ResizeObserver | null = null;
+/**
+ * Scroll cue (#610), opt-in: put it on a list that scrolls inside a sheet. A phone
+ * draws no scrollbar until a finger moves, and a list that ends on a whole row
+ * looked complete (a four-man squad). The list fades at its foot while there is
+ * more below, and not at the end or when it all fits. Looked at again on a scroll,
+ * when the box changes size (a hint closed, the phone turned; one observer for
+ * every list, as watchSeg has) and when its rows or its own class and style change
+ * (a redraw, a toast's reserve at its foot). A list that is replaced, not refilled
+ * (the ladder), is given it again as it is built. Returns the way to take it off.
+ */
+export function hintScroll(box: HTMLElement): () => void {
+  const check = (): void => syncMore(box);
+  box.addEventListener('scroll', check, { passive: true });
+  if (typeof ResizeObserver !== 'undefined') {
+    moreWatch ??= new ResizeObserver((entries) => { for (const e of entries) syncMore(e.target as HTMLElement); });
+    moreWatch.observe(box);
+  }
+  const redrawn = typeof MutationObserver === 'undefined' ? null : new MutationObserver(check);
+  redrawn?.observe(box, { childList: true, attributes: true, attributeFilter: ['class', 'style'] });
+  check();
+  return () => {
+    box.removeEventListener('scroll', check);
+    moreWatch?.unobserve(box);
+    redrawn?.disconnect();
+    box.classList.remove(SCROLL_MORE_CLASS);
+  };
+}
+
 /** Currently open modal overlay, if any (guards against stacking). */
 let openModalEl: HTMLElement | null = null;
+/** The open dialog's `onRemove` (#617): runs when closeModal takes it down, by any route. */
+let openModalRemoved: (() => void) | null = null;
+/**
+ * Whether a dialog has closed since the last frame was drawn (#606). One opened now takes its
+ * place before the dim is seen to go (◂ back from a rival's player closes his page, then opens
+ * the squad again), so it is a swap as much as one opened over an open dialog.
+ */
+let closedThisFrame = false;
 
 /**
  * Open a centred modal containing `content`. Clicking the dimmed backdrop closes
  * it. Returns the backdrop element. Only one modal is open at a time — opening a
  * second closes the first.
+ *
+ * `onRemove` runs when closeModal takes the dialog down, whoever called it: a dock tab or
+ * another dialog opening close it without telling the page (#617).
  *
  * With `screen: true` the modal is a nav *screen* instead of a dialog: it is
  * confined to the screen region (HUD and nav stay visible and usable), it
@@ -357,10 +571,15 @@ let openModalEl: HTMLElement | null = null;
  * its content scrolls, so a header row never scrolls away. A dialog (or a
  * sheet) gets a ✕ in its corner with `closeButton: true`. `key` is a screen's nav destination (see
  * openScreen).
+ *
+ * A dialog comes in (#606): its dim fades and its card grows from --nrl-pop. One that takes
+ * another dialog's place is marked `data-swap` and cuts in, so the dim does not blink. `cut: true`
+ * leaves the entrance out for good: the player page (a drill-in from a list) and the facility
+ * popup (it rises by itself).
  */
 export function openModal(
   content: HTMLElement,
-  opts: { class?: string; screen?: boolean; closeButton?: boolean; region?: boolean; key?: string } = {},
+  opts: { class?: string; screen?: boolean; closeButton?: boolean; region?: boolean; key?: string; cut?: boolean; onRemove?: () => void } = {},
 ): HTMLElement {
   ensureStyles();
   const framed = opts.screen === true || opts.region === true;
@@ -391,13 +610,17 @@ export function openModal(
     return openScreen(backdrop, undefined, opts.key);
   }
 
+  const swap = dialogOpen() || closedThisFrame;
   closeModal();
   const backdrop = el(
     'div',
     { class: opts.region ? 'nrl-modal-backdrop nrl-dialog-region' : 'nrl-modal-backdrop', onClick: () => closeModal() },
     box,
   );
+  if (swap) backdrop.setAttribute('data-swap', '');
+  if (opts.cut) backdrop.setAttribute('data-cut', '');
   openModalEl = backdrop;
+  openModalRemoved = opts.onRemove ?? null;
   getRoot().appendChild(backdrop);
   return backdrop;
 }
@@ -410,8 +633,15 @@ export function dialogOpen(): boolean {
 /** Close the currently open (dialog) modal, if any. Screens use closeScreen(). */
 export function closeModal(): void {
   if (openModalEl) {
+    if (openModalEl.isConnected && typeof requestAnimationFrame === 'function') {
+      closedThisFrame = true;
+      requestAnimationFrame(() => { closedThisFrame = false; });
+    }
     openModalEl.remove();
     openModalEl = null;
+    const removed = openModalRemoved;
+    openModalRemoved = null;
+    removed?.();
   }
 }
 
@@ -425,7 +655,35 @@ export function ensureStyles(): void {
   style.id = STYLE_ID;
   style.textContent = CSS;
   document.head.appendChild(style);
+  listenForPress();
 }
+
+let pressListening = false;
+/**
+ * iOS Safari applies :active on a touch only once something listens for touchstart (#604).
+ * One passive listener on the document, from here and from the title, which is up first.
+ */
+export function listenForPress(): void {
+  if (pressListening || typeof document === 'undefined' || typeof document.addEventListener !== 'function') return;
+  pressListening = true;
+  document.addEventListener('touchstart', () => {}, { passive: true });
+}
+
+/** Motion (#597): every entrance and transition in src/ui takes its time, curve and travel from these. */
+const MOTION_TOKENS = `--nrl-dur-press: 120ms;
+  --nrl-dur-fast: 150ms;
+  --nrl-dur-sheet: 180ms;
+  --nrl-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --nrl-ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --nrl-rise: 12px;
+  --nrl-pop: 0.97;
+  --nrl-press: 0.97;`;
+// The one reduced-motion rule (#597): travel and scale go, the fade stays. A keyframe that
+// moves does it by --nrl-rise (calc() for up, left and part-way), so it needs no rule of its own.
+const REDUCED_MOTION = '@media (prefers-reduced-motion: reduce) { :root { --nrl-rise: 0px; --nrl-pop: 1; --nrl-press: 1; } }';
+/** The same tokens for the title, whose sheet is up before this one is injected (#604). */
+export const MOTION_CSS = `:root { ${MOTION_TOKENS} }
+${REDUCED_MOTION}`;
 
 // Broadcast Quiet (docs/specs/ui-broadcast-quiet.md): navy sheets over the
 // grounds, Barlow Condensed caps for labels and buttons, IBM Plex Sans for body
@@ -473,12 +731,19 @@ export const CSS = `
   --nrl-f-label: 'Barlow Condensed', 'Arial Narrow', system-ui, sans-serif;
   --nrl-f-body: 'IBM Plex Sans', system-ui, sans-serif;
   --nrl-f-num: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  ${MOTION_TOKENS}
 }
+${REDUCED_MOTION}
 .nrl-panel, .nrl-btn, .nrl-modal, .nrl-modal-backdrop, .nrl-dock, .nrl-screen {
   font-family: var(--nrl-f-body);
   box-sizing: border-box;
 }
 #ui-root input, #ui-root select, #ui-root textarea { font: inherit; }
+/* A field you type in is never under 16px (#609): below that iOS Safari zooms the page into it on
+   focus and leaves it zoomed. The rule above out-ranks a field's own font-size, so the floor goes
+   here; rem, so it still follows Settings › Text size. The match lab's panel is a dense desk tool
+   and keeps its small fields. */
+#ui-root :is(input:is([type="text"], [type="search"], [type="number"]), input:not([type]), textarea, select):not(.nrl-lab *) { font-size: max(1rem, 16px); }
 /* Every number in Plex Mono: money, scores, ratings, the clock. */
 .nrl-num { font-family: var(--nrl-f-num); font-weight: 600; font-variant-numeric: tabular-nums; }
 /* A raised tile inside a sheet. */
@@ -509,24 +774,53 @@ export const CSS = `
   min-width: 44px;
   line-height: 1.1;
   white-space: nowrap;
-  transition: background 0.12s ease, transform 0.08s ease;
+  transition: background-color var(--nrl-dur-press) ease;
 }
-.nrl-btn:hover:not(:disabled) { background: #283669; }
-.nrl-btn:active:not(:disabled) { transform: translateY(1px); }
+/* ── Press (#604) ─────────────────────────────────────────────────────────
+   A touch has no hover: a tap left :hover on what it touched, so every :hover in src/ui sits
+   in a (hover: hover) and (pointer: fine) block. A press shows under the finger instead, on
+   :active: the control's hover fill, and a button or a small tile shrinks to --nrl-press (1
+   under reduced motion). It eases in and snaps back on release, so a control measured just
+   after a tap is its whole size. Each hover rule below has its :active twin. */
+@media (hover: hover) and (pointer: fine) { .nrl-btn:hover:not(:disabled) { background: #283669; } }
+.nrl-btn:active:not(:disabled) {
+  background: #283669;
+  transform: scale(var(--nrl-press));
+  transition: background-color var(--nrl-dur-press) ease, transform var(--nrl-dur-press) var(--nrl-ease-out);
+}
+/* The browser's own tap box goes (the presses above replace it), and a control's label can't be
+   long-press selected, pop a callout or double-tap zoom. Fields, the Guide and News stay selectable. */
+#ui-root, #ui-root * { -webkit-tap-highlight-color: transparent; }
+#ui-root :is(button, [role="button"], summary, .nrl-dock, .nrl-seg, .nrl-toast, .nrl-ladder-rival) {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+}
+/* Tiles and chips that are not .nrl-btn shrink like one; full-width rows only take their fill. */
+:is(.nrl-lineup-tile, .nrl-lineup-play, button.nrl-club-home-row, .nrl-kit-swatch, button.nrl-finance-contracts,
+  button.nrl-dock-statusbox, .nrl-board-chip, .nrl-toast:not(.nrl-toast-action), .nrl-mo-coach, .nrl-mo-log-toggle, .nrl-mo-scoreboard):active {
+  transform: scale(var(--nrl-press));
+  transition: transform var(--nrl-dur-press) var(--nrl-ease-out);
+}
 .nrl-btn:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
 .nrl-btn.nrl-btn-primary { background: var(--nrl-accent); color: var(--nrl-on-accent); }
-.nrl-btn.nrl-btn-primary:hover:not(:disabled) { background: #f7da5e; }
+@media (hover: hover) and (pointer: fine) { .nrl-btn.nrl-btn-primary:hover:not(:disabled) { background: #f7da5e; } }
+.nrl-btn.nrl-btn-primary:active:not(:disabled) { background: #f7da5e; }
 .nrl-btn.nrl-btn-danger { background: var(--nrl-button); color: var(--nrl-neg); }
-.nrl-btn.nrl-btn-danger:hover:not(:disabled) { background: #283669; }
+@media (hover: hover) and (pointer: fine) { .nrl-btn.nrl-btn-danger:hover:not(:disabled) { background: #283669; } }
+.nrl-btn.nrl-btn-danger:active:not(:disabled) { background: #283669; }
+/* Armed (#612): a two-tap Sell or Release asking again is solid red, on every screen that asks. */
+.nrl-btn.nrl-btn-armed, .nrl-btn.nrl-btn-armed:hover:not(:disabled), .nrl-btn.nrl-btn-armed:active:not(:disabled) { background: var(--nrl-neg); color: var(--nrl-on-accent); }
 /* Disabled stays visible and says why (the reason is the label or the title). */
 .nrl-btn:disabled { cursor: default; opacity: 0.55; }
 .nrl-btn.nrl-btn-primary:disabled { background: var(--nrl-raised); color: var(--nrl-muted); opacity: 1; }
 /* One selected-chip look everywhere (sorts, filters, tabs, presets): yellow, navy text.
-   A touch leaves :hover on the last chip tapped; the selection wins over it. */
-.nrl-btn.nrl-sort-active, .nrl-btn.nrl-sort-active:hover:not(:disabled),
-.nrl-btn[data-active], .nrl-btn[data-active]:hover:not(:disabled),
-.nrl-seg > .nrl-btn[aria-pressed="true"], .nrl-seg > .nrl-btn[aria-pressed="true"]:hover:not(:disabled),
-.nrl-seg > .nrl-btn[aria-selected="true"], .nrl-seg > .nrl-btn[aria-selected="true"]:hover:not(:disabled) {
+   The selection wins over hover (a mouse) and over a press. */
+.nrl-btn.nrl-sort-active, .nrl-btn.nrl-sort-active:hover:not(:disabled), .nrl-btn.nrl-sort-active:active:not(:disabled),
+.nrl-btn[data-active], .nrl-btn[data-active]:hover:not(:disabled), .nrl-btn[data-active]:active:not(:disabled),
+.nrl-seg > .nrl-btn[aria-pressed="true"], .nrl-seg > .nrl-btn[aria-pressed="true"]:hover:not(:disabled), .nrl-seg > .nrl-btn[aria-pressed="true"]:active:not(:disabled),
+.nrl-seg > .nrl-btn[aria-selected="true"], .nrl-seg > .nrl-btn[aria-selected="true"]:hover:not(:disabled), .nrl-seg > .nrl-btn[aria-selected="true"]:active:not(:disabled) {
   background: var(--nrl-accent);
   color: var(--nrl-on-accent);
 }
@@ -545,6 +839,11 @@ export const CSS = `
   scrollbar-width: none;
 }
 .nrl-seg::-webkit-scrollbar { display: none; }
+/* A track too long for its room scrolls; the cut side fades, so the row reads as going on (#611, watchSeg). */
+.nrl-seg[data-cut] { -webkit-mask-image: var(--nrl-seg-cut); mask-image: var(--nrl-seg-cut); }
+.nrl-seg[data-cut="end"] { --nrl-seg-cut: linear-gradient(to left, transparent, #000 24px); }
+.nrl-seg[data-cut="start"] { --nrl-seg-cut: linear-gradient(to right, transparent, #000 24px); }
+.nrl-seg[data-cut="both"] { --nrl-seg-cut: linear-gradient(to right, transparent, #000 24px, #000 calc(100% - 24px), transparent); }
 .nrl-seg > .nrl-btn {
   flex: 0 0 auto;
   min-height: 38px;
@@ -556,8 +855,11 @@ export const CSS = `
   font-size: 1rem;
   font-weight: 700;
   letter-spacing: 0.06em;
+  /* #604: the pill and the label change in the same frame (a fading pill left navy text on navy). */
+  transition-property: none;
 }
-.nrl-seg > .nrl-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.06); }
+@media (hover: hover) and (pointer: fine) { .nrl-seg > .nrl-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.06); } }
+.nrl-seg > .nrl-btn:active:not(:disabled) { background: rgba(255, 255, 255, 0.06); transition-property: transform; }
 @media (pointer: coarse) { .nrl-seg > .nrl-btn { min-height: 44px; } }
 /* A small caps label (column heads, section titles). */
 .nrl-label {
@@ -572,6 +874,8 @@ export const CSS = `
 .nrl-neg { color: var(--nrl-neg); }
 .nrl-attn { color: var(--nrl-accent); }
 .nrl-muted { color: var(--nrl-muted); }
+/* A name that may be 24 letters with no space (#616): it breaks inside its box, never past it. */
+.nrl-name-wrap { min-width: 0; overflow-wrap: anywhere; }
 
 /* ── Dock (the only navigation): status · tabs · PLAY WEEK ───────────────── */
 .nrl-dock-wrap {
@@ -613,7 +917,7 @@ export const CSS = `
 }
 button.nrl-dock-statusbox { cursor: pointer; }
 button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; border-radius: 8px; }
-.nrl-dock-money { font-family: var(--nrl-f-num); font-size: 0.9375rem; font-weight: 600; line-height: 1.2; white-space: nowrap; transition: color 0.15s ease; }
+.nrl-dock-money { font-family: var(--nrl-f-num); font-size: 0.9375rem; font-weight: 600; line-height: 1.2; white-space: nowrap; transition: color var(--nrl-dur-fast) ease; }
 .nrl-dock-week { font-family: var(--nrl-f-label); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.06em; color: var(--nrl-muted); white-space: nowrap; }
 /* #351 H2: under 20 weeks of runway the money goes amber, under 8 red; N12.5 in debt is red with its tag. */
 .nrl-dock-money.nrl-money-low { color: var(--nrl-fit-ok); }
@@ -643,10 +947,11 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
   gap: 6px;
   overflow: hidden;
 }
-.nrl-dock-tabs > .nrl-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.05); }
-/* The open sheet's tab (aria-current); a touch leaves :hover on it, the marker wins. */
-.nrl-dock-tabs > .nrl-btn[aria-current="page"], .nrl-dock-tabs > .nrl-btn[aria-current="page"]:hover:not(:disabled),
-.nrl-dock-tabs > .nrl-btn[aria-expanded="true"], .nrl-dock-tabs > .nrl-btn[aria-expanded="true"]:hover:not(:disabled) {
+@media (hover: hover) and (pointer: fine) { .nrl-dock-tabs > .nrl-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.05); } }
+.nrl-dock-tabs > .nrl-btn:active:not(:disabled) { background: rgba(255, 255, 255, 0.05); }
+/* The open sheet's tab (aria-current); the marker wins over hover and a press. */
+.nrl-dock-tabs > .nrl-btn[aria-current="page"], .nrl-dock-tabs > .nrl-btn[aria-current="page"]:hover:not(:disabled), .nrl-dock-tabs > .nrl-btn[aria-current="page"]:active:not(:disabled),
+.nrl-dock-tabs > .nrl-btn[aria-expanded="true"], .nrl-dock-tabs > .nrl-btn[aria-expanded="true"]:hover:not(:disabled), .nrl-dock-tabs > .nrl-btn[aria-expanded="true"]:active:not(:disabled) {
   background: var(--nrl-button);
   color: var(--nrl-accent);
   font-weight: 700;
@@ -664,6 +969,12 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
   border-radius: 2px;
   background: var(--nrl-accent);
 }
+/* ▴'s room (#607): a closed tab holds the width its label gains with ▴, so opening a sheet never
+   moves the next tab. It sits after the alert dot (the dot stays by its label) and takes the tab's
+   6px gap back; an open tab's own ▴ takes its place. Large and Larger have no room to spare for it
+   (nor has a dock of 620px or less, below): there ▴ takes room on the open tab only, as it did. */
+.nrl-nav-room { order: 1; flex: 0 0 auto; margin-left: -6px; white-space: pre; visibility: hidden; }
+.nrl-dock-tabs > .nrl-btn:has(.nrl-nav-caret) > .nrl-nav-room, html[data-text-size] .nrl-nav-room { display: none; }
 /* An alert: an 8px dot after the label (the count is in its spoken label). */
 .nrl-nav-dot { width: 8px; height: 8px; border-radius: 4px; background: var(--nrl-alert); flex: 0 0 auto; }
 .nrl-dock-spacer { flex: 1 1 auto; min-width: 4px; }
@@ -676,7 +987,15 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
   background: transparent;
   color: var(--nrl-on-accent);
 }
-.nrl-dock-play-group > .nrl-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.18); }
+@media (hover: hover) and (pointer: fine) { .nrl-dock-play-group > .nrl-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.18); } }
+/* The yellow is the group's, so PLAY WEEK pressed shrinks the whole of it (#604); its buttons only take the fill. */
+.nrl-dock-play-group > .nrl-btn:active:not(:disabled) { background: rgba(255, 255, 255, 0.18); transform: none; }
+.nrl-dock-play-group:has(> .nrl-dock-advance:active:not(:disabled)) {
+  transform: scale(var(--nrl-press));
+  transition: transform var(--nrl-dur-press) var(--nrl-ease-out);
+}
+/* Navy inside the yellow: the accent ring was yellow on yellow, and the group's overflow cut it off. */
+.nrl-dock-play-group > .nrl-btn:focus-visible { outline-color: var(--nrl-on-accent); outline-offset: -4px; }
 .nrl-dock-advance { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: 0 16px; max-width: 15rem; }
 .nrl-dock-advance-label { font-family: var(--nrl-f-label); font-size: 1.1875rem; font-weight: 700; letter-spacing: 0.04em; line-height: 1; white-space: nowrap; }
 /* One line (#344): it may break anywhere, so its narrowest is a letter and PLAY WEEK's narrowest is its
@@ -732,12 +1051,22 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
   background: var(--nrl-navy);
   border-radius: 12px;
   box-shadow: var(--nrl-shadow-tray);
+  /* #606: out of the ▾ under its bottom right corner. It is shown by taking [hidden] off, which
+     starts the entrance again each time; closing is a cut. */
+  transform-origin: bottom right;
+  animation: nrl-fade-in var(--nrl-dur-fast) var(--nrl-ease-out), nrl-pop-in var(--nrl-dur-fast) var(--nrl-ease-out);
 }
 .nrl-hud-menu[hidden] { display: none; }
 .nrl-hud-menu-item { width: 100%; text-align: left; }
 /* #350: the menu rises into the screen region, so while it is open the dock goes above a
    region dialog (100): over a decision card, a tap on ×4 weeks must not answer it. */
 .nrl-dock-wrap:has(.nrl-hud-menu:not([hidden])) { z-index: 101; }
+/* In debt on a phone (#607) the tag made the status block half as wide again and the tabs paid for it:
+   "SQUA… LEAG…" at 667, and inside the notch's insets at 844 too. The red, minus-signed balance says
+   it on screen; the tag stays in the tile's text for screen readers (#239). To 960px: an iPhone at 956. */
+@media (max-width: 960px) {
+  .nrl-hud-debt { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
 /* Large and Larger text (#371): the tabs close up so all five, ▴ and an alert dot stay whole.
    Up to 900px, not 760 (#344): at 844×390 with the notch's insets Large clipped them too.
    Larger: no gap and no tracking between them, 18px more. */
@@ -760,8 +1089,14 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
   html[data-text-size="larger"] .nrl-dock-tabs > .nrl-btn { padding: 0 4px; }
   html[data-text-size="larger"] .nrl-dock-advance { padding: 0 6px; }
 }
+/* ▴'s room is 12px of air after each label (#607), so on a phone at Normal the tabs give some of
+   their padding back and what fitted before still does: a decisions count on PLAY WEEK inside the
+   notch's insets at 844, RESUME MATCH with one at 667. */
+@media (min-width: 761px) and (max-width: 900px) { .nrl-dock-tabs > .nrl-btn { padding: 0 8px; } }
+@media (min-width: 621px) and (max-width: 760px) { .nrl-dock-tabs > .nrl-btn { padding: 0 6px; } }
 @media (max-width: 620px) {
   .nrl-dock-advance-sub, .nrl-dock-week-total { display: none; }
+  .nrl-nav-room { display: none; }
   /* An alert dot in its tab's corner, not after the label (#344: 11px a tab back at 568). */
   .nrl-dock-tabs > .nrl-btn > .nrl-nav-dot { position: absolute; top: 5px; right: 5px; }
 }
@@ -793,6 +1128,7 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
   inset: 0;
   background: rgba(5, 9, 22, 0.35);
   z-index: 54;
+  animation: nrl-fade-in var(--nrl-dur-sheet) var(--nrl-ease-out); /* #606: in with its sheet */
 }
 .nrl-office-dim[hidden], .nrl-nav-sheet[hidden] { display: none; }
 .nrl-nav-sheet {
@@ -811,13 +1147,14 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
   max-height: calc(100vh - var(--nrl-nav-h, 0px) - 20px - var(--nrl-safe-t, 0px));
   max-height: calc(100dvh - var(--nrl-nav-h, 0px) - 20px - var(--nrl-safe-t, 0px));
   overflow-y: auto;
+  overscroll-behavior: contain;
   box-sizing: border-box;
   padding: 10px 12px;
   background: var(--nrl-sheet);
   border-radius: 16px;
   box-shadow: var(--nrl-shadow-tray);
   z-index: 56;
-  animation: nrl-sheet-up 180ms ease-out;
+  animation: nrl-sheet-up var(--nrl-dur-sheet) var(--nrl-ease-out);
 }
 .nrl-nav-sheet > .nrl-btn {
   min-height: 64px;
@@ -834,7 +1171,8 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
   letter-spacing: 0;
   overflow: hidden;
 }
-.nrl-nav-sheet > .nrl-btn:hover:not(:disabled) { background: #22305c; }
+@media (hover: hover) and (pointer: fine) { .nrl-nav-sheet > .nrl-btn:hover:not(:disabled) { background: #22305c; } }
+.nrl-nav-sheet > .nrl-btn:active:not(:disabled) { background: #22305c; }
 .nrl-nav-sheet > .nrl-btn[aria-current="page"] { box-shadow: inset 0 0 0 2px var(--nrl-accent); }
 /* #344: the tab's bar, under an open tile's name too. */
 .nrl-nav-sheet > .nrl-btn[aria-current="page"] .nrl-office-name { position: relative; padding-bottom: 5px; }
@@ -855,8 +1193,8 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
 .nrl-nav-sheet > .nrl-btn.nrl-office-locked { cursor: default; opacity: 0.55; }
 .nrl-office-locked .nrl-office-status { white-space: normal; }
 @media (max-width: 560px) { .nrl-nav-sheet { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@keyframes nrl-sheet-up { from { opacity: 0; transform: translateY(12px); } }
-@media (prefers-reduced-motion: reduce) { .nrl-nav-sheet, .nrl-screen-region { animation: none !important; } }
+/* The rise every sheet, popup and match card comes in on (the match and report stylesheets use it too). */
+@keyframes nrl-sheet-up { from { opacity: 0; transform: translateY(var(--nrl-rise)); } }
 
 /* ── Hub chips: the club home's only things on the grounds (3a) ──────────
    The decisions waiting, and (#368) the board objective most at risk under it. */
@@ -923,9 +1261,19 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
   max-height: 85vh;
   max-height: 85dvh; /* #206: Safari's toolbars */
   overflow: auto;
+  overscroll-behavior: contain;
   box-sizing: border-box;
   font-size: 0.875rem;
 }
+/* A dialog comes in (#606): its dim fades and its card, which fades with the dim it sits in, grows
+   from --nrl-pop about its centre. --nrl-dur-fast, not a sheet's time: the week summary is up after
+   every PLAY WEEK. Not a sheet (it rises, .nrl-screen-region below), not a dialog that takes
+   another's place ([data-swap]: the dim must not blink) and not one opened with cut (the player
+   page, the facility popup). There is no exit: closing is a cut. */
+.nrl-modal-backdrop:not(.nrl-screen-backdrop):not([data-swap]):not([data-cut]) { animation: nrl-fade-in var(--nrl-dur-fast) var(--nrl-ease-out); }
+.nrl-modal-backdrop:not(.nrl-screen-backdrop):not([data-swap]):not([data-cut]) > .nrl-modal { animation: nrl-pop-in var(--nrl-dur-fast) var(--nrl-ease-out); }
+@keyframes nrl-fade-in { from { opacity: 0; } }
+@keyframes nrl-pop-in { from { transform: scale(var(--nrl-pop)); } }
 .nrl-modal h2 { font-family: var(--nrl-f-label); font-size: 1.375rem; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; line-height: 1.15; }
 .nrl-modal h3 { font-family: var(--nrl-f-label); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); }
 
@@ -944,8 +1292,11 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
   margin: 0 auto;
   z-index: 50;
   box-sizing: border-box;
-  animation: nrl-sheet-up 180ms ease-out;
+  animation: nrl-sheet-up var(--nrl-dur-sheet) var(--nrl-ease-out);
 }
+/* #605: a sheet taking another's place is there at once. Rising from nothing, it let the
+   grounds flash through on every tab and segment switch. */
+.nrl-screen-region[data-swap] { animation: none; }
 .nrl-screen-backdrop { background: transparent; padding: 0; display: flex; align-items: stretch; justify-content: stretch; }
 .nrl-screen-backdrop .nrl-modal {
   width: 100%;
@@ -1087,6 +1438,15 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
   gap: 8px;
   align-content: start;
 }
+/* A list with more below (#610, hintScroll): its foot fades out. A tap row deep (44px), so the
+   fade reaches the last whole row's words where the list ends between rows: 20px fell on the
+   empty top of the next row and showed nothing. A list of close lines sets less
+   (--nrl-scroll-fade). Under a third of a short box, which keeps it off a sticky header.
+   A still cue: it does not animate. */
+.nrl-scroll-more {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - min(var(--nrl-scroll-fade, 44px), 30%)), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - min(var(--nrl-scroll-fade, 44px), 30%)), transparent);
+}
 .nrl-screen-empty {
   color: var(--nrl-muted);
   padding: 24px;
@@ -1171,9 +1531,8 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
 .nrl-toast-success { background: #1d5a33; color: #fff; border-left-color: var(--nrl-accent); }
 .nrl-toast-danger { background: #7a2a24; color: #fff; border-left-color: var(--nrl-alert); }
 .nrl-toast-danger .nrl-toast-text::before { content: '! '; font-weight: 700; }
-.nrl-toast-in { animation: nrl-toast-in 150ms ease-out; }
-@keyframes nrl-toast-in { from { opacity: 0; transform: translateY(-4px); } }
-@media (prefers-reduced-motion: reduce) { .nrl-toast-in { animation: none; } }
+.nrl-toast-in { animation: nrl-toast-in var(--nrl-dur-fast) var(--nrl-ease-out); }
+@keyframes nrl-toast-in { from { opacity: 0; transform: translateY(calc(var(--nrl-rise) / -3)); } }
 
 /* ── Update bar (N7, #181): a new build is waiting; never during a match ── */
 .nrl-update-toast {
@@ -1294,7 +1653,8 @@ body:has(.nrl-update-toast) .nrl-hub-chips { max-width: calc(100vw - 32px - 310p
   white-space: normal;
   min-height: 48px;
 }
-.nrl-btn.nrl-event-choice:hover:not(:disabled) { background: #22305c; }
+@media (hover: hover) and (pointer: fine) { .nrl-btn.nrl-event-choice:hover:not(:disabled) { background: #22305c; } }
+.nrl-btn.nrl-event-choice:active:not(:disabled) { background: #22305c; }
 .nrl-event-choice-label { font-family: var(--nrl-f-label); font-size: 1.0625rem; font-weight: 700; letter-spacing: 0.02em; line-height: 1.2; color: var(--nrl-text); }
 .nrl-event-choice-hint { font-family: var(--nrl-f-body); font-size: 0.75rem; font-weight: 400; line-height: 1.35; color: var(--nrl-text-2); }
 /* #346: a risk is its own line, marked so it never reads as a sure cost. */
@@ -1331,7 +1691,7 @@ body:has(.nrl-update-toast) .nrl-hub-chips { max-width: calc(100vw - 32px - 310p
    money and the board) so a typical week fits a phone on its side unscrolled. ── */
 .nrl-dialog-region .nrl-summary-modal { width: min(100%, 680px); }
 .nrl-summary h2 { margin: 0 0 8px; padding-right: 44px; min-height: 36px; display: flex; align-items: center; }
-.nrl-summary-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 6px 10px; }
+.nrl-summary-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 6px 10px; --nrl-scroll-fade: 24px; }
 .nrl-summary-col { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .nrl-summary-sec { padding: 6px 10px; border-radius: 8px; background: var(--nrl-raised); border-left: 3px solid var(--nrl-bench); font-size: 0.8125rem; }
 .nrl-summary-sec h3 { margin: 0 0 2px; }
@@ -1468,5 +1828,6 @@ body:has(.nrl-placebar:not([hidden])) .nrl-decisions-chip { visibility: hidden; 
 .nrl-guide-figure { border-radius: 10px; overflow: hidden; background: var(--nrl-panel); padding: 6px; }
 .nrl-guide-foot { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 .nrl-guide-build { font-family: var(--nrl-f-num); font-size: 0.6875rem; color: var(--nrl-muted); white-space: nowrap; }
-@media (max-width: 760px) { .nrl-guide-build { display: none; } }
+/* Up to 900px the build label's room goes to the tabs: all eight fit at 844 (#611). */
+@media (max-width: 900px) { .nrl-guide-build { display: none; } }
 `;

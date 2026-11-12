@@ -27,7 +27,7 @@ import { button, getRoot, mount } from '../ui/dom';
 import { MATCH_NOT_SAVED_TEXT, MATCH_SAVED_TEXT, SKIPPING_EXIT_TEXT } from '../ui/hud';
 import type { TeamSheet, MatchEvent, WeatherKind } from '../sim/events';
 import { getState, setState, type Fixture } from '../core/state';
-import { SKIP_ARM_MS, callForRole, callsLockedHint, callsUnlockLine, coachBadge, cssHex, lockedNote, matchSettingsOpener, mountMatchOverlay, renderCoachBadge, showMatchSheet, showPlanCard, trayCallsOn, trayHidden, trayPlayEls, trayPlays, trayPlaysKey, trayPlaysOn, TRAY_CAP, TRAY_CAP_WITH_PLAYS, trayRowEls, trayRows, trayWithLocked, type MatchOverlayHandle, type PlanCardHandle, type TrayPlay } from '../ui/screens/matchOverlay';
+import { SKIP_ARMED_LABEL, SKIP_ARMED_SAY, SKIP_ARM_MS, SKIP_LABEL, TRAY_CALLED_MS, callForRole, callsLockedHint, callsUnlockLine, coachBadge, cssHex, lockedNote, matchSettingsOpener, mountMatchOverlay, renderCoachBadge, showMatchSheet, showPlanCard, skipTap, trayCallsOn, trayHidden, trayPlayEls, trayPlays, trayPlaysKey, trayPlaysOn, trayTap, TRAY_CAP, TRAY_CAP_WITH_PLAYS, trayRowEls, trayRows, trayWithLocked, type MatchOverlayHandle, type PlanCardHandle, type TrayPlay } from '../ui/screens/matchOverlay';
 import { PLAYS_BY_ID, type PlayId } from '../data/plays';
 import { setFullTimeExit, shortName } from '../ui/screens/matchReport';
 import { styleLine } from '../ui/tacticsBlurbs';
@@ -745,37 +745,53 @@ export class MatchScene extends Phaser.Scene {
     divider.className = 'nrl-mo-pill-div';
     // SKIP has no undo and sits a finger's width from 8× (#348 M3): the first tap
     // arms it, the second goes. The live sim can only skip to full time (no break in between).
-    const skip = button('Skip ▸▸', () => this.tapSkip(skip), { class: 'nrl-mo-skip' });
+    const skip = button(SKIP_LABEL, () => this.tapSkip(skip, armedSay), { class: 'nrl-mo-skip' });
     skip.setAttribute('data-skip-pill', '');
     skip.title = 'Skip to full time';
-    pill.append(divider, skip);
+    // Armed is said aloud as well (#601): the word on the button is short, and the rest is colour.
+    const armedSay = document.createElement('span');
+    armedSay.className = 'nrl-mo-sr';
+    armedSay.setAttribute('role', 'status');
+    pill.append(divider, skip, armedSay);
     this.controlsEl = pill;
     const slot = this.overlay?.slot?.('speed');
     if (slot) slot.append(pill);
     else mount(pill);
   }
 
-  /** SKIP's first tap arms it ("Full time?") for a few seconds; the second skips. */
+  /** SKIP's first tap arms it ("Sure?") for a few seconds; the second skips. */
   private skipArm: ReturnType<typeof setTimeout> | null = null;
+  private skipArmedAt = 0;
 
-  private tapSkip(btn: HTMLButtonElement): void {
-    if (!this.skipArm) {
-      btn.textContent = 'Full time? ▸▸';
+  private tapSkip(btn: HTMLButtonElement, say: HTMLElement): void {
+    const tap = skipTap(this.skipArm ? performance.now() - this.skipArmedAt : null);
+    if (tap === 'wait') return;
+    if (tap === 'arm') {
+      // Armed, the pill keeps its shape (#601): "Full time? ▸▸" was 48px wider, which slid
+      // 8× under the finger that had just missed it, so its next tap skipped the match.
+      btn.style.width = `${btn.getBoundingClientRect().width}px`;
+      btn.textContent = SKIP_ARMED_LABEL;
+      btn.setAttribute('aria-label', SKIP_ARMED_SAY);
       btn.setAttribute('data-armed', '');
-      this.skipArm = setTimeout(() => this.disarmSkip(btn), SKIP_ARM_MS);
+      say.textContent = SKIP_ARMED_SAY;
+      this.skipArmedAt = performance.now();
+      this.skipArm = setTimeout(() => this.disarmSkip(btn, say), SKIP_ARM_MS);
       return;
     }
-    this.disarmSkip(btn);
+    this.disarmSkip(btn, say);
     this.toggleTray(false);
     this.playback?.skip();
   }
 
-  private disarmSkip(btn?: HTMLButtonElement): void {
+  private disarmSkip(btn?: HTMLButtonElement, say?: HTMLElement): void {
     if (this.skipArm) clearTimeout(this.skipArm);
     this.skipArm = null;
     if (!btn) return;
-    btn.textContent = 'Skip ▸▸';
+    btn.textContent = SKIP_LABEL;
+    btn.style.width = '';
+    btn.removeAttribute('aria-label');
     btn.removeAttribute('data-armed');
+    if (say) say.textContent = '';
   }
 
   /** The sheet over the field (the pause menu): the match holds while it is up. */
@@ -844,6 +860,8 @@ export class MatchScene extends Phaser.Scene {
       back();
       return;
     }
+    // It takes the pause sheet's place over the dimmed field: a swap, with no dialog's entrance (#606).
+    dialog.setAttribute('data-swap', '');
     const watch = new MutationObserver(() => {
       if (dialog.isConnected) return;
       watch.disconnect();
@@ -856,7 +874,6 @@ export class MatchScene extends Phaser.Scene {
 
   // ── Coach calls (#73, 3o): COACH in the bottom row and its tray of the calls on now ──
   private coachBtn: HTMLButtonElement | null = null;
-  private coachLabel: HTMLSpanElement | null = null;
   private coachBadgeEl: HTMLSpanElement | null = null;
   /** The tray (`.nrl-mo-calls`): only while it is open do its rows exist. */
   private callsEl: HTMLDivElement | null = null;
@@ -865,6 +882,12 @@ export class MatchScene extends Phaser.Scene {
   private trayFoot: HTMLDivElement | null = null;
   /** The calls the rows were last built for, so a row isn't rebuilt under the finger. */
   private trayKey = '';
+  /** The open tray's height when its rows were last looked at: it sits on its bottom edge, so a taller tray has moved every tile. */
+  private trayHeight = 0;
+  /** When the open tray's rows last changed under the finger (performance.now()); null when they have not since it opened (#608). */
+  private trayChangedAt: number | null = null;
+  /** A call has gone in and the tray is about to shut (#608): its tiles stay as they were, the one tapped lit, for TRAY_CALLED_MS. */
+  private trayShut: ReturnType<typeof setTimeout> | null = null;
   private callSide: 'home' | 'away' = 'home';
   /** The calls his Coach's Office has unlocked (N9.6). */
   private unlocked: readonly CoachCall[] = COACH_CALLS;
@@ -886,6 +909,10 @@ export class MatchScene extends Phaser.Scene {
   private mountCoach(side: 'home' | 'away', unlocked: readonly CoachCall[]): void {
     this.callSide = side;
     this.unlocked = unlocked;
+    // The scene is kept between matches: the last tray's change and its shut still to come are not this one's (#608).
+    if (this.trayShut) clearTimeout(this.trayShut);
+    this.trayShut = null;
+    this.trayChangedAt = null;
     const label = document.createElement('span');
     label.className = 'nrl-mo-coach-label';
     label.textContent = 'COACH';
@@ -938,7 +965,6 @@ export class MatchScene extends Phaser.Scene {
       this.trayPlaysList = plays;
     }
     this.coachBtn = btn;
-    this.coachLabel = label;
     this.coachBadgeEl = badge;
     this.callsEl = tray;
     this.trayTitle = title;
@@ -960,13 +986,49 @@ export class MatchScene extends Phaser.Scene {
     if (!this.callsEl || !this.coachBtn) return;
     if (open && (this.finished || this.sheet || this.planCard)) return;
     if (open === this.trayOpen()) return;
+    if (this.trayShut) clearTimeout(this.trayShut);
+    this.trayShut = null;
     this.callsEl.hidden = !open;
+    this.callsEl.removeAttribute('data-changed');
     this.coachBtn.setAttribute('aria-expanded', String(open));
-    if (this.coachLabel) this.coachLabel.textContent = open ? 'COACH ▾' : 'COACH';
     this.overlay?.setTrayOpen?.(open);
     this.trayKey = '';
     this.trayPlaysKeyNow = '';
+    this.trayChangedAt = null;
     if (open) this.refreshCallChips();
+  }
+
+  /**
+   * The open tray's tiles changed or moved under the finger (#608): a tap in the next
+   * TRAY_SETTLE_MS was aimed at the tile that was there, so it makes no call (trayTap),
+   * and the tiles dip and come back so the change reads.
+   */
+  private trayChanged(): void {
+    const tray = this.callsEl;
+    if (!tray) return;
+    this.trayChangedAt = performance.now();
+    tray.removeAttribute('data-changed');
+    void tray.offsetWidth; // the fade starts again
+    tray.setAttribute('data-changed', '');
+  }
+
+  /** A tap on a tile makes no call just after the tiles changed, or once a call has gone in and the tray is shutting (#608). */
+  private trayTapWaits(): boolean {
+    return this.trayShut !== null || trayTap(this.trayChangedAt === null ? null : performance.now() - this.trayChangedAt) === 'wait';
+  }
+
+  /**
+   * A call went in (#608): COACH says so at once (its badge names the call), the tile tapped is lit,
+   * and the tray shuts TRAY_CALLED_MS later, so the tap is seen to have landed where the finger was.
+   */
+  private shutTrayCalled(tile: string): void {
+    if (!this.callsEl || !this.coachBtn || !this.trayOpen()) return;
+    this.callsEl.querySelector(tile)?.setAttribute('data-called', '');
+    this.coachBtn.setAttribute('aria-expanded', 'false');
+    this.trayShut = setTimeout(() => {
+      this.trayShut = null;
+      this.toggleTray(false);
+    }, TRAY_CALLED_MS);
   }
 
   /** The badge and the tray follow the play (a few times a second): the calls the sim takes now. */
@@ -994,7 +1056,7 @@ export class MatchScene extends Phaser.Scene {
     const badge = coachBadge(trayCallsOn(usable), attacking, this.madeCall, { on: trayPlaysOn(plays), made: playLatest ? this.madePlay : null });
     if (this.coachBadgeEl) renderCoachBadge(this.coachBadgeEl, badge.text);
     if (this.coachBadgeEl) this.coachBadgeEl.dataset.state = badge.state;
-    if (!this.trayOpen() || !this.trayList || !this.trayTitle || !this.trayFoot) return;
+    if (!this.trayOpen() || this.trayShut || !this.callsEl || !this.trayList || !this.trayTitle || !this.trayFoot) return;
     // The locked calls (N9.6) that fit the moment: ones the sim would take now if his Coach's Office had them,
     // under the usable rows while there is room, the rest in the footer. The sim never sees them as calls.
     const locked = COACH_CALLS.filter((c) => !this.unlocked.includes(c) && callForRole(c, attacking) && pb.callRefusal(side, c) === null)
@@ -1004,8 +1066,12 @@ export class MatchScene extends Phaser.Scene {
     const title = rows.some((r) => r.id === 'kickoff') ? 'Kick-off' : attacking ? 'Your ball' : 'Their ball';
     if (this.trayTitle.textContent !== title) this.trayTitle.textContent = title;
     const key = `${title}:${rows.map((r) => r.buttons.map((b) => `${b.call}${b.locked !== undefined ? '#' : b.why === null ? '' : '-'}`).join('+')).join(',')}`;
+    // Just opened, nothing was under the finger yet. From then on new tiles, or the same ones moved, are a change (#608).
+    const opened = this.trayKey === '';
+    let changed = false;
     if (key !== this.trayKey) {
       this.trayKey = key;
+      changed = true;
       const els: HTMLElement[] = trayRowEls(rows, (call) => this.makeCall(call), (level) => this.noteLocked(level));
       if (els.length === 0 && plays.length === 0) {
         const none = document.createElement('div');
@@ -1019,6 +1085,7 @@ export class MatchScene extends Phaser.Scene {
       const pkey = trayPlaysKey(plays);
       if (pkey !== this.trayPlaysKeyNow) {
         this.trayPlaysKeyNow = pkey;
+        changed = true;
         this.trayPlaysList.replaceChildren(...trayPlayEls(plays, (id) => this.makePlay(id)));
       }
       if (this.trayPlaysEl.hidden !== (plays.length === 0)) this.trayPlaysEl.hidden = plays.length === 0;
@@ -1028,22 +1095,31 @@ export class MatchScene extends Phaser.Scene {
       ? this.lockedNoteText
       : callsUnlockLine(buttons, overflow.map((b) => ({ call: b.call, level: b.locked ?? 0 })), trayHidden(buttons, attacking, rows));
     if (this.trayFoot.textContent !== foot) this.trayFoot.textContent = foot;
+    // The Plays section coming or going, or the footer taking another line, moves every tile: the tray sits on its bottom edge.
+    const height = this.callsEl.offsetHeight;
+    // The note the finger just asked for is not the tiles moving under it (#617): the next tap is aimed at the tray as it now stands.
+    if (!opened && (changed || (height !== this.trayHeight && !this.noteAsked))) this.trayChanged();
+    this.trayHeight = height;
   }
 
   /** The note a tap on a locked tile shows in the footer ("Unlocks with Coach's Office 2"), and until when. */
   private lockedNoteText = '';
   private lockedNoteUntil = 0;
+  /** Set while a tap's own note redraws the tray, so its footer line does not count as a move (#617). */
+  private noteAsked = false;
 
   private noteLocked(level: number): void {
     this.lockedNoteText = lockedNote(level);
     this.lockedNoteUntil = this.time.now + LOCKED_NOTE_MS;
+    this.noteAsked = true;
     this.refreshCallChips();
+    this.noteAsked = false;
   }
 
-  /** A call from the tray: in on the next tick, the tray closes, the log says it (and later whether it paid off). */
+  /** A call from the tray: in on the next tick, its tile lit and the tray shut a moment later, the log says it (and later whether it paid off). */
   private makeCall(call: CoachCall): void {
     const pb = this.playback;
-    if (!(pb instanceof LivePlayback)) return;
+    if (!(pb instanceof LivePlayback) || this.trayTapWaits()) return;
     if (pb.call(this.callSide, call) === null) {
       // Fresh legs (#367), a penalty call (#396) and a kick-off call (#397) aren't the set's call: the badge keeps the set's own.
       if (!callIsBench(call) && !callIsPenalty(call) && !callIsKickoff(call)) {
@@ -1051,7 +1127,7 @@ export class MatchScene extends Phaser.Scene {
         this.madeAt = pb.tick;
       }
       this.overlay?.noteCall?.(CALL_LABEL[call]);
-      this.toggleTray(false);
+      this.shutTrayCalled(`[data-call="${call}"]`);
     }
     // A refusal (the play moved on under the finger) just rebuilds the rows.
     this.refreshCallChips();
@@ -1066,15 +1142,15 @@ export class MatchScene extends Phaser.Scene {
     });
   }
 
-  /** A set play from the tray (#326): it waits for the next play-the-ball, the tray closes, the badge names it, the log says it. */
+  /** A set play from the tray (#326): it waits for the next play-the-ball, the tray closes as for a call, the badge names it, the log says it. */
   private makePlay(play: PlayId): void {
     const pb = this.playback;
-    if (!(pb instanceof LivePlayback)) return;
+    if (!(pb instanceof LivePlayback) || this.trayTapWaits()) return;
     if (pb.call(this.callSide, 'set-play', play) === null) {
       this.madePlay = play;
       this.madePlayAt = pb.tick;
       this.overlay?.noteCall?.(PLAYS_BY_ID[play].short);
-      this.toggleTray(false);
+      this.shutTrayCalled(`[data-play="${play}"]`);
     }
     this.refreshCallChips();
   }

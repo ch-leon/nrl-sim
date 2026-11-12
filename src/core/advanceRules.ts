@@ -6,6 +6,7 @@
 
 import { activeLeague, onPackChange } from '../content';
 import { ECON, MORALE, ON_FIELD, SEASON_ROUNDS, WEEKS_PER_SEASON, SQUAD_MIN } from '../config';
+import { fmtMoney } from '../utils/money';
 
 /** How far a multi-advance runs. */
 export type AdvanceTarget =
@@ -155,8 +156,7 @@ export function debtStop(f: Pick<WeekFacts, 'moneyBefore' | 'moneyAfter' | 'forc
     return { kind: 'bankruptcy', text: `${sold === 1 ? 'Forced sale' : 'Forced sales'}: ${names}${more} sold to cover debts.` };
   }
   if (crossedBelow(f, ECON.FORCED_SALE_FLOOR)) {
-    const floor = `-$${Math.abs(ECON.FORCED_SALE_FLOOR).toLocaleString('en-US')}`;
-    return { kind: 'bankruptcy', text: `Balance below the fire-sale floor (${floor}).` };
+    return { kind: 'bankruptcy', text: `Balance below the fire-sale floor (${fmtMoney(ECON.FORCED_SALE_FLOOR)}).` };
   }
   if (crossedBelow(f, ECON.BANKRUPTCY_WARN)) {
     return { kind: 'bankruptcy', text: 'Club has gone into debt.' };

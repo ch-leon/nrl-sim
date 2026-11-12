@@ -13,7 +13,7 @@ import { roundLabel } from '../../systems/matchday';
 // match in a sheet of its own (#326). Saved at once, so a side picked and then
 // the app closed is not lost. DOM UI kit only; the rules are pure and tested
 // in systems/lineup.ts. No Phaser.
-import { el, button, openScreen, openModal, closeModal, screenHead, segmented } from '../dom';
+import { el, button, hintScroll, openScreen, openModal, closeModal, screenHead, segmented } from '../dom';
 import { getState, type Player, type Position } from '../../core/state';
 import { bus } from '../../core/events';
 import { overallRating } from '../../data/player';
@@ -26,7 +26,7 @@ import { PLAYER_ID } from '../../systems/fixtures';
 import { playerRivalContext, rivalStyle } from '../../systems/rivalRound';
 import { kickerAndCaptain } from '../../match/league/sheets';
 import {
-  LINEUP_SLOTS, POSITION_SHORT, autoPickKeepingPlan, commitLineup, setRotation, describeFills, effectiveRating, lineupAverage, occupant, placeAt, positionFit,
+  LINEUP_SLOTS, POSITION_SHORT, autoPickKeepingPlan, commitLineup, setRotation, describeFills, effectiveRating, lineupAverage, lineupChanges, occupant, placeAt, positionFit,
   resolveLineup, sameSpot, setCaptain, setKicker, setTactics, spotOf, statsAt, swapSpots, validTactics, type Spot,
 } from '../../systems/lineup';
 import { ensureScreenStyles } from './recruit';
@@ -144,7 +144,8 @@ const LINEUP_CSS = `
 /* #422: a tile drawn lower than a finger (40px on the pitch, 36 on the bench on a short phone) is tapped over a
    44px band: its hit area reaches into the gaps round it, never as far as the next tile's. */
 .nrl-lineup-tile::after { content: ''; position: absolute; left: 0; right: 0; top: min(0px, calc(50% - 22px)); bottom: min(0px, calc(50% - 22px)); }
-.nrl-lineup-tile:hover { background: #22305c; }
+@media (hover: hover) and (pointer: fine) { .nrl-lineup-tile:hover { background: #22305c; } }
+.nrl-lineup-tile:active { background: #22305c; }
 .nrl-lineup-tile:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 1px; }
 .nrl-lineup-tile[data-selected] { box-shadow: 0 0 0 2px var(--nrl-accent); z-index: 2; }
 .nrl-lineup-tile[data-empty] { background: rgba(232, 224, 200, 0.12); }
@@ -203,7 +204,8 @@ const LINEUP_CSS = `
 }
 /* N14 (#263): 44px rows on a touch screen (the list scrolls; the field is unchanged). */
 @media (pointer: coarse) { .nrl-lineup-row { min-height: 44px; } }
-.nrl-lineup-row:hover { background: #22305c; }
+@media (hover: hover) and (pointer: fine) { .nrl-lineup-row:hover { background: #22305c; } }
+.nrl-lineup-row:active { background: #22305c; }
 .nrl-lineup-row:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: -2px; }
 .nrl-lineup-row[data-selected] { background: var(--nrl-me); }
 .nrl-lineup-row[data-injured], .nrl-lineup-row[data-banned] { opacity: 0.55; cursor: default; }
@@ -302,9 +304,11 @@ ${PLAN_FIT_CSS}
   .nrl-lineup-plan .nrl-seg { padding: 1px; }
 }
 /* The Plays sheet (#326): the plays owned as rows, a numbered tick for each taken, in the order taken. */
-.nrl-lineup-plays-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 6px; max-height: min(52vh, 320px); overflow-y: auto; overscroll-behavior: contain; }
+.nrl-lineup-plays-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 6px; max-height: min(52vh, 320px); max-height: min(52dvh, 320px); overflow-y: auto; overscroll-behavior: contain; }
 .nrl-lineup-play { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 4px 10px; border: 0; border-radius: 10px; background: var(--nrl-button); color: var(--nrl-text); text-align: left; cursor: pointer; min-width: 0; font: inherit; }
 .nrl-lineup-play[aria-pressed="true"] { background: var(--nrl-me); }
+/* Pressed (#604): a button's pressed fill, so it shows under reduced motion too (dom.ts adds the scale). */
+.nrl-lineup-play:not([aria-pressed="true"]):active { background: #283669; }
 .nrl-lineup-play[data-full] { opacity: 0.55; }
 .nrl-lineup-play:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: -2px; }
 .nrl-lineup-play-tick { flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--nrl-line); display: flex; align-items: center; justify-content: center; font-family: var(--nrl-f-num); font-size: 0.875rem; font-weight: 700; box-sizing: border-box; }
@@ -327,6 +331,11 @@ const surname = (name: string): string => name.trim().split(/\s+/).pop() ?? name
 const fitClass = (f: number): string => (f >= 1 ? '' : f >= 0.9 ? 'nrl-lineup-fit-related' : 'nrl-lineup-fit-unrelated');
 /** Human label for a position (title-cased, hyphens kept). */
 const positionLabel = (pos: string): string => pos.replace(/(^|-)([a-z])/g, (_m, sep: string, ch: string) => sep + ch.toUpperCase());
+
+/** What AUTO PICK says it did (#614), by the spots it changed: a tap on a side already the best is not a dead one. */
+export function autoPickNote(changes: number): string {
+  return changes === 0 ? 'Already your best side.' : `Auto pick: ${changes} change${changes === 1 ? '' : 's'}.`;
+}
 
 let unsub: (() => void) | null = null;
 let selected: Spot | null = null;
@@ -374,6 +383,7 @@ export function openLineupScreen(): void {
   const kcRow = el('div', { class: 'nrl-lineup-kc' }, kBtn, cBtn);
   kcRow.hidden = true;
   const list = el('div', { class: 'nrl-lineup-list' });
+  hintScroll(list); // the squad runs past the sheet's foot (#610)
 
   // The plan (N11): attack and defence presets and the bench rotation, as the half-time sheet has them (3r).
   const rotation = segmented<Rotation>(ROTATIONS.map((r) => ({ id: r, label: ROTATION_LABEL[r], title: ROTATION_TIP[r] })), null,
@@ -441,12 +451,15 @@ export function openLineupScreen(): void {
 
   // Who kicks and who captains today (N11): the coach's picks, or the defaults.
   let roles: { kicker?: string; captain?: string } = {};
+  // The spot the list was last sorted for (#614).
+  let listFor: Spot | null = null;
   const tile = (p: Player | null, spot: Spot, slotPos: Position | null): HTMLElement => {
     const label = spot.kind === 'starter' ? POSITION_SHORT[slotPos!] : `B${spot.index + 1}`;
     const injured = p !== null && p.injuredWeeks > 0;
     const banned = p !== null && (p.suspendedWeeks ?? 0) > 0;
     const fit = p && slotPos ? positionFit(p.position, slotPos) : 1;
-    const rating = p ? (slotPos ? effectiveRating(p, slotPos) : overallRating(p)) : null;
+    // A bench seat has no slot: his overall, in whole numbers like the list beside it (#600).
+    const rating = p ? (slotPos ? effectiveRating(p, slotPos) : Math.round(overallRating(p))) : null;
     const top = el('span', { class: 'nrl-lineup-tile-top' }, `${label} `);
     if (injured) top.append(el('span', { class: 'nrl-lineup-tile-out', text: 'OUT' }));
     else if (banned) top.append(el('span', { class: 'nrl-lineup-tile-out', text: 'BAN' }));
@@ -600,6 +613,10 @@ export function openLineupScreen(): void {
       if (occupantId === p.id) row.setAttribute('data-selected', '');
       list.append(row);
     }
+    // Another spot picked (or none now) sorts the list afresh: back to its top, where the best man for
+    // the spot is (#614). The same spot drawn again (a kicker, an injury) leaves the list where it was.
+    if (selected ? !sameSpot(selected, listFor) : listFor !== null) list.scrollTop = 0;
+    listFor = selected;
   };
 
   /** The Plays button and sheet (#326): the plays owned, ticked in the order taken, three at most. */
@@ -640,7 +657,9 @@ export function openLineupScreen(): void {
   const autoBtn = button('AUTO PICK', () => {
     selected = null;
     const cur = getState().lineup;
-    commitLineup(autoPickKeepingPlan(getState().squad, cur));
+    const best = autoPickKeepingPlan(getState().squad, cur);
+    commitLineup(best);
+    toast(autoPickNote(lineupChanges(cur, best)));
   });
   autoBtn.title = 'Today’s best nine by slot and the next four';
   autoBtn.setAttribute('data-auto-pick', '');

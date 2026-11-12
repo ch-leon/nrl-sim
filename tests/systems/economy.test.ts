@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   weeklyWages, weeklyUpkeep, weeklyIncome, gateReceipts, homeGate, recentForm, tickContracts,
   handleBankruptcy, applyEconomy, registerEconomySystem, registerFinanceSystem, financeNet, classifyReason,
-  nextStandGate, stampMovement, weeklyOverhead, sponsorIncome, sponsorReturn, moneyText,
+  nextStandGate, stampMovement, weeklyOverhead, sponsorIncome, sponsorReturn,
 } from '../../src/systems/economy';
 import { emptyFinance, setState } from '../../src/core/state';
 import { earnMoney, spendMoney } from '../../src/data/club';
@@ -420,10 +420,6 @@ describe('handleBankruptcy', () => {
     setup({ money: -8946, squad: [mkPlayer()] });
     handleBankruptcy(getState());
     expect(seen).toEqual(['The club is in the red (-$8,946). Balance the books!']);
-  });
-
-  it('moneyText: the dock\'s form whatever the device locale (#417)', () => {
-    expect([-8946, -100_000, -0.4, 0, 1234.6, 64_000].map(moneyText)).toEqual(['-$8,946', '-$100,000', '$0', '$0', '$1,235', '$64,000']);
   });
 
   it('no warning when money >= 0', () => {

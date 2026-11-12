@@ -28,7 +28,7 @@ export async function runExpansionIntro(browser) {
       await page.locator(width === 844 ? '[data-expansion-skip]' : '[data-expansion-work]').tap();
       await page.locator('[data-step="build"]').waitFor();
       const state = await page.evaluate(() => window.__nrlState());
-      if (!lines[1].includes(`$${state.money.toLocaleString()}`) || state.objectives.some((o) => !lines[2].includes(o.text))) rec.problems.push('bank/objectives differ from live state');
+      if (!lines[1].includes(`$${state.money.toLocaleString('en-US')}`) || state.objectives.some((o) => !lines[2].includes(o.text))) rec.problems.push('bank/objectives differ from live state');
       // Reload saves via the existing pagehide autosave. Continue never shows the intro.
       await page.reload();
       await page.locator('[data-nrl-continue-1]').tap();

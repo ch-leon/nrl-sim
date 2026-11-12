@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { playTrials, BASE, OUT_ROOT, openNav, SHEET_EXIT, closeWeekSummary, log } from '../common.mjs';
+import { playTrials, BASE, OUT_ROOT, openNav, SHEET_EXIT, closeWeekSummary, log, skipFromPill } from '../common.mjs';
 
 /** Facility ladder + both veteran exits, played through round 8 on the required phones. */
 export async function runUnlocks(browser) {
@@ -62,9 +62,7 @@ export async function runUnlocks(browser) {
         await page.waitForFunction(() => document.querySelector('[data-ask-proceed]') || document.querySelector('.nrl-mo-controls'));
         if (await ask.isVisible()) await ask.tap();
         await page.waitForSelector('.nrl-mo-controls', { timeout: 60000 });
-        await page.locator('.nrl-mo-controls [data-skip-pill]').tap();
-        await page.waitForSelector('[data-skip-pill][data-armed]');
-        await page.locator('.nrl-mo-controls [data-skip-pill]').tap();
+        await skipFromPill(page);
         await page.waitForSelector('.nrl-mo-ft [data-back-to-club]', { timeout: 120000 });
         await page.locator('.nrl-mo-ft [data-back-to-club]').evaluate((n) => n.click());
         // The week settles before the scene switch; nav must see the visible dock.
