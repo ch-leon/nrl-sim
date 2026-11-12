@@ -35,7 +35,7 @@ import {
   RAIN_ANGLE,
   atmosphereGrade,
   atmosphereParticles,
-  buildLightmap,
+  cachedLightmap,
   drawGlow,
   drawGust,
   drawLeaf,
@@ -171,7 +171,7 @@ export function attachMatchAtmosphere(scene: Phaser.Scene, opts: AtmosphereOptio
   // ── Light ──────────────────────────────────────────────────────────────────
   if (!gradeIsNeutral(grade)) {
     if (grade.pool !== 0xffffff || grade.edge !== 0xffffff) {
-      const lm = buildLightmap(offsetX, grade, 8);
+      const lm = cachedLightmap(offsetX, grade, 8);
       const key = `atm-lightmap~${++serial}`;
       toTexture(scene, key, lm.buf);
       scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.LINEAR);

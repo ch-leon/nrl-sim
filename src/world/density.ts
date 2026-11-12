@@ -12,13 +12,36 @@
 // cam.zoom / screenDensity() (cssZoom), the zoom ranges of a camera controller are
 // CSS zooms multiplied by it, and the DOM's CSS px become canvas px times it.
 import Phaser from 'phaser';
-import { backingSize, densityFor, screenDensity, setScreenDensity } from './viewport';
+import { backingSize, densityFor, isSoftwareRenderer, screenDensity, setScreenDensity } from './viewport';
 import { CSS_PIXELS, overrideOn } from '../labs/flags';
 
-/** The screen's ratio, or 1 under the developer override that keeps the old CSS-pixel canvas (labs/flags CSS_PIXELS). */
+/**
+ * The screen's ratio, or 1 under the developer override that keeps the old CSS-pixel
+ * canvas (labs/flags CSS_PIXELS), and 1 where WebGL draws on the CPU (no GPU, or one
+ * the browser has blocked): there every frame fills 4× the pixels at 2×, and a ×4
+ * phone in software GL drew the grounds at 10 fps instead of 32 (#627's perf run).
+ */
 function deviceRatio(): number {
-  if (typeof window === 'undefined' || overrideOn(CSS_PIXELS)) return 1;
+  if (typeof window === 'undefined' || overrideOn(CSS_PIXELS) || softwareGl()) return 1;
   return window.devicePixelRatio || 1;
+}
+
+let software: boolean | undefined;
+/** True when WebGL renders in software (isSoftwareRenderer), read once from a throwaway context. */
+function softwareGl(): boolean {
+  if (software !== undefined) return software;
+  software = false;
+  try {
+    const gl = document.createElement('canvas').getContext('webgl');
+    if (gl) {
+      const info = gl.getExtension('WEBGL_debug_renderer_info');
+      software = isSoftwareRenderer(String(gl.getParameter(info ? info.UNMASKED_RENDERER_WEBGL : gl.RENDERER)));
+      gl.getExtension('WEBGL_lose_context')?.loseContext();
+    }
+  } catch {
+    /* no WebGL: Phaser falls back to canvas, at the screen's density as before */
+  }
+  return software;
 }
 
 /** The game's scale config: the window's size at the screen's density, shown at CSS size. */

@@ -175,6 +175,27 @@ export function buildLightmap(offsetX: number, g: AtmosphereGrade, scale = 8): L
   return { buf, rect, scale };
 }
 
+/** Light maps built last, kept for the next match (about 60 KB each). */
+const LIGHTMAPS_KEPT = 4;
+const lightmaps = new Map<string, Lightmap>();
+
+/**
+ * buildLightmap, kept: the next fixture's are built in an idle slice during the week
+ * (matchArtAhead.ts), so the match's start only uploads one. Read-only: never write into it.
+ */
+export function cachedLightmap(offsetX: number, g: AtmosphereGrade, scale = 8): Lightmap {
+  const key = `${offsetX}|${scale}|${g.pool}|${g.edge}|${g.falloff}`;
+  let lm = lightmaps.get(key);
+  if (lm) {
+    lightmaps.delete(key);
+  } else {
+    lm = buildLightmap(offsetX, g, scale);
+    while (lightmaps.size >= LIGHTMAPS_KEPT) lightmaps.delete(lightmaps.keys().next().value!);
+  }
+  lightmaps.set(key, lm);
+  return lm;
+}
+
 // ── Particles ────────────────────────────────────────────────────────────────
 
 /**

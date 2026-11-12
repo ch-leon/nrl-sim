@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  isSoftwareRenderer,
   MAX_DENSITY,
   MIN_PLAYER_PX,
   MIN_VIEW_SCALE,
@@ -142,5 +143,17 @@ describe('zoom at the screen\'s pixel density', () => {
     } finally {
       setScreenDensity(1);
     }
+  });
+});
+
+describe('isSoftwareRenderer', () => {
+  it('names the software rasterisers, not a GPU or a masked name', () => {
+    expect(isSoftwareRenderer('ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)')).toBe(true);
+    expect(isSoftwareRenderer('llvmpipe (LLVM 15.0.7, 256 bits)')).toBe(true);
+    expect(isSoftwareRenderer('ANGLE (Microsoft, Microsoft Basic Render Driver Direct3D11 vs_5_0 ps_5_0)')).toBe(true);
+    expect(isSoftwareRenderer('Apple GPU')).toBe(false);
+    expect(isSoftwareRenderer('Adreno (TM) 640')).toBe(false);
+    expect(isSoftwareRenderer('Mali-G78 MP14')).toBe(false);
+    expect(isSoftwareRenderer('WebKit WebGL')).toBe(false);
   });
 });

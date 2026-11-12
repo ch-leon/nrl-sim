@@ -3,7 +3,7 @@ import { PixelBuffer } from '../art/pixel';
 import type { Kit } from '../art/match/kit';
 import type { PlayerAnim } from '../art/match/players';
 import type { RingStyle } from '../art/match/kitClash';
-import { drawRingPixels, RING_SCALE } from '../match/view/ringTexture';
+import { liveRingPixels, RING_SCALE } from '../match/view/ringTexture';
 import { appearanceFor, WIDTH, HEIGHT, CENTRE, FOOT, type Appearance } from '../art/prototype/player';
 import { drawLivePlayer } from '../art/match/livePlayer';
 import { CONTACT_W, CONTACT_H, CONTACT_X, CONTACT_FOOT, drawContact } from '../art/prototype/contact';
@@ -65,7 +65,7 @@ function ringTexture(art: MatchArtRegistry, color: number, style: RingStyle): st
   const id = `${style}-${color.toString(16)}`;
   let key = keys.get(id);
   if (!key) {
-    key = art.texture(`live-ring-${id}`, drawRingPixels(style, 15, 7.5, { color, width: 1.5, alpha: .9, fillAlpha: style === 'solid' ? .28 : .1 }));
+    key = art.texture(`live-ring-${id}`, liveRingPixels(style, color));
     keys.set(id, key);
   }
   return key;

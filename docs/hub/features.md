@@ -64,7 +64,7 @@ What's in the game, with the PR that added each.
 ## Recently added
 
 - Match watchability, wave 1 ([PR](https://github.com/ch-leon/nrl-sim/pull/676), [tracker](https://github.com/ch-leon/nrl-sim/issues/626)):
-  - A phone shows more of the play: the canvas renders at the screen's pixel density, so a 2× phone sits at ×1.5 (about 14 of 18 players in view, was 11) and big hits and tries zoom in. Developer settings can switch back to the old resolution to compare frame rate.
+  - A phone shows more of the play: the canvas renders at the screen's pixel density, so a 2× phone sits at ×1.5 (about 14 of 18 players in view, was 11) and big hits and tries zoom in. Developer settings can switch back to the old resolution to compare frame rate. A browser drawing without a GPU (software WebGL) stays at 1×, and the hand-off to a match no longer waits on painting the players' rings, the night light map or the last stadium textures.
   - A match starts at ×2. Contact plays at the chosen speed, and the ruck is not doubled again at ×2.
   - Players face the way they move on screen, and the run is a real stride driven by distance run, with a breathing idle.
   - Three sizes of big moment: a try, a clean break or a 40/20 slows the match; a big hit, bust, strip or intercept freezes for a beat and shakes; the rest keep their pop-up. Only a clean break (about 3 a match) gets the big call.

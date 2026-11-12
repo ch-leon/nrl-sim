@@ -407,11 +407,22 @@ export class MatchScene extends Phaser.Scene {
     const fixtureKitsNow = { home: kits.home, away: kits.away };
     const key = fixtureArtKey(this.offsetX, fixtureKitsNow);
     const art = takeFixtureArt(key);
-    if (!this.live || (art && fixtureArtPieces(art).every((p) => p.texKey))) {
+    if (!this.live) {
       this.build(kits, art ?? paintFixtureArt(this.offsetX, fixtureKitsNow));
       return;
     }
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.teardown());
+    if (art && fixtureArtPieces(art).every((p) => p.texKey)) {
+      // All uploaded ahead: placed in a task of its own. The scene starts inside the
+      // Play Week tap, and the week's tick plus the build in one task blocked a ×4
+      // phone for close to 300 ms (#627's perf run).
+      const token = ++this.buildToken;
+      this.art.adopt(fixtureArtPieces(art)); // freed by teardown even if we never build
+      setTimeout(() => {
+        if (token === this.buildToken) this.build(kits, art, false);
+      }, 0);
+      return;
+    }
     const beat = this.add
       .text(this.cameras.main.width / 2, this.cameras.main.height / 2, KICK_OFF_TEXT, { fontFamily: MATCH_LABEL_FONT, fontSize: '22px', fontStyle: 'bold', color: '#ffffff', resolution: 2 })
       .setOrigin(0.5)
@@ -502,20 +513,26 @@ export class MatchScene extends Phaser.Scene {
     this.mountBackButton();
     if (ownTeardown) this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.teardown());
     this.built = true;
-    // A live match starts its effects and playback on the next frame (N10.5), so the
-    // frame that placed the stadium stays short on a phone; the lab starts at once.
+    // A live match starts its effects and playback in a task of its own (N10.5), so the
+    // task that placed the stadium stays short on a phone; the lab starts at once. Not a
+    // frame later: on a 2× screen the stadium's first frame blocks for 200 ms (#627), and
+    // the controls and the players' first draw were waiting behind it.
     if (!this.live) {
       this.startMatch();
       return;
     }
+    // Shown by startMatch: a frame drawn before it would paint the whole stadium at the
+    // screen's density with no players on it, the costliest frame of the hand-off.
+    this.cameras.main.setVisible(false);
     const token = this.buildToken;
-    void nextFrame().then(() => {
+    setTimeout(() => {
       if (token === this.buildToken) this.startMatch();
-    });
+    }, 0);
   }
 
   /** The effects, atmosphere and playback, over the stadium build() placed. */
   private startMatch(): void {
+    this.cameras.main.setVisible(true);
     // Publish sheets for the crowd emitters' kit tints (read by attachMatchFx).
     this.data.set('home', this.home);
     this.data.set('away', this.away);

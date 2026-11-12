@@ -12,6 +12,28 @@ import { RING_EDGE, type RingPaint } from './rings';
 /** Texels per art pixel: the ring stays soft-edged and crisp at any camera zoom a phone uses. */
 export const RING_SCALE = 4;
 
+/** The rings painted last, kept for the next scene (a few of 22 KB each): painted ahead in the week, matchArtAhead.ts. */
+const LIVE_RINGS_KEPT = 4;
+const liveRings = new Map<string, PixelBuffer>();
+
+/**
+ * The ring under a live player (matchPlayers.ts) for a side's colour and style, painted
+ * once and kept: the match art painted ahead paints the next fixture's two during the
+ * week, so the hand-off to the match only uploads them. Read-only: never write into it.
+ */
+export function liveRingPixels(style: RingStyle, color: number): PixelBuffer {
+  const id = `${style}-${color.toString(16)}`;
+  let buf = liveRings.get(id);
+  if (buf) {
+    liveRings.delete(id);
+  } else {
+    buf = drawRingPixels(style, 15, 7.5, { color, width: 1.5, alpha: 0.9, fillAlpha: style === 'solid' ? 0.28 : 0.1 });
+    while (liveRings.size >= LIVE_RINGS_KEPT) liveRings.delete(liveRings.keys().next().value!);
+  }
+  liveRings.set(id, buf);
+  return buf;
+}
+
 type Seg = readonly [x0: number, y0: number, x1: number, y1: number];
 
 /**
@@ -43,7 +65,16 @@ export function drawRingPixels(style: RingStyle, w: number, h: number, p: RingPa
   const layers: { width: number; color: number; alpha: number }[] = style === 'solid'
     ? [{ width: p.width, color: p.color, alpha: p.alpha }]
     : [{ width: p.width + 1.5, color: RING_EDGE, alpha: 0.85 * p.alpha }, { width: p.width * 1.2, color: p.color, alpha: p.alpha }];
+  // A segment covers nothing further than half the widest line plus 1.5 texels from it
+  // (half a texel of side, one of end), so each row only tests the segments whose padded
+  // box it crosses, and each texel the ones whose box holds it: the same pixels, a
+  // fraction of the work (the hand-off paints both sides' rings).
+  const reachMax = 0.5 + (Math.max(...layers.map((l) => l.width)) * scale) / 2 + 1 + 1e-6;
+  const boxes = segs.map((s) => [Math.min(s[0], s[2]) - reachMax, Math.min(s[1], s[3]) - reachMax, Math.max(s[0], s[2]) + reachMax, Math.max(s[1], s[3]) + reachMax] as const);
   for (let y = 0; y < bh; y++) {
+    const rowY = y + 0.5;
+    const rowSegs: number[] = [];
+    for (let k = 0; k < segs.length; k++) if (rowY >= boxes[k]![1] && rowY <= boxes[k]![3]) rowSegs.push(k);
     for (let x = 0; x < bw; x++) {
       const px = x + 0.5; const py = y + 0.5;
       // Premultiplied running colour, painted in the order drawRing paints.
@@ -60,7 +91,8 @@ export function drawRingPixels(style: RingStyle, w: number, h: number, p: RingPa
         const d = (u * u + v * v - 1) / (2 * grad);
         over(p.color, d <= 0 ? p.fillAlpha : 0); // hard-edged, like the pixel art around it
       }
-      const reach = segs.map((s) => segReach(px, py, s));
+      const reach: { dist: number; past: number }[] = [];
+      for (const k of rowSegs) if (px >= boxes[k]![0] && px <= boxes[k]![2]) reach.push(segReach(px, py, segs[k]!));
       for (const l of layers) {
         let cover = 0;
         for (const r of reach) {

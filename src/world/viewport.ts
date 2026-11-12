@@ -40,6 +40,15 @@ export function densityFor(devicePixelRatio: number): number {
   return Math.max(1, devicePixelRatio / Math.ceil(devicePixelRatio / MAX_DENSITY - 1e-9));
 }
 
+/**
+ * A WebGL renderer string for a software rasteriser (Chrome's SwiftShader, Mesa's
+ * llvmpipe/softpipe, Windows' Basic Render Driver): no GPU, so the canvas renders at
+ * 1× (world/density.ts). A real phone's GPU, or a browser that masks the name, is not.
+ */
+export function isSoftwareRenderer(renderer: string): boolean {
+  return /swiftshader|llvmpipe|softpipe|software|basic render driver/i.test(renderer);
+}
+
 /** Canvas px per CSS px the game is rendered at now. */
 export function screenDensity(): number {
   return current;
