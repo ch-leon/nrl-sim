@@ -30,7 +30,7 @@ is permitted, while a single marker is a tactical option. Sources:
   targets as `mark.x + dir * (markerStandM + k * markerGapM)`, `mark.y`. Verify
   settled marker bodies stay aligned through ordinary separation. Cover release
   for Slide, Rush and Compressed and early dummy-half reactions.
-- [ ] Update BAK-207 defence, BAK-208 defence and tuning §3, and features Recently
+- [x] Update BAK-207 defence, BAK-208 defence and tuning §3, and features Recently
   added with the PR link. Run targeted tests, TypeScript, full Vitest and build.
 - [ ] Have Claude independently review the issue's done-when line and final diff,
   listing problems without editing. Open one draft PR, run PR CI plus QA, and
