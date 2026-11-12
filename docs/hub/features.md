@@ -63,7 +63,7 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
-- Kick catches and loose-ball pickups carry explicit commentary detail, so a kick scooped up on its first grounded tick is called a pickup.
+- Kick catches and loose-ball pickups carry explicit commentary detail, so a kick scooped up on its first grounded tick is called a pickup ([PR](https://github.com/ch-leon/nrl-sim/pull/620)).
 
 - The isolated developer regional career includes an optional cross-division
   Open Cup, with a saved deterministic draw, implicit byes, profile-based dates,
