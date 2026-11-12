@@ -63,7 +63,7 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
-- **Draft, awaiting Leon’s play-test:** non-markers physically retreat 10m (or to their goal line) before defensive involvement. Covers quick heels, handovers, bins and substitutions; production is unchanged ([issue #625](https://github.com/ch-leon/nrl-sim/issues/625)).
+- **Draft, awaiting Leon’s play-test:** non-markers physically retreat 10m (or to their goal line) before defensive involvement. Covers quick heels, handovers, bins and substitutions; production is unchanged ([draft PR #677](https://github.com/ch-leon/nrl-sim/pull/677)).
 
 - Ruck markers line up square with the play-the-ball, one behind the other in both attacking directions, with room between bodies ([PR](https://github.com/ch-leon/nrl-sim/pull/621), [spec](../specs/618-marker-alignment.md)).
 
