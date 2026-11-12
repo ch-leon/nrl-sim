@@ -573,12 +573,21 @@ export const REPORT_CSS = `
 .nrl-ft-potm { animation: nrl-ft-slide 420ms cubic-bezier(0.2, 0.8, 0.2, 1) 700ms backwards; }
 @keyframes nrl-ft-slide { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .nrl-ft-potm { animation: none; } }
-.nrl-ft-actions { display: flex; justify-content: flex-end; gap: 8px; }
+/* The actions stay in reach when a short screen makes the card scroll (956×330: the stat rows took Back to Club off the bottom). */
+.nrl-ft-actions { display: flex; justify-content: flex-end; gap: 8px; position: sticky; bottom: 0; background: var(--nrl-navy); }
 .nrl-ft-actions .nrl-btn { height: 48px; font-size: 1.125rem; padding: 0 16px; }
 .nrl-ft-actions .nrl-btn-primary { padding: 0 22px; font-size: 1.1875rem; }
 @media (max-height: 400px) {
   .nrl-ft-card { gap: 10px; padding: 16px 20px; }
   .nrl-ft-pts { font-size: 2.375rem; }
+}
+/* Under 360px tall (a phone in landscape with Safari's bars) the three stats share one line, so the card fits unscrolled. */
+@media (max-height: 360px) {
+  .nrl-ft-card { gap: 8px; padding: 12px 20px; }
+  .nrl-ft-stats { flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 2px 16px; }
+  .nrl-ft-stat { grid-template-columns: auto auto auto; gap: 5px; font-size: 0.875rem; }
+  .nrl-ft-stat-l { font-size: 0.75rem; letter-spacing: 0.06em; }
+  .nrl-ft-potm { padding: 8px 0; }
 }
 /* The report (3t): a full sheet over the dimmed pitch, the stats column on the right. */
 .nrl-modal-backdrop.nrl-report-backdrop {
