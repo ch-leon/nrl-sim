@@ -51,7 +51,8 @@ const X0 = -RING;
 const X1 = FIELD_LONG + RING;
 const Y0 = -RING;
 const Y1 = FIELD_WIDE + RING;
-const BACK_FAR = Y0 - BACK_TIERS * TIER_D;
+/** The grandstand's back wall (grid gy): its roof runs 1.2 tiles beyond. */
+export const BACK_FAR = Y0 - BACK_TIERS * TIER_D;
 const HILL_FAR = X0 - HILL_D;
 const FRONT_FAR = Y1 + FRONT_TIERS * TIER_D;
 const END_FAR = X1 + FRONT_TIERS * TIER_D;

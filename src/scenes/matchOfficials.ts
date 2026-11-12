@@ -28,13 +28,22 @@ import { toFieldPt } from '../match/core/field';
 import type { PlayerSnap, Side, Snapshot } from '../match/core/snapshot';
 import { BENCH, REF, benchSeat, benchSeated, binSeat, binnedSpot, refCoversCarrier, refereeSignal, refereeSpot, type BenchSheet } from '../match/view/officials';
 import type { MatchArtRegistry } from './matchArt';
+import { BOARD_TEX_H, BOARD_TEX_W, boardColor, drawScoreboard, flashWord, scoreboardOrigin, type BoardState } from '../art/match/scoreboard';
+import { reducedMotion } from '../match/view/impact';
 
 /** Seconds a tick lasts (the sim's 20 Hz). */
 const TICK_S = 0.05;
 /** Referee frames kept (a few dozen are ever drawn). */
 const REF_FRAMES = 48;
+/** The scoreboard's flash after a score (real ms): beats of BEAT_MS for FLASH_MS, the last stretch back on the score. */
+const FLASH_MS = 3600;
+const FLASH_WORD_MS = 2600;
+const BEAT_MS = 280;
 /** World px the sin-bin card hangs above the binned man's feet. */
 const CARD_LIFT = 41;
+
+/** Phaser.BlendModes.ADD (the type-only import keeps Phaser out of this module's tests). */
+const BLEND_ADD = 1;
 
 /** A canvas texture repainted in place: one per thing, never one per frame. */
 class Canvas {
@@ -62,6 +71,11 @@ export interface OfficialsOptions {
   offsetX: number;
   /** The depth a player's sprite is drawn at (the referee goes behind the carrier rather than over him). */
   carrierDepth: (side: Side, slot: number) => number | null;
+  /** The sides' short tags (the score bug's) and the scoreboard's depth (behind the pitch). */
+  tags: readonly [string, string];
+  boardDepth: number;
+  /** After dark the board's LEDs glow through the night grade: an additive copy at this depth and strength (none by day). */
+  boardGlow?: { depth: number; alpha: number };
 }
 
 interface BenchView {
@@ -85,8 +99,19 @@ export class MatchOfficials {
   private readonly benches: Record<Side, BenchView>;
   private readonly seated = new Map<string, PixelBuffer>();
 
+  private readonly scene: Phaser.Scene;
+  private readonly board: Canvas;
+  private readonly boardColors: readonly [number, number];
+  private boardShown = '';
+  private boardLast: readonly [number, number] | null = null;
+  private boardFlash: { word: string; side: Side; from: number } | null = null;
+  private readonly reduced = reducedMotion();
+  /** The points on the scoreboard now (the e2e run checks it against the score bug). */
+  boardScore: readonly [number, number] | null = null;
+
   constructor(scene: Phaser.Scene, art: MatchArtRegistry, opts: OfficialsOptions) {
     this.opts = opts;
+    this.scene = scene;
     const world = (p: { x: number; y: number }) => {
       const f = toFieldPt(p);
       return opts.toWorld(f.fx, f.fy);
@@ -120,6 +145,43 @@ export class MatchOfficials {
     this.refCanvas = new Canvas(scene, art, 'referee', WIDTH, HEIGHT);
     this.ref = scene.add.sprite(0, 0, this.refCanvas.key).setOrigin(CENTRE / WIDTH, FOOT / HEIGHT);
     this.refShadow = scene.add.image(0, 0, opts.shadowKey).setDepth(-80_000);
+    // The scoreboard on the grandstand roof (#673): one texture, repainted when what it shows changes.
+    this.boardColors = [boardColor(opts.kits.home), boardColor(opts.kits.away)];
+    this.board = new Canvas(scene, art, 'scoreboard', BOARD_TEX_W, BOARD_TEX_H);
+    const o = scoreboardOrigin(opts.offsetX);
+    scene.add.image(o.x, o.y, this.board.key).setOrigin(0, 0).setDepth(opts.boardDepth);
+    if (opts.boardGlow) {
+      scene.add.image(o.x, o.y, this.board.key).setOrigin(0, 0).setDepth(opts.boardGlow.depth).setAlpha(opts.boardGlow.alpha).setBlendMode(BLEND_ADD);
+    }
+    this.board.paint(drawScoreboard({ tags: opts.tags, score: [0, 0] }, this.boardColors));
+  }
+
+  /**
+   * The scoreboard shows the drawn tick's score (the replay's while one plays, as the score
+   * bug does). A score going up flashes the word in the scorer's colours, on wall-clock
+   * beats; under reduced motion the word holds still for the same time.
+   */
+  private drawBoard(score: readonly [number, number]): void {
+    const now = this.scene.time.now;
+    const last = this.boardLast;
+    if (last && (score[0] > last[0] || score[1] > last[1])) {
+      const side: Side = score[0] - last[0] >= score[1] - last[1] ? 'home' : 'away';
+      const pts = side === 'home' ? score[0] - last[0] : score[1] - last[1];
+      this.boardFlash = { word: flashWord(pts), side, from: now };
+    } else if (last && (score[0] < last[0] || score[1] < last[1])) this.boardFlash = null; // rewound (a seek, a replay)
+    this.boardLast = score;
+    this.boardScore = score;
+    let state: BoardState = { tags: this.opts.tags, score };
+    const f = this.boardFlash;
+    if (f) {
+      const t = now - f.from;
+      if (t >= FLASH_MS) this.boardFlash = null;
+      else if (t < FLASH_WORD_MS) state = { ...state, flash: { word: f.word, side: f.side, on: this.reduced || Math.floor(t / BEAT_MS) % 2 === 0 } };
+    }
+    const key = JSON.stringify(state);
+    if (key === this.boardShown) return;
+    this.boardShown = key;
+    this.board.paint(drawScoreboard(state, this.boardColors));
   }
 
   /** Where a sin-binned man is drawn (his side's bin), or null to leave him where the sim has him. */
@@ -133,6 +195,7 @@ export class MatchOfficials {
   /** Draw everyone for the frame between `prev` and `cur` at `alpha` (LiveView calls this after the players). */
   draw(prev: Snapshot, cur: Snapshot, alpha: number): void {
     this.latest = cur;
+    if (cur.score) this.drawBoard([cur.score.home, cur.score.away]);
     this.drawReferee(prev, cur, alpha);
     for (const side of ['home', 'away'] as const) this.drawBench(side, cur);
   }

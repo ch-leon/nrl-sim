@@ -279,3 +279,29 @@ export function drawGust(len = 40): PixelBuffer {
   }
   return b;
 }
+
+// ── Floodlights coming on (#673) ─────────────────────────────────────────────
+
+/** Each bank starts this long after the one before (ms), stutters for FLICKER_MS, then warms up over WARM_MS. */
+export const LIGHTS_STAGGER_MS = 450;
+export const LIGHTS_FLICKER_MS = 360;
+export const LIGHTS_WARM_MS = 2200;
+
+/**
+ * How far floodlight bank `bank` is on, 0..1, `ms` after kick-off at a dusk or night
+ * fixture: off until its turn, a stutter (on, off, on), then a metal-halide warm-up
+ * from a third to full. Wall-clock only. The ground's whole set is on by
+ * `lightsOnMs(banks)`.
+ */
+export function floodlightRamp(ms: number, bank: number): number {
+  const t = ms - bank * LIGHTS_STAGGER_MS;
+  if (t <= 0) return 0;
+  if (t < LIGHTS_FLICKER_MS) return [0.6, 0, 0.45, 0, 0.35][Math.floor((t / LIGHTS_FLICKER_MS) * 5)] ?? 0;
+  const w = Math.min(1, (t - LIGHTS_FLICKER_MS) / LIGHTS_WARM_MS);
+  return 0.35 + 0.65 * (1 - (1 - w) * (1 - w));
+}
+
+/** When every one of `banks` floodlight banks is fully on (ms after kick-off). */
+export function lightsOnMs(banks: number): number {
+  return (banks - 1) * LIGHTS_STAGGER_MS + LIGHTS_FLICKER_MS + LIGHTS_WARM_MS;
+}

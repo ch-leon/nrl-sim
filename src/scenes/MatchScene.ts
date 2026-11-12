@@ -13,7 +13,8 @@ import { halfTimeNumbers } from '../ui/matchupRead';
 //
 // Depth convention (ARCHITECTURE §7): depth = world (screen) y of a thing's
 // ground contact + layer. Static layers sit outside the field's y range:
-//   BG (field, back stands)  < back crowd < shadows < players/posts/ball (y+1)
+//   BG (field, back stands)  < scoreboard < back crowd < shadows
+//   < players/posts/flags/referee/benches/ball (y+1)
 //   < particles (10 000) < FG near terraces < front crowd.
 //
 // Pure geometry lives in ./matchField and src/art/match (Phaser-free, tested).
@@ -50,7 +51,7 @@ import { runMatch } from '../match/league/match';
 import { canUseWorker, playMatchesInWorker } from '../systems/matchJobs';
 
 import { attachMatchFx } from '../fx/particles';
-import { attachMatchAtmosphere } from '../fx/atmosphere';
+import { DEPTH_GLOW, attachMatchAtmosphere } from '../fx/atmosphere';
 import { RING_STYLES, resolveKits } from '../art/match/kitClash';
 import { drawRing } from '../match/view/rings';
 import { teamLetters, teamLettersOn, teamTags } from '../ui/teamTag';
@@ -125,6 +126,8 @@ export {
 // Static layer depths (see header).
 const DEPTH_BG = -100_000;
 const DEPTH_CROWD_BACK = -90_000;
+/** The scoreboard on the grandstand roof (#673): over the stand, under its crowd. */
+const DEPTH_BOARD = -95_000;
 const DEPTH_SHADOW = -80_000;
 const DEPTH_FG = 50_000;
 /** Name tags sit above the light map and crowd FX (70–72k), below weather (80k). */
@@ -471,6 +474,9 @@ export class MatchScene extends Phaser.Scene {
       shadowKey: props.shadow,
       offsetX: this.offsetX,
       carrierDepth: (side, slot) => this.players[side][slot]?.sprite.depth ?? null,
+      tags: teamTags(this.home.name, this.away.name),
+      boardDepth: DEPTH_BOARD,
+      ...(lighting !== 'day' ? { boardGlow: { depth: DEPTH_GLOW, alpha: lighting === 'night' ? 0.85 : 0.55 } } : {}),
     });
     this.markerColors = { home: kits.rings.home, away: kits.rings.away };
     this.marker = this.add.graphics().setVisible(false);
