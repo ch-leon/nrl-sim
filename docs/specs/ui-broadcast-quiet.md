@@ -137,6 +137,7 @@ Each screen's mock is `docs/screenshots/broadcast-quiet/<id>_<name>.png` (render
   - Per team: a 6px colour stripe (home #f4d03f, away #2f8a46), the 3-letter code (Barlow 19/700; "★" marks the user's team), and a 36×44 score box (#1b264a, Mono 20/600).
   - Then the clock block: bg #f4d03f, Mono 16 time + "1H"/"2H".
   - Optional 4px possession bar underneath, as the team-colour split.
+  - **Occasion tag (#640)**: a final (a knockout, i.e. a golden-point fixture) carries a `FINAL` tag, and the player's derby (the nearest rival, `systems/derby.ts`, the one News calls "Derby week") a `DERBY` tag, at the left of the momentum row under the bug (accent fill, 10px label type) for the whole match. FINAL wins if both.
 - **Commentary strip (log = line)**: bottom 78, centred, width 560, height 40, radius 8, bg `rgba(14,22,48,.95)`.
   - Contents: a "LIVE" tag (yellow), the latest event on one line (14px, ellipsis), and "FULL LOG ▴" on the right.
   - Tapping it sets the log to full.
@@ -160,6 +161,7 @@ Each screen's mock is `docs/screenshots/broadcast-quiet/<id>_<name>.png` (render
   - Then scorer name (20/700) and "TEAM · +4" (14, #c9d1ea).
   - Shown about 3s. **It shows even when the log is hidden.**
   - Same pattern for other key moments: penalty goal, field goal, sin bin.
+  - **Golden point (#640)**: `GOLDEN POINT` / "Next score wins" in the same banner, once, as the restart is played (the overlay's `setClock` first reports the `gp` half).
 
 ### 3o Coach calls open
 - Tray above the Coach button: `left 16, bottom 80`, width 360, #0e1630, radius 14.
@@ -184,7 +186,10 @@ Each screen's mock is `docs/screenshots/broadcast-quiet/<id>_<name>.png` (render
 - **Header**: "FULL TIME · ROUND 2" with a result tag (WIN BY 6 in #2a8346).
 - **Score**: 42 Mono, then "v Opponent".
 - **Effect chips**: ladder move, gate, injuries (injuries in #f0a39b).
-- **Player of the match**: a row with a 44px initials badge.
+- **Score count-up (#640)**: the score counts up from 0–0 over 0.8s (ease-out) and ends on the exact result.
+- **Stat rows (#640)**: three on the card, possession, line breaks and tries, the player's side first, label between.
+- **Player of the match**: a row with a 44px initials badge; it slides in from the right (0.42s, after 0.7s).
+- Under `prefers-reduced-motion` the score is final at once and the row does not slide. Back to Club takes the first tap throughout (#203); the card is 341px tall, inside 844x390 and 667x375.
 - **Buttons**: REPORT (secondary) and **BACK TO CLUB ▸** (primary).
 
 ### 3t Match report

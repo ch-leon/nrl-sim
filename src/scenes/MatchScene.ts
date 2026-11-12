@@ -27,6 +27,7 @@ import { button, getRoot, mount } from '../ui/dom';
 import { MATCH_NOT_SAVED_TEXT, MATCH_SAVED_TEXT, SKIPPING_EXIT_TEXT } from '../ui/hud';
 import type { TeamSheet, MatchEvent, WeatherKind } from '../sim/events';
 import { getState, setState, type Fixture } from '../core/state';
+import { isDerbyFixture } from '../systems/derby';
 import { SKIP_ARM_MS, callForRole, callsLockedHint, callsUnlockLine, coachBadge, cssHex, lockedNote, matchSettingsOpener, mountMatchOverlay, renderCoachBadge, showMatchSheet, showPlanCard, trayCallsOn, trayHidden, trayPlayEls, trayPlays, trayPlaysKey, trayPlaysOn, TRAY_CAP, TRAY_CAP_WITH_PLAYS, trayRowEls, trayRows, trayWithLocked, type MatchOverlayHandle, type PlanCardHandle, type TrayPlay } from '../ui/screens/matchOverlay';
 import { PLAYS_BY_ID, type PlayId } from '../data/plays';
 import { setFullTimeExit, shortName } from '../ui/screens/matchReport';
@@ -443,6 +444,15 @@ export class MatchScene extends Phaser.Scene {
     this.scale.on('resize', this.onResize);
   }
 
+  /** The player's derby (#640): the career's own News already calls it one (systems/derby.ts, geography only). Never in the lab, which has no career. */
+  private isDerby(): boolean {
+    try {
+      return !!this.fixture && isDerbyFixture(getState(), this.fixture);
+    } catch {
+      return false;
+    }
+  }
+
   private startPlayback(): void {
     if (this.live) {
       // The overlay reads Nines halves and the sim's running clock.
@@ -454,6 +464,7 @@ export class MatchScene extends Phaser.Scene {
         halfMinutes: NINES.halfMinutes,
         worn: { home: cssHex(this.markerColors.home), away: cssHex(this.markerColors.away) },
         ...(live.coachSide ?? live.planSide ? { mine: live.coachSide ?? live.planSide } : {}),
+        ...(live.goldenPoint ? { occasion: 'final' as const } : this.isDerby() ? { occasion: 'derby' as const } : {}),
       });
       this.playback = new LivePlayback(this, {
         home: this.home,

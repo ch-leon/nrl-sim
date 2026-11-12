@@ -1113,6 +1113,8 @@ export interface MatchOverlayOptions {
   worn?: { home: string; away: string };
   /** The coach's side: his club is starred on the score bug (#348 M8), and his calls are his in the log. */
   mine?: 'home' | 'away';
+  /** What the match is beyond a round: a final (a knockout: golden point if level) or the player's derby (#640). Tagged on the score bug for the whole match. */
+  occasion?: 'final' | 'derby';
 }
 
 /** A 0xRRGGBB colour as CSS. */
@@ -1185,6 +1187,8 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   const scoreEl = el('span', { class: 'nrl-mo-score nrl-mo-sr', text: '0 – 0' });
   // The team-colour split under the score bug is the momentum line (#366): who is on top, the last few minutes.
   const momentum = momentumLine(worn, codes);
+  // A final or a derby (#640): its tag at the foot of the bug's left end, the momentum line's own row.
+  if (opts.occasion) momentum.row.prepend(el('span', { class: 'nrl-mo-occasion', text: opts.occasion === 'final' ? 'FINAL' : 'DERBY', attrs: { 'data-occasion': opts.occasion } }));
   const board = el(
     'button',
     { class: 'nrl-mo-scoreboard', attrs: { type: 'button', 'aria-expanded': 'false', 'aria-controls': 'nrl-mo-stats', title: 'Match stats' } },
@@ -1451,6 +1455,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   // ── Key moments ──
   let bannerTimer: ReturnType<typeof setTimeout> | null = null;
   let bannerWasTry = false;
+  let goldenAnnounced = false;
   /** Built during a burst of events (Skip) and shown once the burst ends. */
   let queued: (() => void) | null = null;
   let flushScheduled = false;
@@ -1604,7 +1609,13 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
         halfEl.textContent = 'FT';
         return;
       }
-      // Golden point (N9.4): its own clock from 00:00.
+      // Golden point (N9.4): its own clock from 00:00, and the banner once, as the restart is played (#640).
+      if (half === 'gp' && !goldenAnnounced && finalClock === null) {
+        goldenAnnounced = true;
+        showMoment({ head: 'GOLDEN POINT', who: 'Next score wins', sub: '', tone: 'score' });
+        bannerWasTry = false;
+        holdBanner(BANNER_MS.try);
+      }
       clockEl.textContent = formatClockSeconds(matchSeconds, half === 'gp' ? 60 : 2 * halfMinutes);
       halfEl.textContent = half === 1 ? '1H' : half === 2 ? '2H' : 'GP';
     },
@@ -1796,6 +1807,7 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 .nrl-mo-momentum { display: block; flex: 1 1 auto; min-width: 0; height: 8px; }
 /* The leaning side's tag at the line's newest end (#371); the same height when even, so the bug never jumps. */
 .nrl-mo-momentum-tag { flex: 0 0 auto; min-width: 2.4em; height: 1.2em; padding: 0 4px; font-family: var(--nrl-f-label); font-size: 0.625rem; font-weight: 700; line-height: 1.2; letter-spacing: 0.04em; text-align: right; color: var(--nrl-text-2); }
+.nrl-mo-occasion { flex: 0 0 auto; padding: 0 6px; height: 1.2em; font-family: var(--nrl-f-label); font-size: 0.625rem; font-weight: 700; line-height: 1.2; letter-spacing: 0.08em; background: var(--nrl-accent); color: var(--nrl-on-accent); }
 .nrl-mo-momentum-fill { stroke: none; }
 .nrl-mo-momentum-axis { stroke: rgba(255, 255, 255, 0.25); stroke-width: 1px; vector-effect: non-scaling-stroke; }
 /* What a call did (#366): a tag over COACH for two seconds; it never takes a tap or moves the row. */
