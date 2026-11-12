@@ -2,15 +2,28 @@
 // Hidden unless ?labs=1 was opened on this browser (or a playtest career is on).
 // Finding it is not security: nothing here unlocks anything paid for.
 import { EXPERIMENTS } from './experiments';
-import { experimentOn, OPEN_SCREENS, overrideOn, setExperiment, setOverride, testCareer } from './flags';
-import { currentProbe, enterTestCareer, resetAll, returnToNormalCareer, transitionRefusal } from './devCareer';
+import { experimentOn, fieldLengthPreference, OPEN_SCREENS, overrideOn, setExperiment, setOverride, testCareer } from './flags';
+import { FIELD_LENGTHS, isFieldLength, type FieldLength } from './fieldLength';
+import { applyFieldLength, resetFieldSelection } from './fieldSelection';
+import { currentProbe, enterTestCareer, returnToNormalCareer, transitionRefusal } from './devCareer';
 import { syncDevMarker } from './marker';
+import { FIELD_LENGTH } from '../match/core/field';
 import { button, el, openModal, closeModal } from '../ui/dom';
 
 export const DEV_SETTINGS_TITLE = 'Developer settings';
 
 export function labsPanelModel(on: (id: string) => boolean) {
   return EXPERIMENTS.map((e) => ({ ...e, on: on(e.id), smallPrint: 'Changes take effect at the next match.' }));
+}
+
+/** Browser-local physical field choice; applying restarts the frozen geometry. */
+export function fieldSelectionModel(selected: FieldLength = 100, wait: string | null = null) {
+  return {
+    selected, label: 'Field length', applyLabel: 'Apply', wait,
+    options: FIELD_LENGTHS.map(value => ({ value, label: value === 100 ? '100m (default)' : `${value}m` })),
+    note: 'On this browser only; never saved as a career rule.',
+    smallPrint: 'Apply saves your progress and reloads between matches.' + (selected === 60 ? ' 40/20 is off on a 60m field.' : ''),
+  };
 }
 
 /** The override rows (#519): browser-local, never saved, and honest about what they don't undo. */
@@ -38,7 +51,8 @@ const PANEL_CSS = `
 .nrl-labs-panel h3 { margin:6px 0 0; font-size:0.95em; }
 .nrl-labs-panel small { display:block; }
 .nrl-labs-panel .nrl-dev-section { display:flex; flex-direction:column; gap:6px; }
-.nrl-labs-panel .nrl-btn, .nrl-labs-panel .nrl-settings-toggle { min-height:44px; }
+.nrl-labs-panel .nrl-btn, .nrl-labs-panel .nrl-settings-toggle, .nrl-labs-panel select { min-height:44px; }
+.nrl-labs-panel select { font:inherit; color:inherit; background:var(--nrl-bg, #152030); padding:6px 10px; border:1px solid currentColor; border-radius:4px; }
 .nrl-labs-panel .nrl-dev-row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
 .nrl-labs-panel .nrl-dev-wait { color:var(--nrl-accent, #f4d03f); }
 `;
@@ -62,6 +76,29 @@ function toggleRow(attr: string, id: string, label: string, note: string, smallP
 function section(id: string, title: string, ...children: HTMLElement[]): HTMLElement {
   const head = el('h3', { text: title, attrs: { id } });
   return el('section', { class: 'nrl-dev-section', attrs: { 'aria-labelledby': id } }, head, ...children);
+}
+
+function fieldSelectionRow(): HTMLElement {
+  const model = fieldSelectionModel(fieldLengthPreference(), transitionRefusal(currentProbe()));
+  const select = el('select', { attrs: { id: 'nrl-dev-field-length', 'data-field-length': '', 'aria-describedby': 'nrl-dev-field-note nrl-dev-field-print nrl-dev-field-status' } },
+    ...model.options.map(option => el('option', { text: option.label, attrs: { value: String(option.value) } })));
+  select.value = String(model.selected);
+  const status = el('small', { class: 'nrl-dev-wait', text: model.wait ?? '', attrs: { id: 'nrl-dev-field-status', role: 'status', 'aria-live': 'polite' } });
+  const smallPrint = el('small', { text: model.smallPrint, attrs: { id: 'nrl-dev-field-print' } });
+  select.addEventListener('change', () => {
+    const selected = Number(select.value);
+    if (isFieldLength(selected)) smallPrint.textContent = fieldSelectionModel(selected).smallPrint;
+  });
+  const apply = button(model.applyLabel, () => {
+    const result = applyFieldLength(Number(select.value));
+    if (!result.ok) status.textContent = result.why;
+  }, { class: 'nrl-dev-field-apply' });
+  apply.setAttribute('data-dev-action', 'apply-field');
+  apply.setAttribute('aria-describedby', 'nrl-dev-field-print nrl-dev-field-status');
+  if (model.wait) { select.disabled = true; apply.disabled = true; }
+  return el('div', { class: 'nrl-dev-section' },
+    el('div', { class: 'nrl-dev-row' }, el('label', { text: model.label, attrs: { for: select.id } }), select, apply),
+    el('small', { text: model.note, attrs: { id: 'nrl-dev-field-note' } }), smallPrint, status);
 }
 
 export function openLabsPanel(): void {
@@ -101,19 +138,27 @@ export function openLabsPanel(): void {
 
   const experiments = labsPanelModel(experimentOn).map((e) => toggleRow('data-experiment', e.id, e.label, e.note, e.smallPrint, e.on,
     (on) => { setExperiment(e.id, on); syncDevMarker(); }));
-  content.append(section('nrl-dev-experiments', 'Experiments', ...experiments));
+  content.append(section('nrl-dev-experiments', 'Experiments', ...experiments, fieldSelectionRow()));
 
   const resetWhy = el('small', { class: 'nrl-dev-wait', attrs: { role: 'status', 'aria-live': 'polite' } });
   const off = button('Reset all', () => {
-    const res = resetAll();
+    const res = resetFieldSelection();
     if (!res.ok) { resetWhy.textContent = res.why; return; }
     syncDevMarker();
     closeModal();
   }, { class: 'nrl-labs-off' });
+  const resetWait = FIELD_LENGTH !== 100 ? transitionRefusal(currentProbe()) : null;
+  if (resetWait) {
+    off.disabled = true;
+    resetWhy.id = 'nrl-dev-reset-why';
+    resetWhy.textContent = resetWait;
+    off.setAttribute('aria-describedby', resetWhy.id);
+  }
   content.append(section('nrl-dev-reset', 'Reset',
-    el('small', { text: inTest
+    el('small', { text: (inTest
       ? 'Leaves the playtest career as Return does, turns everything here off and hides this page. Hints you have seen stay.'
-      : 'Turns everything here off and hides this page. Your career and the hints you have seen stay.' }),
+      : 'Turns everything here off and hides this page. Your career and the hints you have seen stay.')
+      + (FIELD_LENGTH !== 100 ? ' Returns to a 100m field and reloads.' : '') }),
     off, resetWhy));
   openModal(content, { region: true, closeButton: true });
 }
