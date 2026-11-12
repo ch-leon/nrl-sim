@@ -5,6 +5,7 @@ import { LIVE } from '../league/live/knobs';
 import type { LivePlayerAction } from '../../art/match/livePlayer';
 import { hashString } from '../../art/match/kit';
 import { MOMENT_ACTIONS, momentLift, type MomentAction } from '../../art/match/moments';
+import { screenFacing } from './screenFacing';
 
 export interface PlayerPicture {
   /** -1 plants the feet; otherwise the continuing run cycle, independent of hand progress. */
@@ -58,6 +59,5 @@ export function playerPicture(p: PlayerSnap, previous: PlayerSnap, tick: number,
   const lift = MOMENT_ACTIONS.includes(action as MomentAction) ? momentLift(action as MomentAction, frame) : 0;
   const strideFrame = ['run', 'carry', 'catch', 'pass', 'airCatch'].includes(action)
     ? p.speed > .6 ? Math.floor(tick * .6 + p.slot) % 6 : -1 : undefined;
-  const dy = p.y - previous.y;
-  return { who: p.who ?? `${p.side}/${p.slot}`, action, frame, lift, ...(strideFrame === undefined ? {} : { strideFrame }), facing: (p.headY ?? dy) < -.2 ? 'back' : 'front', left: p.headX * screenDir < 0, possession };
+  return { who: p.who ?? `${p.side}/${p.slot}`, action, frame, lift, ...(strideFrame === undefined ? {} : { strideFrame }), ...screenFacing(p, previous, screenDir), possession };
 }

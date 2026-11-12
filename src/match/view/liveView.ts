@@ -4,9 +4,10 @@
 // Structural interfaces mirror MatchScene's public surface; no Phaser import,
 // so it is unit-tested with fake actors.
 import { toFieldPt } from '../core/field';
-import type { Snapshot, Side } from '../core/snapshot';
+import type { PlayerSnap, Snapshot, Side } from '../core/snapshot';
 import type { PlayerAnim } from '../../art/match/players';
 import { playerPicture, type PlayerPicture } from './playerPicture';
+import { screenFacing } from './screenFacing';
 import { advanceContactAnimation, type ContactAnimation } from './contactAnimation';
 import { contactLayout, type ContactLayout, type ContactPoint } from './contactLayout';
 
@@ -58,8 +59,7 @@ export class LiveView {
     const points: ContactPoint[] = [];
     for (let i = 0; i < cur.players.length; i++) {
       const c = cur.players[i]!;
-      const before = prev.players.find(p => p.side === c.side && p.slot === c.slot);
-      const p = before && before.who === c.who ? before : c;
+      const p = this.before(prev, c);
       const actor = this.s.players[c.side][c.slot];
       if (!actor) continue;
       if (c.who !== undefined) actor.wear?.(c.who);
@@ -69,7 +69,7 @@ export class LiveView {
       actor.place(w.x, w.y, w.y + 1 + c.slot * 0.001 + (c.side === 'away' ? 0.0005 : 0));
       actor.setSpriteVisible?.(true);
       points.push({ player: { side: c.side, slot: c.slot, who: c.who ?? `${c.side}/${c.slot}` }, ...w });
-      const faceLeft = c.headX * this.screenDir < 0;
+      const faceLeft = screenFacing(c, p, this.screenDir).left;
       const cadence = c.pose === 'run' ? Math.max(0.45, Math.min(1.7, c.speed / CADENCE_SPEED)) : 1;
       if (actor.paint) actor.paint(playerPicture(c, p, cur.tick, cur.ball.holder, this.screenDir));
       else actor.play(c.pose as PlayerAnim, faceLeft, timeScale * cadence);
@@ -80,8 +80,9 @@ export class LiveView {
       this.contactState = advanceContactAnimation(this.contactState, cur);
       if (this.contactState) {
         const carrier = cur.players.find(p => p.side === this.contactState!.contact.carrier.side && p.slot === this.contactState!.contact.carrier.slot)!;
-        contactFacing = (carrier.headY ?? 0) < -.2 ? 'back' : 'front';
-        layout = contactLayout(this.contactState, points, carrier.headX * this.screenDir < 0);
+        const facing = screenFacing(carrier, this.before(prev, carrier), this.screenDir);
+        contactFacing = facing.facing;
+        layout = contactLayout(this.contactState, points, facing.left);
         if (layout) for (const p of layout.feet) {
           const actor = this.s.players[p.player.side][p.player.slot];
           actor?.place(p.x, p.y, p.y + 1); actor?.setSpriteVisible?.(false);
@@ -96,7 +97,7 @@ export class LiveView {
     const lift = Math.round((pb.lift + (cb.lift - pb.lift) * a) * LIFT_PX_PER_M);
     if (cb.holder) {
       const h = cur.players.find((q) => q.side === cb.holder!.side && q.slot === cb.holder!.slot);
-      const hand = h && h.headX * this.screenDir < 0 ? -4 : 4;
+      const hand = h && screenFacing(h, this.before(prev, h), this.screenDir).left ? -4 : 4;
       this.s.ball.place(bw.x + hand, bw.y, lift, bw.y + 1.01 + cb.holder.slot * 0.001);
       const drawn = layout?.feet.find(p => p.player.side === cb.holder!.side && p.player.slot === cb.holder!.slot);
       this.s.focus?.carrier({ side: cb.holder.side, x: drawn?.x ?? bw.x, y: drawn?.y ?? bw.y });
@@ -107,5 +108,11 @@ export class LiveView {
     // Held balls are painted once in the player's hands (or the shared tackle).
     const embedded = !!cb.holder && !!this.s.players[cb.holder.side][cb.holder.slot]?.paint;
     this.s.ball.setRendered?.(!embedded);
+  }
+
+  /** The same player a tick earlier, or himself when the slot changed hands. */
+  private before(prev: Snapshot, c: PlayerSnap): PlayerSnap {
+    const before = prev.players.find(p => p.side === c.side && p.slot === c.slot);
+    return before && before.who === c.who ? before : c;
   }
 }

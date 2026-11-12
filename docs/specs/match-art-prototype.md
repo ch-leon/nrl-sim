@@ -32,6 +32,12 @@ and big-moment animation work follow that release and phone play-test.
   Simulation-tick frame selection keeps pauses and replays consistent. The CPU
   frame cache is capped at 512; each fixture owns one texture per player and one
   contact texture, all freed at scene shutdown.
+- Facing follows the heading as it moves on screen, not the field axes (#629):
+  `screenFacing` projects the sim heading through `fieldToGrid` and `gridToScreen`;
+  up the screen shows the back, down it the face, and a leftward heading flips the
+  sprite. The player picture, the contact layer and the held ball's hand all use it.
+  Within 0.2 of an axis (`FACING_BAND`, about 12°) the previous snapshot's heading
+  decides, so a run along a boundary holds its view; no view state is stored.
 
 Contest odds, RNG, movement, fatigue and strip rules are unchanged. Portraits and
 grounds characters remain a later art pass. The larger head catalogue stays

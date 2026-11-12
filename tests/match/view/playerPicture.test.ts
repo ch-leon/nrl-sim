@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { playerPicture } from '../../../src/match/view/playerPicture';
 import type { PlayerSnap } from '../../../src/match/core/snapshot';
 import { LIVE } from '../../../src/match/league/live/knobs';
-const p: PlayerSnap = { side: 'home', slot: 0, who: 'captain', x: 40, y: 20, pose: 'run', headX: 1, headY: -.6, speed: 6, caughtTick: 100 };
+import { FACING_BAND, screenFacing, screenHeading } from '../../../src/match/view/screenFacing';
+import { fieldToWorldPoint } from '../../../src/scenes/matchField';
+import { toFieldPt } from '../../../src/match/core/field';
+// Toward the home try line and the near touchline: up and to the right of the screen.
+const p: PlayerSnap = { side: 'home', slot: 0, who: 'captain', x: 40, y: 20, pose: 'run', headX: -.6, headY: -.8, speed: 6, caughtTick: 100 };
 describe('live player presentation', () => {
   it('catches during forward movement and tucks into a carry, with stable direction', () => {
     const holder = { side: 'home' as const, slot: 0 };
@@ -48,5 +52,51 @@ describe('live player presentation', () => {
       expect(playerPicture(passer, passer, 100, null, 1)).toMatchObject({ frame: 0, possession: false });
       expect(playerPicture(passer, passer, 100 + duration - 1, null, 1).frame).toBe(5);
     }
+  });
+  it('faces by how the heading moves on screen, not by the field axes', () => {
+    const at = (x: number, y: number) => { const f = toFieldPt({ x, y }); return fieldToWorldPoint(f.fx, f.fy, 0); };
+    for (let deg = 0; deg < 360; deg += 5) {
+      const h = { headX: Math.cos(deg * Math.PI / 180), headY: Math.sin(deg * Math.PI / 180) };
+      const a = at(50, 34), b = at(50 + h.headX, 34 + h.headY);
+      const s = { x: b.x - a.x, y: b.y - a.y }, m = Math.hypot(s.x, s.y);
+      expect(screenHeading(h.headX, h.headY).x).toBeCloseTo(s.x / m);
+      expect(screenHeading(h.headX, h.headY).y).toBeCloseTo(s.y / m);
+      const { facing, left } = screenFacing(h, h);
+      if (Math.abs(s.y / m) > FACING_BAND) expect(facing).toBe(s.y < 0 ? 'back' : 'front');
+      if (Math.abs(s.x / m) > FACING_BAND) expect(left).toBe(s.x < 0);
+    }
+    // A carrier running at either try line: his back going up the screen, his face coming down it.
+    const holder = { side: 'home' as const, slot: 0 };
+    const toZero = { ...p, headX: -1, headY: 0 }, toHundred = { ...p, headX: 1, headY: 0 };
+    expect(playerPicture(toZero, toZero, 110, holder, 1)).toMatchObject({ action: 'carry', facing: 'back', left: true });
+    expect(playerPicture(toHundred, toHundred, 110, holder, 1)).toMatchObject({ action: 'carry', facing: 'front', left: false });
+    expect(playerPicture(toZero, toZero, 110, holder, -1).left).toBe(false);
+  });
+  it('does not flicker as a straight run steps across a view boundary and back', () => {
+    // The field heading (running right on screen) whose screen-down component is `y`.
+    const headingFor = (y: number) => {
+      let best = { headX: 1, headY: 0 }, err = Infinity;
+      for (let d = 0; d < 360; d += .05) {
+        const h = { headX: Math.cos(d * Math.PI / 180), headY: Math.sin(d * Math.PI / 180) };
+        const s = screenHeading(h.headX, h.headY);
+        if (s.x > 0 && Math.abs(s.y - y) < err) { err = Math.abs(s.y - y); best = h; }
+      }
+      return best;
+    };
+    const views = (ys: number[]) => {
+      const hs = ys.map(headingFor);
+      return hs.map((h, i) => screenFacing(h, hs[Math.max(0, i - 1)]!).facing);
+    };
+    const changes = (v: string[]) => v.filter((x, i) => i > 0 && x !== v[i - 1]).length;
+    // Down the screen to up it and back again, a little each tick: one change each way.
+    const sweep = Array.from({ length: 21 }, (_, i) => .5 - i * .05);
+    expect(changes(views([...sweep, ...sweep.slice().reverse()]))).toBe(2);
+    // A run wobbling either side of a band edge holds the view it came in with.
+    for (const edge of [-FACING_BAND, FACING_BAND]) {
+      const wobble = Array.from({ length: 16 }, (_, i) => edge + (i % 2 ? .03 : -.03));
+      expect(new Set(views(wobble)).size).toBe(1);
+    }
+    // Straight along the boundary itself: the same view every tick.
+    expect(new Set(views(Array.from({ length: 8 }, () => .01))).size).toBe(1);
   });
 });
