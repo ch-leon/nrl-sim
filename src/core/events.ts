@@ -74,6 +74,8 @@ export interface Events {
   'match:committed': { fixture: Fixture; result: MatchResult };
   /** Save & exit left a live match parked: the week stays held and the club's Advance Week resumes it. */
   'match:parked': { tick: number };
+  /** The referee awards a penalty (the contract MatchEvent has no kind for one): presentation only, for the whistle. */
+  'match:penalty': { tick: number };
   'board:sacked': { season: number; reason: string };
   // forcedSales (N12.5): who the week's forced sales let go, so a multi-week advance
   // can stop on a sale; the economy emits the warning after the sales.

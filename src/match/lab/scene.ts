@@ -99,6 +99,7 @@ export class LabScene extends MatchScene {
       // camera. The subscribers pick what they react to by event kind.
       const ev = toMatchEvent(e, r.cur, this.ids);
       if (ev) bus.emit('match:event', ev);
+      if (e.kind === 'penalty') bus.emit('match:penalty', { tick: e.tick });
     }
   }
 

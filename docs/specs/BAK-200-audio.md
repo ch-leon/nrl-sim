@@ -107,3 +107,34 @@ returns unless the context is `running`. The master gain feeds a `DynamicsCompre
 knee 8, ratio 12, attack 3 ms, release 250 ms) that feeds the destination, so music + tackle + cheer do not clip.
 Reported from reading the code; not reproduced on an iPhone. The re-arm logic is covered by a unit test with
 fakes; on-device confirmation (lock the phone or take a call, come back, tap) is still owed.
+
+### Match sound (#635)
+All synthesised; nothing here has been listened to yet.
+
+**Event to sound** (`soundsForMatchEvent`, from `match:event`): `kickoff` whistle; `kick` (every kind, 40/20
+included) boot; `conversion` / `penalty-goal` / `field-goal` boot then `goal` (ting) or `miss` 0.25 s later;
+`break` whoosh; `tackle` the 90 Hz thump at 0.6 gain; `big-hit` the louder, lower `tackleBig` (62 to 45 Hz);
+`half-time` (golden point too) and `full-time` `whistleLong` + `siren`; `sin-bin` whistle; `try` as #634.
+A new bus event `match:penalty` (emitted by the live playback and the lab for a sim `penalty`; the contract
+`MatchEvent` has no penalty kind, and adding one would change results) plays the whistle. Tackle sounds get a
+pitch nudge of about +-7% from `pitchVariation(counter)`: a hash of a count, never the sim's RNG.
+
+**Crowd bed.** Looping 3 s noise buffer through a low-pass into the master gain. It starts on `match:started`
+(or on the first `match:event` when the context is running, which covers the lab) and fades out at `match:finished`
+(2.5 s). Steady level `crowdLevel(x, momentum)` = 0.10 + 0.22 x (how far inside 30 m of either try line the last
+event's `x` is) + 0.10 x |momentum|/100; the gain node gets that times `CROWD_OUT` (0.35, noise is dense).
+Position is the last `match:event`'s `x` (tackles and set starts arrive every few seconds); momentum is folded from
+the same events as the recorder (`applyMomentumEvent`, decay at `set-start`). Swells on top, decaying over about
+2 s: try 0.4 (0.14 for a try against), break 0.22, big hit 0.08, goal 0.10. The filter opens with the level.
+Music sits behind a `musicBus` gain that drops to 0.4 while the crowd is up.
+
+**Full time.** `full-time` event: whistle and siren. `match:finished`: the coached side's win, draw or loss
+sting (`stingWin` / `stingDraw` / `stingLoss`) 1.4 s later. After a win or draw the grounds track returns after
+3.5 s; after a loss the music stops and the grounds track waits for the next `ui:openScreen` or `week:advanced`,
+so a loss never crossfades to the cheerful tune. (`match:finished` fires at the whistle, so "held until the
+full-time card is dismissed" is approximated by that wait, not tied to the card.)
+
+`SFX_GAP` still applies per sound name, so Skip does not stack sounds. Mute (master 0 and `playSfx` guard) and a
+non-running context silence all of it; the crowd does not start unless the context is running.
+**The lab does not initialise audio** (`main.ts` boots it before `initAudio`), so none of this plays in `#lab`
+until `bootLab` creates a state and calls `initAudio()`.

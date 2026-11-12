@@ -860,6 +860,7 @@ export class LivePlayback {
     }
     // The contract's events, recorded for the result and sent to the overlay and FX.
     for (const ev of this.recorder.add(events, cur)) bus.emit('match:event', ev);
+    for (const e of events) if (e.kind === 'penalty') bus.emit('match:penalty', { tick: e.tick }); // the whistle (audio); the contract has no penalty event
   }
 
   /** One replay per try: the button stays up for eight seconds, including after the siren. */
