@@ -1683,6 +1683,7 @@ the replaced player’s eligibility. Possession changes and restarts clear the o
 ruck obligation, including a launched territorial kick (the receiving side becomes
 the attack). Normal tactical positioning, kick distances and fatigue costs remain
 as configured. This correction is held for Leon’s play-test before merge.
+
 ## Short-match comparison (#513, draft)
 
 `npm run build:match-preview -- <output-directory>` builds three separate bundles
@@ -1704,7 +1705,9 @@ The preview lab uses career smart pace and key-moment caps at the selected ×1,
 and records viewed milliseconds per half, excluding pause and half-time. It drops
 the lab’s additional slow-motion beat so it does not add a second pacing layer.
 Changing speed/stepping/seeking or hiding the tab invalidates comparison timing;
-hiding also pauses. Restart clears queued coach calls and resets the timer.
+hiding or rotating upright also pauses. Restart clears queued coach calls and resets
+the timer. Viewing time uses elapsed wall time, independently of Phaser’s
+smoothed frame delta.
 Normal lab playback is unchanged. Fatigue, sprint gas, substitutions and ordinary
 kick distances have not been compressed with the match: these are play-test
 limitations to compare rather than hidden balance tuning. PWA registration and

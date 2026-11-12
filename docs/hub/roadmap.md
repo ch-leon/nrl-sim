@@ -29,7 +29,7 @@ live gameplay change; work still open below has not shipped.
   no match changed. Expansive is still about 41% of level-rating games (−8.4 against
   strength), well under the other attacks. The next pass looks at why a rushing line
   shuts out the wide game; it is not a Speed question.
-- **Labs: shorter matches** ([issue #513](https://github.com/ch-leon/nrl-sim/issues/513)):
+- **Shorter-match comparison** ([draft PR #678](https://github.com/ch-leon/nrl-sim/pull/678)):
   Leon approved separate 100m/80m/60m preview builds after the retreat fix, targeting
   2–2.5 minutes of actual watching per half at ×1. The first comparison uses 2:30
   clock halves. Hold both drafts until his play-test; no production setting changed.

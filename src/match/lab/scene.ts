@@ -50,6 +50,7 @@ export class LabScene extends MatchScene {
   private previewPace = 1;
   private previewMoments = new KeyMoments();
   private previewTick = 0;
+  private previewAt = 0;
 
   constructor() {
     super('Lab');
@@ -80,10 +81,18 @@ export class LabScene extends MatchScene {
         r.pause();
       }
     };
+    const onResize = (): void => {
+      if (MATCH_PREVIEW && innerHeight > innerWidth && r.playing) {
+        this.controller.watchClock?.invalidate();
+        r.pause();
+      }
+    };
     if (MATCH_PREVIEW) document.addEventListener('visibilitychange', onVisibility);
+    if (MATCH_PREVIEW) window.addEventListener('resize', onResize);
     this.view.draw(r.prev, r.cur, 0, 1);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('resize', onResize);
       r.onEvents = null;
       this.popups?.destroy();
       this.popups = null;
@@ -122,6 +131,9 @@ export class LabScene extends MatchScene {
     const r = this.controller.runner;
     let shownSpeed = r.speed;
     if (MATCH_PREVIEW) {
+      const now = performance.now();
+      const viewingDelta = this.previewAt ? now - this.previewAt : 0;
+      this.previewAt = now;
       if (r.tick < this.previewTick) { this.previewMoments = new KeyMoments(); this.previewPace = 1; }
       const phase = (r.current as LiveSim).phaseKind;
       const chosen = r.speed;
@@ -129,7 +141,7 @@ export class LabScene extends MatchScene {
       this.previewPace = blendPace(this.previewPace, playbackPace(phase), delta);
       const cap = this.previewMoments.cap(r.cur.clock, NINES.halfMinutes);
       shownSpeed = Math.min(chosen * this.previewPace, cap ?? Infinity);
-      this.controller.watchClock?.advance(delta, r.cur.clock?.half ?? 1, chosen, phase, r.playing);
+      this.controller.watchClock?.advance(viewingDelta, r.cur.clock?.half ?? 1, chosen, phase, r.playing);
       r.setSpeed(shownSpeed);
       r.update(delta);
       r.setSpeed(chosen);
