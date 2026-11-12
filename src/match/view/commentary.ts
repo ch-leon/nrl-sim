@@ -10,7 +10,9 @@
 // resumed), and nothing here is anything the sim reads. A Commentator follows the
 // match event by event and the ball tick by tick: it knows a kick is in the air
 // (so a catch reads as one, and a kick picked up off the ground as a scoop) and
-// does not say the same line twice running. The whistles (half-time, full
+// does not say the same line twice running. It also keeps a small memory of the match
+// (score, who has scored, the lead, the clock) and adds a line after an event's own when
+// that memory has news: a second try, the lead changing hands, a close finish (#637). The whistles (half-time, full
 // time, golden point, the siren) hash the seed alone, so a match skipped to full
 // time in the Worker ends on the line it would have ended on.
 //
@@ -21,6 +23,7 @@ import { CALL_LABEL, callIsPenalty, isCoachCall } from '../league/calls';
 import { playOfDetail, playShortTitle } from '../league/plays';
 import type { Play } from '../../data/plays';
 import { MID_Y } from '../core/field';
+import { NINES } from '../league/rules';
 import { MAX_LAT_M } from '../league/tactics';
 import { ROLES } from '../league/roles';
 import { COUNTERS } from '../league/counters';
@@ -87,7 +90,7 @@ export const LINES: Readonly<Record<string, readonly string[]>> = {
   'loose-ball:in-goal': ["Loose in the in-goal — it's a race!", 'A race for it in the in-goal!', 'Both sides chase it into the in-goal.'],
   'set-start:scramble': ['{player} wins the scramble.', '{player} comes up with the loose ball!', '{player} gets to it first.'],
   'regather:scramble': ['{player} wins the race to it in-goal!', '{player} gets there first in-goal!', '{player} beats them to it over the line!'],
-  '40-20': ['40/20! {player} finds touch.', 'A 40/20 from {player}!', '40/20 — {team} get the ball back.'],
+  '40-20': ['40/20! {player} finds touch.', 'A 40/20 from {player}!', '40/20 — {team} get the ball back.', 'What a kick! {player} finds the 40/20!', '{player} nails the 40/20.', '{player} lands the 40/20!'],
   'on-full': ['Out on the full — {other} ball.', '{player} kicks it out on the full.', 'On the full! {other} get the ball back.'],
   'touch:kick': ['It finds touch — {other} ball.', '{player} finds touch.', 'Out it goes off the boot of {player}.'],
   'touch:penalty': ['{team} find touch from the penalty.', '{player} kicks for the line.', 'Penalty kick to touch by {player}.'],
@@ -106,7 +109,7 @@ export const LINES: Readonly<Record<string, readonly string[]>> = {
   'slow-ptb': ['Slow play-the-ball — the defence is set.', '{player} is slow to his feet.', 'The defence wins the ruck. Slow ball.'],
   dart: ['{player} darts from dummy-half.', '{player} goes himself from dummy-half.', 'Out of dummy-half goes {player}.'],
   // ── Attack ──
-  'line-break': ['{player} breaks the line!', 'Line break! {player} is away.', '{player} is through the line!', '{player} finds the gap and goes.'],
+  'line-break': ['{player} breaks the line!', 'Line break! {player} is away.', '{player} is through the line!', '{player} finds the gap and goes.', '{player} cuts the defence open!', 'Daylight! {player} is through!', '{player} slices through the line!'],
   // A half break (#638): the carrier is through one gap but the cover is still there. Plain words, no shout.
   'line-break:half': ['{player} busts through.', '{player} gets outside his man.', '{player} slips the first defender.', '{player} finds a bit of room.'],
   step: ['{player} steps his man!', 'A big step from {player}.', "{player} steps inside and he's gone."],
@@ -128,9 +131,9 @@ export const LINES: Readonly<Record<string, readonly string[]>> = {
   tackle: ['{player} wraps him up.', '{player} makes the tackle.', 'Held. {player} brings him down.', '{player} stops him in his tracks.'],
   // A Wrecking Ball drives on through it (§3); the tackler holds on.
   'tackle:drive': ['{player} hangs on as he drives through.', 'He drives on, but {player} holds him.', '{player} is carried back but holds on.'],
-  'big-hit': ['{player} smashes him backwards!', 'Big hit from {player}!', '{player} drives him back in the tackle!'],
+  'big-hit': ['{player} smashes him backwards!', 'Big hit from {player}!', '{player} drives him back in the tackle!', 'Huge shot from {player}!', '{player} flattens him!', 'Bone-rattling hit from {player}!'],
   'run-down': ['{player} runs him down!', 'Caught from behind! {player} gets there.', '{player} chases him down from behind.'],
-  intercept: ['{player} picks it off!', 'Intercept! {player} reads the pass.', '{player} jumps the pass!'],
+  intercept: ['{player} picks it off!', 'Intercept! {player} reads the pass.', '{player} jumps the pass!', 'Intercept! {player} steals it!', '{player} snatches the pass out of the air!', 'Pass picked off by {player}!'],
   gamble: ['{player} gambles and misses.', '{player} goes for the intercept, no luck.', '{player} jumps out of the line and misses.'],
   strip: ['{player} strips the ball!', '{player} rips it free in the tackle!', 'Stripped! {player} wins the ball.'],
   // ── Errors ──
@@ -158,14 +161,14 @@ export const LINES: Readonly<Record<string, readonly string[]>> = {
   'sin-bin': ['{player} is sent to the sin bin.', 'Sin bin! {player} has to go.', '{player} is off to the bin.'],
   'sin-bin-return': ['{player} is back from the sin bin.', '{player} returns from the bin.', 'Back on: {player} is back from the bin.'],
   // ── Scoring ──
-  try: ['TRY! {player} dives over.', 'TRY! {player} scores for {team}.', '{player} goes over — four points!', 'Four points: {player} gets it down.'],
+  try: ['TRY! {player} dives over.', 'TRY! {player} scores for {team}.', '{player} goes over — four points!', 'Four points: {player} gets it down.', 'TRY! {player} crashes over!', 'TRY! {player} is over for {team}!', 'Down it goes: TRY for {player}!'],
   'try:bonus': ['Five points! {player} scores from the zone.', '{player} goes round for the bonus try!', 'Bonus try! {player} gets it in the zone.'],
   'conversion:good': ['{player} converts.', '{player} adds the extras.', 'The conversion is good — two more.', 'Over it goes: {player} converts.'],
   'conversion:missed': ['{player} misses the conversion.', 'Wide of the posts — no extras.', 'The conversion drifts wide.'],
   'penalty-goal:good': ['{player} kicks the penalty goal.', 'Two points: {player} slots the penalty.', '{player} makes no mistake — two points.'],
   'penalty-goal:missed': ['{player} misses the penalty goal.', "Wide! {player}'s penalty goal misses.", 'No points — the penalty goes wide.'],
   'drop-goal': ['{player} drops for the field goal…', '{player} has a shot at a field goal.', 'Field goal attempt from {player}.'],
-  'field-goal:good': ['FIELD GOAL! {player} slots it.', '{player} drops it over — one point!', "One point: {player}'s field goal is good."],
+  'field-goal:good': ['FIELD GOAL! {player} slots it.', '{player} drops it over — one point!', "One point: {player}'s field goal is good.", 'Field goal! {player} slots the one-pointer.', '{player} splits the posts — one point!', 'Over it sails: {player}, field goal!'],
   'field-goal:missed': ["{player}'s field goal goes wide.", 'The field goal misses.', '{player} pushes the field goal wide.'],
   // ── The coach (#73, N11) ──
   'coach-call': ['{team} coach calls: {call}.', 'Call from the {team} box: {call}.', '{team} make a call: {call}.'],
@@ -189,6 +192,19 @@ export const LINES: Readonly<Record<string, readonly string[]>> = {
   'full-time:win': ['Full time: {winner} win {hi}–{lo}.', "That's full time — {winner} win {hi}–{lo}.", '{winner} take it {hi}–{lo}. Full time.'],
   'full-time:draw': ['Full time: it ends {hi}–{lo}.', 'All square at full time, {hi}–{lo}.', 'Full time — honours even at {hi}–{lo}.'],
   'full-time:golden-point': ['Golden point to {winner}! {hi}–{lo}.', '{winner} win it in golden point!', 'Golden point goes to {winner}: {hi}–{lo}.'],
+  // ── The match so far (the Commentator's memory: who has how many, who leads, how long) ──
+  'memory:second-try': ['{player} has two tonight!', 'A second try for {player}!', '{player} bags a double.', 'Two for {player}, and he is on fire.'],
+  'memory:hat-trick': ['Hat-trick! {player} has three!', '{player} completes the hat-trick!', 'Three tries for {player}: a hat-trick!'],
+  'memory:many-tries': ['{player} has {n} tries now!', 'Another for {player}: {n} tries!', '{n} tries for {player}, unstoppable.'],
+  'memory:back-in-front': ['{team} back in front!', '{team} hit the front again.', '{team} take the lead back.', '{team} edge back in front.'],
+  'memory:take-lead': ['{team} take the lead!', '{team} go in front.', 'And {team} are in front.'],
+  'memory:lead-final': ['{team} in front, and it is finals footy.', 'Finals pressure: {team} take the lead.', "{team} lead. One slip and the season's gone."],
+  'memory:in-a-row': ['{team} score again: {n} tries in a row.', "That's {n} in a row for {team}.", '{team} have scored {n} straight tries.'],
+  'memory:close-late': ['Just {margin} in it with {n} to play.', '{leader} lead by {margin} with {n} to go.', 'Only {margin} in it, {n} left.'],
+  'memory:level-late': ['All square with {n} to play.', 'Level with {n} to go. Who wants it?', 'Nothing in it, {n} left.'],
+  'memory:scoreless': ['Still nothing on the board after {n} minutes.', 'Scoreless after {n} minutes.', '{n} minutes gone and still 0–0.'],
+  'memory:drought': ["{team} haven't scored since the {n} minute.", 'Nothing for {team} since the {n} minute.', '{team} stuck on {m} since the {n} minute.'],
+  'memory:yet-to-score': ['{team} are yet to score.', 'Still no points for {team}.', "{team} haven't troubled the scorers."],
   // ── The report's story line (matchReport.ts) ──
   'story:double': ['{player} scores {n} tries.', '{n} tries for {player}.', '{player} crosses {n} times.'],
   'story:tries': ['{team} score {n} tries to {m}.', 'It is {n} tries to {m}.', '{n} tries to {m} in the end.'],
@@ -205,6 +221,39 @@ const KICKS: ReadonlySet<string> = new Set(['kick', 'kickoff', 'drop-out']);
 const ENDS_KICK: ReadonlySet<string> = new Set([
   'set-start', 'regather', 'drop', 'touch', 'dead-ball', 'on-full', '40-20', 'try', 'error', 'penalty', 'charge-down', 'tackle', 'half-time', 'full-time', 'golden-point',
 ]);
+
+/** Lines that matter: a try, a sin bin, a clean break, a penalty, a kick that wins it, the whistles. The strip holds one a moment before any other line replaces it. */
+const IMPORTANT_KEYS: ReadonlySet<string> = new Set([
+  'try', 'try:bonus', 'line-break', '40-20', 'field-goal:good', 'penalty', 'penalty:offside', 'penalty:high',
+  'sin-bin', 'sin-bin:high', 'sin-bin:professional', 'sin-bin:repeat', 'sin-bin:offside',
+  'golden-point', 'half-time:lead', 'half-time:level', 'full-time:win', 'full-time:draw', 'full-time:golden-point',
+]);
+
+/** Whether a line for this moment is held on the strip (the memory lines always are). A half break (`detail: 'half'`) stays a plain line. */
+export function isImportantKey(key: string, detail?: string): boolean {
+  if (key === 'line-break' && detail === 'half') return false;
+  return IMPORTANT_KEYS.has(key) || key.startsWith('memory:');
+}
+
+/** A line the Commentator says, and whether the strip should hold it. */
+export interface Said {
+  text: string;
+  important: boolean;
+}
+
+/** Minutes with no score before a side's drought (or a scoreless match) is worth saying; the match is two halves of seven. */
+export const SPELL_MINUTES = 6;
+/** The last minutes in which a close margin is worth saying. */
+export const CLOSE_LATE_MINUTES = 4;
+/** A margin a converted try can wipe out. */
+const CLOSE_MARGIN = 6;
+
+/** "3rd", "12th": a match minute in words. */
+function ordinalOf(n: number): string {
+  const t = n % 100;
+  const suffix = t >= 11 && t <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th';
+  return `${n}${suffix}`;
+}
 
 /** A count of tries in words ("four tries to three"). */
 function countWord(n: number): string {
@@ -371,12 +420,34 @@ export class Commentator {
    */
   private readonly calledPlay: Record<Side, Play | null> = { home: null, away: null };
   private readonly lastCalledPlay: Record<Side, Play | null> = { home: null, away: null };
+  /**
+   * The match so far: only what the events, the score and the clock after each one
+   * say, so a resumed or skipped stretch heard in order leaves the same memory as a
+   * watched one. Nothing here is read by the sim or hashed into a line's pick.
+   */
+  private readonly memo = {
+    score: { home: 0, away: 0 } as Record<Side, number>,
+    hasLed: { home: false, away: false } as Record<Side, boolean>,
+    tries: new Map<string, number>(),
+    run: { side: null as Side | null, n: 0 },
+    scoredAt: { home: null as number | null, away: null as number | null },
+    spellSaid: { home: false, away: false },
+    scorelessSaid: false,
+    close: null as { margin: number; minute: number } | null,
+    minute: NaN,
+  };
+  private readonly knockout: boolean;
+  private readonly matchMinutes: number;
 
   constructor(
     private readonly seed: number,
     names: Readonly<Record<Side, string>>,
     sheets?: Readonly<Record<Side, TeamSheet>>,
+    /** `knockout`: a final (the match plays golden point if level); `matchMinutes`: its length, for "n to play". */
+    opts: { knockout?: boolean; matchMinutes?: number } = {},
   ) {
+    this.knockout = !!opts.knockout;
+    this.matchMinutes = opts.matchMinutes ?? 2 * NINES.halfMinutes;
     this.plans = { home: { ...(sheets?.home.tactics ?? DEFAULT_TACTICS) }, away: { ...(sheets?.away.tactics ?? DEFAULT_TACTICS) } };
     this.fits = { home: styleFit(sheets?.home.roster ?? []), away: styleFit(sheets?.away.roster ?? []) };
     this.words = { home: shortName(names.home), away: shortName(names.away) };
@@ -384,6 +455,22 @@ export class Commentator {
 
   /** The line for an event ('' for nothing to say), given the score after it. */
   line(e: SimEvent, score?: Readonly<Record<Side, number>>, minute?: number, ballY?: number): string {
+    return this.said(e, score, minute, ballY)[0]?.text ?? '';
+  }
+
+  /**
+   * What the event says: its own line, then a line from the match's memory when it
+   * has one (a second try, the lead changing hands, a close finish, a long drought).
+   * Each says whether the strip should hold it.
+   */
+  said(e: SimEvent, score?: Readonly<Record<Side, number>>, minute?: number, ballY?: number): Said[] {
+    const main = this.main(e, score, minute, ballY);
+    const out: Said[] = main.text ? [{ text: main.text, important: isImportantKey(main.key, e.detail) }] : [];
+    for (const text of this.remember(e, score, minute)) out.push({ text, important: true });
+    return out;
+  }
+
+  private main(e: SimEvent, score?: Readonly<Record<Side, number>>, minute?: number, ballY?: number): { text: string; key: string } {
     const ordinal = e.tick === this.tick ? ++this.ordinal : (this.ordinal = 0);
     this.tick = e.tick;
     if (e.kind === 'plan' && e.side) {
@@ -399,7 +486,7 @@ export class Commentator {
     } else if (ENDS_KICK.has(e.kind)) this.kickInAir = false;
     const lines = LINES[key];
     // A moment with no lines of its own (a kind the sim gained since): the sim's own words.
-    if (!lines) return e.text;
+    if (!lines) return { text: e.text, key };
     const side = e.side;
     const plan = e.kind === 'plan' ? planLabel(e.detail) : undefined;
     const setPlay = e.kind === 'set-play' || e.kind === 'play-breaks-down' || e.kind === 'coach-call' ? playOfDetail(e.detail) : play.paid;
@@ -411,7 +498,88 @@ export class Commentator {
       ...(setPlay ? { play: playShortTitle(setPlay) } : {}),
       ...(score ? this.scoreFill(score) : {}),
     };
-    return this.say(key, lines, f, e.tick, ordinal, counter ? side : undefined) ?? e.text;
+    return { text: this.say(key, lines, f, e.tick, ordinal, counter ? side : undefined) ?? e.text, key };
+  }
+
+
+  /**
+   * The match's memory speaks (at most one line a moment): a hat-trick or a second
+   * try, the lead changing hands, a side scoring again, a close finish, a long
+   * scoreless spell. Scores are read off the score after each event, so a try,
+   * a penalty goal and a field goal all count the same way.
+   */
+  private remember(e: SimEvent, score: Readonly<Record<Side, number>> | undefined, minute: number | undefined): string[] {
+    const m = this.memo;
+    if (minute !== undefined && Number.isFinite(minute)) m.minute = minute;
+    if (!score || e.kind === 'half-time' || e.kind === 'full-time' || e.kind === 'golden-point' || e.kind === 'siren') return [];
+    const known = Number.isFinite(m.minute);
+    const golden = known && m.minute >= this.matchMinutes;
+    const tick = e.tick;
+    const say = (key: string, f: LineFill): string[] => {
+      const text = this.say(key, LINES[key]!, f, tick, 1000);
+      return text ? [text] : [];
+    };
+    // The score moved: who scored, and did the lead change hands (the first points of a match never do).
+    const before = m.score;
+    const rose: Side | null = score.home > before.home ? 'home' : score.away > before.away ? 'away' : null;
+    let lead: { side: Side; back: boolean } | null = null;
+    if (rose) {
+      const was = before.home === before.away ? null : before.home > before.away ? 'home' : 'away';
+      const now = score.home === score.away ? null : score.home > score.away ? 'home' : 'away';
+      if (before.home + before.away > 0 && now === rose && was !== rose) lead = { side: rose, back: m.hasLed[rose] };
+      if (now) m.hasLed[now] = true;
+      m.scoredAt[rose] = known ? m.minute : 0;
+      m.spellSaid[rose] = false;
+      m.score = { home: score.home, away: score.away };
+    }
+    const margin = Math.abs(score.home - score.away);
+    const leader = score.home === score.away ? undefined : this.words[score.home > score.away ? 'home' : 'away'];
+    // A try: its scorer's count, and the run of tries one side has put together.
+    let tryLine: string | null = null;
+    if (e.kind === 'try' && e.side) {
+      const n = e.player ? (m.tries.set(`${e.side}:${e.player}`, (m.tries.get(`${e.side}:${e.player}`) ?? 0) + 1), m.tries.get(`${e.side}:${e.player}`)!) : 0;
+      m.run = m.run.side === e.side ? { side: e.side, n: m.run.n + 1 } : { side: e.side, n: 1 };
+      const team = this.words[e.side];
+      if (n >= 4) tryLine = 'memory:many-tries';
+      else if (n === 3) tryLine = 'memory:hat-trick';
+      else if (lead) tryLine = null;
+      else if (n === 2) tryLine = 'memory:second-try';
+      else if (m.run.n >= 2) tryLine = 'memory:in-a-row';
+      if (tryLine) return say(tryLine, { ...(e.player ? { player: e.player } : {}), team, n: countWord(tryLine === 'memory:in-a-row' ? m.run.n : n) });
+    }
+    if (lead) {
+      const key = this.knockout ? 'memory:lead-final' : lead.back ? 'memory:back-in-front' : 'memory:take-lead';
+      return say(key, { team: this.words[lead.side], margin });
+    }
+    // A kick at goal closes the book on a score: a close margin in the last minutes.
+    if ((e.kind === 'conversion' || e.kind === 'penalty-goal' || e.kind === 'field-goal') && known && !golden) {
+      const left = this.matchMinutes - m.minute;
+      if (left > 0 && left <= CLOSE_LATE_MINUTES && margin <= CLOSE_MARGIN && !(m.close && m.close.margin === margin && m.minute - m.close.minute < 2)) {
+        m.close = { margin, minute: m.minute };
+        const mins = Math.max(1, Math.ceil(left));
+        const n = mins === 1 ? 'one minute' : `${countWord(mins)} minutes`;
+        return say(margin === 0 ? 'memory:level-late' : 'memory:close-late', { n, margin, ...(leader ? { leader } : {}) });
+      }
+    }
+    // A long spell with nothing on the board, said once as a set changes hands.
+    if (e.kind === 'handover' && known && !golden) {
+      const side = (['home', 'away'] as const)
+        .filter((s) => !m.spellSaid[s] && m.minute - (m.scoredAt[s] ?? 0) >= SPELL_MINUTES)
+        .sort((a, b) => (m.scoredAt[a] ?? -1) - (m.scoredAt[b] ?? -1))[0];
+      if (m.score.home + m.score.away === 0) {
+        if (!m.scorelessSaid && m.minute >= SPELL_MINUTES) {
+          m.scorelessSaid = true;
+          return say('memory:scoreless', { n: String(Math.floor(m.minute)) });
+        }
+      } else if (side) {
+        m.spellSaid[side] = true;
+        const since = m.scoredAt[side];
+        return since === null
+          ? say('memory:yet-to-score', { team: this.words[side] })
+          : say('memory:drought', { team: this.words[side], n: ordinalOf(Math.floor(since) + 1), m: String(m.score[side]) });
+      }
+    }
+    return [];
   }
 
   /**

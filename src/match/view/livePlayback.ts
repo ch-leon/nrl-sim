@@ -348,7 +348,7 @@ export class LivePlayback {
     this.plans = opts.plans ?? [];
     this.controls = opts.controls ?? [];
     this.recorder = new MatchRecorder({ home: home.clubId, away: away.clubId });
-    this.commentator = new Commentator(opts.seed, { home: home.name, away: away.name }, { home, away });
+    this.commentator = new Commentator(opts.seed, { home: home.name, away: away.name }, { home, away }, { knockout: !!opts.goldenPoint });
     // Exactly the sim runMatch would play: same sheets, seed, weather, injury rate, difficulty and calls.
     const simOpts: LiveOptions = { weather: opts.weather, calls: opts.calls, plans: this.plans, controls: this.controls, ...(opts.injuryRate !== undefined ? { injuryRate: opts.injuryRate } : {}), ...(opts.difficultyEdge ? { difficultyEdge: opts.difficultyEdge } : {}), ...(opts.aiCoach?.length ? { aiCoach: opts.aiCoach } : {}), ...(opts.aiRival ? { aiRival: opts.aiRival } : {}), ...(opts.breakRuleSides?.length ? { breakRuleSides: opts.breakRuleSides } : {}), ...(opts.goldenPoint ? { goldenPoint: true } : {}) };
     this.simOpts = simOpts;
@@ -701,7 +701,7 @@ export class LivePlayback {
     this.skipping = true;
     this.kicks.clear();
     this.runner.pause();
-    this.opts.overlay?.comment(SKIPPING_TEXT);
+    this.opts.overlay?.comment(SKIPPING_TEXT, 'now');
     void elsewhere({ home: this.opts.home, away: this.opts.away, opts: this.runOptions() })
       .then((result) => this.finishFrom(result))
       .catch((err: unknown) => {
@@ -739,7 +739,7 @@ export class LivePlayback {
     for (const ev of result.events.slice(this.recorder.events.length)) bus.emit('match:event', ev);
     const golden = result.events.some((e) => e.kind === 'full-time' && e.detail === 'golden-point');
     // The final whistle in the ticker: the same line the match would have ended on here (the whistles hash the seed alone).
-    this.opts.overlay?.comment(this.commentator.fullTime({ home: result.homeScore, away: result.awayScore }, golden));
+    this.opts.overlay?.comment(this.commentator.fullTime({ home: result.homeScore, away: result.awayScore }, golden), 'now');
     if (result.calls) {
       const [mh, ma] = result.calls.made;
       const [ph, pa] = result.calls.paid;
@@ -759,7 +759,7 @@ export class LivePlayback {
     this.skipping = true;
     while (!this.runner.finished) this.runner.step();
     this.skipping = false;
-    if (this.finalLine) this.opts.overlay?.comment(this.finalLine);
+    if (this.finalLine) this.opts.overlay?.comment(this.finalLine, 'now');
     this.view.draw(this.runner.prev, this.runner.cur, 1, 0.001);
     this.showClock();
     this.finish();
@@ -887,8 +887,10 @@ export class LivePlayback {
         if (this.opts.keyMoments?.()) this.keyMoments.note(e);
       }
       // The ticker reads the commentator (commentary.ts). It hears a resumed or skipped stretch too, silently, so the match reads the same.
-      const line = this.commentator.line(e, cur.score, cur.clock?.minute, cur.ball.y);
-      if (line && !this.skipping) this.opts.overlay?.comment(line);
+      // Its memory (a second try, a lead change) comes through the same path, so it is rebuilt by a resume and by Skip.
+      const said = this.commentator.said(e, cur.score, cur.clock?.minute, cur.ball.y);
+      const line = said[0]?.text ?? '';
+      if (!this.skipping) said.forEach((s, i) => this.opts.overlay?.comment(s.text, s.important ? 'important' : 'routine', i > 0));
       else if (line && e.kind === 'full-time') this.finalLine = line;
       if (e.kind === 'try' && !this.skipping) this.offerTryReplay(e.tick);
       if (e.kind === 'coach-call' || e.kind === 'call-paid') this.opts.overlay?.setCalls?.(this.sim.callsMade, this.sim.callsPaid);

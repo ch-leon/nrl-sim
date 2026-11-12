@@ -39,6 +39,7 @@ import { PLAYS_BY_ID, type PlayId } from '../../data/plays';
 import { PLAYS } from '../../match/league/plays';
 import { surnameOf } from '../../match/view/popups';
 import { TICKER_FIT_CHARS } from '../../match/view/commentary';
+import { StripHold, type CommentWeight } from '../../match/view/stripHold';
 import { lockedCallsLine, officeLevelName, officeLevelOf } from '../coachCallsText';
 import { teamTags } from '../teamTag';
 import { MOMENTUM_STEP_MIN, momentumLabel, momentumLeader, momentumShapes, momentumWindow, type MomentumEvent } from '../../match/view/momentum';
@@ -1076,8 +1077,13 @@ export interface MatchOverlayHandle {
   setTackle?(count: number | null): void;
   /** The live sim's running clock (match seconds and half), finer than the events' whole minutes. */
   setClock(matchSeconds: number, half: 1 | 2 | 'gp'): void;
-  /** A line in the commentary and the log: every line comes this way, from the live playback's commentary (N15.2). */
-  comment(line: string): void;
+  /**
+   * A line in the commentary and the log: every line comes this way, from the live playback's commentary (N15.2).
+   * The log takes every line. The strip holds an 'important' one for a moment (stripHold.ts) before a routine line
+   * can replace it; 'now' takes the strip at once. `follow`: the line adds to the event's own line (the match's memory),
+   * so a score or a call is never tagged on it.
+   */
+  comment(line: string, weight?: CommentWeight, follow?: boolean): void;
   /** Coach calls made and paid off, home and away (#73): the stats line, and the coach's own lines in the log. */
   setCalls?(made: Readonly<Record<'home' | 'away', number>>, paid: Readonly<Record<'home' | 'away', number>>): void;
   /** Show Replay for eight seconds after a try (N15.5). Tapping hides it and calls `onTap`. */
@@ -1417,7 +1423,30 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   /** The lines said since the last event: the tick in hand (its events come after its lines). */
   let batch: HTMLElement[] = [];
   let eventSince = false;
-  const addLine = (text: string, kind = ''): HTMLElement => {
+  const hold = new StripHold();
+  let holdTimer: ReturnType<typeof setTimeout> | null = null;
+  const showOnStrip = (text: string): void => {
+    stripText.classList.remove('nrl-mo-line-wait');
+    stripText.textContent = text;
+  };
+  /** The hold on the strip has run out: the next important line waiting for it goes up. */
+  const releaseStrip = (): void => {
+    holdTimer = null;
+    const next = hold.release(performance.now());
+    if (next !== null) showOnStrip(next);
+    const at = hold.nextAt();
+    if (at !== null) holdTimer = setTimeout(releaseStrip, Math.max(0, at - performance.now()));
+  };
+  const offerToStrip = (text: string, weight: CommentWeight): void => {
+    const now = performance.now();
+    const shown = hold.offer(text, weight, now);
+    if (shown !== null) showOnStrip(shown);
+    if (holdTimer) clearTimeout(holdTimer);
+    holdTimer = null;
+    const at = hold.nextAt();
+    if (at !== null) holdTimer = setTimeout(releaseStrip, Math.max(0, at - now));
+  };
+  const addLine = (text: string, kind = '', strip: CommentWeight | null = 'routine'): HTMLElement => {
     const line = el('div', { class: 'nrl-mo-line' }, el('span', { class: 'nrl-mo-line-t', text: clockEl.textContent ?? '' }), el('span', { class: 'nrl-mo-line-text', text }));
     if (kind) line.dataset.kind = kind;
     feed.prepend(line);
@@ -1425,8 +1454,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       const lines = [...feed.children] as HTMLElement[];
       lines[logLineToDrop(lines.map((l) => l.dataset.kind))]?.remove();
     }
-    stripText.classList.remove('nrl-mo-line-wait');
-    stripText.textContent = text;
+    if (strip) offerToStrip(text, strip);
     if (eventSince) {
       batch = [];
       eventSince = false;
@@ -1436,7 +1464,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   };
   /** The latest line of the tick with no tag yet: the call's line (setCalls follows it at once). */
   const untagged = (): HTMLElement | null => {
-    for (let i = batch.length - 1; i >= 0; i--) if (!batch[i]!.dataset.kind) return batch[i]!;
+    for (let i = batch.length - 1; i >= 0; i--) if (!batch[i]!.dataset.kind && !batch[i]!.dataset.follow) return batch[i]!;
     return null;
   };
   /**
@@ -1444,7 +1472,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
    * first untagged line (a whistle in the same tick comes after the kick).
    */
   const scoreLine = (player: string | undefined): HTMLElement | null => {
-    const open = batch.filter((l) => !l.dataset.kind);
+    const open = batch.filter((l) => !l.dataset.kind && !l.dataset.follow);
     const name = player?.trim().split(/\s+/).pop();
     const named = name ? open.filter((l) => l.textContent?.includes(name)) : [];
     return named[named.length - 1] ?? open[0] ?? null;
@@ -1558,6 +1586,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       offEvent();
       offFinished();
       if (bannerTimer) clearTimeout(bannerTimer);
+      if (holdTimer) clearTimeout(holdTimer);
       clearReplayOffer();
       replayTag?.remove();
       document.documentElement.style.removeProperty(BOARD_VAR);
@@ -1572,8 +1601,9 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       document.body?.classList.remove(MATCH_ACTIVE_CLASS, MATCH_FINAL_CLASS);
       if (active === handle) active = null;
     },
-    comment(line: string): void {
-      addLine(line);
+    comment(line: string, weight: CommentWeight = 'routine', follow = false): void {
+      const added = addLine(line, '', weight);
+      if (follow) added.dataset.follow = '1';
     },
     setCalls(made, paid): void {
       const mine = opts.mine;
