@@ -113,7 +113,7 @@ All synthesised; nothing here has been listened to yet.
 
 **Event to sound** (`soundsForMatchEvent`, from `match:event`): `kickoff` whistle; `kick` (every kind, 40/20
 included) boot; `conversion` / `penalty-goal` / `field-goal` boot then `goal` (ting) or `miss` 0.25 s later;
-`break` whoosh; `tackle` the 90 Hz thump at 0.6 gain; `big-hit` the louder, lower `tackleBig` (62 to 45 Hz);
+a clean break (`match:clean-break`, #638, about 3 a match) the whoosh, while a `break` the sim counts is silent; `tackle` the 90 Hz thump at 0.6 gain; `big-hit` the louder, lower `tackleBig` (62 to 45 Hz);
 `half-time` (golden point too) and `full-time` `whistleLong` + `siren`; `sin-bin` whistle; `try` as #634.
 A new bus event `match:penalty` (emitted by the live playback and the lab for a sim `penalty`; the contract
 `MatchEvent` has no penalty kind, and adding one would change results) plays the whistle. Tackle sounds get a
@@ -125,7 +125,7 @@ pitch nudge of about +-7% from `pitchVariation(counter)`: a hash of a count, nev
 event's `x` is) + 0.10 x |momentum|/100; the gain node gets that times `CROWD_OUT` (0.35, noise is dense).
 Position is the last `match:event`'s `x` (tackles and set starts arrive every few seconds); momentum is folded from
 the same events as the recorder (`applyMomentumEvent`, decay at `set-start`). Swells on top, decaying over about
-2 s: try 0.4 (0.14 for a try against), break 0.22, big hit 0.08, goal 0.10. The filter opens with the level.
+2 s: try 0.4 (0.14 for a try against), clean break 0.22, any other break 0.06, big hit 0.08, goal 0.10. The filter opens with the level.
 Music sits behind a `musicBus` gain that drops to 0.4 while the crowd is up.
 
 **Full time.** `full-time` event: whistle and siren. `match:finished`: the coached side's win, draw or loss

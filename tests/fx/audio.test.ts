@@ -141,8 +141,8 @@ describe('soundsForMatchEvent (#635)', () => {
     expect(names('penalty-goal', 'good')).toEqual(['boot', 'goal']);
     expect(names('field-goal', 'missed')).toEqual(['boot', 'miss']);
   });
-  it('a line break whooshes; runs and the rest are silent', () => {
-    expect(names('break')).toEqual(['whoosh']);
+  it('a break the sim counts is silent (only a clean one whooshes, on its own bus event); runs and the rest too', () => {
+    expect(names('break')).toEqual([]);
     expect(names('run')).toEqual([]);
     expect(names('error')).toEqual([]);
   });
@@ -491,6 +491,12 @@ describe('AudioEngine (fake context)', () => {
     bus.emit('match:event', { t: 3, kind: 'break', teamId: 'player', x: 8, y: 50 });
     // The swell goes past the steady level before settling back to it.
     expect(Math.max(...ramps.mock.calls.map((c) => c[0] as number))).toBeGreaterThan(near * CROWD_OUT);
+    // A clean break (#638) swells further than a break the sim merely counts.
+    const half = Math.max(...ramps.mock.calls.map((c) => c[0] as number));
+    ramps.mockClear();
+    fake.currentTime += 3;
+    bus.emit('match:clean-break', { tick: 60 });
+    expect(Math.max(...ramps.mock.calls.map((c) => c[0] as number))).toBeGreaterThan(half);
   });
 
   it('the music drops under the crowd and comes back when the match ends', async () => {

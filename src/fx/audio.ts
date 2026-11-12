@@ -399,8 +399,6 @@ export function soundsForMatchEvent(ev: SoundEvent, cheers: boolean): SfxCue[] {
     case 'penalty-goal':
     case 'field-goal':
       return [{ name: 'boot' }, { name: ev.detail === 'good' ? 'goal' : 'miss', delay: 0.25 }];
-    case 'break':
-      return [{ name: 'whoosh' }];
     case 'half-time':
     case 'full-time':
       return [{ name: 'whistleLong' }, { name: 'siren', delay: 0.5 }];
@@ -436,7 +434,7 @@ export const CROWD_MOMENTUM = 0.1;
 /** Noise is dense: the level above is scaled down by this on its way to the gain node, so the bed sits under the one-shots (measured offline: RMS about 0.07 near a line, a try is 0.03). */
 export const CROWD_OUT = 0.35;
 /** Extra swell, decaying, on a moment. */
-export const CROWD_SWELL: Readonly<Record<string, number>> = { 'try': 0.4, 'try-against': 0.14, 'break': 0.22, 'big-hit': 0.08, 'goal': 0.1 };
+export const CROWD_SWELL: Readonly<Record<string, number>> = { 'try': 0.4, 'try-against': 0.14, 'break': 0.06, 'clean-break': 0.22, 'big-hit': 0.08, 'goal': 0.1 };
 
 /**
  * Steady crowd level (before swells) from the ball's length position `x` (0..100, either try line at an
@@ -841,6 +839,12 @@ export class AudioEngine {
     this.playSfx('whistle');
   }
 
+  /** A clean break (#638, about 3 a match): the whoosh and the big swell. Every break the sim counts (about 16) only lifts the crowd a little. */
+  onCleanBreak(): void {
+    this.setCrowdBase(crowdLevel(this.ballX, this.momentum), CROWD_SWELL['clean-break']!);
+    this.playSfx('whoosh');
+  }
+
   /** Full time: the whistle has gone (the match event); the sting for the coached side's result follows it. */
   onFinished(fixture: { homeId: string; awayId: string } | undefined, result: { homeScore: number; awayScore: number } | undefined): void {
     const mine = getState().clubId;
@@ -916,6 +920,7 @@ export class AudioEngine {
     );
     this.unsubs.push(bus.on('match:event', (ev) => this.onMatchEvent(ev)));
     this.unsubs.push(bus.on('match:penalty', () => this.onPenalty()));
+    this.unsubs.push(bus.on('match:clean-break', () => this.onCleanBreak()));
     this.unsubs.push(bus.on('ui:notify', () => this.playSfx('click')));
     this.unsubs.push(
       bus.on('match:started', ({ home, away }) => {

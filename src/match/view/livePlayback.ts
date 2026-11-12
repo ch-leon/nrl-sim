@@ -848,6 +848,7 @@ export class LivePlayback {
     for (const sim of events) {
       // A line break the view calls half (#638) reads and plays as a plain line; the recorded events below are the sim's own.
       const e = shownBreak(sim, cur);
+      if (e.kind === 'line-break' && e.detail !== HALF_BREAK) bus.emit('match:clean-break', { tick: e.tick }); // the whoosh and the crowd (audio)
       // A kick struck or brought down (N15.3); a skipped or resumed stretch shows none.
       if (this.skipping) {
         this.kicks.clear();

@@ -13,7 +13,7 @@ import { toMatchEvent } from '../league/events';
 import { LiveView } from '../view/liveView';
 import { PopupLayer } from '../view/popupLayer';
 import { ContestLayer } from '../view/contestLayer';
-import { shownBreak } from '../view/lineBreak';
+import { HALF_BREAK, shownBreak } from '../view/lineBreak';
 import { popupFor, type PopupView } from '../view/popups';
 import { impactTier, playImpact } from '../view/impact';
 import { WrestleBar } from '../view/wrestleBar';
@@ -101,6 +101,7 @@ export class LabScene extends MatchScene {
       const ev = toMatchEvent(sim, r.cur, this.ids);
       if (ev) bus.emit('match:event', ev);
       if (e.kind === 'penalty') bus.emit('match:penalty', { tick: e.tick });
+      if (e.kind === 'line-break' && e.detail !== HALF_BREAK) bus.emit('match:clean-break', { tick: e.tick });
     }
   }
 
