@@ -7,7 +7,7 @@ live gameplay change; work still open below has not shipped.
 
 ## Now
 
-- **Defensive retreat correction** ([draft PR #677](https://github.com/ch-leon/nrl-sim/pull/677)): built on an isolated branch; independent review and checks in progress. Leon must play-test before merge.
+- **Defensive retreat play-test** ([PR #677](https://github.com/ch-leon/nrl-sim/pull/677)): watch a match at ×1 and check that defenders get back 10m before rejoining play, especially on dummy-half darts.
 
 - **[Match transition and big-moment release](../specs/match-big-moments.md)** ([issue #588](https://github.com/ch-leon/nrl-sim/issues/588)): integrate the completed catch/pass/ruck transitions and kicks/high-takes/try celebrations onto released build #584. The candidate is being checked for the next playable build; release evidence belongs in its PR.
 
