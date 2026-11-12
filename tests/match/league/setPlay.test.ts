@@ -127,7 +127,7 @@ describe('the launch and the script (plan §3.3)', () => {
       expect(e).not.toBeNull();
       if (sim.tackleCount === 1 && zoneOf(sim.toLineNow('home')) === 'attackingHalf') launch = e;
     }
-    expect(launch.tick).toBe(16262);
+    expect(launch.tick).toBe(8322);
     expect(launch.detail).toBe('block-play');
     expect(launch.player).toBe(sim.man('home', 5).name); // the halfback calls it
     expect(launch.text).toMatch(/calls the block play/);
@@ -222,7 +222,7 @@ describe('the launch and the script (plan §3.3)', () => {
     // Test the successful script; breakdown odds have their own coverage above.
     sim.force = 0.99;
     const e = until(sim, (x) => x.kind === 'set-play');
-    expect(e?.tick).toBe(780);
+    expect(e?.tick).toBe(3277);
     sim.retarget();
     const s = sim.script!;
     const wing = sim.man('home', s.edge === 'left' ? 1 : 2);

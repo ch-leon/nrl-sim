@@ -224,8 +224,8 @@ describe('out-schemed (#468)', () => {
     expect(losses).toBeGreaterThan(0);
     const flatUs = { ...us, tactics: { attack: 'balanced', defence: 'slide' } as const };
     const flatThem = { ...them, tactics: { attack: 'balanced', defence: 'slide' } as const };
-    // Seed 6 keeps this negative control a real loss after completed retreats (#625).
-    const flat = runMatch(flatUs, flatThem, { seed: 6 });
+    // Seed 1 keeps this negative control a real loss after completed retreats (#625).
+    const flat = runMatch(flatUs, flatThem, { seed: 1 });
     expect(flat.awayScore).toBeGreaterThan(flat.homeScore);
     expect(hasReason(why(s, flat, flatUs, flatThem))).toBe(false);
   });

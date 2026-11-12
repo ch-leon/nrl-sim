@@ -336,9 +336,9 @@ describe('kicks in real matches', () => {
     const types = new Set<string>();
     const done: Kick[] = [];
     const aimed = new Map<Kick, { x: number; y: number }>();
-    // Include a third trajectory for enough ground landings after completed retreats (#625).
+    // Kick-chase supplies bombs as well as long kicks and ground landings after #625.
     for (const seed of [31, 32, 33]) {
-      const sim = new LiveSim(sideSheet('H', { rating: 60 }), sideSheet('A', { rating: 60 }), seed);
+      const sim = new LiveSim(sideSheet('H', { rating: 60, tactics: { attack: 'kick-chase' } }), sideSheet('A', { rating: 60, tactics: { attack: 'kick-chase' } }), seed);
       const w = new KickWatch();
       let open: Kick | null = null;
       while (!sim.finished && sim.tick < 100_000) {
@@ -393,8 +393,8 @@ describe('kicks in real matches', () => {
     expect(checked).toBeGreaterThan(2);
     // The phone goes wide for kicks. The landing stays in the band (asserted above).
     // Desktop holds the kicker with it. A phone holds him on most frames of these
-    // two seeds (about 71% after the 7:00 cut, 63% since the deeper kick-off, #397,
-    // a 35–42 m kick) and loses him on a long kick, as tuning §9 already says.
+    // three Kick-chase fixtures (including bombs, long kicks and kick-offs), and
+    // loses him on a long kick, as tuning §9 already says.
     expect(zooms.phone).toContain(1);
     for (const z of [...zooms.phone, ...zooms.desktop]) expect([1, 2]).toContain(z);
     expect(held.desktop / frames.desktop).toBeGreaterThan(0.9);

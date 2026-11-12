@@ -25,19 +25,16 @@ function sheet(id: string, base = 60): TeamSheet {
     roster: POSITIONS.map((position, i) => ({ name: `${id} ${position} ${i}`, position, stats: { speed: base, strength: base, stamina: 50, handling: base, kicking: base, footyIQ: base } })),
   };
 }
-function events(seeds: number, seconds: number): { es: SimEvent[]; snaps: Snapshot[] } {
+function events(seeds: number): SimEvent[] {
   const es: SimEvent[] = [];
-  const snaps: Snapshot[] = [];
   for (let s = 1; s <= seeds; s++) {
     const sim = new LiveSim(sheet('H'), sheet('A'), s);
-    for (let i = 0; i < seconds * 20; i++) {
+    while (!sim.finished && sim.tick < 100_000) {
       sim.step();
-      const snap = sim.snapshot();
-      es.push(...snap.events);
-      snaps.push(snap);
+      es.push(...sim.tickEvents);
     }
   }
-  return { es, snaps };
+  return es;
 }
 
 describe('the last-tackle call (pure)', () => {
@@ -94,7 +91,9 @@ describe('the last-tackle call (pure)', () => {
 describe('kicks in the live sim', () => {
   // The kicking game on its own: no penalties or six-agains (2e) cutting sets short.
   const restore = applyTuning({ 'penalty.ruckSixAgain': 0, 'penalty.holdDown': 0, 'penalty.offside.slide': 0, 'penalty.offside.rush': 0, 'penalty.offside.compressed': 0, 'penalty.highShot': 0, 'penalty.highShotHothead': 0 });
-  const { es } = events(24, 180);
+  // Whole matches give both sides their full field-position cycle; the opening
+  // three minutes overrepresent territory kicks after completed retreats (#625).
+  const es = events(24);
   restore();
   const kicks = es.filter((e) => e.kind === 'kick');
   const byKind = (d: string): number => kicks.filter((e) => e.detail === d).length;

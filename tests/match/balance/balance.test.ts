@@ -200,10 +200,15 @@ describe('measuring and reporting', () => {
     expect(a.counts).toEqual(b.counts);
     expect(a.counts.tackles.mean).toBeGreaterThan(0);
     expect(a.legs.map((l) => l.minute)).toEqual([]); // under 3 minutes: no legs reading yet
+    // Completed sprinting retreats (#625) spend more legs in the baseline.
+    // Check the override causally, then exact restoration, rather than pinning match energy.
+    const baseline = measureCell(cell(), 2, 3);
     const tired = measureCell(cell({ 'fatigue.runCost': 0.002 }), 2, 3);
     expect(tired.legs[0]!.home).toBeLessThan(0.7);
     expect(FATIGUE.runCost).toBeCloseTo(0.00015 * (9 / 7));
-    expect(measureCell(cell(), 2, 3).legs[0]!.home).toBeGreaterThan(0.85);
+    expect(tired.legs[0]!.home).toBeLessThan(baseline.legs[0]!.home - 0.1);
+    // Wall-clock runtime is metadata; every deterministic result must restore exactly.
+    expect(measureCell(cell(), 2, 3)).toEqual({ ...baseline, ms: expect.any(Number) });
   });
   it('marks the §7 bands and flags only changes beyond luck', () => {
     expect(bandMark('tries', 7)).toBe('✓');
@@ -285,8 +290,8 @@ describe('measuring and reporting', () => {
     // Previous pins after #619: 10-26:350:9f50a5eaf6a452fd / 10-38:372:36729ef35fa1720e.
     // #625: non-markers physically complete their fixed 10 m retreat, changing
     // contact timing and every subsequent seeded trajectory without new random draws.
-    { attack: 'balanced' as const, expected: '26-9:377:b23b141eb79e878b' },
-    { attack: 'expansive' as const, expected: '12-8:355:9d00025e316680df' },
+    { attack: 'balanced' as const, expected: '18-27:354:e450dc56bc77a2f2' },
+    { attack: 'expansive' as const, expected: '17-19:363:83502c967cb51fa3' },
   ])('pins an even $attack / Slide match (seed 1)', async ({ attack, expected }) => {
     const sim = new LiveSim(sideSheet('H', { rating: 60, tactics: { attack } }), sideSheet('A', { rating: 60 }), 1);
     const parts: string[] = [];
@@ -313,8 +318,8 @@ describe('measuring and reporting', () => {
     // #618's marker geometry changes these carries too; previous pins were
     // 18-10:388:5d308d93c0af885a and 10-10:414:0ecee253d598e626.
     // #625's completed retreat changes these scripted carries and their trajectories too.
-    { name: 'plays-on', aiCoach: false, expected: '16-16:367:800efd5c4a18a5a3' },
-    { name: 'plays-on-hard', aiCoach: true, expected: '4-11:420:8b3b635525fc6018' },
+    { name: 'plays-on', aiCoach: false, expected: '29-16:363:2aa3303144770632' },
+    { name: 'plays-on-hard', aiCoach: true, expected: '24-6:383:20854f5e3bc6084f' },
   ])('pins $name: an even Balanced / Slide match with set plays (seed 1)', async ({ aiCoach, expected }) => {
     const home = { ...sideSheet('H', { rating: 60 }), plays: ['block-play' as const, 'cut-out-winger' as const, 'kick-pass' as const] };
     const sim = new LiveSim(home, sideSheet('A', { rating: 60 }), 1, aiCoach ? { aiCoach: ['home'] } : {});
