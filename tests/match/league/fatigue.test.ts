@@ -40,6 +40,48 @@ function play(sim: LiveSim, seconds: number, onTick?: (s: Snapshot) => void): Si
 }
 const AVG = { ...AVERAGE, stamina: 50 };
 
+/** Matched carriers: only his legs change; the defender, geometry and roll stay fixed. */
+class CarrierFatigueSim extends LiveSim {
+  constructor(energy: number) {
+    super(sheet('H'), sheet('A'), 1);
+    this.tick = 100;
+    this.attacking = 'home'; this.dir = 1;
+    this.phase = { kind: 'play' };
+    for (const p of this.players) {
+      p.body.pos = { x: 90, y: 5 + p.slot * 7 };
+      p.body.vel = { x: 0, y: 0 };
+      p.lockUntil = 0; p.busyUntil = 0; p.cooldownUntil = 0;
+    }
+    const carrier = this.players[7]!, defender = this.players[16]!;
+    carrier.energy = energy;
+    carrier.body.pos = { x: 50, y: 34 };
+    carrier.body.vel = { x: 5, y: 0 };
+    carrier.catchTick = 0;
+    defender.body.pos = { x: 51, y: 34 };
+    this.ball = { kind: 'held', by: 7 };
+  }
+  contact(roll: number): string | undefined {
+    this.rng.next = () => roll;
+    this.contest(this.players[7]!, this.players[16]!, [this.players[16]!]);
+    return this.tickEvents.find(e => e.kind === 'break-tackle' || e.kind === 'fend')?.kind;
+  }
+  stepAgainst(roll: number): boolean {
+    this.rng.next = () => roll;
+    this.pendingControl.home = { tick: this.tick, side: 'home', kind: 'step-up' };
+    this.stepPlay();
+    return this.tickEvents.some(e => e.kind === 'step');
+  }
+  runningSpeed(): number {
+    const carrier = this.players[7]!;
+    this.players[16]!.body.pos = { x: 90, y: 34 };
+    carrier.body.vel = { x: 0, y: 0 };
+    carrier.target = { x: 80, y: 34 };
+    carrier.through = true;
+    for (let i = 0; i < 40; i++) { this.tick++; this.move(); }
+    return Math.hypot(carrier.body.vel.x, carrier.body.vel.y);
+  }
+}
+
 describe('legs (pure)', () => {
   it('Stamina sets the drain rate; a Workhorse drains slower', () => {
     expect(drainRate(50)).toBeCloseTo(1);
@@ -155,27 +197,29 @@ describe('legs and the wrestle in the live sim', () => {
     expect(away).toBeLessThan(1);
     expect(away).toBeGreaterThan(home + 0.08);
   });
-  it('a side on spent legs is slower and busts, fends and steps less', () => {
-    const tally = (energy: number): { breaks: number; tackles: number; top: number } => {
-      let breaks = 0;
-      let tackles = 0;
-      let top = 0;
-      // 24 seeds: the effect is a few per cent, and 8 seeds is within the noise.
-      for (let s = 1; s <= 24; s++) {
-        const es = play(new LiveSim(sheet('H'), sheet('A'), s, { energy }), 150, (snap) => {
-          for (const p of snap.players) top = Math.max(top, p.speed);
-        });
-        breaks += es.filter((e) => e.kind === 'break-tackle' || e.kind === 'fend' || e.kind === 'step').length;
-        tackles += es.filter((e) => e.kind === 'tackle' || e.kind === 'big-hit').length;
+  it('a carrier on spent legs is slower and busts, fends and steps less against a fresh defender', () => {
+    // Whole matches with both sides spent also slow the retreating defence
+    // (#625). Isolate carrier fatigue against the same fresh defender instead.
+    const tally = (energy: number) => {
+      const totals = { busts: 0, fends: 0, steps: 0 };
+      // Uniform matched rolls cover the actual integration odds without seed luck.
+      for (let i = 0; i < 500; i++) {
+        const roll = (i + 0.5) / 500;
+        const outcome = new CarrierFatigueSim(energy).contact(roll);
+        if (outcome === 'break-tackle') totals.busts++;
+        if (outcome === 'fend') totals.fends++;
+        if (new CarrierFatigueSim(energy).stepAgainst(roll)) totals.steps++;
       }
-      return { breaks, tackles, top };
+      return { ...totals, top: new CarrierFatigueSim(energy).runningSpeed() };
     };
     const fresh = tally(1);
     const spent = tally(LEGS_ENERGY.spent);
-    // Spent is −20% top speed; a spent man who gets back to tired legs in the stretch is −10% (#397's
-    // kick-off chase found one at exactly that), never fresh.
-    expect(spent.top).toBeLessThanOrEqual(fresh.top * FATIGUE.tiredSpeed + 1e-9);
-    expect(spent.breaks / spent.tackles).toBeLessThan(fresh.breaks / fresh.tackles);
+    expect(fresh.top).toBeGreaterThan(0);
+    expect(spent.top).toBeLessThanOrEqual(fresh.top * FATIGUE.spentSpeed + 1e-9);
+    for (const action of ['busts', 'fends', 'steps'] as const) {
+      expect(fresh[action], action).toBeGreaterThan(0);
+      expect(spent[action], action).toBeLessThan(fresh[action]);
+    }
   });
   it('a held tackle is a wrestle: the bar runs down, more men end it sooner, and the tackle comes when he is held', () => {
     const lengths: Record<number, number[]> = { 1: [], 2: [], 3: [] };

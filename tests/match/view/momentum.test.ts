@@ -44,21 +44,30 @@ describe('momentumWindow (#366)', () => {
       // the overlay's precise time, including events on a minute boundary (#618).
       const sim = new LiveSim(home, away, seed, { weather: 'clear' });
       const seen: MomentumEvent[] = [];
+      const sampled = [{ t: 0, value: 0 }];
+      let momentum = 0;
+      let minute = 0;
       while (!sim.finished) {
         sim.step();
-        if (!sim.tickEvents.length) continue;
-        const snap = sim.snapshot();
-        for (const e of sim.tickEvents) {
-          const mapped = toMatchEvent(e, snap, { home: 'H', away: 'A' });
-          if (mapped) seen.push({ at: sim.matchSeconds / 60, kind: mapped.kind, teamId: mapped.teamId });
+        if (sim.tickEvents.length) {
+          const snap = sim.snapshot();
+          for (const e of sim.tickEvents) {
+            const mapped = toMatchEvent(e, snap, { home: 'H', away: 'A' });
+            if (mapped) {
+              seen.push({ at: sim.matchSeconds / 60, kind: mapped.kind, teamId: mapped.teamId });
+              momentum = foldMomentum(momentum, mapped.kind, mapped.teamId === 'H');
+            }
+          }
+        }
+        // The recorder samples the first tick reaching each minute. At the
+        // siren the clock can stay at 7:00 while later play-on events occur.
+        const now = Math.floor(sim.matchSeconds / 60);
+        if (now > minute) {
+          minute = now;
+          sampled.push({ t: minute, value: Math.round(momentum) });
         }
       }
-      for (const r of res.momentumTimeline) {
-        if (r.t === 0) continue;
-        let m = 0;
-        for (const e of seen) if (e.at <= r.t) m = foldMomentum(m, e.kind, e.teamId === 'H');
-        expect(Math.round(m), `seed ${seed} minute ${r.t}`).toBe(r.value);
-      }
+      expect(sampled, `seed ${seed}`).toEqual(res.momentumTimeline);
       let all = 0;
       for (const e of seen) all = foldMomentum(all, e.kind, e.teamId === 'H');
       expect(last(momentumWindow(seen, 'H', 99, 99))).toBeCloseTo(all, 6);

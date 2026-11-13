@@ -121,6 +121,7 @@ export abstract class LiveRestarts extends LivePlay {
     const posts = postsFor(this.dirOf(side), FIELD_LENGTH, MID_Y);
     const spot = clampToGround(conversionSpot(scorer.body.pos.y, posts, this.dirOf(side)), 1);
     this.ball = { kind: 'held', by: this.indexOf(kicker) };
+    this.retreat = null;
     this.attacking = side;
     this.dir = this.dirOf(side);
     this.phase = { kind: 'conversion', t0: this.tick, side, kicker: this.indexOf(kicker), spot, readyAt: 0, good: null };
@@ -136,6 +137,7 @@ export abstract class LiveRestarts extends LivePlay {
       this.endHalf(); // the last play of the half
       return;
     }
+    this.retreat = null;
     const kicking = other(scoringSide);
     this.ball = { kind: 'held', by: this.indexOf(this.kicker(kicking)) };
     this.attacking = other(kicking);
@@ -281,6 +283,7 @@ export abstract class LiveRestarts extends LivePlay {
     this.pendingKick = null;
     this.looseFor = null;
     this.markers = [];
+    this.retreat = null;
     this.kickFrom = null;
     this.mark = { ...spot };
     this.lineX = spot.x + this.dir * LIVE.onsideM;
@@ -319,6 +322,7 @@ export abstract class LiveRestarts extends LivePlay {
     const marker = [...this.side(other(ph.side))].sort((a, b) => dist(a.body.pos, ph.spot) - dist(b.body.pos, ph.spot))[0]!;
     this.lock(p, 'ptb', LIVE.ptbTicks);
     this.phase = { kind: 'ruck', t0: this.tick, carrier: ph.player, tackler: this.indexOf(marker), stage: 'ptb', handover: false, heldAt: 0, down: 0, pace: null };
+    this.startRetreat();
   }
 
   /** A goal-line drop-out by `side`, from the middle of its own try line. */
@@ -333,6 +337,7 @@ export abstract class LiveRestarts extends LivePlay {
     this.pendingKick = null;
     this.looseFor = null;
     this.markers = [];
+    this.retreat = null;
     this.kickFrom = null;
     this.phase = { kind: 'restart', t0: this.tick, kicking, from: 'goal-line' };
     this.callSwaps();

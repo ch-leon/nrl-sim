@@ -1,6 +1,6 @@
 # Features
 
-Last updated: 2026-11-12
+Last updated: 2026-11-13
 
 What's in the game, with the PR that added each.
 
@@ -86,6 +86,8 @@ What's in the game, with the PR that added each.
   - A scoreboard on the grandstand roof shows the score and flashes after one; floodlights come on bank by bank at dusk and night kick-offs.
   - Body language: the defensive line gets ready at the play-the-ball; tired players run hunched and stand hands-on-knees; hands on head after a knock-on or a missed goal; team-mates gather round a try scorer; long hair and shorts hems move with the stride.
   - Ten more traits show when they fire (Offload King, Jets, Last Line, Pickpocket, Poacher, Brick Wall, Hothead, Razzle Dazzle, Gambler, Workhorse), and each player page says what to look for.
+
+- Defenders other than the markers must physically retreat 10m (or to their goal line) after each ruck before they can rejoin the defence, including after quick heels, handovers, sin bins and substitutions ([PR](https://github.com/ch-leon/nrl-sim/pull/677), [evidence](../specs/625-retreat-validation.md)).
 
 - Ruck markers line up square with the play-the-ball, one behind the other in both attacking directions, with room between bodies ([PR](https://github.com/ch-leon/nrl-sim/pull/621), [spec](../specs/618-marker-alignment.md)).
 

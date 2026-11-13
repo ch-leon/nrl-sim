@@ -38,6 +38,9 @@ import { contractsEndingSoon } from '../../src/systems/contracts';
 // Previous pin: 1788836146.
 // #618: square marker positions change match outcomes and subsequent season draws.
 // UI-read and no-read seasons must still agree. Previous pin: 1597012555.
+// #625: completed retreats, including handovers, change match outcomes and later
+// season draws. The final standing-marker/deep-cover corrections restore this historical
+// season fingerprint; UI-read and no-read seasons still agree.
 const MAIN_SEED_AFTER_SEASON = 1788836146;
 
 describe('the rng stream (#369)', () => {

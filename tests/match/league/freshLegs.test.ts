@@ -236,7 +236,9 @@ describe('Fresh legs in the live sim', () => {
 
   it('with the rotation running, nobody is swapped twice at a stoppage and the bench keeps its men', () => {
     const rotating = sideSheet('H', { rating: 60, rotation: 'heavy' });
-    for (const seed of [1, 2, 3]) {
+    // Seed 3 no longer supplies a paid coach call alongside heavy rotation;
+    // seed 4 keeps this a real paid-call/automatic-rotation collision fixture (#625).
+    for (const seed of [1, 2, 4]) {
       const { ticks, sim } = play(seed, { energy: 0.45 }, rotating);
       expect(sim.callsPaid.home).toBeGreaterThan(0);
       for (const t of ticks) {

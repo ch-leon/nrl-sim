@@ -25,19 +25,16 @@ function sheet(id: string, base = 60): TeamSheet {
     roster: POSITIONS.map((position, i) => ({ name: `${id} ${position} ${i}`, position, stats: { speed: base, strength: base, stamina: 50, handling: base, kicking: base, footyIQ: base } })),
   };
 }
-function events(seeds: number, seconds: number): { es: SimEvent[]; snaps: Snapshot[] } {
+function events(seeds: number, seconds = Infinity): SimEvent[] {
   const es: SimEvent[] = [];
-  const snaps: Snapshot[] = [];
   for (let s = 1; s <= seeds; s++) {
     const sim = new LiveSim(sheet('H'), sheet('A'), s);
-    for (let i = 0; i < seconds * 20; i++) {
+    while (!sim.finished && sim.tick < Math.min(100_000, seconds * 20)) {
       sim.step();
-      const snap = sim.snapshot();
-      es.push(...snap.events);
-      snaps.push(snap);
+      es.push(...sim.tickEvents);
     }
   }
-  return { es, snaps };
+  return es;
 }
 
 describe('the last-tackle call (pure)', () => {
@@ -94,17 +91,23 @@ describe('the last-tackle call (pure)', () => {
 describe('kicks in the live sim', () => {
   // The kicking game on its own: no penalties or six-agains (2e) cutting sets short.
   const restore = applyTuning({ 'penalty.ruckSixAgain': 0, 'penalty.holdDown': 0, 'penalty.offside.slide': 0, 'penalty.offside.rush': 0, 'penalty.offside.compressed': 0, 'penalty.highShot': 0, 'penalty.highShotHothead': 0 });
-  const { es } = events(24, 180);
+  // Whole matches give both sides their full field-position cycle; the opening
+  // three minutes overrepresent territory kicks after completed retreats (#625).
+  const es = events(24);
+  // Keep the original opening exposure for the absolute-count smoke checks.
+  const esOpening = events(24, 180);
   restore();
   const kicks = es.filter((e) => e.kind === 'kick');
   const byKind = (d: string): number => kicks.filter((e) => e.detail === d).length;
+  const openingKicks = esOpening.filter((e) => e.kind === 'kick');
+  const byOpeningKind = (d: string): number => openingKicks.filter((e) => e.detail === d).length;
 
   it('uses the whole kicking game: long, bomb, grubber, chip and cross-field all happen, and attacking kicks are common', () => {
-    for (const d of ['long', 'bomb', 'grubber', 'chip', 'cross-field']) expect(byKind(d), `${d}: ${JSON.stringify(Object.fromEntries(['long', 'bomb', 'grubber', 'chip', 'cross-field'].map((k) => [k, byKind(k)])))}`).toBeGreaterThan(0);
+    for (const d of ['long', 'bomb', 'grubber', 'chip', 'cross-field']) expect(byOpeningKind(d), `${d}: ${JSON.stringify(Object.fromEntries(['long', 'bomb', 'grubber', 'chip', 'cross-field'].map((k) => [k, byOpeningKind(k)])))}`).toBeGreaterThan(0);
     const attacking = byKind('grubber') + byKind('chip') + byKind('cross-field');
     expect(attacking).toBeGreaterThan(kicks.length * 0.2);
     expect(attacking + byKind('bomb')).toBeGreaterThan(kicks.length * 0.4);
-    expect(kicks.every((e) => e.detail !== undefined)).toBe(true);
+    expect(openingKicks.every((e) => e.detail !== undefined)).toBe(true);
   });
   it('a grubber is a chase: some of them score, and most of them do not', () => {
     // Full matches, so the red-zone chase actually happens. The reward is real
@@ -134,20 +137,20 @@ describe('kicks in the live sim', () => {
     expect(tries).toBeLessThan(grubbers * 0.45);
   }, 30_000);
   it('kicks get chased: the kicking side regathers some, and catchers spill some under pressure', () => {
-    expect(es.filter((e) => e.kind === 'regather').length).toBeGreaterThan(0);
-    expect(es.filter((e) => e.kind === 'drop').length).toBeGreaterThan(0);
+    expect(esOpening.filter((e) => e.kind === 'regather').length).toBeGreaterThan(0);
+    expect(esOpening.filter((e) => e.kind === 'drop').length).toBeGreaterThan(0);
   });
   it('the game still scores and restarts normally', () => {
-    expect(es.filter((e) => e.kind === 'try').length).toBeGreaterThan(5);
-    expect(es.filter((e) => e.kind === 'kickoff').length).toBeGreaterThan(5);
+    expect(esOpening.filter((e) => e.kind === 'try').length).toBeGreaterThan(5);
+    expect(esOpening.filter((e) => e.kind === 'kickoff').length).toBeGreaterThan(5);
   });
   it('names the kick type on the pop-up and in the contract event', () => {
-    const g = kicks.find((e) => e.detail === 'grubber')!;
+    const g = openingKicks.find((e) => e.detail === 'grubber')!;
     expect(popupFor(g)?.word).toBe('GRUBBER!');
-    expect(popupFor(kicks.find((e) => e.detail === 'long')!)?.word).toBe('KICK!');
+    expect(popupFor(openingKicks.find((e) => e.detail === 'long')!)?.word).toBe('KICK!');
     const snap: Snapshot = { tick: g.tick, players: [], ball: { x: 90, y: 30, lift: 0, holder: null }, label: '', events: [] };
     expect(toMatchEvent(g, snap, { home: 'H', away: 'A' })).toMatchObject({ kind: 'kick', detail: 'grubber' });
-    expect(toMatchEvent(kicks.find((e) => e.detail === 'cross-field')!, snap, { home: 'H', away: 'A' })).toMatchObject({ kind: 'kick', detail: 'bomb' });
+    expect(toMatchEvent(openingKicks.find((e) => e.detail === 'cross-field')!, snap, { home: 'H', away: 'A' })).toMatchObject({ kind: 'kick', detail: 'bomb' });
     expect(popupFor({ tick: 1, kind: 'regather', text: '', player: 'Ari Dunn' })).toMatchObject({ word: 'REGATHER!', big: true });
     expect(popupFor({ tick: 1, kind: 'drop', text: '', player: 'Ari Dunn' })).toMatchObject({ word: 'DROPPED!', tone: 'bad' });
   });

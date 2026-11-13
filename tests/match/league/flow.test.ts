@@ -79,26 +79,44 @@ describe('passing on the move', () => {
   });
 
   it('the carrier runs a touch slower than a free runner of the same speed stat', () => {
-    const carrier: number[] = [];
-    const free: number[] = [];
-    const sim = new LiveSim(sheet('H'), sheet('A'), 3);
-    for (let i = 0; i < 120 * 20; i++) {
-      sim.step();
-      const snap = sim.snapshot();
-      if (!snap.ball.holder) continue;
-      for (const p of snap.players) {
-        if (p.pose !== 'run' || p.speed < 5.5) continue; // flat-out runners only
-        const holding = p.side === snap.ball.holder.side && p.slot === snap.ball.holder.slot;
-        (holding ? carrier : free).push(p.speed);
+    // Match identical unimpeded runs: natural support/retreat runners have
+    // different arrival, gas and fatigue histories after #625.
+    class MatchedRunSim extends LiveSim {
+      constructor(holding: boolean) {
+        super(sheet('H'), sheet('A'), 3);
+        this.tick = 100; this.attacking = 'home'; this.dir = 1;
+        this.phase = { kind: 'play' };
+        for (const p of this.players) {
+          p.body.pos = { x: 90, y: 5 + p.slot * 7 };
+          p.body.vel = { x: 0, y: 0 };
+          p.lockUntil = 1000;
+        }
+        const runner = this.players[7]!;
+        runner.lockUntil = 0;
+        runner.body.pos = { x: 20, y: 34 };
+        runner.target = { x: 90, y: 34 };
+        runner.through = true;
+        runner.wantsSprint = false;
+        this.ball = { kind: 'held', by: holding ? 7 : 5 };
+      }
+      speeds(): number[] {
+        const speeds: number[] = [];
+        for (let i = 0; i < 60; i++) {
+          this.tick++; this.move();
+          const velocity = this.players[7]!.body.vel;
+          speeds.push(Math.hypot(velocity.x, velocity.y));
+        }
+        return speeds;
       }
     }
+    const carrier = new MatchedRunSim(true).speeds();
+    const free = new MatchedRunSim(false).speeds();
     expect(carrier.length).toBeGreaterThan(50);
     expect(free.length).toBeGreaterThan(50);
-    // Most of the carrying is at cruise, and carrying costs LIVE.carrySpeed.
-    // Free runners are not all at the sprint cap (support cruises), so the
-    // carrier's median is cruise × that cost, and still under the free median.
+    // Both runs cruise with identical gas and legs; only carrying costs speed.
     const median = (xs: number[]): number => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)]!;
     expect(median(carrier)).toBeCloseTo(maxSpeedFor(60) * GAS.cruise * LIVE.carrySpeed, 2);
+    expect(median(free)).toBeCloseTo(maxSpeedFor(60) * GAS.cruise, 2);
     expect(median(carrier)).toBeLessThan(median(free));
   });
 });
