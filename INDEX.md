@@ -318,3 +318,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261112-203748-20261113-60m-corrected-retreat-short-match | 20261113 60m corrected retreat short match | 52030527 | codex/short-match-preview | [report](runs/20261112-203748-20261113-60m-corrected-retreat-short-match/report.md) |
 | 20261112-233958-standard | standard | 7422697 | main | [report](runs/20261112-233958-standard/report.md) |
 | 20261113-002731-standard | standard | b3e028c | main | [report](runs/20261113-002731-standard/report.md) |
+| 20261113-025618-standard | standard | 8f6aae2 | main | [report](runs/20261113-025618-standard/report.md) |
