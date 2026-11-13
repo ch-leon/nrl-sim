@@ -113,6 +113,11 @@ What's in the game, with the PR that added each.
   week, long lists show there is more below, and the dock's tabs hold their
   place ([issue](https://github.com/ch-leon/nrl-sim/issues/596)).
 
+- The finance testing model now has headless salary, fee, income and cap quotes,
+  a versioned contract and a reproducible opening-roster inventory. This prepares
+  the fresh-career economy; cash/cap transactions and player-facing finance are
+  subsequent work ([PR #595](https://github.com/ch-leon/nrl-sim/pull/595)).
+
 - The isolated developer regional career includes an optional cross-division
   Open Cup, with a saved deterministic draw, implicit byes, profile-based dates,
   a neutral final and a finite seeded tie decider. Existing match/result hooks

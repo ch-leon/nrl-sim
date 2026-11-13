@@ -1,0 +1,282 @@
+{
+  "rulesVersion": 1,
+  "worldSource": "8b5e34a",
+  "seedRange": [
+    1,
+    20
+  ],
+  "worlds": 120,
+  "clubBills": 2880,
+  "summary": [
+    {
+      "pack": "au",
+      "difficulty": "easy",
+      "tier": "local",
+      "cap": 350000,
+      "clubs": 160,
+      "min": 236500,
+      "median": 289000,
+      "max": 346500,
+      "overCap": 0,
+      "player": {
+        "min": 308300,
+        "max": 346500,
+        "overCap": 0
+      }
+    },
+    {
+      "pack": "au",
+      "difficulty": "easy",
+      "tier": "championship",
+      "cap": 450000,
+      "clubs": 160,
+      "min": 290800,
+      "median": 341300,
+      "max": 406100,
+      "overCap": 0,
+      "player": null
+    },
+    {
+      "pack": "au",
+      "difficulty": "easy",
+      "tier": "premier",
+      "cap": 600000,
+      "clubs": 160,
+      "min": 347000,
+      "median": 435400,
+      "max": 607200,
+      "overCap": 1,
+      "player": null
+    },
+    {
+      "pack": "au",
+      "difficulty": "normal",
+      "tier": "local",
+      "cap": 350000,
+      "clubs": 160,
+      "min": 236500,
+      "median": 286200,
+      "max": 325500,
+      "overCap": 0,
+      "player": {
+        "min": 285600,
+        "max": 323200,
+        "overCap": 0
+      }
+    },
+    {
+      "pack": "au",
+      "difficulty": "normal",
+      "tier": "championship",
+      "cap": 450000,
+      "clubs": 160,
+      "min": 290800,
+      "median": 341300,
+      "max": 406100,
+      "overCap": 0,
+      "player": null
+    },
+    {
+      "pack": "au",
+      "difficulty": "normal",
+      "tier": "premier",
+      "cap": 600000,
+      "clubs": 160,
+      "min": 347000,
+      "median": 435400,
+      "max": 607200,
+      "overCap": 1,
+      "player": null
+    },
+    {
+      "pack": "au",
+      "difficulty": "hard",
+      "tier": "local",
+      "cap": 350000,
+      "clubs": 160,
+      "min": 236500,
+      "median": 281100,
+      "max": 325500,
+      "overCap": 0,
+      "player": {
+        "min": 262900,
+        "max": 299900,
+        "overCap": 0
+      }
+    },
+    {
+      "pack": "au",
+      "difficulty": "hard",
+      "tier": "championship",
+      "cap": 450000,
+      "clubs": 160,
+      "min": 290800,
+      "median": 341300,
+      "max": 406100,
+      "overCap": 0,
+      "player": null
+    },
+    {
+      "pack": "au",
+      "difficulty": "hard",
+      "tier": "premier",
+      "cap": 600000,
+      "clubs": 160,
+      "min": 347000,
+      "median": 435400,
+      "max": 607200,
+      "overCap": 1,
+      "player": null
+    },
+    {
+      "pack": "uk",
+      "difficulty": "easy",
+      "tier": "local",
+      "cap": 350000,
+      "clubs": 160,
+      "min": 238200,
+      "median": 287100,
+      "max": 341400,
+      "overCap": 0,
+      "player": {
+        "min": 307000,
+        "max": 341400,
+        "overCap": 0
+      }
+    },
+    {
+      "pack": "uk",
+      "difficulty": "easy",
+      "tier": "championship",
+      "cap": 450000,
+      "clubs": 160,
+      "min": 289500,
+      "median": 341800,
+      "max": 412600,
+      "overCap": 0,
+      "player": null
+    },
+    {
+      "pack": "uk",
+      "difficulty": "easy",
+      "tier": "premier",
+      "cap": 600000,
+      "clubs": 160,
+      "min": 350000,
+      "median": 436400,
+      "max": 588700,
+      "overCap": 0,
+      "player": null
+    },
+    {
+      "pack": "uk",
+      "difficulty": "normal",
+      "tier": "local",
+      "cap": 350000,
+      "clubs": 160,
+      "min": 238200,
+      "median": 286500,
+      "max": 321700,
+      "overCap": 0,
+      "player": {
+        "min": 284100,
+        "max": 318300,
+        "overCap": 0
+      }
+    },
+    {
+      "pack": "uk",
+      "difficulty": "normal",
+      "tier": "championship",
+      "cap": 450000,
+      "clubs": 160,
+      "min": 289500,
+      "median": 341800,
+      "max": 412600,
+      "overCap": 0,
+      "player": null
+    },
+    {
+      "pack": "uk",
+      "difficulty": "normal",
+      "tier": "premier",
+      "cap": 600000,
+      "clubs": 160,
+      "min": 350000,
+      "median": 436400,
+      "max": 588700,
+      "overCap": 0,
+      "player": null
+    },
+    {
+      "pack": "uk",
+      "difficulty": "hard",
+      "tier": "local",
+      "cap": 350000,
+      "clubs": 160,
+      "min": 238200,
+      "median": 278500,
+      "max": 321700,
+      "overCap": 0,
+      "player": {
+        "min": 261600,
+        "max": 295200,
+        "overCap": 0
+      }
+    },
+    {
+      "pack": "uk",
+      "difficulty": "hard",
+      "tier": "championship",
+      "cap": 450000,
+      "clubs": 160,
+      "min": 289500,
+      "median": 341800,
+      "max": 412600,
+      "overCap": 0,
+      "player": null
+    },
+    {
+      "pack": "uk",
+      "difficulty": "hard",
+      "tier": "premier",
+      "cap": 600000,
+      "clubs": 160,
+      "min": 350000,
+      "median": 436400,
+      "max": 588700,
+      "overCap": 0,
+      "player": null
+    }
+  ],
+  "overCapCases": [
+    {
+      "pack": "au",
+      "difficulty": "easy",
+      "seed": 17,
+      "clubId": "rival-reapers",
+      "tier": "premier",
+      "marketBill": 607200,
+      "offeredBill": 599991
+    },
+    {
+      "pack": "au",
+      "difficulty": "normal",
+      "seed": 17,
+      "clubId": "rival-reapers",
+      "tier": "premier",
+      "marketBill": 607200,
+      "offeredBill": 599991
+    },
+    {
+      "pack": "au",
+      "difficulty": "hard",
+      "seed": 17,
+      "clubId": "rival-reapers",
+      "tier": "premier",
+      "marketBill": 607200,
+      "offeredBill": 599991
+    }
+  ],
+  "limitation": "Static unmodified opening rosters quoted at market demand. No games, growth, transfers, purchases or season balance. Over-cap results are admission constraints for #557, not legal created finance careers."
+}
