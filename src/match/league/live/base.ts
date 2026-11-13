@@ -25,6 +25,7 @@ import type { MatchInjury, WeatherKind } from '../../../sim/events';
 import { styleFit, type StyleFit } from '../fit';
 import { compressedCounter, fitEdge, rushCounter, slideCounter } from '../counters';
 import { NO_AUTO_USED, sheetPlays, type AutoUsed } from '../plays';
+import type { ShapeCall, ShapeName } from '../shapes';
 import type { PlayId } from '../../../data/plays';
 import { LIVE } from './knobs';
 import { other, STAND_INS, captainOf, benchOf, statsOf, type Player, type BenchMan, type Phase, type PendingKick, type LiveOptions, type PlanInput, type ScriptedPlay } from './types';
@@ -154,6 +155,14 @@ export abstract class LiveBase {
   protected readonly pendingPlay: Record<Side, PlayId | null> = { home: null, away: null };
   protected readonly playUsed: Record<Side, boolean> = { home: false, away: false };
   protected scripted: ScriptedPlay | null = null;
+  /**
+   * The attack shape picked as the last ruck formed (#649 step 2): null when
+   * none was (shapes off, a handover, a quick or restart play-the-ball, the
+   * last tackle), and then everyone holds his base lane as before.
+   */
+  protected shape: ShapeCall | null = null;
+  /** Shapes picked so far, both sides together (a view channel, like `playsRun`: not events; the harness counts them). */
+  readonly shapesPicked: Record<ShapeName, number> = { spread: 0, pod: 0, edge: 0, backDoor: 0 };
   protected playKick: { side: Side; edge: number; chasers: number[] } | null = null;
   protected tucked = -1;
   protected readonly autoUsed: Record<Side, AutoUsed> = { home: { ...NO_AUTO_USED, lastSet: {} }, away: { ...NO_AUTO_USED, lastSet: {} } };
@@ -553,6 +562,7 @@ export abstract class LiveBase {
 
   protected abstract announcePaid(vs: readonly CallVerdict[]): void;
   protected abstract playCall(): CoachCall | null;
+  protected abstract chooseShape(handover: boolean, pace: 'quick' | 'slow' | null): ShapeCall | null;
   protected abstract swapIn(p: Player, bi: number, fresh?: boolean): void;
   abstract get matchSeconds(): number;
   protected abstract toLineFor(side: Side, p: Vec): number;

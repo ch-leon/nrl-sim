@@ -77,7 +77,8 @@ describe('weighted receiver: in the sim', () => {
     for (const k of ['live.receiverMargin', 'live.receiverSpread', 'live.receiverAtRuck']) expect(names).toContain(k);
   });
   it('off (margin 0) plays exactly as before it existed: same events, points and rolls (pinned from f02f4fa)', () => {
-    const restore = applyTuning({ 'live.receiverMargin': 0 });
+    // The attack shapes (#649 step 2) came after f02f4fa: off too, so this stays step 1's own proof.
+    const restore = applyTuning({ 'live.receiverMargin': 0, 'shapes.on': 0 });
     try {
       expect(play(1)).toEqual({ events: 133, home: 6, away: 11, draws: 634 });
       expect(play(11)).toEqual({ events: 136, home: 0, away: 6, draws: 667 });

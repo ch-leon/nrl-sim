@@ -294,8 +294,11 @@ describe('measuring and reporting', () => {
     // These pins cover the actual five-minute default, without changing the seed or mechanics.
     // The weighted receiver (#649) adds a roll per pass decision and re-pins both; at
     // live.receiverMargin 0 they were 1-0:127:3176e88b734d4e28 / 0-0:141:a6acfd1ea8357fe9.
-    { attack: 'balanced' as const, expected: '10-0:120:785e83425993f65b' },
-    { attack: 'expansive' as const, expected: '6-0:119:0c43dd4315fca6d2' },
+    // The attack shapes (#649 step 2) add a roll at each play-the-ball and move the attackers
+    // into shape, re-pinning both; at shapes.on 0 they are 10-0:120:785e83425993f65b /
+    // 6-0:119:0c43dd4315fca6d2, the pins before it.
+    { attack: 'balanced' as const, expected: '0-4:135:7796fbc5e338d880' },
+    { attack: 'expansive' as const, expected: '11-4:132:994746e9d4dd5c41' },
   ])('pins an even $attack / Slide match (seed 1)', async ({ attack, expected }) => {
     const sim = new LiveSim(sideSheet('H', { rating: 60, tactics: { attack } }), sideSheet('A', { rating: 60 }), 1);
     const parts: string[] = [];
@@ -325,8 +328,11 @@ describe('measuring and reporting', () => {
     // Short-match default re-pins these at two 2:30 halves, keeping the same play/AI coverage.
     // The weighted receiver (#649) re-pins both (10-6:141:7f3f6474439483eb and
     // 12-6:152:590616020216c265 before it); both still launch a play and the AI coach still calls one.
-    { name: 'plays-on', aiCoach: false, expected: '6-7:137:d1d03788b03a1934' },
-    { name: 'plays-on-hard', aiCoach: true, expected: '7-6:160:ef629166efdf6fe6' },
+    // The attack shapes (#649 step 2) re-pin both (6-7:137:d1d03788b03a1934 and
+    // 7-6:160:ef629166efdf6fe6 before them, as they are at shapes.on 0); a launched play still
+    // overrides the shape, and both still launch one.
+    { name: 'plays-on', aiCoach: false, expected: '7-0:144:bec3a284f5d7d61e' },
+    { name: 'plays-on-hard', aiCoach: true, expected: '6-12:157:6925272ea38d5ff8' },
   ])('pins $name: an even Balanced / Slide match with set plays (seed 1)', async ({ aiCoach, expected }) => {
     const home = { ...sideSheet('H', { rating: 60 }), plays: ['block-play' as const, 'cut-out-winger' as const, 'kick-pass' as const] };
     const sim = new LiveSim(home, sideSheet('A', { rating: 60 }), 1, aiCoach ? { aiCoach: ['home'] } : {});

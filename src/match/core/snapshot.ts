@@ -115,6 +115,12 @@ export interface Snapshot {
    * Presentation only: the sim never reads it back.
    */
   phase?: { kind: string; since: number; golden?: boolean };
+  /**
+   * The attack shape in force (#649 step 2): the side, the shape's name (`shapes.ts`) and the
+   * side of the ruck it plays to (+1 toward y = 68); null when there is none. Set in the live
+   * sim's snapshot as it is built. Presentation only: the sim never reads it back.
+   */
+  shape?: { side: Side; name: string; sign: 1 | -1 } | null;
 }
 
 export interface ClockSnap {

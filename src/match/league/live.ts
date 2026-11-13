@@ -157,6 +157,12 @@ export class LiveSim extends LivePositioning implements MatchSim {
   }
 
   // ── Snapshot ──────────────────────────────────────────────────────────────
+  /** The attack shape in force, for the view (#649). */
+  private shapeSnap(): NonNullable<Snapshot['shape']> | null {
+    const s = this.shapeInForce();
+    return s ? { side: s.side, name: s.name, sign: s.sign } : null;
+  }
+
   snapshot(): Snapshot {
     const b = this.ball; const ph = this.phase;
     const scorer = ph.kind === 'try' ? this.players[ph.scorer] : undefined;
@@ -223,6 +229,7 @@ export class LiveSim extends LivePositioning implements MatchSim {
       clock: { half: this.half, seconds: this.clockTicks * TICK_S, minute: Math.floor(this.matchSeconds / 60), siren: this.siren, finished: this.finished },
       score: { ...this.points },
       phase: { kind: ph.kind, since: this.phaseSince, ...(this.golden ? { golden: true } : {}) },
+      shape: this.shapeSnap(),
     };
     const w = ph.kind === 'tackle' ? ph.wrestle : null;
     const contact = this.visualContact;

@@ -169,6 +169,31 @@ first receiver and the engaged carrier's pass in open play, one roll each; the
 last-tackle pass to the kicker, the coach's pass input, offloads and set plays keep
 their man. Margin 0 is off: no roll, every seed as before. Tuning §5.
 
+**Where they stand** (#649 step 2, attack shapes — *awaiting lab sign-off*). As a ruck
+forms, the side in possession picks a shape for the play-the-ball, with one roll, and its
+men run to the shape's spots with the movement they already have (nobody is placed):
+
+| Shape | Who goes where (toward the open side unless said) |
+|---|---|
+| **Spread** | Nobody moves: the base lanes, as before |
+| **Forward pod** | Prop and second-row flat and close off the ruck (3 and 6.5 m across); the halves stand off it, 14 m either side, out of the dummy-half's reach: a hit-up shape |
+| **Edge shift** | Everyone but the far winger stacked across one side: near half, far half, far edge man, fullback, near edge man and winger at 12 / 28 / 45 / 60 / 78 / 94% of the room to touch; the prop stands up flat beside the ruck, no pass option, so the ball goes through the halves. To the open side; three times in ten to the short side instead, when that is 20 m wide or more |
+| **Back door** | The prop flat as the lead runner, the near half 8 m deep behind him, the edge man outside and the fullback in the line |
+
+The pick is weighted by the attack preset (Tight leans on the pod, Expansive and All-out
+on the edge and the back door), again by the mark's zone (the pod from deep, width in the
+attacking half; inside 10 m of the line the back door is not used), and by the tackle
+(the pod early, width on the second-last). The shape holds through the ruck and 1.5 s
+into the play, its lanes off the mark and its depths off the ball; then the base lanes.
+The pass options are whoever the shape puts in the window, and the weighted receiver
+picks among them. **No shape and no roll** on a handover, a quick play-the-ball (no time
+to set), a restart's play-the-ball (the side sets for it), the last tackle (the kicker's
+ball, as before) or after the siren. A set play the half or the coach launches takes
+over from its launch, and a coach's call for the play (Hit-up, Shift) overrides the shape
+while it is in force. Defenders are unchanged. `shapes.on` 0 is off: no roll, every man
+in his lane, every seed as before. The snapshot carries the shape in force (`shape`,
+presentation only). Tuning §5.
+
 ### 4.3 Catch (kicks) — *first slice implemented (lab feedback round 2)*
 A kick hangs for its flight time (2√(2·peak/g): a 12 m kick ≈ 3.1 s, a bomb ≈ 4 s), so
 chasers and catchers can get under it. **Whoever is nearest the landing point within
@@ -527,6 +552,7 @@ makes the break but can't finish it, the workhorse who is never quick and never 
 | F2+ | Sprint follow-ups (kick chase, line speed on cruise, lab legs bar, stamina knobs) — *shipped* (N9.3) | §8.2, §11 |
 | N13.5 | A side's plan can change at half-time and after a try, by a rule the match opts into — *shipped* (off unless a side is named; N14 wires the rivals). Tuning §30 | §5 |
 | #649.1 | The weighted receiver: the pass goes to one of the near-best options by weight, not always the best — *awaiting lab sign-off*. Tuning §5 | §4.2 |
+| #649.2 | Attack shapes at the play-the-ball: forward pod, edge shift, back door or the spread, weighted by preset, zone and tackle — *awaiting lab sign-off*. Tuning §5 | §4.2 |
 
 Then BAK-207 Phase 2 (full match, scoring, halves) and Phase 3 (balance).
 

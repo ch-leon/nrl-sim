@@ -251,14 +251,23 @@ describe('the report', () => {
     const both = reportMarkdown({ plan, meta, results: [old, { ...old, variant: 'again', watch: { ...fresh!, flow: { ...fresh!.flow, leadChanges: stat(fresh!.flow.leadChanges.mean + 3) } } }] });
     expect(both).toMatch(/\| again \| [\d.]+ \(\+3\.0/);
   });
-  it('adds the first-receiver columns last, with a dash for results from before them (#649)', () => {
+  it('adds the first-receiver columns after the last tackles, with a dash for results from before them (#649)', () => {
     expect(reportMarkdown({ plan, meta, results: [old] })).toContain('| Last tackle pass % | 1st receiver same man % | 1st receiver slots |');
-    const { receivers: _, ...older } = fresh!;
+    // Step 2 (#649) added the shape columns after them; a result from before step 1 has neither.
+    const { receivers: _, shapes: __, ...older } = fresh!;
     const md = reportMarkdown({ plan, meta, results: [{ ...old, watch: older }] });
     // The baseline's second (watchability) row.
     const line = md.split('\n').filter((l) => l.startsWith('| baseline | ')).pop()!;
-    expect(line.trim().endsWith('| — | — |')).toBe(true);
-    expect(line.split('—').length).toBe(3);
+    expect(line.trim().endsWith('| — | — | — | — | — | — |')).toBe(true);
+    expect(line.split('—').length).toBe(7);
+  });
+  it('adds the shape columns last: shares of the shapes picked, a dash with none picked (#649 step 2)', () => {
+    expect(reportMarkdown({ plan, meta, results: [old] })).toContain('| 1st receiver slots | Shape spread % | Shape forward pod % | Shape edge shift % | Shape back door % |');
+    const line = (md: string): string => md.split('\n').filter((l) => l.startsWith('| baseline | ')).pop()!;
+    const on = line(reportMarkdown({ plan, meta, results: [old] })).split('|').slice(-5, -1).map(Number);
+    expect(on.reduce((a, b) => a + b, 0)).toBeGreaterThanOrEqual(99);
+    const none = { spread: stat(0), pod: stat(0), edge: stat(0), backDoor: stat(0) };
+    expect(line(reportMarkdown({ plan, meta, results: [{ ...old, watch: { ...fresh!, shapes: none } }] })).trim().endsWith('| — | — | — | — |')).toBe(true);
   });
 });
 

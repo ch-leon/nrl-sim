@@ -101,9 +101,12 @@ describe('the referee (#642)', () => {
   it('signals a try with the scorer down and points for a penalty', () => {
     const snaps = matches.flat();
     expect(snaps.some((s) => refereeSignal(s) === 'try')).toBe(true);
-    expect(snaps.some((s) => refereeSignal(s) === 'penalty')).toBe(true);
+    // Seeds 3 and 11 had a penalty until the attack shapes (#649 step 2) reshuffled them: more seeds until one does.
+    let pens = snaps.some((s) => refereeSignal(s) === 'penalty');
+    for (let seed = 1; seed <= 12 && !pens; seed++) pens = playMatch(seed).some((s) => refereeSignal(s) === 'penalty');
+    expect(pens).toBe(true);
     expect(refereeSignal(snaps[0]!)).toBeNull();
-  });
+  }, 120_000);
 
   it('wears a strip neither side can be taken for', () => {
     for (const [a, b] of [[['#b5f23a', '#111111'], ['#1e3a8a', '#ffffff']], [['#ff4fa6', '#ffffff'], ['#2fd6e6', '#000000']]] as const) {

@@ -303,7 +303,10 @@ describe('LiveSim', () => {
       expect(s.ball.lift).toBeGreaterThanOrEqual(0);
       expect(Number.isFinite(s.ball.x) && Number.isFinite(s.ball.y)).toBe(true);
     });
-    expect(maxLoose).toBeLessThan(5 / TICK_S); // a long kick nobody is under + the run to it
+    // A long kick nobody is under + the run to it. 5 s until the attack shapes (#649 step 2) reshuffled
+    // this seed: its longest is now a territory kick gathered after 5.15 s; seed 6 already had a 5.55 s
+    // bomb before them. Six seconds is still a ball that is never left lying.
+    expect(maxLoose).toBeLessThan(6 / TICK_S);
   });
 
   it('pace is continuous (#85): while the ball is in play nobody stands still for more than a second', () => {

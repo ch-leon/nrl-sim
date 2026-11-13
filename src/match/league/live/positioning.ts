@@ -6,7 +6,8 @@ import type { Side } from '../../core/snapshot';
 import { add, clamp, dist, type Vec } from '../../core/vec';
 import { ROLES, formationTarget } from '../roles';
 import { gapTarget, intercept, supportSpots, type Candidate } from '../tactics';
-import type { AttackPlan } from '../presets';
+import { zoneOf, type AttackPlan } from '../presets';
+import { SHAPES, pickShape, shapeCall, shapeSpot, shapeWeights, tackleBucket, type ShapeCall } from '../shapes';
 import { speedMult } from '../traits';
 import { FATIGUE, afterRun, legsSpeed } from '../fatigue';
 import { GAS, canSprint, paceMult, runCostMult, stepGas } from '../gas';
@@ -82,6 +83,37 @@ export abstract class LivePositioning extends LiveContact {
       .filter((d) => d !== t && d !== this.fullback(t.side))
       .sort((a, b) => dist(a.body.pos, this.mark) - dist(b.body.pos, this.mark))[0];
     return second ? [t, second] : [t];
+  }
+
+  /**
+   * The attack shape for the ruck forming now (#649 step 2), one roll while
+   * `shapes.on`: weighted by the side's attack preset, the mark's zone (inside
+   * `shapes.lineM` its own row) and the tackle count. No shape and no roll on a
+   * handover, a quick play-the-ball (no time to set), the last tackle (the
+   * kicker's) or after the siren.
+   */
+  protected chooseShape(handover: boolean, pace: 'quick' | 'slow' | null): ShapeCall | null {
+    if (SHAPES.on <= 0 || handover || pace === 'quick' || this.siren) return null;
+    const bucket = tackleBucket(this.tackles, SET_TACKLES);
+    if (bucket === null) return null;
+    const toLine = this.toLineFor(this.attacking, this.mark);
+    const weights = shapeWeights(this.tactics[this.attacking].attack, toLine <= SHAPES.lineM ? 'line' : zoneOf(toLine), bucket);
+    const { name, sign } = pickShape(weights, this.rng.next(), this.mark.y);
+    this.shapesPicked[name]++;
+    return shapeCall(this.attacking, name, sign);
+  }
+
+  /**
+   * The shape the attack is in this tick, or null: its ruck, and the first
+   * `shapes.holdTicks` after the ball is played. A set play or a coach's call
+   * for the play overrides it.
+   */
+  protected shapeInForce(): ShapeCall | null {
+    const s = this.shape;
+    if (s === null || s.side !== this.attacking || this.scripted !== null || this.playCall() !== null) return null;
+    const kind = this.phase.kind;
+    if (kind === 'ruck') return s;
+    return kind === 'play' && this.tick < this.ruckPlayedAt + SHAPES.holdTicks ? s : null;
   }
 
   protected dummyHalfSpot(): Vec {
@@ -283,8 +315,11 @@ export abstract class LivePositioning extends LiveContact {
     const handoverMarkers = ph.kind === 'ruck' && ph.handover && ph.stage !== 'dh' ? this.currentMarkers() : [];
     const spots = supportSpots(anchor, this.dir);
     const broken = this.lineBroken();
+    // The attack shape (#649): its spots off the mark; null (off, or none this ruck) leaves every lane as it was.
+    const shape = this.shapeInForce();
     for (const p of attackers) {
       const role = ROLES[p.slot]!;
+      const inShape = shape ? shapeSpot(shape, p.slot, this.mark.y, anchor.x, this.dir) : null;
       p.through = false;
       if (this.targetRetreat(p)) continue;
       if (handoverMarkers.includes(p)) {
@@ -324,14 +359,17 @@ export abstract class LivePositioning extends LiveContact {
         // The ball is heeled: the backline comes onto it, so the first receiver
         // hits the pass at pace instead of standing flat-footed. The forwards
         // standing close to the ruck keep enough depth to stay a pass option.
-        const spot = formationTarget(role, anchor, this.dir, true);
-        const advance = Math.max(0, Math.min(LIVE.ruckAdvanceM, role.atk - 3));
+        const spot = inShape ? inShape.pos : formationTarget(role, anchor, this.dir, true);
+        const advance = Math.max(0, Math.min(LIVE.ruckAdvanceM, (inShape ? inShape.depth : role.atk) - 3));
         p.target = clampToGround({ x: spot.x + this.dir * advance, y: spot.y }, 1);
       } else if (this.anticipatingGrubber(p)) {
         // The chase is on before the boot: come up in his lane, then onto the spot once it is aimed.
         p.target = this.grubberChaseSpot(p);
         p.wantsSprint = this.pendingKick?.kind === 'grubber' || dist(p.body.pos, p.target) > 8;
         p.through = true;
+      } else if (inShape && (ph.kind === 'ruck' || !supports.includes(p))) {
+        // Into the shape: at the ruck ahead of standing by the tackled man; once the ball is out, the carrier's support comes first.
+        p.target = inShape.pos;
       } else if (supports.includes(p)) {
         const s = spots[supports.indexOf(p) as 0 | 1];
         // Take the side he's already on.

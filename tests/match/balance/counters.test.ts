@@ -48,6 +48,12 @@ describe('position stat overrides', () => {
   });
 });
 
+/** The first seed whose one-minute even match is drawn (so its points share is exactly ½). */
+function drawnSeed(): number {
+  for (let seed = 1; seed < 60; seed++) if (measureCell({ variant: { name: 'baseline' }, scenario: even }, 1, 1, seed).trackedDraw === 1) return seed;
+  throw new Error('no drawn one-minute match in seeds 1–59');
+}
+
 describe('tracked counter measurements', () => {
   it('keeps opposing kick and try context when attributing kick counts to one side', () => {
     const events = [
@@ -78,16 +84,22 @@ describe('tracked counter measurements', () => {
     expect(both.trackedCounts!.pointsFor).toEqual(both.opponentCounts!.pointsAgainst);
   });
   it('calculates wins plus half draws and its sample SE on a two-seed cell', () => {
-    // Seeds 7/8 give one loss and one draw since the weighted receiver (#649; a draw then a loss before it).
-    // Seed 3 supplies a neutral one-minute draw (seed 2 before #649).
-    // This two-sample fixture checks aggregation mechanics, not match balance.
+    // This two-sample fixture checks aggregation mechanics, not match balance. It used to
+    // pin seeds (7/8, and 3 for the draw), re-pinned by every mechanic that adds a roll;
+    // it now takes the first two neighbouring seeds with different results, and the first
+    // seed whose one-minute even match is drawn (#649 step 2).
     const tiny = cell;
-    const first = measureCell(tiny, 1, 4, 7);
-    const second = measureCell(tiny, 1, 4, 8);
-    const both = measureCell(tiny, 2, 4, 7);
+    const share = (seed: number): number => {
+      const r = measureCell(tiny, 1, 4, seed);
+      return r.trackedWin! + r.trackedDraw! / 2;
+    };
+    let start = 1;
+    while (share(start) === share(start + 1) && start < 40) start++;
+    const first = measureCell(tiny, 1, 4, start);
+    const second = measureCell(tiny, 1, 4, start + 1);
+    const both = measureCell(tiny, 2, 4, start);
     const xs = [first, second].map((r) => r.trackedWin! + r.trackedDraw! / 2);
-    expect(xs).toEqual([0, 0.5]);
-    expect(measureCell({ ...cell, scenario: even }, 1, 1, 3).pointsShare).toEqual({ mean: 0.5, se: 0 });
+    expect(measureCell({ ...cell, scenario: even }, 1, 1, drawnSeed()).pointsShare).toEqual({ mean: 0.5, se: 0 });
     expect(new Set(xs).size).toBe(2);
     const mean = (xs[0]! + xs[1]!) / 2;
     expect(both.pointsShare!.mean).toBe(mean);
@@ -95,8 +107,8 @@ describe('tracked counter measurements', () => {
     expect(first.pointsShare!.se).toBe(0);
   });
   it('opts into matrix and per-side tables, leaving the legacy report unchanged', () => {
-    // Seed 3: a one-minute draw (seed 2 before the weighted receiver, #649).
-    const result = measureCell(cellsOf(plan({}))[0]!, 1, 1, 3);
+    // A one-minute draw: the first such seed (it was pinned, 2 and then 3; #649 step 2).
+    const result = measureCell(cellsOf(plan({}))[0]!, 1, 1, drawnSeed());
     const input = { plan: plan({}), meta: {}, results: [result] };
     const legacy = reportMarkdown(input);
     const { pointsShare: _share, trackedCounts: _tracked, opponentCounts: _opponent, ...old } = result;

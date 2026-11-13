@@ -5,6 +5,7 @@
 import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL } from '../league/presets';
 import { SIDE_COUNTS, MATCH_MINUTES, type CellResult, type CountKey, type Stat, type WatchStats } from './measure';
 import { LAST_TACKLES, ORIGINS } from './watch';
+import { SHAPE_LABEL, SHAPE_NAMES, type ShapeName } from '../league/shapes';
 
 /**
  * §7 balance targets per full Nines match, both sides combined. Tackles, line
@@ -154,6 +155,12 @@ export function sharesOf<K extends string>(counts: Record<K, Stat>, keys: readon
 
 const pctStat = (s: Stat): Stat => ({ mean: s.mean * 100, se: s.se * 100 });
 
+/** One shape's share of the shapes picked in a row, or nothing when none were (off, or a run from before #649 step 2). */
+function shapeShare(w: WatchStats, r: CellResult, k: ShapeName): Stat | undefined {
+  if (!w.shapes || SHAPE_NAMES.every((n) => w.shapes![n].mean === 0)) return undefined;
+  return sharesOf(w.shapes, SHAPE_NAMES, r.seeds, r.minutes).shares[k];
+}
+
 /** The watchability columns, in order: header, and the value of each for one result (undefined when it predates them). */
 const WATCH_COLUMNS: readonly { head: string; digits: number; get: (w: WatchStats, r: CellResult) => Stat | undefined }[] = [
   { head: 'Lead changes', digits: 2, get: (w) => w.flow.leadChanges },
@@ -165,6 +172,8 @@ const WATCH_COLUMNS: readonly { head: string; digits: number; get: (w: WatchStat
   // Who took the dummy-half's ball (#649); a dash in results from before it.
   { head: '1st receiver same man %', digits: 0, get: (w) => w.receivers?.sameMan },
   { head: '1st receiver slots', digits: 1, get: (w) => w.receivers?.slots },
+  // The attack shapes picked (#649 step 2), as shares of the picks; a dash with none picked (shapes off) or in results from before them.
+  ...SHAPE_NAMES.map((k) => ({ head: `Shape ${SHAPE_LABEL[k].toLowerCase()} %`, digits: 0, get: (w: WatchStats, r: CellResult) => shapeShare(w, r, k) })),
 ];
 
 /** The watchability table for one scenario's rows, or nothing when none of them has the measures (a run from before #648). */

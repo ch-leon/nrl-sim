@@ -221,6 +221,10 @@ never as zero: the table is left out, or a dash shown for that row):
   share would (a match with no such pair reads 0). **Slots** is how many slots took a
   first pass, a side's mean. Neither is scaled for a stretch. Results from before
   #649 show a dash.
+- **Shape spread / forward pod / edge shift / back door %** (#649 step 2): the attack
+  shapes picked at the play-the-ball (`src/match/league/shapes.ts`), both sides, as
+  shares of the picks; the per-match counts are `watch.shapes` in `results*.jsonl`. A
+  row with no shape picked (`shapes.on` 0) or from before step 2 shows a dash.
 
 Origins and last-tackle plays are shares of the tries or last tackles in the row;
 the `*` marks use a standard error that treats each try (or last tackle) as an

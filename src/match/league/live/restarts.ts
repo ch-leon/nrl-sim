@@ -326,6 +326,8 @@ export abstract class LiveRestarts extends LivePlay {
     // Play-the-ball: the nearest defender stands at the mark as the tackler would.
     const marker = [...this.side(other(ph.side))].sort((a, b) => dist(a.body.pos, ph.spot) - dist(b.body.pos, ph.spot))[0]!;
     this.lock(p, 'ptb', LIVE.ptbTicks);
+    // A restart's play-the-ball is played off the lanes the side set for it: no shape, no roll (#649).
+    this.shape = null;
     this.phase = { kind: 'ruck', t0: this.tick, carrier: ph.player, tackler: this.indexOf(marker), stage: 'ptb', handover: false, heldAt: 0, down: 0, pace: null };
     this.startRetreat();
   }
