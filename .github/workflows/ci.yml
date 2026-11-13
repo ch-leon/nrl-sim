@@ -91,6 +91,7 @@ jobs:
   # their verdict.
   webkit-shard:
     name: webkit (${{ matrix.group }})
+    # Playwright 1.56.1 supports WebKit on 24.04; ubuntu-latest can select 26.04.
     # Pinned: ubuntu-latest became Ubuntu 26.04 on 13 Nov 2026 and playwright-core 1.56.1
     # has no WebKit for it ("Playwright does not support webkit on ubuntu26.04-x64").
     # Go back to ubuntu-latest once playwright-core is on a version that does.
