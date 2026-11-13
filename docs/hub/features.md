@@ -66,7 +66,7 @@ What's in the game, with the PR that added each.
 
 - **Draft, awaiting Leon’s play-test:** normal 2:30 clock halves on a 100m field; the existing Experiments panel offers browser-local 100m/80m/60m choices between matches ([draft PR #678](https://github.com/ch-leon/nrl-sim/pull/678)).
 
-- **Draft, awaiting Leon’s play-test:** non-markers physically retreat 10m (or to their goal line) before defensive involvement. Covers quick heels, handovers, bins and substitutions ([draft PR #677](https://github.com/ch-leon/nrl-sim/pull/677), [evidence](../specs/625-retreat-validation.md)).
+- Non-markers physically retreat 10m (or to their goal line) before defensive involvement. Covers quick heels, handovers, bins and substitutions ([PR #677](https://github.com/ch-leon/nrl-sim/pull/677), [evidence](../specs/625-retreat-validation.md)).
 
 - Ruck markers line up square with the play-the-ball, one behind the other in both attacking directions, with room between bodies ([PR](https://github.com/ch-leon/nrl-sim/pull/621), [spec](../specs/618-marker-alignment.md)).
 

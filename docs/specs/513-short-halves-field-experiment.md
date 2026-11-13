@@ -2,8 +2,9 @@
 
 Leon requested this revision on 13 November 2026: 2.5-minute halves, a normal
 100m field, and 100m/80m/60m choices in the existing Experiments section. These
-replace the separate-build-only delivery in draft PR #678. Keep both PRs held
-for his play-test; do not merge.
+replace the separate-build-only delivery in draft PR #678. Keep the short-match and separate career-balance PRs held
+for his play-test; do not merge. Retreat PR #677 was merged by another process
+on 13 November; this candidate includes it.
 
 ## Design
 
@@ -33,21 +34,21 @@ kicking distances, bins, fatigue and substitutions unchanged as prototype limits
 
 ## Implementation plan
 
-- [ ] Add red tests for strict/default field preference parsing, worker bootstrap,
+- [x] Add red tests for strict/default field preference parsing, worker bootstrap,
   persistence/readback failure and transition guards. Implement a small DOM-free
   field-settings helper and frozen field resolver; wire Experiments selector and
   reset. Verify `npx vitest run tests/labs` and typecheck.
-- [ ] Add red Worker/name/recovery parity tests, then update all four worker entry
+- [x] Add red Worker/name/recovery parity tests, then update all four worker entry
   points and engine identity. Build and check actual browser Worker snapshots and
   art extents under all three selections, not only mocked workers.
-- [ ] Change normal half length to 2.5; inspect the full suite before adapting
+- [x] Change normal half length to 2.5; inspect the full suite before adapting
   clock-sensitive mechanics fixtures. Keep explicit historical-duration fixtures
   where they test scoring or whole-match mechanics, and separately test the real
   default duration. Do not introduce a hidden global test override or lower
   balance thresholds just to pass.
-- [ ] Resolve the existing WebKit counter-report witness failure against the new
+- [x] Resolve the existing WebKit counter-report witness failure against the new
   clock/trajectories while retaining real loss/counter assertions.
-- [ ] Run default and 80m/60m browser matches, selection/reload/reset/recovery,
+- [x] Run default and 80m/60m browser matches, selection/reload/reset/recovery,
   save unchanged/invalid-value/storage-blocked cases, portrait/landscape controls,
   timing and scoring. Re-run the existing balance harness if simulation semantics
   change, otherwise preserve previous run attribution and confirm parity.

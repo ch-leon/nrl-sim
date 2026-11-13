@@ -6,7 +6,9 @@ The measurements below describe the first fixed-field comparison and remain
 valid live-sim measurements. [Current contract](513-short-halves-field-experiment.md).
 
 This page covers the [retreat PR #677](https://github.com/ch-leon/nrl-sim/pull/677).
-Leon must play-test it before it merges. The short-field comparison lives in the
+It was merged by another process on 13 November 2026 at 00:27 UTC.
+The short-match and career-balance changes remain held for Leon’s play-test.
+The short-field comparison lives in the
 stacked [field comparison PR #678](https://github.com/ch-leon/nrl-sim/pull/678);
 its evidence is kept in the last two sections, which are marked as #678 only.
 The private comparison is https://nrl-sim-match-playtest.code-heroes-3364.chatgpt.site .
@@ -20,7 +22,7 @@ the new defence before the heel. Already-deep men retain their depth; markers
 are protected from Fresh legs. A field-goal charge-down checks the original
 nearest defender's eligibility rather than substituting a remote player.
 
-The corrected source is `1e3f7efd`; normal rules remain 100m and seven-minute
+At this historical measurement, the corrected source was `1e3f7efd`; normal rules remained 100m and seven-minute
 halves. The suite includes both directions, real goal-line movement, handovers,
 bins/substitutions, call settlement at half/full/golden breaks, and the original
 seed 1 eligibility invariant. Independent Claude reviews found the edge cases
