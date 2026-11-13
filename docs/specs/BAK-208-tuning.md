@@ -18,6 +18,11 @@ result. Keep it in step with the code: when a constant changes, change the row.
 > (`npm run balance -- --list` prints them all with their values). Write a plan with the
 > values to try and run it over many seeds — see `balance/README.md`. The Balance workflow
 > re-measures the standard suite whenever the match code changes on `main`.
+>
+> **Watch it on and off.** The lab takes the same names in its address:
+> `#lab?seed=11&knobs=live.receiverMargin:0` (several with commas) plays that match with
+> those values, shows them beside the styles line and keeps them across a restart. An
+> unknown name is reported and nothing is changed.
 
 ## 1. Clock and field
 

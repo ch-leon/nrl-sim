@@ -9,7 +9,8 @@ import { densityScaleConfig, trackDensity } from '../../world/density';
 import { ensureStyles, getRoot } from '../../ui/dom';
 import { initToasts } from '../../ui/toasts';
 import { LiveSim } from '../league/live';
-import { LabController, labHash, parseLabHash, type LabParams } from './controller';
+import { LabController, knobsText, labHash, parseLabHash, type LabParams } from './controller';
+import { applyTuning, checkTuning } from '../league/tuning';
 import { LabPanel } from './panel';
 import { LabScene, type LabSceneData } from './scene';
 import { DEFAULT_AWAY, DEFAULT_HOME, LAB_CLUBS, labSheet, withPlays } from './sheets';
@@ -37,7 +38,20 @@ export function bootLab(): void {
   const notify = (text: string): void => bus.emit('ui:notify', { text, kind: 'info' });
 
   let panel: LabPanel | null = null;
+  // Knob overrides from the URL (`knobs=`): put back before every restart, so a match never inherits the last one's.
+  let undoKnobs: (() => void) | null = null;
   const start = (params: LabParams): void => {
+    undoKnobs?.();
+    undoKnobs = null;
+    let knobNote = '';
+    if (params.knobs) {
+      const bad = checkTuning(params.knobs);
+      if (bad.length) notify(`Knobs ignored: ${bad.join('; ')}`);
+      else {
+        undoKnobs = applyTuning(params.knobs);
+        knobNote = ` · knobs: ${knobsText(params.knobs)}`;
+      }
+    }
     const home = labSheet(params.home, params.traits, params.tactics.home);
     const away = labSheet(params.away, params.traits, params.tactics.away);
     const ctrl = new LabController(
@@ -47,9 +61,9 @@ export function bootLab(): void {
     );
     const data: LabSceneData = { home, away, controller: ctrl, weather: params.weather ?? 'clear' };
     panel?.destroy();
-    const styles = `${home.name}: ${tacticsLabel(home.tactics ?? DEFAULT_TACTICS)} · ${away.name}: ${tacticsLabel(away.tactics ?? DEFAULT_TACTICS)}`;
+    const styles = `${home.name}: ${tacticsLabel(home.tactics ?? DEFAULT_TACTICS)} · ${away.name}: ${tacticsLabel(away.tactics ?? DEFAULT_TACTICS)}${knobNote}`;
     panel = new LabPanel(ctrl, LAB_CLUBS, { restart: start, notify }, styles);
-    history.replaceState(null, '', labHash({ seed: params.seed, home: params.home, away: params.away, tick: params.tick, traits: params.traits, tactics: params.tactics, legs: params.legs, bench: params.bench, weather: params.weather, calls: params.calls, ai: params.ai, final: params.final, plays: params.plays }));
+    history.replaceState(null, '', labHash({ seed: params.seed, home: params.home, away: params.away, tick: params.tick, traits: params.traits, tactics: params.tactics, legs: params.legs, bench: params.bench, weather: params.weather, calls: params.calls, ai: params.ai, final: params.final, plays: params.plays, knobs: params.knobs }));
     if (!game) {
       game = new Phaser.Game({
         type: Phaser.AUTO,
