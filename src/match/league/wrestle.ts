@@ -40,19 +40,23 @@ export const WRESTLE = {
 /**
  * Held up over the line (#652, BAK-208 §8.1; tuning reference §11). A carrier
  * in contact as he reaches the try line (driven over in the wrestle, or met on
- * it in open play) with two or three men on him, or one man and little drive
- * left, can be held up: no try, a play-the-ball 10 m out (a handover on the
- * last). One roll, only then. Overridable by name (`heldUp.base`).
+ * it in open play) can be held up by any defender on him: no try, a
+ * play-the-ball 10 m out (a handover on the last). One roll, only then; a lone
+ * tackler's odds fall with the carrier's drive (Leon, 13 Nov 2026).
+ * Overridable by name (`heldUp.base`).
  */
 export const HELD_UP = {
   /** 1 on; 0 off: no roll, and a carrier carried or driven over with men on him scores as before. */
   on: 1,
   /** Chance two average fresh men hold up an average fresh carrier who reaches the line with no drive left. */
-  base: 0.6,
+  base: 0.75,
   /** Added for each man more than two in the tackle, taken off for each fewer. */
   perMan: 0.15,
-  /** A lone tackler can only hold him up when the carrier has at most this share of his drive left. */
-  oneManFight: 0.35,
+  /**
+   * A lone tackler is a contest only when the carrier has at most this share of his drive left.
+   * 1 (the default, Leon 13 Nov 2026): always passed, any lone tackler contests. 0.35 is the first rule.
+   */
+  oneManFight: 1,
   /** Met on the line in open play: free defenders this close (m) as he carries it over are on him. */
   reachM: 2.5,
   /** Taken off × his drive at the line: the share of his fight left in the wrestle, or of his top speed in open play. */
@@ -87,7 +91,7 @@ export interface HeldUpInputs {
   brickWall: number;
 }
 
-/** Whether the line is a contest at all: two or more on him, or one and little fight left. No roll otherwise. */
+/** Whether the line is a contest at all: two or more on him, or one with at most `oneManFight` of his drive left (always, at 1). No roll otherwise. */
 export function heldUpContest(men: number, fightLeft: number): boolean {
   return men >= 2 || (men === 1 && fightLeft <= HELD_UP.oneManFight);
 }

@@ -447,8 +447,8 @@ export abstract class LiveContact extends LivePenalties {
   /**
    * Held up over the line (#652, BAK-208 §8.1). A carrier in contact as he
    * reaches the line, driven over in the wrestle or met on it in open play,
-   * with two or three men on him, or one and little drive left in him, may be
-   * kept off the ground. One roll, only then (`holdUp`): their numbers and hold
+   * may be kept off the ground by any defender on him (a lone one only with
+   * little drive left in him while `heldUp.oneManFight` < 1). One roll, only then (`holdUp`): their numbers and hold
    * (Strength and legs) against his, less the drive and momentum he brings,
    * and the traits. Held: no try, and a play-the-ball 10 m out by him with the
    * tackle counted (a handover there on the last), as the rules give.
@@ -489,7 +489,7 @@ export abstract class LiveContact extends LivePenalties {
     const t = men[0]!;
     const who = men.length > 1 ? `${men.slice(0, -1).map((d) => d.name).join(', ')} and ${men[men.length - 1]!.name}` : t.name;
     const credit = men.length >= 2 && wall > 0 ? announce(men[walls.indexOf(wall)]!.traits.find((x) => x.id === 'brickWall')) : undefined;
-    this.emit('held-up', `Held up! ${who} keep ${c.name} off the ground`, t, credit);
+    this.emit('held-up', `Held up! ${who} ${men.length > 1 ? 'keep' : 'keeps'} ${c.name} off the ground`, t, credit);
     this.tagContact(c, men, startedTick);
     this.lock(c, 'down', LIVE.downTicks);
     for (const d of men) this.lock(d, 'down', LIVE.downTicks);

@@ -1,6 +1,6 @@
 // Held up over the line (#652 part 1, BAK-208 §8.1): a carrier in contact as he
-// reaches the line, with two or three men on him or one and little drive left,
-// can be held up. One roll, only then; off (heldUp.on 0) plays as before.
+// reaches the line can be held up by any defender on him (a lone tackler only with
+// little drive left under the first rule, heldUp.oneManFight 0.35). One roll, only then; off (heldUp.on 0) plays as before.
 import { describe, expect, it } from 'vitest';
 import { SET_TACKLES } from '../../../src/config';
 import { FIELD_LENGTH } from '../../../src/match/core/field';
@@ -15,13 +15,26 @@ import { Commentator, LINES } from '../../../src/match/view/commentary';
 const even: HeldUpInputs = { men: 2, hold: 1, carrierHold: 1, fightLeft: 0, speedDiff: 0, wreckingBall: 0, brickWall: 0 };
 
 describe('held up: the odds', () => {
-  it('is a contest only with two or three men on him, or one and little drive left', () => {
+  it('any defender on him is a contest at the default; a lone one at full pace has small odds', () => {
+    expect(HELD_UP.oneManFight).toBe(1);
     expect(heldUpContest(2, 1)).toBe(true);
     expect(heldUpContest(3, 0.9)).toBe(true);
-    expect(heldUpContest(1, HELD_UP.oneManFight)).toBe(true);
-    expect(heldUpContest(1, HELD_UP.oneManFight + 0.01)).toBe(false);
+    expect(heldUpContest(1, 1)).toBe(true);
     expect(heldUpContest(0, 0)).toBe(false);
-    expect(heldUpChance({ ...even, men: 1, fightLeft: 0.9 })).toBe(0);
+    const lone = heldUpChance({ ...even, men: 1, fightLeft: 0.9 });
+    expect(lone).toBeGreaterThan(0);
+    expect(lone).toBeLessThan(heldUpChance({ ...even, fightLeft: 0.9 }));
+  });
+  it('the first rule by override: a lone tackler only with little drive left', () => {
+    const restore = applyTuning({ 'heldUp.oneManFight': 0.35, 'heldUp.base': 0.6 });
+    try {
+      expect(heldUpContest(1, 0.35)).toBe(true);
+      expect(heldUpContest(1, 0.36)).toBe(false);
+      expect(heldUpContest(2, 1)).toBe(true);
+      expect(heldUpChance({ ...even, men: 1, fightLeft: 0.9 })).toBe(0);
+    } finally {
+      restore();
+    }
   });
   it('two average men on a carrier with no drive left: the base', () => {
     expect(heldUpChance(even)).toBeCloseTo(HELD_UP.base, 10);
@@ -39,9 +52,11 @@ describe('held up: the odds', () => {
     expect(heldUpChance({ ...even, speedDiff: 50 })).toBeCloseTo(p - HELD_UP.momentumCap, 10);
   });
   it('a Wrecking Ball carrier is held up less, a Brick Wall among two or more more (not alone)', () => {
-    const p = heldUpChance(even);
-    expect(heldUpChance({ ...even, wreckingBall: 1.6 })).toBeCloseTo(p - HELD_UP.wreckingBall * 1.6, 10);
-    expect(heldUpChance({ ...even, brickWall: 1 })).toBeCloseTo(p + HELD_UP.brickWall, 10);
+    // Half his drive left, so neither side of it meets the cap.
+    const mid = { ...even, fightLeft: 0.5 };
+    const p = heldUpChance(mid);
+    expect(heldUpChance({ ...mid, wreckingBall: 1.6 })).toBeCloseTo(p - HELD_UP.wreckingBall * 1.6, 10);
+    expect(heldUpChance({ ...mid, brickWall: 1 })).toBeCloseTo(p + HELD_UP.brickWall, 10);
     const alone = { ...even, men: 1, fightLeft: 0.2 };
     expect(heldUpChance({ ...alone, brickWall: 1 })).toBe(heldUpChance(alone));
   });
@@ -95,18 +110,25 @@ describe('held up: in the sim', () => {
   });
 
   it('on, the roll is drawn only when a carrier in contact reaches the line: a match with none plays as off', () => {
-    // Most matches have no contest at the line and play exactly as off; one that has one draws
-    // its roll there and goes another way (more draws or fewer, but a different match).
-    let same = 0;
-    let moved = 0;
-    for (const seed of [1, 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31]) {
-      const off = withTuning({ 'heldUp.on': 0 }, () => play(seed));
-      const on = play(seed);
-      if (on.draws === off.draws && on.events === off.events && on.home === off.home && on.away === off.away) same++;
-      else moved++;
-    }
-    expect(same).toBeGreaterThan(moved);
-    expect(moved).toBeGreaterThan(0);
+    // Under the first rule (two men, or one and little drive) most matches have no contest at the line and
+    // play exactly as off; one that has one draws its roll there and goes another way. At the default
+    // (any tackler on him) most matches have one, so the gate is shown under the first rule.
+    const count = (over: Record<string, number>): { same: number; moved: number } => {
+      let same = 0;
+      let moved = 0;
+      for (const seed of [1, 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31]) {
+        const off = withTuning({ 'heldUp.on': 0 }, () => play(seed));
+        const on = withTuning(over, () => play(seed));
+        if (on.draws === off.draws && on.events === off.events && on.home === off.home && on.away === off.away) same++;
+        else moved++;
+      }
+      return { same, moved };
+    };
+    const first = count({ 'heldUp.oneManFight': 0.35, 'heldUp.base': 0.6 });
+    expect(first.same).toBeGreaterThan(first.moved);
+    expect(first.moved).toBeGreaterThan(0);
+    // The default contests more often: more matches move.
+    expect(count({}).moved).toBeGreaterThan(first.moved);
   });
 
   it('held up: no try; a play-the-ball 10 m out with the tackle counted, a handover there on the last', () => {

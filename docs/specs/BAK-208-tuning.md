@@ -347,10 +347,10 @@ play). The roll is drawn only when he is in contact at the line and it is a cont
 |---|---|---|
 | `heldUp.on` | 1 (**0 = off**) | 0: no roll, every carrier over the line scores, every seed exactly as before #652. |
 | `heldUp.reachM` | 2.5 m | Carried over in open play: free defenders (not down, not beaten, onside) this close are on him, three at most. Higher: more men on him at the line, more contests. |
-| `heldUp.oneManFight` | 0.35 | A lone tackler is a contest only when the carrier's drive is at most this (the share of his fight left in the wrestle, or of his top speed in open play). 1: any lone tackler contests (the odds still fall with drive). |
-| `heldUp.base` | 0.6 | Chance two average fresh men hold up an average fresh carrier with no drive left. |
+| `heldUp.oneManFight` | 1 | A lone tackler is a contest only when the carrier's drive is at most this (the share of his fight left in the wrestle, or of his top speed in open play). At 1 the threshold is always passed: any lone tackler contests and the odds alone fall with drive (Leon, 13 Nov 2026). 0.35 is the first rule (a lone tackler only on a carrier with little drive left; with `heldUp.base` 0.6, a held-up in 3–8% of matches). |
+| `heldUp.base` | 0.75 | Chance two average fresh men hold up an average fresh carrier with no drive left (0.6 under the first rule). |
 | `heldUp.perMan` | 0.15 | Added for a third man, taken off for a lone one. |
-| `heldUp.drive` | 0.3 | Taken off × his drive at the line (0–1). A carrier at full pace with two on him: about 0.32. |
+| `heldUp.drive` | 0.3 | Taken off × his drive at the line (0–1). A carrier at full pace with two on him: about 0.47; one man on a carrier at 90% of his top speed: about 0.33. |
 | `heldUp.momentumPerMs` / `heldUp.momentumCap` | 0.02 / ±0.06 | Taken off per m/s he is quicker than the first man (added when slower), capped. |
 | `heldUp.strength` | 0.4 | × (the men's average `holdOf` − his own): Strength /120, each less the legs he has lost (`wrestle.holdLegs`). 20 Strength points ≈ 7%. |
 | `heldUp.wreckingBall` / `heldUp.brickWall` | 0.1 / 0.1 per level multiplier | A Wrecking Ball carrier is held up less; a Brick Wall among two or three men more (named on the pop-up). |

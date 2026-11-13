@@ -22,14 +22,22 @@ function surface() {
   };
 }
 
-/** Seed 28 with golden point on (the lab's `final=1`) and the historical seven-minute halves (#678 cut them to 2:30) is level at full time with the lab's default sides (seed 12 before the weighted receiver, #649; 28 is the first of 1–60 since). */
-const GOLDEN_SEED = 28;
+/**
+ * A match level at full time, with golden point on (the lab's `final=1`) and the historical seven-minute
+ * halves (#678 cut them to 2:30), with the lab's default sides: the first such seed from 28 (seed 12 before
+ * the weighted receiver, #649, then 28; held up at the line, #652, reshuffled 28, so the seed is searched
+ * for rather than pinned).
+ */
+const GOLDEN_FROM = 28;
 
 function play(): Snapshot[] {
-  const sim = new LiveSim(labSheet(DEFAULT_HOME), labSheet(DEFAULT_AWAY), GOLDEN_SEED, { goldenPoint: true, length: { halves: 2, halfMinutes: 7 } });
-  const snaps: Snapshot[] = [sim.snapshot()];
-  while (!sim.finished) { sim.step(); snaps.push(sim.snapshot()); }
-  return snaps;
+  for (let seed = GOLDEN_FROM; seed < GOLDEN_FROM + 60; seed++) {
+    const sim = new LiveSim(labSheet(DEFAULT_HOME), labSheet(DEFAULT_AWAY), seed, { goldenPoint: true, length: { halves: 2, halfMinutes: 7 } });
+    const snaps: Snapshot[] = [sim.snapshot()];
+    while (!sim.finished) { sim.step(); snaps.push(sim.snapshot()); }
+    if (snaps.some((q) => q.phase?.kind === 'half-time' && !!q.phase.golden)) return snaps;
+  }
+  throw new Error('no level match in 60 seeds');
 }
 
 describe('the whistle (#675)', () => {

@@ -1,6 +1,6 @@
 {
   "name": "held-up",
-  "description": "#652 part 1, held up over the line: how often is a carrier held up (heldUp a match, heldUpMatches the share of matches with one), and what does it cost in tries, completion, try origin and the six preset rows? Baseline is the off value (heldUp.on 0, no roll); 'on' is the shipped default (two or three men on him at the line, or one and little drive left); the other two widen it to any lone tackler on him (heldUp.oneManFight 1), at the default odds and at higher odds (heldUp.base 0.75). The scenarios are standard.json's plus traits as rolled (gen) and two-level-III traits (stars), where Wrecking Ball and Brick Wall show.",
+  "description": "#652 part 1, held up over the line: how often is a carrier held up (heldUp a match, heldUpMatches the share of matches with one), and what does it cost in tries, completion, try origin and the six preset rows? Baseline is the off value (heldUp.on 0, no roll); 'on, first rule' is the first proposal (two or three men on him at the line, or one and little drive left: heldUp.oneManFight 0.35, heldUp.base 0.6); the other two let any lone tackler on him contest (heldUp.oneManFight 1), at the first odds and at the higher odds (heldUp.base 0.75) that Leon chose as the default on 13 Nov 2026. The scenarios are standard.json's plus traits as rolled (gen) and two-level-III traits (stars), where Wrecking Ball and Brick Wall show.",
   "seeds": 60,
   "base": { "heldUp.on": 0 },
   "scenarios": [
@@ -21,8 +21,8 @@
     { "name": "even 60 v 60, stars", "home": { "rating": 60, "traits": "stars" }, "away": { "rating": 60, "traits": "stars" } }
   ],
   "variants": [
-    { "name": "on", "tuning": { "heldUp.on": 1 } },
-    { "name": "on, any lone tackler", "tuning": { "heldUp.on": 1, "heldUp.oneManFight": 1 } },
-    { "name": "on, any lone tackler, base 0.75", "tuning": { "heldUp.on": 1, "heldUp.oneManFight": 1, "heldUp.base": 0.75 } }
+    { "name": "on, first rule", "tuning": { "heldUp.on": 1, "heldUp.oneManFight": 0.35, "heldUp.base": 0.6 } },
+    { "name": "on, any lone tackler", "tuning": { "heldUp.on": 1, "heldUp.oneManFight": 1, "heldUp.base": 0.6 } },
+    { "name": "on, any lone tackler, base 0.75 (the default)", "tuning": { "heldUp.on": 1, "heldUp.oneManFight": 1, "heldUp.base": 0.75 } }
   ]
 }
