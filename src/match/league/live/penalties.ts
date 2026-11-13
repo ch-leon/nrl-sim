@@ -72,6 +72,7 @@ export abstract class LivePenalties extends LiveRestarts {
     this.kickCall = this.fgCall = null;
     this.looseFor = null;
     this.markers = [];
+    this.retreat = null;
     if (choice === 'tap') this.startSetPiece(award, mark, 'tap');
     else {
       this.ball = { kind: 'held', by: this.indexOf(taker) };
@@ -150,6 +151,8 @@ export abstract class LivePenalties extends LiveRestarts {
   protected binClock(): void {
     for (const p of this.players) {
       if (p.binUntilS < 0 || this.matchSeconds < p.binUntilS) continue;
+      this.retreat?.eligible.delete(p);
+      this.retreat?.markers.delete(p);
       p.binUntilS = -1;
       this.refreshOnField();
       this.emit('sin-bin-return', `${p.name} is back from the sin bin`, p);
@@ -191,11 +194,15 @@ export abstract class LivePenalties extends LiveRestarts {
     const k = this.players[g.kicker]!;
     const dir = this.dirOf(k.side);
     if (this.rng.next() < GOALS.chargeDown) {
-      const d = [...this.side(other(k.side))].sort((a, b) => dist(a.body.pos, k.body.pos) - dist(b.body.pos, k.body.pos))[0]!;
-      this.emit('charge-down', `${d.name} charges down the field goal!`, d);
-      this.ball = bounceFlight(k.body.pos, { x: -dir, y: (this.rng.next() - 0.5) * 1.2 }, this.tick, 4, 14, 2);
-      this.looseFor = null;
-      return;
+      const d = [...this.side(other(k.side))]
+        .sort((a, b) => dist(a.body.pos, k.body.pos) - dist(b.body.pos, k.body.pos))[0];
+      // A short or grounded nearest man cannot be replaced by a distant defender.
+      if (d && !this.locked(d) && this.retreatLine(d) === null) {
+        this.emit('charge-down', `${d.name} charges down the field goal!`, d);
+        this.ball = bounceFlight(k.body.pos, { x: -dir, y: (this.rng.next() - 0.5) * 1.2 }, this.tick, 4, 14, 2);
+        this.looseFor = null;
+        return;
+      }
     }
     const posts = postsFor(dir, FIELD_LENGTH, MID_Y);
     const good = this.rng.next() < goalChance(k.body.pos, posts, k.stats.kicking, this.goalAcc(k));

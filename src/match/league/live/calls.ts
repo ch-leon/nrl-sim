@@ -342,7 +342,7 @@ export abstract class LiveCalls extends LiveBase {
       const p = this.at(side, pick.slot);
       const i = this.indexOf(p);
       const dh = p === this.dummyHalf(this.attacking) || (ph.handover && p === this.dummyHalf(other(this.attacking)));
-      if (p === this.holder() || i === ph.carrier || i === ph.tackler || this.markers.includes(i) || dh || this.locked(p)) continue;
+      if (p === this.holder() || i === ph.carrier || i === ph.tackler || this.markers.includes(i) || this.currentMarkers().includes(p) || dh || this.locked(p)) continue;
       fl.pending = false;
       this.swapIn(p, pick.bench, true);
     }
@@ -374,7 +374,9 @@ export abstract class LiveCalls extends LiveBase {
 
   /** A tackle ends a play call; a new set (the ball changes hands or the count goes back) ends them all. */
   protected expireCalls(): void {
-    const newSet = this.attacking !== this.callAtk || this.tackles < this.callTackles;
+    const atBreak = this.phase.kind === 'half-time' || this.phase.kind === 'full-time';
+    if (atBreak && this.callAtk === null) return;
+    const newSet = atBreak || this.attacking !== this.callAtk || this.tackles < this.callTackles;
     const tackled = this.tackles !== this.callTackles;
     this.countSet(newSet);
     this.announcePaid(this.judge.observe([...this.events], this.ballPos().x, !newSet && this.tackles > this.callTackles, newSet));
@@ -392,7 +394,7 @@ export abstract class LiveCalls extends LiveBase {
       const def = this.callState[other(this.attacking)];
       if (def.defence && def.defenceLeft > 0 && --def.defenceLeft <= 0) def.defence = null;
     }
-    this.callAtk = this.attacking;
+    this.callAtk = atBreak ? null : this.attacking;
     this.callTackles = this.tackles;
   }
 

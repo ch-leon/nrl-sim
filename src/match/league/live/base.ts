@@ -58,6 +58,12 @@ export abstract class LiveBase {
   protected mark: Vec = { x: 50, y: MID_Y };
   /** The defensive line's x. */
   protected lineX = 60;
+  /** The last ruck's fixed legal line; reaching it once releases each non-marker. */
+  protected retreat: {
+    side: Side; dir: 1 | -1; line: number;
+    eligible: Map<Player, string>; markers: Map<Player, string>;
+  } | null = null;
+
   protected pendingKick: PendingKick | null = null;
   /** Who kicked the ball now in the air (he leads the chase). */
   protected lastKicker = -1;
@@ -315,6 +321,7 @@ export abstract class LiveBase {
     this.looseFor = null;
     this.pendingKick = null;
     this.markers = [];
+    this.retreat = null;
     this.kickFrom = null;
     this.outPending = null;
     this.assignTargets();
@@ -385,6 +392,41 @@ export abstract class LiveBase {
         binSpot: { x: 50, y: 1 },
       };
     });
+  }
+
+  protected startRetreat(): void {
+    this.retreat = null;
+    const handover = this.phase.kind === 'ruck' && this.phase.handover && this.phase.stage !== 'dh';
+    const side = handover ? this.attacking : other(this.attacking);
+    const dir = this.dirOf(other(side));
+    const markers = this.currentMarkers().filter(p => p.side === side && this.onField(p));
+    const line = Math.max(0, Math.min(FIELD_LENGTH, this.mark.x + dir * LIVE.onsideM));
+    this.retreat = { side, dir, line, eligible: new Map(), markers: new Map(markers.map(p => [p, p.key])) };
+    this.observeRetreat();
+  }
+
+  /**
+   * Null means free to defend; otherwise he still owes this fixed retreat line.
+   * Also records an observed crossing before a decision; move observes every tick.
+   */
+  protected retreatLine(p: Player): number | null {
+    const r = this.retreat;
+    const handover = this.phase.kind === 'ruck' && this.phase.handover && this.phase.stage !== 'dh';
+    if (!r || r.side !== p.side || r.side !== (handover ? this.attacking : other(this.attacking))
+      || r.dir !== (handover ? -this.dir : this.dir)) return null;
+    if (!this.onField(p)) return null;
+    if (r.markers.get(p) === p.key || r.eligible.get(p) === p.key) return null;
+    if ((p.body.pos.x - r.line) * r.dir >= 0) {
+      r.eligible.set(p, p.key);
+      return null;
+    }
+    return r.line;
+  }
+
+  /** Observe every movement tick, including ticks between targeting decisions. */
+  protected observeRetreat(): void {
+    if (!this.retreat) return;
+    for (const p of this.side(this.retreat.side)) this.retreatLine(p);
   }
 
   private idx(side: Side, slot: number): number {

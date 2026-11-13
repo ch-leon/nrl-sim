@@ -1,11 +1,13 @@
 # Roadmap
 
-Last updated: 2026-11-11
+Last updated: 2026-11-13
 
 Status checked against GitHub on 7 Nov 2026. Merged tooling is not the same as a
 live gameplay change; work still open below has not shipped.
 
 ## Now
+
+- **Defensive retreat play-test** ([PR #677](https://github.com/ch-leon/nrl-sim/pull/677)): watch a match at ×1 and check that defenders get back 10m before rejoining play, especially on dummy-half darts.
 
 - **[Match transition and big-moment release](../specs/match-big-moments.md)** ([issue #588](https://github.com/ch-leon/nrl-sim/issues/588)): integrate the completed catch/pass/ruck transitions and kicks/high-takes/try celebrations onto released build #584. The candidate is being checked for the next playable build; release evidence belongs in its PR.
 

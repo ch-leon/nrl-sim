@@ -36,6 +36,7 @@ export abstract class LiveKicks extends LiveClock {
     this.kickoffUp = k.kickoff;
     this.kickCall = this.fgCall = null;
     const receiving = other(kicker.side);
+    this.retreat = null;
     this.attacking = receiving;
     this.dir = this.dirOf(receiving);
     this.tackles = 0;
@@ -178,7 +179,7 @@ export abstract class LiveKicks extends LiveClock {
       for (const p of this.players) {
         if (this.looseFor && p.side !== this.looseFor) continue;
         if (this.raceFor && p.side !== this.raceFor) continue;
-        if (this.locked(p) || !this.onField(p)) continue;
+        if (this.locked(p) || !this.onField(p) || this.retreatLine(p) !== null) continue;
         const d = dist(p.body.pos, b.pos);
         if (d < bd) {
           bd = d;
@@ -236,7 +237,7 @@ export abstract class LiveKicks extends LiveClock {
     let best: Player | undefined;
     let bd = Infinity;
     for (const p of this.players) {
-      if (this.locked(p) || !this.onField(p)) continue;
+      if (this.locked(p) || !this.onField(p) || this.retreatLine(p) !== null) continue;
       let d = dist(p.body.pos, at);
       if (cover > 0 && p.side === this.attacking && (p === fullback || ROLES[p.slot]!.name === 'winger')) d = fieldingRead(d, cover, LIVE.kickCatchReach);
       if (this.indexOf(p) === nominated) d -= 0.3;
@@ -357,6 +358,7 @@ export abstract class LiveKicks extends LiveClock {
 
   /** Possession changes hands where the ball is; a fresh set for the other side. */
   protected turnover(): void {
+    this.retreat = null;
     this.offloadReceiver = null;
     this.pendingControl.home = this.pendingControl.away = null;
     this.kickCall = this.fgCall = null;

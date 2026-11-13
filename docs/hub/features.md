@@ -1,6 +1,6 @@
 # Features
 
-Last updated: 2026-11-12
+Last updated: 2026-11-13
 
 What's in the game, with the PR that added each.
 
@@ -63,6 +63,8 @@ What's in the game, with the PR that added each.
 - Android test APK ([PR](https://github.com/ch-leon/nrl-sim/pull/394)); CI ([PR](https://github.com/ch-leon/nrl-sim/pull/442))
 
 ## Recently added
+
+- Defenders other than the markers must physically retreat 10m (or to their goal line) after each ruck before they can rejoin the defence, including after quick heels, handovers, sin bins and substitutions ([PR](https://github.com/ch-leon/nrl-sim/pull/677), [evidence](../specs/625-retreat-validation.md)).
 
 - Ruck markers line up square with the play-the-ball, one behind the other in both attacking directions, with room between bodies ([PR](https://github.com/ch-leon/nrl-sim/pull/621), [spec](../specs/618-marker-alignment.md)).
 
