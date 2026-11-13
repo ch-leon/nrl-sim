@@ -248,6 +248,8 @@ export function initMatchArtAhead(host: ArtAheadHost): () => void {
     for (const p of fixtureArtPieces(art)) if (p.texKey && textures?.exists(p.texKey)) textures.remove(p.texKey);
   };
   let queued = false;
+  /** The rings and light maps last warmed for. */
+  let warmedFor = '';
   const look = (): void => {
     // Not during a multi-week run, nor under a match: there the fixture is the one on
     // screen (its art already taken) and the worker would compete with Skip's.
@@ -265,6 +267,10 @@ export function initMatchArtAhead(host: ArtAheadHost): () => void {
     const state = getState();
     const fixture = nextFixture(state.league.fixtures, state.week, PLAYER_ID);
     const lighting = lightingForFixture(fixture, state.season);
+    // Once a fixture: any state change looks again, and the cached art needs no second look.
+    const warmKey = `${kits.ringStyles.home}${kits.rings.home}|${kits.ringStyles.away}${kits.rings.away}|${lighting}`;
+    if (warmKey === warmedFor) return;
+    warmedFor = warmKey;
     const later: (() => void)[] = [
       () => liveRingPixels(kits.ringStyles.home, kits.rings.home),
       () => liveRingPixels(kits.ringStyles.away, kits.rings.away),
