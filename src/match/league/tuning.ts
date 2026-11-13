@@ -25,6 +25,7 @@ import { BREAKS } from './breaks';
 import { CALLS } from './calls';
 import { KICKOFF } from './kickoff';
 import { KICK_CONTEST } from './kickContest';
+import { LAST_TACKLE } from './lastTackle';
 import { WRESTLE } from './wrestle';
 import { BIN } from './sinbin';
 import { PLAYS } from './plays';
@@ -73,6 +74,7 @@ export const KNOBS = {
   calls: CALLS,
   kickoff: KICKOFF,
   kickContest: KICK_CONTEST,
+  lastTackle: LAST_TACKLE,
   breaks: BREAKS,
   goals: GOALS,
   bin: BIN,

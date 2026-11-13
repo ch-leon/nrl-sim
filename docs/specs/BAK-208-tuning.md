@@ -142,9 +142,18 @@ Weighting only open play (`live.receiverAtRuck` 0) leaves the first receiver as 
 |---|---|---|---|
 | `KICK_SPEED` / `GRUBBER_SPEED` | `ball.ts` | 20 / 12 m/s | Flight speed; a kick is in the air for max(distance ÷ speed, `hangTime(peak)`). Grubber was 13; 12 gives the chase a step. |
 | `hangTime` | `ball.ts` | 2√(2·peak / 9.81) | Peaks: long 12 (3.1 s), bomb 20 (4 s), cross-field 13, chip 5, kick-off 18 (16 before #397; Short and Long kick-offs 20), grubber 0.9 (ground). |
-| `RUN_CLOSE_M` / `RUN_IT_ZONE_M` / `RUN_IT_CHANCE` / `ATTACK_KICK_M` | `tactics.ts` | 6 / 40 / 20% / 50 m | Run the last inside 6 m; 1 in 5 inside 40; territory beyond 50. |
+| `RUN_CLOSE_M` / `RUN_IT_ZONE_M` / `RUN_IT_CHANCE` / `ATTACK_KICK_M` | `tactics.ts` | 6 / 40 / 20% / 50 m | **Off value of the last-tackle call only** (`lastTackle.on` 0): run the last inside 6 m; 1 in 5 inside 40. With it on, the `lastTackle.*` table below owns the last and these three are not read. `ATTACK_KICK_M` (territory beyond 50) still shapes `kickWeights`, as does the 40 m line. |
+| Last-tackle call on (`lastTackle.on`) | `lastTackle.ts`; `callLastPlay` in `live/play.ts` | 1 (**0 = off**) | #650 part 1. On: the kicker's last-tackle call is one roll among kick / run it / shift it wide by the weights below, then for a kick `chooseKick`'s roll as before; the second-last's early kick is called at the play-the-ball (below). 0: the call as before #650, no new roll, every seed as a65edf9. |
+| Zone weights (`lastTackle.zones.<zone>.kick / run / pass`) | `lastTackle.ts` | own 20 1 / 0.04 / 0.04 · own half 1 / 0.08 / 0.1 · midfield 1 / 0.12 / 0.18 · attacking half 1 / 0.25 / 0.25 · red zone 1 / 0.3 / 0.3 | The share of each is its weight over the three. Raise a run or pass weight for more of it in that zone. The old "1 in 5 inside 40" is the attacking-half and red-zone run weights (0.25 on a kick of 1 is 1 in 5 before the pass weight). |
+| `lastTackle.closeM` | `lastTackle.ts` | 6 m | Inside this the kick weight is 0: run or pass only (was `RUN_CLOSE_M`, which ran every one). |
+| Style lean (`lastTackle.presets.<preset>.kick / pass`) | `lastTackle.ts` | Tight 1.15 / 0.8 · Balanced 1 / 1 · Expansive 0.8 / 1.6 · Kick-chase 1.8 / 0.6 · All-out 0.6 / 1.6 | × the zone's kick and pass weights (run ×1). Kick-chase kicks the last most, All-out least; the kick type is still the preset's `kickBias`. |
+| `lastTackle.lateS` / `lastTackle.trailRun` / `lastTackle.leadKick` | `lastTackle.ts` | 60 s / ×2 / ×2 | The score and the clock, read only here (#651 is the match-wide version): in the match's last 60 s (or golden point) a side behind doubles its run and pass weights, a side in front its kick weight. 1 / 1 turns the read off. |
+| `lastTackle.bootPerKicking` / `lastTackle.bigBoot` | `lastTackle.ts` | 0.02 a point over 60 / 0.3 a level | The kicker's boot: × (1 + 0.02·(kicking − 60) + 0.3·Big Boot) on the kick weight (Big Boot I 1, II 1.6, III 2.2). |
+| `lastTackle.pacePerSpeed` | `lastTackle.ts` | 0.03 a point | The edge's pace: × (1 + 0.03·(his centre and wingers' mean Speed − theirs)) on the run and pass weights. |
+| `lastTackle.minMult` | `lastTackle.ts` | 0.25 | No boot, pace or late lean goes below this. |
+| `lastTackle.earlyScale` / `lastTackle.earlyOwn20` / `lastTackle.earlyMax` | `lastTackle.ts`; `callEarlyKick` in `live/play.ts` | 1 / 0.05 / 0.9 | The early kick on the second-last, with the call on. Still the kicker's call when the ball finds him on the second-last (a half is the usual first receiver), with the same rolls in the same order; only the chance changes: the style's `earlyKick` (inside `live.earlyKickM`) or `earlyTerritory` (own 20 / own half) × `earlyScale`, + `earlyOwn20` for a territory kick from the own 20 (so a Balanced, Expansive or All-out side may go early from there too), × the boot lean (and, for territory, × `leadKick` in front late, ÷ `trailRun` behind late), at most `earlyMax`. A first cut that rolled it at the play-the-ball and had the dummy-half find the kicker for it was dropped: it changed who took the first pass on the second-last and Tight won about 58% (harness run `20261113-091649-lt-early`). |
 | `kickWeights(toLine)` | `tactics.ts` | table (§4.4) | Long / bomb / cross-field / grubber / chip weights by zone, × preset `kickBias`. |
-| `live.earlyKickM` + preset `earlyKick` | `live/knobs.ts` / `presets.ts` | 25 m, 35% Balanced | Early grubber / chip on the second-last tackle. |
+| `live.earlyKickM` + preset `earlyKick` | `live/knobs.ts` / `presets.ts` | 25 m, 35% Balanced | Early grubber / chip on the second-last tackle (× `lastTackle.earlyScale` with the call on). |
 | Targets | `tactics.ts` | grubber: inside 16 m, 3 m into the in-goal, else 8 m short; aimed on a winger's lane · chip 10–13 m · cross-field 2 m short, far winger · bomb 22–28 m · long 32 m (× Big Boot) | Where each kick lands. |
 | `live.kickCatchReach` | `live/knobs.ts` | 2.5 m | Whoever is nearest within this takes a kick (nominated man −0.3 m). |
 | `live.dropChance` / `live.dropPressured` | `live/knobs.ts` | 6% / 18% − (Skill − 50)/300 | Spill under a kick. |
@@ -158,7 +167,31 @@ Weighting only open play (`live.receiverAtRuck` 0) leaves the first receiver as 
 | `kickoff.short` (#397) | `kickoff.ts` | 12 m past halfway, peak 20 · regather 25% + 0.5%/pt (best of the 3 nearest chasers' Speed − the catcher's Skill), 15–40% | The Short kick-off call. One draw, only when called. A regather is the kicking side's ball near halfway; a miss is theirs about 12 m from halfway. Measured: 25% over 1,000 even kicks (`kickoff.test.ts`). |
 | `kickoff.long` (#397) | `kickoff.ts` | receivers' 5 m line at Skill ≤ 30 to the try line at ≥ 90, peak 20 · dead on the full 10% (3 m past the dead-ball line) · paid off inside 10 m | The Long kick-off call. One draw, only when called. Dead on the full is a penalty to the receivers at halfway (no sin bin). |
 
-Tests: `tests/match/league/kicks.test.ts`.
+Tests: `tests/match/league/kicks.test.ts`, `tests/match/league/lastTackle.test.ts` (the weights, the
+style order, the late read, off equals a65edf9 with its roll count).
+
+**More options on the last (#650 part 1).** One new roll per last-tackle call while
+`lastTackle.on` is 1, drawn by the kicker as he makes it (`callLastPlay`), before
+`chooseKick`'s roll, which follows only for a kick; it replaces the old run-it roll (drawn
+only inside 40 m), so a last tackle beyond 40 m now draws two rolls where it drew one. The
+second-last's early kick keeps its rolls; the own 20 adds one for styles with no
+`earlyTerritory`. Shift it wide is a pass to the widest man behind the kicker within
+`MAX_LAT_M` (+3 m for a wide style) once `live.passCooldown` has run, with no roll of its own
+(the pass's own interception and handling odds as usual); with nobody there he takes it on.
+Measured by `balance/plans/last-tackle.json` (run `20261113-094245-last-tackle`) and
+`standard.json` on (`20261113-095632-standard`) against off (`20261113-095318-standard-lt-off`),
+13 November 2026, 2:30 halves. Even 60 v 60, off → on: last tackle kick 69 → 58%, run 22 →
+25%, pass 9 → 17% (kick and pass beyond luck in every scenario; run 24–34% everywhere);
+kicks 5.9 → 5.2 a match and kick metres 151 → 129 (both beyond luck); where a won ball's set
+starts 55.8 → 53.8 m to go; completion 72.8 → 72.9%; errors 3.8 → 3.5, tries 1.6 → 1.8 (not
+beyond luck). Completion stays in its band in every scenario (70.4–75.5%). The six preset
+rows (points share, ±3.3) on (off): Tight 53.0 (49.3), Expansive 48.0 (48.0), Kick-chase
+**43.8** (48.8), All-out 55.0 (51.0), Rush 51.3 (51.3), Compressed 49.8 (44.5). **Kick-chase
+misses 45%**: it was 45.5 over 300 matches in a tuning run (`lt-lean2`) with a lighter lean,
+and 44.1 with no lean, so it is the other side's new options, not its own lean, that cost it.
+Kick-chase still kicks the last most (61% with Balanced, against 57% for two Balanced sides)
+and All-out least (52%, pass 23%). A first cut that rolled the early kick at the
+play-the-ball (the dummy-half finding the kicker) put Tight near 58% and was dropped.
 
 ## 7. Traits (§3)
 

@@ -192,9 +192,23 @@ counted in the match report. Between even sides about one bomb in five is contes
 back, 12% spilled). Tuning §31.
 
 ### 4.4 Kicks — *first slice implemented: long, bomb, grubber, chip, cross-field*
-The kicker makes **one call** for the last tackle: inside 6 m he runs it; inside 40 m he
-runs it one time in five; otherwise a kick by zone, each announced by type. On the
-second-last tackle inside 25 m he goes early 35% of the time (grubber 60 / chip 40):
+The kicker makes **one call** for the last tackle. **More options on the last (#650 part 1,
+`lastTackle.on`, awaiting lab sign-off):** one roll among **kick**, **run it** and **shift it
+wide** (to the widest man behind him in reach, who plays on), weighted by zone (own 20 kick
+1 / run 0.04 / pass 0.04, rising to red zone 1 / 0.3 / 0.3; no kick inside 6 m), × the side's
+style (Kick-chase kick ×1.8, Tight ×1.15, Expansive ×0.8, All-out ×0.6; Expansive and All-out
+pass ×1.6, Tight ×0.8, Kick-chase ×0.6), × who is on the field (the kicker's Skill over 60
+and his Big Boot lift the kick; the centre and wingers' Speed over the other side's lifts run
+and pass), and × the score and the clock in the match's last minute only (behind: run and
+pass ×2; in front: kick ×2). A kick then takes `chooseKick`'s roll as before. The coach's
+last-tackle calls (Run it, Bomb, Grubber, 40/20, Field goal) and a set play's script still
+come first. The early kick on the second-last stays his call when the ball finds him then,
+with its chance leaning on his boot and, for a territory kick, the late score; from the own 20
+any side may go early (+5%). Numbers and
+what they measured: tuning reference §6. Off (`lastTackle.on` 0), as before: inside 6 m he
+runs it; inside 40 m he runs it one time in five; otherwise a kick by zone, each announced by
+type. On the second-last tackle inside 25 m he goes early 35% of the time (grubber 60 / chip
+40), if the ball finds him:
 
 | Kick | When the AI chooses it | Resolution |
 |---|---|---|
@@ -527,6 +541,7 @@ makes the break but can't finish it, the workhorse who is never quick and never 
 | F2+ | Sprint follow-ups (kick chase, line speed on cruise, lab legs bar, stamina knobs) — *shipped* (N9.3) | §8.2, §11 |
 | N13.5 | A side's plan can change at half-time and after a try, by a rule the match opts into — *shipped* (off unless a side is named; N14 wires the rivals). Tuning §30 | §5 |
 | #649.1 | The weighted receiver: the pass goes to one of the near-best options by weight, not always the best — *awaiting lab sign-off*. Tuning §5 | §4.2 |
+| #650.1 | More options on the last: kick, run it or shift it wide by zone, style, the late score and who is on the field; the second-last's early kick leans the same way — *awaiting lab sign-off*. Tuning §6 | §4.4 |
 
 Then BAK-207 Phase 2 (full match, scoring, halves) and Phase 3 (balance).
 

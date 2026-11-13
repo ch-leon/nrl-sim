@@ -1,0 +1,23 @@
+{
+  "name": "last-tackle",
+  "description": "#650 part 1: does weighing the last tackle's kick, run and pass wide (lastTackle.*), with the second-last's early kick leaning the same way, bring the last-tackle kick share down with run and pass both above 10%, without moving completion out of its band or the six preset rows out of 45–55% (Kick-chase still the kickingest, All-out the least)? Baseline is the off value (lastTackle.on 0, every seed as before #650); 'on' is the proposed default; the other two take out the late score-and-clock read and the personnel read to show what each adds.",
+  "seeds": 60,
+  "base": { "lastTackle.on": 0 },
+  "scenarios": [
+    { "name": "even 60 v 60", "home": { "rating": 60 }, "away": { "rating": 60 } },
+    { "name": "expansive v grind", "home": { "rating": 60, "tactics": { "attack": "expansive" } }, "away": { "rating": 60, "tactics": { "attack": "grind" } } },
+    { "name": "70 v 50", "home": { "rating": 70 }, "away": { "rating": 50 } },
+    { "name": "fliers v stayers", "home": { "rating": 60, "stats": { "speed": 85, "stamina": 30 } }, "away": { "rating": 60, "stats": { "speed": 65, "stamina": 80 } } },
+    { "name": "grind v balanced", "seeds": 100, "track": "home", "bothWays": true, "home": { "rating": 60, "tactics": { "attack": "grind" } }, "away": { "rating": 60 } },
+    { "name": "expansive v balanced", "seeds": 100, "track": "home", "bothWays": true, "home": { "rating": 60, "tactics": { "attack": "expansive" } }, "away": { "rating": 60 } },
+    { "name": "kick-chase v balanced", "seeds": 100, "track": "home", "bothWays": true, "home": { "rating": 60, "tactics": { "attack": "kick-chase" } }, "away": { "rating": 60 } },
+    { "name": "all-out v balanced", "seeds": 100, "track": "home", "bothWays": true, "home": { "rating": 60, "tactics": { "attack": "all-out" } }, "away": { "rating": 60 } },
+    { "name": "rush v slide", "seeds": 100, "track": "home", "bothWays": true, "home": { "rating": 60, "tactics": { "defence": "rush" } }, "away": { "rating": 60 } },
+    { "name": "compressed v slide", "seeds": 100, "track": "home", "bothWays": true, "home": { "rating": 60, "tactics": { "defence": "compressed" } }, "away": { "rating": 60 } }
+  ],
+  "variants": [
+    { "name": "on", "tuning": { "lastTackle.on": 1 } },
+    { "name": "on, no personnel", "tuning": { "lastTackle.on": 1, "lastTackle.bootPerKicking": 0, "lastTackle.bigBoot": 0, "lastTackle.pacePerSpeed": 0 } },
+    { "name": "on, no score or clock", "tuning": { "lastTackle.on": 1, "lastTackle.trailRun": 1, "lastTackle.leadKick": 1 } }
+  ]
+}

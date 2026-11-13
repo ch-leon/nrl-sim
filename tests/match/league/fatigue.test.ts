@@ -252,7 +252,8 @@ describe('legs and the wrestle in the live sim', () => {
   });
   it('a strong carrier against weak tacklers sometimes breaks free; quick and slow play-the-balls are announced', () => {
     const es: SimEvent[] = [];
-    for (let s = 1; s <= 6; s++) es.push(...play(new LiveSim(sheet('H', { strength: 90, stamina: 85 }), sheet('A', { strength: 35 }), s), 150));
+    // Seeds 1–10 (was 1–6): with the last-tackle call (#650) seeds 1–6 held no late break.
+    for (let s = 1; s <= 10; s++) es.push(...play(new LiveSim(sheet('H', { strength: 90, stamina: 85 }), sheet('A', { strength: 35 }), s), 150));
     const late = es.filter((e) => e.kind === 'break-tackle' && e.detail === 'wrestle');
     expect(late.length).toBeGreaterThan(0);
     expect(late.every((e) => e.side === 'home' || e.side === 'away')).toBe(true);

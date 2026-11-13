@@ -4,6 +4,7 @@
 // Nothing here reads a random number or changes the sim: the harness only
 // looks (events, plus the ball's x and who holds it, read off the sim). The
 // attribution rules are written up in balance/README.md ("Watchability").
+import { SET_TACKLES } from '../../config';
 import type { Side, SimEvent } from '../core/snapshot';
 import { PLAYS } from '../league/plays';
 import { PLAYERS } from '../league/roles';
@@ -277,3 +278,42 @@ export class FirstReceivers {
 }
 
 const sideOf = (holder: number): Side => (holder < PLAYERS ? 'home' : 'away');
+
+/**
+ * Where the ball is kicked and where sets start (#650): `earlyKicks`, kicks in
+ * play on the second-last tackle of a set, a match (a count); `startM`, the
+ * metres to go at the first play-the-ball after the ball changes hands (100 is
+ * a side's own line), the match's mean, 0 with none.
+ */
+export const TERRITORY = ['earlyKicks', 'startM'] as const;
+export type TerritoryKey = (typeof TERRITORY)[number];
+
+export class Territory {
+  private kicks = 0;
+  private startSum = 0;
+  private starts = 0;
+  private holding: Side | null = null;
+  private pending = false;
+  private tackle = 0;
+
+  /**
+   * One tick, after the step: its events, the view, the tackle count the set is on and the metres to go
+   * for the side with the ball. A kick hands the ball over as it is struck, so its tackle is the one the
+   * tick before read.
+   */
+  tick(es: readonly SimEvent[], view: TickView, tackle: number, toGo: () => number): void {
+    for (const e of es) if (e.kind === 'kick' && this.tackle === SET_TACKLES - 2) this.kicks++;
+    this.tackle = tackle;
+    if (this.holding !== null && view.attacking !== this.holding) this.pending = true;
+    this.holding = view.attacking;
+    if (this.pending && view.phase === 'ruck') {
+      this.startSum += toGo();
+      this.starts++;
+      this.pending = false;
+    }
+  }
+
+  result(): Record<TerritoryKey, number> {
+    return { earlyKicks: this.kicks, startM: this.starts > 0 ? this.startSum / this.starts : 0 };
+  }
+}

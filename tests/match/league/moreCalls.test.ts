@@ -49,7 +49,8 @@ interface Played {
  * (#649) reshuffled them again: of seeds 1–40 only seed 7 has both (Take the
  * two at tick 884, Tap and go at 5064).
  */
-const PENALTY_SEEDS = [7];
+// A home penalty in range on 6-minute halves is rare: these hold one with the last-tackle call (#650) on (20, 30) and off (7).
+const PENALTY_SEEDS = [7, 20, 30];
 
 /** Play with the home coach making `call` whenever he may (as a player at the tray does: a tap, in on the next tick). */
 function play(seed: number, call: CoachCall | null, minutes = 6, side: 'home' | 'away' = 'home'): Played {
@@ -208,7 +209,8 @@ describe('five more calls (#396): each does what it says', () => {
     let kicks = 0;
     let inReach = 0;
     let found = 0;
-    for (let seed = 1; seed <= 40; seed++) {
+    // 40/20s are rare: 60 seeds hold one with the last-tackle call (#650) on and off (was 40).
+    for (let seed = 1; seed <= 60; seed++) {
       const calls: CallInput[] = [];
       const sim = new LiveSim(H, A, seed, { length: { halves: 1, halfMinutes: 6 }, calls });
       let aimed = false;
