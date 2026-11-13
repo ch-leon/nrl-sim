@@ -28,6 +28,7 @@ import { bus } from '../core/events';
 import { domUpdateHooks, scheduleUpdatePrompt } from '../ui/updatePrompt';
 import { browserStorage } from '../core/storage/local';
 import { IOS_INSTALL_HINT_KEY } from '../core/storageKeys';
+import { MATCH_PREVIEW } from '../match/preview';
 
 /** The `beforeinstallprompt` event, typed minimally (not in lib.dom yet). */
 interface BeforeInstallPromptEvent extends Event {
@@ -108,6 +109,7 @@ export async function promptInstall(): Promise<
  * the hint (main.ts holds it until the tutorial ends, #337 U4).
  */
 export function initPwa(opts: { holdIosHint?: (show: () => void) => void } = {}): void {
+  if (MATCH_PREVIEW) return;
   if (initialised || typeof window === 'undefined') return;
   initialised = true;
 

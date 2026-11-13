@@ -14,6 +14,7 @@ import { LEGS, isLegs, type Legs } from '../league/fatigue';
 import { NINES } from '../league/rules';
 import { DEFAULT_ROTATION, ROTATIONS, isRotation, type Rotation } from '../league/bench';
 import { CALL_LABEL, COACH_CALLS, type CoachCall } from '../league/calls';
+import { MATCH_PREVIEW } from '../preview';
 
 const TRAIT_MODE_LABEL: Readonly<Record<TraitMode, string>> = { gen: 'as rolled', none: 'none', stars: 'all superstars' };
 const LEGS_LABEL: Readonly<Record<Legs, string>> = { fresh: 'fresh', late: 'last 8 min', spent: 'cooked' };
@@ -199,7 +200,8 @@ export class LabPanel {
     }, { class: 'nrl-lab-mini nrl-lab-collapse' });
     this.root = panel(
       { class: 'nrl-lab' },
-      el('div', { class: 'nrl-lab-row nrl-lab-head' }, el('div', { class: 'nrl-lab-title', text: 'Match Lab · live match' }), collapse),
+      el('div', { class: 'nrl-lab-row nrl-lab-head' }, el('div', { class: 'nrl-lab-title', text: MATCH_PREVIEW ? `${MATCH_PREVIEW.fieldLength}m playtest · 2:30 halves` : 'Match Lab · live match' }),
+        ...(MATCH_PREVIEW ? [el('a', { text: 'Fields', attrs: { href: '../', 'aria-label': 'Compare field lengths' } })] : []), collapse),
       el('div', { class: 'nrl-lab-row nrl-lab-more' }, home, el('span', { text: 'v' }), away, seed, go, shuffle),
       el('div', { class: 'nrl-lab-row nrl-lab-more' }, el('span', { text: 'Skills' }), traits, el('span', { text: 'Legs' }), legs, el('span', { text: 'Bench' }), bench, el('span', { text: 'Wx' }), wx),
       el('div', { class: 'nrl-lab-row nrl-lab-more' }, el('span', { text: 'H' }), hAtk, hDef, el('span', { text: 'A' }), aAtk, aDef),
@@ -211,11 +213,20 @@ export class LabPanel {
       this.stats,
       el('div', { class: 'nrl-lab-row nrl-lab-more' }, flag, codeIn, load),
       this.log,
-      el('div', { class: 'nrl-lab-hint nrl-lab-more', text: p.note ? `Flag note: ${p.note}` : `Nines match: two ${NINES.halfMinutes}:00 halves, the clock in the label, ⏩ skips to the next break. ⚑ Flag anything that looks wrong.` }),
+      el('div', { class: 'nrl-lab-hint nrl-lab-more', text: p.note ? `Flag note: ${p.note}` : MATCH_PREVIEW
+        ? `Unmerged comparison. Keep speed at 1×. Viewing timer excludes pauses and half-time; stepping or seeking invalidates it. ${MATCH_PREVIEW.fieldLength === 60 ? '40/20 is off: its zones overlap on a 60m field.' : 'Normal kicking distances apply.'}`
+        : `Nines match: two halves of ${NINES.halfMinutes} minutes, the clock in the label, ⏩ skips to the next break. ⚑ Flag anything that looks wrong.` }),
     );
     this.log.classList.add('nrl-lab-more');
+    if (MATCH_PREVIEW) {
+      this.root.setAttribute('data-preview', '');
+      for (const advanced of [step, whistle, this.scrub, this.stats, ...this.speedBtns.filter(b => b.textContent !== speedLabel(1))]) advanced.classList.add('nrl-lab-more');
+      const restart = button('Restart', () => { ctrl.restart(); this.sync(); }, { class: 'nrl-lab-mini' });
+      this.playBtn.parentElement?.insertBefore(restart, this.playBtn.nextSibling);
+      this.playBtn.setAttribute('aria-label', 'Play or pause match');
+    }
     // A short screen (a phone on its side) starts with just the play controls; + opens the rest.
-    if (window.matchMedia?.(`(max-height: ${SHORT_SCREEN_PX}px)`).matches) {
+    if (MATCH_PREVIEW || window.matchMedia?.(`(max-height: ${SHORT_SCREEN_PX}px)`).matches) {
       this.root.setAttribute('data-collapsed', '');
       collapse.textContent = '+';
     }
@@ -233,7 +244,11 @@ export class LabPanel {
     }
     this.playBtn.textContent = r.playing ? '❚❚' : '▶';
     for (const b of this.speedBtns) b.toggleAttribute('data-active', b.textContent === speedLabel(r.speed));
-    this.readout.textContent = `t ${r.tick} · ${(r.tick / 20).toFixed(1)}s`;
+    const watched = this.ctrl.watchClock;
+    const time = (ms: number): string => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`;
+    this.readout.textContent = MATCH_PREVIEW && watched
+      ? `${MATCH_PREVIEW.fieldLength}m · watched ${time(watched.milliseconds[0]!)} + ${time(watched.milliseconds[1]!)}${watched.clean ? ' at 1×' : ' · restart timer'}`
+      : `t ${r.tick} · ${(r.tick / 20).toFixed(1)}s`;
     this.label.textContent = r.cur.label;
     if (!this.scrubbing) {
       this.scrub.max = String(Math.max(1, r.maxTick));
@@ -311,6 +326,12 @@ function ensureLabStyles(): void {
 .nrl-lab-code { flex: 1 1 6rem; }
 .nrl-lab .nrl-btn { padding: 0.2rem 0.55rem; font-size: 0.8rem; border-radius: 8px; }
 .nrl-lab .nrl-lab-mini { padding: 0.15rem 0.4rem; }
+.nrl-lab[data-preview] .nrl-lab-mini, .nrl-lab[data-preview] a { min-width: 44px; min-height: 44px; }
+.nrl-lab[data-preview] a { color: #f4d03f; display: inline-flex; align-items: center; justify-content: center; }
+.nrl-lab[data-preview] { font-size: 13px; }
+.nrl-lab[data-preview] .nrl-lab-title { font-size: 13px; }
+.nrl-lab[data-preview] .nrl-btn { font-size: 13px; }
+.nrl-lab[data-preview] .nrl-lab-label { color: #c9d1ea; }
 .nrl-lab-readout { margin-left: auto; font-family: var(--nrl-f-num); font-variant-numeric: tabular-nums; }
 .nrl-lab-scrub { width: 100%; margin: 0; accent-color: #f4d03f; }
 .nrl-lab-label { color: #9aa6c7; }

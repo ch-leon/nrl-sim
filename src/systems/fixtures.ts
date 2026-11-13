@@ -11,6 +11,7 @@
 // orchestrator calls registerFixturesSystem() from main.ts to install the tick /
 // season hooks, and initLeague(state) at boot to populate clubs/fixtures/ladder.
 
+import { NINES } from '../match/league/rules';
 import {
   getState,
   setState,
@@ -331,8 +332,11 @@ export function cheapSimScore(
 ): { homeScore: number; awayScore: number } {
   const homeBase = CHEAP.base + (home.strength - away.strength) * CHEAP.gap + CHEAP.home;
   const awayBase = CHEAP.base + (away.strength - home.strength) * CHEAP.gap;
-  const homeScore = Math.max(0, Math.round(homeBase + rng.int(0, CHEAP.spread)));
-  const awayScore = Math.max(0, Math.round(awayBase + rng.int(0, CHEAP.spread)));
+  // CHEAP was calibrated on seven-minute halves. Keep its score rate when the
+  // normal clock changes, retaining the same two draws and strength/home inputs.
+  const duration = NINES.halfMinutes / 7;
+  const homeScore = Math.max(0, Math.round((homeBase + rng.int(0, CHEAP.spread)) * duration));
+  const awayScore = Math.max(0, Math.round((awayBase + rng.int(0, CHEAP.spread)) * duration));
   return { homeScore, awayScore };
 }
 

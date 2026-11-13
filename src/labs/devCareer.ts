@@ -199,11 +199,22 @@ export function returnToNormalCareer(deps: SwitchDeps = pageDeps()): SwitchResul
  * playtest keys left behind are cleared. Refused, changing nothing, mid-match in
  * a playtest career.
  */
+function removeLabsQuery(): void {
+  if (typeof location === 'undefined' || typeof history === 'undefined') return;
+  try {
+    const url = new URL(location.href);
+    if (!url.searchParams.has('labs')) return;
+    url.searchParams.delete('labs');
+    history.replaceState(history.state, '', url.href);
+  } catch { /* A restricted history API cannot prevent resetting the settings. */ }
+}
+
 export function resetAll(deps: SwitchDeps = pageDeps()): SwitchResult {
   if (testCareer()) {
     const back = returnToNormalCareer({ ...deps, reload: () => {} });
     if (!back.ok) return back;
     turnAllOff();
+    removeLabsQuery();
     deps.reload();
     return { ok: true };
   }
@@ -212,6 +223,7 @@ export function resetAll(deps: SwitchDeps = pageDeps()): SwitchResult {
     try { deps.storage.removeItem(DEV_TEST_BACKUP_KEY); } catch { /* best effort */ }
   }
   turnAllOff();
+  removeLabsQuery();
   return { ok: true };
 }
 

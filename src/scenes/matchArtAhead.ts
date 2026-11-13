@@ -8,6 +8,8 @@ import { activePack } from '../content';
 // different opponent, paints again (and frees the old one's textures). Node and the
 // tests have no Worker and paint in place; a worker that fails or stays silent is
 // dropped and the art painted here.
+import { FIELD_LENGTH } from '../match/core/field';
+import { fieldWorkerName } from '../labs/fieldLength';
 import { bus } from '../core/events';
 import { getState, type GameState } from '../core/state';
 import { advanceInProgress } from '../core/advance';
@@ -84,7 +86,8 @@ function canPaintElsewhere(): boolean {
 function artWorker(): Worker | null {
   if (!canPaintElsewhere()) return null;
   try {
-    return (worker ??= new Worker(new URL('../art/match/artWorker.ts', import.meta.url), { type: 'module', name: 'match-art' }));
+    // Keep the literal URL bundled; skip static evaluation of the runtime name.
+    return (worker ??= new Worker(new URL('../art/match/artWorker.ts', import.meta.url), { /* @vite-ignore */ type: 'module', name: fieldWorkerName('match-art', FIELD_LENGTH) }));
   } catch {
     return null;
   }

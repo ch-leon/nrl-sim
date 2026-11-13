@@ -127,7 +127,7 @@ export interface Plan {
   description?: string;
   /** Matches per cell (seeds seedStart … seedStart + seeds − 1). */
   seeds: number;
-  /** Leave out for whole matches (two 7:00 halves, half-time, full time). A number plays one stretch of that many minutes instead, counts scaled to 14. */
+  /** Leave out for whole matches (two configured halves, half-time, full time). A number plays one stretch of that many minutes instead, counts scaled to MATCH_MINUTES. */
   minutes?: number;
   seedStart?: number;
   /** Opt-in attack × defence matrix and compact tracked-side tables. */

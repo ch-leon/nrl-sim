@@ -2,9 +2,12 @@
 // the mapping to the engine contract's field coords (fx 0..100 along, fy
 // 0..100 across) that the renderer, overlay and MatchEvents already use.
 import { clamp, type Vec } from './vec';
+import { MATCH_PREVIEW } from '../preview';
+import { bootFieldLength } from '../fieldSettings';
 
 /** Try-line to try-line. */
-export const FIELD_LENGTH = 100;
+export const FIELD_LENGTH = MATCH_PREVIEW?.fieldLength ?? bootFieldLength();
+export const MID_X = FIELD_LENGTH / 2;
 /** Touchline to touchline. */
 export const FIELD_WIDTH = 68;
 /** Depth of each in-goal behind the try-line. */
@@ -18,12 +21,12 @@ export interface FieldPt {
   fy: number;
 }
 
-export function toFieldPt(p: Vec): FieldPt {
-  return { fx: p.x, fy: (p.y / FIELD_WIDTH) * 100 };
+export function toFieldPt(p: Vec, length = FIELD_LENGTH): FieldPt {
+  return { fx: length === 100 ? p.x : p.x / length * 100, fy: (p.y / FIELD_WIDTH) * 100 };
 }
 
-export function fromFieldPt(f: FieldPt): Vec {
-  return { x: f.fx, y: (f.fy / 100) * FIELD_WIDTH };
+export function fromFieldPt(f: FieldPt, length = FIELD_LENGTH): Vec {
+  return { x: length === 100 ? f.fx : f.fx / 100 * length, y: (f.fy / 100) * FIELD_WIDTH };
 }
 
 /** Keep a point on the field including the in-goals (`margin` metres inside the lines). */

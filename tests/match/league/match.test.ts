@@ -65,13 +65,14 @@ function play(seed: number): Played {
 }
 
 describe('the match clock, halves and full time', () => {
-  const seeds = [1, 2, 3];
+  // Sample contiguous seeds at the real default: enough scoring exposure for restart/end checks.
+  const seeds = Array.from({ length: 12 }, (_, i) => i + 1);
   const games: Played[] = [];
   beforeAll(() => {
     for (const s of seeds) games.push(play(s));
   });
 
-  it('kicks off, sounds the siren at 7:00, goes to half-time, and ends at full time after 14:00', () => {
+  it('kicks off, sounds the siren at 2:30, goes to half-time, and ends at full time after 5:00', () => {
     for (const g of games) {
       const kinds = g.events.map((x) => x.e.kind);
       expect(kinds[0]).toBe('kickoff');
@@ -130,7 +131,8 @@ describe('the match clock, halves and full time', () => {
   it('half-time gives back half the legs a player has lost', () => {
     for (const g of games) {
       const { before, after } = g.halfTime!;
-      expect(before).toBeLessThan(0.9); // nine minutes have cost something
+      expect(before).toBeLessThan(1); // the short default still costs legs before the break
+      expect(after).toBeGreaterThan(before);
       expect(after).toBeCloseTo(before + (1 - before) * NINES.halfTimeLegsBack, 2);
     }
   });
@@ -145,7 +147,7 @@ describe('the match clock, halves and full time', () => {
       const last = g.events[g.events.length - 1]!.snap;
       expect(last.score).toEqual(g.sim.points);
       expect(last.label).toContain(`${g.sim.points.home}–${g.sim.points.away}`);
-      expect(last.label).toContain(`2nd ${NINES.halfMinutes}:00`);
+      expect(last.label).toContain(clockText(2, NINES.halfMinutes * 60));
     }
     expect(clockText(1, 272.4)).toBe('1st 4:32');
   });
@@ -183,7 +185,7 @@ describe('runMatch', () => {
         expect(i.weeks).toBeGreaterThanOrEqual(1);
         expect(i.weeks).toBeLessThanOrEqual(3);
       }
-      expect(r.momentumTimeline.length).toBeGreaterThan(10);
+      expect(r.momentumTimeline.map((point) => point.t)).toEqual(Array.from({ length: 2 * NINES.halfMinutes + 1 }, (_, minute) => minute));
       let s = initLiveState();
       for (const ev of r.events) s = reduceEvent(s, ev, 'H');
       expect(s.homeScore).toBe(r.homeScore);

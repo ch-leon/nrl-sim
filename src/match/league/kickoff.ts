@@ -2,7 +2,7 @@
 // and the kicking side's two calls in the restart break, Short and Long. Pure:
 // live.ts draws the dice and plays the kick; this module says where it lands,
 // how high it goes and the odds. Not in tuning.ts while #391 edits it.
-import { IN_GOAL } from '../core/field';
+import { IN_GOAL, MID_X } from '../core/field';
 import { clamp, type Vec } from '../core/vec';
 import { chaserWins } from './kickContest';
 import { kickoffTarget } from './tactics';
@@ -44,7 +44,7 @@ export type KickoffCall = 'kickoff-short' | 'kickoff-long';
 
 /** Where the kick-off comes down on the receivers' side of halfway, in metres from their own try line, by the kicker's Kicking. */
 export function kickoffLineM(call: KickoffCall | null, kicking: number, deep = KICKOFF.deepDefault > 0): number {
-  if (call === 'kickoff-short') return 50 - KICKOFF.short.pastHalfwayM;
+  if (call === 'kickoff-short') return MID_X - KICKOFF.short.pastHalfwayM;
   const k = call === 'kickoff-long' ? KICKOFF.long : deep ? KICKOFF.deep : null;
   if (!k) return KICKOFF.today.lineM;
   const s = KICKOFF.deep;
