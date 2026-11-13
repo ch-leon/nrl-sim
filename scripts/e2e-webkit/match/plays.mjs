@@ -27,11 +27,14 @@ const TODAY_TRAY = 'div.nrl-mo-tray.nrl-mo-calls[div.nrl-mo-tray-head[span.nrl-m
  *     counts the plays ("· 1 play"). The same with every call unlocked (a top Coach's
  *     Office): the calls give way to three tiles and the tray still does not scroll.
  *   - The bottom row with the tray shut and the longest badge ("6 calls · 3 plays"):
- *     COACH, LOG and the speed pill do not overlap; on a phone 720 wide or less the
- *     badge stacks, so COACH is no wider than with today's longest badge.
+ *     COACH, LOG and the speed pill do not overlap; the badge stacks, so COACH is no
+ *     wider than with today's longest badge. The badge is one width (#608): LOG's left
+ *     edge is the same whatever the badge reads and with the tray open, and the longest
+ *     label ("Take the two") is not cut.
  *   - Defending, the section is hidden.
- *   - A tap on a play: the tray shuts, the badge names the play, the call record has
- *     it, and once it is run (at the next play-the-ball) the tag over COACH says what
+ *   - A tap on a play: its tile lights and the tray shuts a moment later (#608; a tap
+ *     inside 300ms of the tiles changing makes no call), the badge names the play, the
+ *     call record has it, and once it is run (at the next play-the-ball) the tag over COACH says what
  *     came of it, on screen and clear of the commentary line.
  * At ×4 to get through the sets; a minute or two a size.
  */
@@ -92,8 +95,14 @@ export async function runMatchPlays(browser, sizes = [[844, 390], [667, 375], [5
       const shutTray = async () => {
         if (!(await page.locator('.nrl-mo-calls[hidden]').count())) await page.locator('.nrl-mo-bar [data-coach]').tap();
       };
+      /**
+       * The match holds at ×1 while the tray is open (#639), whatever speed was picked, so a wait made with
+       * it open covers a quarter of the match time it did at this check's ×4. The waits below are sized for ×1:
+       * a change of possession, or a set reaching a tackle a play can be called on, can take over a minute.
+       */
+      const TRAY_OPEN_WAIT_MS = 240000;
       /** Wait for the tray's title to read `title` (his side's ball, or theirs) with it open. */
-      const waitTitle = (title) => page.waitForFunction((t) => document.querySelector('.nrl-mo-tray-title')?.textContent === t, title, { timeout: 90000 });
+      const waitTitle = (title) => page.waitForFunction((t) => document.querySelector('.nrl-mo-tray-title')?.textContent === t, title, { timeout: TRAY_OPEN_WAIT_MS });
       const problems = [];
       try {
         await page.goto(BASE);
@@ -118,12 +127,18 @@ export async function runMatchPlays(browser, sizes = [[844, 390], [667, 375], [5
         const sheetPlays = await page.evaluate(() => { const sc = window.__nrlGame.scene.getScene('Match'); return [...sc.playback.playsOf(sc.callSide)]; });
         if (sheetPlays.join(',') !== (withPlays ? PLAYS.join(',') : '')) problems.push(`the match's plays are [${sheetPlays.join(',')}]`);
 
-        // With the ball.
+        // With the ball. Possession can change between a wait and the read that follows it (at the
+        // kick-off it does within a second: his side has the ball until it is kicked away), so the
+        // read is taken again until it is still his ball in the read itself.
         await openTray();
-        await waitTitle('Your ball');
-        if (withPlays) await page.waitForFunction(() => document.querySelectorAll('[data-tray-plays]:not([hidden]) [data-play]').length > 0, null, { timeout: 5000 });
-        await settle();
-        const atk = await read();
+        let atk = null;
+        for (let i = 0; i < 8; i++) {
+          await waitTitle('Your ball');
+          if (withPlays) await page.waitForFunction(() => document.querySelectorAll('[data-tray-plays]:not([hidden]) [data-play]').length > 0, null, { timeout: TRAY_OPEN_WAIT_MS }).catch(() => {});
+          await settle();
+          atk = await read();
+          if (atk.title === 'Your ball' && (!withPlays || atk.shown)) break;
+        }
         await page.screenshot({ path: join(OUT, `attacking-${tag}-${w}x${h}.png`) });
         const t = atk.tray;
         if (t.left < -1 || t.top < -1 || t.right > atk.vw + 1 || t.bottom > atk.vh + 1) problems.push('the open tray is off screen');
@@ -197,16 +212,35 @@ export async function runMatchPlays(browser, sizes = [[844, 390], [667, 375], [5
             if (ra && rb && ra.l < rb.r - 1 && rb.l < ra.r - 1 && ra.t < rb.b - 1 && rb.t < ra.b - 1) out.push(`${a} overlaps ${b}`);
           }
           if (longest && innerWidth <= 720 && coach() > todayW + 1) out.push(`COACH is ${Math.round(coach())}px wide with "${longest}", ${Math.round(todayW)}px with today's longest badge`);
-          return out;
+          // One width whatever it reads (#608): LOG's left edge does not move with the badge's text,
+          // and the longest label the badge shows is whole.
+          const logLeft = () => document.querySelector('.nrl-mo-log-toggle').getBoundingClientRect().left;
+          const edges = [[longest ?? 'Gang tackle', logLeft()]];
+          badge.removeAttribute('data-parts');
+          for (const text of ['Their ball', 'No calls', '1 call', 'Take the two']) {
+            badge.textContent = text;
+            edges.push([text, logLeft()]);
+            if (badge.scrollWidth > badge.clientWidth + 1) out.push(`the badge cuts "${text}"`);
+          }
+          const moved = edges.filter(([, x]) => Math.abs(x - edges[0][1]) > 0.5);
+          if (moved.length) out.push(`LOG's left edge is ${edges[0][1].toFixed(1)}px with "${edges[0][0]}" but ${moved.map(([t, x]) => `${x.toFixed(1)}px with "${t}"`).join(', ')}`);
+          return { out, logLeft: edges[0][1] };
         }, withPlays ? '6 calls · 3 plays' : null);
-        problems.push(...bar.map((p) => `bottom row: ${p}`));
+        problems.push(...bar.out.map((p) => `bottom row: ${p}`));
         await page.screenshot({ path: join(OUT, `bar-${tag}-${w}x${h}.png`) });
         await openTray();
+        // Open, the badge keeps its room unseen (#608): LOG is where it was with the tray shut.
+        const openLeft = await page.evaluate(() => document.querySelector('.nrl-mo-log-toggle').getBoundingClientRect().left);
+        if (Math.abs(openLeft - bar.logLeft) > 0.5) problems.push(`bottom row: LOG's left edge is ${openLeft.toFixed(1)}px with the tray open, ${bar.logLeft.toFixed(1)}px with it shut`);
 
-        // Defending: no plays.
-        await waitTitle('Their ball');
-        await settle();
-        const def = await read();
+        // Defending: no plays. The same care: read again until it is still their ball in the read.
+        let def = null;
+        for (let i = 0; i < 8; i++) {
+          await waitTitle('Their ball');
+          await settle();
+          def = await read();
+          if (def.title === 'Their ball') break;
+        }
         await page.screenshot({ path: join(OUT, `defending-${tag}-${w}x${h}.png`) });
         if (def.shown || def.tiles.length) problems.push('the Plays section shows while defending');
         if (!withPlays && def.shape !== TODAY_TRAY) problems.push(`defending, the tray is not today's: ${def.shape}`);
@@ -214,6 +248,7 @@ export async function runMatchPlays(browser, sizes = [[844, 390], [667, 375], [5
 
         if (withPlays) {
           // Call one: the first tile that can be called. Its tag comes once it has been run.
+          // A tap inside 300ms of the tiles changing makes no call (#608): tap until the tile lights.
           let called = null;
           let result = '';
           for (let tries = 0; tries < 4 && !result; tries++) {
@@ -223,10 +258,12 @@ export async function runMatchPlays(browser, sizes = [[844, 390], [667, 375], [5
               const b = document.querySelector('[data-tray-plays]:not([hidden]) [data-play]:not([disabled])');
               if (!b) return null;
               b.click();
-              return b.dataset.play;
-            }, null, { timeout: 60000 }).then((hdl) => hdl.jsonValue());
+              return b.hasAttribute('data-called') ? b.dataset.play : null;
+            }, null, { timeout: TRAY_OPEN_WAIT_MS }).then((hdl) => hdl.jsonValue());
             called = play;
-            if (!(await page.locator('.nrl-mo-calls[hidden]').count())) problems.push('the tray stayed open after the play was called');
+            // The call is in at the tap: COACH is shut for a screen reader at once, the tray itself a moment later (TRAY_CALLED_MS).
+            if ((await page.locator('.nrl-mo-bar [data-coach]').getAttribute('aria-expanded')) !== 'false') problems.push('COACH still reads open after the play was called');
+            if (!(await page.waitForSelector('.nrl-mo-calls[hidden]', { state: 'attached', timeout: 3000 }).then(() => true, () => false))) problems.push('the tray stayed open after the play was called');
             const badge = await page.locator('.nrl-mo-coach-badge').textContent();
             if (badge !== SHORT[play]) problems.push(`after the call the badge reads "${badge}"`);
             const queued = await page.evaluate(() => { const sc = window.__nrlGame.scene.getScene('Match'); return sc.playback.opts.calls.filter((c) => c.call === 'set-play').map((c) => c.play); });
@@ -237,7 +274,7 @@ export async function runMatchPlays(browser, sizes = [[844, 390], [667, 375], [5
               return el && el.textContent.startsWith(short) ? el.textContent : null;
             }, SHORT[play], { timeout: 60000 }).then((hdl) => hdl.jsonValue());
             // Seen: shown, on screen, and not under the commentary line or COACH, measured once its slide-up
-            // (nrl-mo-up, 180ms) has settled. It has no pointer events, so measure rather than hit-test.
+            // (nrl-sheet-up, 180ms) has settled. It has no pointer events, so measure rather than hit-test.
             const seen = await page.evaluate(async () => {
               const el = document.querySelector('.nrl-mo-call-result');
               if (!el) return 'gone before it settled';

@@ -44,10 +44,10 @@ interface Played {
 /**
  * Seeds for the penalty pair: a home penalty in range is rare in a 6-minute half,
  * and one the captain doesn't tap himself (Tap and go's moment) rarer still.
- * 1–8 had both until the deeper default kick-off (#397) reshuffled every match;
- * these four have Take the two on (14, 65, 119, 142) and Tap and go (65, 119, 142).
+ * The completed retreat (#625) reshuffled the previous fixtures: seed 6 has
+ * both Take the two and Tap and go on at tick 4506.
  */
-const PENALTY_SEEDS = [14, 65, 119, 142];
+const PENALTY_SEEDS = [6];
 
 /** Play with the home coach making `call` whenever he may (as a player at the tray does: a tap, in on the next tick). */
 function play(seed: number, call: CoachCall | null, minutes = 6, side: 'home' | 'away' = 'home'): Played {
@@ -70,12 +70,12 @@ function play(seed: number, call: CoachCall | null, minutes = 6, side: 'home' | 
   return { sim, events, calls, legal, refusals };
 }
 
-/** The events after each of the home coach's calls of `call`, up to the end of that set (a handover, a kick, a turnover), the next call or `span` events. */
+/** The events after each of the home coach's calls of `call`, up to the end of that set (a handover, a kick, a turnover, a score or a restart), the next call or `span` events. */
 function afterCalls(p: Played, call: CoachCall, span = 80): SimEvent[][] {
   const at = p.events.flatMap((e, i) => (e.kind === 'coach-call' && e.detail === call && e.side === 'home' ? [i] : []));
   return at.map((i, k) => {
     const run = p.events.slice(i + 1, Math.min(at[k + 1] ?? Infinity, i + 1 + span));
-    const end = run.findIndex((e) => e.kind === 'handover' || e.kind === 'kick' || e.kind === 'error' || e.kind === 'intercept' || e.kind === 'strip');
+    const end = run.findIndex((e) => e.kind === 'handover' || e.kind === 'kick' || e.kind === 'error' || e.kind === 'intercept' || e.kind === 'strip' || e.kind === 'try' || e.kind === 'set-start' || e.kind === 'penalty');
     return end < 0 ? run : run.slice(0, end + 1);
   });
 }

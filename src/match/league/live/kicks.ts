@@ -36,6 +36,7 @@ export abstract class LiveKicks extends LiveClock {
     this.kickoffUp = k.kickoff;
     this.kickCall = this.fgCall = null;
     const receiving = other(kicker.side);
+    this.retreat = null;
     this.attacking = receiving;
     this.dir = this.dirOf(receiving);
     this.tackles = 0;
@@ -136,6 +137,7 @@ export abstract class LiveKicks extends LiveClock {
       if (b.via === 'pass' && r.side === this.attacking && this.rng.next() < knockOnChance(r.stats.handling, pressured, false, spillExtra) * this.wx.handling) {
         // Spilled: the ball squirts forward and the defence takes over.
         this.emit('error', spillExtra > 0 ? `${r.name} can't hold the wild offload — knock-on` : `${r.name} spills it — knock-on`, r);
+        this.react(r, 'error');
         this.lastTouch = r.side;
         this.bounce(b.to, { x: this.dir, y: (this.rng.next() - 0.5) * 0.6 }, 2.5, 12, 2);
         this.turnover();
@@ -167,6 +169,7 @@ export abstract class LiveKicks extends LiveClock {
         this.endKick(r.side, r.body.pos);
         if (this.groundInGoal(r)) return;
         this.emit('set-start', `${r.name} takes the kick — ${this.names[this.attacking]} ball`, r);
+        this.events[this.events.length - 1]!.detail = 'caught';
       }
       return;
     }
@@ -177,7 +180,7 @@ export abstract class LiveKicks extends LiveClock {
       for (const p of this.players) {
         if (this.looseFor && p.side !== this.looseFor) continue;
         if (this.raceFor && p.side !== this.raceFor) continue;
-        if (this.locked(p) || !this.onField(p)) continue;
+        if (this.locked(p) || !this.onField(p) || this.retreatLine(p) !== null) continue;
         const d = dist(p.body.pos, b.pos);
         if (d < bd) {
           bd = d;
@@ -204,7 +207,10 @@ export abstract class LiveKicks extends LiveClock {
           this.events[this.events.length - 1]!.detail = 'scramble';
         }
         if (this.groundInGoal(best, raced)) return;
-        if (!scramble) this.emit('set-start', `${best.name} scoops it up — ${this.names[this.attacking]} ball`, best);
+        if (!scramble) {
+          this.emit('set-start', `${best.name} scoops it up — ${this.names[this.attacking]} ball`, best);
+          this.events[this.events.length - 1]!.detail = 'gathered';
+        }
         if (this.phase.kind !== 'play') this.phase = { kind: 'play' };
       }
     }
@@ -232,7 +238,7 @@ export abstract class LiveKicks extends LiveClock {
     let best: Player | undefined;
     let bd = Infinity;
     for (const p of this.players) {
-      if (this.locked(p) || !this.onField(p)) continue;
+      if (this.locked(p) || !this.onField(p) || this.retreatLine(p) !== null) continue;
       let d = dist(p.body.pos, at);
       if (cover > 0 && p.side === this.attacking && (p === fullback || ROLES[p.slot]!.name === 'winger')) d = fieldingRead(d, cover, LIVE.kickCatchReach);
       if (this.indexOf(p) === nominated) d -= 0.3;
@@ -295,6 +301,7 @@ export abstract class LiveKicks extends LiveClock {
     this.lastTouch = r.side;
     const way = { x: (this.rng.next() - 0.5) * 2, y: (this.rng.next() - 0.5) * 2 };
     this.emit('drop', text, r);
+    this.react(r, 'error');
     if (way.x * this.dir > 0 && !this.kickoffUp) {
       this.events[this.events.length - 1]!.detail = 'knock-on';
       this.bounce(at, way, 2.5, 12, 2);
@@ -353,6 +360,7 @@ export abstract class LiveKicks extends LiveClock {
 
   /** Possession changes hands where the ball is; a fresh set for the other side. */
   protected turnover(): void {
+    this.retreat = null;
     this.offloadReceiver = null;
     this.pendingControl.home = this.pendingControl.away = null;
     this.kickCall = this.fgCall = null;

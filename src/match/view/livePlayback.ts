@@ -22,7 +22,7 @@ import { replayRange, Runner, TICK_MS, type SimFactory } from '../core/engine';
 import type { Side, SimEvent, Snapshot } from '../core/snapshot';
 import { LiveSim, type LiveOptions, type PlanInput } from '../league/live';
 import { MatchRecorder, type RunMatchOptions } from '../league/match';
-import { callIsBench, callIsPenalty, type CallInput, type CallVerdict, type CoachCall } from '../league/calls';
+import { callIsBench, callIsPenalty, callResultText, type CallInput, type CallVerdict, type CoachCall } from '../league/calls';
 import type { PlayId } from '../../data/plays';
 import type { PlayFit } from '../league/plays';
 import type { DifficultyEdge } from '../league/spread';
@@ -30,19 +30,22 @@ import type { TeamTactics } from '../league/presets';
 import { NINES } from '../league/rules';
 import { LiveView, type ViewSurface } from './liveView';
 import { PopupLayer } from './popupLayer';
-import { SLOWMO_FACTOR, SLOWMO_MS, popupFor } from './popups';
+import { callPaidPopup, popupFor } from './popups';
+import { impactTier, playImpact } from './impact';
 import { SprintLayer } from './sprintLayer';
 import { WrestleBar } from './wrestleBar';
 import { ZoneLayer, bonusTryEnd } from './zoneLayer';
 import { Commentator } from './commentary';
+import { HALF_BREAK, shownBreak } from './lineBreak';
 import { KickLayer, KickWatch, framingHeld, kickFrame, kickPoints, type Frame } from './kickLayer';
-import { TRAIT_FAST_FROM, TRAIT_SLOW_FACTOR, TRAIT_SLOW_MS, TraitLayer } from './traitLayer';
+import { TRAIT_FAST_FROM, TRAIT_SLOW_FACTOR, TRAIT_SLOW_MS, TraitLayer, TraitRoster } from './traitLayer';
 import { ContestLayer } from './contestLayer';
 import type { PopupView } from './popups';
 import { replayFrame, replayFrom, REPLAY_WORKER_MS } from './replay';
 import { toFieldPt } from '../core/field';
 import { canUseWorker, playReplayInWorker } from '../../systems/matchJobs';
 import { liveMatchSaveDue } from '../../systems/liveMatchRecord';
+import { cssZoom } from '../../world/viewport';
 
 export type PlaybackSpeed = 1 | 2 | 4 | 8;
 
@@ -61,18 +64,25 @@ export interface PlaybackBall {
   place(x: number, y: number, lift: number, depth: number): void;
 }
 
-/** A live match starts at ×4 when the player has not picked a speed (§5.1 decision 1, then the 7:00 halves). */
-export const LIVE_DEFAULT_SPEED: PlaybackSpeed = 4;
+/** A live match starts at ×2 when the player has not picked a speed (§5.1 decision 1; ×4 until Leon moved it on 12 Nov 2026, #628). */
+export const LIVE_DEFAULT_SPEED: PlaybackSpeed = 2;
 
 /**
  * Dead time on screen plays at twice the chosen speed. Open play stays at the
- * chosen speed. A ruck includes the play-the-ball. A set piece is a tap restart,
+ * chosen speed, and so does contact (#628): the tackle is what the player came
+ * to see. A ruck includes the play-the-ball. A set piece is a tap restart,
  * a penalty the kick being lined up, a goal the field-goal celebration.
  */
-const FAST_PHASES: ReadonlySet<string> = new Set(['ruck', 'tackle', 'restart', 'set-piece', 'conversion', 'try', 'penalty', 'goal']);
+const FAST_PHASES: ReadonlySet<string> = new Set(['ruck', 'restart', 'set-piece', 'conversion', 'try', 'penalty', 'goal']);
 
-/** 2 during dead time, 1 while the ball is in play (and through the half-time break, which the card holds). */
-export function playbackPace(phase: string): 1 | 2 {
+/**
+ * 2 during dead time, 1 while the ball is in play or in contact (and through the
+ * half-time break, which the card holds). The ruck is capped at ×2 real speed
+ * (#628): doubled at ×1, left at the chosen speed at ×2. ×4 and ×8 keep the
+ * doubling, as they always did, so they are no slower than before.
+ */
+export function playbackPace(phase: string, speed: number = 1): 1 | 2 {
+  if (phase === 'ruck' && speed === 2) return 1;
   return FAST_PHASES.has(phase) ? 2 : 1;
 }
 
@@ -114,10 +124,15 @@ export function holdTackle(held: ShownTackle | null, phase: string, side: Side, 
 /** How quickly the pace eases between ×1 and ×2. Most of the gap closes in about 0.4 s, so a phase change does not lurch. */
 export const PACE_BLEND_MS = 400;
 
+/** A key moment's cap arrives quickly (#631): the time constant is 35 ms, so it has settled in about 100 ms and the break is not under way before the slow-down. */
+export const KEY_CAP_IN_MS = 35;
+/** And is released slowly, so the match does not lurch back up to speed. */
+export const KEY_CAP_OUT_MS = 600;
+
 /** Move `current` toward `target` over `deltaMs` of real time. A huge frame snaps; a 16 ms frame barely moves. */
-export function blendPace(current: number, target: number, deltaMs: number): number {
+export function blendPace(current: number, target: number, deltaMs: number, tauMs: number = PACE_BLEND_MS): number {
   if (!(deltaMs > 0)) return current;
-  const k = 1 - Math.exp(-deltaMs / PACE_BLEND_MS);
+  const k = 1 - Math.exp(-deltaMs / tauMs);
   return current + (target - current) * k;
 }
 
@@ -144,8 +159,11 @@ export class KeyMoments {
   private lateWaived = 0;
 
   /** A sim event on screen (not a skipped or resumed stretch). */
-  note(e: { kind: string }): void {
-    if (e.kind === 'line-break') this.moment ??= 'break';
+  note(e: { kind: string; detail?: string }): void {
+    if (e.kind === 'line-break') {
+      // A half break (#638) is the plain thing it sounds like: no slow-down.
+      if (e.detail !== HALF_BREAK) this.moment ??= 'break';
+    }
     else if (e.kind === 'try') this.moment = 'try';
     else if (this.moment === 'try' && (e.kind === 'conversion' || e.kind === 'full-time' || e.kind === 'half-time')) this.moment = null;
   }
@@ -180,7 +198,7 @@ export function keyMomentsOn(settings: { keyMoments?: boolean }): boolean {
   return settings.keyMoments !== false;
 }
 
-/** The speed buttons remember. Anything else (an old save, a bad value) is ×4. */
+/** The speed buttons remember. Anything else (an old save, a bad value) is ×2. */
 export function playbackSpeedOf(raw: unknown): PlaybackSpeed {
   return raw === 1 || raw === 2 || raw === 4 || raw === 8 ? raw : LIVE_DEFAULT_SPEED;
 }
@@ -217,7 +235,7 @@ interface Sprite {
 /** What the live playback needs of the Match scene. */
 export interface LivePlaybackScene extends ViewSurface {
   players: Record<Side, readonly (ViewSurface['players'][Side][number] & { sprite: Sprite })[]>;
-  cameras: { main: { zoom: number; worldView: { x: number; y: number; width: number; height: number } } };
+  cameras: { main: { zoom: number; width?: number; worldView: { x: number; y: number; width: number; height: number }; shake?(ms: number, intensity: number): unknown } };
   /** The sides' colours (the carrier ring's), for the kick contest's rings. */
   readonly sideColors?: Readonly<Record<Side, number>>;
 }
@@ -236,6 +254,8 @@ export interface LivePlaybackOptions {
   plans?: PlanInput[];
   controls?: ControlInput[];
   controlsSide?: Side;
+  /** The side the player coaches (#639): its calls paying off are shouted over the field and sounded. */
+  coachSide?: Side;
   /** The rival's AI coach (N9.6). */
   aiCoach?: ('home' | 'away')[];
   /** Sides whose plan changes at the breaks (N13.5). The watched match, a resume and a Skip all use it. */
@@ -328,13 +348,14 @@ export class LivePlayback {
     this.plans = opts.plans ?? [];
     this.controls = opts.controls ?? [];
     this.recorder = new MatchRecorder({ home: home.clubId, away: away.clubId });
-    this.commentator = new Commentator(opts.seed, { home: home.name, away: away.name }, { home, away });
+    this.commentator = new Commentator(opts.seed, { home: home.name, away: away.name }, { home, away }, { knockout: !!opts.goldenPoint });
     // Exactly the sim runMatch would play: same sheets, seed, weather, injury rate, difficulty and calls.
     const simOpts: LiveOptions = { weather: opts.weather, calls: opts.calls, plans: this.plans, controls: this.controls, ...(opts.injuryRate !== undefined ? { injuryRate: opts.injuryRate } : {}), ...(opts.difficultyEdge ? { difficultyEdge: opts.difficultyEdge } : {}), ...(opts.aiCoach?.length ? { aiCoach: opts.aiCoach } : {}), ...(opts.aiRival ? { aiRival: opts.aiRival } : {}), ...(opts.breakRuleSides?.length ? { breakRuleSides: opts.breakRuleSides } : {}), ...(opts.goldenPoint ? { goldenPoint: true } : {}) };
     this.simOpts = simOpts;
     this.factory = (seed) => new LiveSim(home, away, seed, simOpts);
     // Over the kick's trail, under the pop-ups. Built before a resume steps the sim, which clears it.
     this.traits = new TraitLayer(scene, DEPTH_POPUP - 0.5);
+    this.traits.setRoster(new TraitRoster({ home, away }));
     this.contest = new ContestLayer(scene, DEPTH_POPUP - 3);
     this.speed = playbackSpeedOf(opts.speed);
     this.runner = new Runner(this.factory, opts.seed);
@@ -373,6 +394,7 @@ export class LivePlayback {
     this.popups = new PopupLayer(scene, DEPTH_POPUP);
     this.wrestleBar = new WrestleBar(scene, DEPTH_POPUP);
     this.sprintLayer = new SprintLayer(scene, DEPTH_POPUP - 1);
+    this.sprintLayer.setRoster(new TraitRoster({ home, away }));
     this.zone = new ZoneLayer(scene, DEPTH_ZONE, (fx, fy) => scene.fieldToWorld(fx, fy));
     this.kickLayer = new KickLayer(scene, { air: DEPTH_KICK_AIR, ground: DEPTH_KICK_GROUND }, () => scene.sideColors ?? { home: 0xffffff, away: 0xffffff });
     this.view.draw(this.runner.prev, this.runner.cur, 0, 1);
@@ -605,25 +627,34 @@ export class LivePlayback {
   /** A key moment is slowing the match to this speed now (the speed row shows it, #366), or null. */
   get slowedTo(): number | null {
     const cap = this.keyCap();
-    return cap !== null && cap < this.speed * playbackPace(this.sim.phaseKind) ? cap : null;
+    return cap !== null && cap < this.speed * playbackPace(this.sim.phaseKind, this.speed) ? cap : null;
   }
 
-  /** The key moment's cap, when the setting is on and the match is playing on screen. */
+  /** The coach's tray is open (#639): the match plays at ×1 at most while a call is chosen, then back to the chosen speed. */
+  private callsOpen = false;
+  setCallsOpen(open: boolean): void {
+    this.callsOpen = open;
+  }
+
+  /** The key moment's cap (or the open tray's), when the match is playing on screen. */
   private keyCap(): number | null {
-    if (this.skipping || this.awaitingSkip || this.finishEmitted || !this.opts.keyMoments?.()) return null;
+    if (this.skipping || this.awaitingSkip || this.finishEmitted) return null;
+    if (this.callsOpen) return KEY_MOMENT_SPEED;
+    if (!this.opts.keyMoments?.()) return null;
     return this.keyMoments.cap(this.runner.cur.clock, NINES.halfMinutes);
   }
 
   /** Ease the runner between the chosen speed and twice that, from the phase on screen, and down to a key moment's cap (#366). */
   private applyPace(deltaMs: number): void {
-    this.pace = blendPace(this.pace, playbackPace(this.sim.phaseKind), deltaMs);
+    this.pace = blendPace(this.pace, playbackPace(this.sim.phaseKind, this.speed), deltaMs);
     const free = this.speed * this.pace;
     const cap = this.keyCap();
     if (cap !== null || this.keySpeed !== null) {
       // Eased from the speed on screen to the cap, never above the speed it would play at anyway; then back up to it.
       const held = Math.min(this.keySpeed ?? free, free);
-      this.keySpeed = blendPace(held, cap === null ? free : Math.min(cap, free), deltaMs);
-      if (cap === null && this.keySpeed > free * 0.995) this.keySpeed = null;
+      const to = cap === null ? free : Math.min(cap, free);
+      this.keySpeed = blendPace(held, to, deltaMs, to < held ? KEY_CAP_IN_MS : KEY_CAP_OUT_MS);
+      if (cap === null && this.keySpeed > free * 0.99) this.keySpeed = null;
     }
     const attacking = this.opts.controlsSide && this.sim.inPossession === this.opts.controlsSide;
     this.runner.setSpeed(attacking ? Math.min(1, this.keySpeed ?? free) : this.keySpeed ?? free);
@@ -636,8 +667,20 @@ export class LivePlayback {
       this.verdictsSeen = vs.length;
       return;
     }
-    while (this.verdictsSeen < vs.length) this.opts.onCallResult?.(vs[this.verdictsSeen++]!);
+    while (this.verdictsSeen < vs.length) {
+      const v = vs[this.verdictsSeen++]!;
+      this.opts.onCallResult?.(v);
+      // The player's own call paying off: a pop-up over the man who made it count, and the rising tone (#639).
+      if (v.paid && v.side === this.opts.coachSide) {
+        const who = this.lastActor[v.side];
+        if (who !== undefined) this.popups.show(callPaidPopup(callResultText(v)), v.side, who);
+        bus.emit('match:call-paid', { call: v.call });
+      }
+    }
   }
+
+  /** The slot each side's latest named event was about: who a call that pays off is shouted over (#639). */
+  private readonly lastActor: Partial<Record<Side, number>> = {};
 
   /**
    * Play the rest of the match at once: every event still reaches the overlay (the
@@ -660,7 +703,7 @@ export class LivePlayback {
     this.skipping = true;
     this.kicks.clear();
     this.runner.pause();
-    this.opts.overlay?.comment(SKIPPING_TEXT);
+    this.opts.overlay?.comment(SKIPPING_TEXT, 'now');
     void elsewhere({ home: this.opts.home, away: this.opts.away, opts: this.runOptions() })
       .then((result) => this.finishFrom(result))
       .catch((err: unknown) => {
@@ -698,7 +741,7 @@ export class LivePlayback {
     for (const ev of result.events.slice(this.recorder.events.length)) bus.emit('match:event', ev);
     const golden = result.events.some((e) => e.kind === 'full-time' && e.detail === 'golden-point');
     // The final whistle in the ticker: the same line the match would have ended on here (the whistles hash the seed alone).
-    this.opts.overlay?.comment(this.commentator.fullTime({ home: result.homeScore, away: result.awayScore }, golden));
+    this.opts.overlay?.comment(this.commentator.fullTime({ home: result.homeScore, away: result.awayScore }, golden), 'now');
     if (result.calls) {
       const [mh, ma] = result.calls.made;
       const [ph, pa] = result.calls.paid;
@@ -718,7 +761,7 @@ export class LivePlayback {
     this.skipping = true;
     while (!this.runner.finished) this.runner.step();
     this.skipping = false;
-    if (this.finalLine) this.opts.overlay?.comment(this.finalLine);
+    if (this.finalLine) this.opts.overlay?.comment(this.finalLine, 'now');
     this.view.draw(this.runner.prev, this.runner.cur, 1, 0.001);
     this.showClock();
     this.finish();
@@ -761,7 +804,8 @@ export class LivePlayback {
   /** Pop-ups, the wrestle bar and sprint streaks, once the camera has moved this frame. */
   late(deltaMs: number): void {
     const cam = this.scene.cameras.main;
-    const zoom = cam.zoom;
+    // Screen-sized layers take the zoom in CSS terms; the canvas renders at the screen's density (#627).
+    const zoom = cssZoom(cam);
     const feet = (side: Side, slot: number): { x: number; y: number } | null => {
       const a = this.scene.players[side][slot];
       return a ? { x: a.sprite.x, y: a.sprite.y } : null;
@@ -827,22 +871,33 @@ export class LivePlayback {
 
   private onSimEvents(events: readonly SimEvent[]): void {
     const cur = this.runner.cur;
-    for (const e of events) {
+    for (const sim of events) {
+      // A line break the view calls half (#638) reads and plays as a plain line; the recorded events below are the sim's own.
+      const e = shownBreak(sim, cur);
+      if (e.side !== undefined && e.slot !== undefined && e.kind !== 'call-paid' && e.kind !== 'coach-call') this.lastActor[e.side] = e.slot;
+      // The whoosh and the crowd (audio); a skipped or resumed stretch is not heard.
+      if (!this.skipping && e.kind === 'line-break' && e.detail !== HALF_BREAK) bus.emit('match:clean-break', { tick: e.tick });
       // A kick struck or brought down (N15.3); a skipped or resumed stretch shows none.
       if (this.skipping) {
         this.kicks.clear();
         this.traits.clear();
+        this.traits.tally(e, cur); // a Workhorse's set is still counted
         this.contest.clear();
       } else {
         this.kicks.event(e, cur);
         // At ×4 and ×8 a one-second move is gone before it can be read. Ease the match; the mark also holds longer.
-        if (this.traits.note(e, cur) && this.runner.speed >= TRAIT_FAST_FROM) this.runner.slowMo(TRAIT_SLOW_MS, TRAIT_SLOW_FACTOR);
+        const cue = this.traits.note(e, cur);
+        if (cue && this.runner.speed >= TRAIT_FAST_FROM) this.runner.slowMo(TRAIT_SLOW_MS, TRAIT_SLOW_FACTOR);
+        // A cue that earns a beat its own event lacks (Last Line's held frame): note() asks for one only when the moment has none.
+        if (cue?.tier && playImpact(cue.tier, { runner: this.runner, camera: this.scene.cameras.main })) this.closeupUntil = this.now + CLOSEUP_MS;
         this.contest.note(e, cur);
         if (this.opts.keyMoments?.()) this.keyMoments.note(e);
       }
       // The ticker reads the commentator (commentary.ts). It hears a resumed or skipped stretch too, silently, so the match reads the same.
-      const line = this.commentator.line(e, cur.score, cur.clock?.minute, cur.ball.y);
-      if (line && !this.skipping) this.opts.overlay?.comment(line);
+      // Its memory (a second try, a lead change) comes through the same path, so it is rebuilt by a resume and by Skip.
+      const said = this.commentator.said(e, cur.score, cur.clock?.minute, cur.ball.y);
+      const line = said[0]?.text ?? '';
+      if (!this.skipping) said.forEach((s, i) => this.opts.overlay?.comment(s.text, s.important ? 'important' : 'routine', i > 0));
       else if (line && e.kind === 'full-time') this.finalLine = line;
       if (e.kind === 'try' && !this.skipping) this.offerTryReplay(e.tick);
       if (e.kind === 'coach-call' || e.kind === 'call-paid') this.opts.overlay?.setCalls?.(this.sim.callsMade, this.sim.callsPaid);
@@ -852,14 +907,14 @@ export class LivePlayback {
       if (end) this.zone.flash(end);
       if (p && e.side !== undefined && e.slot !== undefined) {
         this.popups.show(p, e.side, e.slot);
-        if (p.big) {
-          this.runner.slowMo(SLOWMO_MS, SLOWMO_FACTOR);
-          this.closeupUntil = this.now + CLOSEUP_MS;
-        }
+        const tier = impactTier(e, p);
+        if (tier && playImpact(tier, { runner: this.runner, camera: this.scene.cameras.main })) this.closeupUntil = this.now + CLOSEUP_MS;
       }
     }
     // The contract's events, recorded for the result and sent to the overlay and FX.
     for (const ev of this.recorder.add(events, cur)) bus.emit('match:event', ev);
+    // The whistle (audio; the contract has no penalty event). Not through a skipped or resumed stretch.
+    if (!this.skipping) for (const e of events) if (e.kind === 'penalty') bus.emit('match:penalty', { tick: e.tick });
   }
 
   /** One replay per try: the button stays up for eight seconds, including after the siren. */

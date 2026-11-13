@@ -7,7 +7,7 @@
 // touching this file. No Phaser.
 
 import { buildLabel } from '../buildInfo';
-import { button, closeScreen, el, openModal } from '../dom';
+import { button, closeScreen, el, openModal, revealSeg, watchSeg } from '../dom';
 import { startTutorial } from '../tutorial';
 import { reloadForUpdate, updateReady } from '../../fx/pwa';
 import { CLUB_PAGES, type GuideFigure, type GuidePage, type GuideScreen, type GuideSection } from './pages';
@@ -94,6 +94,8 @@ export function openGuideScreen(pageId?: string): HTMLElement {
     for (const b of tabs.querySelectorAll<HTMLButtonElement>('.nrl-btn')) {
       b.setAttribute('aria-pressed', String(b.getAttribute('data-guide-tab') === page.id));
     }
+    // #611: the eight tabs outrun a 667px phone (and any phone at Larger text); the picked one comes into the track.
+    revealSeg(tabs);
     body.scrollTop = 0;
   };
   for (const p of GUIDE_PAGES) {
@@ -103,6 +105,8 @@ export function openGuideScreen(pageId?: string): HTMLElement {
     b.setAttribute('role', 'tab');
     tabs.append(b);
   }
+  // The page it reopens on is brought into the track once the sheet is on the page (show() below runs before that).
+  watchSeg(tabs);
 
   const foot = el('div', { class: 'nrl-guide-foot' });
   foot.append(el('span', { class: 'nrl-guide-build', text: `Build ${buildLabel()}`, attrs: { 'data-nrl-build': '' } }));

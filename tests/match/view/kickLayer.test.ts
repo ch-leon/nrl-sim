@@ -111,6 +111,23 @@ describe('kickFrame: the framing that holds the kicker and where the ball comes 
     for (let w = 0; w < 1200; w += 37) for (const view of [PHONE, DESKTOP]) expect(Number.isInteger(kickFrame([{ x: 0, y: 0 }, { x: w, y: w / 3 }], view, 2).zoom)).toBe(true);
   });
 
+  it('on a dense screen works in canvas px, steps by one device px and keeps the margins in CSS px (#627)', () => {
+    // An 844×390 phone at 2×: a 1688×780 canvas, default zoom 3 (×1.5 CSS), floor 2 (×1).
+    const view = { width: PHONE.width * 2, height: PHONE.height * 2 };
+    const fits = kickFrame([{ x: 100, y: 100 }, { x: 160, y: 120 }], view, 3, 2);
+    expect(fits.zoom).toBe(3);
+    // The band's middle sits where it does at 1×, in CSS px: canvas px / 2.
+    const mid = onScreen({ x: 130, y: 110 }, fits, view);
+    expect(mid.x / 2).toBeCloseTo((FRAME_MARGIN.left + PHONE.width - FRAME_MARGIN.right) / 2);
+    expect(mid.y / 2).toBeCloseTo((FRAME_MARGIN.top + PHONE.height - FRAME_MARGIN.bottom) / 2);
+    // The clear width is 1688 less 2 × 200 px of margins, 1288: 400 px across fits at 3 (1200), 500 does not.
+    expect(kickFrame([{ x: 0, y: 0 }, { x: 400, y: 0 }], view, 3, 2).zoom).toBe(3);
+    expect(kickFrame([{ x: 0, y: 0 }, { x: 500, y: 0 }], view, 3, 2).zoom).toBe(2);
+    // Never wider than ×1 in CSS terms, as at 1×.
+    expect(kickFrame([{ x: 0, y: 0 }, { x: 5000, y: 5000 }], view, 3, 2).zoom).toBe(2);
+    expect(kickFrame([{ x: 0, y: 0 }, { x: 5000, y: 5000 }], { width: PHONE.width * 3, height: PHONE.height * 3 }, 4, 3).zoom).toBe(3);
+  });
+
   it('when they cannot all fit, holds the landing first, then the kicker, then the top of the flight as far as it goes', () => {
     // A bomb on a phone: 300 px from its top to the kicker, 194 px of clear band at zoom 1.
     const landing = { x: 0, y: 0 };
@@ -336,8 +353,9 @@ describe('kicks in real matches', () => {
     const types = new Set<string>();
     const done: Kick[] = [];
     const aimed = new Map<Kick, { x: number; y: number }>();
-    for (const seed of [31, 32]) {
-      const sim = new LiveSim(sideSheet('H', { rating: 60 }), sideSheet('A', { rating: 60 }), seed);
+    // Kick-chase supplies bombs as well as long kicks and ground landings after #625.
+    for (const seed of [31, 32, 33]) {
+      const sim = new LiveSim(sideSheet('H', { rating: 60, tactics: { attack: 'kick-chase' } }), sideSheet('A', { rating: 60, tactics: { attack: 'kick-chase' } }), seed);
       const w = new KickWatch();
       let open: Kick | null = null;
       while (!sim.finished && sim.tick < 100_000) {
@@ -392,8 +410,8 @@ describe('kicks in real matches', () => {
     expect(checked).toBeGreaterThan(2);
     // The phone goes wide for kicks. The landing stays in the band (asserted above).
     // Desktop holds the kicker with it. A phone holds him on most frames of these
-    // two seeds (about 71% after the 7:00 cut, 63% since the deeper kick-off, #397,
-    // a 35–42 m kick) and loses him on a long kick, as tuning §9 already says.
+    // three Kick-chase fixtures (including bombs, long kicks and kick-offs), and
+    // loses him on a long kick, as tuning §9 already says.
     expect(zooms.phone).toContain(1);
     for (const z of [...zooms.phone, ...zooms.desktop]) expect([1, 2]).toContain(z);
     expect(held.desktop / frames.desktop).toBeGreaterThan(0.9);

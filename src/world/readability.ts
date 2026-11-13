@@ -2,6 +2,7 @@
 // the commentary ticker, name tags, the carrier marker and the situational
 // camera zoom. Presentation only; nothing here touches the sim.
 import type { MatchEvent, MatchEventKind } from '../sim/events';
+import { zoomForViewport } from './viewport';
 
 export type TeamSide = 'home' | 'away';
 
@@ -75,16 +76,29 @@ export function carrierMarkerTarget(
 // ── Situational zoom ──────────────────────────────────────────────────────────
 
 /**
- * Default match zoom: a player stands ~42px tall. Whole numbers only — pixel
- * art shimmers at fractional zooms once everything is moving (see viewport).
+ * Default match zoom as authored at 1280×800: a player stands ~42px tall. The
+ * camera only ever sits at a whole number of canvas px per art px (see viewport):
+ * on a phone the default comes down to ×1.5 on a 2× screen and ×1.33 on a 3× one,
+ * or stays ×2 on a 1× screen (#627).
  */
 export const ZOOM_DEFAULT = 2;
-/** Tighter at rucks and tackles. */
+/**
+ * Tighter on the big moments. As authored (a 1× desktop) this is ×3; on any screen
+ * it is ZOOM_CLOSE_STEPS whole steps in from that screen's default (zoomForBeat).
+ */
 export const ZOOM_CLOSE = 3;
+/** Canvas px per art px a close-up pulls in from the default: one step on every screen. */
+export const ZOOM_CLOSE_STEPS = 1;
 /** Kicks and breaks: no tighter than default, so the ball's destination stays in view. */
 export const ZOOM_WIDE = 2;
-/** Exponential ease rate (per second) toward the target zoom. */
+/** Exponential ease rate (per second) toward a target zoom (easeZoom's default). */
 export const ZOOM_RATE_PER_S = 2.2;
+/**
+ * A beat's zoom change (in to a close-up and back out) moves one whole step in this
+ * long, linearly, so it lands in a few frames instead of crawling through
+ * fractional zooms, where moving pixel art shimmers (#627).
+ */
+export const ZOOM_STEP_MS = 90;
 
 export function zoomForEvent(kind: MatchEventKind): number {
   switch (kind) {
@@ -104,9 +118,26 @@ export function zoomForEvent(kind: MatchEventKind): number {
   }
 }
 
+/**
+ * The camera zoom (canvas px per art px) for a beat's authored zoom on a CSS-px
+ * viewport at `density`: the viewport's default, or for a close-up one whole step
+ * in from it, so a phone gets one too (#627: ×3 used to round back to ×2 there).
+ */
+export function zoomForBeat(beat: number, view: { width: number; height: number }, density = 1): number {
+  const base = zoomForViewport(ZOOM_DEFAULT, view, density);
+  if (beat > ZOOM_DEFAULT) return base + ZOOM_CLOSE_STEPS;
+  return beat < ZOOM_DEFAULT ? Math.min(base, zoomForViewport(beat, view, density)) : base;
+}
+
 /** Frame-rate-independent ease of `cur` toward `target` over `deltaMs`. */
 export function easeZoom(cur: number, target: number, deltaMs: number, rate = ZOOM_RATE_PER_S): number {
   const k = 1 - Math.exp((-rate * Math.max(0, deltaMs)) / 1000);
   const next = cur + (target - cur) * k;
   return Math.abs(target - next) < 0.002 ? target : next;
+}
+
+/** Linear move of `cur` toward `target`: one whole zoom step per `msPerStep`, landing exactly on it. */
+export function stepZoom(cur: number, target: number, deltaMs: number, msPerStep = ZOOM_STEP_MS): number {
+  const d = Math.max(0, deltaMs) / Math.max(1, msPerStep);
+  return Math.abs(target - cur) <= d ? target : cur + Math.sign(target - cur) * d;
 }

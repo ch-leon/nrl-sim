@@ -131,7 +131,7 @@ export abstract class LiveContact extends LivePenalties {
     let best: Player | null = null;
     let bd = LIVE.laneM;
     for (const d of this.side(other(side))) {
-      if (this.locked(d)) continue;
+      if (this.locked(d) || this.retreatLine(d) !== null) continue;
       const u = clamp(dot(sub(d.body.pos, from), seg) / len2, 0.15, 0.95);
       const onLine = add(from, scale(seg, u));
       const off = dist(d.body.pos, onLine);
@@ -184,6 +184,7 @@ export abstract class LiveContact extends LivePenalties {
       case 'strip': {
         // One-on-one, he rips it free: the tackler is the new carrier.
         this.emit('strip', `${t.name} strips the ball from ${c.name}!`, t, credit);
+        this.react(c, 'error');
         this.tagContact(c, [t]);
         this.lock(c, 'tackled', 14);
         this.lock(t, 'tackle', 6);
@@ -245,6 +246,7 @@ export abstract class LiveContact extends LivePenalties {
     // Ball lost in the tackle (2f): a knock-on, more on a big hit and in the rain.
     if (this.rng.next() < lostInContactChance(outcome === 'big-hit', c.stats.handling, this.wx.handling)) {
       this.emit('error', `${c.name} loses the ball in the tackle — knock-on`, c);
+      this.react(c, 'error');
       this.tagContact(c, [t]);
       this.events[this.events.length - 1]!.detail = 'contact';
       this.lock(c, 'tackled', LIVE.contactTicks);
@@ -387,7 +389,7 @@ export abstract class LiveContact extends LivePenalties {
     for (const d of this.side(other(c.side))) {
       if (w.men.length >= WRESTLE.maxMen) break;
       const i = this.indexOf(d);
-      if (w.men.includes(i) || this.locked(d) || this.tick < d.cooldownUntil || dist(d.body.pos, c.body.pos) > LIVE.tackleReach + 0.3) continue;
+      if (w.men.includes(i) || this.locked(d) || this.retreatLine(d) !== null || this.tick < d.cooldownUntil || dist(d.body.pos, c.body.pos) > LIVE.tackleReach + 0.3) continue;
       w.men.push(i);
       w.grip += gripOf(d.stats, d.energy, false);
       this.tire(d, FATIGUE.contactCost.tackler);
@@ -454,6 +456,7 @@ export abstract class LiveContact extends LivePenalties {
   }
 
   protected score(scorer: Player): void {
+    this.retreat = null;
     this.overLineAt = -1;
     const dir = this.dirOf(scorer.side);
     const bonus = inBonusZone(scorer.body.pos, postsFor(dir, FIELD_LENGTH, MID_Y), dir);
@@ -482,7 +485,7 @@ export abstract class LiveContact extends LivePenalties {
     // runs at the line, not at the two men standing over the mark.
     const dplan = this.defPlan();
     const held = this.tick < this.ruckPlayedAt + LIVE.markerReleaseTicks * dplan.markerHold && h !== this.dummyHalf(h.side);
-    const free = defenders.filter((d) => !this.locked(d) && this.tick >= d.cooldownUntil && !(held && this.markers.includes(this.indexOf(d))));
+    const free = defenders.filter((d) => !this.locked(d) && this.retreatLine(d) === null && this.tick >= d.cooldownUntil && !(held && this.markers.includes(this.indexOf(d))));
     // A defender already behind the carrier can only chase; the ones in front
     // of him are the tackle, so they rank first.
     const behind = (d: Player): boolean => (d.body.pos.x - h.body.pos.x) * this.dir < 0;

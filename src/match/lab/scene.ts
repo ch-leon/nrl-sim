@@ -7,15 +7,18 @@ import Phaser from 'phaser';
 import { MatchScene } from '../../scenes/MatchScene';
 import { bus } from '../../core/events';
 import type { TeamSheet, WeatherKind } from '../../sim/events';
-import { ZOOM_DEFAULT } from '../../world/readability';
+import { cssZoom } from '../../world/viewport';
 import type { Side, SimEvent } from '../core/snapshot';
 import { toMatchEvent } from '../league/events';
 import { LiveView } from '../view/liveView';
 import { PopupLayer } from '../view/popupLayer';
 import { ContestLayer } from '../view/contestLayer';
-import { SLOWMO_FACTOR, SLOWMO_MS, popupFor, type PopupView } from '../view/popups';
+import { HALF_BREAK, shownBreak } from '../view/lineBreak';
+import { popupFor, type PopupView } from '../view/popups';
+import { impactTier, playImpact } from '../view/impact';
 import { WrestleBar } from '../view/wrestleBar';
 import { SprintLayer } from '../view/sprintLayer';
+import { TRAIT_FAST_FROM, TRAIT_SLOW_FACTOR, TRAIT_SLOW_MS, TraitLayer, TraitRoster } from '../view/traitLayer';
 import { LegsLayer } from '../view/legsLayer';
 import { FATIGUE } from '../league/fatigue';
 import type { LabController } from './controller';
@@ -38,10 +41,12 @@ export class LabScene extends MatchScene {
   private view: LiveView | null = null;
   private popups: PopupLayer | null = null;
   private contest: ContestLayer | null = null;
+  private traits: TraitLayer | null = null;
   private wrestleBar: WrestleBar | null = null;
   private sprintLayer: SprintLayer | null = null;
   private legsLayer: LegsLayer | null = null;
   private ids!: Record<Side, string>;
+  private sheets!: Record<Side, TeamSheet>;
   private closeupUntil = 0;
 
   constructor() {
@@ -52,6 +57,7 @@ export class LabScene extends MatchScene {
     super.init({ home: data.home, away: data.away, ...(data.weather ? { weather: data.weather } : {}) });
     this.controller = data.controller;
     this.ids = { home: data.home.clubId, away: data.away.clubId };
+    this.sheets = { home: data.home, away: data.away };
   }
 
   override create(): void {
@@ -62,8 +68,11 @@ export class LabScene extends MatchScene {
     this.view = new LiveView(this);
     this.popups = new PopupLayer(this, DEPTH_POPUP);
     this.contest = new ContestLayer(this, DEPTH_POPUP - 3);
+    this.traits = new TraitLayer(this, DEPTH_POPUP - 0.5);
+    this.traits.setRoster(new TraitRoster({ home: this.sheets.home, away: this.sheets.away }));
     this.wrestleBar = new WrestleBar(this, DEPTH_POPUP);
     this.sprintLayer = new SprintLayer(this, DEPTH_POPUP - 1);
+    this.sprintLayer.setRoster(new TraitRoster({ home: this.sheets.home, away: this.sheets.away }));
     this.legsLayer = new LegsLayer(this, DEPTH_POPUP - 2, FATIGUE);
     const r = this.controller.runner;
     r.onEvents = (events) => this.onSimEvents(events);
@@ -74,6 +83,8 @@ export class LabScene extends MatchScene {
       this.popups = null;
       this.contest?.destroy();
       this.contest = null;
+      this.traits?.destroy();
+      this.traits = null;
       this.wrestleBar?.destroy();
       this.wrestleBar = null;
       this.sprintLayer?.destroy();
@@ -85,21 +96,31 @@ export class LabScene extends MatchScene {
 
   private onSimEvents(events: readonly SimEvent[]): void {
     const r = this.controller.runner;
-    for (const e of events) {
+    for (const sim of events) {
+      const e = shownBreak(sim, r.cur);
       this.contest?.note(e, r.cur);
+      // The trait cues (#654): the same layer a real match draws, so the lab can sign each one off.
+      const cue = this.traits?.note(e, r.cur);
+      if (cue && r.speed >= TRAIT_FAST_FROM) r.slowMo(TRAIT_SLOW_MS, TRAIT_SLOW_FACTOR);
+      if (cue?.tier && playImpact(cue.tier, { runner: r, camera: this.cameras.main })) this.closeupUntil = this.time.now + CLOSEUP_MS;
       const p = popupFor(e);
       if (p && e.side !== undefined && e.slot !== undefined) {
         this.popups?.show(p, e.side, e.slot);
-        if (p.big) {
-          r.slowMo(SLOWMO_MS, SLOWMO_FACTOR);
-          this.closeupUntil = this.time.now + CLOSEUP_MS;
-        }
+        const tier = impactTier(e, p);
+        if (tier && playImpact(tier, { runner: r, camera: this.cameras.main })) this.closeupUntil = this.time.now + CLOSEUP_MS;
       }
       // Light up the stadium the way a real match does: particles, crowd,
       // camera. The subscribers pick what they react to by event kind.
-      const ev = toMatchEvent(e, r.cur, this.ids);
+      const ev = toMatchEvent(sim, r.cur, this.ids);
       if (ev) bus.emit('match:event', ev);
+      if (e.kind === 'penalty') bus.emit('match:penalty', { tick: e.tick });
+      if (e.kind === 'line-break' && e.detail !== HALF_BREAK) bus.emit('match:clean-break', { tick: e.tick });
     }
+  }
+
+  /** The lab's own clock: its runner's speed. */
+  protected override playSpeed(): number {
+    return this.controller.runner.speed;
   }
 
   override update(time: number, delta: number): void {
@@ -109,8 +130,7 @@ export class LabScene extends MatchScene {
     // The close-up MatchScene picked for a big moment eases back out after a beat.
     if (this.closeupUntil && time > this.closeupUntil) {
       this.closeupUntil = 0;
-      this.beatZoom = ZOOM_DEFAULT;
-      this.zoomTarget = this.viewZoom(ZOOM_DEFAULT);
+      this.endCloseUp();
     }
     super.update(time, delta); // camera follows the ball the view just placed
     const feet = (side: Side, slot: number): { x: number; y: number } | null => {
@@ -118,16 +138,19 @@ export class LabScene extends MatchScene {
       return a ? { x: a.sprite.x, y: a.sprite.y } : null;
     };
     const cam = this.cameras.main;
+    // The layers are screen-sized in CSS px: they take the camera's zoom in CSS terms (#627).
+    const zoom = cssZoom(cam);
     const v = cam.worldView;
     const view: PopupView = { left: v.x, top: v.y, width: v.width, height: v.height };
-    this.popups?.update(delta, cam.zoom, feet, view);
-    this.contest?.update(delta, cam.zoom, (fx, fy) => this.fieldToWorld(fx, fy), feet);
+    this.popups?.update(delta, zoom, feet, view);
+    this.contest?.update(delta, zoom, (fx, fy) => this.fieldToWorld(fx, fy), feet);
+    this.traits?.update(delta, zoom, (fx, fy) => this.fieldToWorld(fx, fy), feet, r.speed);
     // The wrestle bar: the fight left in the carrier while he is in a tackle (§8.1).
-    this.wrestleBar?.update(r.cur.wrestle, this.cameras.main.zoom, (w) => feet(w.side, w.slot));
+    this.wrestleBar?.update(r.cur.wrestle, zoom, (w) => feet(w.side, w.slot));
     // Legs (§8): a bar under everyone, green → amber once tired → red once spent.
-    this.legsLayer?.update(r.cur, this.cameras.main.zoom, feet);
+    this.legsLayer?.update(r.cur, zoom, feet);
     // Sprint and gas (§8.2): streaks behind anyone flat out, gas bars on the carrier and his chasers.
-    this.sprintLayer?.update(r.cur, this.cameras.main.zoom, (side, slot) => {
+    this.sprintLayer?.update(r.cur, zoom, (side, slot) => {
       const a = this.players[side][slot];
       return a ? { x: a.sprite.x, y: a.sprite.y, faceLeft: a.sprite.flipX } : null;
     });

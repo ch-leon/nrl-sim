@@ -66,8 +66,6 @@ export function playStyleLabel(play: Play): string {
   return PRESET_LABEL[play.style];
 }
 
-export const money = (n: number): string => `$${n.toLocaleString('en-US')}`;
-
 /** The Lineup's button: "Plays: Block · Cut-out · —", a dash for each of the three not taken. */
 export function playsButtonLabel(plays: readonly PlayId[]): string {
   const names = plays.slice(0, PLAYS.takeMax).map((id) => PLAYS_BY_ID[id]?.short ?? id);

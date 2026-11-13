@@ -36,7 +36,12 @@ import { contractsEndingSoon } from '../../src/systems/contracts';
 // #539: XP replaces passive facility growth, changing selection and later match outcomes.
 // No RNG draw was added; UI-read and no-read runs still finish on the same stream.
 // Previous pin: 1788836146.
-const MAIN_SEED_AFTER_SEASON = 1597012555;
+// #618: square marker positions change match outcomes and subsequent season draws.
+// UI-read and no-read seasons must still agree. Previous pin: 1597012555.
+// #625: completed retreats, including handovers, change match outcomes and later
+// season draws. The final standing-marker/deep-cover corrections restore this historical
+// season fingerprint; UI-read and no-read seasons still agree.
+const MAIN_SEED_AFTER_SEASON = 1788836146;
 
 describe('the rng stream (#369)', () => {
   it.each([0, 1])('weekly potential and dot reads preserve the season stream with habit AI=%i', (ai) => {

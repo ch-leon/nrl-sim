@@ -163,7 +163,7 @@ src/
                            #   screens/ (squad, lineup, recruit, contracts, finance, …)
   fx/                      # audio, particles, atmosphere, PWA
   qa/soak.ts               # headless multi-season soak (npm run soak)
-  utils/                   # rng, hash, …
+  utils/                   # rng, hash, money (fmtMoney, fmtMoneyShort), …
   vendor/phaser-slim.js    # the Phaser the production build ships (#400)
 scripts/
   e2e-season.mjs           # Chromium playthrough of a season (dumps the save corpus)
@@ -551,7 +551,14 @@ simulation inputs; cosmetic presentation choices must not consume its RNG.
 
 ## 7. Rendering conventions
 
-- Phaser config (`main.ts`): `pixelArt: true`, `roundPixels: true`, background `#1a1a2e`.
+- Phaser config (`main.ts`): `pixelArt: true`, `roundPixels: true`, background `#0e1630` (`BRAND.colors.app`).
+- Pixel density (#627, `src/world/density.ts`): the canvas renders at the screen's
+  `devicePixelRatio` (at most 2; a 3× screen at 1.5) in `Scale.NONE`, a backing store of CSS size × density shown
+  at CSS size. Game units are canvas px: pointer x/y, camera width/height and camera zoom.
+  A camera's zoom in CSS terms is `cssZoom(cam)` (`src/world/viewport.ts`); anything kept
+  screen-sized (pop-ups, name tags, bars) scales by `1 / cssZoom`, CSS px from the DOM are ×
+  `screenDensity()`, and `CameraController` zoom ranges and drag threshold are CSS values it
+  multiplies by the density. The match camera only sits at whole numbers of canvas px per art px.
 - Iso projection (`src/world/iso.ts`): `screenX = (gx - gy) * TILE_W/2`,
   `screenY = (gx + gy) * TILE_H/2`; depth = `screenY` (+1 for objects on tile).
 - Grounds textures (BootScene → `registerGroundsArt`, `src/art/grounds/`): tiles

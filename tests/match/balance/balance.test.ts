@@ -200,10 +200,15 @@ describe('measuring and reporting', () => {
     expect(a.counts).toEqual(b.counts);
     expect(a.counts.tackles.mean).toBeGreaterThan(0);
     expect(a.legs.map((l) => l.minute)).toEqual([]); // under 3 minutes: no legs reading yet
+    // Completed sprinting retreats (#625) spend more legs in the baseline.
+    // Check the override causally, then exact restoration, rather than pinning match energy.
+    const baseline = measureCell(cell(), 2, 3);
     const tired = measureCell(cell({ 'fatigue.runCost': 0.002 }), 2, 3);
     expect(tired.legs[0]!.home).toBeLessThan(0.7);
     expect(FATIGUE.runCost).toBeCloseTo(0.00015 * (9 / 7));
-    expect(measureCell(cell(), 2, 3).legs[0]!.home).toBeGreaterThan(0.85);
+    expect(tired.legs[0]!.home).toBeLessThan(baseline.legs[0]!.home - 0.1);
+    // Wall-clock runtime is metadata; every deterministic result must restore exactly.
+    expect(measureCell(cell(), 2, 3)).toEqual({ ...baseline, ms: expect.any(Number) });
   });
   it('marks the §7 bands and flags only changes beyond luck', () => {
     expect(bandMark('tries', 7)).toBe('✓');
@@ -280,9 +285,13 @@ describe('measuring and reporting', () => {
     // receivers' 15–8 m line instead of their 24 m line; balance/plans/kickoff-depth.md),
     // and before that 8-16:346:3436c830c791688a and 14-14:385:97934f5b337f329e.
     // Expansive was 8-10:377:e051c574b7fe72b5: strategy counters switched on, #465.
-    // Balanced / Slide retains its pin: flat fit is exactly 1 and its cell is zero.
-    { attack: 'balanced' as const, expected: '10-26:350:34ab09d37c3de210' },
-    { attack: 'expansive' as const, expected: '10-38:372:0e0dce9822247ec4' },
+    // #618 re-pins both: square markers move from side by side to 1.8/3.6 m
+    // downfield, changing contact geometry without adding a random draw.
+    // Previous pins after #619: 10-26:350:9f50a5eaf6a452fd / 10-38:372:36729ef35fa1720e.
+    // #625: non-markers physically complete their fixed 10 m retreat, changing
+    // contact timing and every subsequent seeded trajectory without new random draws.
+    { attack: 'balanced' as const, expected: '18-27:354:e450dc56bc77a2f2' },
+    { attack: 'expansive' as const, expected: '17-19:363:83502c967cb51fa3' },
   ])('pins an even $attack / Slide match (seed 1)', async ({ attack, expected }) => {
     const sim = new LiveSim(sideSheet('H', { rating: 60, tactics: { attack } }), sideSheet('A', { rating: 60 }), 1);
     const parts: string[] = [];
@@ -306,8 +315,11 @@ describe('measuring and reporting', () => {
     // coach on the home side, so its live play call is pinned too (plays-on-hard). Re-pin
     // in the same commit whenever a play's numbers change, with the reason here. The two
     // pins above are untouched by plays: a sheet without them takes no new branch or roll.
-    { name: 'plays-on', aiCoach: false, expected: '18-10:388:2aac62c880ffbcf3' },
-    { name: 'plays-on-hard', aiCoach: true, expected: '10-10:414:d2084e7d74b5c443' },
+    // #618's marker geometry changes these carries too; previous pins were
+    // 18-10:388:5d308d93c0af885a and 10-10:414:0ecee253d598e626.
+    // #625's completed retreat changes these scripted carries and their trajectories too.
+    { name: 'plays-on', aiCoach: false, expected: '29-16:363:2aa3303144770632' },
+    { name: 'plays-on-hard', aiCoach: true, expected: '24-6:383:20854f5e3bc6084f' },
   ])('pins $name: an even Balanced / Slide match with set plays (seed 1)', async ({ aiCoach, expected }) => {
     const home = { ...sideSheet('H', { rating: 60 }), plays: ['block-play' as const, 'cut-out-winger' as const, 'kick-pass' as const] };
     const sim = new LiveSim(home, sideSheet('A', { rating: 60 }), 1, aiCoach ? { aiCoach: ['home'] } : {});

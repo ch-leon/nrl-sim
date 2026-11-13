@@ -172,7 +172,8 @@ describe('sin bins in the live sim', () => {
     restore = applyTuning(ALWAYS);
     const bins = new BinSwing();
     let count = 0;
-    for (let seed = 1; seed <= 24; seed++) {
+    // One planned fourfold sample halves sampling error for rare bin-time scoring (#625).
+    for (let seed = 1; seed <= 96; seed++) {
       const sim = new LiveSim(home, away, seed);
       while (!sim.finished && sim.tick < 100_000) {
         sim.step();

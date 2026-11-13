@@ -14,7 +14,7 @@ import type { ContactPlayer } from '../../match/core/snapshot';
 
 const HOME = buildKit(0xe6b632, 0x21394a, 'v');
 const AWAY = buildKit(0x669ba4, 0xf3eee2, 'hoops');
-const OLD_ACTION: Record<Action, PlayerAnim> = { idle: 'idle', run: 'run', carry: 'run', pass: 'pass', catch: 'catch', brace: 'tackled', wrap: 'tackle', ground: 'down', ptb: 'ptb' };
+const OLD_ACTION: Record<Action, PlayerAnim> = { idle: 'idle', run: 'run', carry: 'run', pass: 'pass', catch: 'catch', brace: 'tackled', wrap: 'tackle', ground: 'down', ptb: 'ptb', fend: 'fend' };
 const LABELS: Record<Head, string> = { short: 'Short', buzz: 'Buzz cut', mullet: 'Mullet', headgear: 'Headgear', headband: 'Headband', curls: 'Curls', braids: 'Braids', mohawk: 'Mohawk', bald: 'Bald', ponytail: 'Ponytail', flatTop: 'Flat top' };
 
 function texture(buf: PixelBuffer): HTMLCanvasElement {

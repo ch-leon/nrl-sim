@@ -107,6 +107,10 @@ export const LIVE = {
   laneM: 1.5,
   /** Markers may not leave the ruck to tackle until this long after the ball is played. */
   markerReleaseTicks: 14,
+  /** First marker's distance in front of the mark; keep at least 2 × BODY_RADIUS to clear the tackled player. */
+  markerStandM: 1.8,
+  /** Second marker stands directly behind the first; keep the gap at least 2 × BODY_RADIUS. */
+  markerGapM: 1.8,
   /** A pass to the side with the overlap gets this much preference (scaled up by an expansive plan). */
   overlapPrefer: 0.8,
   /** Players within this box either side of the passer count toward the overlap. */

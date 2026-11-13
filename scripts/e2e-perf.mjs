@@ -37,6 +37,7 @@
 //   npm run e2e:perf -- --budget              (fail on a missed budget; the nightly QA job)
 //   npm run e2e:perf -- --budget my.json      (another budget file)
 //   npm run e2e:perf -- --throttle 1          (no throttling, for a baseline)
+//   npm run e2e:perf -- --dpr 3               (a 3× screen; the default is a 2× phone, #627)
 //   CHROMIUM_PATH=/path/to/chrome npm run e2e:perf
 //   E2E_URL=http://localhost:5173/ npm run e2e:perf
 import { spawn } from 'node:child_process';
@@ -50,6 +51,8 @@ import { weeksAdvanced } from './e2e-week-count.mjs';
 const argv = process.argv.slice(2);
 const flag = (name, dflt) => (argv.includes(`--${name}`) ? argv[argv.indexOf(`--${name}`) + 1] : dflt);
 const THROTTLE = Number(flag('throttle', 4));
+// The screen's pixel density: the canvas renders at it (#627), so it sets the fill rate.
+const DPR = Number(flag('dpr', 2));
 // --budget alone means the checked-in file (next to this script); --budget <file> another one.
 const budgetArg = argv.includes('--budget') ? argv[argv.indexOf('--budget') + 1] : undefined;
 const BUDGET = argv.includes('--budget')
@@ -93,7 +96,7 @@ function stopServer() {
 }
 
 // ── Measurements ───────────────────────────────────────────────────────────────
-const result = { throttle: THROTTLE, size: `${W}x${H}`, timings: {}, errors: [], bundle: null };
+const result = { throttle: THROTTLE, size: `${W}x${H}`, dpr: DPR, timings: {}, errors: [], bundle: null };
 let page;
 const state = () => page.evaluate(() => window.__nrlState?.() ?? null);
 const wait = (ms) => page.waitForTimeout(ms);
@@ -295,7 +298,7 @@ async function advance(index, { probe = false } = {}) {
 
 async function run() {
   const browser = await chromium.launch({ executablePath: CHROMIUM, args: ['--use-gl=swiftshader'] });
-  const ctx = await browser.newContext({ viewport: { width: W, height: H }, hasTouch: true, isMobile: true });
+  const ctx = await browser.newContext({ viewport: { width: W, height: H }, deviceScaleFactor: DPR, hasTouch: true, isMobile: true });
   // CDP throttling slows the page but not a Worker (QA finding 11, #216). From N10.3 the
   // fast-forwarded match plays in one, so each Worker reply is held back (throttle − 1) ×
   // the Worker's own time: its wall time is ×throttle like the page's.
@@ -339,6 +342,8 @@ async function run() {
   });
   await timed('Start → grounds (textures painted, HUD up)', async () => {
     await page.fill('[data-nrl-clubname]', 'Budget FC');
+    // Start is disabled ("Loading towns…") until the town list is in (#613); a DOM click before that does nothing.
+    await page.waitForFunction(() => !document.querySelector('[data-nrl-start]')?.disabled);
     await clickTimed('[data-nrl-start]');
     await page.locator('[data-expansion-work]').tap();
     await page.waitForFunction(() => document.querySelector('.nrl-dock') && window.__nrlGame?.scene.isActive('Grounds'));
@@ -511,13 +516,13 @@ if (budgetFile) {
 const missed = verdicts.filter((v) => !v.ok && !v.warn);
 const warned = verdicts.filter((v) => !v.ok && v.warn);
 const budgetName = BUDGET ? relative(process.cwd(), BUDGET) : null;
-const report = { throttle: THROTTLE, size: `${W}x${H}`, metrics, budget: budgetName, verdicts, ok: !result.errors.length && !missed.length, errors: result.errors };
+const report = { throttle: THROTTLE, size: `${W}x${H}`, dpr: DPR, metrics, budget: budgetName, verdicts, ok: !result.errors.length && !missed.length, errors: result.errors };
 writeFileSync(join(OUT, 'report.json'), JSON.stringify(report, null, 2));
 
 // Markdown for the log and the job summary.
 const rows = Object.entries(t).map(([k, v]) => `| ${k} | ${v.fps !== undefined ? `${v.fps} fps` : `${v.ms} ms`} | ${v.blockMs ?? ''}${v.blockMs !== undefined ? ' ms' : ''} | ${v.notes ?? ''} |`);
 const b = result.bundle;
-const md = [`| Moment (CPU ×${THROTTLE}, ${W}×${H}) | Time | Longest block | Notes |`, '|---|---|---|---|', ...rows];
+const md = [`| Moment (CPU ×${THROTTLE}, ${W}×${H} at ${DPR}×) | Time | Longest block | Notes |`, '|---|---|---|---|', ...rows];
 if (b) md.push(`| bundle (${b.files} js/css files) | ${b.rawKb} KB raw, ${b.gzKb} KB gzipped | | ${b.biggest.map((x) => `${x.file} ${x.kb} KB`).join(', ')} |`);
 if (BUDGET) {
   md.push('', `| Budget (${budgetName}) | Value | Max | |`, '|---|---|---|---|');

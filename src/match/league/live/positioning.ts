@@ -1,7 +1,7 @@
 import { SET_TACKLES } from '../../../config';
 import { TICK_S } from '../../core/engine';
 import { FIELD_LENGTH, FIELD_WIDTH, MID_Y, clampToGround } from '../../core/field';
-import { arrive, integrate, separate, speedOf, type Body } from '../../core/body';
+import { BODY_RADIUS, arrive, integrate, separate, speedOf, type Body } from '../../core/body';
 import type { Side } from '../../core/snapshot';
 import { add, clamp, dist, type Vec } from '../../core/vec';
 import { ROLES, formationTarget } from '../roles';
@@ -72,6 +72,12 @@ export abstract class LivePositioning extends LiveContact {
     const ph = this.phase;
     if (ph.kind !== 'tackle' && ph.kind !== 'ruck') return [];
     const t = this.players[ph.tackler]!;
+    if (ph.kind === 'ruck' && this.retreat) return [...this.retreat.markers].filter(([p, key]) => this.onField(p) && p.key === key).map(([p]) => p);
+    if (ph.kind === 'ruck' && ph.handover && ph.stage !== 'dh') {
+      return this.side(this.attacking)
+        .filter(p => this.indexOf(p) !== ph.carrier && !this.locked(p))
+        .sort((a, b) => dist(a.body.pos, this.mark) - dist(b.body.pos, this.mark)).slice(0, 2);
+    }
     const second = this.side(t.side)
       .filter((d) => d !== t && d !== this.fullback(t.side))
       .sort((a, b) => dist(a.body.pos, this.mark) - dist(b.body.pos, this.mark))[0];
@@ -273,12 +279,17 @@ export abstract class LivePositioning extends LiveContact {
       pool.sort((a, b) => dist(a.body.pos, lead.body.pos) - dist(b.body.pos, lead.body.pos));
       supports.push(...pool.slice(0, 2));
     }
+    const handoverMarkers = ph.kind === 'ruck' && ph.handover && ph.stage !== 'dh' ? this.currentMarkers() : [];
     const spots = supportSpots(anchor, this.dir);
     const broken = this.lineBroken();
     for (const p of attackers) {
       const role = ROLES[p.slot]!;
       p.through = false;
-      if (chasers.has(p) && looseAt) {
+      if (this.targetRetreat(p)) continue;
+      if (handoverMarkers.includes(p)) {
+        const k = handoverMarkers.indexOf(p);
+        p.target = clampToGround({ x: this.mark.x - this.dir * (LIVE.markerStandM + k * LIVE.markerGapM), y: this.mark.y }, 0.5);
+      } else if (chasers.has(p) && looseAt) {
         p.target = { ...looseAt };
         p.wantsSprint = true;
       } else if (kickUp && kickChasers.has(p)) {
@@ -367,6 +378,7 @@ export abstract class LivePositioning extends LiveContact {
     for (const p of defenders) {
       const role = ROLES[p.slot]!;
       p.through = false;
+      if (this.targetRetreat(p)) continue;
       if (chasers.has(p) && looseAt) {
         p.target = { ...looseAt };
         p.wantsSprint = true;
@@ -385,7 +397,8 @@ export abstract class LivePositioning extends LiveContact {
         p.wantsSprint = broken || dist(p.body.pos, target.body.pos) < LIVE.sprintCloseM;
       } else if (markers.includes(p)) {
         const k = markers.indexOf(p);
-        p.target = clampToGround({ x: this.mark.x + this.dir * 0.8, y: this.mark.y + (k === 0 ? -0.9 : 0.9) }, 0.5);
+        // Square at the play-the-ball, one behind the other toward their own goal line.
+        p.target = clampToGround({ x: this.mark.x + this.dir * (LIVE.markerStandM + k * LIVE.markerGapM), y: this.mark.y }, 0.5);
       } else if (p === this.fullback(def)) {
         // The last line: deeper still on the last tackle, and once the kicker
         // shapes to kick he reads it and goes to where it will land.
@@ -457,6 +470,23 @@ export abstract class LivePositioning extends LiveContact {
     }
   }
 
+  /** A short defender can use his normal available gas to get back promptly. */
+  private targetRetreat(p: Player): boolean {
+    if (!this.onField(p)) return false;
+    const pending = this.retreatLine(p);
+    const r = this.retreat;
+    const hold = r && p.side === r.side && r.markers.get(p) !== p.key
+      && this.phase.kind === 'ruck' && this.phase.handover && this.phase.stage !== 'dh';
+    if (pending === null && !hold) return false;
+    // Pending men cross the legal line; eligible men keep their current depth.
+    // Arrive steering stops short, so aim a body radius beyond the legal line.
+    p.target = { x: pending === null ? p.body.pos.x : pending + r!.dir * BODY_RADIUS, y: p.body.pos.y };
+    p.through = false;
+    // Once back, hold the line until the handover heel without burning gas.
+    p.wantsSprint = pending !== null;
+    return true;
+  }
+
   // ── Physics ───────────────────────────────────────────────────────────────
   protected move(): void {
     const dt = TICK_S;
@@ -482,6 +512,8 @@ export abstract class LivePositioning extends LiveContact {
         continue;
       }
       p.slide = null;
+      // Rucks can begin between targeting decisions: retire immediately.
+      this.targetRetreat(p);
       // Cruise unless he wants to go and has the gas; blown, less than cruise (§8.2).
       p.sprinting = p.wantsSprint && canSprint(p.gas);
       let max = p.body.maxSpeed * paceMult(p.gas, p.sprinting);
@@ -499,7 +531,9 @@ export abstract class LivePositioning extends LiveContact {
         this.emit('blown', `${p.name} has nothing left in the tank`, p);
       }
       // Sprinting costs the legs more per metre than cruising.
-      this.legs(p, dist(from, p.body.pos) * runCostMult(p.sprinting), stopped ? 'stop' : standing ? 'walk' : 'no');
+      const metres = dist(from, p.body.pos);
+      p.odometer += metres;
+      this.legs(p, metres * runCostMult(p.sprinting), stopped ? 'stop' : standing ? 'walk' : 'no');
       if (p.jink) {
         // The sidestep: a sharp lateral shift spread over a few ticks.
         p.body.pos = clampToGround(add(p.body.pos, { x: 0, y: p.jink.dy / LIVE.stepJinkTicks }), 0.5);
@@ -511,6 +545,7 @@ export abstract class LivePositioning extends LiveContact {
       separate(bodies, undefined, held);
       for (const b of bodies) b.pos = clampToGround(b.pos, 0.5);
     }
+    this.observeRetreat();
     for (const p of this.players) {
       if (this.locked(p) || this.tick < p.poseUntil) continue;
       p.pose = speedOf(p.body) > 0.6 ? 'run' : 'idle';

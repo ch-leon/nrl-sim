@@ -91,7 +91,9 @@ Every transition is a thing that physically happens on the field; nothing is imp
 - **Support:** two runners hold lines either side of the carrier; wingers stay wide;
   fullback trails.
 - **Defence:** line holds 10 m back from the ruck and re-forms each tackle; two markers
-  at the ruck; line slides with the ball; defenders inside `RUSH_M` of the carrier commit;
+  at the ruck, square with the play-the-ball and one behind the other toward their
+  own goal line (1.8 m from the mark, then 1.8 m between markers); line slides with
+  the ball; defenders inside `RUSH_M` of the carrier commit;
   a tackle is **attempted** when within reach.
 - **Contest:** tackler strength+tackling vs carrier strength+evasion+momentum → `held`,
   `big-hit` (driven back), `broken` (carrier continues), `fend`, `offload`. Each result is
@@ -160,7 +162,7 @@ Phases 0–1 are the point: if the prototype isn't fun to watch, nothing after i
 ### 5.1 Phase 2 breakdown (#86) — *agreed 2026-10-18*
 
 > **Decided (Leon, 2026-10-18): "go with the recommendations".** Real 9:00 halves, the live
-> match screen defaulting to ×4; Nines drop-kick conversions in 2c, the bonus zone left for
+> match screen defaulting to ×4 (now ×2, #628); Nines drop-kick conversions in 2c, the bonus zone left for
 > Phase 5 (#77) unless asked for; no scrums; the order below with 2g last; headless speed
 > checked on a phone in 2g and made faster in Phase 3.
 >
@@ -275,7 +277,7 @@ with `view/livePlayback.ts` in place of the event-log replay: the lab's pop-ups,
 and sprint streaks on the stadium's sprites, the overlay, score banners, crowd and FX fed the
 same `match:event` stream `runMatch` recorded (a test checks the watched stream equals the
 result's events), the overlay's clock off the sim (MM:SS, Nines halves), ×1/×2/×4/×8 starting
-at ×4, Skip (plays the rest at once, no pop-ups) and `match:finished` at full time. Rival v
+at ×2 (×4 until 12 Nov 2026, #628), Skip (plays the rest at once, no pop-ups) and `match:finished` at full time. Rival v
 rival matches stay on the classic engine. On this container's software GL the handoff takes
 about 0.8 s longer than classic and Skip 1.3–2.2 s (coach calls step 2 since: the week holds at the match and the result comes at full time from the match watched, so no headless match at kick-off; handoff 1.2–1.9 s). **Found:** big rating gaps (rivals in a new
 game range from 34 to 69) give blowouts of 100+ (classic: about 50–0); the first Phase 3 item.
@@ -287,7 +289,7 @@ After Phase 2: Phase 3 (balance, with the harness on whole matches) and the line
    fatigue tuning already assume it; at ×1 a match takes 18 minutes to watch, about 4½ at ×4.
    The old playback took 5 minutes at ×1. The other way is a scaled clock (shorter halves of sim
    time, the clock running fast), which would mean retuning legs and gas and rescaling every §7
-   target. Recommended: real halves, and the live match screen defaults to ×4 with ×1 a tap away.
+   target. Recommended: real halves, and the live match screen defaults to ×2 (was ×4 until 12 Nov 2026, #628) with ×1 a tap away.
 2. **Conversions as Nines drop kicks** and **bonus-zone tries worth 5** (#77) built into 2c now,
    or plain conversions now and the Nines extras in Phase 5. Recommended: drop kicks now
    (it is the same work either way); bonus zone your call.

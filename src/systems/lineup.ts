@@ -413,6 +413,14 @@ export function setRotation(lineup: Lineup, rotation: Rotation): Lineup {
   return { ...lineup, rotation };
 }
 
+/** How many of the thirteen spots (the nine slots, the four seats) hold a different man in `b` than in `a`. */
+export function lineupChanges(a: Lineup, b: Lineup): number {
+  let n = 0;
+  for (let i = 0; i < LINEUP_SLOTS.length; i++) if ((a.starters[i] ?? null) !== (b.starters[i] ?? null)) n++;
+  for (let i = 0; i < BENCH.size; i++) if ((a.bench[i] ?? null) !== (b.bench[i] ?? null)) n++;
+  return n;
+}
+
 /** Auto pick changes the thirteen while retaining the coach's roles and plays. */
 export function autoPickKeepingPlan(squad: readonly Player[], lineup: Lineup): Lineup {
   return { ...autoPick(squad, lineup.rotation, validTactics(lineup.tactics)),

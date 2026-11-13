@@ -43,6 +43,7 @@ export class StubNode {
   getAttribute(k: string): string | null { return k === 'class' ? this.className : this.attrs[k] ?? null; }
   hasAttribute(k: string): boolean { return k in this.attrs; }
   addEventListener(ev: string, fn: () => void): void { (this.listeners[ev] ||= []).push(fn); }
+  removeEventListener(ev: string, fn: () => void): void { this.listeners[ev] = (this.listeners[ev] ?? []).filter((f) => f !== fn); }
   click(): void { if (!this.disabled) for (const fn of this.listeners.click ?? []) fn(); }
   focus(): void {}
 

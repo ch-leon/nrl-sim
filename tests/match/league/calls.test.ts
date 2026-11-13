@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest';
 import { LiveSim } from '../../../src/match/league/live';
 import { runMatch } from '../../../src/match/league/match';
 import { sideSheet } from '../../../src/match/balance/measure';
-import { CALLS, CALL_LABEL, CALL_RESULT, COACH_CALLS, CallJudge, callIsPlay, callIsSetPlay, chipState, isCoachCall, unlockedCalls, withAttackCall, type CallInput, type CoachCall } from '../../../src/match/league/calls';
+import { CALLS, CALL_LABEL, CALL_RESULT, COACH_CALLS, CallJudge, callIsPlay, callIsSetPlay, callMoment, chipState, isCoachCall, unlockedCalls, withAttackCall, type CallInput, type CoachCall } from '../../../src/match/league/calls';
 import { CALL_TILE, CALL_WHEN, callsLine } from '../../../src/ui/screens/matchOverlay';
 import { attackPlan } from '../../../src/match/league/presets';
 import type { SimEvent } from '../../../src/match/core/snapshot';
@@ -201,5 +201,20 @@ describe('the set play call (#326)', () => {
     expect(callIsSetPlay('shift-left')).toBe(false);
     const plan = attackPlan('balanced', 'midfield');
     expect(withAttackCall(plan, 'set-play')).toEqual(plan);
+  });
+});
+
+describe('callMoment (#639): when the COACH badge pulses', () => {
+  it('a penalty won, a restart, or the last tackle with a kick call on', () => {
+    expect(callMoment(['take-two', 'tap-go'], true, false)).toBe('penalty');
+    expect(callMoment(['kickoff-short', 'kickoff-long'], true, false)).toBe('restart');
+    expect(callMoment(['hit-up', 'bomb'], true, true)).toBe('last-tackle');
+  });
+  it('not otherwise: mid-set, a defence call, or the last tackle with nothing that suits it', () => {
+    expect(callMoment(['hit-up', 'shift-left', 'kick-early'], true, false)).toBeNull();
+    expect(callMoment(['bomb'], true, false)).toBeNull();
+    expect(callMoment(['rush', 'hold'], false, true)).toBeNull();
+    expect(callMoment(['hit-up', 'fresh-legs'], true, true)).toBeNull();
+    expect(callMoment([], true, true)).toBeNull();
   });
 });

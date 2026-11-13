@@ -5,10 +5,9 @@
 // unit-tested. No Phaser.
 import { FACILITY_CATALOG, type FacilityDefId } from '../data/facility';
 import { getState } from '../core/state';
+import { fmtMoney } from '../utils/money';
 import { activeGroundsScene, onPlacementAim, onPlacementMode, type PlacementAim, type PlacementMode } from '../world/placement';
 import { button, el, mount } from './dom';
-
-const money = (n: number): string => `$${n.toLocaleString('en-US')}`;
 
 /** Instruction line for a placement mode. */
 export function placementBarText(mode: PlacementMode): string {
@@ -37,7 +36,7 @@ function whyNot(aim: PlacementAim, cost: number, cash: number): string {
     case 'duplicate':
       return 'You already have one';
     case 'insufficient-funds':
-      return `Need ${money(Math.max(0, cost - cash))} more`;
+      return `Need ${fmtMoney(Math.max(0, cost - cash))} more`;
     case 'missing':
       return 'It is no longer there';
     default:
@@ -51,7 +50,7 @@ export function placementBarModel(mode: PlacementMode, aim: PlacementAim | null,
   const cost = mode.kind === 'move' ? mode.fee : def.cost;
   const text = placementBarText(mode);
   const action =
-    mode.kind === 'move' ? (aim?.home ? 'Keep it here' : `Move here · ${money(cost)}`) : `Build here · ${money(cost)}`;
+    mode.kind === 'move' ? (aim?.home ? 'Keep it here' : `Move here · ${fmtMoney(cost)}`) : `Build here · ${fmtMoney(cost)}`;
   if (!aim) return { text, action, disabled: true, why: '' };
   if (aim.v.ok) return { text, action, disabled: false, why: '' };
   return { text, action, disabled: true, why: whyNot(aim, cost, cash) };

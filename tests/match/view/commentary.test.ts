@@ -71,6 +71,14 @@ const SAMPLES: SimEvent[] = [
 ];
 
 describe('the lines', () => {
+  it('uses explicit catch/pickup detail even when the previous ball frame suggests the opposite', () => {
+    expect(lineKey(ev('set-start', { detail: 'gathered' }), true)).toBe('set-start:gathered');
+    expect(lineKey(ev('set-start', { detail: 'caught' }), false)).toBe('set-start:caught');
+    expect(lineKey(ev('set-start', { detail: 'scramble' }), true)).toBe('set-start:scramble');
+    expect(lineKey(ev('set-start'), true)).toBe('set-start:caught');
+    expect(lineKey(ev('set-start'), false)).toBe('set-start:gathered');
+  });
+
   it('cover every kind the live sim emits (read off live.ts)', () => {
     const kinds = emittedKinds();
     expect(kinds.length).toBeGreaterThan(50);
@@ -182,7 +190,11 @@ describe('the voice is seeded, never rolled', () => {
         expect(LINES[lineKey(e, false, snap.score)] && LINES[lineKey(e, true, snap.score)], `${e.kind}:${e.detail ?? ''}`).toBeDefined();
         const line = c.line(e, snap.score);
         lines.push(line);
-        if (e.kind === 'set-start') pickups.push({ text: e.text, line, player: e.player ?? '' });
+        if (e.kind === 'set-start') {
+          if (e.text.includes('takes the kick')) expect(e.detail).toBe('caught');
+          if (e.text.includes('scoops it up')) expect(e.detail).toBe('gathered');
+          pickups.push({ text: e.text, line, player: e.player ?? '' });
+        }
       }
       c.ball(snap.ball, snap.tick);
     }

@@ -562,38 +562,3 @@ export function drawPlayerFrame(kit: Kit, look: Look, anim: PlayerAnim, frame: n
   fig.outline(OUTLINE);
   return fig;
 }
-
-// ── Atlas ────────────────────────────────────────────────────────────────────
-
-export interface AtlasFrame {
-  name: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
-/** Frame name inside a kit atlas, e.g. `2-run-3` (look 2, run frame 3). */
-export function frameName(look: number, anim: PlayerAnim, frame: number): string {
-  return `${look}-${anim}-${frame}`;
-}
-
-/** Every look × anim frame for one kit, packed in a grid (one row per look). */
-export function buildPlayerAtlas(kit: Kit): { buf: PixelBuffer; frames: AtlasFrame[] } {
-  const perLook = ANIM_ORDER.reduce((n, a) => n + PLAYER_ANIMS[a].frames, 0);
-  const buf = new PixelBuffer(perLook * FRAME_W, LOOKS.length * FRAME_H);
-  const frames: AtlasFrame[] = [];
-  LOOKS.forEach((look, li) => {
-    let col = 0;
-    for (const anim of ANIM_ORDER) {
-      for (let f = 0; f < PLAYER_ANIMS[anim].frames; f++) {
-        const x = col * FRAME_W;
-        const y = li * FRAME_H;
-        buf.blit(drawPlayerFrame(kit, look, anim, f), x, y);
-        frames.push({ name: frameName(li, anim, f), x, y, w: FRAME_W, h: FRAME_H });
-        col++;
-      }
-    }
-  });
-  return { buf, frames };
-}

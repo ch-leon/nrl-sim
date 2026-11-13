@@ -86,8 +86,9 @@ describe('a set play from the tray (#326, phase 3)', () => {
       expect(fit.roles.length).toBeGreaterThan(0);
       expect(fit.worst.short).toBe(Math.max(...fit.roles.map((r) => r.short)));
     }
-    // With the ball in open play and the second-man play on: call it.
-    frames(pb, () => pb.inPossession === 'home' && sim(pb).phaseKind === 'play' && pb.callRefusal('home', 'set-play', 'second-man') === null);
+    // At a completed tackle, with the second-man play on: call it before the play-the-ball.
+    // An open-play call can legitimately lapse if the carrier turns it over first.
+    frames(pb, () => pb.inPossession === 'home' && sim(pb).phaseKind === 'ruck' && pb.callRefusal('home', 'set-play', 'second-man') === null);
     expect(pb.callRefusal('home', 'set-play', 'second-man')).toBeNull();
     // Defending, the other side can't call one of ours; nor a play not taken in.
     expect(pb.callRefusal('away', 'set-play', 'second-man')).not.toBeNull();

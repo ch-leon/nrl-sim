@@ -39,6 +39,7 @@ import { PLAYS_BY_ID, type PlayId } from '../../data/plays';
 import { PLAYS } from '../../match/league/plays';
 import { surnameOf } from '../../match/view/popups';
 import { TICKER_FIT_CHARS } from '../../match/view/commentary';
+import { StripHold, type CommentWeight } from '../../match/view/stripHold';
 import { lockedCallsLine, officeLevelName, officeLevelOf } from '../coachCallsText';
 import { teamTags } from '../teamTag';
 import { MOMENTUM_STEP_MIN, momentumLabel, momentumLeader, momentumShapes, momentumWindow, type MomentumEvent } from '../../match/view/momentum';
@@ -709,8 +710,8 @@ export function coachBadge(legal: number, attacking: boolean, made: CoachCall | 
 
 /**
  * Put a coachBadge's text in the COACH badge. Calls and plays together ("2 calls · 1 play",
- * #326) go in as two parts, so a narrow phone can stack them and the bottom row is no
- * wider than with today's badge; anything else is the plain text it always was.
+ * #326) go in as two parts, stacked as two short lines so they fit the badge's one
+ * width (#608); anything else is the plain text it always was.
  */
 export function renderCoachBadge(el: HTMLElement, text: string): void {
   const parts = text.split(' · ');
@@ -816,6 +817,29 @@ export function callsLine(made: Readonly<Record<'home' | 'away', number>>, paid:
 
 /** How long SKIP in the speed pill stays armed for its second tap (it has no undo, #348 M3). */
 export const SKIP_ARM_MS = 3000;
+/** A tap this soon after the one that armed SKIP is the same stab at the screen, not an answer (#601). */
+export const SKIP_REPEAT_MS = 300;
+/** SKIP's words. Armed it keeps the width it had, so its word is no longer than this one (#601). */
+export const SKIP_LABEL = 'Skip ▸▸';
+export const SKIP_ARMED_LABEL = 'Sure?';
+/** The armed button in full, for a screen reader. */
+export const SKIP_ARMED_SAY = 'Tap again to skip to full time';
+
+/** What a tap on SKIP does. `armedFor` is how long it has been armed (ms), null when it is not. */
+export function skipTap(armedFor: number | null): 'arm' | 'wait' | 'skip' {
+  if (armedFor === null) return 'arm';
+  return armedFor < SKIP_REPEAT_MS ? 'wait' : 'skip';
+}
+
+/** A tap this soon after the open tray's rows changed was aimed at the tile that was there before (#608). */
+export const TRAY_SETTLE_MS = 300;
+/** How long the tile just called stays lit before the tray shuts (#608). */
+export const TRAY_CALLED_MS = 140;
+
+/** What a tap on a tray tile does. `changedFor` is how long ago the open tray's rows last changed (ms), null when they have not since it opened. */
+export function trayTap(changedFor: number | null): 'call' | 'wait' {
+  return changedFor !== null && changedFor < TRAY_SETTLE_MS ? 'wait' : 'call';
+}
 
 /** Smallest the ticker's line is drawn, px, when a long name would otherwise run over (#433). */
 export const TICKER_MIN_PX = 11;
@@ -1069,6 +1093,28 @@ export class TackleChip {
   }
 }
 
+/** The part of an element a held text writes. */
+export type HeldTextEl = Pick<HTMLElement, 'textContent'>;
+
+/**
+ * Words on the page that are written only when they change (#602), as the tackle
+ * chip's are: the clock, the half label, the scores, the Replay chip's seconds.
+ * The live clock is set every frame, and writing the same words again still costs
+ * a style pass, a layout and a paint. It starts from what its element says and
+ * must be that element's only writer; a new overlay builds new ones.
+ */
+export class HeldText {
+  private text: string;
+
+  constructor(private readonly el: HeldTextEl) {
+    this.text = el.textContent ?? '';
+  }
+
+  set(text: string): void {
+    if (text !== this.text) this.el.textContent = this.text = text;
+  }
+}
+
 export interface MatchOverlayHandle {
   /** Remove the overlay and unsubscribe all bus handlers. Idempotent. */
   destroy(): void;
@@ -1076,8 +1122,13 @@ export interface MatchOverlayHandle {
   setTackle?(count: number | null): void;
   /** The live sim's running clock (match seconds and half), finer than the events' whole minutes. */
   setClock(matchSeconds: number, half: 1 | 2 | 'gp'): void;
-  /** A line in the commentary and the log: every line comes this way, from the live playback's commentary (N15.2). */
-  comment(line: string): void;
+  /**
+   * A line in the commentary and the log: every line comes this way, from the live playback's commentary (N15.2).
+   * The log takes every line. The strip holds an 'important' one for a moment (stripHold.ts) before a routine line
+   * can replace it; 'now' takes the strip at once. `follow`: the line adds to the event's own line (the match's memory),
+   * so a score or a call is never tagged on it.
+   */
+  comment(line: string, weight?: CommentWeight, follow?: boolean): void;
   /** Coach calls made and paid off, home and away (#73): the stats line, and the coach's own lines in the log. */
   setCalls?(made: Readonly<Record<'home' | 'away', number>>, paid: Readonly<Record<'home' | 'away', number>>): void;
   /** Show Replay for eight seconds after a try (N15.5). Tapping hides it and calls `onTap`. */
@@ -1113,6 +1164,8 @@ export interface MatchOverlayOptions {
   worn?: { home: string; away: string };
   /** The coach's side: his club is starred on the score bug (#348 M8), and his calls are his in the log. */
   mine?: 'home' | 'away';
+  /** What the match is beyond a round: a final (a knockout: golden point if level) or the player's derby (#640). Tagged on the score bug for the whole match. */
+  occasion?: 'final' | 'derby';
 }
 
 /** A 0xRRGGBB colour as CSS. */
@@ -1185,6 +1238,8 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   const scoreEl = el('span', { class: 'nrl-mo-score nrl-mo-sr', text: '0 – 0' });
   // The team-colour split under the score bug is the momentum line (#366): who is on top, the last few minutes.
   const momentum = momentumLine(worn, codes);
+  // A final or a derby (#640): its tag at the foot of the bug's left end, the momentum line's own row.
+  if (opts.occasion) momentum.row.prepend(el('span', { class: 'nrl-mo-occasion', text: opts.occasion === 'final' ? 'FINAL' : 'DERBY', attrs: { 'data-occasion': opts.occasion } }));
   const board = el(
     'button',
     { class: 'nrl-mo-scoreboard', attrs: { type: 'button', 'aria-expanded': 'false', 'aria-controls': 'nrl-mo-stats', title: 'Match stats' } },
@@ -1233,8 +1288,32 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       ...(anyCalls ? [pair('Calls paid off', `${calls.paid.home}/${calls.made.home}`, `${calls.paid.away}/${calls.made.away}`)] : []),
     ];
   };
+  // An event rewrites only the values and bars that changed (#602), so the rows on the page
+  // stay the same elements. The table is built again only when its rows change (Calls paid off joins).
+  let statsShown: { rows: StatRow[]; cells: { home: HTMLElement; away: HTMLElement; bar: HTMLElement }[] } | null = null;
   const renderStats = (): void => {
-    statsBody.replaceChildren(statTable(statRows(), codes, worn));
+    const rows = statRows();
+    const shown = statsShown;
+    if (!shown || shown.rows.length !== rows.length || rows.some((r, i) => r.label !== shown.rows[i]!.label)) {
+      const table = statTable(rows, codes, worn);
+      const cells = [...table.querySelectorAll<HTMLElement>('.nrl-mo-statrow')].map((row) => ({
+        home: row.querySelector<HTMLElement>('.nrl-mo-stat-h')!,
+        away: row.querySelector<HTMLElement>('.nrl-mo-stat-a')!,
+        bar: row.querySelector<HTMLElement>('.nrl-mo-stat-bar')!.children[0] as HTMLElement,
+      }));
+      statsBody.replaceChildren(table);
+      statsShown = { rows, cells };
+      return;
+    }
+    rows.forEach((r, i) => {
+      const was = shown.rows[i]!;
+      const cell = shown.cells[i]!;
+      if (r.home !== was.home) cell.home.textContent = r.home;
+      if (r.away !== was.away) cell.away.textContent = r.away;
+      const split = statSplit(r.home, r.away);
+      if (split !== statSplit(was.home, was.away)) cell.bar.style.width = `${split}%`;
+    });
+    shown.rows = rows;
   };
   board.addEventListener('click', () => {
     statsOpen = !statsOpen;
@@ -1257,8 +1336,24 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   strip.addEventListener('click', () => setMode('full'));
   // A long typed name wraps (the CSS) and, on a narrow window, draws smaller until the
   // whole line is inside the strip (#433). The size resets when the line or the width changes.
+  // Measuring forces a layout mid-frame (#602): none while the line is not showing (the log
+  // off or full, the stats or the tray in its place, full time), and one a frame at most:
+  // the first ask measures at once, any more that frame wait for the next.
   let fitKey = '';
+  let fitFrame = 0;
+  let fitAgain = false;
   const fitStrip = (): void => {
+    if (mode !== 'line' || statsOpen || finalClock !== null || root.classList.contains('nrl-mo-tray-open')) return;
+    if (fitFrame) {
+      fitAgain = true;
+      return;
+    }
+    fitFrame = requestAnimationFrame(() => {
+      fitFrame = 0;
+      if (!fitAgain) return;
+      fitAgain = false;
+      fitStrip();
+    });
     if (stripText.clientHeight < 1) return;
     const key = `${stripText.textContent}\0${strip.clientWidth}\0${document.documentElement.getAttribute('data-text-size') ?? ''}`;
     if (key === fitKey) return;
@@ -1365,7 +1460,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   // Under the open coach tray it hides and waits too, for a while (#348, stepReplayOffer).
   let replayTimer: ReturnType<typeof setInterval> | null = null;
   let replayBtn: HTMLButtonElement | null = null;
-  let replayCount: HTMLElement | null = null;
+  let replayCount: HeldText | null = null;
   let replayOffer: ReplayOffer = newReplayOffer();
   let replayAt = 0;
   let replayTag: HTMLElement | null = null;
@@ -1388,22 +1483,28 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       return;
     }
     replayBtn.hidden = !step.show;
-    if (replayCount) replayCount.textContent = String(replayCountdown(step.leftMs));
+    replayCount?.set(String(replayCountdown(step.leftMs)));
   };
   const cardWatch = new MutationObserver(tickReplay);
   cardWatch.observe(getRoot(), { childList: true });
   document.body?.classList.add(MATCH_ACTIVE_CLASS);
 
+  // The score bug's words, each written only when it changes (#602): the clock is set every frame, the score every event.
+  const clockText = new HeldText(clockEl);
+  const halfText = new HeldText(halfEl);
+  const homePts = new HeldText(homeCell.pts);
+  const awayPts = new HeldText(awayCell.pts);
+  const scoreText = new HeldText(scoreEl);
   const showScore = (h: number, a: number): void => {
-    homeCell.pts.textContent = String(h);
-    awayCell.pts.textContent = String(a);
-    scoreEl.textContent = `${h} – ${a}`;
+    homePts.set(String(h));
+    awayPts.set(String(a));
+    scoreText.set(`${h} – ${a}`);
   };
   const render = (): void => {
     showScore(state.homeScore, state.awayScore);
     if (!liveClock) {
-      clockEl.textContent = formatClock(state.minute, 2 * halfMinutes);
-      halfEl.textContent = state.half === 1 ? '1H' : '2H';
+      clockText.set(formatClock(state.minute, 2 * halfMinutes));
+      halfText.set(state.half === 1 ? '1H' : '2H');
     }
     if (statsOpen) renderStats();
   };
@@ -1413,16 +1514,38 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   /** The lines said since the last event: the tick in hand (its events come after its lines). */
   let batch: HTMLElement[] = [];
   let eventSince = false;
-  const addLine = (text: string, kind = ''): HTMLElement => {
-    const line = el('div', { class: 'nrl-mo-line' }, el('span', { class: 'nrl-mo-line-t', text: clockEl.textContent ?? '' }), el('span', { class: 'nrl-mo-line-text', text }));
+  const hold = new StripHold();
+  let holdTimer: ReturnType<typeof setTimeout> | null = null;
+  const showOnStrip = (text: string): void => {
+    stripText.classList.remove('nrl-mo-line-wait');
+    stripText.textContent = text;
+  };
+  /** The hold on the strip has run out: the next important line waiting for it goes up. */
+  const releaseStrip = (): void => {
+    holdTimer = null;
+    const next = hold.release(performance.now());
+    if (next !== null) showOnStrip(next);
+    const at = hold.nextAt();
+    if (at !== null) holdTimer = setTimeout(releaseStrip, Math.max(0, at - performance.now()));
+  };
+  const offerToStrip = (text: string, weight: CommentWeight): void => {
+    const now = performance.now();
+    const shown = hold.offer(text, weight, now);
+    if (shown !== null) showOnStrip(shown);
+    if (holdTimer) clearTimeout(holdTimer);
+    holdTimer = null;
+    const at = hold.nextAt();
+    if (at !== null) holdTimer = setTimeout(releaseStrip, Math.max(0, at - now));
+  };
+  const addLine = (text: string, kind = '', strip: CommentWeight | null = 'routine'): HTMLElement => {
+    const line = el('div', { class: 'nrl-mo-line' }, el('span', { class: 'nrl-mo-line-t', text: clockEl.textContent ?? '' }), el('span', { class: 'nrl-mo-line-text nrl-name-wrap', text }));
     if (kind) line.dataset.kind = kind;
     feed.prepend(line);
     while (feed.childElementCount > MAX_LOG) {
       const lines = [...feed.children] as HTMLElement[];
       lines[logLineToDrop(lines.map((l) => l.dataset.kind))]?.remove();
     }
-    stripText.classList.remove('nrl-mo-line-wait');
-    stripText.textContent = text;
+    if (strip) offerToStrip(text, strip);
     if (eventSince) {
       batch = [];
       eventSince = false;
@@ -1432,7 +1555,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   };
   /** The latest line of the tick with no tag yet: the call's line (setCalls follows it at once). */
   const untagged = (): HTMLElement | null => {
-    for (let i = batch.length - 1; i >= 0; i--) if (!batch[i]!.dataset.kind) return batch[i]!;
+    for (let i = batch.length - 1; i >= 0; i--) if (!batch[i]!.dataset.kind && !batch[i]!.dataset.follow) return batch[i]!;
     return null;
   };
   /**
@@ -1440,7 +1563,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
    * first untagged line (a whistle in the same tick comes after the kick).
    */
   const scoreLine = (player: string | undefined): HTMLElement | null => {
-    const open = batch.filter((l) => !l.dataset.kind);
+    const open = batch.filter((l) => !l.dataset.kind && !l.dataset.follow);
     const name = player?.trim().split(/\s+/).pop();
     const named = name ? open.filter((l) => l.textContent?.includes(name)) : [];
     return named[named.length - 1] ?? open[0] ?? null;
@@ -1451,6 +1574,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   // ── Key moments ──
   let bannerTimer: ReturnType<typeof setTimeout> | null = null;
   let bannerWasTry = false;
+  let goldenAnnounced = false;
   /** Built during a burst of events (Skip) and shown once the burst ends. */
   let queued: (() => void) | null = null;
   let flushScheduled = false;
@@ -1553,11 +1677,13 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       offEvent();
       offFinished();
       if (bannerTimer) clearTimeout(bannerTimer);
+      if (holdTimer) clearTimeout(holdTimer);
       clearReplayOffer();
       replayTag?.remove();
       document.documentElement.style.removeProperty(BOARD_VAR);
       if (boardFrame) cancelAnimationFrame(boardFrame);
       boardObserver?.disconnect();
+      if (fitFrame) cancelAnimationFrame(fitFrame);
       fitObserver.disconnect();
       stripObserver?.disconnect();
       cardWatch.disconnect();
@@ -1567,8 +1693,9 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       document.body?.classList.remove(MATCH_ACTIVE_CLASS, MATCH_FINAL_CLASS);
       if (active === handle) active = null;
     },
-    comment(line: string): void {
-      addLine(line);
+    comment(line: string, weight: CommentWeight = 'routine', follow = false): void {
+      const added = addLine(line, '', weight);
+      if (follow) added.dataset.follow = '1';
     },
     setCalls(made, paid): void {
       const mine = opts.mine;
@@ -1599,14 +1726,20 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       // Full time keeps the clock and the label it had at the whistle, except while a replay
       // shows an earlier half. (After a Skip the paused sim still reports where it stopped.)
       if (finalClock !== null && !root.classList.contains('nrl-mo-replaying')) {
-        clockEl.textContent = finalClock;
+        clockText.set(finalClock);
         tackle.fullTime();
-        halfEl.textContent = 'FT';
+        halfText.set('FT');
         return;
       }
-      // Golden point (N9.4): its own clock from 00:00.
-      clockEl.textContent = formatClockSeconds(matchSeconds, half === 'gp' ? 60 : 2 * halfMinutes);
-      halfEl.textContent = half === 1 ? '1H' : half === 2 ? '2H' : 'GP';
+      // Golden point (N9.4): its own clock from 00:00, and the banner once, as the restart is played (#640).
+      if (half === 'gp' && !goldenAnnounced && finalClock === null) {
+        goldenAnnounced = true;
+        showMoment({ head: 'GOLDEN POINT', who: 'Next score wins', sub: '', tone: 'score' });
+        bannerWasTry = false;
+        holdBanner(BANNER_MS.try);
+      }
+      clockText.set(formatClockSeconds(matchSeconds, half === 'gp' ? 60 : 2 * halfMinutes));
+      halfText.set(half === 1 ? '1H' : half === 2 ? '2H' : 'GP');
     },
     offerReplay(onTap: () => void): void {
       clearReplayOffer();
@@ -1616,8 +1749,9 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
         clearReplayOffer();
         onTap();
       }, { class: 'nrl-mo-replay' });
-      replayCount = el('span', { class: 'nrl-mo-replay-count', attrs: { 'aria-hidden': 'true' } });
-      replayBtn.append(replayCount);
+      const count = el('span', { class: 'nrl-mo-replay-count', attrs: { 'aria-hidden': 'true' } });
+      replayCount = new HeldText(count);
+      replayBtn.append(count);
       replayBtn.setAttribute('aria-label', 'Replay try');
       root.append(replayBtn);
       replayOffer = newReplayOffer();
@@ -1675,7 +1809,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       hideBanner();
     }
     tackle.fullTime();
-    halfEl.textContent = 'FT';
+    halfText.set('FT');
     finalClock = clockEl.textContent ?? '';
     root.classList.add('nrl-mo-final');
     document.body?.classList.add(MATCH_FINAL_CLASS);
@@ -1753,6 +1887,7 @@ export const MATCH_FINAL_CLASS = 'nrl-match-final';
 /** Inject the match stylesheet once (the report and the full-time card share its stat rows). */
 export function injectOverlayStyles(): void {
   if (typeof document === 'undefined') return;
+  ensureStyles(); // the shared kit holds the motion tokens and nrl-sheet-up the cards here rise on (#597)
   if (document.getElementById(OVERLAY_STYLE_ID)) return;
   const style = document.createElement('style');
   style.id = OVERLAY_STYLE_ID;
@@ -1772,7 +1907,7 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
   position: fixed; top: calc(12px + var(--nrl-safe-t)); left: calc(16px + var(--nrl-safe-l)); z-index: 15;
   pointer-events: auto; cursor: pointer; display: flex; flex-direction: column; margin: 0; padding: 0; border: 0;
   border-radius: 8px; overflow: hidden; background: var(--nrl-navy); color: var(--nrl-text); box-shadow: var(--nrl-shadow-chip);
-  font: inherit; text-align: left; -webkit-tap-highlight-color: transparent;
+  font: inherit; text-align: left;
 }
 .nrl-mo-scoreboard:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
 .nrl-mo-scoreboard[aria-expanded="true"]::after { content: ''; position: absolute; inset: 0; border-radius: 8px; box-shadow: inset 0 0 0 2px var(--nrl-accent); pointer-events: none; }
@@ -1796,6 +1931,7 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 .nrl-mo-momentum { display: block; flex: 1 1 auto; min-width: 0; height: 8px; }
 /* The leaning side's tag at the line's newest end (#371); the same height when even, so the bug never jumps. */
 .nrl-mo-momentum-tag { flex: 0 0 auto; min-width: 2.4em; height: 1.2em; padding: 0 4px; font-family: var(--nrl-f-label); font-size: 0.625rem; font-weight: 700; line-height: 1.2; letter-spacing: 0.04em; text-align: right; color: var(--nrl-text-2); }
+.nrl-mo-occasion { flex: 0 0 auto; padding: 0 6px; height: 1.2em; font-family: var(--nrl-f-label); font-size: 0.625rem; font-weight: 700; line-height: 1.2; letter-spacing: 0.08em; background: var(--nrl-accent); color: var(--nrl-on-accent); }
 .nrl-mo-momentum-fill { stroke: none; }
 .nrl-mo-momentum-axis { stroke: rgba(255, 255, 255, 0.25); stroke-width: 1px; vector-effect: non-scaling-stroke; }
 /* What a call did (#366): a tag over COACH for two seconds; it never takes a tap or moves the row. */
@@ -1804,18 +1940,21 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
   max-width: calc(100vw - 32px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   padding: 8px 12px; border-radius: 10px; background: var(--nrl-navy); box-shadow: var(--nrl-shadow-chip);
   font-family: var(--nrl-f-label); font-size: 0.9375rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--nrl-text-2);
-  animation: nrl-mo-up 180ms ease-out;
+  animation: nrl-sheet-up var(--nrl-dur-sheet) var(--nrl-ease-out);
 }
 .nrl-mo-call-result[data-paid] { color: var(--nrl-pos); }
 .nrl-mo-tray-open ~ .nrl-mo-call-result, .nrl-mo-call-result[hidden] { display: none; }
 /* Key moments (#366): the speed a break, a try or the last minutes hold the match at pulses in the pill; the chosen one stays yellow. */
 .nrl-mo-controls .nrl-btn.nrl-mo-speed[data-slow] { box-shadow: inset 0 0 0 2px var(--nrl-accent); animation: nrl-mo-slow 0.9s ease-in-out infinite alternate; }
 @keyframes nrl-mo-slow { from { color: var(--nrl-text); } to { color: var(--nrl-accent); } }
-@media (prefers-reduced-motion: reduce) { .nrl-mo-call-result, .nrl-mo-controls .nrl-btn.nrl-mo-speed[data-slow] { animation: none; } }
-/* The stats, opened from the score bug: the report's stat column (3t). Asked for, so over the banner. */
+/* The pulse never ends, so reduced motion stops it; the entrances keep their fade and lose their travel (dom.ts, #597). */
+@media (prefers-reduced-motion: reduce) { .nrl-mo-controls .nrl-btn.nrl-mo-speed[data-slow] { animation: none; } }
+/* The stats, opened from the score bug: the report's stat column (3t). Asked for, so over the banner.
+   dvh follows Safari's toolbars, so the last rows stay above COACH and LOG; the vh line is the fallback (#609). */
 .nrl-mo-statsheet {
   position: fixed; top: calc(var(--nrl-mo-board, 60px) + 6px); left: calc(16px + var(--nrl-safe-l)); z-index: 19;
-  width: min(340px, calc(100vw - 32px)); max-height: calc(100vh - var(--nrl-mo-board, 60px) - 94px); overflow-y: auto; box-sizing: border-box;
+  width: min(340px, calc(100vw - 32px)); max-height: calc(100vh - var(--nrl-mo-board, 60px) - 94px);
+  max-height: calc(100dvh - var(--nrl-mo-board, 60px) - 94px); overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box;
   padding: 8px 12px 10px; border-radius: 14px; background: var(--nrl-sheet); box-shadow: var(--nrl-shadow-tray); pointer-events: auto;
 }
 .nrl-mo-statsheet[hidden] { display: none; }
@@ -1842,6 +1981,8 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
   border-radius: 8px; overflow: hidden; background: rgba(14, 22, 48, 0.95); color: var(--nrl-text); box-shadow: var(--nrl-shadow-chip);
   font: inherit; text-align: left; cursor: pointer; pointer-events: auto;
 }
+/* Pressed, it shrinks about where it is centred (#604): the scale goes after the centring, not instead of it. */
+.nrl-mo-strip:active { transform: translateX(-50%) scale(var(--nrl-press)); transition: transform var(--nrl-dur-press) var(--nrl-ease-out); }
 .nrl-mo-strip:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
 .nrl-mo-strip-live { display: flex; align-items: center; padding: 0 10px; background: var(--nrl-accent); color: var(--nrl-on-accent); font-family: var(--nrl-f-label); font-size: 0.875rem; font-weight: 700; letter-spacing: 0.06em; }
 /* #433: a long typed name wraps onto a second line (the strip grows up, clear of the
@@ -1862,7 +2003,7 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
   position: fixed; top: calc(12px + var(--nrl-safe-t)); right: calc(12px + var(--nrl-safe-r)); bottom: calc(80px + var(--nrl-safe-b)); z-index: 18;
   width: min(330px, calc(100vw - 24px)); box-sizing: border-box; padding: 10px 12px; border-radius: 14px;
   background: var(--nrl-sheet); box-shadow: var(--nrl-shadow-tray); display: flex; flex-direction: column; gap: 6px; pointer-events: auto;
-  animation: nrl-mo-in-right 180ms ease-out;
+  animation: nrl-mo-in-right var(--nrl-dur-sheet) var(--nrl-ease-out);
 }
 .nrl-mo-full-under .nrl-mo-full { top: calc(var(--nrl-mo-board, 60px) + 6px); }
 .nrl-match-overlay:not([data-log="full"]) .nrl-mo-full,
@@ -1874,7 +2015,7 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 .nrl-mo-full-x::after { content: ''; position: absolute; inset: -4px; }
 .nrl-mo-filters { display: flex; gap: 4px; }
 .nrl-btn.nrl-mo-filter { position: relative; height: 30px; min-height: 30px; padding: 0 10px; border-radius: 6px; background: var(--nrl-raised); font-size: 0.8125rem; font-weight: 600; }
-.nrl-btn.nrl-mo-filter[data-active], .nrl-btn.nrl-mo-filter[data-active]:hover:not(:disabled) { background: var(--nrl-accent); color: var(--nrl-on-accent); font-weight: 700; }
+.nrl-btn.nrl-mo-filter[data-active], .nrl-btn.nrl-mo-filter[data-active]:hover:not(:disabled), .nrl-btn.nrl-mo-filter[data-active]:active:not(:disabled) { background: var(--nrl-accent); color: var(--nrl-on-accent); font-weight: 700; }
 .nrl-mo-filter::after { content: ''; position: absolute; inset: -7px 0; } /* a 44px hit area */
 .nrl-mo-feed { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; }
 .nrl-mo-line { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 8px; padding: 5px 0; border-top: 1px solid var(--nrl-button); font-size: 0.75rem; line-height: 1.35; }
@@ -1897,37 +2038,54 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 .nrl-mo-bar-gap { flex: 1 1 auto; }
 .nrl-mo-log-toggle, .nrl-mo-coach {
   pointer-events: auto; height: 56px; display: flex; align-items: center; margin: 0; border: 0; border-radius: 14px;
-  background: var(--nrl-navy); color: var(--nrl-text); box-shadow: var(--nrl-shadow-chip); cursor: pointer; -webkit-tap-highlight-color: transparent;
+  background: var(--nrl-navy); color: var(--nrl-text); box-shadow: var(--nrl-shadow-chip); cursor: pointer;
   font-family: var(--nrl-f-label); font-weight: 700; letter-spacing: 0.04em; white-space: nowrap;
 }
 .nrl-mo-log-toggle:focus-visible, .nrl-mo-coach:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
 .nrl-mo-log-toggle { gap: 8px; padding: 0 14px; font-size: 1rem; }
 .nrl-mo-log-toggle[aria-pressed="false"] { color: var(--nrl-text-2); }
-.nrl-mo-switch { width: 28px; height: 16px; border-radius: 8px; background: var(--nrl-line); display: flex; align-items: center; padding: 0 2px; box-sizing: border-box; transition: background 0.15s ease; }
-.nrl-mo-switch > i { width: 12px; height: 12px; border-radius: 6px; background: #fff; transition: transform 0.15s ease; }
+.nrl-mo-switch { width: 28px; height: 16px; border-radius: 8px; background: var(--nrl-line); display: flex; align-items: center; padding: 0 2px; box-sizing: border-box; transition: background-color var(--nrl-dur-fast) ease; }
+.nrl-mo-switch > i { width: 12px; height: 12px; border-radius: 6px; background: #fff; transition: transform var(--nrl-dur-fast) var(--nrl-ease-in-out); }
 .nrl-mo-log-toggle[aria-pressed="true"] .nrl-mo-switch { background: var(--nrl-accent); }
 .nrl-mo-log-toggle[aria-pressed="true"] .nrl-mo-switch > i { transform: translateX(12px); }
-/* COACH (MatchScene): its badge says how many calls are on, or why none ("THEIR BALL"). */
+/* COACH (MatchScene): its badge says how many calls are on, or why none ("THEIR BALL"). The badge is one
+   width, its text centred (#608): room for the longest it shows ("TAKE THE TWO"), so COACH keeps its width
+   and LOG beside it stays put as the text changes. Anything longer would end in an ellipsis. */
 .nrl-mo-coach { gap: 10px; padding: 0 8px 0 16px; font-size: 1.1875rem; }
+.nrl-mo-coach-label { position: relative; }
 .nrl-mo-coach-badge {
-  height: 36px; display: flex; align-items: center; padding: 0 10px; border-radius: 8px; font-size: 0.9375rem; text-transform: uppercase;
+  box-sizing: border-box; width: 6.8em; height: 36px; padding: 0 6px; border-radius: 8px; font-size: 0.9375rem; line-height: 36px; text-align: center; text-transform: uppercase;
+  overflow: hidden; text-overflow: ellipsis;
   background: var(--nrl-raised); color: var(--nrl-muted);
 }
 .nrl-mo-coach-badge[data-state="on"] { background: var(--nrl-accent); color: var(--nrl-on-accent); }
 .nrl-mo-coach-badge[data-state="made"] { color: var(--nrl-accent); }
-/* Calls and plays together (#326): one line, its spaces kept; stacked two lines on a narrow phone (below). */
-.nrl-mo-coach-badge[data-parts] { display: block; line-height: 36px; white-space: pre; }
-.nrl-mo-coach[aria-expanded="true"] { padding: 0 16px; background: var(--nrl-button); box-shadow: inset 0 0 0 2px var(--nrl-accent); }
-.nrl-mo-coach[aria-expanded="true"] .nrl-mo-coach-badge { display: none; }
+/* A moment a held call suits (#639): the badge swells once. */
+.nrl-mo-coach-badge[data-pulse] { animation: nrl-mo-coach-pulse var(--nrl-dur-sheet) var(--nrl-ease-out) 3; }
+/* A ring that spreads and fades, three beats on the motion tokens (#597): nothing moves or scales, so reduced motion keeps it. */
+@keyframes nrl-mo-coach-pulse { from { box-shadow: 0 0 0 0 var(--nrl-accent); } to { box-shadow: 0 0 0 8px transparent; } }
+/* Calls and plays together ("2 calls · 1 play", #326): two short lines, so they fit the badge's one width (#608). */
+.nrl-mo-coach-badge[data-parts] { display: flex; flex-direction: column; justify-content: center; align-items: center; line-height: 1.1; }
+.nrl-mo-coach-badge[data-parts] > span { font-size: 0.8em; }
+.nrl-mo-coach-badge[data-parts] .nrl-mo-badge-sep { display: none; }
+/* Open (3o): the ring, and ▾ after COACH. The badge keeps its room unseen and ▾ sits in it, on the same
+   padding, so the button is the width it was shut (#608). */
+.nrl-mo-coach[aria-expanded="true"] { background: var(--nrl-button); box-shadow: inset 0 0 0 2px var(--nrl-accent); }
+.nrl-mo-coach[aria-expanded="true"] .nrl-mo-coach-badge { visibility: hidden; }
+.nrl-mo-coach[aria-expanded="true"] .nrl-mo-coach-label::after { content: '▾'; position: absolute; left: 100%; margin-left: 0.3em; }
 /* The coach tray (3o): only the calls on now; the match keeps playing. #396: at most five rows
    (six buttons), as tiles two a line (three on a short wide phone), so it never scrolls. */
 .nrl-mo-tray {
   position: fixed; left: calc(16px + var(--nrl-safe-l)); bottom: calc(80px + var(--nrl-safe-b)); z-index: 21;
-  width: min(360px, calc(100vw - 32px)); max-height: calc(100vh - 88px - var(--nrl-mo-board, 60px)); overflow-y: auto; box-sizing: border-box;
+  width: min(360px, calc(100vw - 32px)); max-height: calc(100vh - 88px - var(--nrl-mo-board, 60px));
+  max-height: calc(100dvh - 88px - var(--nrl-mo-board, 60px)); overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box;
   display: flex; flex-direction: column; gap: 6px; padding: 8px 12px; border-radius: 14px; background: var(--nrl-navy); box-shadow: var(--nrl-shadow-tray);
-  pointer-events: auto; animation: nrl-mo-up 180ms ease-out;
+  pointer-events: auto; animation: nrl-sheet-up var(--nrl-dur-sheet) var(--nrl-ease-out);
 }
 .nrl-mo-tray[hidden] { display: none; }
+/* Its rows changed while it was open (#608): they dip and come back, so the change reads before a tap lands. */
+.nrl-mo-tray[data-changed] .nrl-mo-tray-list, .nrl-mo-tray[data-changed] .nrl-mo-tray-plays { animation: nrl-mo-tray-changed var(--nrl-dur-fast) var(--nrl-ease-out); }
+@keyframes nrl-mo-tray-changed { from { opacity: 0.6; } }
 /* The tray and the full log side by side: the log gives way on a narrow phone (667px) rather than sit under the tray. */
 .nrl-mo-tray-open .nrl-mo-full { width: min(330px, calc(100vw - 32px - 360px - 8px - var(--nrl-safe-l) - var(--nrl-safe-r))); }
 .nrl-mo-tray-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-flow: row dense; gap: 6px; }
@@ -1945,10 +2103,12 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
   max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
   font-family: var(--nrl-f-body); font-size: 0.75rem; font-weight: 400; line-height: 1.2; color: var(--nrl-text-2);
 }
+/* The call just made (#608): the badge's "on" colours, at once, for the moment before the tray shuts. */
+.nrl-btn.nrl-mo-tray-call[data-called], .nrl-btn.nrl-mo-tray-call[data-called]:hover, .nrl-btn.nrl-mo-tray-call[data-called]:active { background: var(--nrl-accent); color: var(--nrl-on-accent); transition-property: transform; }
+.nrl-mo-tray-call[data-called] span { color: var(--nrl-on-accent); }
 /* A locked call (the Coach's Office hasn't unlocked it): greyed, outlined rather than filled, its level as a
    small tag. aria-disabled, not disabled, so a tap can say what unlocks it; it never makes the call. */
-.nrl-btn.nrl-mo-tray-call.nrl-mo-tray-locked { background: transparent; box-shadow: inset 0 0 0 1px var(--nrl-line); color: var(--nrl-muted); cursor: default; }
-.nrl-btn.nrl-mo-tray-call.nrl-mo-tray-locked:hover { background: transparent; }
+.nrl-btn.nrl-mo-tray-call.nrl-mo-tray-locked, .nrl-btn.nrl-mo-tray-call.nrl-mo-tray-locked:hover, .nrl-btn.nrl-mo-tray-call.nrl-mo-tray-locked:active { background: transparent; box-shadow: inset 0 0 0 1px var(--nrl-line); color: var(--nrl-muted); cursor: default; }
 .nrl-mo-tray-locked span { color: var(--nrl-muted); font-family: var(--nrl-f-label); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; font-size: 0.6875rem; }
 /* #432: at Large and Larger the tray grows wider, so each caption still fits on one
    line inside the 44px tile (Normal is untouched). A short phone is already three
@@ -2034,10 +2194,12 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 .nrl-mo-controls .nrl-btn {
   width: 44px; min-width: 44px; height: 44px; min-height: 44px; padding: 0; border-radius: 22px; background: transparent;
   color: var(--nrl-text-2); font-size: 1.0625rem; font-weight: 700; letter-spacing: 0; text-transform: none;
+  transition-property: none; /* #604: the yellow circle and its digit change in the same frame */
 }
-.nrl-mo-controls .nrl-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.06); }
+@media (hover: hover) and (pointer: fine) { .nrl-mo-controls .nrl-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.06); } }
+.nrl-mo-controls .nrl-btn:active:not(:disabled) { background: rgba(255, 255, 255, 0.06); transition-property: transform; }
 .nrl-mo-controls .nrl-btn.nrl-mo-pause { width: 44px; color: var(--nrl-text); font-size: 0.8125rem; }
-.nrl-mo-controls .nrl-btn.nrl-mo-speed[aria-pressed="true"], .nrl-mo-controls .nrl-btn.nrl-mo-speed[aria-pressed="true"]:hover:not(:disabled) { background: var(--nrl-accent); color: var(--nrl-on-accent); }
+.nrl-mo-controls .nrl-btn.nrl-mo-speed[aria-pressed="true"], .nrl-mo-controls .nrl-btn.nrl-mo-speed[aria-pressed="true"]:hover:not(:disabled), .nrl-mo-controls .nrl-btn.nrl-mo-speed[aria-pressed="true"]:active:not(:disabled) { background: var(--nrl-accent); color: var(--nrl-on-accent); }
 .nrl-mo-pill-div { width: 1px; height: 28px; margin: 0 4px; background: var(--nrl-line); }
 .nrl-mo-controls .nrl-btn.nrl-mo-skip { width: auto; padding: 0 12px; color: var(--nrl-text); letter-spacing: 0.06em; text-transform: uppercase; }
 .nrl-mo-controls .nrl-btn.nrl-mo-skip[data-armed] { color: var(--nrl-accent); }
@@ -2052,9 +2214,6 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
   .nrl-mo-bar:has(.nrl-mo-planchip:not([hidden])) .nrl-mo-controls .nrl-mo-speed:not([aria-pressed="true"]),
   .nrl-mo-bar:has(.nrl-mo-planchip:not([hidden])) .nrl-mo-pill-div { display: none; }
   .nrl-mo-coach { padding: 0 6px 0 12px; gap: 8px; }
-  /* "2 calls · 1 play" (#326) as two short lines, no wider than today's longest badge, so the row keeps its width. */
-  .nrl-mo-coach-badge[data-parts] { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; line-height: 1.1; font-size: 0.75rem; white-space: nowrap; }
-  .nrl-mo-coach-badge[data-parts] .nrl-mo-badge-sep { display: none; }
   .nrl-mo-log-toggle { padding: 0 12px; }
 }
 /* Large and Larger text (#371) on a narrow phone: the row keeps to one line with the Plan chip up,
@@ -2062,8 +2221,6 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 @media (max-width: 720px) {
   html[data-text-size] .nrl-mo-bar, html[data-text-size] .nrl-mo-slot { gap: 6px; }
   html[data-text-size] .nrl-mo-coach { padding: 0 4px 0 10px; gap: 6px; }
-  html[data-text-size] .nrl-mo-coach[aria-expanded="true"] { padding: 0 10px; }
-  html[data-text-size] .nrl-mo-coach-badge { padding: 0 6px; }
   html[data-text-size] .nrl-mo-log-toggle { padding: 0 8px; gap: 6px; }
   html[data-text-size] .nrl-btn.nrl-mo-planchip { padding: 0 10px; }
   html[data-text-size] .nrl-mo-controls { padding: 0 4px; }
@@ -2092,15 +2249,15 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 .nrl-mo-banner-who { font-family: var(--nrl-f-label); font-size: 1.25rem; font-weight: 700; line-height: 1; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nrl-mo-banner-sub { font-family: var(--nrl-f-label); font-size: 0.875rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--nrl-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nrl-mo-banner-extra { color: var(--nrl-accent); }
-.nrl-mo-banner-in { animation: nrl-mo-in-left 150ms ease-out both; }
-/* Points: the scoring side's box flashes. */
+.nrl-mo-banner-in { animation: nrl-mo-in-left var(--nrl-dur-fast) var(--nrl-ease-out) both; }
+/* Points: the scoring side's box flashes. Colour only, nothing moves, so it plays under reduced motion too (#597). */
 .nrl-mo-scored { animation: nrl-mo-scored 1.2s ease-out; }
 @keyframes nrl-mo-scored { 0%, 35% { background: var(--nrl-accent); color: var(--nrl-on-accent); } 100% { background: var(--nrl-raised); } }
-@keyframes nrl-mo-in-left { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: none; } }
-@keyframes nrl-mo-in-right { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
-@keyframes nrl-mo-up { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+/* Sideways by the shared travel (#597); the tray, the cards and the sheets rise on dom.ts's nrl-sheet-up. */
+@keyframes nrl-mo-in-left { from { opacity: 0; transform: translateX(calc(var(--nrl-rise) * -1)); } to { opacity: 1; transform: none; } }
+@keyframes nrl-mo-in-right { from { opacity: 0; transform: translateX(var(--nrl-rise)); } to { opacity: 1; transform: none; } }
 /* Replay (N15.5, #348 M5): a small chip under the banner, its seconds left beside it. Never
-   centred with a transform: the pressed nudge (.nrl-btn:active) would replace it. */
+   centred with a transform: the press's scale (.nrl-btn:active, #604) would replace it. */
 .nrl-mo-replay, .nrl-mo-replay-tag {
   position: fixed; left: calc(16px + var(--nrl-safe-l)); top: calc(var(--nrl-mo-board, 60px) + 70px);
   z-index: 26; pointer-events: auto; min-height: 44px;
@@ -2130,7 +2287,7 @@ ${PLAN_FIT_CSS}
   width: 100%; max-width: 1180px; min-height: min(296px, 100%); max-height: 100%; overflow: hidden; box-sizing: border-box;
   display: flex; flex-direction: column; gap: 10px;
   padding: 10px calc(24px + var(--nrl-safe-r)) calc(16px + var(--nrl-safe-b)) calc(24px + var(--nrl-safe-l));
-  border-radius: 22px 22px 0 0; background: var(--nrl-navy); box-shadow: var(--nrl-shadow-modal); animation: nrl-mo-up 180ms ease-out;
+  border-radius: 22px 22px 0 0; background: var(--nrl-navy); box-shadow: var(--nrl-shadow-modal); animation: nrl-sheet-up var(--nrl-dur-sheet) var(--nrl-ease-out);
 }
 .nrl-mo-plan-grab { flex: 0 0 auto; align-self: center; width: 40px; height: 4px; border-radius: 2px; background: var(--nrl-line); }
 .nrl-mo-plan-top { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; }
@@ -2141,7 +2298,7 @@ ${PLAN_FIT_CSS}
 .nrl-mo-plan-plays { flex-basis: 100%; font-size: 0.75rem; color: var(--nrl-text-2); }
 .nrl-mo-plan-top, .nrl-mo-plan-grab { flex: 0 0 auto; }
 /* On a short screen the rows scroll and the foot with the primary stays put (#341). */
-.nrl-mo-plan-rows { flex: 0 1 auto; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: 72px minmax(0, 1fr); align-items: center; gap: 8px 12px; }
+.nrl-mo-plan-rows { flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: grid; grid-template-columns: 72px minmax(0, 1fr); align-items: center; gap: 8px 12px; }
 .nrl-mo-plan-label { font-family: var(--nrl-f-label); font-size: 0.875rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); }
 .nrl-mo-plan .nrl-seg { display: flex; gap: 4px; padding: 4px; overflow: visible; }
 .nrl-mo-plan .nrl-seg > .nrl-btn { flex: 1 1 0; min-width: 0; height: 40px; min-height: 40px; padding: 0 6px; font-size: 1.0625rem; font-weight: 600; letter-spacing: 0.02em; text-transform: none; }
@@ -2152,9 +2309,9 @@ ${PLAN_FIT_CSS}
 .nrl-btn.nrl-mo-plan-go { flex: 0 0 auto; height: 48px; padding: 0 24px; font-size: 1.1875rem; }
 .nrl-mo-sheet { align-items: center; justify-content: center; }
 .nrl-mo-sheet-card {
-  position: relative; width: min(340px, calc(100vw - 32px)); max-height: calc(100% - 24px); overflow-y: auto; box-sizing: border-box;
+  position: relative; width: min(340px, calc(100vw - 32px)); max-height: calc(100% - 24px); overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box;
   display: flex; flex-direction: column; gap: 6px; padding: 16px 18px 18px; border-radius: 18px; background: var(--nrl-navy); box-shadow: var(--nrl-shadow-modal);
-  animation: nrl-mo-up 180ms ease-out;
+  animation: nrl-sheet-up var(--nrl-dur-sheet) var(--nrl-ease-out);
 }
 .nrl-mo-sheet-head { padding-right: 44px; font-family: var(--nrl-f-label); font-size: 1.375rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--nrl-accent); }
 .nrl-btn.nrl-mo-sheet-x { position: absolute; top: 10px; right: 10px; width: 36px; min-width: 36px; height: 36px; min-height: 36px; padding: 0; border-radius: 8px; font-family: var(--nrl-f-body); font-size: 0.9375rem; }
@@ -2167,8 +2324,5 @@ ${PLAN_FIT_CSS}
   .nrl-mo-sheet-card { width: min(460px, calc(100vw - 32px)); }
   .nrl-mo-sheet-actions { display: grid; grid-template-columns: 1fr 1fr; }
   .nrl-mo-sheet-actions .nrl-btn:first-child { grid-column: 1 / -1; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .nrl-mo-banner-in, .nrl-mo-scored, .nrl-mo-full, .nrl-mo-tray, .nrl-mo-plan-sheet, .nrl-mo-sheet-card { animation: none; }
 }
 `;

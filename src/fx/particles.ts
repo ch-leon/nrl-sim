@@ -1,8 +1,8 @@
 // src/fx/particles.ts — pooled particle effects for key moments (BAK-201, WU-14).
 //
 // Two attach functions a scene calls in its create():
-//   attachMatchFx(scene)   — try burst + gold shower, big-hit ring + camera
-//                            shake, ambient crowd specks along the sidelines.
+//   attachMatchFx(scene)   — try burst + gold shower, big-hit ring,
+//                            ambient crowd specks along the sidelines.
 //   attachGroundsFx(scene) — coin sparkle on positive money, dust puff on
 //                            facility placement, premiership confetti.
 //
@@ -19,6 +19,7 @@
 // Pure math (world mapping + cap allocation) lives in ./particleMath so it is
 // unit-testable in the node env (Phaser can't import there). We re-export it.
 import Phaser from 'phaser';
+import { screenDensity } from '../world/viewport';
 import { TILE_W } from '../config';
 import { bus } from '../core/events';
 import type { MatchEvent } from '../sim/events';
@@ -196,9 +197,8 @@ export function attachMatchFx(scene: Phaser.Scene): FxHandle {
       // Shower rains from above the try line down toward the event position.
       goldShower.emitParticleAt(w.x, bounds.y, MATCH_CAPS.goldShower);
     } else {
-      // big-hit: radial ring + a short, sharp camera shake.
+      // big-hit: a radial ring. The shake is the impact tier's (match/view/impact.ts, #631): the same size on screen at any zoom, and off under reduced motion.
       bigHitRing.explode(MATCH_CAPS.bigHitRing, w.x, w.y);
-      scene.cameras.main.shake(100, 0.008);
     }
   };
 
@@ -282,8 +282,9 @@ export function attachGroundsFx(scene: Phaser.Scene): FxHandle {
     if (!hud) return; // HUD not mounted → skip rather than throw (spec)
     const r = hud.getBoundingClientRect();
     if (r.width === 0 && r.height === 0) return;
-    // Map the HUD money corner (screen px) into world space.
-    const world = cam.getWorldPoint(r.left + r.width / 2, r.top + r.height / 2);
+    // Map the HUD money corner (CSS px, so canvas px times the density, #627) into world space.
+    const d = screenDensity();
+    const world = cam.getWorldPoint((r.left + r.width / 2) * d, (r.top + r.height / 2) * d);
     coinSparkle.explode(GROUNDS_CAPS.coinSparkle, world.x, world.y);
   };
 

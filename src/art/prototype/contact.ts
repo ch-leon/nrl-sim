@@ -2,8 +2,8 @@
 import { PixelBuffer } from '../pixel';
 import { OUTLINE, type Kit } from '../match/kit';
 import { drawHead, type Facing } from './head';
-import { ballPixels, CENTRE, FOOT, drawPrototypePlayer, type Appearance } from './player';
-import { add, blend, blendBody, body, contactPainter, flip, type Body, type Point } from './tackle';
+import { ballPixels, CENTRE, FOOT, PAINT_FOOT, drawPrototypePlayer, type Appearance } from './player';
+import { add, blend, blendBody, body, contactPainter, flip, standTall, type Body, type Point } from './tackle';
 import { contactPlayerKey, type ContactAnimation } from '../../match/view/contactAnimation';
 import { fitLegs, bentContactArm, type ContactArm } from '../match/limbs';
 export { contactLeg, bentContactArm } from '../match/limbs';
@@ -64,7 +64,7 @@ export function contactPoseAt(state: ContactAnimation): ContactPose {
   if (state.variant === 1 && completed) c = { ...c, shoulder: add(c.shoulder, -2 * fall, 0), head: add(c.head, -2 * fall, 0), knee: add(c.knee, -2 * fall, -fall) };
   const recovery = completed ? ease((after - .55) / .45) : 0;
   const ready = ruckPoseAt('ptb', 0);
-  const recoveryTarget = shift(ready.pose, CONTACT_X - CENTRE, CONTACT_FOOT - FOOT);
+  const recoveryTarget = shift(ready.pose, CONTACT_X - CENTRE, CONTACT_FOOT - PAINT_FOOT);
   c = blendBody(c, recoveryTarget, recovery);
   if (ptb) c = recoveryTarget;
   c = fitLegs(c);
@@ -112,7 +112,7 @@ export function contactPoseAt(state: ContactAnimation): ContactPose {
       left: !stolen || !running, arms, grip, role, running };
   });
   const owner = stolen ? defenders[0]!.player : carrier.player;
-  const ball = stolen ? blend(add(c.shoulder, 5, 4), add(defenders[0]!.pose.shoulder, 4, 4), ease(after / .18)) : blend(add(c.shoulder, 3, 4), add(ready.ball, CONTACT_X - CENTRE, CONTACT_FOOT - FOOT), recovery);
+  const ball = stolen ? blend(add(c.shoulder, 5, 4), add(defenders[0]!.pose.shoulder, 4, 4), ease(after / .18)) : blend(add(c.shoulder, 3, 4), add(ready.ball, CONTACT_X - CENTRE, CONTACT_FOOT - PAINT_FOOT), recovery);
   return { carrier, defenders, ball, owner, ptb, impact: state.kind === 'dominant' && after < .15 ? 1 - after / .15 : 0 };
 }
 
@@ -128,9 +128,28 @@ export function tiltedHead(look: Appearance, kit: Kit, facing: Facing, left: boo
   return out;
 }
 
+/**
+ * Each man at his own height (`standTall`), as his single-player frames draw him.
+ * Arms keep their grip: a hand on the carrier rides with the carrier's chest.
+ */
+export function standContact(pose: ContactPose, lookFor: (p: ContactPlayer) => Appearance): ContactPose {
+  const rise = (a: ContactBody) => a.running || (a.role === 'carrier' && pose.ptb) ? 0 : lookFor(a.player).stature;
+  const carrier = standTall(pose.carrier.pose, rise(pose.carrier));
+  const carrierDy = carrier.shoulder[1] - pose.carrier.pose.shoulder[1];
+  const tall = (a: ContactBody, p: Body): ContactBody => {
+    const dy = p.shoulder[1] - a.pose.shoulder[1];
+    const hand = dy * (1 - a.grip) + (a.role === 'carrier' ? dy : carrierDy) * a.grip;
+    return { ...a, pose: p, arms: a.arms.map(arm => ({ shoulder: add(arm.shoulder, 0, dy), elbow: add(arm.elbow, 0, (dy + hand) / 2), hand: add(arm.hand, 0, hand) })) };
+  };
+  const defenders = pose.defenders.map(d => tall(d, standTall(d.pose, rise(d))));
+  const owner = [pose.carrier, ...pose.defenders].findIndex(a => contactPlayerKey(a.player) === contactPlayerKey(pose.owner));
+  const ownerDy = owner <= 0 ? carrierDy : defenders[owner - 1]!.pose.shoulder[1] - pose.defenders[owner - 1]!.pose.shoulder[1];
+  return { ...pose, carrier: tall(pose.carrier, carrier), defenders, ball: add(pose.ball, 0, ownerDy) };
+}
+
 export function drawContact(state: ContactAnimation, lookFor: (p: ContactPlayer) => Appearance, kitFor: (p: ContactPlayer) => Kit, facing: Facing = 'front', suppliedPose?: ContactPose): PixelBuffer {
   const out = new PixelBuffer(CONTACT_W, CONTACT_H);
-  const pose = suppliedPose ?? contactPoseAt(state); const brush = contactPainter(out);
+  const pose = standContact(suppliedPose ?? contactPoseAt(state), lookFor); const brush = contactPainter(out);
   const arm = (p: ContactArm, look: Appearance, dark = false) => brush.arm(p.shoulder, p.elbow, p.hand, look, dark);
   const ownerKey = contactPlayerKey(pose.owner);
   const drawBody = (actor: ContactBody) => {

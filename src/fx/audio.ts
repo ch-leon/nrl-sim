@@ -15,6 +15,8 @@
 import { openAllUnlocks } from '../systems/unlocks';
 import { labsVisible } from '../labs/flags';
 import { bus } from '../core/events';
+import type { MatchEvent } from '../sim/events';
+import { applyMomentumEvent, decayMomentum } from '../sim/weather';
 import { getState, setState, setMatchSettings, type GameState } from '../core/state';
 import { el, button, openModal, closeModal, screenKey, segmented } from '../ui/dom';
 import { TEXT_SIZES, textSizeOf } from '../ui/textSize';
@@ -25,7 +27,13 @@ import { canInstall, promptInstall } from './pwa';
 
 // ── Public sfx names (BAK-200) ─────────────────────────────────────────────
 
-export type SfxName = 'click' | 'coin' | 'build' | 'cheer' | 'tackle' | 'try';
+export type SfxName =
+  | 'click' | 'coin' | 'build' | 'cheer' | 'tackle' | 'try' | 'groan'
+  // The match (#635): the referee, the boot, the posts, a break, a big hit and the full-time stings.
+  | 'whistle' | 'whistleLong' | 'siren' | 'boot' | 'goal' | 'miss' | 'whoosh' | 'tackleBig'
+  | 'stingWin' | 'stingDraw' | 'stingLoss'
+  // A coach's call paid off (#639).
+  | 'callPaid';
 
 export type MusicTrack = 'grounds' | 'match';
 
@@ -127,6 +135,101 @@ export const SFX_PRESETS: Record<SfxName, SfxPreset> = {
       { type: 'square', freq: 659.25, start: 0.09, duration: 0.09, gain: 0.3, attack: 0.003 }, // E5
       { type: 'square', freq: 783.99, start: 0.18, duration: 0.09, gain: 0.3, attack: 0.003 }, // G5
       { type: 'square', freq: 1046.5, start: 0.27, duration: 0.12, gain: 0.3, attack: 0.003 }, // C6
+    ],
+    noises: [],
+  },
+  // A try against (#634): a low falling sawtooth sigh under a dull noise murmur, no jingle.
+  groan: {
+    tones: [{ type: 'sawtooth', freq: 170, freqEnd: 90, start: 0, duration: 0.7, gain: 0.16, attack: 0.08 }],
+    noises: [{ filter: 'lowpass', freqStart: 500, freqEnd: 220, Q: 0.7, start: 0, duration: 0.8, gain: 0.3, attack: 0.15 }],
+  },
+  // The referee's whistle (#635): two sines a few Hz apart beat into a warble, with a little breath.
+  whistle: {
+    tones: [
+      { type: 'sine', freq: 2800, start: 0, duration: 0.38, gain: 0.14, attack: 0.012 },
+      { type: 'sine', freq: 2860, start: 0, duration: 0.38, gain: 0.14, attack: 0.012 },
+    ],
+    noises: [{ filter: 'bandpass', freqStart: 3200, Q: 2, start: 0, duration: 0.38, gain: 0.05, attack: 0.02 }],
+  },
+  // Half-time and full time: a short blast and a long one.
+  whistleLong: {
+    tones: [
+      { type: 'sine', freq: 2800, start: 0, duration: 0.3, gain: 0.14, attack: 0.012 },
+      { type: 'sine', freq: 2860, start: 0, duration: 0.3, gain: 0.14, attack: 0.012 },
+      { type: 'sine', freq: 2800, start: 0.4, duration: 0.8, gain: 0.14, attack: 0.012 },
+      { type: 'sine', freq: 2860, start: 0.4, duration: 0.8, gain: 0.14, attack: 0.012 },
+    ],
+    noises: [{ filter: 'bandpass', freqStart: 3200, Q: 2, start: 0, duration: 1.2, gain: 0.04, attack: 0.02 }],
+  },
+  // The hooter: a steady low sawtooth pair, a touch out of tune.
+  siren: {
+    tones: [
+      { type: 'sawtooth', freq: 233, start: 0, duration: 1.4, gain: 0.07, attack: 0.06 },
+      { type: 'sawtooth', freq: 237, start: 0, duration: 1.4, gain: 0.07, attack: 0.06 },
+    ],
+    noises: [],
+  },
+  // A boot on the ball: a short glide down and a snap of leather. Higher and drier than a tackle.
+  boot: {
+    tones: [{ type: 'sine', freq: 170, freqEnd: 70, start: 0, duration: 0.11, gain: 0.45, attack: 0.002 }],
+    noises: [{ filter: 'bandpass', freqStart: 1600, Q: 1, start: 0, duration: 0.04, gain: 0.3, attack: 0.001 }],
+  },
+  // A goal kicked: a bright "ting" off the posts.
+  goal: {
+    tones: [
+      { type: 'sine', freq: 1760, start: 0, duration: 0.55, gain: 0.2, attack: 0.002 },
+      { type: 'sine', freq: 2637, start: 0, duration: 0.35, gain: 0.08, attack: 0.002 },
+    ],
+    noises: [],
+  },
+  // A miss: a dull, falling thunk.
+  miss: {
+    tones: [{ type: 'triangle', freq: 260, freqEnd: 120, start: 0, duration: 0.32, gain: 0.22, attack: 0.01 }],
+    noises: [{ filter: 'lowpass', freqStart: 350, start: 0, duration: 0.2, gain: 0.2, attack: 0.005 }],
+  },
+  // A line break: air rushing past, swelling then gone.
+  whoosh: {
+    tones: [],
+    noises: [{ filter: 'bandpass', freqStart: 400, freqEnd: 2800, Q: 1, start: 0, duration: 0.5, gain: 0.3, attack: 0.2 }],
+  },
+  // A big hit: louder and lower than the 90 Hz tackle, a longer body under the crack.
+  tackleBig: {
+    tones: [{ type: 'sine', freq: 62, freqEnd: 45, start: 0, duration: 0.3, gain: 0.7, attack: 0.002 }],
+    noises: [{ filter: 'lowpass', freqStart: 900, start: 0, duration: 0.14, gain: 0.5, attack: 0.001 }],
+  },
+  // Full-time stings, played just after the whistle (the engine delays them). A win is a bright run up, a
+  // draw two level notes, a loss a slow fall; none of them is the cheerful grounds tune.
+  stingWin: {
+    tones: [
+      { type: 'square', freq: 523.25, start: 0.0, duration: 0.12, gain: 0.22, attack: 0.003 },
+      { type: 'square', freq: 659.25, start: 0.12, duration: 0.12, gain: 0.22, attack: 0.003 },
+      { type: 'square', freq: 783.99, start: 0.24, duration: 0.12, gain: 0.22, attack: 0.003 },
+      { type: 'square', freq: 1046.5, start: 0.36, duration: 0.6, gain: 0.22, attack: 0.003 },
+    ],
+    noises: [],
+  },
+  stingDraw: {
+    tones: [
+      { type: 'triangle', freq: 392, start: 0, duration: 0.25, gain: 0.25, attack: 0.01 },
+      { type: 'triangle', freq: 392, start: 0.3, duration: 0.5, gain: 0.25, attack: 0.01 },
+    ],
+    noises: [],
+  },
+  stingLoss: {
+    tones: [
+      { type: 'triangle', freq: 329.63, start: 0.0, duration: 0.3, gain: 0.28, attack: 0.01 },
+      { type: 'triangle', freq: 293.66, start: 0.3, duration: 0.3, gain: 0.28, attack: 0.01 },
+      { type: 'triangle', freq: 261.63, start: 0.6, duration: 0.3, gain: 0.28, attack: 0.01 },
+      { type: 'triangle', freq: 196, start: 0.9, duration: 0.9, gain: 0.28, attack: 0.01 },
+    ],
+    noises: [],
+  },
+  // A coach's call paid off (#639): three sine notes rising (A5, D6, F#6), light and short.
+  callPaid: {
+    tones: [
+      { type: 'sine', freq: 880, start: 0, duration: 0.08, gain: 0.25, attack: 0.004 },
+      { type: 'sine', freq: 1174.7, start: 0.07, duration: 0.08, gain: 0.25, attack: 0.004 },
+      { type: 'sine', freq: 1480, start: 0.14, duration: 0.16, gain: 0.25, attack: 0.004 },
     ],
     noises: [],
   },
@@ -262,8 +365,115 @@ export function scheduleWindow(
 /** Map a match-event kind to an SFX (or null). Exported for testing. */
 export function sfxForMatchEventKind(kind: string): SfxName | null {
   if (kind === 'try') return 'try';
-  if (kind === 'big-hit' || kind === 'tackle') return 'tackle';
+  if (kind === 'big-hit') return 'tackleBig';
+  if (kind === 'tackle') return 'tackle';
   return null;
+}
+
+/** One sound a match event asks for: which, how loud against its preset, how late, and whether its pitch varies. */
+export interface SfxCue {
+  name: SfxName;
+  /** Multiplies the preset's gain (default 1). */
+  gain?: number;
+  /** Seconds to wait before it starts (the full-time sting waits for the whistle). */
+  delay?: number;
+  /** Nudge the pitch a little so repeats do not sound identical. */
+  vary?: boolean;
+}
+
+/** The slice of a MatchEvent the sound mapping reads. */
+export interface SoundEvent {
+  kind: string;
+  teamId: string;
+  detail?: string;
+}
+
+/**
+ * Every sound a match event makes (#635), in order. `cheers` is whether a try for this event's side is
+ * one the crowd cheers (see sfxForTry). The whistle kinds are the referee's: kick-off, half-time (and golden
+ * point), full time, a man to the sin bin. A kick of any kind is a boot; a kick at goal also rings or misses.
+ * An ordinary tackle is softer than a big hit, which is both louder (its own preset) and lower.
+ */
+export function soundsForMatchEvent(ev: SoundEvent, cheers: boolean): SfxCue[] {
+  switch (ev.kind) {
+    case 'try':
+      return sfxForTry(cheers).map((name) => ({ name }));
+    case 'tackle':
+      return [{ name: 'tackle', gain: 0.6, vary: true }];
+    case 'big-hit':
+      return [{ name: 'tackleBig', vary: true }];
+    case 'kickoff':
+      return [{ name: 'whistle' }];
+    case 'kick':
+      return [{ name: 'boot', vary: true }];
+    case 'conversion':
+    case 'penalty-goal':
+    case 'field-goal':
+      return [{ name: 'boot' }, { name: ev.detail === 'good' ? 'goal' : 'miss', delay: 0.25 }];
+    case 'half-time':
+    case 'full-time':
+      return [{ name: 'whistleLong' }, { name: 'siren', delay: 0.5 }];
+    case 'sin-bin':
+      return [{ name: 'whistle' }];
+    default:
+      return [];
+  }
+}
+
+/** The full-time sting for the coached side's result, played after the whistle. */
+export function stingForResult(own: number, theirs: number): SfxName {
+  return own > theirs ? 'stingWin' : own < theirs ? 'stingLoss' : 'stingDraw';
+}
+
+/**
+ * A repeatable pitch multiplier in about 0.93..1.07 from a counter: the same sequence on every run, and never
+ * the sim's RNG (a drawn sound must not move a match).
+ */
+export function pitchVariation(n: number): number {
+  const h = Math.imul(n + 1, 2654435761) >>> 0;
+  return 0.93 + ((h >>> 8) % 1000) / 1000 * 0.14;
+}
+
+// ── The crowd bed (#635) ───────────────────────────────────────────────────
+
+/** Crowd gain at rest (halfway, quiet): audible, never silent. */
+export const CROWD_BASE = 0.1;
+/** What the ball being inside a try line's 30 m adds, at the line itself. */
+export const CROWD_ZONE = 0.22;
+/** What a fully one-sided momentum adds. */
+export const CROWD_MOMENTUM = 0.1;
+/** Noise is dense: the level above is scaled down by this on its way to the gain node, so the bed sits under the one-shots (measured offline: RMS about 0.07 near a line, a try is 0.03). */
+export const CROWD_OUT = 0.35;
+/** Extra swell, decaying, on a moment. */
+export const CROWD_SWELL: Readonly<Record<string, number>> = { 'try': 0.4, 'try-against': 0.14, 'break': 0.06, 'clean-break': 0.22, 'big-hit': 0.08, 'goal': 0.1 };
+
+/**
+ * Steady crowd level (before swells) from the ball's length position `x` (0..100, either try line at an
+ * end) and momentum (-100..100). Rises smoothly from nothing at 30 m out to the full zone term on the line;
+ * null position (nothing seen yet) is halfway.
+ */
+export function crowdLevel(x: number | null, momentum: number): number {
+  const at = Math.min(Math.max(x ?? 50, 0), 100);
+  const toLine = Math.min(at, 100 - at);
+  const zone = Math.min(Math.max((30 - toLine) / 30, 0), 1);
+  return CROWD_BASE + CROWD_ZONE * zone + CROWD_MOMENTUM * Math.min(Math.abs(momentum) / 100, 1);
+}
+
+/** The swell a match event adds to the crowd (0 for most). */
+export function crowdSwellFor(ev: SoundEvent, cheers: boolean): number {
+  if (ev.kind === 'try') return CROWD_SWELL[cheers ? 'try' : 'try-against'];
+  if (ev.kind === 'break' || ev.kind === 'big-hit') return CROWD_SWELL[ev.kind];
+  if ((ev.kind === 'conversion' || ev.kind === 'penalty-goal' || ev.kind === 'field-goal') && ev.detail === 'good') return CROWD_SWELL.goal;
+  return 0;
+}
+
+/**
+ * What a try sounds like (#634): the coached side's keeps the fanfare and the cheer, a try against is
+ * a groan with no jingle. `ours` is false only for the other side's try in a match the player coaches;
+ * the lab (nobody coached) cheers both.
+ */
+export function sfxForTry(ours: boolean): SfxName[] {
+  return ours ? ['try', 'cheer'] : ['groan'];
 }
 
 // ── Music loop definitions (precomputed note arrays) ───────────────────────
@@ -368,6 +578,19 @@ interface ActiveMusic {
 export class AudioEngine {
   private ctx: AudioContext | null;
   private master: GainNode | null = null;
+  private limiter: DynamicsCompressorNode | null = null;
+  /** Music runs through this so the crowd can sit over it during play. */
+  private musicBus: GainNode | null = null;
+  private crowd: { src: AudioBufferSourceNode; filter: BiquadFilterNode; gain: GainNode } | null = null;
+  /** Steady crowd level from where the ball is and the momentum; swells ride on top of it. */
+  private crowdBase = CROWD_BASE;
+  private ballX: number | null = null;
+  private momentum = 0;
+  private homeId: string | null = null;
+  private sfxCount = 0;
+  private timers = new Set<ReturnType<typeof setTimeout>>();
+  /** After a loss the cheerful grounds track waits for the next screen. */
+  private holdGrounds = false;
   private schedulerId: ReturnType<typeof setInterval> | null = null;
   private active: ActiveMusic | null = null;
 
@@ -380,6 +603,8 @@ export class AudioEngine {
   private disposed = false;
   /** When each SFX last started (audio time), for SFX_GAP. */
   private sfxStarted = new Map<SfxName, number>();
+  /** True while a match the player coaches is on (match:started names the player's club): a try for anyone else is a try against. */
+  private coaching = false;
 
   /** `ctx` injectable for tests. If omitted, one is created when available. */
   constructor(ctx?: AudioContext) {
@@ -392,7 +617,18 @@ export class AudioEngine {
     if (this.ctx) {
       this.master = this.ctx.createGain();
       this.master.gain.value = masterGainFor(getState().settings);
-      this.master.connect(this.ctx.destination);
+      // A limiter after the master (#636): music, a tackle and a cheer can sum past full scale, which clips.
+      this.limiter = this.ctx.createDynamicsCompressor();
+      this.limiter.threshold.value = -10;
+      this.limiter.knee.value = 8;
+      this.limiter.ratio.value = 12;
+      this.limiter.attack.value = 0.003;
+      this.limiter.release.value = 0.25;
+      this.master.connect(this.limiter);
+      this.limiter.connect(this.ctx.destination);
+      this.musicBus = this.ctx.createGain();
+      this.musicBus.gain.value = 1;
+      this.musicBus.connect(this.master);
     }
   }
 
@@ -401,12 +637,37 @@ export class AudioEngine {
     return this.ctx !== null;
   }
 
-  /** Resume the context after a user gesture. No-op if running/unavailable. */
+  /** True when the context is actually running (not suspended, or interrupted by a call or the lock screen). */
+  get running(): boolean {
+    return this.ctx?.state === 'running';
+  }
+
+  /**
+   * Resume the context. No-op if running/unavailable. Safari also reports 'interrupted' (a call, the
+   * lock screen), which resumes the same way. Call it synchronously inside a gesture: iOS only honours that.
+   */
   async resume(): Promise<void> {
     if (!this.ctx) return;
-    if (this.ctx.state === 'suspended') {
-      await this.ctx.resume();
+    const state = this.ctx.state as string;
+    if (state === 'suspended' || state === 'interrupted') {
+      try {
+        await this.ctx.resume();
+      } catch {
+        /* refused outside a gesture: the unlock listeners try again on the next tap */
+      }
     }
+  }
+
+  /** Call `fn` whenever the context drops to suspended or interrupted. Returns the unsubscribe. */
+  onStalled(fn: () => void): () => void {
+    const ctx = this.ctx;
+    if (!ctx || typeof ctx.addEventListener !== 'function') return () => {};
+    const h = (): void => {
+      const state = ctx.state as string;
+      if (state === 'suspended' || state === 'interrupted') fn();
+    };
+    ctx.addEventListener('statechange', h);
+    return () => ctx.removeEventListener('statechange', h);
   }
 
   /** Set volume [0,1] (clamps) and persist through the store. */
@@ -430,9 +691,9 @@ export class AudioEngine {
   }
 
   /** Play a one-shot SFX. No-op if muted, unavailable, or context suspended. */
-  playSfx(name: SfxName): void {
+  playSfx(name: SfxName, opts: { gain?: number; delay?: number; vary?: boolean } = {}): void {
     if (!this.ctx || !this.master) return;
-    if (this.ctx.state === 'suspended') return;
+    if (this.ctx.state !== 'running') return;
     if (getState().settings.muted) return;
     const now = this.ctx.currentTime;
     // A skipped match lands the rest of its events in one go (N10.4): hundreds of the same few
@@ -442,8 +703,11 @@ export class AudioEngine {
     if (last !== undefined && now - last < SFX_GAP) return;
     this.sfxStarted.set(name, now);
     const preset = SFX_PRESETS[name];
-    for (const tone of preset.tones) this.renderTone(tone, now);
-    for (const noise of preset.noises) this.renderNoise(noise, now);
+    const at = now + (opts.delay ?? 0);
+    const gain = opts.gain ?? 1;
+    const pitch = opts.vary ? pitchVariation(this.sfxCount++) : 1;
+    for (const tone of preset.tones) this.renderTone(tone, at, gain, pitch);
+    for (const noise of preset.noises) this.renderNoise(noise, at, gain, pitch);
   }
 
   /** Start (or crossfade to) a music track. Idempotent per track. */
@@ -461,7 +725,7 @@ export class AudioEngine {
     const gain = this.ctx.createGain();
     gain.gain.setValueAtTime(0, now);
     gain.gain.linearRampToValueAtTime(1, now + CROSSFADE);
-    gain.connect(this.master);
+    gain.connect(this.musicBus ?? this.master);
     this.active = { track, loop, gain, loopStart: now, cursor: now };
     this.ensureScheduler();
   }
@@ -476,6 +740,167 @@ export class AudioEngine {
     }
   }
 
+  // ── The crowd bed (#635) ────────────────────────────────────────────────
+
+  /** The steady crowd level now (before swells): what the tests and the browser check read. */
+  get crowdTarget(): number {
+    return this.crowdBase;
+  }
+
+  /** The crowd's gain param while the bed is running, else null. */
+  get crowdGain(): AudioParam | null {
+    return this.crowd?.gain.gain ?? null;
+  }
+
+  /** Start the looping crowd (filtered noise) if the context is running; the music drops under it. Idempotent. */
+  startCrowd(): void {
+    if (!this.ctx || !this.master || this.crowd || this.ctx.state !== 'running') return;
+    const buffer = this.makeNoiseBuffer(3);
+    if (!buffer) return;
+    const now = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource();
+    src.buffer = buffer;
+    src.loop = true;
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(900, now);
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(0, now);
+    src.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.master);
+    src.start(now);
+    this.crowd = { src, filter, gain };
+    this.setMusicDuck(true);
+    this.setCrowdBase(this.crowdBase);
+  }
+
+  /** Fade the crowd out and let the music back up. */
+  stopCrowd(fade = 1.5): void {
+    const c = this.crowd;
+    if (!this.ctx || !c) return;
+    this.crowd = null;
+    const now = this.ctx.currentTime;
+    c.gain.gain.cancelScheduledValues(now);
+    c.gain.gain.setValueAtTime(c.gain.gain.value, now);
+    c.gain.gain.linearRampToValueAtTime(0, now + fade);
+    try {
+      c.src.stop(now + fade + 0.05);
+    } catch {
+      /* already stopped */
+    }
+    this.later(() => {
+      try {
+        c.gain.disconnect();
+      } catch {
+        /* gone */
+      }
+    }, (fade + 0.2) * 1000);
+    this.setMusicDuck(false);
+  }
+
+  /** Music sits at under half while the crowd is up, so the crowd reads as the match. */
+  private setMusicDuck(on: boolean): void {
+    if (!this.ctx || !this.musicBus) return;
+    this.musicBus.gain.cancelScheduledValues(this.ctx.currentTime);
+    this.musicBus.gain.setTargetAtTime(on ? 0.4 : 1, this.ctx.currentTime, 0.4);
+  }
+
+  /** Move the steady crowd level (gently), and brighten the filter as it rises. */
+  private setCrowdBase(level: number, swell = 0): void {
+    this.crowdBase = level;
+    const c = this.crowd;
+    if (!this.ctx || !c) return;
+    const now = this.ctx.currentTime;
+    const g = c.gain.gain;
+    g.cancelScheduledValues(now);
+    g.setValueAtTime(g.value, now);
+    if (swell > 0) {
+      // Up fast on the moment, then back to the steady level over a couple of seconds.
+      g.linearRampToValueAtTime((level + swell) * CROWD_OUT, now + 0.3);
+      g.setTargetAtTime(level * CROWD_OUT, now + 0.9, 1.2);
+    } else {
+      g.linearRampToValueAtTime(level * CROWD_OUT, now + 0.8);
+    }
+    c.filter.frequency.cancelScheduledValues(now);
+    c.filter.frequency.linearRampToValueAtTime(700 + 3200 * Math.min(level + swell, 0.6), now + 0.8);
+  }
+
+  /** Does a try by this club get the cheer? */
+  cheersFor(teamId: string): boolean {
+    return !this.coaching || teamId === getState().clubId;
+  }
+
+  /** One match event: fold the ball position and momentum into the crowd, then play what it sounds like. */
+  onMatchEvent(ev: MatchEvent): void {
+    // Momentum, as the recorder and the overlay fold it. Only its size matters here, so a lab match with no
+    // start event takes the first side it hears as "home".
+    this.homeId ??= ev.teamId;
+    if (ev.kind === 'try' || ev.kind === 'big-hit' || ev.kind === 'error') this.momentum = applyMomentumEvent(this.momentum, ev.kind, ev.teamId === this.homeId);
+    else if (ev.kind === 'set-start') this.momentum = decayMomentum(this.momentum);
+    if (typeof ev.x === 'number') this.ballX = ev.x;
+    const cheers = this.cheersFor(ev.teamId);
+    this.startCrowd(); // the lab has no match:started; a context woken mid-match starts it here
+    this.setCrowdBase(crowdLevel(this.ballX, this.momentum), crowdSwellFor(ev, cheers));
+    for (const cue of soundsForMatchEvent(ev, cheers)) this.playSfx(cue.name, cue);
+  }
+
+  /** The referee's whistle for a penalty (the contract has no event for one; the playback says so on the bus). */
+  onPenalty(): void {
+    this.playSfx('whistle');
+  }
+
+  /** A clean break (#638, about 3 a match): the whoosh and the big swell. Every break the sim counts (about 16) only lifts the crowd a little. */
+  onCleanBreak(): void {
+    this.setCrowdBase(crowdLevel(this.ballX, this.momentum), CROWD_SWELL['clean-break']!);
+    this.playSfx('whoosh');
+  }
+
+  /** Full time: the whistle has gone (the match event); the sting for the coached side's result follows it. */
+  onFinished(fixture: { homeId: string; awayId: string } | undefined, result: { homeScore: number; awayScore: number } | undefined): void {
+    const mine = getState().clubId;
+    const home = fixture?.homeId === mine;
+    const scored = result !== undefined && (home || fixture?.awayId === mine);
+    const own = !scored ? null : home ? result.homeScore : result.awayScore;
+    const theirs = !scored ? 0 : home ? result.awayScore : result.homeScore;
+    this.coaching = false;
+    this.homeId = null;
+    this.momentum = 0;
+    this.ballX = null;
+    this.crowdBase = CROWD_BASE;
+    this.stopCrowd(2.5);
+    if (own === null) {
+      this.playMusic('grounds');
+      return;
+    }
+    const sting = stingForResult(own, theirs);
+    this.playSfx(sting, { delay: 1.4 });
+    if (sting === 'stingLoss') {
+      // No cheerful tune on the way out of a loss: the grounds track waits for the next screen.
+      this.stopMusic();
+      this.holdGrounds = true;
+    } else {
+      this.later(() => {
+        if (!this.active || this.active.track === 'match') this.playMusic('grounds');
+      }, 3500);
+    }
+  }
+
+  /** Bring the grounds track back after a loss, once the player has moved on. */
+  private releaseGrounds(): void {
+    if (!this.holdGrounds) return;
+    this.holdGrounds = false;
+    if (!this.active) this.playMusic('grounds');
+  }
+
+  private later(fn: () => void, ms: number): void {
+    const t = setTimeout(() => {
+      this.timers.delete(t);
+      fn();
+    }, ms);
+    this.timers.add(t);
+  }
+
   /** Tear down: stop scheduler, unsubscribe bus handlers, close context. */
   dispose(): void {
     if (this.disposed) return;
@@ -486,6 +911,9 @@ export class AudioEngine {
     }
     for (const off of this.unsubs) off();
     this.unsubs = [];
+    for (const t of this.timers) clearTimeout(t);
+    this.timers.clear();
+    this.crowd = null;
     this.active = null;
     this.fadingOut = [];
     if (this.ctx && this.ctx.state !== 'closed') {
@@ -501,16 +929,33 @@ export class AudioEngine {
         if (p.delta > 0) this.playSfx('coin');
       }),
     );
+    this.unsubs.push(bus.on('match:event', (ev) => this.onMatchEvent(ev)));
+    this.unsubs.push(bus.on('match:penalty', () => this.onPenalty()));
+    this.unsubs.push(bus.on('match:clean-break', () => this.onCleanBreak()));
+    this.unsubs.push(bus.on('match:call-paid', () => this.playSfx('callPaid')));
+    this.unsubs.push(bus.on('ui:notify', () => this.playSfx('click')));
     this.unsubs.push(
-      bus.on('match:event', (ev) => {
-        const sfx = sfxForMatchEventKind(ev.kind);
-        if (sfx) this.playSfx(sfx);
-        if (ev.kind === 'try') this.playSfx('cheer');
+      bus.on('match:started', ({ home, away }) => {
+        // The coached club is GameState.clubId; its sheet (and so its events' teamId) carries that id.
+        const mine = getState().clubId;
+        this.coaching = home?.clubId === mine || away?.clubId === mine;
+        this.homeId = home?.clubId ?? null;
+        this.momentum = 0;
+        this.ballX = null;
+        this.holdGrounds = false;
+        this.playMusic('match');
+        this.startCrowd();
       }),
     );
-    this.unsubs.push(bus.on('ui:notify', () => this.playSfx('click')));
-    this.unsubs.push(bus.on('match:started', () => this.playMusic('match')));
-    this.unsubs.push(bus.on('match:finished', () => this.playMusic('grounds')));
+    this.unsubs.push(bus.on('match:finished', ({ fixture, result }) => this.onFinished(fixture, result)));
+    this.unsubs.push(
+      bus.on('match:parked', () => {
+        this.coaching = false;
+        this.stopCrowd();
+      }),
+    );
+    this.unsubs.push(bus.on('ui:openScreen', () => this.releaseGrounds()));
+    this.unsubs.push(bus.on('week:advanced', () => this.releaseGrounds()));
   }
 
   // ── internals ──────────────────────────────────────────────────────────
@@ -572,18 +1017,18 @@ export class AudioEngine {
     osc.stop(note.when + note.duration + 0.02);
   }
 
-  private renderTone(tone: SfxTone, now: number): void {
+  private renderTone(tone: SfxTone, now: number, gain = 1, pitch = 1): void {
     if (!this.ctx || !this.master) return;
     const at = now + tone.start;
     const osc = this.ctx.createOscillator();
     const g = this.ctx.createGain();
     osc.type = tone.type;
-    osc.frequency.setValueAtTime(tone.freq, at);
+    osc.frequency.setValueAtTime(tone.freq * pitch, at);
     if (tone.freqEnd !== undefined) {
-      osc.frequency.linearRampToValueAtTime(tone.freqEnd, at + tone.duration);
+      osc.frequency.linearRampToValueAtTime(tone.freqEnd * pitch, at + tone.duration);
     }
     g.gain.setValueAtTime(0, at);
-    g.gain.linearRampToValueAtTime(tone.gain, at + tone.attack);
+    g.gain.linearRampToValueAtTime(tone.gain * gain, at + tone.attack);
     g.gain.exponentialRampToValueAtTime(0.0001, at + tone.duration);
     osc.connect(g);
     g.connect(this.master);
@@ -591,7 +1036,7 @@ export class AudioEngine {
     osc.stop(at + tone.duration + 0.02);
   }
 
-  private renderNoise(noise: SfxNoise, now: number): void {
+  private renderNoise(noise: SfxNoise, now: number, gain = 1, pitch = 1): void {
     if (!this.ctx || !this.master) return;
     const at = now + noise.start;
     const buffer = this.makeNoiseBuffer(noise.duration);
@@ -603,16 +1048,16 @@ export class AudioEngine {
     if (noise.filter) {
       const filter = this.ctx.createBiquadFilter();
       filter.type = noise.filter;
-      filter.frequency.setValueAtTime(noise.freqStart, at);
+      filter.frequency.setValueAtTime(noise.freqStart * pitch, at);
       if (noise.freqEnd !== undefined) {
-        filter.frequency.linearRampToValueAtTime(noise.freqEnd, at + noise.duration);
+        filter.frequency.linearRampToValueAtTime(noise.freqEnd * pitch, at + noise.duration);
       }
       if (noise.Q !== undefined) filter.Q.value = noise.Q;
       src.connect(filter);
       node = filter;
     }
     g.gain.setValueAtTime(0, at);
-    g.gain.linearRampToValueAtTime(noise.gain, at + noise.attack);
+    g.gain.linearRampToValueAtTime(noise.gain * gain, at + noise.attack);
     g.gain.exponentialRampToValueAtTime(0.0001, at + noise.duration);
     node.connect(g);
     g.connect(this.master);
@@ -635,6 +1080,68 @@ export class AudioEngine {
 
 let engine: AudioEngine | null = null;
 
+/** The gestures that can unlock audio. touchend and click are the ones iOS accepts; pointerdown alone is not enough there. */
+export const UNLOCK_EVENTS = ['pointerdown', 'keydown', 'touchend', 'click'] as const;
+
+interface ListenTarget {
+  addEventListener(type: string, fn: () => void, opts?: unknown): void;
+  removeEventListener(type: string, fn: () => void): void;
+}
+
+/**
+ * Keep audio unlocked (#636). Listens for a gesture until the context is actually running (a gesture
+ * that leaves it suspended keeps the listeners), then stands down. If the context is later suspended or
+ * interrupted (a call, the lock screen, switching apps), or the page comes back to the foreground and it
+ * is not running, it tries `resume()` and arms the listeners again. `onUnlocked` runs each time it gets going.
+ * Returns a remover. `win` and `doc` are injectable for the unit test.
+ */
+export function installAudioUnlock(
+  eng: AudioEngine,
+  win: ListenTarget,
+  doc: ListenTarget & { visibilityState?: string },
+  onUnlocked: () => void = () => {},
+): () => void {
+  let armed = false;
+  const disarm = (): void => {
+    if (!armed) return;
+    armed = false;
+    for (const t of UNLOCK_EVENTS) win.removeEventListener(t, onGesture);
+  };
+  const arm = (): void => {
+    if (armed) return;
+    armed = true;
+    for (const t of UNLOCK_EVENTS) win.addEventListener(t, onGesture);
+  };
+  function onGesture(): void {
+    void eng.resume().then(() => {
+      if (!eng.running) return; // still asleep: stay armed for the next tap
+      disarm();
+      onUnlocked();
+    });
+  }
+  const retry = (): void => {
+    if (eng.running) return;
+    arm();
+    void eng.resume().then(() => {
+      if (eng.running) {
+        disarm();
+        onUnlocked();
+      }
+    });
+  };
+  const onVisible = (): void => {
+    if (doc.visibilityState === 'visible') retry();
+  };
+  arm();
+  doc.addEventListener('visibilitychange', onVisible);
+  const offStalled = eng.onStalled(retry);
+  return () => {
+    disarm();
+    doc.removeEventListener('visibilitychange', onVisible);
+    offStalled();
+  };
+}
+
 /**
  * Create (once) the AudioEngine singleton, subscribe it to the bus, and register
  * a one-time self-removing gesture listener that resumes the context and starts
@@ -645,18 +1152,13 @@ export function initAudio(): AudioEngine {
   engine = new AudioEngine();
   engine.subscribeBus();
 
-  if (typeof window !== 'undefined' && engine.available) {
-    const onGesture = (): void => {
-      window.removeEventListener('pointerdown', onGesture);
-      window.removeEventListener('keydown', onGesture);
-      void engine?.resume().then(() => {
-        // The gesture may itself have triggered a match (Advance Week click);
-        // don't crossfade grounds music over a track that already started.
-        if (!engine?.musicPlaying) engine?.playMusic('grounds');
-      });
-    };
-    window.addEventListener('pointerdown', onGesture, { once: true });
-    window.addEventListener('keydown', onGesture, { once: true });
+  if (typeof window !== 'undefined' && typeof document !== 'undefined' && engine.available) {
+    const eng = engine;
+    installAudioUnlock(eng, window, document, () => {
+      // The gesture may itself have triggered a match (Advance Week click);
+      // don't crossfade grounds music over a track that already started.
+      if (!eng.musicPlaying) eng.playMusic('grounds');
+    });
   }
 
   return engine;

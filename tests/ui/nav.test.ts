@@ -208,12 +208,64 @@ describe('the dock at every text size (#344)', () => {
     expect(narrow).toMatch(/\.nrl-dock-tabs \{ order: 1; flex: 1 1 100%/);
     expect(narrow).toMatch(/\.nrl-nav-caret \{ display: none; \}/);
   });
+
+  it("holds ▴'s room on a closed tab at Normal, after the dot; not at Large or Larger, to 620px or upright, where ▴ takes room only when open (#607)", () => {
+    expect(rule('.nrl-nav-room')).toMatch(/order: 1; flex: 0 0 auto; margin-left: -6px; white-space: pre; visibility: hidden/);
+    expect(rule('.nrl-dock-tabs > .nrl-btn')).toMatch(/gap: 6px/); // the gap the room's margin takes back
+    expect(CSS).toMatch(/\.nrl-dock-tabs > \.nrl-btn:has\(\.nrl-nav-caret\) > \.nrl-nav-room, html\[data-text-size\] \.nrl-nav-room \{ display: none; \}/);
+    expect(CSS.slice(CSS.indexOf('@media (max-width: 620px)'))).toMatch(/^@media \(max-width: 620px\) \{[^@]*\n  \.nrl-nav-room \{ display: none; \}/);
+    expect(PORTRAIT_CSS).toMatch(/html:root \.nrl-nav-caret, html:root \.nrl-nav-room \{ display: none; \}/);
+  });
+
+  it('gives tab padding back for it on a phone at Normal, under the Large and Larger rules (#607)', () => {
+    expect(CSS).toMatch(/@media \(min-width: 761px\) and \(max-width: 900px\) \{ \.nrl-dock-tabs > \.nrl-btn \{ padding: 0 8px; \} \}/);
+    expect(CSS).toMatch(/@media \(min-width: 621px\) and \(max-width: 760px\) \{ \.nrl-dock-tabs > \.nrl-btn \{ padding: 0 6px; \} \}/);
+  });
 });
 
 import { beforeEach, afterEach, vi } from 'vitest';
 import { createNav } from '../../src/ui/nav';
 import { stubDocument, StubNode } from './stubDom';
 import { bus } from '../../src/core/events';
+import { el, openScreen, closeScreen } from '../../src/ui/dom';
+import { PORTRAIT_CSS } from '../../src/ui/portrait';
+
+// #607: the dock never moves. A closed tab holds ▴'s room; the open tab's label carries the ▴ itself.
+describe('the tabs stay put when one opens (#607)', () => {
+  beforeEach(() => { stubDocument(); bus.clear(); });
+  afterEach(() => { closeScreen(); vi.unstubAllGlobals(); });
+  it("every tab but CLUB has ▴'s room from the start; ▴ itself is in the open tab's label only", () => {
+    const nav = createNav();
+    nav.registerScreen('squad', 'Squad', () => openScreen(el('div'), undefined, 'squad'));
+    nav.registerScreen('fixtures', 'League', () => openScreen(el('div'), undefined, 'fixtures'));
+    nav.registerScreen('staff', 'Staff & Board', () => {}, { more: true });
+    const body = document.body as unknown as StubNode;
+    const ids = ['club', 'squad', 'fixtures', 'office'];
+    const tab = (id: string): StubNode => body.querySelector(`[data-screen="${id}"]`)!;
+    const rooms = (): (string | null)[] => ids.map((id) => tab(id).querySelector('.nrl-nav-room')?.textContent ?? null);
+    const labels = (): string[] => ids.map((id) => tab(id).querySelector('.nrl-nav-label')!.textContent);
+    const everyRoom = [null, ' ▴', ' ▴', ' ▴'];
+    expect([rooms(), labels()]).toEqual([everyRoom, ['CLUB', 'SQUAD', 'LEAGUE', 'OFFICE']]);
+    // The room is as wide as what an open label gains: the same text.
+    expect(tabText('Squad', true)).toBe(`${tabText('Squad', false)}${rooms()[1]}`);
+
+    tab('squad').click();
+    expect(tab('squad').getAttribute('aria-current')).toBe('page');
+    expect([rooms(), labels()]).toEqual([everyRoom, ['CLUB', 'SQUAD ▴', 'LEAGUE', 'OFFICE']]);
+    expect(tab('squad').querySelector('.nrl-nav-caret')!.textContent).toBe(' ▴');
+    tab('office').click(); // Office's sheet over the grounds: the screen closes first
+    expect([rooms(), labels()]).toEqual([everyRoom, ['CLUB', 'SQUAD', 'LEAGUE', 'OFFICE ▴']]);
+    tab('club').click();
+    expect([rooms(), labels()]).toEqual([everyRoom, ['CLUB', 'SQUAD', 'LEAGUE', 'OFFICE']]);
+    // The room is after the label in the tab, the alert dot after both: CSS (order) draws the dot between.
+    nav.setDot('squad', true, 'Squad — 1 contract ends within 4 weeks');
+    expect(tab('squad').children.map((c) => c.className)).toEqual(['nrl-nav-label', 'nrl-nav-room', 'nrl-nav-dot']);
+    // What a tab says is its aria-label, so the hidden ▴ is never read out.
+    expect(tab('squad').getAttribute('aria-label')).toBe('Squad — 1 contract ends within 4 weeks');
+    expect(tab('fixtures').getAttribute('aria-label')).toBe('League');
+    nav.destroy();
+  });
+});
 
 describe('Office locks (#482)', () => {
   beforeEach(() => { stubDocument(); bus.clear(); });

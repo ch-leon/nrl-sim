@@ -2,7 +2,8 @@
 // rendering (openFixturesScreen/openLadderScreen) is skipped: jsdom is not
 // installed and the vitest env is 'node' (see vite.config.ts), matching the
 // hud.ts / nav.ts convention. The formatting/projection helpers are pure and
-// covered here.
+// covered here. The open sheet drawing itself again as the week moves on (#603)
+// is in leagueLive.test.ts, on the stand-in DOM.
 import { describe, it, expect } from 'vitest';
 import {
   fmtFixtureLine,
@@ -192,5 +193,26 @@ describe('the League sheet (3h)', () => {
       ['R3', 'Cyclones', false, 'next', 'NEXT'],
       ['R4', 'Reapers', true, 'later', 'Wk 4'],
     ]);
+  });
+});
+
+import { LEAGUE_CSS, myFixtureParts } from '../../../src/ui/screens/fixtures';
+import { StubNode, stubDocument } from '../stubDom';
+import { afterEach, beforeEach, vi } from 'vitest';
+
+// #616: the H / A marker sits beside the opponent, so a long name is cut and the marker stays.
+describe('a fixture row with a long opponent', () => {
+  beforeEach(() => stubDocument());
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('keeps H / A out of the cut name, never shrinking', () => {
+    const parts = myFixtureParts({ round: 3, rd: 'R3', opponentId: 'w', opponent: 'W'.repeat(24), home: false, tone: 'later', res: 'Wk 3' }) as unknown as StubNode[];
+    expect(parts.map((p) => p.className)).toEqual(['nrl-fixture-rd', 'nrl-fixture-opp', 'nrl-fixture-ha', 'nrl-fixture-res nrl-fixture-later']);
+    expect(parts[1]!.textContent).toBe(`v ${'W'.repeat(24)}`);
+    expect(parts[1]!.children).toEqual([]);
+    expect(parts[2]!.textContent).toBe('A');
+    expect(parts[2]!.getAttribute('title')).toBe('Away');
+    expect(LEAGUE_CSS).toContain('.nrl-fixture-ha { flex: 0 0 auto;');
+    expect(LEAGUE_CSS).toMatch(/\.nrl-fixture-opp \{[^}]*min-width: 0;[^}]*text-overflow: ellipsis;/);
   });
 });

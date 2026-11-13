@@ -17,14 +17,15 @@ predicts a winner.
 Done when the kick clearly reaches the strike on the real release tick, a
 successful high reception has a distinct airborne take and landing, and the
 scorer grounds the ball, recovers and celebrates without an abrupt pose change.
-Teammates can react differently without inventing a paired interaction.
+Teammates can react differently without inventing a paired interaction; since #668 they
+gather round the scorer to do it, each on his own.
 
 ## Implementation
 
 - `moments.ts` paints punts, low grubber stabs, drop kicks, high takes, scored
   dives, recovery and individual celebrations. It reuses the approved head
   painter and short arm/leg solvers. Dives rotate the body and face together;
-  turf flecks mark the slide. All images fit the existing 44×40 texture.
+  turf flecks mark the slide. All images fit the 44×42 player texture (#643).
 - The kick sampler uses real start, strike and unlock ticks. Frames before the
   strike keep the ball embedded in the holder's hands; the strike and follow-
   through use the real flying ball. Immediate goal kicks begin at the strike,
@@ -40,9 +41,10 @@ Teammates can react differently without inventing a paired interaction.
 - The try phase identifies the actual scorer and his scoring side. The first
   ten ticks show the dive/grounding; the next ten bridge the sim's change from
   `dive` to `celebrate` with a rise. The scorer then joins the celebration.
-  Teammates choose stable fist-pump, pointing or arms-up reactions from player
-  identity and try time. No extra RNG, invented chest-bump partner or opponent
-  celebration is introduced. The holder keeps the only rendered ball.
+  Teammates choose stable fist-pump, pointing, arms-up or knee-slide (#644)
+  reactions from player identity and try time. No extra RNG, invented chest-bump
+  partner or opponent celebration is introduced: `chestBump` stays drawn but
+  unpicked, as it needs a partner. The holder keeps the only rendered ball.
 
 ## Snapshot contract and compatibility
 
@@ -55,9 +57,58 @@ An old tag cannot affect a later pass or pickup because it must match the curren
 retain ordinary pose sampling.
 
 No movement, rules, contest probabilities, timing knobs, match RNG, saves or
-appearance assignments change. The frame cache remains bounded at 512 CPU
+appearance assignments change. The frame cache remains bounded (768 since #646) CPU
 frames, with one reusable GPU texture per actor. Pause and seek sample from the
 snapshot alone; no wall-clock animation state is accumulated.
+
+## The mob and the slump (#668)
+
+From the scorer's `tryTick` the view (`src/match/view/tryMob.ts`) draws his
+nearest team-mates gathering round him: up to four, those within 10 m, the pull
+fading out by 14 m and as a fifth man closes on the fourth, so nobody joins or
+leaves in a single tick. Each comes in from his own side of the scorer and stops
+2.6 m short, drawn at most 6 m from where the sim has him. They gather over 18
+ticks, hold to 28, and are eased back by 48, two ticks before the try phase ends
+(`live.tryTicks`, 50) and the conversion's positions take over. They run while
+the view carries them and cheer on the spot otherwise, each on his own
+(`fistPump` or `celebrate`, from his identity): still no hugs, handshakes or
+chest-bumps, and no partner. Like the contact layout, this changes only where
+they are drawn; the sim's positions, and the snap test on them (a body placed
+more than 4 m in a tick), are untouched, and the offsets are interpolated
+between ticks like any position. The worst drawn step through a try is about
+10 world px a tick, under a sprinter's and far under a snap.
+
+The side that conceded slumps 8 ticks after the try: standing, hands on hips
+with the head down (the pose painted for #667); on the move back to their
+positions, the spent trudge (#666's level 2: hunched, head down, no spring).
+
+## Reactions (#667)
+
+The big moments are no longer only the scoring side's. `PlayerSnap` adds
+`reactTick` and `react` (`error`, `miss`, `bin`), the same kind of
+presentation fact as `tryTick` and `celebrationTick`: stamped (`react()` in
+`live/base.ts`) beside an event the sim already emits, never read back by the
+sim, no RNG, and reported for `REACT_SNAP_TICKS` (40) after it. Nothing is
+invented for the view; each stamp is a fact the sim has just announced:
+
+| Event (emit) | Who | Reaction |
+| --- | --- | --- |
+| `error` (knock-on on a pass, ball lost in the tackle) | the man who lost it | hands on head |
+| `drop` (a spilled kick) | the catcher | hands on head |
+| `strip` | the carrier stripped (the event names the tackler) | hands on head |
+| `conversion`, `penalty-goal`, `field-goal` missed | the kicker | hands on head |
+| `sin-bin` | the culprit | arms folded, while `binned` |
+
+`playerPicture` holds hands on head for `REACT_HOLD_TICKS` (24, about a second
+at ×1) from the stamp, over his standing or running legs, and only while he is
+free: not holding the ball, not in a tackle or other locked pose, and with no
+opponent carrying the ball within 8 m (he is needed). A man stood still nods it
+over two frames. The binned man folds his arms for as long as `binned` is set,
+walking off or on the touchline; where he stands is the stadium's. A missed
+tackle that led to a break is left out: the line-break event names only the
+breaker, and the beaten tackler named by `break-tackle` is immediately chasing,
+so there is no fact that says he missed *and* is free. Hands on hips, head
+down, is painted for the conceding side after a try (#668).
 
 ## Review
 

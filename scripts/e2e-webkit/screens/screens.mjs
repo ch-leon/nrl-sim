@@ -23,14 +23,15 @@ export const SCREEN_RUNS = (process.env.E2E_SCREEN_SIZES ?? '844x390@47,0,47,21 
 
 /** Screens reached from the dock: what shows its content, and what must stay on screen. */
 const NAV_SCREENS = [
-  { id: 'squad', box: '.nrl-screen-region', rows: '.nrl-grid-body > .nrl-row', primary: ['[data-focus-menu]'] },
-  { id: 'lineup', box: '.nrl-screen-region', rows: '.nrl-lineup-list > *', card: '.nrl-lineup-field', primary: ['[data-auto-pick]'] },
+  { id: 'squad', box: '.nrl-screen-region', rows: '.nrl-grid-body > .nrl-row', primary: ['[data-focus-menu]'], more: '.nrl-grid-body' },
+  { id: 'lineup', box: '.nrl-screen-region', rows: '.nrl-lineup-list > *', card: '.nrl-lineup-field', primary: ['[data-auto-pick]'], more: '.nrl-lineup-list' },
   { id: 'recruit', box: '.nrl-screen-region', rows: '.nrl-grid-body > .nrl-row', primary: ['.nrl-grid-body > :first-child .nrl-row-action'] },
   { id: 'fixtures', box: '.nrl-screen-region', rows: '.nrl-fixture-row', primary: ['[data-next-row]'] },
-  { id: 'ladder', box: '.nrl-screen-region', rows: '.nrl-ladder-table tbody tr' },
+  { id: 'ladder', box: '.nrl-screen-region', rows: '.nrl-ladder-table tbody tr', more: '.nrl-ladder-scroll' },
   { id: 'news', box: '.nrl-screen-region .nrl-modal', rows: '.nrl-news-item, .nrl-news-empty', card: '.nrl-event-card' },
   { id: 'build', box: '.nrl-screen-region', rows: '.nrl-build-list > *', primary: ['.nrl-build-list > :first-child'] },
-  { id: 'finance', box: '.nrl-screen-region', rows: '.nrl-finance-row', card: '.nrl-finance-tile', primary: ['[data-finance-contracts]'] },
+  // #610: THIS WEEK's seven lines all show; the seventh, Home gates, was under the sheet's foot.
+  { id: 'finance', box: '.nrl-screen-region', rows: '.nrl-finance-row', all: '.nrl-finance-lines > .nrl-finance-row', card: '.nrl-finance-tile', primary: ['[data-finance-contracts]'] },
   // The three one-button roles must show whole; the attack coach's taller row of four Hire
   // buttons (#326) comes after them and is reached by scrolling the staff list.
   { id: 'staff', box: '.nrl-screen-region', rows: '.nrl-staff-row:not([data-staff="attackCoach"])', primary: ['.nrl-staff-row .nrl-btn'] },
@@ -107,6 +108,9 @@ function screenProblems(page, spec, safe) {
     }
     const content = `${shown}/${rows.length} rows whole${spec.card ? `, ${cards} whole card(s)` : ''}${spec.prose ? `, ${lines} lines of text` : ''}`;
     if (shown < need && cards < 1 && lines < 8) out.push(`only ${content}`);
+    // Rows that must all show without a scroll (`all`).
+    const hid = spec.all ? [...box.querySelectorAll(spec.all)].filter((e) => !seen(e)) : [];
+    if (hid.length) out.push(`not whole without scrolling: ${hid.map((e) => e.textContent.trim().slice(0, 24)).join('; ')}`);
     // Every close in the screen, and its primary action. A screen with one named
     // exit (the full-time report's Back to Club) has no ✕ of its own: that exit instead.
     const closes = [...box.querySelectorAll('button')].filter((b) => /^(✕|close)$/i.test(b.textContent.trim()) || b.getAttribute('aria-label') === 'Close');
@@ -136,6 +140,36 @@ function screenProblems(page, spec, safe) {
     }
     return { problems: out, content };
   }, [spec, safe]);
+}
+
+/**
+ * The scroll cue on the list `sel` (#610): a phone draws no scrollbar until a finger moves, so a
+ * list with more below fades at its foot (.nrl-scroll-more, a mask), and does not at its end.
+ * The list goes back where it was.
+ */
+async function scrollCueProblems(page, sel) {
+  const at = (to) => page.evaluate(([sel, to]) => {
+    const e = document.querySelector(sel);
+    if (!e) return null;
+    if (to !== null) e.scrollTop = to === 'end' ? e.scrollHeight : to;
+    // Two frames: the scroll event, then the style.
+    return new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(() => {
+      const cs = getComputedStyle(e);
+      const mask = [cs.maskImage, cs.webkitMaskImage].some((m) => m && m !== 'none');
+      res({ top: e.scrollTop, more: e.scrollTop + e.clientHeight < e.scrollHeight - 1, cue: e.classList.contains('nrl-scroll-more'), mask });
+    })));
+  }, [sel, to]);
+  const was = await at(null);
+  if (!was) return [`${sel} not shown`];
+  // From its top, wherever it opened (the ladder opens on the club's row).
+  const top = await at(0);
+  if (!top.more) return [`${sel} has nothing below it to cue`];
+  const out = [];
+  if (!top.cue || !top.mask) out.push(`${sel} has more below and no fade at its foot (class ${top.cue}, mask ${top.mask})`);
+  const end = await at('end');
+  if (end.more || end.cue || end.mask) out.push(`${sel} still fades at the end of the list (more ${end.more}, class ${end.cue}, mask ${end.mask})`);
+  await at(was.top);
+  return out;
 }
 
 /**
@@ -453,9 +487,52 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
         await page.locator('.nrl-hint-x').tap();
         rec.notes.push('first-visit hint dismissed');
       }
-      return check(rec, spec, spec.id);
+      const problems = await check(rec, spec, spec.id);
+      if (spec.more) problems.push(...await scrollCueProblems(page, spec.more));
+      return problems;
     });
   }
+  // #605: a sheet that takes another's place has no entrance (the rise starts from nothing, so
+  // the grounds flashed through between the two): a dock tab, Squad's segments, an Office tile,
+  // Finance's VIEW ▸ and its ◂ back. One opened on the bare grounds rises, and again after a close.
+  await step('sheet-swap', async (rec) => {
+    const grounds = async () => {
+      await tap(SHEET_EXIT);
+      await page.waitForSelector('.nrl-screen-region', { state: 'detached' });
+      await page.waitForTimeout(250);
+    };
+    /** Tap `sel` and read the sheet in the same turn, before a frame is drawn: its key, and whether it rises. */
+    const open = (sel) => page.evaluate((sel) => {
+      document.querySelector(sel)?.click();
+      const s = document.querySelector('.nrl-screen-region');
+      return s ? { key: s.getAttribute('data-screen-key'), rises: getComputedStyle(s).animationName !== 'none' } : null;
+    }, sel);
+    const dockTab = (id) => `.nrl-nav > .nrl-btn[data-screen="${id}"]`;
+    const out = [];
+    const want = async (what, sel, key, rises) => {
+      const got = await open(sel);
+      await page.waitForTimeout(250);
+      if (got?.key !== key) out.push(`${what}: ${got?.key ?? 'no'} sheet, not ${key}`);
+      else if (got.rises !== rises) out.push(`${what}: the sheet ${got.rises ? 'rises in from nothing' : 'has no entrance'}`);
+      else rec.notes.push(`${what} ${rises ? 'rises' : 'swaps'}`);
+    };
+    await grounds();
+    await want('grounds → SQUAD', dockTab('squad'), 'squad', true);
+    await want('SQUAD → LEAGUE', dockTab('fixtures'), 'fixtures', false);
+    await want('LEAGUE → SQUAD', dockTab('squad'), 'squad', false);
+    await want('Squad → Lineup', '.nrl-sq-tabs [data-seg="lineup"]', 'lineup', false);
+    await want('Lineup → Recruit', '.nrl-sq-tabs [data-seg="recruit"]', 'recruit', false);
+    await tap('.nrl-nav [data-nav-more]');
+    await page.waitForSelector('.nrl-nav-sheet:not([hidden])');
+    await page.waitForTimeout(250);
+    await want('Office → Finance', '.nrl-nav-sheet [data-screen="finance"]', 'finance', false);
+    await want('Finance → Contracts', '[data-finance-contracts]', 'contracts', false);
+    await want('Contracts ◂ Finance', '.nrl-screen-region [data-back]', 'finance', false);
+    await grounds();
+    await want('grounds → LEAGUE', dockTab('fixtures'), 'fixtures', true);
+    await grounds();
+    return out;
+  });
   // #467: every new readout at both requested text sizes. Images stay in CI artifacts.
   const textSize = (size) => page.evaluate((size) => {
     if (size === 'normal') document.documentElement.removeAttribute('data-text-size');
@@ -736,7 +813,7 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
       const trayAt = Date.now();
       const traying = await clock();
       if (!(await runs(traying).then(() => true).catch(() => false))) out.push('the match stopped under the coach tray');
-      // Measure the tray settled (#390): mid slide-in (nrl-mo-up, 180ms) WebKit reports its 44px rows as 43.99998px.
+      // Measure the tray settled (#390): mid slide-in (nrl-sheet-up, 180ms) WebKit reports its 44px rows as 43.99998px.
       await page.evaluate(() => Promise.all(document.querySelector('.nrl-mo-calls').getAnimations({ subtree: true }).map((a) => a.finished.catch(() => {}))));
       const tray = await page.evaluate(() => {
         const t = document.querySelector('.nrl-mo-calls');

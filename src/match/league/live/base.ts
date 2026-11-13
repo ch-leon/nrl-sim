@@ -58,6 +58,12 @@ export abstract class LiveBase {
   protected mark: Vec = { x: 50, y: MID_Y };
   /** The defensive line's x. */
   protected lineX = 60;
+  /** The last ruck's fixed legal line; reaching it once releases each non-marker. */
+  protected retreat: {
+    side: Side; dir: 1 | -1; line: number;
+    eligible: Map<Player, string>; markers: Map<Player, string>;
+  } | null = null;
+
   protected pendingKick: PendingKick | null = null;
   /** Who kicked the ball now in the air (he leads the chase). */
   protected lastKicker = -1;
@@ -315,6 +321,7 @@ export abstract class LiveBase {
     this.looseFor = null;
     this.pendingKick = null;
     this.markers = [];
+    this.retreat = null;
     this.kickFrom = null;
     this.outPending = null;
     this.assignTargets();
@@ -357,6 +364,8 @@ export abstract class LiveBase {
         drain: drainRate(stamina, traits),
         gassed: false,
         body: makeBody({ x: 50, y: MID_Y }, maxSpeedFor(stats.speed), { x: this.dirOf(side), y: 0 }),
+        odometer: 0,
+        react: null, // set at build so every player has one shape: added later it slowed the whole sim by a third
         pose: 'idle',
         poseUntil: 0,
         lockUntil: 0,
@@ -387,6 +396,41 @@ export abstract class LiveBase {
     });
   }
 
+  protected startRetreat(): void {
+    this.retreat = null;
+    const handover = this.phase.kind === 'ruck' && this.phase.handover && this.phase.stage !== 'dh';
+    const side = handover ? this.attacking : other(this.attacking);
+    const dir = this.dirOf(other(side));
+    const markers = this.currentMarkers().filter(p => p.side === side && this.onField(p));
+    const line = Math.max(0, Math.min(FIELD_LENGTH, this.mark.x + dir * LIVE.onsideM));
+    this.retreat = { side, dir, line, eligible: new Map(), markers: new Map(markers.map(p => [p, p.key])) };
+    this.observeRetreat();
+  }
+
+  /**
+   * Null means free to defend; otherwise he still owes this fixed retreat line.
+   * Also records an observed crossing before a decision; move observes every tick.
+   */
+  protected retreatLine(p: Player): number | null {
+    const r = this.retreat;
+    const handover = this.phase.kind === 'ruck' && this.phase.handover && this.phase.stage !== 'dh';
+    if (!r || r.side !== p.side || r.side !== (handover ? this.attacking : other(this.attacking))
+      || r.dir !== (handover ? -this.dir : this.dir)) return null;
+    if (!this.onField(p)) return null;
+    if (r.markers.get(p) === p.key || r.eligible.get(p) === p.key) return null;
+    if ((p.body.pos.x - r.line) * r.dir >= 0) {
+      r.eligible.set(p, p.key);
+      return null;
+    }
+    return r.line;
+  }
+
+  /** Observe every movement tick, including ticks between targeting decisions. */
+  protected observeRetreat(): void {
+    if (!this.retreat) return;
+    for (const p of this.side(this.retreat.side)) this.retreatLine(p);
+  }
+
   private idx(side: Side, slot: number): number {
     return (side === 'home' ? 0 : PLAYERS) + slot;
   }
@@ -410,6 +454,10 @@ export abstract class LiveBase {
   }
   protected emit(kind: string, text: string, p?: Player, trait?: string): void {
     this.events.push({ tick: this.tick, kind, text, ...(p ? { side: p.side, slot: p.slot, player: p.name } : {}), ...(trait ? { trait } : {}) });
+  }
+  /** Remember, for the picture only, that he just made the error, missed the goal or was binned (#667). */
+  protected react(p: Player, kind: 'error' | 'miss' | 'bin'): void {
+    p.react = { tick: this.tick, kind };
   }
   /** Metres from the carrier to the line he is attacking. */
   protected toLine(p: Player): number {

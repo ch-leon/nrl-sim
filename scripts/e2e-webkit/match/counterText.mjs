@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { BASE, OUT_ROOT, IPHONE_UA, closeWeekSummary, openNav, log } from '../common.mjs';
+import { BASE, OUT_ROOT, IPHONE_UA, closeWeekSummary, openNav, log, skipFromPill } from '../common.mjs';
 
 /** #468: the real loss report and its plan CTA at both landscape sizes and text
  * settings. Screenshots are CI artifacts, never checked into the repository. */
@@ -32,7 +32,9 @@ export async function runCounterText(browser) {
         const s = window.__nrlState();
         s.settings.textSize = size;
         s.settings.hints = false;
-        s.rngSeed = 468;
+        // #618: seed 468 no longer ranks Out-schemed in the final loss report.
+        // #625: the defensive retreat turns seed 469 into a win.
+        s.rngSeed = 470;
         s.lineup.tactics = { attack: 'grind', defence: 'slide' };
         s.lineup.rotation = 'standard';
         // Normal reads recent habits (#469): this fixture needs Compressed v Tight.
@@ -108,8 +110,7 @@ export async function runCounterText(browser) {
       }));
       await page.screenshot({ path: join(out, `${tag}-commentary.png`) });
       await page.evaluate(() => window.__nrlGame.scene.getScene('Match').playback.release());
-      await page.locator('.nrl-mo-skip').tap();
-      await page.locator('.nrl-mo-skip').tap();
+      await skipFromPill(page);
       await page.waitForSelector('.nrl-mo-ft [data-report]', { timeout: 30000 });
       await page.locator('.nrl-mo-ft [data-report]').tap();
       await page.locator('[data-why-lost] summary').tap();

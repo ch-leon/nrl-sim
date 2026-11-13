@@ -1,6 +1,6 @@
 # Features
 
-Last updated: 2026-11-11
+Last updated: 2026-11-13
 
 What's in the game, with the PR that added each.
 
@@ -49,6 +49,7 @@ What's in the game, with the PR that added each.
 - Upright menus, 5-tab bar ([PR](https://github.com/ch-leon/nrl-sim/pull/436))
 - Three-tap onboarding, Undo ([PR](https://github.com/ch-leon/nrl-sim/pull/380))
 - Text size, non-colour cues ([PR](https://github.com/ch-leon/nrl-sim/pull/385))
+- Touch polish: press feedback, motion tokens, mis-tap guards, scroll cues ([PR](https://github.com/ch-leon/nrl-sim/pull/617))
 
 ## Labs
 
@@ -62,6 +63,46 @@ What's in the game, with the PR that added each.
 - Android test APK ([PR](https://github.com/ch-leon/nrl-sim/pull/394)); CI ([PR](https://github.com/ch-leon/nrl-sim/pull/442))
 
 ## Recently added
+
+- Match watchability, wave 1 ([PR](https://github.com/ch-leon/nrl-sim/pull/676), [tracker](https://github.com/ch-leon/nrl-sim/issues/626)):
+  - A phone shows more of the play: the canvas renders at the screen's pixel density, so a 2× phone sits at ×1.5 (about 14 of 18 players in view, was 11) and big hits and tries zoom in. Developer settings can switch back to the old resolution to compare frame rate. A browser drawing without a GPU (software WebGL) stays at 1×, and the hand-off to a match no longer waits on painting the players' rings, the night light map or the last stadium textures.
+  - A match starts at ×2. Contact plays at the chosen speed, and the ruck is not doubled again at ×2.
+  - Players face the way they move on screen, and the run is a real stride driven by distance run, with a breathing idle.
+  - Three sizes of big moment: a try, a clean break or a 40/20 slows the match; a big hit, bust, strip or intercept freezes for a beat and shakes; the rest keep their pop-up. Only a clean break (about 3 a match) gets the big call.
+  - Match sound: a crowd that rises near the try line and on a break, the whistle, the siren, a boot on the ball, a heavier big hit, and a groan when you concede. Not yet listened to by a person.
+  - The balance report has a watchability table: lead changes, late margins, how tries are scored and what sides do on the last tackle.
+
+- Match watchability, wave 2 ([PR](https://github.com/ch-leon/nrl-sim/pull/676), [tracker](https://github.com/ch-leon/nrl-sim/issues/626)):
+  - Commentary remembers the match: a second try, a hat-trick, the lead changing hands, two tries in a row, a close margin late, a long scoreless spell. A try, a clean break, a sin bin or a penalty stays on the strip for 1.2 s; routine lines no longer push it off.
+  - Forwards are drawn bigger than outside backs, heights vary, and all eleven head styles turn up. Players wear a number (their place on the team sheet) and real sleeve cuffs. A fending carrier keeps striding. Players in existing saves may change look once.
+  - The camera leaves room ahead of the ball carrier, picks its zoom back up 3 s after a pinch, and no longer streaks at the start of a half. The ball spins and its shadow follows its height; players cast a shadow that matches the stadium light.
+  - A coach call paying off shows `COACH'S CALL!` over the player and sounds; the COACH badge pulses when a held call suits the moment; the match holds at ×1 while the tray is open.
+  - Full time counts the score up and shows possession, line breaks and tries on the card. Golden point announces itself, and a final or a derby is tagged in the score bug.
+  - The match draws with less work each frame: the player frame cache holds 768 frames and the team rings are painted once.
+
+- Match watchability, wave 3 ([PR](https://github.com/ch-leon/nrl-sim/pull/676), [tracker](https://github.com/ch-leon/nrl-sim/issues/626)):
+  - A referee trails the ruck and signals tries and penalties; corner flags, benches with the interchange players seated, and a sin bin with a yellow card over the man in it.
+  - The crowd is drawn at the players' scale and fills the near terraces. It groans at a try against and a missed kick, looks up at a bomb, rises at kick-off and full time, waves flags on a home try and runs a Mexican wave.
+  - A scoreboard on the grandstand roof shows the score and flashes after one; floodlights come on bank by bank at dusk and night kick-offs.
+  - Body language: the defensive line gets ready at the play-the-ball; tired players run hunched and stand hands-on-knees; hands on head after a knock-on or a missed goal; team-mates gather round a try scorer; long hair and shorts hems move with the stride.
+  - Ten more traits show when they fire (Offload King, Jets, Last Line, Pickpocket, Poacher, Brick Wall, Hothead, Razzle Dazzle, Gambler, Workhorse), and each player page says what to look for.
+
+- Defenders other than the markers must physically retreat 10m (or to their goal line) after each ruck before they can rejoin the defence, including after quick heels, handovers, sin bins and substitutions ([PR](https://github.com/ch-leon/nrl-sim/pull/677), [evidence](../specs/625-retreat-validation.md)).
+
+- Ruck markers line up square with the play-the-ball, one behind the other in both attacking directions, with room between bodies ([PR](https://github.com/ch-leon/nrl-sim/pull/621), [spec](../specs/618-marker-alignment.md)).
+
+- Kick catches and loose-ball pickups carry explicit commentary detail, so a kick scooped up on its first grounded tick is called a pickup ([PR](https://github.com/ch-leon/nrl-sim/pull/620)).
+
+- A touch and motion polish pass over the menus and the match screen. Controls
+  show a press under the finger and hover fills no longer stick after a tap; a
+  sheet that replaces a sheet opens without replaying its entrance; dialogs and
+  the ▾ menu ease in; motion runs on shared tokens and reduced motion keeps the
+  fades without the travel. A double tap no longer signs two players or upgrades
+  twice, arming SKIP no longer moves the speed pill, and the coach tray ignores
+  taps for a moment after its tiles move. The bank flashes the week's net
+  direction, money reads one way on every screen, the League sheet follows the
+  week, long lists show there is more below, and the dock's tabs hold their
+  place ([issue](https://github.com/ch-leon/nrl-sim/issues/596)).
 
 - The finance testing model now has headless salary, fee, income and cap quotes,
   a versioned contract and a reproducible opening-roster inventory. This prepares

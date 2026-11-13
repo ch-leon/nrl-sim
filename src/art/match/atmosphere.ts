@@ -175,6 +175,27 @@ export function buildLightmap(offsetX: number, g: AtmosphereGrade, scale = 8): L
   return { buf, rect, scale };
 }
 
+/** Light maps built last, kept for the next match (about 60 KB each). */
+const LIGHTMAPS_KEPT = 4;
+const lightmaps = new Map<string, Lightmap>();
+
+/**
+ * buildLightmap, kept: the next fixture's are built in an idle slice during the week
+ * (matchArtAhead.ts), so the match's start only uploads one. Read-only: never write into it.
+ */
+export function cachedLightmap(offsetX: number, g: AtmosphereGrade, scale = 8): Lightmap {
+  const key = `${offsetX}|${scale}|${g.pool}|${g.edge}|${g.falloff}`;
+  let lm = lightmaps.get(key);
+  if (lm) {
+    lightmaps.delete(key);
+  } else {
+    lm = buildLightmap(offsetX, g, scale);
+    while (lightmaps.size >= LIGHTMAPS_KEPT) lightmaps.delete(lightmaps.keys().next().value!);
+  }
+  lightmaps.set(key, lm);
+  return lm;
+}
+
 // ── Particles ────────────────────────────────────────────────────────────────
 
 /**
@@ -278,4 +299,30 @@ export function drawGust(len = 40): PixelBuffer {
     b.set(x, 1, 0xffffff, a * 0.35);
   }
   return b;
+}
+
+// ── Floodlights coming on (#673) ─────────────────────────────────────────────
+
+/** Each bank starts this long after the one before (ms), stutters for FLICKER_MS, then warms up over WARM_MS. */
+export const LIGHTS_STAGGER_MS = 450;
+export const LIGHTS_FLICKER_MS = 360;
+export const LIGHTS_WARM_MS = 2200;
+
+/**
+ * How far floodlight bank `bank` is on, 0..1, `ms` after kick-off at a dusk or night
+ * fixture: off until its turn, a stutter (on, off, on), then a metal-halide warm-up
+ * from a third to full. Wall-clock only. The ground's whole set is on by
+ * `lightsOnMs(banks)`.
+ */
+export function floodlightRamp(ms: number, bank: number): number {
+  const t = ms - bank * LIGHTS_STAGGER_MS;
+  if (t <= 0) return 0;
+  if (t < LIGHTS_FLICKER_MS) return [0.6, 0, 0.45, 0, 0.35][Math.floor((t / LIGHTS_FLICKER_MS) * 5)] ?? 0;
+  const w = Math.min(1, (t - LIGHTS_FLICKER_MS) / LIGHTS_WARM_MS);
+  return 0.35 + 0.65 * (1 - (1 - w) * (1 - w));
+}
+
+/** When every one of `banks` floodlight banks is fully on (ms after kick-off). */
+export function lightsOnMs(banks: number): number {
+  return (banks - 1) * LIGHTS_STAGGER_MS + LIGHTS_FLICKER_MS + LIGHTS_WARM_MS;
 }

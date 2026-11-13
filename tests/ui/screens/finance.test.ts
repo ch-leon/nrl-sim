@@ -328,6 +328,8 @@ describe('fmtMoney / fmtMoneyCompact / fmtRunway', () => {
     expect(fmtMoneyCompact(12345)).toBe('$12.3k');
     expect(fmtMoneyCompact(-2500)).toBe('-$2.5k');
     expect(fmtMoneyCompact(999)).toBe('$999');
+    // A million and over steps to "m", not "$1600.0k" (#615); the ".0" stays for the column.
+    expect([1_600_000, 2_000_000, 999_950, -1_250_000].map(fmtMoneyCompact)).toEqual(['$1.6m', '$2.0m', '$1.0m', '-$1.3m']);
   });
 
   it('labels runway', () => {
@@ -634,5 +636,35 @@ describe('Finance key tiles (3j)', () => {
     expect(fmtExpiring(0)).toBe(`No contracts end within ${EXPIRY_WINDOW_WEEKS} wks`);
     expect(fmtExpiring(1)).toBe(`1 contract ends within ${EXPIRY_WINDOW_WEEKS} wks`);
     expect(fmtExpiring(2)).toBe(`2 contracts end within ${EXPIRY_WINDOW_WEEKS} wks`);
+  });
+});
+
+// #610: THIS WEEK's seven lines on a short phone. At 28px (29 with its rule) the seventh,
+// Home gates, showed 6px of itself in the 180px the sheet has at 844×390, so the six lines
+// on show did not add up to the Net under them. The rooms are measured in the running game.
+import { FINANCE_CSS } from '../../../src/ui/screens/finance';
+
+describe("THIS WEEK's lines fit a short phone (#610)", () => {
+  const LINES = 7;
+  /** `.nrl-finance-row`'s min-height inside the first block of `media`, plus its 1px rule. */
+  const rowIn = (media: string): number => {
+    const at = FINANCE_CSS.indexOf(media);
+    expect(at).toBeGreaterThan(-1);
+    const m = /\.nrl-finance-row \{ min-height: (\d+)px; \}/.exec(FINANCE_CSS.slice(at));
+    expect(m).not.toBeNull();
+    return Number(m![1]) + 1;
+  };
+
+  it('844×390 and 667×375: seven lines in 171px (the 180px less an iPhone home bar)', () => {
+    expect(LINES * rowIn('@media (max-height: 400px) {')).toBeLessThanOrEqual(171);
+  });
+
+  it('956×330: seven lines in 147px (the 162px less a home bar)', () => {
+    expect(LINES * rowIn('@media (max-height: 340px) {')).toBeLessThanOrEqual(147);
+  });
+
+  it('the Net row keeps its height, and the lines keep 28px where there is room', () => {
+    expect(FINANCE_CSS).toContain('.nrl-finance-row.nrl-finance-net { min-height: 32px;');
+    expect(FINANCE_CSS).toMatch(/\n\.nrl-finance-row \{[^}]*min-height: 28px;/);
   });
 });

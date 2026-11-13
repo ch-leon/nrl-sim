@@ -10,6 +10,7 @@ import { textWidth } from '../src/art/match/font';
 import { renderIcon } from '../src/art/appIcon';
 import { exportFilename, exportSave, importSave, pickSaveFile } from '../src/core/save';
 import { createNewGame, SAVE_VERSION } from '../src/core/state';
+import config from '../capacitor.config';
 import { PWA_MANIFEST, brandIndexHtml } from '../src/brandBuild';
 
 // #363: the game's name, short name, colours and logo live in src/brand.ts, and every
@@ -73,8 +74,9 @@ describe('BRAND today (players see no change)', () => {
     expect(BRAND.colors.primary).toBe(COLOR_TOKENS.accent);
     expect(BRAND.colors.onPrimary).toBe(COLOR_TOKENS.onAccent);
     expect(BRAND.colors.text).toBe(COLOR_TOKENS.text);
-    // Only what the theme has no token for is the brand's own: the manifest and icon colours.
-    expect(BRAND.colors.app).toBe('#1a1a2e');
+    // Only what the theme has no token for is the brand's own: the ball's colour. The
+    // installed app's colour is the page's navy (#622).
+    expect(BRAND.colors.app).toBe(COLOR_TOKENS.navy);
     expect(BRAND.colors.iconBall).toBe('#e8e4d8');
   });
 
@@ -131,7 +133,11 @@ describe('each consumer reads BRAND', () => {
     expect(PWA_MANIFEST.theme_color).toBe(BRAND.colors.app);
     expect(PWA_MANIFEST.background_color).toBe(BRAND.colors.app);
     // Today's values, as main shipped them.
-    expect([PWA_MANIFEST.name, PWA_MANIFEST.short_name, PWA_MANIFEST.theme_color]).toEqual(['NRL Sim', 'NRLSim', '#1a1a2e']);
+    expect([PWA_MANIFEST.name, PWA_MANIFEST.short_name, PWA_MANIFEST.theme_color]).toEqual(['NRL Sim', 'NRLSim', '#0e1630']);
+  });
+
+  it("the Android WebView's background is the app's colour (#622)", () => {
+    expect(config.backgroundColor).toBe(BRAND.colors.app);
   });
 
   it('index.html has placeholders, and the build fills in the brand', () => {
@@ -143,6 +149,8 @@ describe('each consumer reads BRAND', () => {
     expect(html).toContain('<meta name="apple-mobile-web-app-title" content="NRL Sim" />');
     expect(html).toContain('<meta name="theme-color" content="#0e1630" />');
     expect(html).toContain('background: #0e1630;');
+    expect(html).toContain('<meta name="color-scheme" content="dark" />');
+    expect(html).toContain('<meta name="mobile-web-app-capable" content="yes" />');
     // A name with markup in it is escaped, and an unknown placeholder fails the build.
     expect(brandIndexHtml('<title>%BRAND_NAME%</title>', withBrand({ name: 'A & B <C>' }))).toBe('<title>A &amp; B &lt;C></title>');
     expect(() => brandIndexHtml('%BRAND_NOPE%')).toThrow(/BRAND_NOPE/);
@@ -202,14 +210,18 @@ describe('export file name and import', () => {
   });
 });
 
-/** SHA-256 of the RGBA pixels main's scripts/gen-icons.mjs drew (before #363). */
+/**
+ * SHA-256 of the RGBA pixels scripts/gen-icons.mjs draws. Until #622 these were the
+ * pre-#363 bytes on the old navy-black field (eef08fbf…, c13d4c91…); the ball and its
+ * shape are unchanged and only the field colour moved to the page's navy.
+ */
 const MAIN_ICON_SHA = {
-  192: 'eef08fbfdec71735d4fa6bf062923339cb94eabf879eaeef47de32b5792e1440',
-  512: 'c13d4c9110283a6ea435389aaae7427ac33ce5d9f19eac109ff194daa50d5883',
+  192: '9775c3f3ad1a7ca83be17f5ee068e8eabf518eda2a3061c34e35d9085ff7decc',
+  512: '12b94087fed0fcfc3f8f5aad61e9ca034d57c159aa93305eb322ff29aee30919',
 } as const;
 
 describe('icons', () => {
-  it("are today's icons, pixel for pixel (main's renderer hashed these bytes)", async () => {
+  it("are today's icons, pixel for pixel", async () => {
     expect(await sha256(renderIcon(192, BRAND))).toBe(MAIN_ICON_SHA[192]);
     expect(await sha256(renderIcon(512, BRAND))).toBe(MAIN_ICON_SHA[512]);
   });
@@ -217,7 +229,7 @@ describe('icons', () => {
   it("draw the brand's colours and letters", () => {
     const at = (px: Uint8Array, size: number, x: number, y: number): number[] => [...px.subarray((y * size + x) * 4, (y * size + x) * 4 + 3)];
     const plain = renderIcon(192, BRAND);
-    expect(at(plain, 192, 0, 0)).toEqual([0x1a, 0x1a, 0x2e]); // field
+    expect(at(plain, 192, 0, 0)).toEqual([0x0e, 0x16, 0x30]); // field
     expect(at(plain, 192, 70, 96)).toEqual([0xe8, 0xe4, 0xd8]); // ball
     const lettered = renderIcon(192, withBrand({ iconLetters: 'FM', colors: { ...BRAND.colors, app: '#102030' } }));
     expect(at(lettered, 192, 0, 0)).toEqual([0x10, 0x20, 0x30]);

@@ -26,6 +26,14 @@ describe('sprintMarks', () => {
     expect(of('away', 3)).toMatchObject({ streak: true, bar: null });
     expect(of('away', 4)).toBeUndefined();
   });
+  it('a Jets man going flat out is marked, with his odometer for the dust; a Jets man cruising, or a plain sprinter, is not', () => {
+    const s = snap([P('home', 1, 50, { sprint: true, who: 'j', odometer: 41 }), P('home', 2, 45, { sprint: true, who: 'x' }), P('home', 3, 40, { who: 'j' })], null);
+    const m = sprintMarks(s, (side, who) => side === 'home' && who === 'j');
+    expect(m.find((x) => x.slot === 1)).toMatchObject({ streak: true, jets: true, odo: 41 });
+    expect(m.find((x) => x.slot === 2)?.jets).toBeUndefined();
+    expect(m.find((x) => x.slot === 3)).toBeUndefined();
+    expect(sprintMarks(s).every((x) => x.jets === undefined)).toBe(true);
+  });
   it('a blown carrier shows his empty bar in red; no carrier, no bars', () => {
     const blown = sprintMarks(snap([P('home', 1, 50, { blown: true, gas: 0.05 })], { side: 'home', slot: 1 }));
     expect(blown).toEqual([{ side: 'home', slot: 1, streak: false, bar: 0.05, blown: true }]);
