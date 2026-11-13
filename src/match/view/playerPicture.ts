@@ -8,6 +8,7 @@ import { MOMENT_ACTIONS, momentLift, type MomentAction } from '../../art/match/m
 import { screenFacing } from './screenFacing';
 import { legsBand } from './legsLayer';
 import { FATIGUE } from '../league/fatigue';
+import { eyesUp, type EyesUp } from './eyesUp';
 
 export interface PlayerPicture {
   /** -1 plants the feet; otherwise the continuing run cycle, independent of hand progress. */
@@ -16,6 +17,8 @@ export interface PlayerPicture {
   lift?: number;
   /** Fatigue in the body (#666): 1 on tired legs, 2 spent or blown; absent when fresh. Part of the frame. */
   tired?: 1 | 2;
+  /** Head tipped back at a bomb in the air (#671): 1 a glance, 2 right back; absent otherwise. Part of the frame. */
+  lookUp?: 1 | 2;
   who: string; action: LivePlayerAction; frame: number; facing: Facing; left: boolean; possession: boolean;
 }
 
@@ -48,6 +51,8 @@ export interface PictureContext {
   carrier?: { side: Side; x: number; y: number };
   /** A try (#668): the scoring side, ticks since, and the mates the view draws gathering round the scorer. */
   tryScene?: { side: Side; age: number; mob: Map<string, { moving: boolean; left: boolean }> };
+  /** A bomb in the air (#671): the few men under it, looking up. */
+  eyesUp?: EyesUp;
 }
 /** Ticks after a try before the side that conceded slumps (the scorer is still going over). */
 const SLUMP_AFTER = 8;
@@ -88,8 +93,10 @@ export function tiredLevel(p: PlayerSnap): 0 | 1 | 2 {
   return band === 'spent' ? 2 : band === 'tired' ? 1 : 0;
 }
 
-export function pictureContext(s: Snapshot): PictureContext {
+export function pictureContext(s: Snapshot, prev?: Snapshot): PictureContext {
   const ctx: PictureContext = {};
+  const up = prev && eyesUp(prev, s);
+  if (up) ctx.eyesUp = up;
   const h = s.ball.holder && s.players.find(p => p.side === s.ball.holder!.side && p.slot === s.ball.holder!.slot);
   if (h) ctx.carrier = { side: h.side, x: h.x, y: h.y };
   const r = s.players.find(p => p.pose === 'ptb' || p.pose === 'dummyHalf');
@@ -186,6 +193,8 @@ export function playerPicture(p: PlayerSnap, previous: PlayerSnap, tick: number,
   const lift = MOMENT_ACTIONS.includes(action as MomentAction) ? momentLift(action as MomentAction, frame) : 0;
   const strideFrame = ['run', 'carry', 'catch', 'pass', 'airCatch', 'fend', 'handsOnHead', 'handsOnHips', 'armsFolded'].includes(action)
     ? gait : undefined;
+  // Eyes on the bomb (#671): standing or running, ball elsewhere, one of the few under it.
+  const lookUp = ctx.eyesUp?.who.has(`${p.side}/${p.slot}`) && (action === 'idle' || action === 'run') && !possession && !p.binned ? ctx.eyesUp.level : 0;
   const tired = slump ? 2 : weary && (action === 'run' || action === 'carry' || action === 'idle') ? weary : 0;
-  return { who: p.who ?? `${p.side}/${p.slot}`, action, frame, lift, ...(strideFrame === undefined ? {} : { strideFrame }), ...(tired ? { tired } : {}), ...facing, possession };
+  return { who: p.who ?? `${p.side}/${p.slot}`, action, frame, lift, ...(strideFrame === undefined ? {} : { strideFrame }), ...(tired ? { tired } : {}), ...(lookUp ? { lookUp } : {}), ...facing, possession };
 }

@@ -88,7 +88,7 @@ export class LiveView {
     const a = Math.max(0, Math.min(1, alpha));
     const points: ContactPoint[] = [];
     let placed = 0;
-    const ctx = pictureContext(cur);
+    const ctx = pictureContext(cur, prev);
     // After a try (#668): mates drawn gathered round the scorer, interpolated like any position.
     const mobNow = tryScene(cur); const mobBefore = tryScene(prev);
     const offset = (scene: TryScene | null, c: PlayerSnap) => scene?.offsets.find(o => o.side === c.side && o.slot === c.slot) ?? { dx: 0, dy: 0 };
