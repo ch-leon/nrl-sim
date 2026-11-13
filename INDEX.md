@@ -324,3 +324,6 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261113-055251-standard | standard | 0059bae | main | [report](runs/20261113-055251-standard/report.md) |
 | 20261113-063655-standard | standard | 2fd3316 | main | [report](runs/20261113-063655-standard/report.md) |
 | 20261113-085114-standard-receiver-on-v-off | standard, receiver on v off | a65edf9 | claude/exciting-goldberg-3lccgc | [report](runs/20261113-085114-standard-receiver-on-v-off/report.md) |
+| 20261113-093021-standard-heldup-off | standard | a65edf9 (uncommitted changes) | worktree-agent-a62ea983e82036d03 | [report](runs/20261113-093021-standard-heldup-off/report.md) |
+| 20261113-105904-standard | standard | f58861b (uncommitted changes) | worktree-agent-a62ea983e82036d03 | [report](runs/20261113-105904-standard/report.md) |
+| 20261113-110233-heldup-expansive-check | heldup expansive check | f58861b (uncommitted changes) | worktree-agent-a62ea983e82036d03 | [report](runs/20261113-110233-heldup-expansive-check/report.md) |

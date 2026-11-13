@@ -1,0 +1,33 @@
+{
+  "name": "heldup expansive check",
+  "description": "#652: is Expansive v Balanced's drop to 42.5% at the new held-up default (standard.json, 100 seeds both ways) beyond luck? Same row at 400 seeds both ways, off v on.",
+  "seeds": 400,
+  "base": {
+    "heldUp.on": 0
+  },
+  "scenarios": [
+    {
+      "name": "expansive v balanced",
+      "seeds": 400,
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "on (default)",
+      "tuning": {
+        "heldUp.on": 1
+      }
+    }
+  ]
+}
