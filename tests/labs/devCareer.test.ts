@@ -11,7 +11,7 @@ import { DEV_TEST_BACKUP_KEY, DEV_TEST_DISPLACED_KEY, DEV_TEST_PREFIX, DEVICE_ID
 import { checksumOf, parseMeta } from '../../src/core/storage/meta';
 import { clearLiveMatch, writeLiveMatch } from '../../src/systems/liveMatchRecord';
 import {
-  __setLabs, developerSession, experimentOn, hintSeen, OPEN_SCREENS, overrideOn, readLabs, setExperiment, setOverride, testCareer,
+  __setLabs, developerSession, devSettingsEntryVisible, experimentOn, hintSeen, labsBlocksAnalytics, OPEN_SCREENS, overrideOn, readLabs, setExperiment, setOverride, testCareer,
 } from '../../src/labs/flags';
 import {
   applyPlaytestPreset, bootCareerNamespace, careerKeys, enterTestCareer, markPlaytestBuilt, resetAll, returnToNormalCareer,
@@ -84,6 +84,7 @@ afterEach(() => {
   setCareerNamespace(null);
   __unlockSaves();
   __setLabs(null);
+  vi.unstubAllEnvs();
   vi.unstubAllGlobals();
 });
 
@@ -341,10 +342,24 @@ describe('the screen override', () => {
     expect(uiScreenLockReason(getState(), 'staff')).toBe('Opens at round 4');
   });
 
-  it('does nothing while the page is hidden (defaults off)', () => {
+  it('does nothing while the page is hidden and the build switch is off', () => {
+    vi.stubEnv('VITE_DEV_SETTINGS', '0');
     createNewGame('Gates', 3);
     __setLabs({ visible: false, on: {}, hintsSeen: [], overrides: { [OPEN_SCREENS]: true } });
+    expect(devSettingsEntryVisible()).toBe(false);
+    expect(overrideOn(OPEN_SCREENS)).toBe(false);
     expect(uiScreenLockReason(getState(), 'staff')).toBe('Opens at round 4');
+  });
+
+  it('applies a stored override when the build shows the page, and does not write the career', () => {
+    createNewGame('Gates', 3);
+    initLeague(getState());
+    const before = JSON.stringify(getState());
+    __setLabs({ visible: false, on: {}, hintsSeen: [], overrides: { [OPEN_SCREENS]: true } });
+    expect(devSettingsEntryVisible()).toBe(true);
+    expect(uiScreenLockReason(getState(), 'staff')).toBeNull();
+    expect(JSON.stringify(getState())).toBe(before);
+    expect(labsBlocksAnalytics()).toBe(true);
   });
 });
 
@@ -354,8 +369,15 @@ describe('the developer marker', () => {
     expect(developerSession()).toBeNull();
     expect(devMarkerText(developerSession())).toBeNull();
     __setLabs({ visible: true, on: {}, hintsSeen: [] });
+    // The build shows the page. Nothing is on, so this is still a normal career.
+    expect(developerSession()).toBeNull();
+    expect(devMarkerText(developerSession())).toBeNull();
+    expect(labsBlocksAnalytics()).toBe(false);
+    vi.stubEnv('VITE_DEV_SETTINGS', '0');
     expect(developerSession()).toEqual({ testCareer: false, overrides: [], experiments: [] });
     expect(devMarkerText(developerSession())).toBeNull();
+    expect(labsBlocksAnalytics()).toBe(true);
+    vi.unstubAllEnvs();
     setExperiment('match-controls', true);
     expect(devMarkerText(developerSession())).toBe('DEV');
     __setLabs({ visible: false, on: {}, hintsSeen: [], testCareer: { preset: 'block-play', fresh: false, from: 1 } });
@@ -372,12 +394,14 @@ describe('the developer marker', () => {
   });
 });
 
-describe('analytics stays off for developer sessions (#518 reads labsVisible)', () => {
+describe('analytics stays off for a real developer session, not for the Settings entry', () => {
   it('counts a playtest career as Labs even with the page hidden', async () => {
     const { labsVisible } = await import('../../src/labs/flags');
     __setLabs({ visible: false, on: {}, hintsSeen: [] });
     expect(labsVisible()).toBe(false);
+    expect(labsBlocksAnalytics()).toBe(false);
     __setLabs({ visible: false, on: {}, hintsSeen: [], testCareer: { preset: 'block-play', fresh: false, from: 1 } });
     expect(labsVisible()).toBe(true);
+    expect(labsBlocksAnalytics()).toBe(true);
   });
 });

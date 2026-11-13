@@ -32,7 +32,12 @@ describe('field experiment settings', () => {
   it('freezes the same validated choice for the page and every worker type', () => {
     const stored = JSON.stringify({ visible: true, on: {}, hintsSeen: [], fieldLength: 60 });
     expect(resolveBootField({ worker: false, stored })).toBe(60);
-    expect(resolveBootField({ worker: false, stored: stored.replace('true', 'false') })).toBe(100);
+    const hidden = stored.replace('true', 'false');
+    try {
+      vi.stubEnv('VITE_DEV_SETTINGS', '0');
+      expect(resolveBootField({ worker: false, stored: hidden })).toBe(100);
+    } finally { vi.unstubAllEnvs(); }
+    expect(resolveBootField({ worker: false, stored: hidden })).toBe(60);
     for (const length of FIELD_LENGTHS) for (const name of ['match-skip', 'match-background', 'match-replay', 'match-art']) {
       const configured = fieldWorkerName(name, length);
       expect(resolveBootField({ worker: true, workerName: configured, stored })).toBe(length);

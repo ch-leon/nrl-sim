@@ -6,12 +6,21 @@ never part of a save.
 
 ## Finding it
 
-It stays hidden until `?labs=1` has been opened on this browser (the Labs URL from
-before still works). It also shows while a playtest career is on, because the way
-back lives here. It sits in Settings, which has a **Developer settings** button
-(class `nrl-labs-open`, kept from Labs). Finding the page is not security. Nothing
-on it unlocks paid content, entitlements or payments, and it is no game-state
-editor.
+It is in Settings on every current build: GitHub Pages, the Android test APK and
+local dev. The build switch is `VITE_DEV_SETTINGS`, on unless it is `0` (`false`,
+`off` and `no` count as off too). **Before launch, set `VITE_DEV_SETTINGS=0` or
+remove Developer settings.** The switch is not saved on the browser, so turning
+it off hides the entry again for anyone who never opened `?labs=1`.
+
+`?labs=1` still shows it, including when the switch is off, and that visit is
+remembered on this browser. It also shows while a playtest career is on, because
+the way back lives here. With the switch off, that is the only way in, as before.
+
+It sits in Settings, which has a **Developer settings** button (class
+`nrl-labs-open`, kept from Labs). Finding the page is not security. Nothing on
+it unlocks paid content, entitlements or payments, and it is no game-state
+editor. Showing the entry does not change a career: every override and
+experiment stays off until it is switched on.
 
 Everything is kept in the existing `nrl-sim-labs` key. Old values read as before,
 and the newer fields (`overrides`, `testCareer`) are optional. A bad value in one
@@ -25,7 +34,7 @@ of them drops only that field, never the rest.
 | **Screens → Render at the old resolution** | The canvas is drawn in CSS pixels as it was before #627 (`src/world/density.ts` reads the override): the match zooms back to ×2 and a phone shows fewer players. It exists to compare frame rate on a real phone against device-density rendering. Nothing is saved. | After a reload, on this browser |
 | **Playtest career** | Set up playtest career, or Return to my career (below). | Refused during a live, parked or resumable match, on the Match scene, and during Advance Until |
 | **Experiments → Match controls** | Unchanged from Labs. Off by default. | The next match |
-| **Reset all** (class `nrl-labs-off`) | Turns the experiments and overrides off and hides the page. The hints already seen stay. In a playtest career it first leaves the way Return does; any playtest keys left behind are cleared. | Mid-match in a playtest career it is refused and changes nothing |
+| **Reset all** (class `nrl-labs-off`) | Turns the experiments and overrides off. The hints already seen stay. It hides the page only when `VITE_DEV_SETTINGS` is off; while the switch is on, the entry stays in Settings with everything off. In a playtest career it first leaves the way Return does; any playtest keys left behind are cleared. | Mid-match in a playtest career it is refused and changes nothing |
 
 Every control is at least 44px tall and every section is labelled. The page scrolls
 inside its frame upright (390×844) and sideways (667×375 and 568×320).
@@ -74,11 +83,15 @@ inside its frame upright (390×844) and sideways (667×375 and 568×320).
 
 ## Marker contract (analytics and anything else that must leave testing out)
 
-- The analytics merged in #518 already stays off on any browser where
-  `labsVisible()` is true (`src/analytics/index.ts`, reason `labs`). `labsVisible()`
-  is also true while a playtest career is on, even after the page is hidden, so
-  developer and playtest sessions send nothing. If that rule ever changes to
-  classify instead of drop, use the marker below.
+- Analytics stays off when `?labs=1` is in the URL, or when a developer
+  override, experiment, short field or playtest career is actually on
+  (`labsBlocksAnalytics` in `src/labs/flags.ts`, read by `src/analytics/index.ts`,
+  reason `labs`). A playtest career counts even after the page is hidden.
+  Seeing Developer settings because the build switch is on does not turn
+  analytics off, and a normal career still sends. When `VITE_DEV_SETTINGS=0`,
+  the old rule is back: analytics stays off whenever `labsVisible()` is true,
+  including a browser that only opened `?labs=1` and turned nothing on. If that
+  rule ever changes to classify instead of drop, use the marker below.
 - JavaScript error tracking (#548) uses the same off-switches, including test
   careers. DNT/GPC are also checked before SDK loading, because the SDK can
   otherwise send in cookieless-always mode despite `respect_dnt: true`. Guarded window error/rejection listeners keep at most ten sanitized
@@ -95,12 +108,16 @@ inside its frame upright (390×844) and sideways (667×375 and 568×320).
   and unknown-script frames are dropped. This trades diagnostic detail for privacy;
   the app build identifies the minified bundle. No replay, logs or native crash path.
   Live ingestion still awaits the public project token from the accounts side.
-- `developerSession()` in `src/labs/flags.ts` returns `null` on a player's browser
-  (the page has never been shown). Otherwise it returns `{ testCareer, overrides,
-  experiments }`. Treat any non-null value as a developer session: either send
-  nothing, or tag every event `dev_session: true` with `test_career`. It reads the
-  same `nrl-sim-labs` key, so code that can't import it may read
-  `localStorage['nrl-sim-labs']` and test `visible === true || testCareer`.
+- `developerSession()` in `src/labs/flags.ts` returns `null` on a normal career.
+  With the build switch on, the page being listed is not a session: null until
+  an override, experiment, short field or playtest career is on. With the switch
+  off, it returns `{ testCareer, overrides, experiments }` whenever the page has
+  been shown (`labsVisible()`), even if every control is off. Treat any non-null
+  value as a developer session: either send nothing, or tag every event
+  `dev_session: true` with `test_career`. It reads the same `nrl-sim-labs` key.
+  Code that can't import it, and is checking the old unlock rather than the
+  build switch, may read `localStorage['nrl-sim-labs']` and test
+  `visible === true || testCareer`.
 - `<html data-nrl-dev="developer|test-career">` is set at boot and whenever the page
   changes something.
 - The visible tag (`.nrl-dev-marker`, top centre, no pointer events) reads **TEST

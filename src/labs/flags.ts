@@ -2,6 +2,11 @@
 // One JSON value under LABS_KEY: whether the page is shown, the experiments and
 // overrides switched on, the hints seen, and the playtest career's marker. Old
 // values (visible, on, hintsSeen only) still read as they always did.
+//
+// The Settings entry is on in every build unless VITE_DEV_SETTINGS is 0 (see
+// devSettingsFrom). That switch is not written into this key, so turning it off
+// before launch hides the entry again for anyone who never opened ?labs=1.
+/// <reference types="vite/client" />
 import { browserStorage } from '../core/storage/local';
 import { LABS_KEY } from '../core/storageKeys';
 import { isFieldLength, type FieldLength } from './fieldLength';
@@ -59,7 +64,28 @@ export function readLabs(raw: unknown): LabsState {
   } catch { return empty(); }
 }
 export function labsVisibleFrom(search: string, stored: unknown): boolean {
+  // Not the build switch. Remembering that would keep the page after VITE_DEV_SETTINGS=0.
   return new URLSearchParams(search).get('labs') === '1' || readLabs(stored).visible;
+}
+
+/** Build env the Developer settings switch reads (`import.meta.env` in the game). */
+export interface DevSettingsEnv {
+  VITE_DEV_SETTINGS?: string;
+}
+
+/**
+ * Developer settings in Settings. On unless the build sets `VITE_DEV_SETTINGS`
+ * to `0`, `false`, `off` or `no`. Unset (GitHub Pages, the Android test APK,
+ * local dev) is on. Before launch, set it to `0`.
+ */
+export function devSettingsFrom(env: DevSettingsEnv): boolean {
+  const v = (env.VITE_DEV_SETTINGS ?? '').trim().toLowerCase();
+  return v !== '0' && v !== 'false' && v !== 'off' && v !== 'no';
+}
+
+/** This build shows the Settings entry. Read on each call so a test can stub the env. */
+export function devSettingsBuildOn(): boolean {
+  return devSettingsFrom({ VITE_DEV_SETTINGS: import.meta.env.VITE_DEV_SETTINGS });
 }
 let cached: LabsState | null = null;
 function state(): LabsState {
@@ -84,11 +110,20 @@ function persist(): boolean {
     return s.getItem(LABS_KEY) === text;
   } catch { return false; /* Local session still works. */ }
 }
-/** Shown in Settings: after ?labs=1, or while a playtest career is on (its way back is here). */
+/** The old unlock: ?labs=1 was opened here, or a playtest career is on (its way back is here). */
 export function labsVisible(): boolean { const s = state(); return s.visible || s.testCareer !== undefined; }
-export function experimentOn(id: string): boolean { const s = state(); return s.visible && s.on[id] === true; }
+/** The Settings entry: this build, or the old unlock. Showing it writes nothing. */
+export function devSettingsEntryVisible(): boolean { return devSettingsBuildOn() || labsVisible(); }
+export function experimentOn(id: string): boolean {
+  const s = state();
+  // A stored experiment stays inert while the page is hidden and the build switch is off.
+  return (s.visible || devSettingsBuildOn()) && s.on[id] === true;
+}
 export function setExperiment(id: string, on: boolean): void { state().on[id] = on; persist(); }
-export function fieldLengthPreference(): FieldLength { const s = state(); return (s.visible || s.testCareer !== undefined) ? s.fieldLength ?? 100 : 100; }
+export function fieldLengthPreference(): FieldLength {
+  const s = state();
+  return (s.visible || s.testCareer !== undefined || devSettingsBuildOn()) ? s.fieldLength ?? 100 : 100;
+}
 /** Roll back an unsaved choice: physics must agree with the setting after reload. */
 export function setFieldLengthPreference(length: FieldLength): boolean {
   if (!isFieldLength(length)) return false;
@@ -100,8 +135,31 @@ export function setFieldLengthPreference(length: FieldLength): boolean {
   cached = previous;
   return false;
 }
-/** A developer override (#519): only while the page is shown, like an experiment. */
-export function overrideOn(id: string): boolean { const s = state(); return labsVisible() && s.overrides?.[id] === true; }
+/** A developer override (#519): while the page is unlocked, or while this build shows it. Off until switched on. */
+export function overrideOn(id: string): boolean {
+  const s = state();
+  return (labsVisible() || devSettingsBuildOn()) && s.overrides?.[id] === true;
+}
+
+/** An override, experiment, short field or playtest career is actually on. The entry being listed is not. */
+function developerChangesOn(): boolean {
+  const s = state();
+  if (s.testCareer !== undefined) return true;
+  if (Object.values(s.overrides ?? {}).some((v) => v === true)) return true;
+  if (Object.values(s.on).some((v) => v === true)) return true;
+  return fieldLengthPreference() !== 100;
+}
+
+/**
+ * Analytics treats this browser as Labs. With the build switch on, only
+ * `developerChangesOn` does — seeing the entry does not. `?labs=1` is the
+ * analytics guard's own URL check. With the switch off, today's rule: the page
+ * having been shown, or a playtest career.
+ */
+export function labsBlocksAnalytics(): boolean {
+  if (!devSettingsBuildOn()) return labsVisible();
+  return developerChangesOn();
+}
 export function setOverride(id: string, on: boolean): void {
   const s = state();
   s.overrides = { ...s.overrides, [id]: on };
@@ -133,8 +191,11 @@ export function setTestCareer(marker: TestCareerMarker | null): boolean {
 }
 
 /**
- * The developer/test session marker (#519), for analytics and anything else that
- * must leave Leon's testing out: null on a player's browser; otherwise what is on.
+ * The developer/test session marker (#519), for anything that must leave testing
+ * out. Null on a normal career. With the build switch on, the entry being shown
+ * is not a session: null until an override, experiment, short field or playtest
+ * career is on. With the switch off, non-null whenever the page has been shown.
+ * Analytics uses `labsBlocksAnalytics` (and the `?labs=1` URL check), not this.
  * The contract is in docs/specs/developer-settings.md.
  */
 export interface DeveloperSession {
@@ -146,8 +207,12 @@ export interface DeveloperSession {
   experiments: string[];
 }
 export function developerSession(): DeveloperSession | null {
+  // Switch on: a shown page with nothing switched on is a normal career (no DEV tag).
+  // Switch off: any shown page is a session, as before, even with every control off.
+  if (devSettingsBuildOn()) {
+    if (!developerChangesOn()) return null;
+  } else if (!labsVisible()) return null;
   const s = state();
-  if (!labsVisible()) return null;
   const on = (m: Record<string, boolean> | undefined): string[] => Object.keys(m ?? {}).filter((k) => m![k] === true).sort();
   const experiments = on(s.on);
   if (fieldLengthPreference() !== 100) experiments.push(`field-${fieldLengthPreference()}m`);
