@@ -55,6 +55,7 @@ try {
   await page.locator('#compare').click();
   assert.equal(await page.locator('.old').isVisible(), true);
   await page.locator('[data-time="3.35"]').click();
+  // The art lab never mounts the rotate card, so a tall window is still a layout check.
   for (const [width, height] of [[1280, 900], [844, 390], [390, 844]]) {
     await page.setViewportSize({ width, height });
     await page.waitForFunction(() => document.querySelector('#new-pitch').width === Math.round(document.querySelector('#new-pitch').getBoundingClientRect().width));

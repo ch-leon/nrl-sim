@@ -46,7 +46,7 @@ What's in the game, with the PR that added each.
 ## UI and accessibility
 
 - Broadcast Quiet look ([PR](https://github.com/ch-leon/nrl-sim/pull/381))
-- Upright menus, 5-tab bar ([PR](https://github.com/ch-leon/nrl-sim/pull/436))
+- 5-tab bar ([PR](https://github.com/ch-leon/nrl-sim/pull/436)). On a phone, the game plays in landscape: holding it upright covers everything with “Turn your phone sideways”, and the Android app locks to landscape.
 - Three-tap onboarding, Undo ([PR](https://github.com/ch-leon/nrl-sim/pull/380))
 - Text size, non-colour cues ([PR](https://github.com/ch-leon/nrl-sim/pull/385))
 - Touch polish: press feedback, motion tokens, mis-tap guards, scroll cues ([PR](https://github.com/ch-leon/nrl-sim/pull/617))
@@ -63,6 +63,8 @@ What's in the game, with the PR that added each.
 - Android test APK ([PR](https://github.com/ch-leon/nrl-sim/pull/394)); CI ([PR](https://github.com/ch-leon/nrl-sim/pull/442))
 
 ## Recently added
+
+- Portrait is blocked on a touch phone. The title, menus, grounds and live match all sit under “Turn your phone sideways” until the phone is landscape, and the Android app locks to landscape. The upright Club home sheet is gone. A desktop window is never blocked.
 
 - Developer settings is in Settings on every build (GitHub Pages, the Android test APK and local dev). Overrides and experiments stay off until you turn one on, so a normal career plays as before. Analytics stays on unless the address has `?labs=1` or a developer override, experiment or playtest career is actually on. Before launch, set `VITE_DEV_SETTINGS=0` or remove Developer settings ([PR #683](https://github.com/ch-leon/nrl-sim/pull/683)).
 

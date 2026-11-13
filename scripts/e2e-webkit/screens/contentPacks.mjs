@@ -1,4 +1,4 @@
-// #488: actual country setup, lazy loading, ladder, Club home and watched report.
+// #488: actual country setup, lazy loading, ladder and watched report, at phone landscape.
 // Screenshots are kept by the existing CI artifact, never committed.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -9,7 +9,7 @@ export async function runContentPacks(browser) {
   mkdirSync(out, { recursive: true });
   const towns = JSON.parse(readFileSync('src/data/towns.json', 'utf8'));
   const reports = [];
-  for (const [width, height] of [[667, 375], [844, 390], [390, 844]]) {
+  for (const [width, height] of [[667, 375], [844, 390]]) {
     for (const country of ['GB', 'AU']) {
       const town = towns.find(t => t.country === country);
       const context = await browser.newContext({ viewport: { width, height }, hasTouch: true, serviceWorkers: 'block' });
@@ -40,17 +40,10 @@ export async function runContentPacks(browser) {
         if (report.ukRequests !== (expected === 'uk' ? 1 : 0)) throw new Error(`Unexpected UK requests: ${report.ukRequests}`);
         report.pack = state.pack;
         report.clubs = state.league.clubs.length;
-        if (width < height) {
-          await openNav(page, 'club');
-          await page.locator('[data-club-home]').waitFor();
-          await shot('club-home');
-        }
         await playTrials(page);
         await openNav(page, 'ladder');
         await page.locator('.nrl-ladder-table').waitFor();
         await shot('ladder');
-        // Matches play in landscape. Capture the report again upright afterwards.
-        if (width < height) await page.setViewportSize({ width: 844, height: 390 });
         await openNav(page, 'club');
         await page.locator('[data-hud="advance"]').tap();
         await page.waitForFunction(() => document.querySelector('[data-ask-proceed]') || document.querySelector('.nrl-mo-controls'));
@@ -61,7 +54,6 @@ export async function runContentPacks(browser) {
         await page.waitForSelector('.nrl-mo-ft [data-report]', { timeout: 120000 });
         await page.locator('.nrl-mo-ft [data-report]').tap();
         await page.locator('.nrl-report').waitFor();
-        if (width < height) await page.setViewportSize({ width, height });
         await shot('match-report');
         if (report.errors.length) throw new Error(report.errors.join('; '));
         report.ok = true;
