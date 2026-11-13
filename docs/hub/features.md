@@ -97,6 +97,7 @@ What's in the game, with the PR that added each.
   - At half-time and full time both sides walk off and fade behind the card, winners celebrating and losers head-down; before golden point each side huddles, then spreads.
   - The men under a bomb tip their heads back to watch it.
   - The referee no longer darts when the ball changes hands.
+  - Follow-ups ([PR](https://github.com/ch-leon/nrl-sim/pull/685), [issue](https://github.com/ch-leon/nrl-sim/issues/682)): the referee glides through the play-the-ball instead of stepping as the ball reaches the dummy half, and the walk-off at half-time stands still under a pause.
 
 - Defenders other than the markers must physically retreat 10m (or to their goal line) after each ruck before they can rejoin the defence, including after quick heels, handovers, sin bins and substitutions ([PR](https://github.com/ch-leon/nrl-sim/pull/677), [evidence](../specs/625-retreat-validation.md)).
 

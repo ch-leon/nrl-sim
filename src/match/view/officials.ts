@@ -4,6 +4,7 @@
 // everyone in the same place. Positions are sim metres (field.ts).
 import { FIELD_LENGTH, FIELD_WIDTH, IN_GOAL, toFieldPt } from '../core/field';
 import { fieldToWorldPoint } from '../../scenes/matchField';
+import { LIVE } from '../league/live';
 import type { PlayerSnap, Side, Snapshot } from '../core/snapshot';
 
 /**
@@ -49,6 +50,36 @@ function middleOf(players: readonly PlayerSnap[]): { x: number; y: number } {
 
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
 
+/** What the referee stands off: the ball he reads, the point he is pushed away from, and how hard (0..1). */
+interface Read {
+  ball: { x: number; y: number };
+  from: { x: number; y: number };
+  weight: number;
+}
+
+/**
+ * What the referee reads off a snapshot (#682). A heel rolling to the dummy half can end up to
+ * 17 m short of him (he collects it at the mark), and the ball then snaps onto him in the tick he
+ * catches it: that stepped the referee's spot (his share of the ball, and the push off it) by up
+ * to 1.7 m. He is a man, so he is already where the ball is about to land: while the heel rolls
+ * the ball he reads slides to the dummy half by how much of the roll has gone (his `poseUntil`
+ * runs from the heel's start), the push off the rolling ball fades out as it goes, and the push
+ * off the dummy half fades in over the hold that follows, from his `caughtTick`.
+ */
+function readPlay(s: Snapshot): Read {
+  const holder = s.ball.holder && s.players.find((p) => p.side === s.ball.holder!.side && p.slot === s.ball.holder!.slot);
+  if (holder) {
+    const heeled = holder.pose === 'dummyHalf' && holder.caughtTick !== undefined;
+    const w = heeled ? clamp((s.tick - holder.caughtTick!) / Math.max(1, LIVE.dhHoldTicks), 0, 1) : 1;
+    return { ball: s.ball, from: holder, weight: w };
+  }
+  const dh = s.players.find((p) => p.pose === 'dummyHalf' && p.poseUntil !== undefined);
+  if (!dh) return { ball: s.ball, from: s.ball, weight: 1 };
+  const gone = LIVE.rollTicks + LIVE.dhHoldTicks + 2 - (dh.poseUntil! - s.tick);
+  const f = clamp(gone / Math.max(1, LIVE.rollTicks), 0, 1);
+  return { ball: { x: s.ball.x + (dh.x - s.ball.x) * f, y: s.ball.y + (dh.y - s.ball.y) * f }, from: s.ball, weight: 1 - f };
+}
+
 /**
  * The referee's spot on this tick, in sim metres. Continuous in the snapshot: every
  * input (the ball, the bodies' middle) moves continuously, so he glides with play and
@@ -56,9 +87,10 @@ const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.m
  */
 export function refereeSpot(s: Snapshot): { x: number; y: number } {
   const mid = middleOf(s.players);
+  const { ball, from: c, weight } = readPlay(s);
   const b = REF.ballShare;
-  const ax = s.ball.x * b + mid.x * (1 - b);
-  const ay = s.ball.y * b + mid.y * (1 - b);
+  const ax = ball.x * b + mid.x * (1 - b);
+  const ay = ball.y * b + mid.y * (1 - b);
   // 1 with room on the far side (low y), easing to 0 as play nears the far touchline.
   const far = clamp((ay - REF.farRoomM) / REF.swingM, 0, 1);
   // Toward the middle of the field along it, with a little bias so the direction never vanishes.
@@ -71,13 +103,11 @@ export function refereeSpot(s: Snapshot): { x: number; y: number } {
   // Off the ball and whoever has it: pushed away from it, a push that fades to nothing as
   // the ball comes right up to him, so a ball passing through his spot swings him round
   // it rather than flipping him to the other side of it in one tick.
-  const holder = s.ball.holder && s.players.find((p) => p.side === s.ball.holder!.side && p.slot === s.ball.holder!.slot);
-  const c = holder ?? s.ball;
   const ex = x - c.x;
   const ey = y - c.y;
   const d = Math.hypot(ex, ey);
   if (d < REF.clearM && d > 1e-9) {
-    const k = ((REF.clearM - d) * Math.min(1, d / REF.fadeM)) / d;
+    const k = (weight * (REF.clearM - d) * Math.min(1, d / REF.fadeM)) / d;
     x += ex * k;
     y += ey * k;
   }

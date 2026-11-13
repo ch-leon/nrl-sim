@@ -331,6 +331,8 @@ export class LivePlayback {
   private readonly simOpts: LiveOptions;
   /** Half-time (and a plan card) holds the match; a replay does not resume over one. */
   private holds = 0;
+  /** How many of those holds are a card the match waits behind (the half-time plan card), not the player's own pause (#682). */
+  private cardHolds = 0;
   /** off, waiting on the re-sim, or playing the snaps. */
   private replayGate: 'off' | 'loading' | 'playing' = 'off';
   /** Bumped to drop a re-sim that comes back after Skip or destroy. */
@@ -552,13 +554,20 @@ export class LivePlayback {
     return { made: this.sim.callsMade, paid: this.sim.callsPaid };
   }
 
-  /** Hold the match (the half-time card is up, the coach is changing the plan), and let it go on. */
-  hold(): void {
+  /**
+   * Hold the match (the half-time card is up, the coach is changing the plan), and let it go on.
+   * `card`: the hold is a card the match waits behind, so the walk-off plays on under it; any other
+   * hold (the pause sheet, Settings, a control hint) is the player's pause, and freezes the picture
+   * (#682). `release` takes the same kind back.
+   */
+  hold(card = false): void {
     this.holds++;
+    if (card) this.cardHolds++;
     this.runner.pause();
   }
-  release(): void {
+  release(card = false): void {
     this.holds = Math.max(0, this.holds - 1);
+    if (card) this.cardHolds = Math.max(0, this.cardHolds - 1);
     if (this.holds === 0 && this.replayGate === 'off' && !this.finishEmitted && !this.awaitingSkip) this.runner.play();
   }
 
@@ -780,8 +789,10 @@ export class LivePlayback {
     const r = this.runner;
     this.applyPace(deltaMs);
     r.update(deltaMs);
-    // The walk-off and the huddle play on behind the half-time card and after the full-time whistle (#675).
-    this.view.draw(r.prev, r.cur, r.alpha, r.playing ? r.speed : 0.001, this.breakClock.advance(r.cur, deltaMs, r.speed, !r.playing || r.finished));
+    // The walk-off and the huddle play on behind the half-time card and after the full-time whistle (#675),
+    // but not under the player's own pause: the sim is stood still then, and the picture with it (#682).
+    const behindCard = !r.playing && this.cardHolds > 0 && this.cardHolds === this.holds;
+    this.view.draw(r.prev, r.cur, r.alpha, r.playing ? r.speed : 0.001, this.breakClock.advance(r.cur, deltaMs, r.speed, behindCard || r.finished));
     this.showClock();
     if (this.closeupUntil && this.now > this.closeupUntil) {
       this.closeupUntil = 0;
