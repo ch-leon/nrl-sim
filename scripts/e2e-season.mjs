@@ -815,6 +815,34 @@ async function play() {
     halfTimeDone = 'half-time: waited 6 s, Expansive, Continue';
     rec.notes.push(halfTimeDone);
   }
+  // A hard kill before waiting for an optional try: a short scoreless match can finish during that wait.
+  // Reload mid-match (no pagehide the game can trust) and Continue.
+  // The same match comes back, not kick-off.
+  await step('live-kill', async (rec) => {
+    if (!liveOn) return 'skipped';
+    if (!halfTimeDone && (await halfTimeCard().count())) await playHalfTime(rec);
+    const before = (await page.locator('.nrl-mo-clock').textContent())?.trim();
+    const tick = await page.evaluate(() => {
+      const raw = localStorage.getItem('nrl-live-match-1');
+      return raw ? JSON.parse(raw).tick : 0;
+    });
+    if (!(tick > 0)) throw new Error(`the live-match record has no tick (${tick})`);
+    await page.reload();
+    await page.waitForSelector('[data-nrl-continue-1]', { timeout: 30000 });
+    await tap('[data-nrl-continue-1]');
+    await page.waitForSelector('.nrl-mo-controls', { timeout: 20000 });
+    await page.waitForFunction(() => {
+      const t = document.querySelector('.nrl-mo-clock')?.textContent?.trim();
+      return !!t && t !== '00:00';
+    }, { timeout: 15000 });
+    const after = (await page.locator('.nrl-mo-clock').textContent())?.trim();
+    const afterTick = await page.evaluate(() => {
+      const raw = localStorage.getItem('nrl-live-match-1');
+      return raw ? JSON.parse(raw).tick : 0;
+    });
+    if (afterTick + 40 < tick) throw new Error(`resumed tick ${afterTick} is behind the kill tick ${tick}`);
+    rec.notes.push(`killed at ${before} (tick ${tick}); resumed at ${after} (tick ${afterTick})`);
+  });
   await step('try-replay', async (rec) => {
     if (!liveOn) return 'skipped';
     const btn = page.locator('.nrl-mo-replay');
@@ -824,6 +852,7 @@ async function play() {
       const got = await Promise.race([
         btn.waitFor({ state: 'visible', timeout: until - Date.now() }).then(() => 'replay'),
         halfTimeCard().waitFor({ timeout: until - Date.now() }).then(() => 'half-time'),
+        page.locator('.nrl-mo-final').waitFor({ state: 'attached', timeout: until - Date.now() }).then(() => 'full-time'),
       ]).catch(() => null);
       if (got === 'half-time' && !halfTimeDone) await playHalfTime(rec);
       else if (got === 'replay') seen = true;
@@ -907,33 +936,6 @@ async function play() {
     if (!(d >= 0 && d <= 1)) throw new Error(`replay ended at ${after}, the live match was tapped at ${tapped}`);
     rec.notes.push(`Replay tapped at ${tapped}, live again at ${after}; main-thread block ${block} ms`);
   });
-  // A hard kill: reload mid-match (no pagehide the game can trust) and Continue.
-  // The same match comes back, not kick-off.
-  await step('live-kill', async (rec) => {
-    if (!liveOn) return 'skipped';
-    if (!halfTimeDone && (await halfTimeCard().count())) await playHalfTime(rec);
-    const before = (await page.locator('.nrl-mo-clock').textContent())?.trim();
-    const tick = await page.evaluate(() => {
-      const raw = localStorage.getItem('nrl-live-match-1');
-      return raw ? JSON.parse(raw).tick : 0;
-    });
-    if (!(tick > 0)) throw new Error(`the live-match record has no tick (${tick})`);
-    await page.reload();
-    await page.waitForSelector('[data-nrl-continue-1]', { timeout: 30000 });
-    await tap('[data-nrl-continue-1]');
-    await page.waitForSelector('.nrl-mo-controls', { timeout: 20000 });
-    await page.waitForFunction(() => {
-      const t = document.querySelector('.nrl-mo-clock')?.textContent?.trim();
-      return !!t && t !== '00:00';
-    }, { timeout: 15000 });
-    const after = (await page.locator('.nrl-mo-clock').textContent())?.trim();
-    const afterTick = await page.evaluate(() => {
-      const raw = localStorage.getItem('nrl-live-match-1');
-      return raw ? JSON.parse(raw).tick : 0;
-    });
-    if (afterTick + 40 < tick) throw new Error(`resumed tick ${afterTick} is behind the kill tick ${tick}`);
-    rec.notes.push(`killed at ${before} (tick ${tick}); resumed at ${after} (tick ${afterTick})`);
-  });
   // Coach calls (#73, 3o): COACH in the bottom row opens a tray of the calls legal now.
   // Make the first one on offer and see the COACH badge name it for the set; skipped
   // when there is no COACH button.
@@ -995,7 +997,8 @@ async function play() {
   });
   await step('live-fulltime', async (rec) => {
     if (!liveOn) return 'skipped';
-    await skipMatch();
+    // A match without a try can already be over after try-replay; still verify its saved result.
+    if (!(await page.locator('.nrl-mo-final').count())) await skipMatch();
     await page.waitForSelector(BACK_TO_CLUB, { timeout: 20000 });
     await wait(500);
     const shown = (await page.locator('.nrl-mo-score').textContent())?.trim();
