@@ -48,7 +48,12 @@ export function resetFieldSelection(deps: FieldResetDeps = resetPageDeps()): Swi
   if (!deps.save()) return { ok: false, why: "Your career's latest change didn't save, so nothing was reset." };
   if (!deps.persist(100)) return { ok: false, why: "The default field couldn't be saved on this browser, so nothing was reset." };
   const result = deps.reset();
-  if (!result.ok) return result;
+  if (!result.ok) {
+    // The career switch can still refuse after the default was written. Keep the
+    // stored choice aligned with this page's frozen field when backing out.
+    if (isFieldLength(deps.activeLength) && deps.persist(deps.activeLength)) return result;
+    return { ok: false, why: `${result.why} The previous field choice couldn't be restored. Your saved field choice may have changed to 100m; reapply your field choice before reloading.` };
+  }
   // Leaving the playtest career already reloads through its existing reset flow.
   if (!deps.inTest) deps.reload();
   return { ok: true };

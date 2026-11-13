@@ -154,10 +154,33 @@ describe('Reset all with a shorter frozen field', () => {
     expect(d.reload).not.toHaveBeenCalled();
   });
 
-  it('shows a refused career reset without reloading', () => {
-    const d = resetDeps();
+  it.each([80, 60] as const)('restores the previous %sm choice when the career reset refuses', activeLength => {
+    setFieldLengthPreference(activeLength);
+    const d = resetDeps(activeLength);
+    const writes: number[] = [];
+    d.persist = length => { writes.push(length); return setFieldLengthPreference(length); };
     d.reset = () => ({ ok: false, why: 'A match is waiting to resume.' });
     expect(resetFieldSelection(d)).toEqual({ ok: false, why: 'A match is waiting to resume.' });
+    expect(writes).toEqual([100, activeLength]);
+    expect(fieldLengthPreference()).toBe(activeLength);
+    expect(JSON.parse(stored.get(LABS_KEY)!).fieldLength).toBe(activeLength);
+    expect(d.reload).not.toHaveBeenCalled();
+  });
+
+  it('reports that the saved field choice may have changed when rollback also fails', () => {
+    setFieldLengthPreference(80);
+    const d = resetDeps();
+    const writes: number[] = [];
+    d.persist = length => {
+      writes.push(length);
+      return length === 100 ? setFieldLengthPreference(length) : false;
+    };
+    d.reset = () => ({ ok: false, why: 'A match is waiting to resume.' });
+    const result = resetFieldSelection(d);
+    expect(result).toMatchObject({ ok: false, why: expect.stringMatching(/saved field choice may have changed/i) });
+    if (!result.ok) expect(result.why).toMatch(/reapply.*before reloading/i);
+    expect(writes).toEqual([100, 80]);
+    expect(fieldLengthPreference()).toBe(100);
     expect(d.reload).not.toHaveBeenCalled();
   });
 
