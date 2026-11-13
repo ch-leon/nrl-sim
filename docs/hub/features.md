@@ -53,7 +53,7 @@ What's in the game, with the PR that added each.
 
 ## Labs
 
-- `?labs=1`, all off by default; Retro Bowl-style controls ([PR](https://github.com/ch-leon/nrl-sim/pull/438))
+- In Settings on current builds (`VITE_DEV_SETTINGS`, on until launch); `?labs=1` still works; every experiment off by default ([PR](https://github.com/ch-leon/nrl-sim/pull/438))
 
 ## Under the hood
 
@@ -63,6 +63,8 @@ What's in the game, with the PR that added each.
 - Android test APK ([PR](https://github.com/ch-leon/nrl-sim/pull/394)); CI ([PR](https://github.com/ch-leon/nrl-sim/pull/442))
 
 ## Recently added
+
+- Developer settings is in Settings on every build (GitHub Pages, the Android test APK and local dev). Overrides and experiments stay off until you turn one on, so a normal career plays as before. Analytics stays on unless the address has `?labs=1` or a developer override, experiment or playtest career is actually on. Before launch, set `VITE_DEV_SETTINGS=0` or remove Developer settings ([PR #683](https://github.com/ch-leon/nrl-sim/pull/683)).
 
 - Normal 2:30 clock halves on a 100m field; the existing Experiments panel offers browser-local 100m/80m/60m choices between matches ([PR #678](https://github.com/ch-leon/nrl-sim/pull/678)).
 

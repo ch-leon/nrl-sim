@@ -4,8 +4,9 @@ import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, 
 
 /**
  * Developer settings (#519), the real route on an iPhone, upright first:
- *   - a player's Settings has no Developer settings; `?labs=1` (the old Labs URL) shows it,
- *     the page has its Screens, Playtest career, Experiments (Match controls, off) and
+ *   - Settings shows Developer settings with no `?labs=1` (the build switch is on). Nothing
+ *     on the page is on, and opening it does not change the career. `?labs=1` still shows it.
+ *     The page has its Screens, Playtest career, Experiments (Match controls, off) and
  *     Reset parts, 44px targets, and fits upright (390×844) and sideways (667×375, 568×320);
  *   - the screen override opens Staff & Board on the dock's Office with a DEV tag and
  *     writes no career key; off locks it again;
@@ -16,7 +17,8 @@ import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, 
  *     record is under the playtest prefix; mid-match, Return is refused with the reason;
  *   - after the match, Return reloads to the title with the normal keys byte for byte and
  *     no playtest key left; Continue is the normal club;
- *   - Reset all turns the override off and hides the page, keeping the hints seen and the career.
+ *   - Reset all turns the override off and keeps the hints seen and the career. The entry
+ *     stays in Settings while the build switch is on.
  */
 export async function runDevSettings(browser) {
   const started = Date.now();
@@ -68,16 +70,25 @@ export async function runDevSettings(browser) {
     return out.map((p) => `${tag}: ${p}`);
   };
   try {
-    // 1. A player's Settings: no Developer settings.
+    // 1. Settings shows Developer settings with no ?labs=1. Nothing is on, so no tag,
+    //    and the career just started is unchanged.
     await page.goto(BASE);
     await page.locator('[data-nrl-start]').tap();
     await page.locator('[data-expansion-work]').tap();
     if (await page.locator('.nrl-tutorial-skip').count()) await page.locator('.nrl-tutorial-skip').tap();
+    await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
+    const startedCareer = await careerKeys();
+    if (!startedCareer['nrl-sim-save-slot-1']) throw new Error('no normal save in slot 1');
     await openNav(page, 'settings');
-    if (await page.locator('.nrl-labs-open').count()) throw new Error('Developer settings shows without ?labs=1');
-    if (await page.locator('.nrl-dev-marker').count()) throw new Error('a developer tag shows on a player’s game');
+    if (!(await page.locator('.nrl-labs-open').count())) throw new Error('Developer settings is missing without ?labs=1');
+    if (await page.locator('.nrl-dev-marker').count()) throw new Error('a developer tag shows on a normal career');
+    await page.locator('.nrl-labs-open').tap();
+    await page.locator('.nrl-labs-panel').waitFor();
+    if (await page.locator('[data-experiment="match-controls"]').isChecked()) throw new Error('Match controls is on by default');
+    if (await page.locator('[data-override="open-screens"]').isChecked()) throw new Error('Open every Office screen is on by default');
     await closePanel();
-    step('hidden by default');
+    if (!same(await careerKeys(), startedCareer)) throw new Error('opening Developer settings changed a career key');
+    step('shown without ?labs=1; career unchanged; switches off');
 
     // 2. The old Labs URL shows it; the career continues from the title.
     await page.goto(`${BASE}&labs=1`);
@@ -260,10 +271,11 @@ export async function runDevSettings(browser) {
     if (JSON.stringify(labs.hintsSeen) !== JSON.stringify(hints)) throw new Error('Reset all lost the hints seen');
     if (!same(await careerKeys(), beforeReset)) throw new Error('Reset all changed a career key');
     await openNav(page, 'settings');
-    if (await page.locator('.nrl-labs-open').count()) throw new Error('Developer settings still shows after Reset all');
+    if (!(await page.locator('.nrl-labs-open').count())) throw new Error('Reset all hid Developer settings while the build switch is on');
+    if (await page.locator('.nrl-dev-marker').count()) throw new Error('a developer tag stayed after Reset all');
     await closePanel();
     if (errors.length) throw new Error(`page errors: ${errors.join('; ')}`);
-    step('Reset all: off and hidden, hints and career kept');
+    step('Reset all: switches off, career kept, Developer settings still in Settings');
     log(`ok  dev settings (${((Date.now() - started) / 1000).toFixed(1)}s)`);
     return 0;
   } catch (err) {

@@ -2,13 +2,14 @@
 // between matches, before any simulation constants or stadium textures exist.
 import { browserStorage } from '../core/storage/local';
 import { LABS_KEY } from '../core/storageKeys';
-import { readLabs } from '../labs/flags';
+import { devSettingsBuildOn, readLabs } from '../labs/flags';
 import { fieldFromWorkerName, type FieldLength } from '../labs/fieldLength';
 
 export function resolveBootField(input: { worker: boolean; workerName?: unknown; stored?: unknown }): FieldLength {
   if (input.worker) return fieldFromWorkerName(input.workerName);
   const settings = readLabs(input.stored);
-  return (settings.visible || settings.testCareer !== undefined) ? settings.fieldLength ?? 100 : 100;
+  // The build switch shows the page, so a stored length counts. With it off, a hidden page stays at 100m.
+  return (settings.visible || settings.testCareer !== undefined || devSettingsBuildOn()) ? settings.fieldLength ?? 100 : 100;
 }
 export function bootFieldLength(): FieldLength {
   if (typeof window === 'undefined') return resolveBootField({ worker: true, workerName: (globalThis as { name?: unknown }).name });

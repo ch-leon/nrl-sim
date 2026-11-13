@@ -13,7 +13,7 @@
 //    pointer/key listener that resume()s it on the first user gesture.
 
 import { openAllUnlocks } from '../systems/unlocks';
-import { labsVisible } from '../labs/flags';
+import { devSettingsEntryVisible } from '../labs/flags';
 import { bus } from '../core/events';
 import type { MatchEvent } from '../sim/events';
 import { applyMomentumEvent, decayMomentum } from '../sim/weather';
@@ -1347,7 +1347,7 @@ export function initAudioUi(): () => void {
   return () => {
     syncUnlocks();
     labs.remove();
-    if (labsVisible()) content.querySelector('.nrl-settings-col:last-child')?.append(labs);
+    if (devSettingsEntryVisible()) content.querySelector('.nrl-settings-col:last-child')?.append(labs);
     syncInstallVisibility();
     for (const t of [mute, coachCalls, keyMoments, liveRivals, weekSummary, teamLetters]) t.sync();
     textSize.set(textSizeOf(getState().settings.textSize));

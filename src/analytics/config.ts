@@ -7,9 +7,12 @@
 //    a secret key put in the wrong variable is never shipped to a request;
 //  - it is a production build (`npm run dev` only with `VITE_POSTHOG_DEV=1`), and
 //    never vitest (MODE 'test');
-//  - the page is the game: not the match lab (`/#lab`), not Labs (`?labs=1` or
-//    switched on in Settings), not an automated run (`?e2e`, the test careers the
-//    playthroughs and the save corpus drive, or a browser under automation).
+//  - the page is the game: not the match lab (`/#lab`), not an active Labs
+//    session (`?labs=1`, or `page.labs` from labsBlocksAnalytics: a developer
+//    override, experiment, short field or playtest career actually on — the
+//    Settings entry being listed is not enough), not an automated run (`?e2e`,
+//    the test careers the playthroughs and the save corpus drive, or a browser
+//    under automation).
 // The host is fixed to PostHog's EU cloud; no build variable can move the data.
 
 /** PostHog's EU ingestion host (#450: EU cloud only). */
@@ -27,7 +30,7 @@ export interface AnalyticsEnv {
 export interface AnalyticsPage {
   hash: string;
   search: string;
-  /** Labs switched on in this browser (src/labs/flags.ts). */
+  /** An active Labs session (src/labs/flags.ts labsBlocksAnalytics), not merely the Settings entry. */
   labs: boolean;
   /** navigator.webdriver: a browser driven by Playwright and the like. */
   automated: boolean;

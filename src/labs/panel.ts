@@ -1,8 +1,8 @@
 // Developer settings (was Labs: match controls, Leon, 30 Oct; #519). Pure models, thin sheet.
-// Hidden unless ?labs=1 was opened on this browser (or a playtest career is on).
+// In Settings when VITE_DEV_SETTINGS is on (the default), after ?labs=1, or in a playtest career.
 // Finding it is not security: nothing here unlocks anything paid for.
 import { EXPERIMENTS } from './experiments';
-import { experimentOn, CSS_PIXELS, fieldLengthPreference, OPEN_SCREENS, overrideOn, setExperiment, setOverride, testCareer } from './flags';
+import { devSettingsBuildOn, experimentOn, CSS_PIXELS, fieldLengthPreference, OPEN_SCREENS, overrideOn, setExperiment, setOverride, testCareer } from './flags';
 import { FIELD_LENGTHS, isFieldLength, type FieldLength } from './fieldLength';
 import { applyFieldLength, resetFieldSelection } from './fieldSelection';
 import { currentProbe, enterTestCareer, returnToNormalCareer, transitionRefusal } from './devCareer';
@@ -166,10 +166,11 @@ export function openLabsPanel(): void {
     resetWhy.textContent = resetWait;
     off.setAttribute('aria-describedby', resetWhy.id);
   }
+  const hides = devSettingsBuildOn() ? '' : ' and hides this page';
   content.append(section('nrl-dev-reset', 'Reset',
     el('small', { text: (inTest
-      ? 'Leaves the playtest career as Return does, turns everything here off and hides this page. Hints you have seen stay.'
-      : 'Turns everything here off and hides this page. Your career and the hints you have seen stay.')
+      ? `Leaves the playtest career as Return does, turns everything here off${hides}. Hints you have seen stay.`
+      : `Turns everything here off${hides}. Your career and the hints you have seen stay.`)
       + (FIELD_LENGTH !== 100 ? ' Returns to a 100m field and reloads.' : '') }),
     off, resetWhy));
   openModal(content, { region: true, closeButton: true });

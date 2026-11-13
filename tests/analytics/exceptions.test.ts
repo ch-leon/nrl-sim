@@ -32,7 +32,7 @@ describe('JavaScript error tracking (#548)', () => {
     const client: AnalyticsClient = { capture: vi.fn(), captureException: capture };
     load = vi.fn(async () => ({ createClient: () => client }));
   });
-  afterEach(() => { __resetAnalytics(); __setLabs(null); vi.unstubAllGlobals(); vi.useRealTimers(); });
+  afterEach(() => { __resetAnalytics(); __setLabs(null); vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.useRealTimers(); });
   const start = (load: ReturnType<typeof vi.fn>, env = PROD, page = PAGE) => startAnalytics({ env, page, load, defer: (run) => run() });
 
   it('queues uncaught errors and unhandled rejections before title/start without fetching the SDK, then sends with build and platform', async () => {
@@ -106,7 +106,10 @@ describe('JavaScript error tracking (#548)', () => {
     vi.stubGlobal('navigator', {});
     __setLabs({ visible: true, on: {}, hintsSeen: [] });
     dispatch(target, 'unhandledrejection', error(12));
-    expect(capture).toHaveBeenCalledOnce();
+    expect(capture).toHaveBeenCalledTimes(2);
+    __setLabs({ visible: true, on: {}, hintsSeen: [], overrides: { 'open-screens': true } });
+    dispatch(target, 'unhandledrejection', error(13));
+    expect(capture).toHaveBeenCalledTimes(2);
   });
 
   it('allows the explicit development override', async () => {
@@ -116,7 +119,26 @@ describe('JavaScript error tracking (#548)', () => {
     expect(capture).toHaveBeenCalledOnce();
   });
 
-  it('drops queued and later errors if Labs is switched on before flushing', async () => {
+  it('still sends when Developer settings is only shown, and drops once an override is on', async () => {
+    __setLabs({ visible: true, on: {}, hintsSeen: [] });
+    installExceptionTracking({ env: PROD }, target);
+    dispatch(target, 'error', error());
+    await startAnalytics({ env: PROD, load, defer: (run) => run() });
+    expect(load).toHaveBeenCalledOnce();
+    expect(capture).toHaveBeenCalledOnce();
+    __resetAnalytics();
+    load.mockClear();
+    capture.mockClear();
+    __setLabs({ visible: false, on: {}, hintsSeen: [], overrides: { 'open-screens': true } });
+    installExceptionTracking({ env: PROD }, target);
+    dispatch(target, 'error', error(11));
+    await startAnalytics({ env: PROD, load, defer: (run) => run() });
+    expect(load).not.toHaveBeenCalled();
+    expect(capture).not.toHaveBeenCalled();
+  });
+
+  it('drops queued errors when the build switch is off and the page has been shown', async () => {
+    vi.stubEnv('VITE_DEV_SETTINGS', '0');
     __setLabs({ visible: false, on: {}, hintsSeen: [] });
     installExceptionTracking({ env: PROD }, target);
     dispatch(target, 'error', error());
