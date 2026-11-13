@@ -143,7 +143,7 @@ original four and all forty-four must each appear separately with paired 95%
 intervals, including the original four's losing result.
 
 `npm run soak -- --career-agency --jobs 4 --json <file>` owns the maintained
-cohort. It refuses sizing, pack, difficulty, mode and shard options that could
+cohort. It refuses tuning, sizing, pack, difficulty, mode and shard options that could
 silently change the question. The same existing soak pipeline runs the 88
 careers, and `src/qa/careerAgency.ts` validates all cases and paired starts,
 fails on missing/duplicate/mismatched/partial careers or any invariant problem,
@@ -217,3 +217,11 @@ Local verification on 2026-11-13: `npx tsc --noEmit`, `npx vitest run` (289 file
 baseline and postguard cash/forced-sale tradeoffs, review flags and output hashes.
 No runtime tuning follows from the near-zero baseline. Independent different-tool
 checking, CI/QA and the user's release decision remain outstanding.
+
+Independent-review follow-up: the default gate now rejects `--tune`; duration
+controls remain ordinary soak experiments rather than default-gate runs. Its QA
+step names `shell: bash` explicitly as well as inheriting the workflow default,
+so producer failures propagate through `tee`. Deck coverage checks every current
+card has a safe fallback and rejects unknown or unprojected recurring financing
+effects. A reserve-boundary test confirms the production signing helper leaves
+cash untouched and the QA budget counts its fee exactly once.

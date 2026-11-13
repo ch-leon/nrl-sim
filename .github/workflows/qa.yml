@@ -46,6 +46,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Managed career agency (fixed 44 paired seeds, two seasons)
+        shell: bash
         run: |
           mkdir -p e2e-output/career-agency
           status=0

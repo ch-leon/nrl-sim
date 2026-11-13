@@ -45,8 +45,8 @@ import { careerAgencyCases, careerAgencyMarkdown, careerAgencyReport } from '../
 
 const args = process.argv.slice(2).filter((a) => a !== '--');
 const agency = args.includes('--career-agency');
-if (agency && ['seasons', 'seeds', 'weeks', 'pack', 'personas', 'managed-only', 'difficulties', 'live-rivals', 'shard'].some(name => args.includes(`--${name}`))) {
-  throw new Error('--career-agency uses the complete fixed two-season AU Normal cohort; sizing, mode, pack, difficulty and shard options cannot be combined with it');
+if (agency && ['seasons', 'seeds', 'weeks', 'pack', 'personas', 'managed-only', 'difficulties', 'live-rivals', 'shard', 'tune'].some(name => args.includes(`--${name}`))) {
+  throw new Error('--career-agency uses the complete fixed two-season AU Normal cohort; tuning, sizing, mode, pack, difficulty and shard options cannot be combined with it');
 }
 const opt = (name: string, dflt: number): number => {
   const i = args.indexOf(`--${name}`);
@@ -322,9 +322,8 @@ if (forfeiting.length) {
   console.log(`\nForfeits: ${forfeiting.length} of ${results.length} runs forfeited rounds (${[...by].map(([m, n]) => `${m} ${n}`).join(', ')}); ${whole} forfeited a whole season.`);
 } else console.log(`\nForfeits: none in ${results.length} runs.`);
 
-const all = [
-  ...results.flatMap((r) => r.problems.map((p) => `seed ${r.seed} ${r.mode}${r.fromVersion !== undefined ? ` from v${r.fromVersion}` : ''}: ${p}`)),
-  ...(agencyReport?.problems ?? []),
-];
+// The agency report already includes each run's problems with its seed and mode.
+const all = agencyReport ? agencyReport.problems : results.flatMap((r) =>
+  r.problems.map((p) => `seed ${r.seed} ${r.mode}${r.fromVersion !== undefined ? ` from v${r.fromVersion}` : ''}: ${p}`));
 console.log(all.length ? `\n${all.length} problems:\n${all.join('\n')}` : '\nNo problems.');
 process.exit(all.length ? 1 : 0);
