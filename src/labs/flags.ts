@@ -121,7 +121,11 @@ export function testCareer(): TestCareerMarker | null { return state().testCaree
 export function setTestCareer(marker: TestCareerMarker | null): boolean {
   const s = state();
   if (marker) s.testCareer = { ...marker };
-  else delete s.testCareer;
+  else {
+    delete s.testCareer;
+    // A hidden playtest-only field must not revive on a later ?labs=1 boot.
+    if (!s.visible) delete s.fieldLength;
+  }
   return persist();
 }
 

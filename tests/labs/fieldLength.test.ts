@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { FIELD_LENGTHS, isFieldLength, fieldWorkerName, fieldFromWorkerName } from '../../src/labs/fieldLength';
-import { __setLabs, readLabs, fieldLengthPreference, setFieldLengthPreference, turnAllOff } from '../../src/labs/flags';
+import { __setLabs, readLabs, fieldLengthPreference, setFieldLengthPreference, setTestCareer, turnAllOff } from '../../src/labs/flags';
 import { resolveBootField } from '../../src/match/fieldSettings';
 
 describe('field experiment settings', () => {
@@ -63,6 +63,19 @@ describe('field experiment settings', () => {
       expect(readLabs(raw).fieldLength).toBeUndefined();
       const reopened = { ...JSON.parse(raw), visible: true };
       expect(resolveBootField({ worker: false, stored: JSON.stringify(reopened) })).toBe(100);
+    } finally { __setLabs(null); vi.unstubAllGlobals(); }
+  });
+  it('does not revive a hidden playtest field after returning to a normal career', () => {
+    const memory = new Map<string, string>();
+    vi.stubGlobal('localStorage', { getItem: (key: string) => memory.get(key) ?? null,
+      setItem: (key: string, value: string) => memory.set(key, value) });
+    try {
+      __setLabs({ visible: false, on: {}, hintsSeen: [], fieldLength: 60,
+        testCareer: { preset: 'block-play', fresh: false, from: 1 } });
+      expect(setTestCareer(null)).toBe(true);
+      const stored = readLabs(memory.get('nrl-sim-labs'));
+      expect(stored.fieldLength).toBeUndefined();
+      expect(resolveBootField({ worker: false, stored: JSON.stringify({ ...stored, visible: true }) })).toBe(100);
     } finally { __setLabs(null); vi.unstubAllGlobals(); }
   });
 });
