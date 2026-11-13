@@ -1,0 +1,74 @@
+{
+  "name": "last-tackle-presets-2",
+  "description": "#650 part 1, at the final default (the first cut's run and pass weights × 0.6, chosen in last-tackle-presets): the four attack-preset rows at 400 seeds both ways, off against on. standard.json's 100 seeds (±3.3) read Tight 56.5% and Expansive 41.8% at this default; are all four inside 45–55%? Baseline is off (lastTackle.on 0).",
+  "seeds": 400,
+  "base": {
+    "lastTackle.on": 0
+  },
+  "scenarios": [
+    {
+      "name": "grind v balanced",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "expansive v balanced",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "kick-chase v balanced",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "all-out v balanced",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "on",
+      "tuning": {
+        "lastTackle.on": 1
+      }
+    }
+  ]
+}

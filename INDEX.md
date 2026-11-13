@@ -327,3 +327,7 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261113-093021-standard-heldup-off | standard | a65edf9 (uncommitted changes) | worktree-agent-a62ea983e82036d03 | [report](runs/20261113-093021-standard-heldup-off/report.md) |
 | 20261113-105904-standard | standard | f58861b (uncommitted changes) | worktree-agent-a62ea983e82036d03 | [report](runs/20261113-105904-standard/report.md) |
 | 20261113-110233-heldup-expansive-check | heldup expansive check | f58861b (uncommitted changes) | worktree-agent-a62ea983e82036d03 | [report](runs/20261113-110233-heldup-expansive-check/report.md) |
+| 20261113-095318-standard-lt-off | standard-lt-off | a65edf9 (uncommitted changes) | worktree-agent-a18f30466b7234caa | [report](runs/20261113-095318-standard-lt-off/report.md) |
+| 20261113-111057-last-tackle-presets | last-tackle-presets | c4205f8 | worktree-agent-a18f30466b7234caa | [report](runs/20261113-111057-last-tackle-presets/report.md) |
+| 20261113-112350-standard | standard | c4205f8 (uncommitted changes) | worktree-agent-a18f30466b7234caa | [report](runs/20261113-112350-standard/report.md) |
+| 20261113-112709-last-tackle-presets-2 | last-tackle-presets-2 | c4205f8 (uncommitted changes) | worktree-agent-a18f30466b7234caa | [report](runs/20261113-112709-last-tackle-presets-2/report.md) |
