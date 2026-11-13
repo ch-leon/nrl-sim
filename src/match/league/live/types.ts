@@ -44,6 +44,8 @@ export interface Player {
   /** Already announced as cooked, COOKED! (until he recovers some). */
   gassed: boolean;
   body: Body;
+  /** Metres run under his own steering since kick-off: presentation only (#630), the view's stride; nothing in the sim reads it. */
+  odometer: number;
   pose: string;
   /** Hold `pose` until then (overrides run/idle). */
   poseUntil: number;
@@ -70,6 +72,12 @@ export interface Player {
   catchTick: number;
   /** Last successful airborne kick reception, for the renderer only. */
   aerialCatchTick?: number;
+  /**
+   * His last error, missed goal or sin bin and its tick (#667), for the renderer only: nothing in the sim reads it.
+   * Null until he has one, and set when the player is built: as an optional field added on his first error it gave
+   * the players two shapes, and a headless match took a third longer.
+   */
+  react: { tick: number; kind: 'error' | 'miss' | 'bin' } | null;
   /** Already chose pass-or-carry for this possession (decided once, at engagement). */
   decided: boolean;
   /** Defender index this carrier has already tried to step this possession. */

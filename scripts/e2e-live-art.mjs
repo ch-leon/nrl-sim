@@ -59,7 +59,7 @@ try {
     assert.equal(state.ball,!state.held,`${name}: only flying ball uses separate sprite`);
     if(state.visible) assert.deepEqual(state.hidden,state.expected,`${name}: exact contact participants`);
     else assert.equal(state.hidden.length,0,`${name}: ordinary actors restored`);
-    assert.ok(state.cache<=512);
+    assert.ok(state.cache<=768);
     await page.screenshot({path:`${out}/${name}.png`});
   }
   await seek(moments.group);

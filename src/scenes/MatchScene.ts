@@ -13,7 +13,8 @@ import { halfTimeNumbers } from '../ui/matchupRead';
 //
 // Depth convention (ARCHITECTURE §7): depth = world (screen) y of a thing's
 // ground contact + layer. Static layers sit outside the field's y range:
-//   BG (field, back stands)  < back crowd < shadows < players/posts/ball (y+1)
+//   BG (field, back stands)  < scoreboard < back crowd < shadows
+//   < players/posts/flags/referee/benches/ball (y+1)
 //   < particles (10 000) < FG near terraces < front crowd.
 //
 // Pure geometry lives in ./matchField and src/art/match (Phaser-free, tested).
@@ -21,12 +22,13 @@ import { experimentOn } from '../labs/flags';
 import { ControlsLayer } from '../match/view/controlsLayer';
 import Phaser from 'phaser';
 import { CameraController } from '../world/camera';
-import { zoomForViewport } from '../world/viewport';
+import { cssZoom, screenDensity } from '../world/viewport';
 import { bus } from '../core/events';
 import { button, getRoot, mount } from '../ui/dom';
 import { MATCH_NOT_SAVED_TEXT, MATCH_SAVED_TEXT, SKIPPING_EXIT_TEXT } from '../ui/hud';
 import type { TeamSheet, MatchEvent, WeatherKind } from '../sim/events';
 import { getState, setState, type Fixture } from '../core/state';
+import { isDerbyFixture } from '../systems/derby';
 import { SKIP_ARMED_LABEL, SKIP_ARMED_SAY, SKIP_ARM_MS, SKIP_LABEL, TRAY_CALLED_MS, callForRole, callsLockedHint, callsUnlockLine, coachBadge, cssHex, lockedNote, matchSettingsOpener, mountMatchOverlay, renderCoachBadge, showMatchSheet, showPlanCard, skipTap, trayCallsOn, trayHidden, trayPlayEls, trayPlays, trayPlaysKey, trayPlaysOn, trayTap, TRAY_CAP, TRAY_CAP_WITH_PLAYS, trayRowEls, trayRows, trayWithLocked, type MatchOverlayHandle, type PlanCardHandle, type TrayPlay } from '../ui/screens/matchOverlay';
 import { PLAYS_BY_ID, type PlayId } from '../data/plays';
 import { setFullTimeExit, shortName } from '../ui/screens/matchReport';
@@ -40,16 +42,16 @@ import {
   type PlaybackBall,
   type PlaybackSpeed,
 } from '../match/view/livePlayback';
-import { KICK_BACK_PER_S, KICK_OUT_PER_S, KICK_PAN_MAX_PX_PER_MS, KICK_RETURN_MS, cameraFrame, type Frame } from '../match/view/kickLayer';
+import { KICK_BACK_PER_S, KICK_OUT_PER_S, KICK_PAN_MAX_PX_PER_MS, KICK_RETURN_MS, FRAME_MARGIN, cameraFrame, type Frame } from '../match/view/kickLayer';
 import { NINES } from '../match/league/rules';
-import { ON_FIELD } from '../config';
+import { ON_FIELD, SET_TACKLES } from '../config';
 import type { LiveMatchData } from '../core/events';
-import { CALL_LABEL, CALL_RESULT_MS, COACH_CALLS, callIsBench, callIsKickoff, callIsPenalty, callResultText, unlockLevel, type CallVerdict, type CoachCall } from '../match/league/calls';
+import { CALL_LABEL, CALL_RESULT_MS, COACH_CALLS, callIsBench, callMoment, callIsKickoff, callIsPenalty, callResultText, unlockLevel, type CallVerdict, type CoachCall } from '../match/league/calls';
 import { runMatch } from '../match/league/match';
 import { canUseWorker, playMatchesInWorker } from '../systems/matchJobs';
 
 import { attachMatchFx } from '../fx/particles';
-import { attachMatchAtmosphere } from '../fx/atmosphere';
+import { DEPTH_GLOW, attachMatchAtmosphere } from '../fx/atmosphere';
 import { RING_STYLES, resolveKits } from '../art/match/kitClash';
 import { drawRing } from '../match/view/rings';
 import { teamLetters, teamLettersOn, teamTags } from '../ui/teamTag';
@@ -62,26 +64,39 @@ import {
   type CrowdSeat,
 } from '../art/match/stadium';
 import { fixtureArtKey, fixtureArtPieces, paintFixtureArt, type FixtureArt } from '../art/match/fixtureArt';
-import { CROSSBAR_AX, CROSSBAR_AY, UPRIGHT_H, UPRIGHT_W } from '../art/match/props';
+import { CROSSBAR_AX, CROSSBAR_AY, LIGHT_DX, LIGHT_DY, SHADOW_LENGTH, UPRIGHT_H, UPRIGHT_W } from '../art/match/props';
+import { lightingForFixture, type Lighting } from '../art/match/atmosphere';
+import type { BallMotion } from '../match/view/liveView';
 import {
   CROWD_BASE,
   CROWD_FW,
+  FLAG_HAND_X,
+  FLAG_HAND_Y,
+  POSE_FRAME,
+  POSE_LIFT,
   crowdFrameName,
   crowdPose,
+  flagFrameName,
+  flipForSeat,
   lookForSeat,
   shirtForSeat,
   shirtSide,
   type CrowdMood,
 } from '../art/match/crowd';
+import { reducedMotion } from '../match/view/impact';
 import { isoProject } from '../art/match/iso3d';
 import { MatchArtRegistry } from './matchArt';
 import { MatchActor, MatchContactLayer, PlayerFrameCache } from './matchPlayers';
+import { MatchOfficials } from './matchOfficials';
+import { castLooks } from '../art/prototype/player';
 export { MatchActor } from './matchPlayers';
 import { fixtureArtFor, takeFixtureArt } from './matchArtAhead';
 import {
   NAME_TAG_MS,
   ZOOM_DEFAULT,
   easeZoom,
+  stepZoom,
+  zoomForBeat,
   zoomForEvent,
   type NameTag,
   type TeamSide,
@@ -111,21 +126,43 @@ export {
 // Static layer depths (see header).
 const DEPTH_BG = -100_000;
 const DEPTH_CROWD_BACK = -90_000;
+/** The scoreboard on the grandstand roof (#673): over the stand, under its crowd. */
+const DEPTH_BOARD = -95_000;
 const DEPTH_SHADOW = -80_000;
 const DEPTH_FG = 50_000;
 /** Name tags sit above the light map and crowd FX (70–72k), below weather (80k). */
 const DEPTH_TAG = 73_000;
 const DEPTH_CROWD_FRONT = 60_000;
 
-/** Default match zoom (#17): keeps an integer pixel scale. Eases
- *  tighter/wider per beat (see world/readability). */
+/** Default match zoom (#17), as authored; viewZoom turns a beat's zoom into a whole
+ *  number of canvas px per art px for the screen (see world/readability). */
 const MATCH_ZOOM = ZOOM_DEFAULT;
+/** A close-up is let go by its playback (closeUpDone, the lab's CLOSEUP_MS); past this it goes anyway. */
+const CLOSEUP_LIMIT_MS = 4000;
 /** Name tag sits this many world px above a player's feet (just over his head). */
 const TAG_LIFT = 39;
 /** How long a tap on a locked call's tile shows what unlocks it, in the tray's footer (ms). */
 const LOCKED_NOTE_MS = 2000;
-/** Ghost balls trailing a kicked ball. */
-const TRAIL_LEN = 5;
+/** Lead room (#633): the camera runs this far ahead of a sprinting carrier, as a share of the visible width and of the clear band's height. */
+const LEAD_X = 0.2;
+const LEAD_Y = 0.25;
+/** The carrier's travel is smoothed over this long (real ms) and the lead eases to it at this rate (per s), so a change of direction swings the view, never flips it. */
+const LEAD_VELOCITY_MS = 280;
+const LEAD_RATE_PER_S = 2;
+/** The lead builds from a jog (world px a tick) to a sprint (3.9 px a tick is 9 m/s). */
+const LEAD_FROM = 0.6;
+const LEAD_FULL = 3;
+/** Playback speeds the follow keeps pace with: a carrier covers the same screen in the same sim time at ×4, so the ease quickens with the speed up to this. */
+const FOLLOW_SPEED_MAX = 4;
+/** Automatic zoom (close-ups, kick framing) returns this long after the player's last wheel or pinch (ms). */
+const REARM_MS = 3000;
+/** A flying ball's shadow is half its size this many px of height up. */
+const BALL_SHADOW_REACH = 90;
+/** The ball's wobble about its heading (radians) and its rate (radians per tick): a spiral kick's precession. */
+const BALL_WOBBLE = 0.35;
+const BALL_WOBBLE_RATE = 1.3;
+/** Smallest turn the ball is drawn at (radians). */
+const BALL_TURN_STEP = Math.PI / 12;
 /** The in-match labels (name tag, "Kick-off…") in the HUD's label face (Broadcast Quiet). */
 const MATCH_LABEL_FONT = '"Barlow Condensed", "Arial Narrow", sans-serif';
 /** On screen while a live match waits for its art to be painted or uploaded (N10.5). */
@@ -135,10 +172,16 @@ export const KICK_OFF_TEXT = 'Kick-off…';
 function nextFrame(): Promise<void> {
   return new Promise((resolve) => requestAnimationFrame(() => resolve()));
 }
-/** A flight must rise this high (world px) before it counts as a kick and gets a trail. */
-const TRAIL_MIN_LIFT = 30;
 /** Crowd animation tick (real ms). */
 const CROWD_TICK_MS = 220;
+/** Heads go up while the loose ball is higher than this (metres): a bomb, a kick at goal (#641). */
+const CROWD_HEADS_UP_M = 6;
+/** A Mexican wave (#641): a side this many points clear, nothing for this long (real ms), round the stands at this share a crowd tick (about 10 s a lap), twice, then a rest. */
+const WAVE_MARGIN = 18;
+const WAVE_LULL_MS = 9000;
+const WAVE_PER_TICK = 0.022;
+const WAVE_LAPS = 2;
+const WAVE_REST_MS = 40_000;
 /** Width (world px) of the team ring under every player (#340); the carrier's ring is 22. */
 const CARRIER_RING_W = 22;
 
@@ -152,54 +195,67 @@ export interface MatchSceneData {
   live?: LiveMatchData;
 }
 
-/** The ball sprite + its ground shadow (shown while in the air) + flight trail. */
+/** The ball sprite + its ground shadow (shown while in the air). A kick's one trail is the kick layer's (kickLayer.ts). */
 export class MatchBall implements PlaybackBall {
   readonly sprite: Phaser.GameObjects.Image;
   private readonly shadow: Phaser.GameObjects.Image;
-  private readonly trail: Phaser.GameObjects.Image[] = [];
-  private readonly recent: { x: number; y: number }[] = [];
-  /** This flight has gone high enough to be a kick (trail shown). */
-  private highFlight = false;
   /** Ground position — what the camera follows. */
   gx = 0;
   gy = 0;
+  /** How far the ball moved on screen over the last tick (world px): the carrier's travel, for the camera's lead room. */
+  vx = 0;
+  vy = 0;
 
-  constructor(scene: Phaser.Scene, key: string, shadowKey: string) {
+  /** Half the ball's height: it turns about its middle, so it sits that far above its (bottom) rest point. */
+  private readonly half: number;
+  /** How far the light throws the ball's shadow along the ground per px of height (the day's, dusk's or night's). */
+  private readonly throwX: number;
+  private readonly throwY: number;
+
+  constructor(scene: Phaser.Scene, key: string, shadowKey: string, lighting: Lighting = 'day') {
     this.shadow = scene.add.image(0, 0, shadowKey).setDepth(DEPTH_SHADOW + 1);
-    this.sprite = scene.add.image(0, 0, key).setOrigin(0.5, 1);
-    for (let i = 0; i < TRAIL_LEN; i++) {
-      this.trail.push(scene.add.image(0, 0, key).setOrigin(0.5, 1).setVisible(false));
-    }
+    this.sprite = scene.add.image(0, 0, key).setOrigin(0.5, 0.5);
+    this.half = this.sprite.height / 2;
+    this.throwX = LIGHT_DX * SHADOW_LENGTH[lighting];
+    this.throwY = LIGHT_DY * SHADOW_LENGTH[lighting];
   }
 
-  place(x: number, y: number, lift: number, depth: number): void {
+  place(x: number, y: number, lift: number, depth: number, motion?: BallMotion): void {
     this.gx = x;
     this.gy = y;
     const sy = y - lift + 2;
-    this.sprite.setPosition(x, sy).setDepth(depth);
-    this.shadow.setPosition(x, y).setVisible(lift > 3);
-    // Short trail while a KICK is in the air: fading ghosts of its last spots.
-    // Passes stay low and short; a trail on them just reads as blur (BAK-207).
-    if (lift <= 3) this.highFlight = false;
-    else if (lift > TRAIL_MIN_LIFT) this.highFlight = true;
-    const flying = lift > 3 && this.highFlight;
-    const last = this.recent[this.recent.length - 1];
-    if (!flying || (last && Math.hypot(x - last.x, sy - last.y) > 400)) this.recent.length = 0;
-    if (flying && (!last || Math.hypot(x - last.x, sy - last.y) >= 4)) {
-      this.recent.push({ x, y: sy });
-      if (this.recent.length > TRAIL_LEN) this.recent.shift();
+    this.sprite.setPosition(x, sy - this.half).setDepth(depth);
+    this.turn(motion);
+    this.vx = motion?.dx ?? 0;
+    this.vy = motion?.dy ?? 0;
+    // The shadow lies on the ground along the light, shrinking and paling as the ball climbs:
+    // a bomb's closes on its landing spot as it falls.
+    const near = 1 / (1 + lift / BALL_SHADOW_REACH);
+    this.shadow.setPosition(x + lift * this.throwX, y + lift * this.throwY).setScale(near).setAlpha(0.35 + 0.65 * near).setVisible(lift > 3);
+  }
+  /**
+   * Point the ball along its flight and wobble it with the tick (a pure function of the
+   * tick, so pause, seek and replay show the same ball). The ball is painted lit side up:
+   * heading left, it is flipped rather than turned upside down. Slow or still, it settles flat.
+   */
+  private turn(motion?: BallMotion): void {
+    const speed = motion ? Math.hypot(motion.dx, motion.dy) : 0;
+    if (!motion || speed < 0.3) {
+      this.sprite.setRotation(0).setFlipX(false);
+      return;
     }
-    this.trail.forEach((g, i) => {
-      const p = this.recent[this.recent.length - 2 - i];
-      if (!flying || !p) return void g.setVisible(false);
-      g.setPosition(p.x, p.y).setDepth(depth - 0.01).setAlpha(0.5 - i * 0.09).setScale(1 - i * 0.12).setVisible(true);
-    });
+    const left = motion.dx < 0;
+    const live = Math.min(1, speed / 2);
+    const heading = Math.atan2(left ? -motion.dy : motion.dy, Math.abs(motion.dx));
+    const wobble = BALL_WOBBLE * Math.sin(motion.t * BALL_WOBBLE_RATE) * live;
+    // Steps of 15°: a pixel sprite turned by any angle smears.
+    const angle = Math.round(((heading * live) + wobble) / BALL_TURN_STEP) * BALL_TURN_STEP;
+    this.sprite.setRotation(angle).setFlipX(left);
   }
   setRendered(visible: boolean): void {
     this.sprite.setVisible(visible);
-    if (!visible) { this.shadow.setVisible(false); for (const trail of this.trail) trail.setVisible(false); }
+    if (!visible) this.shadow.setVisible(false);
   }
-
 }
 
 /**
@@ -214,6 +270,8 @@ export class MatchScene extends Phaser.Scene {
   public readonly players: { home: MatchActor[]; away: MatchActor[] } = { home: [], away: [] };
   public ball!: MatchBall;
   public contact?: MatchContactLayer;
+  /** The referee, benches, sin bin and corner flags (#642), drawn by LiveView from the same ticks as the players. */
+  public officials?: MatchOfficials;
   private playerFrames: PlayerFrameCache | null = null;
   /** Readability hooks driven by playback (#17): name tags + carrier ring. */
   public readonly focus = {
@@ -243,10 +301,20 @@ export class MatchScene extends Phaser.Scene {
   protected backBtn: HTMLButtonElement | null = null;
 
   // Crowd.
-  private crowdBobs: { bob: Phaser.GameObjects.Bob; seat: CrowdSeat; shirt: number; look: number; side: 'home' | 'away' | null }[] = [];
+  private crowdBobs: { bob: Phaser.GameObjects.Bob; seat: CrowdSeat; shirt: number; look: number; side: 'home' | 'away' | null; y: number; flag?: Phaser.GameObjects.Bob; flagY?: number }[] = [];
   private crowdTick = 0;
   private mood: CrowdMood = { home: 0, away: 0 };
   private moodUntil = { home: 0, away: 0 };
+  private groanMood = { home: 0, away: 0 };
+  private groanUntil = { home: 0, away: 0 };
+  private riseMood = 0;
+  private riseUntil = 0;
+  private upMood = 0;
+  /** When something last stirred the crowd (real ms): a Mexican wave waits for a lull. */
+  private crowdBusyAt = 0;
+  private waveFrom: number | null = null;
+  private waveNext = 0;
+  private crowdReduced = false;
   private offCrowd: (() => void) | null = null;
   private offZoom: (() => void) | null = null;
 
@@ -263,6 +331,8 @@ export class MatchScene extends Phaser.Scene {
   protected zoomTarget = MATCH_ZOOM;
   /** Authored (desktop) zoom for the current beat; zoomTarget is this scaled for the viewport. */
   protected beatZoom = MATCH_ZOOM;
+  /** Until this scene time a big moment's close-up holds against the beats after it (#627); 0 when none is up. */
+  private closeUpUntil = 0;
   private onResize = (): void => {
     this.zoomTarget = this.viewZoom(this.beatZoom);
     if (this.autoZoom !== null) this.autoZoom = this.cameras.main.zoom;
@@ -274,6 +344,16 @@ export class MatchScene extends Phaser.Scene {
   /** Until this loop time the camera eases back from a kick's framing at the quick rate; whether it is doing so this frame. */
   private kickBackUntil = 0;
   private kickBack = false;
+  /** Lead room (#633): the carrier's smoothed travel (world px a tick), and the lead the camera gives it (world px). */
+  private leadV = { x: 0, y: 0 };
+  private lead = { x: 0, y: 0 };
+  /** The ball is in a carrier's hands this frame (the ring is on him). */
+  private carried = false;
+  /** Bodies were placed this tick (a half's restart): the camera goes straight to the ball. */
+  private cutPending = false;
+  /** The zoom the player left the camera at and when they last changed it (scene ms): automatic zoom returns REARM_MS later. */
+  private handZoom = 0;
+  private handZoomAt = 0;
 
   // ── WU-12 playback + overlay ──────────────────────────────────────────────
   private controlsLayer: ControlsLayer | null = null;
@@ -297,6 +377,12 @@ export class MatchScene extends Phaser.Scene {
     this.players.home = [];
     this.players.away = [];
     this.crowdBobs = [];
+    this.mood = { home: 0, away: 0 };
+    this.moodUntil = { home: 0, away: 0 };
+    this.groanMood = { home: 0, away: 0 };
+    this.groanUntil = { home: 0, away: 0 };
+    this.riseMood = this.riseUntil = this.upMood = this.crowdBusyAt = this.waveNext = 0;
+    this.waveFrom = null;
     this.finished = false;
     this.built = false;
     // Phaser keeps this scene between matches: the last match's half-time sheet must
@@ -321,15 +407,27 @@ export class MatchScene extends Phaser.Scene {
     const fixtureKitsNow = { home: kits.home, away: kits.away };
     const key = fixtureArtKey(this.offsetX, fixtureKitsNow);
     const art = takeFixtureArt(key);
-    if (!this.live || (art && fixtureArtPieces(art).every((p) => p.texKey))) {
+    if (!this.live) {
       this.build(kits, art ?? paintFixtureArt(this.offsetX, fixtureKitsNow));
       return;
     }
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.teardown());
+    if (art && fixtureArtPieces(art).every((p) => p.texKey)) {
+      // All uploaded ahead: placed in a task of its own. The scene starts inside the
+      // Play Week tap, and the week's tick plus the build in one task blocked a ×4
+      // phone for close to 300 ms (#627's perf run).
+      const token = ++this.buildToken;
+      this.art.adopt(fixtureArtPieces(art)); // freed by teardown even if we never build
+      setTimeout(() => {
+        if (token === this.buildToken) this.build(kits, art, false);
+      }, 0);
+      return;
+    }
     const beat = this.add
       .text(this.cameras.main.width / 2, this.cameras.main.height / 2, KICK_OFF_TEXT, { fontFamily: MATCH_LABEL_FONT, fontSize: '22px', fontStyle: 'bold', color: '#ffffff', resolution: 2 })
       .setOrigin(0.5)
-      .setScrollFactor(0);
+      .setScrollFactor(0)
+      .setScale(1 / cssZoom(this.cameras.main)); // 22 CSS px on any screen (#627)
     const token = ++this.buildToken;
     // Shutdown bumps the token (teardown). Not isActive(): inside create() the scene
     // is still CREATING, so it reads false and the match would never build.
@@ -360,22 +458,37 @@ export class MatchScene extends Phaser.Scene {
     // Static stadium layers.
     this.art.layer(art.bg, DEPTH_BG);
     this.art.layer(art.fg, DEPTH_FG);
-    const props = this.art.props('match', kits.home);
+    // The fixture's light sets how long the shadows fall (the same choice the atmosphere makes).
+    let season = 1;
+    try { season = getState().season; } catch { /* the lab has no save */ }
+    const lighting = lightingForFixture(this.fixture, season);
+    const props = this.art.props('match', kits.home, lighting);
     this.spawnPosts(props.upright, props.crossbar);
     this.spawnCrowd(this.art.crowd('match-crowd', art.crowd));
 
     // Players + ball.
-    // Keep ownership of any legacy atlases uploaded ahead; the live actors use
-    // small reusable textures and a bounded cache of approved character frames.
-    this.art.adopt([art.home, art.away]);
-    this.playerFrames = new PlayerFrameCache({ home: kits.home, away: kits.away });
-    this.contact = new MatchContactLayer(this, this.art, { home: kits.home, away: kits.away });
+    // The live actors use small reusable textures and a bounded cache of approved character frames.
+    const looks = castLooks([this.home, this.away]); // each man's build and height by his own position (#643)
+    this.playerFrames = new PlayerFrameCache({ home: kits.home, away: kits.away }, looks);
+    this.contact = new MatchContactLayer(this, this.art, { home: kits.home, away: kits.away }, looks);
     for (let i = 0; i < ON_FIELD; i++) {
       const h = this.home.roster?.[i]; const a = this.away.roster?.[i];
       this.players.home.push(new MatchActor(this, this.art, this.playerFrames, 'home', i, h?.id ?? h?.name ?? `home/${i}`, props.shadow, kits.rings.home, kits.ringStyles.home));
       this.players.away.push(new MatchActor(this, this.art, this.playerFrames, 'away', i, a?.id ?? a?.name ?? `away/${i}`, props.shadow, kits.rings.away, kits.ringStyles.away));
     }
-    this.ball = new MatchBall(this, props.ball, props.ballShadow);
+    this.ball = new MatchBall(this, props.ball, props.ballShadow, lighting);
+    this.officials = new MatchOfficials(this, this.art, {
+      kits: { home: kits.home, away: kits.away },
+      sheets: { home: this.home, away: this.away },
+      look: looks,
+      toWorld: (fx, fy) => this.fieldToWorld(fx, fy),
+      shadowKey: props.shadow,
+      offsetX: this.offsetX,
+      carrierDepth: (side, slot) => this.players[side][slot]?.sprite.depth ?? null,
+      tags: teamTags(this.home.name, this.away.name),
+      boardDepth: DEPTH_BOARD,
+      ...(lighting !== 'day' ? { boardGlow: { depth: DEPTH_GLOW, alpha: lighting === 'night' ? 0.85 : 0.55 } } : {}),
+    });
     this.markerColors = { home: kits.rings.home, away: kits.rings.away };
     this.marker = this.add.graphics().setVisible(false);
     this.markerSide = null;
@@ -400,20 +513,26 @@ export class MatchScene extends Phaser.Scene {
     this.mountBackButton();
     if (ownTeardown) this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.teardown());
     this.built = true;
-    // A live match starts its effects and playback on the next frame (N10.5), so the
-    // frame that placed the stadium stays short on a phone; the lab starts at once.
+    // A live match starts its effects and playback in a task of its own (N10.5), so the
+    // task that placed the stadium stays short on a phone; the lab starts at once. Not a
+    // frame later: on a 2× screen the stadium's first frame blocks for 200 ms (#627), and
+    // the controls and the players' first draw were waiting behind it.
     if (!this.live) {
       this.startMatch();
       return;
     }
+    // Shown by startMatch: a frame drawn before it would paint the whole stadium at the
+    // screen's density with no players on it, the costliest frame of the hand-off.
+    this.cameras.main.setVisible(false);
     const token = this.buildToken;
-    void nextFrame().then(() => {
+    setTimeout(() => {
       if (token === this.buildToken) this.startMatch();
-    });
+    }, 0);
   }
 
   /** The effects, atmosphere and playback, over the stadium build() placed. */
   private startMatch(): void {
+    this.cameras.main.setVisible(true);
     // Publish sheets for the crowd emitters' kit tints (read by attachMatchFx).
     this.data.set('home', this.home);
     this.data.set('away', this.away);
@@ -425,12 +544,26 @@ export class MatchScene extends Phaser.Scene {
     // the live playback, which plays the match and emits its events as they happen.
     this.startPlayback();
     this.offZoom = bus.on('match:event', (ev) => {
-      this.beatZoom = zoomForEvent(ev.kind);
+      const beat = zoomForEvent(ev.kind);
+      // The close-up holds until the moment ends (#627): the tackle and play-the-ball
+      // that follow a big hit within a tick do not pull it straight back out.
+      if (beat <= ZOOM_DEFAULT && this.time.now < this.closeUpUntil) return;
+      this.closeUpUntil = beat > ZOOM_DEFAULT ? this.time.now + CLOSEUP_LIMIT_MS : 0;
+      this.beatZoom = beat;
       this.zoomTarget = this.viewZoom(this.beatZoom);
     });
     // #18: rotating / resizing re-derives the zoom for the new viewport; the
     // CameraController re-clamps scroll on the same event.
     this.scale.on('resize', this.onResize);
+  }
+
+  /** The player's derby (#640): the career's own News already calls it one (systems/derby.ts, geography only). Never in the lab, which has no career. */
+  private isDerby(): boolean {
+    try {
+      return !!this.fixture && isDerbyFixture(getState(), this.fixture);
+    } catch {
+      return false;
+    }
   }
 
   private startPlayback(): void {
@@ -444,6 +577,7 @@ export class MatchScene extends Phaser.Scene {
         halfMinutes: NINES.halfMinutes,
         worn: { home: cssHex(this.markerColors.home), away: cssHex(this.markerColors.away) },
         ...(live.coachSide ?? live.planSide ? { mine: live.coachSide ?? live.planSide } : {}),
+        ...(live.goldenPoint ? { occasion: 'final' as const } : this.isDerby() ? { occasion: 'derby' as const } : {}),
       });
       this.playback = new LivePlayback(this, {
         home: this.home,
@@ -468,13 +602,11 @@ export class MatchScene extends Phaser.Scene {
         ...(canUseWorker()
           ? { skipElsewhere: (job) => playMatchesInWorker([job], SKIP_WORKER_TIMEOUT_MS, 'skip').then(([r]) => r ?? runMatch(job.home, job.away, job.opts)) }
           : {}),
-        closeUpDone: () => {
-          this.beatZoom = ZOOM_DEFAULT;
-          this.zoomTarget = this.viewZoom(ZOOM_DEFAULT);
-        },
+        closeUpDone: () => this.endCloseUp(),
         speed: this.rememberedSpeed(),
         keyMoments: () => this.keyMomentsOn(),
         onCallResult: (v) => this.showCallResult(v),
+        ...(live.coachSide ? { coachSide: live.coachSide } : {}),
       });
       this.mountPlaybackControls(this.playback.getSpeed());
       // Labs: match controls (Leon, 30 Oct). Snapshot the switch for this match.
@@ -514,7 +646,9 @@ export class MatchScene extends Phaser.Scene {
     // while it is up, then comes back to the ball within a second of the catch or the bounce.
     const cam0 = this.cameras.main;
     // A try's replay (N15.5) frames the ball wide, ahead of a kick's own framing.
-    const replayFrame = this.playback?.replayFraming() ?? null;
+    const replay = this.playback?.replayFraming() ?? null;
+    // The replay's zoom is a CSS one (REPLAY_ZOOM); the camera's is canvas px per art px.
+    const replayFrame = replay && { ...replay, zoom: Math.max(1, Math.round(replay.zoom * screenDensity())) };
     const kick = this.playback?.kickFraming({ width: cam0.width, height: cam0.height }, this.zoomTarget) ?? null;
     // A pinch or a wheel has the camera: a kick does not pan it off the ball (note 10).
     this.kickFrame = cameraFrame(replayFrame, kick, this.autoZoom === null);
@@ -538,16 +672,66 @@ export class MatchScene extends Phaser.Scene {
     if (!this.ball) return;
     const cam = this.cameras.main;
     const kf = this.kickFrame;
-    const tx = (kf ? kf.cx : this.ball.gx) - cam.width / 2;
-    const ty = (kf ? kf.cy : this.ball.gy) - cam.height / 2;
+    const kicking = kf !== null || this.kickBack;
+    this.updateLead(delta * Math.min(FOLLOW_SPEED_MAX, Math.max(1, this.playSpeed())), kicking);
+    // The follow centres the ball (and the room ahead of him) on the band the overlay leaves
+    // clear, between the score bug and the bottom bar, the way a kick's framing does.
+    const shiftY = ((FRAME_MARGIN.top - FRAME_MARGIN.bottom) / 2) * screenDensity();
+    const tx = (kf ? kf.cx : this.ball.gx + this.lead.x) - cam.width / 2;
+    const ty = (kf ? kf.cy : this.ball.gy + this.lead.y - shiftY / cam.zoom) - cam.height / 2;
     // Frame-rate independent; the speed cap scales with ×2/×4 playback. Going out to a
     // kick and back the ease alone sets the pace, so the return takes under a second at ×1 too.
-    const kicking = kf !== null || this.kickBack;
-    const maxPx = kicking ? KICK_PAN_MAX_PX_PER_MS : PAN_MAX_PX_PER_MS * (this.playback?.getSpeed() ?? 1);
-    const rate = kf ? KICK_OUT_PER_S : this.kickBack ? KICK_BACK_PER_S : PAN_RATE_PER_S;
-    cam.setScroll(panTowards(cam.scrollX, tx, delta, rate, maxPx), panTowards(cam.scrollY, ty, delta, rate, maxPx));
+    const speed = this.playSpeed();
+    const maxPx = kicking ? KICK_PAN_MAX_PX_PER_MS : PAN_MAX_PX_PER_MS * speed;
+    const rate = kf ? KICK_OUT_PER_S : this.kickBack ? KICK_BACK_PER_S : PAN_RATE_PER_S * Math.min(FOLLOW_SPEED_MAX, Math.max(1, speed));
+    if (this.cutPending) {
+      // The sides were placed for a restart: no streak across the pitch, the camera is there.
+      this.cutPending = false;
+      cam.setScroll(tx, ty);
+    } else if (!this.camController?.isPanning()) {
+      // A finger dragging the view holds it; the follow comes back when it lets go.
+      cam.setScroll(panTowards(cam.scrollX, tx, delta, rate, maxPx), panTowards(cam.scrollY, ty, delta, rate, maxPx));
+    }
     // A live match's pop-ups and bars sit over the sprites where the camera now has them.
     if (this.playback instanceof LivePlayback) this.playback.late(delta);
+  }
+
+  /** How fast the match is playing (1, 2, 4…): the follow keeps pace with it. */
+  protected playSpeed(): number {
+    return this.playback?.getSpeed() ?? 1;
+  }
+
+  /** The sides were put on their spots in one tick: the camera goes with them (LiveView calls this). */
+  cut(): void {
+    this.cutPending = true;
+  }
+
+  /**
+   * Lead room: aim a little ahead of the carrier, the way he is running, so the space he runs
+   * into gets more of the screen than the space behind him. His travel is smoothed and the
+   * lead eases to it, and it is clamped to a share of the view, so it never loses him and
+   * never flips when he turns. No lead while the ball is loose or a kick has the camera.
+   */
+  private updateLead(delta: number, kicking: boolean): void { // delta in sim-time ms (real ms times the playback speed, to ×4)
+    const cam = this.cameras.main;
+    if (this.cutPending) {
+      this.leadV = { x: 0, y: 0 };
+      this.lead = { x: 0, y: 0 };
+    }
+    const run = this.carried && !kicking;
+    const k = 1 - Math.exp(-delta / LEAD_VELOCITY_MS);
+    this.leadV.x += ((run ? this.ball.vx : 0) - this.leadV.x) * k;
+    this.leadV.y += ((run ? this.ball.vy : 0) - this.leadV.y) * k;
+    const sp = Math.hypot(this.leadV.x, this.leadV.y);
+    const m = Math.max(0, Math.min(1, (sp - LEAD_FROM) / (LEAD_FULL - LEAD_FROM)));
+    const d = screenDensity();
+    const viewW = cam.width / cam.zoom;
+    const bandH = Math.max(0, cam.height - (FRAME_MARGIN.top + FRAME_MARGIN.bottom) * d) / cam.zoom;
+    const wantX = sp > 1e-6 ? (this.leadV.x / sp) * m * LEAD_X * viewW : 0;
+    const wantY = sp > 1e-6 ? (this.leadV.y / sp) * m * LEAD_Y * bandH : 0;
+    const r = 1 - Math.exp((-LEAD_RATE_PER_S * delta) / 1000);
+    this.lead.x += (wantX - this.lead.x) * r;
+    this.lead.y += (wantY - this.lead.y) * r;
   }
 
   // ── Readability (#17): name tag, carrier ring, situational zoom ───────────
@@ -560,6 +744,7 @@ export class MatchScene extends Phaser.Scene {
   }
 
   private moveMarker(t: { side: TeamSide; x: number; y: number } | null): void {
+    this.carried = t !== null;
     if (!this.marker) return;
     if (!t) {
       this.marker.setVisible(false);
@@ -600,14 +785,14 @@ export class MatchScene extends Phaser.Scene {
       // The name tag takes the letter's place over its man while it shows.
       const show = actor.sprite.visible && actor !== this.tagActor;
       text.setVisible(show);
-      if (show) text.setScale(1 / cam.zoom).setPosition(actor.sprite.x, actor.sprite.y - TAG_LIFT);
+      if (show) text.setScale(1 / cssZoom(cam)).setPosition(actor.sprite.x, actor.sprite.y - TAG_LIFT);
     }
     if (this.tagText) {
       const a = this.tagActor;
       if (a && this.time.now < this.tagUntil) {
         // Pinned above the sprite's head, counter-scaled so it stays screen-sized.
         this.tagText
-          .setScale(1 / cam.zoom)
+          .setScale(1 / cssZoom(cam))
           .setPosition(a.sprite.x, a.sprite.y - TAG_LIFT)
           .setVisible(true);
       } else {
@@ -615,16 +800,27 @@ export class MatchScene extends Phaser.Scene {
         this.tagActor = null;
       }
     }
-    // Ease toward this beat's zoom, or a kick's (N15.3), unless the player has taken over (wheel/pinch).
+    // Toward this beat's zoom, or a kick's (N15.3), unless the player has taken over (wheel/pinch).
+    // A kick eases out and back; a beat (a close-up and back) steps there in a few frames (#627).
+    if (this.time.now >= this.closeUpUntil && this.closeUpUntil) this.endCloseUp();
     if (this.autoZoom !== null) {
       if (Math.abs(cam.zoom - this.autoZoom) > 0.01) {
         this.autoZoom = null;
+        this.handZoom = cam.zoom;
+        this.handZoomAt = this.time.now;
       } else {
         const kf = this.kickFrame;
-        const rate = kf ? KICK_OUT_PER_S : this.kickBack ? KICK_BACK_PER_S : undefined;
-        cam.setZoom(easeZoom(cam.zoom, kf ? kf.zoom : this.zoomTarget, delta, rate));
+        if (kf || this.kickBack) cam.setZoom(easeZoom(cam.zoom, kf ? kf.zoom : this.zoomTarget, delta, kf ? KICK_OUT_PER_S : KICK_BACK_PER_S));
+        else cam.setZoom(stepZoom(cam.zoom, this.zoomTarget, delta));
         this.autoZoom = cam.zoom;
       }
+    } else if (Math.abs(cam.zoom - this.handZoom) > 0.01) {
+      // Still zooming by hand (a wheel turn, a pinch): the clock starts again.
+      this.handZoom = cam.zoom;
+      this.handZoomAt = this.time.now;
+    } else if (this.time.now - this.handZoomAt >= REARM_MS) {
+      // Left alone for a few seconds: close-ups and kick framing work again, and the zoom eases back to the beat's.
+      this.autoZoom = cam.zoom;
     }
   }
 
@@ -658,13 +854,15 @@ export class MatchScene extends Phaser.Scene {
       const shirt = shirtForSeat(seat);
       const look = lookForSeat(seat);
       const blitter = seat.layer === 'back' ? back : front;
-      const bob = blitter.create(
-        Math.round(w.x - Math.floor(CROWD_FW / 2)),
-        Math.round(w.y - CROWD_BASE),
-        crowdFrameName(shirt, look, seat.view, 0),
-      );
-      this.crowdBobs.push({ bob, seat, shirt, look, side: shirtSide(shirt) });
+      const x = Math.round(w.x - Math.floor(CROWD_FW / 2));
+      const y = Math.round(w.y - CROWD_BASE);
+      const bob = blitter.create(x, y, crowdFrameName(shirt, look, seat.view, 0));
+      bob.setFlipX(flipForSeat(seat));
+      // A flag is held up from his hand, in front of him and behind the row in front.
+      const flag = seat.flag ? blitter.create(x + CROWD_FW - 4 - FLAG_HAND_X, y + CROWD_BASE - 10 - FLAG_HAND_Y, flagFrameName(0)) : undefined;
+      this.crowdBobs.push({ bob, seat, shirt, look, side: shirtSide(shirt), y, ...(flag ? { flag, flagY: flag.y } : {}) });
     }
+    this.crowdReduced = reducedMotion();
     this.time.addEvent({ delay: CROWD_TICK_MS, loop: true, callback: () => this.animateCrowd() });
     this.offCrowd = bus.on('match:event', (ev) => this.crowdReact(ev));
   }
@@ -673,20 +871,38 @@ export class MatchScene extends Phaser.Scene {
   private hype(side: 'home' | 'away', level: number, ms: number): void {
     this.mood[side] = Math.max(this.mood[side], level);
     this.moodUntil[side] = Math.max(this.moodUntil[side], this.time.now + ms);
+    this.crowdBusyAt = this.time.now;
+  }
+
+  /** A side's fans with their hands on their heads for a while: a try against them, a kick at goal missed (#641). */
+  private groan(side: 'home' | 'away', level: number, ms: number): void {
+    this.groanMood[side] = Math.max(this.groanMood[side], level);
+    this.groanUntil[side] = Math.max(this.groanUntil[side], this.time.now + ms);
+    this.crowdBusyAt = this.time.now;
+  }
+
+  /** The whole ground on its feet for a while: the kick-off, the whistles (#641). */
+  private rise(level: number, ms: number): void {
+    this.riseMood = Math.max(this.riseMood, level);
+    this.riseUntil = Math.max(this.riseUntil, this.time.now + ms);
+    this.crowdBusyAt = this.time.now;
   }
 
   private crowdReact(ev: MatchEvent): void {
     const side = ev.teamId === this.home.clubId ? 'home' : 'away';
+    const other = side === 'home' ? 'away' : 'home';
     switch (ev.kind) {
       case 'try':
         this.hype(side, 0.95, 3200);
+        this.groan(other, 0.9, 2600);
         break;
       case 'conversion':
-        if (ev.detail !== 'missed') this.hype(side, 0.7, 1800);
-        break;
       case 'penalty-goal':
       case 'field-goal':
-        this.hype(side, 0.7, 1800);
+        if (ev.detail === 'missed') {
+          this.groan(side, 0.85, 1800);
+          this.hype(other, 0.25, 900);
+        } else this.hype(side, 0.7, 1800);
         break;
       case 'break':
         this.hype(side, 0.35, 1200);
@@ -694,6 +910,18 @@ export class MatchScene extends Phaser.Scene {
       case 'big-hit':
         this.hype(side, 0.3, 900);
         break;
+      case 'kickoff':
+        this.rise(1, 2400);
+        break;
+      case 'half-time':
+        this.rise(0.6, 2400);
+        break;
+      case 'full-time': {
+        this.rise(1, 6000);
+        const sc = this.officials?.latest?.score;
+        if (sc && sc.home !== sc.away) this.hype(sc.home > sc.away ? 'home' : 'away', 0.9, 5000);
+        break;
+      }
       default:
         break;
     }
@@ -701,13 +929,53 @@ export class MatchScene extends Phaser.Scene {
 
   private animateCrowd(): void {
     this.crowdTick++;
+    const now = this.time.now;
     for (const s of ['home', 'away'] as const) {
-      if (this.time.now > this.moodUntil[s]) this.mood[s] = Math.max(0, this.mood[s] - 0.2);
+      if (now > this.moodUntil[s]) this.mood[s] = Math.max(0, this.mood[s] - 0.2);
+      if (now > this.groanUntil[s]) this.groanMood[s] = Math.max(0, this.groanMood[s] - 0.25);
     }
+    if (now > this.riseUntil) this.riseMood = Math.max(0, this.riseMood - 0.25);
+    // Heads up while the ball is high (a bomb, a kick at goal), from the picture on screen.
+    const ball = this.officials?.latest?.ball;
+    const high = !!ball && !ball.holder && ball.lift > CROWD_HEADS_UP_M;
+    this.upMood = high ? 1 : Math.max(0, this.upMood - 0.34);
+    this.mood.groan = this.groanMood;
+    this.mood.up = this.upMood;
+    this.mood.rise = this.riseMood;
+    this.stepWave(now);
+    const homeFlags = this.mood.home >= 0.5;
     for (const c of this.crowdBobs) {
-      const pose = crowdPose(c.seat.r, c.side, this.crowdTick, this.mood);
-      c.bob.setFrame(crowdFrameName(c.shirt, c.look, c.seat.view, pose));
+      const pose = crowdPose(c.seat.r, c.side, this.crowdTick, this.mood, c.seat.along ?? -1);
+      const lift = POSE_LIFT[pose];
+      c.bob.setFrame(crowdFrameName(c.shirt, c.look, c.seat.view, POSE_FRAME[pose]));
+      c.bob.y = c.y - lift;
+      if (c.flag) {
+        // Furled until the home side scores; then flown, the fan on his feet.
+        const waving = homeFlags || (this.mood.wave !== undefined && pose === 3);
+        const frame = waving ? (this.crowdReduced ? 2 : 1 + ((this.crowdTick + Math.floor(c.seat.r * 7)) % 3)) : 0;
+        c.flag.setFrame(flagFrameName(frame));
+        c.flag.y = c.flagY! - (waving ? Math.max(lift, POSE_LIFT[2]) : lift);
+      }
     }
+  }
+
+  /**
+   * A Mexican wave round the stands facing the camera (#641): when one side is well
+   * clear and nothing has happened for a while, it goes round twice; anything that
+   * stirs the crowd stops it. Never under reduced motion.
+   */
+  private stepWave(now: number): void {
+    const sc = this.officials?.latest?.score;
+    const quiet = now - this.crowdBusyAt > WAVE_LULL_MS && this.upMood === 0;
+    if (this.waveFrom === null) {
+      const blowout = !!sc && Math.abs(sc.home - sc.away) >= WAVE_MARGIN;
+      if (!this.crowdReduced && blowout && quiet && now >= this.waveNext) this.waveFrom = this.crowdTick;
+    } else if (!quiet || (this.crowdTick - this.waveFrom) * WAVE_PER_TICK > WAVE_LAPS) {
+      this.waveFrom = null;
+      this.waveNext = now + WAVE_REST_MS;
+    }
+    if (this.waveFrom === null) delete this.mood.wave;
+    else this.mood.wave = ((this.crowdTick - this.waveFrom) * WAVE_PER_TICK) % 1;
   }
 
   // ── Camera ─────────────────────────────────────────────────────────────────
@@ -977,6 +1245,22 @@ export class MatchScene extends Phaser.Scene {
     this.refreshCallChips();
   }
 
+  /** The moment the badge last pulsed for (#639): it pulses once as a penalty, a restart or the last tackle arrives, not again until it has passed. */
+  private pulsedFor: string | null = null;
+
+  private pulseCoach(moment: string | null): void {
+    if (moment === null || this.madeCall !== null || this.trayOpen()) {
+      if (moment === null) this.pulsedFor = null;
+      return;
+    }
+    const badge = this.coachBadgeEl;
+    if (!badge || moment === this.pulsedFor) return;
+    this.pulsedFor = moment;
+    badge.removeAttribute('data-pulse');
+    void badge.offsetWidth;
+    badge.setAttribute('data-pulse', moment);
+  }
+
   private trayOpen(): boolean {
     return !!this.callsEl && !this.callsEl.hidden;
   }
@@ -992,6 +1276,8 @@ export class MatchScene extends Phaser.Scene {
     this.callsEl.removeAttribute('data-changed');
     this.coachBtn.setAttribute('aria-expanded', String(open));
     this.overlay?.setTrayOpen?.(open);
+    // The match plays at ×1 at most while a call is chosen (#639).
+    if (this.playback instanceof LivePlayback) this.playback.setCallsOpen(open);
     this.trayKey = '';
     this.trayPlaysKeyNow = '';
     this.trayChangedAt = null;
@@ -1056,6 +1342,7 @@ export class MatchScene extends Phaser.Scene {
     const badge = coachBadge(trayCallsOn(usable), attacking, this.madeCall, { on: trayPlaysOn(plays), made: playLatest ? this.madePlay : null });
     if (this.coachBadgeEl) renderCoachBadge(this.coachBadgeEl, badge.text);
     if (this.coachBadgeEl) this.coachBadgeEl.dataset.state = badge.state;
+    this.pulseCoach(callMoment(buttons.filter((b) => b.why === null).map((b) => b.call), attacking, pb.controlTackle >= SET_TACKLES - 1));
     if (!this.trayOpen() || this.trayShut || !this.callsEl || !this.trayList || !this.trayTitle || !this.trayFoot) return;
     // The locked calls (N9.6) that fit the moment: ones the sim would take now if his Coach's Office had them,
     // under the usable rows while there is room, the rest in the footer. The sim never sees them as calls.
@@ -1404,8 +1691,17 @@ export class MatchScene extends Phaser.Scene {
     this.scene.start('Grounds');
   }
 
+  /** A beat's authored zoom as the camera's: whole canvas px per art px for this viewport and screen (#627). */
   protected viewZoom(base: number): number {
-    return zoomForViewport(base, { width: this.cameras.main.width, height: this.cameras.main.height });
+    const d = screenDensity();
+    return zoomForBeat(base, { width: this.cameras.main.width / d, height: this.cameras.main.height / d }, d);
+  }
+
+  /** A big moment's close-up is over: back to the default zoom. */
+  protected endCloseUp(): void {
+    this.closeUpUntil = 0;
+    this.beatZoom = ZOOM_DEFAULT;
+    this.zoomTarget = this.viewZoom(ZOOM_DEFAULT);
   }
 
   /** The app is going to the background: a live match records where it is (#73). */
@@ -1458,6 +1754,7 @@ export class MatchScene extends Phaser.Scene {
     this.playerFrames?.clear();
     this.playerFrames = null;
     delete this.contact;
+    delete this.officials;
     this.crowdBobs = [];
     this.players.home = [];
     this.players.away = [];

@@ -51,7 +51,8 @@ const X0 = -RING;
 const X1 = FIELD_LONG + RING;
 const Y0 = -RING;
 const Y1 = FIELD_WIDE + RING;
-const BACK_FAR = Y0 - BACK_TIERS * TIER_D;
+/** The grandstand's back wall (grid gy): its roof runs 1.2 tiles beyond. */
+export const BACK_FAR = Y0 - BACK_TIERS * TIER_D;
 const HILL_FAR = X0 - HILL_D;
 const FRONT_FAR = Y1 + FRONT_TIERS * TIER_D;
 const END_FAR = X1 + FRONT_TIERS * TIER_D;
@@ -67,6 +68,8 @@ const ZONE_R = bonusZoneGrid(1);
 export const POST_GY = [ZONE_R.y0, ZONE_R.y1] as const;
 export const POST_GX = [TRY_A, TRY_B] as const;
 export const POST_H = 84;
+/** How far (grid tiles, along +gx) a post's shadow falls: the light's direction and slope, which every other shadow on the field follows. */
+export const POST_SHADOW_TILES = 2.6;
 export const CROSSBAR_Z = 30;
 
 // The painted extent: generous margins so the camera never shows the void.
@@ -211,7 +214,7 @@ function zoneMark(gx: number, gy: number): number {
 /** Long thin post shadows thrown toward +gx (light from the top-left). */
 function inPostShadow(gx: number, gy: number): boolean {
   for (const px of POST_GX) {
-    if (gx < px || gx > px + 2.6) continue;
+    if (gx < px || gx > px + POST_SHADOW_TILES) continue;
     for (const py of POST_GY) if (Math.abs(gy - py) < 0.05) return true;
     // Crossbar shadow: a band offset along +gx at crossbar height.
     if (Math.abs(gx - (px + 0.95)) < 0.05 && gy > POST_GY[0] && gy < POST_GY[1]) return true;
@@ -751,48 +754,76 @@ export interface CrowdSeat {
   bay: CrowdBay;
   /** Stable per-seat hash in [0,1) for colour/animation phase. */
   r: number;
+  /** Where the seat is on the way round the stands facing the camera (the hill, then the grandstand), 0..1: a Mexican wave's path. Absent on the near terraces. */
+  along?: number;
+  /** This fan holds one of the home end's big flags. */
+  flag?: true;
 }
+
+/** Spectators along a row (grid tiles apart): a 16 px fan every 13–14 px, shoulder to shoulder (#641). */
+export const SEAT_STEP = 0.42;
+/** Seats left empty: the grandstand, the hill, the near terraces. */
+const EMPTY = { stand: 0.1, hill: 0.22, terrace: 0.07 } as const;
 
 /**
  * Every occupied spectator position, deterministic. Rows run parallel to the
- * field edges; some seats stay empty so the stands don't read as wallpaper.
+ * field edges; a few seats stay empty so the stands don't read as wallpaper.
+ * Fans are drawn waist-up (crowd.ts), so a row's heads and shoulders stand over
+ * the waists of the row in front.
  */
 export function crowdSeats(): CrowdSeat[] {
   const seats: CrowdSeat[] = [];
   let id = 0;
-  const push = (s: Omit<CrowdSeat, 'r'>, emptyRate: number): void => {
+  const push = (s: Omit<CrowdSeat, 'r'>, emptyRate: number): CrowdSeat | null => {
     id++;
     const r = noise2(id, 7, 99);
-    if (noise2(id, 3, 77) < emptyRate) return;
-    seats.push({ ...s, r });
+    if (noise2(id, 3, 77) < emptyRate) return null;
+    const seat = { ...s, r };
+    seats.push(seat);
+    return seat;
   };
+  const hillShare = (Y1 - Y0) / (Y1 - Y0 + (X1 - X0));
   // Back grandstand: seats on the back half of each tread.
+  const flagRow: CrowdSeat[] = [];
   for (let k = 0; k < BACK_TIERS; k++) {
     const gy = Y0 - k * TIER_D - TIER_D * 0.62;
     const z = TIER_BASE + k * TIER_RISE;
-    for (let gx = X0 + 0.2; gx < X1 - 0.1; gx += 0.3) {
+    for (let gx = X0 + 0.25; gx < X1 - 0.15; gx += SEAT_STEP) {
       const bay: CrowdBay = gx > FIELD_LONG * 0.74 ? 'away' : gx < FIELD_LONG * 0.2 ? 'home' : 'mixed';
-      push({ gx: gx + (noise2(id, 1, 5) - 0.5) * 0.06, gy, z, layer: 'back', view: 'front', bay }, 0.14);
+      const along = hillShare + ((gx - X0) / (X1 - X0)) * (1 - hillShare);
+      const seat = push({ gx: gx + (noise2(id, 1, 5) - 0.5) * 0.06, gy, z, layer: 'back', view: 'front', bay, along }, EMPTY.stand);
+      if (seat && k === 2 && bay === 'home') flagRow.push(seat);
     }
   }
   // The hill: looser rows of home fans on the slope.
-  for (let r = 0; r < 5; r++) {
-    const gx = X0 - 0.45 - r * 0.72;
+  const hillRow: CrowdSeat[] = [];
+  for (let r = 0; r < 6; r++) {
+    const gx = X0 - 0.45 - r * 0.6;
     const z = HILL_BASE + (X0 - gx) * HILL_RISE;
-    for (let gy = Y0 + 0.3; gy < Y1 - 0.2; gy += 0.34) {
-      push({ gx: gx + (noise2(id, 2, 5) - 0.5) * 0.25, gy: gy + (noise2(id, 4, 5) - 0.5) * 0.1, z, layer: 'back', view: 'front', bay: 'home' }, 0.32);
+    for (let gy = Y0 + 0.3; gy < Y1 - 0.2; gy += 0.45) {
+      const along = ((Y1 - gy) / (Y1 - Y0)) * hillShare;
+      const seat = push({ gx: gx + (noise2(id, 2, 5) - 0.5) * 0.2, gy: gy + (noise2(id, 4, 5) - 0.5) * 0.1, z, layer: 'back', view: 'front', bay: 'home', along }, EMPTY.hill);
+      if (seat && r === 2) hillRow.push(seat);
     }
   }
+  // The home end's flags: four across the hill, two in the grandstand's home bay.
+  const flagAt = (row: CrowdSeat[], key: 'gx' | 'gy', at: number): void => {
+    let best: CrowdSeat | null = null;
+    for (const s of row) if (!best || Math.abs(s[key] - at) < Math.abs(best[key] - at)) best = s;
+    if (best) best.flag = true;
+  };
+  for (const t of [0.15, 0.4, 0.62, 0.85]) flagAt(hillRow, 'gy', Y0 + t * (Y1 - Y0));
+  for (const at of [1.2, 4.2]) flagAt(flagRow, 'gx', at);
   // Front terraces (backs to the camera).
   for (let k = 0; k < FRONT_TIERS; k++) {
     const z = FRONT_BASE + k * FRONT_RISE;
     const gy = Y1 + k * TIER_D + 0.24;
-    for (let gx = X0 + 0.2; gx < X1 - 0.1; gx += 0.3) {
-      push({ gx, gy, z, layer: 'front', view: 'back', bay: 'mixed' }, 0.22);
+    for (let gx = X0 + 0.25; gx < X1 - 0.15; gx += SEAT_STEP) {
+      push({ gx: gx + (noise2(id, 1, 9) - 0.5) * 0.08, gy, z, layer: 'front', view: 'back', bay: 'mixed' }, EMPTY.terrace);
     }
     const gxe = X1 + k * TIER_D + 0.24;
-    for (let gy2 = Y0 + 0.2; gy2 < Y1 - 0.1; gy2 += 0.3) {
-      push({ gx: gxe, gy: gy2, z, layer: 'front', view: 'back', bay: gy2 > FIELD_WIDE * 0.6 ? 'away' : 'mixed' }, 0.24);
+    for (let gy2 = Y0 + 0.25; gy2 < Y1 - 0.15; gy2 += SEAT_STEP) {
+      push({ gx: gxe, gy: gy2 + (noise2(id, 2, 9) - 0.5) * 0.08, z, layer: 'front', view: 'back', bay: gy2 > FIELD_WIDE * 0.6 ? 'away' : 'mixed' }, EMPTY.terrace);
     }
   }
   return seats;

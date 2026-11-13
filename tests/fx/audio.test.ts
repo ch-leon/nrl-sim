@@ -7,8 +7,17 @@ import {
   buildLoop,
   scheduleWindow,
   sfxForMatchEventKind,
+  sfxForTry,
+  soundsForMatchEvent,
+  stingForResult,
+  pitchVariation,
+  crowdLevel,
+  crowdSwellFor,
+  CROWD_OUT,
   SFX_PRESETS,
   AudioEngine,
+  installAudioUnlock,
+  UNLOCK_EVENTS,
   type MusicLoop,
 } from '../../src/fx/audio';
 import { createNewGame, getState } from '../../src/core/state';
@@ -58,10 +67,24 @@ describe('noteFreq', () => {
 });
 
 describe('SFX_PRESETS', () => {
-  it('exposes exactly the six spec presets', () => {
+  it('exposes the six spec presets, the groan and the match sounds', () => {
     expect(Object.keys(SFX_PRESETS).sort()).toEqual(
-      ['build', 'cheer', 'click', 'coin', 'tackle', 'try'].sort(),
+      ['build', 'cheer', 'click', 'coin', 'groan', 'tackle', 'try',
+        'whistle', 'whistleLong', 'siren', 'boot', 'goal', 'miss', 'whoosh', 'tackleBig',
+        'stingWin', 'stingDraw', 'stingLoss', 'callPaid'].sort(),
     );
+  });
+  it('callPaid rises note to note (#639)', () => {
+    const f = SFX_PRESETS.callPaid.tones.map((t) => t.freq);
+    expect(f.length).toBe(3);
+    expect(f[0]).toBeLessThan(f[1]!);
+    expect(f[1]).toBeLessThan(f[2]!);
+  });
+  it('a big hit is louder and lower than an ordinary tackle', () => {
+    const t = SFX_PRESETS.tackle.tones[0];
+    const b = SFX_PRESETS.tackleBig.tones[0];
+    expect(b.gain).toBeGreaterThan(t.gain);
+    expect(b.freq).toBeLessThan(t.freq);
   });
   it('click is a 660Hz square, 40ms', () => {
     const t = SFX_PRESETS.click.tones[0];
@@ -95,10 +118,84 @@ describe('SFX_PRESETS', () => {
 describe('sfxForMatchEventKind', () => {
   it('maps try/big-hit/tackle and ignores others', () => {
     expect(sfxForMatchEventKind('try')).toBe('try');
-    expect(sfxForMatchEventKind('big-hit')).toBe('tackle');
+    expect(sfxForMatchEventKind('big-hit')).toBe('tackleBig');
     expect(sfxForMatchEventKind('tackle')).toBe('tackle');
     expect(sfxForMatchEventKind('kickoff')).toBeNull();
     expect(sfxForMatchEventKind('penalty')).toBeNull();
+  });
+});
+
+describe('sfxForTry (#634)', () => {
+  it('our try is the fanfare and the cheer; a try against a groan with no jingle', () => {
+    expect(sfxForTry(true)).toEqual(['try', 'cheer']);
+    expect(sfxForTry(false)).toEqual(['groan']);
+  });
+});
+
+describe('soundsForMatchEvent (#635)', () => {
+  const names = (kind: string, detail?: string, cheers = true) => soundsForMatchEvent({ kind, teamId: 'x', ...(detail ? { detail } : {}) }, cheers).map((c) => c.name);
+  it('the referee: kick-off and a sin bin a whistle, half-time and full time the long blast and the siren', () => {
+    expect(names('kickoff')).toEqual(['whistle']);
+    expect(names('sin-bin')).toEqual(['whistle']);
+    expect(names('half-time')).toEqual(['whistleLong', 'siren']);
+    expect(names('full-time')).toEqual(['whistleLong', 'siren']);
+  });
+  it('every kick is a boot; a kick at goal then rings or misses', () => {
+    expect(names('kick')).toEqual(['boot']);
+    expect(names('conversion', 'good')).toEqual(['boot', 'goal']);
+    expect(names('conversion', 'missed')).toEqual(['boot', 'miss']);
+    expect(names('penalty-goal', 'good')).toEqual(['boot', 'goal']);
+    expect(names('field-goal', 'missed')).toEqual(['boot', 'miss']);
+  });
+  it('a break the sim counts is silent (only a clean one whooshes, on its own bus event); runs and the rest too', () => {
+    expect(names('break')).toEqual([]);
+    expect(names('run')).toEqual([]);
+    expect(names('error')).toEqual([]);
+  });
+  it('an ordinary tackle is softer than a big hit, and both vary in pitch', () => {
+    const [t] = soundsForMatchEvent({ kind: 'tackle', teamId: 'x' }, true);
+    const [b] = soundsForMatchEvent({ kind: 'big-hit', teamId: 'x' }, true);
+    expect(t.name).toBe('tackle');
+    expect(b.name).toBe('tackleBig');
+    expect(t.gain ?? 1).toBeLessThan(b.gain ?? 1);
+    expect(t.vary && b.vary).toBe(true);
+  });
+  it('tries follow who is cheered', () => {
+    expect(names('try', undefined, true)).toEqual(['try', 'cheer']);
+    expect(names('try', undefined, false)).toEqual(['groan']);
+  });
+  it('the sting follows the coached side result', () => {
+    expect(stingForResult(20, 10)).toBe('stingWin');
+    expect(stingForResult(10, 10)).toBe('stingDraw');
+    expect(stingForResult(4, 30)).toBe('stingLoss');
+  });
+});
+
+describe('pitchVariation', () => {
+  it('is repeatable, stays within about 7%, and does vary', () => {
+    const run = (): number[] => Array.from({ length: 50 }, (_, i) => pitchVariation(i));
+    expect(run()).toEqual(run());
+    for (const v of run()) { expect(v).toBeGreaterThanOrEqual(0.93); expect(v).toBeLessThanOrEqual(1.07); }
+    expect(new Set(run().map((v) => v.toFixed(3))).size).toBeGreaterThan(10);
+  });
+});
+
+describe('crowdLevel (#635)', () => {
+  it('is louder inside either 30 m than at halfway, and louder again with momentum', () => {
+    const mid = crowdLevel(50, 0);
+    expect(crowdLevel(10, 0)).toBeGreaterThan(mid);
+    expect(crowdLevel(90, 0)).toBeGreaterThan(mid);
+    expect(crowdLevel(10, 0)).toBeCloseTo(crowdLevel(90, 0), 6);
+    expect(crowdLevel(2, 0)).toBeGreaterThan(crowdLevel(18, 0));
+    expect(crowdLevel(50, 80)).toBeGreaterThan(mid);
+    expect(crowdLevel(50, -80)).toBeCloseTo(crowdLevel(50, 80), 6);
+    expect(crowdLevel(null, 0)).toBe(mid);
+  });
+  it('a break and a try swell it; a try for us more than one against', () => {
+    expect(crowdSwellFor({ kind: 'break', teamId: 'x' }, true)).toBeGreaterThan(0);
+    expect(crowdSwellFor({ kind: 'try', teamId: 'x' }, true)).toBeGreaterThan(crowdSwellFor({ kind: 'break', teamId: 'x' }, true));
+    expect(crowdSwellFor({ kind: 'try', teamId: 'x' }, true)).toBeGreaterThan(crowdSwellFor({ kind: 'try', teamId: 'x' }, false));
+    expect(crowdSwellFor({ kind: 'tackle', teamId: 'x' }, true)).toBe(0);
   });
 });
 
@@ -193,6 +290,7 @@ interface FakeParam {
   linearRampToValueAtTime: ReturnType<typeof vi.fn>;
   exponentialRampToValueAtTime: ReturnType<typeof vi.fn>;
   cancelScheduledValues: ReturnType<typeof vi.fn>;
+  setTargetAtTime: ReturnType<typeof vi.fn>;
 }
 
 function makeParam(v = 0): FakeParam {
@@ -203,13 +301,30 @@ function makeParam(v = 0): FakeParam {
       return this;
     }),
     linearRampToValueAtTime: vi.fn().mockReturnThis(),
+    setTargetAtTime: vi.fn().mockReturnThis(),
     exponentialRampToValueAtTime: vi.fn().mockReturnThis(),
     cancelScheduledValues: vi.fn().mockReturnThis(),
   };
 }
 
 class FakeAudioContext {
-  state: 'suspended' | 'running' | 'closed' = 'suspended';
+  state: 'suspended' | 'running' | 'closed' | 'interrupted' = 'suspended';
+  /** A context that refuses to resume (no gesture yet) stays as it is. */
+  stubborn = false;
+  private listeners: Record<string, (() => void)[]> = {};
+  addEventListener(t: string, fn: () => void) {
+    (this.listeners[t] ??= []).push(fn);
+  }
+  removeEventListener(t: string, fn: () => void) {
+    this.listeners[t] = (this.listeners[t] ?? []).filter((f) => f !== fn);
+  }
+  setState(s: FakeAudioContext['state']) {
+    this.state = s;
+    for (const f of this.listeners.statechange ?? []) f();
+  }
+  createDynamicsCompressor() {
+    return { threshold: makeParam(), knee: makeParam(), ratio: makeParam(), attack: makeParam(), release: makeParam(), connect: vi.fn(), disconnect: vi.fn() };
+  }
   currentTime = 0;
   sampleRate = 44100;
   destination = {};
@@ -240,7 +355,7 @@ class FakeAudioContext {
     return { getChannelData: () => new Float32Array(len) };
   }
   async resume() {
-    this.state = 'running';
+    if (!this.stubborn) this.state = 'running';
   }
   async close() {
     this.state = 'closed';
@@ -313,28 +428,142 @@ describe('AudioEngine (fake context)', () => {
     expect(spy).not.toHaveBeenCalledWith('coin');
 
     bus.emit('match:event', { t: 20, kind: 'try', teamId: 'player' });
-    expect(spy).toHaveBeenCalledWith('try');
-    expect(spy).toHaveBeenCalledWith('cheer');
+    expect(spy).toHaveBeenCalledWith('try', expect.anything());
+    expect(spy).toHaveBeenCalledWith('cheer', expect.anything());
 
     bus.emit('match:event', { t: 21, kind: 'big-hit', teamId: 'player' });
-    expect(spy).toHaveBeenCalledWith('tackle');
+    expect(spy).toHaveBeenCalledWith('tackleBig', expect.anything());
 
     bus.emit('ui:notify', { text: 'hi', kind: 'info' });
     expect(spy).toHaveBeenCalledWith('click');
   });
 
+  it('a try plays the fanfare for the coached club and a groan against it (#634)', async () => {
+    await engine.resume();
+    engine.subscribeBus();
+    const spy = vi.spyOn(engine, 'playSfx');
+    const sheet = (clubId: string) => ({ clubId }) as never;
+    bus.emit('match:started', { fixture: { round: 1, homeId: 'r1', awayId: 'player' }, home: sheet('r1'), away: sheet('player') } as never);
+    spy.mockClear();
+    bus.emit('match:event', { t: 5, kind: 'try', teamId: 'player' });
+    expect(spy.mock.calls.map((c) => c[0])).toEqual(['try', 'cheer']);
+    spy.mockClear();
+    fake.currentTime += 1;
+    bus.emit('match:event', { t: 9, kind: 'try', teamId: 'r1' });
+    expect(spy.mock.calls.map((c) => c[0])).toEqual(['groan']);
+  });
+
+  it('the lab, where nobody is coached, cheers both sides', async () => {
+    await engine.resume();
+    engine.subscribeBus();
+    const spy = vi.spyOn(engine, 'playSfx');
+    bus.emit('match:event', { t: 5, kind: 'try', teamId: 'r1' });
+    bus.emit('match:event', { t: 9, kind: 'try', teamId: 'r2' });
+    expect(spy.mock.calls.map((c) => c[0])).toEqual(['try', 'cheer', 'try', 'cheer']);
+  });
+
   it('a burst of match events in one moment starts each SFX once (a skipped match, QA finding 16)', async () => {
     await engine.resume();
     engine.subscribeBus();
-    const tackle = SFX_PRESETS.tackle;
-    const one = { oscillators: tackle.tones.length, buffers: tackle.noises.length };
+    const hit = SFX_PRESETS.tackleBig;
+    const one = { oscillators: hit.tones.length, buffers: hit.noises.length };
+    // The first event starts the crowd bed (one noise buffer); count from after it.
+    bus.emit('match:event', { t: 0, kind: 'run', teamId: 'player' });
+    const base = { oscillators: fake.oscillators, buffers: fake.buffers };
     // Skip lands the rest of the match's events in one synchronous go: the audio clock doesn't move.
     for (let t = 0; t < 200; t++) bus.emit('match:event', { t, kind: 'big-hit', teamId: 'player' });
-    expect({ oscillators: fake.oscillators, buffers: fake.buffers }).toEqual(one);
+    expect({ oscillators: fake.oscillators - base.oscillators, buffers: fake.buffers - base.buffers }).toEqual(one);
     // A tackle a moment later is a new sound.
     fake.currentTime += 0.1;
     bus.emit('match:event', { t: 201, kind: 'big-hit', teamId: 'player' });
-    expect({ oscillators: fake.oscillators, buffers: fake.buffers }).toEqual({ oscillators: 2 * one.oscillators, buffers: 2 * one.buffers });
+    expect({ oscillators: fake.oscillators - base.oscillators, buffers: fake.buffers - base.buffers }).toEqual({ oscillators: 2 * one.oscillators, buffers: 2 * one.buffers });
+  });
+
+  it('the crowd bed starts on match:started, follows the ball to the try line and swells on a break', async () => {
+    await engine.resume();
+    engine.subscribeBus();
+    const sheet = (clubId: string) => ({ clubId }) as never;
+    bus.emit('match:started', { fixture: { round: 1, homeId: 'player', awayId: 'r1' }, home: sheet('player'), away: sheet('r1') } as never);
+    expect(engine.crowdGain).not.toBeNull();
+    bus.emit('match:event', { t: 1, kind: 'tackle', teamId: 'r1', x: 50, y: 50 });
+    const mid = engine.crowdTarget;
+    fake.currentTime += 1;
+    bus.emit('match:event', { t: 2, kind: 'tackle', teamId: 'r1', x: 8, y: 50 });
+    const near = engine.crowdTarget;
+    expect(near).toBeGreaterThan(mid);
+    const ramps = engine.crowdGain!.linearRampToValueAtTime as unknown as ReturnType<typeof vi.fn>;
+    ramps.mockClear();
+    fake.currentTime += 1;
+    bus.emit('match:event', { t: 3, kind: 'break', teamId: 'player', x: 8, y: 50 });
+    // The swell goes past the steady level before settling back to it.
+    expect(Math.max(...ramps.mock.calls.map((c) => c[0] as number))).toBeGreaterThan(near * CROWD_OUT);
+    // A clean break (#638) swells further than a break the sim merely counts.
+    const half = Math.max(...ramps.mock.calls.map((c) => c[0] as number));
+    ramps.mockClear();
+    fake.currentTime += 3;
+    bus.emit('match:clean-break', { tick: 60 });
+    expect(Math.max(...ramps.mock.calls.map((c) => c[0] as number))).toBeGreaterThan(half);
+  });
+
+  it('the music drops under the crowd and comes back when the match ends', async () => {
+    await engine.resume();
+    engine.subscribeBus();
+    const musicGain = (engine as unknown as { musicBus: { gain: FakeParam } }).musicBus.gain;
+    bus.emit('match:started', { fixture: { round: 1, homeId: 'player', awayId: 'r1' }, home: { clubId: 'player' }, away: { clubId: 'r1' } } as never);
+    expect(musicGain.setTargetAtTime.mock.calls[musicGain.setTargetAtTime.mock.calls.length - 1]![0]).toBeLessThan(1);
+    bus.emit('match:finished', { fixture: { round: 1, homeId: 'player', awayId: 'r1' }, result: { homeScore: 30, awayScore: 6 } } as never);
+    expect(musicGain.setTargetAtTime.mock.calls[musicGain.setTargetAtTime.mock.calls.length - 1]![0]).toBe(1);
+  });
+
+  it('a loss plays the loss sting and does not go to the grounds track until the player moves on', async () => {
+    await engine.resume();
+    engine.subscribeBus();
+    const music = vi.spyOn(engine, 'playMusic');
+    const sfx = vi.spyOn(engine, 'playSfx');
+    bus.emit('match:started', { fixture: { round: 1, homeId: 'player', awayId: 'r1' }, home: { clubId: 'player' }, away: { clubId: 'r1' } } as never);
+    music.mockClear();
+    bus.emit('match:finished', { fixture: { round: 1, homeId: 'player', awayId: 'r1' }, result: { homeScore: 6, awayScore: 30 } } as never);
+    expect(sfx).toHaveBeenCalledWith('stingLoss', expect.objectContaining({ delay: expect.any(Number) }));
+    expect(music).not.toHaveBeenCalledWith('grounds');
+    expect(engine.musicPlaying).toBe(false);
+    bus.emit('ui:openScreen', { id: 'office' });
+    expect(music).toHaveBeenCalledWith('grounds');
+  });
+
+  it('a win plays the win sting, then the grounds track', async () => {
+    vi.useFakeTimers();
+    try {
+      await engine.resume();
+      engine.subscribeBus();
+      const sfx = vi.spyOn(engine, 'playSfx');
+      const music = vi.spyOn(engine, 'playMusic');
+      bus.emit('match:started', { fixture: { round: 1, homeId: 'r1', awayId: 'player' }, home: { clubId: 'r1' }, away: { clubId: 'player' } } as never);
+      bus.emit('match:finished', { fixture: { round: 1, homeId: 'r1', awayId: 'player' }, result: { homeScore: 6, awayScore: 30 } } as never);
+      expect(sfx).toHaveBeenCalledWith('stingWin', expect.anything());
+      music.mockClear();
+      vi.advanceTimersByTime(4000);
+      expect(music).toHaveBeenCalledWith('grounds');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a penalty whistles; mute and a suspended context silence the whole match', async () => {
+    await engine.resume();
+    engine.subscribeBus();
+    bus.emit('match:penalty', { tick: 10 });
+    expect(fake.oscillators).toBe(SFX_PRESETS.whistle.tones.length);
+    engine.setMuted(true);
+    const before = fake.oscillators;
+    fake.currentTime += 1;
+    for (const kind of ['kickoff', 'kick', 'tackle', 'big-hit', 'break', 'half-time', 'try'] as const) bus.emit('match:event', { t: 1, kind, teamId: 'player', x: 5 });
+    bus.emit('match:penalty', { tick: 11 });
+    expect(fake.oscillators).toBe(before);
+    engine.setMuted(false);
+    fake.state = 'suspended';
+    fake.currentTime += 1;
+    bus.emit('match:event', { t: 2, kind: 'kick', teamId: 'player' });
+    expect(fake.oscillators).toBe(before);
   });
 
   it('playMusic is idempotent per track and switches on match events', () => {
@@ -362,6 +591,113 @@ describe('AudioEngine (fake context)', () => {
     const before = fake.oscillators;
     bus.emit('ui:notify', { text: 'x', kind: 'info' });
     expect(fake.oscillators).toBe(before);
+  });
+});
+
+/** A tiny window/document: records listeners so the test can fire them. */
+class FakeTarget {
+  handlers = new Map<string, Set<() => void>>();
+  visibilityState = 'visible';
+  addEventListener(t: string, fn: () => void) {
+    if (!this.handlers.has(t)) this.handlers.set(t, new Set());
+    this.handlers.get(t)!.add(fn);
+  }
+  removeEventListener(t: string, fn: () => void) {
+    this.handlers.get(t)?.delete(fn);
+  }
+  count(t: string) {
+    return this.handlers.get(t)?.size ?? 0;
+  }
+  fire(t: string) {
+    for (const f of [...(this.handlers.get(t) ?? [])]) f();
+  }
+}
+const flush = () => new Promise((r) => setTimeout(r, 0));
+
+describe('audio unlock and re-arm (#636)', () => {
+  let fake: FakeAudioContext;
+  let engine: AudioEngine;
+  let win: FakeTarget;
+  let doc: FakeTarget;
+  let unlocked: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    createNewGame('Test FC', 42);
+    fake = new FakeAudioContext();
+    engine = new AudioEngine(fake as unknown as AudioContext);
+    win = new FakeTarget();
+    doc = new FakeTarget();
+    unlocked = vi.fn();
+    installAudioUnlock(engine, win, doc, unlocked);
+  });
+  afterEach(() => {
+    engine.dispose();
+    bus.clear();
+  });
+
+  it('listens for touchend and click as well as pointerdown and keydown', () => {
+    for (const t of UNLOCK_EVENTS) expect(win.count(t)).toBe(1);
+    expect(UNLOCK_EVENTS).toEqual(expect.arrayContaining(['touchend', 'click', 'pointerdown', 'keydown']));
+  });
+
+  it('keeps listening while a gesture leaves the context suspended, and stands down once it runs', async () => {
+    fake.stubborn = true;
+    win.fire('touchend');
+    await flush();
+    expect(unlocked).not.toHaveBeenCalled();
+    for (const t of UNLOCK_EVENTS) expect(win.count(t)).toBe(1);
+    fake.stubborn = false;
+    win.fire('click');
+    await flush();
+    expect(fake.state).toBe('running');
+    expect(unlocked).toHaveBeenCalledTimes(1);
+    for (const t of UNLOCK_EVENTS) expect(win.count(t)).toBe(0);
+  });
+
+  it('re-arms and resumes when the context is interrupted, and again on the next tap', async () => {
+    win.fire('pointerdown');
+    await flush();
+    expect(engine.running).toBe(true);
+    expect(win.count('click')).toBe(0);
+    fake.stubborn = true; // a call: iOS will not resume without a gesture
+    fake.setState('interrupted');
+    await flush();
+    expect(engine.running).toBe(false);
+    for (const t of UNLOCK_EVENTS) expect(win.count(t)).toBe(1);
+    fake.stubborn = false;
+    win.fire('touchend');
+    await flush();
+    expect(engine.running).toBe(true);
+    expect(unlocked).toHaveBeenCalledTimes(2);
+    for (const t of UNLOCK_EVENTS) expect(win.count(t)).toBe(0);
+  });
+
+  it('on coming back to the foreground, tries to resume and re-arms if it cannot', async () => {
+    win.fire('keydown');
+    await flush();
+    fake.state = 'suspended';
+    fake.stubborn = true;
+    doc.visibilityState = 'hidden';
+    doc.fire('visibilitychange');
+    await flush();
+    expect(win.count('click')).toBe(0); // hidden: nothing to do
+    doc.visibilityState = 'visible';
+    doc.fire('visibilitychange');
+    await flush();
+    expect(win.count('click')).toBe(1);
+    fake.stubborn = false;
+    doc.fire('visibilitychange');
+    await flush();
+    expect(engine.running).toBe(true);
+    expect(win.count('click')).toBe(0);
+  });
+
+  it('puts a limiter between the master gain and the destination', () => {
+    // The fake records connections: master -> compressor -> destination.
+    const master = (engine as unknown as { master: { connect: ReturnType<typeof vi.fn> } }).master;
+    const limiter = (engine as unknown as { limiter: { connect: ReturnType<typeof vi.fn> } }).limiter;
+    expect(master.connect).toHaveBeenCalledWith(limiter);
+    expect(limiter.connect).toHaveBeenCalledWith(fake.destination);
   });
 });
 

@@ -25,6 +25,7 @@ import { DEFAULT_TACTICS } from '../league/presets';
 import { applyTuning } from '../league/tuning';
 import { labSheet, starTraits } from '../lab/sheets';
 import { POSITION_GROUPS, type Cell, type SideSpec } from './plan';
+import { FLOW, LAST_TACKLES, ORIGINS, PlayWatch, ScoreLine, type FlowKey, type LastTackleKey, type OriginKey } from './watch';
 
 /** Exact fit fixtures belong to the headless harness, never the live game or saved sheets. */
 export class BalanceSim extends LiveSim {
@@ -42,6 +43,20 @@ export class BalanceSim extends LiveSim {
     // Re-place the opening sides with their fixture fits before the first tick.
     // setForKickoff reads the existing receiver and consumes no random draw.
     if (changed) this.setForKickoff(this.firstReceiver === 'home' ? 'away' : 'home');
+  }
+
+  // Read-only views for the watchability counts (#648); they touch nothing in the sim.
+  /** The play now (or about to be) the one on the set's last tackle. */
+  get lastTackleUp(): boolean {
+    return this.lastPlay;
+  }
+  /** Index of the man holding the ball, -1 when it is loose or in the air. */
+  get holderIndex(): number {
+    return this.ball.kind === 'held' ? this.ball.by : -1;
+  }
+  /** The ball's x along the pitch. */
+  get ballX(): number {
+    return this.ballPos().x;
   }
 }
 
@@ -75,6 +90,17 @@ export const SIDE_COUNTS = ['offloads', 'busts', 'lineBreaks', 'tries', 'kicks',
 export type SideCountKey = (typeof SIDE_COUNTS)[number];
 type SideCounts = Record<SideCountKey, number>;
 
+/**
+ * Watchability (#648), per match (counts scaled like COUNTS, shares and margins not):
+ * lead changes and late margins, how tries came about, what last tackles were.
+ * The origins and last tackles are per-match counts; the report turns them into shares.
+ */
+export interface WatchStats {
+  flow: Record<FlowKey, Stat>;
+  origins: Record<OriginKey, Stat>;
+  lastTackles: Record<LastTackleKey, Stat>;
+}
+
 export interface CellResult {
   variant: string;
   scenario: string;
@@ -106,6 +132,8 @@ export interface CellResult {
   nine?: { home?: number; away?: number };
   /** Wall-clock seconds this cell took. */
   ms: number;
+  /** Absent in results written before #648: read as not measured, never as zero. Last in the line so the older fields keep their place. */
+  watch?: WatchStats;
 }
 
 /** Overrides belong to the harness's sheets, never to the game's stored squad. */
@@ -490,6 +518,9 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
     const trackedPerMatch: SideCounts[] = [];
     const opponentPerMatch: SideCounts[] = [];
     const shares: number[] = [];
+    const flowPerSeed: Record<FlowKey, number>[] = [];
+    const originsPerSeed: Record<OriginKey, number>[] = [];
+    const lastPerSeed: Record<LastTackleKey, number>[] = [];
     let wrestleTicks = 0;
     let wins = 0;
     let draws = 0;
@@ -522,6 +553,8 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
       const events: SimEvent[] = [];
       const held = [0, 0, 0, 0];
       const bins = new BinSwing();
+      const score = new ScoreLine(minutes * 60);
+      const watch = new PlayWatch();
       let inW = 0;
       let lastMen = 0;
       let nextLegs = 3;
@@ -558,6 +591,13 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
         const outH = sim.binnedOf('home') > 0;
         const outA = sim.binnedOf('away') > 0;
         bins.tick(outH !== outA ? (outH ? 'home' : 'away') : null, sim.matchSeconds, tickEvents);
+        if (tickEvents.length) {
+          for (const e of tickEvents) {
+            const pts = pointsOf(e);
+            if (pts > 0 && e.side) score.note(sim.matchSeconds, e.side, pts);
+          }
+        }
+        watch.tick(tickEvents, { phase: sim.phaseKind, lastPlay: sim.lastTackleUp, attacking: sim.inPossession, holder: sim.holderIndex, x: () => sim.ballX });
         const men = sim.wrestleMen;
         if (men > 0) {
           inW++;
@@ -589,6 +629,10 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
         shares.push(diff > 0 ? 1 : diff === 0 ? 0.5 : 0);
       }
       if (!flip) {
+        watch.finish();
+        flowPerSeed.push(score.result());
+        originsPerSeed.push(watch.origins);
+        lastPerSeed.push(watch.lastTackles);
         const c = countEvents(events);
         c.wrestles = matchWrestles;
         c.held1 = held[1]!;
@@ -630,6 +674,13 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
     }
     const counts = Object.fromEntries(COUNTS.map((k) => [k, stat(perSeed.map((c) => c[k] * (k === 'completion' || k === 'possession' ? 1 : scale)))])) as Record<CountKey, Stat>;
     const sideStats = (matches: SideCounts[]): Record<SideCountKey, Stat> => Object.fromEntries(SIDE_COUNTS.map((k) => [k, stat(matches.map((c) => c[k] * scale))])) as Record<SideCountKey, Stat>;
+    // Lead changes, tries by origin and last tackles are counts (scaled to a full match); the late margins are shares and points, which a stretch does not scale.
+    const scaled = (k: string): number => (k === 'leadChanges' ? scale : 1);
+    const watch: WatchStats = {
+      flow: Object.fromEntries(FLOW.map((k) => [k, stat(flowPerSeed.map((f) => f[k] * scaled(k)))])) as Record<FlowKey, Stat>,
+      origins: Object.fromEntries(ORIGINS.map((k) => [k, stat(originsPerSeed.map((o) => o[k] * scale))])) as Record<OriginKey, Stat>,
+      lastTackles: Object.fromEntries(LAST_TACKLES.map((k) => [k, stat(lastPerSeed.map((o) => o[k] * scale))])) as Record<LastTackleKey, Stat>,
+    };
     const totalWrestles = perSeed.reduce((a, c) => a + c.wrestles, 0);
     return {
       variant: cell.variant.name,
@@ -647,6 +698,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
         ? { nine: { ...(cell.scenario.home.squad ? { home: nineSum.home / seeds } : {}), ...(cell.scenario.away.squad ? { away: nineSum.away / seeds } : {}) } }
         : {}),
       ms: Date.now() - t0,
+      watch,
     };
   } finally {
     restore();

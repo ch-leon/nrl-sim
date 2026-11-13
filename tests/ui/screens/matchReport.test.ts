@@ -2,7 +2,7 @@
 // built from the MatchResult, it agrees with the score and the overlay's tallies.
 import { describe, it, expect } from 'vitest';
 import { runMatch } from '../../../src/match/league/match';
-import { BONUS_TRY_MARK, buildMatchReport, initials, injuryChip, ladderMove, planChangeLines, planChangesSummary, resultHeadline, shortName } from '../../../src/ui/screens/matchReport';
+import { BONUS_TRY_MARK, buildMatchReport, countUpValue, fullTimeStats, initials, injuryChip, ladderMove, planChangeLines, planChangesSummary, resultHeadline, shortName } from '../../../src/ui/screens/matchReport';
 import { fmtPotmLine, fmtPotmShort } from '../../../src/ui/screens/potm';
 import { playerOfTheMatch } from '../../../src/systems/stats';
 import { summaryLines } from '../../../src/match/view/commentary';
@@ -154,5 +154,34 @@ describe('the full-time card (3s)', () => {
     expect(injuryChip('Dane Webb', 2)).toBe('Webb injured 2 wk');
     expect(ladderMove(5, 4)).toEqual({ from: '5th', to: '4th' });
     expect(ladderMove(3, 3)).toEqual({ held: '3rd' });
+  });
+});
+
+describe('the full-time card occasion (#640)', () => {
+  it('the score counts up from nothing to the exact final, never past it', () => {
+    expect(countUpValue(24, 0)).toBe(0);
+    expect(countUpValue(24, 1)).toBe(24);
+    expect(countUpValue(24, 1.7)).toBe(24);
+    let last = 0;
+    for (let p = 0; p <= 1; p += 0.05) {
+      const v = countUpValue(24, p);
+      expect(v).toBeGreaterThanOrEqual(last);
+      expect(v).toBeLessThanOrEqual(24);
+      last = v;
+    }
+    expect(countUpValue(0, 0.5)).toBe(0);
+  });
+
+  it('three stat rows, the player\u2019s side first', () => {
+    const result = runMatch(sheet('player', 'Live Test FC'), sheet('rival-gulls', 'Gulls'), { seed: 11 });
+    const r = buildMatchReport(result, fixture, names, null);
+    const rows = fullTimeStats(r, result);
+    expect(rows.map((x) => x.label)).toEqual(['Possession', 'Line breaks', 'Tries']);
+    expect(rows[0]).toMatchObject({ first: `${result.stats.possession[0]}%`, second: `${result.stats.possession[1]}%` });
+    expect([rows[2]!.first, rows[2]!.second]).toEqual(result.stats.tries.map(String));
+    // Away: the player's club is first, so the pairs swap.
+    const away = { round: 3, homeId: 'rival-gulls', awayId: 'player' };
+    const ra = buildMatchReport(result, away, names, null);
+    expect(fullTimeStats(ra, result)[0]).toMatchObject({ first: `${result.stats.possession[1]}%`, second: `${result.stats.possession[0]}%` });
   });
 });

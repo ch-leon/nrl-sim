@@ -39,6 +39,35 @@ The sim remains the authority for movement, participants, timing and possession.
 - The existing 512-frame CPU cache now includes the independent stride frame.
   Scene textures are still reused rather than allocated for each pose.
 
+### Body language (#626 wave 3)
+
+- **The line gets ready (#665).** While a carrier is in `ptb` or the dummy half
+  is over the ball, every opponent standing still (`idle`, feet planted) more
+  than 5 m from the ball drops into `ready` (`ruck.ts`): the brace crouch on wide
+  feet, palms open in front, bouncing a pixel on the toes every four ticks
+  (frames 0–1, phased by slot). In the dummy half's last three ticks with the
+  ball the line rises (frame 2); once the pass is away they are idle again. The
+  5 m keeps the markers (1.8 and 3.6 m in front of the mark) as they were; the
+  attack, runners and the sin-binned are unaffected. `pictureContext` reads the
+  ruck once per snapshot, so the frame is a pure function of the tick.
+- **Exhaustion in the body (#666).** `tiredLevel` reads `legs` and `blown` on the
+  legs bar's bands (`legsBand`, `fatigue.tiredAt` / `spentAt`), so bar and body
+  agree: 1 when tired, 2 when spent or blown. A tired man's run, carry and stand
+  keep the hips (and so the legs' reach) but sink the shoulders and head by one
+  pixel per level and lean him forward; the bob loses its lift into flight, and
+  spent his arms pump half as far. Spent or blown and standing still (feet
+  planted, no ball, not in the bin, not set in the line) he goes hands on knees,
+  `blowing` (`moments.ts`): two frames, the back heaving every six ticks. A
+  blown sprinter slumps as he slows. The picture carries `tired`, which joins the
+  frame-cache key only when set, so a fresh man's frames and key are unchanged.
+- **Hair and kit move with the stride (#670).** On the run, long hair (the
+  mullet's and ponytail's tails, the braids' side strands, the headband's tails)
+  is drawn a pixel against the bob (`drawHead`'s `sway`, `-bob`): it hangs where
+  it was while the head rises or drops. On the push-off and flight beats (2, 3
+  and 5) the jersey tail and shorts hem trail a pixel behind. Standing, nothing
+  moves. Both come from the stride frame the picture already carries, so the
+  frame cache gains no entries (the same hits and misses over the same passage).
+
 No engine, save, appearance assignment, rules, odds, fatigue or RNG changes.
 The earlier ordinary-player art study keeps its old frame API; `/#lab` and career
 matches are the authority for reviewing these new transitions. The contact study

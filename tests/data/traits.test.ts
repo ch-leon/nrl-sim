@@ -19,6 +19,13 @@ describe('catalogue', () => {
     expect(POOL_IDS).toContain('dancingFeet');
     expect(POOL_IDS.length).toBeGreaterThanOrEqual(15);
   });
+  it('every on-field trait says what the watcher will see (#654); only the four off-field ones do not', () => {
+    const offField = ['youngGun', 'veteran', 'clubLegend', 'injuryProne'];
+    for (const id of TRAIT_IDS) {
+      if (offField.includes(id)) expect(TRAITS[id].seen, id).toBeUndefined();
+      else expect(TRAITS[id].seen?.length, id).toBeGreaterThan(5);
+    }
+  });
   it('levels scale I ×1.0 · II ×1.6 · III ×2.2 and announce in roman numerals', () => {
     expect(LEVEL_MULT).toEqual({ 1: 1, 2: 1.6, 3: 2.2 });
     expect(traitLabel({ id: 'dancingFeet', level: 2 })).toBe('Dancing Feet II');

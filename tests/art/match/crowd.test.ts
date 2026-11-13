@@ -3,7 +3,13 @@ import { kitFromColors } from '../../../src/art/match/kit';
 import {
   CROWD_BASE,
   CROWD_FH,
+  CROWD_FRAMES,
+  CROWD_LOOKS,
+  FLAG_FRAMES,
+  POSE_FRAME,
   POSE_LIFT,
+  WAVE_BAND,
+  drawFlag,
   cheerShare,
   CROWD_FW,
   buildCrowdAtlas,
@@ -13,7 +19,10 @@ import {
   shirtForSeat,
   shirtSide,
 } from '../../../src/art/match/crowd';
-import { drawBall, drawCrossbar, drawShadow, drawUpright, UPRIGHT_H } from '../../../src/art/match/props';
+import { drawPrototypePlayer, appearanceFor } from '../../../src/art/prototype/player';
+import { drawHead } from '../../../src/art/prototype/head';
+import { crowdSeats } from '../../../src/art/match/stadium';
+import { drawBall, drawCrossbar, drawPlayerShadow, drawShadow, drawUpright, LIGHT_DX, LIGHT_DY, SHADOW_LENGTH, UPRIGHT_H } from '../../../src/art/match/props';
 import { POST_H } from '../../../src/art/match/stadium';
 import { opaqueBounds } from '../../../src/art/match/players';
 import { drawText, textWidth } from '../../../src/art/match/font';
@@ -32,15 +41,20 @@ describe('crowd', () => {
 
   it('cheer poses are taller (arms up) than seated ones', () => {
     const sit = opaqueBounds(drawSpectator(home.jersey, 0, 'front', 0))!;
-    const cheer = opaqueBounds(drawSpectator(home.jersey, 0, 'front', 2))!;
+    const cheer = opaqueBounds(drawSpectator(home.jersey, 0, 'front', 1))!;
     expect(cheer.y0).toBeLessThan(sit.y0);
   });
 
-  it('atlas holds every frame with unique names', () => {
+  it('atlas holds every frame with unique names, and stays small', () => {
     const { buf, frames } = buildCrowdAtlas(crowdShirts(home, away));
     expect(new Set(frames.map((f) => f.name)).size).toBe(frames.length);
-    expect(frames.every((f) => f.w === CROWD_FW && f.h === CROWD_FH)).toBe(true);
-    expect(buf.w * buf.h).toBe(frames.length * CROWD_FW * CROWD_FH);
+    const fans = frames.filter((f) => !f.name.startsWith('flag-'));
+    expect(fans.every((f) => f.w === CROWD_FW && f.h === CROWD_FH)).toBe(true);
+    expect(fans.length).toBe(8 * 2 * CROWD_LOOKS * CROWD_FRAMES.length);
+    expect(frames.filter((f) => f.name.startsWith('flag-')).length).toBe(FLAG_FRAMES.length);
+    // Near a 512² texture's worth of pixels: one idle slice to upload on a phone (N10.5).
+    expect(buf.w * buf.h).toBeLessThan(512 * 512 * 1.05);
+    expect(buf.w).toBeLessThanOrEqual(1024);
   });
 
   it('bays bias shirt colours toward their team', () => {
@@ -81,17 +95,17 @@ describe('crowd liveliness (GitHub #16)', () => {
   const seatsR = Array.from({ length: 400 }, (_, i) => (i + 0.5) / 400);
   const calm = { home: 0, away: 0 };
 
-  it('jump lifts 2px and the wave pose raises one arm above a seated head', () => {
-    expect(POSE_LIFT[3]).toBe(2);
+  it('a jump and standing lift the fan, a groan slumps him; the wave pose raises one arm above a seated head', () => {
+    expect(POSE_LIFT[3]).toBeGreaterThan(POSE_LIFT[2]);
+    expect(POSE_LIFT[7]).toBeGreaterThan(0);
+    expect(POSE_LIFT[5]).toBeLessThan(0);
     const sit = opaqueBounds(drawSpectator(home.jersey, 0, 'front', 0))!;
-    const jump = opaqueBounds(drawSpectator(home.jersey, 0, 'front', 3))!;
-    const cheer = opaqueBounds(drawSpectator(home.jersey, 0, 'front', 2))!;
-    const wave = opaqueBounds(drawSpectator(home.jersey, 0, 'back', 4))!;
-    expect(jump.y0).toBe(cheer.y0 - 2);
-    expect(jump.y0).toBeGreaterThanOrEqual(0); // headroom: the jump never clips
+    const cheer = opaqueBounds(drawSpectator(home.jersey, 0, 'front', 1))!;
+    const wave = opaqueBounds(drawSpectator(home.jersey, 0, 'back', 2))!;
+    expect(cheer.y0).toBeGreaterThanOrEqual(0); // headroom: the arms never clip
     expect(wave.y0).toBeLessThan(sit.y0);
-    // Feet on CROWD_BASE for a seated fan (outline one row below).
-    expect(sit.y1).toBe(CROWD_BASE + 1);
+    // The waist on CROWD_BASE, the frame's last row (the row in front hides it).
+    expect(sit.y1).toBe(CROWD_BASE);
   });
 
   it('an idle crowd keeps moving: every tick some fans shift, but nobody cheers', () => {
@@ -137,6 +151,72 @@ describe('crowd liveliness (GitHub #16)', () => {
   });
 });
 
+describe('crowd scale and reactions (#641)', () => {
+  const seatsR = Array.from({ length: 400 }, (_, i) => (i + 0.5) / 400);
+  const calm = { home: 0, away: 0 };
+
+  it("a fan's head is close to a player's head in size", () => {
+    // The fan's head: the widest run of his face rows that is not outline.
+    const fan = drawSpectator(home.jersey, 0, 'front', 0);
+    let fanHead = 0;
+    for (let y = 6; y < 13; y++) {
+      let n = 0;
+      for (let x = 0; x < fan.w; x++) if (fan.get(x, y).alpha && fan.get(x, y).color !== 0x1c1424) n++;
+      fanHead = Math.max(fanHead, n);
+    }
+    const head = opaqueBounds(drawHead(appearanceFor('scale-test'), home, 'front'))!;
+    const playerHead = head.x1 - head.x0 - 1; // less its outline
+    expect(fanHead / playerHead).toBeGreaterThan(0.7);
+    expect(fanHead / playerHead).toBeLessThanOrEqual(1);
+    // ...on a figure still shorter than a player (waist-up).
+    const f = opaqueBounds(fan)!;
+    const p = opaqueBounds(drawPrototypePlayer(appearanceFor('scale-test'), home, 'idle', 0))!;
+    expect(f.y1 - f.y0).toBeLessThan(p.y1 - p.y0);
+  });
+
+  it('a try against a side and a missed kick at goal put its fans’ hands on their heads, not in the air', () => {
+    const groaning = { home: 0, away: 0, groan: { home: 0.9, away: 0 } };
+    const poses = seatsR.map((r) => crowdPose(r, 'home', 5, groaning));
+    expect(poses.filter((p) => p === 5).length / poses.length).toBeGreaterThan(0.85);
+    expect(seatsR.some((r) => crowdPose(r, 'away', 5, groaning) === 5)).toBe(false);
+    // The groan keeps the arms on the head, no higher than a seated head; a cheer's go above it.
+    const groan = opaqueBounds(drawSpectator(home.jersey, 0, 'front', POSE_FRAME[5]))!;
+    const sit = opaqueBounds(drawSpectator(home.jersey, 0, 'front', 0))!;
+    const cheer = opaqueBounds(drawSpectator(home.jersey, 0, 'front', POSE_FRAME[3]))!;
+    expect(groan.y0).toBeGreaterThanOrEqual(sit.y0);
+    expect(cheer.y0).toBeLessThan(sit.y0);
+    expect(POSE_FRAME[5]).not.toBe(POSE_FRAME[3]);
+  });
+
+  it('heads go up for a high ball, and the ground rises at the whistles', () => {
+    const up = seatsR.map((r) => crowdPose(r, null, 3, { ...calm, up: 1 }));
+    expect(up.filter((p) => p === 6).length / up.length).toBeGreaterThan(0.8);
+    const rise = seatsR.map((r) => crowdPose(r, 'away', 3, { ...calm, rise: 1 }));
+    expect(rise.filter((p) => POSE_LIFT[p] > 0).length / rise.length).toBeGreaterThan(0.95);
+  });
+
+  it('a Mexican wave stands the fans its front passes and no one else', () => {
+    const mood = { ...calm, wave: 0.5 };
+    expect(crowdPose(0.3, null, 1, mood, 0.5)).toBe(3);
+    expect(POSE_LIFT[crowdPose(0.3, null, 1, mood, 0.5 + WAVE_BAND * 1.5)]).toBeGreaterThan(0);
+    expect([0, 1, 4]).toContain(crowdPose(0.3, null, 1, mood, 0.9));
+  });
+
+  it('the home flags fly when waved and hang furled otherwise', () => {
+    const furled = opaqueBounds(drawFlag(home.jersey, home.trim, 0))!;
+    const flying = opaqueBounds(drawFlag(home.jersey, home.trim, 2))!;
+    expect(flying.x1 - flying.x0).toBeGreaterThan(furled.x1 - furled.x0 + 20);
+  });
+
+  it('the near terraces read as full: few empty places, shoulder to shoulder; six flags in the home end', () => {
+    const seats = crowdSeats();
+    expect(seats.filter((s) => s.layer === 'front').length).toBeGreaterThan(330);
+    expect(seats.filter((s) => s.flag).length).toBe(6);
+    expect(seats.filter((s) => s.flag).every((s) => s.bay === 'home')).toBe(true);
+    expect(seats.filter((s) => s.layer === 'back').every((s) => s.along !== undefined && s.along >= 0 && s.along <= 1)).toBe(true);
+  });
+});
+
 describe('props', () => {
   it('goalpost upright is tall, padded and outlined', () => {
     const u = drawUpright(home);
@@ -152,6 +232,35 @@ describe('props', () => {
     const s = drawShadow(12, 5, 0.3);
     expect(s.opaqueCount()).toBeGreaterThan(30);
     expect(s.get(6, 2).alpha).toBeLessThan(255);
+  });
+
+  it('a player’s shadow falls where the posts’ do, longer at dusk and night than by day, centred on the feet', () => {
+    // The slope of the light is the post's: 2.6 tiles along +gx for 84 px.
+    expect(LIGHT_DY / LIGHT_DX).toBeCloseTo(0.5);
+    expect(SHADOW_LENGTH.dusk).toBeGreaterThan(SHADOW_LENGTH.day);
+    expect(SHADOW_LENGTH.night).toBeGreaterThan(SHADOW_LENGTH.day);
+    const reach = (l: 'day' | 'dusk' | 'night'): number => {
+      const b = drawPlayerShadow(l);
+      let right = 0;
+      let left = 0;
+      let below = 0;
+      let above = 0;
+      for (let y = 0; y < b.h; y++) {
+        for (let x = 0; x < b.w; x++) {
+          if (b.get(x, y).alpha === 0) continue;
+          right = Math.max(right, x + 1 - b.w / 2);
+          left = Math.max(left, b.w / 2 - x);
+          below = Math.max(below, y + 1 - b.h / 2);
+          above = Math.max(above, b.h / 2 - y);
+        }
+      }
+      // Down and to the right of the feet (the buffer's centre), with a foot's width behind them.
+      expect(right).toBeGreaterThan(left);
+      expect(below).toBeGreaterThan(above);
+      return right;
+    };
+    expect(reach('dusk')).toBeGreaterThan(reach('day'));
+    expect(reach('night')).toBeGreaterThan(reach('day'));
   });
 });
 

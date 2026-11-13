@@ -32,7 +32,7 @@ describe('contest marks', () => {
   it('flashes a line break on the man who broke it, and nowhere else', () => {
     const m = contestMarkFor(ev('line-break', 'home', 3), picture);
     expect(m).toMatchObject({ kind: 'break', x: 62, y: 30, headX: 1, side: 'home', slot: 3 });
-    expect(contestMarkFor(ev('break-tackle', 'home', 3), picture)).toBeNull();
+    expect(contestMarkFor(ev('break-tackle', 'home', 3), picture)).toMatchObject({ kind: 'dust' }); // a bust is a tier-2 contact (#631)
     expect(contestMarkFor(ev('tackle', 'away', 1), picture)).toBeNull();
     expect(contestMarkFor({ tick: 1, kind: 'line-break', text: '' }, picture)).toBeNull();
     expect(BREAK_SPAN_M).toBeGreaterThan(4);

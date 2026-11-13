@@ -70,7 +70,7 @@ describe('the next fixture painted ahead (N10.5)', () => {
     const art = await fixtureArtFor(offsetX, kitsA);
     const here = paintFixtureArt(offsetX, kitsA);
     expect(art.bg.every((c, i) => sameBytes(c.buf.data, here.bg[i]!.buf.data))).toBe(true);
-    expect(sameBytes(art.home.buf.data, here.home.buf.data)).toBe(true);
+    expect(sameBytes(art.crowd.buf.data, here.crowd.buf.data)).toBe(true);
     expect(art.crowd.frames).toEqual(here.crowd.frames);
   }, 30_000);
 

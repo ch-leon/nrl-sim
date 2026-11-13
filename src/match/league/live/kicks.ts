@@ -137,6 +137,7 @@ export abstract class LiveKicks extends LiveClock {
       if (b.via === 'pass' && r.side === this.attacking && this.rng.next() < knockOnChance(r.stats.handling, pressured, false, spillExtra) * this.wx.handling) {
         // Spilled: the ball squirts forward and the defence takes over.
         this.emit('error', spillExtra > 0 ? `${r.name} can't hold the wild offload — knock-on` : `${r.name} spills it — knock-on`, r);
+        this.react(r, 'error');
         this.lastTouch = r.side;
         this.bounce(b.to, { x: this.dir, y: (this.rng.next() - 0.5) * 0.6 }, 2.5, 12, 2);
         this.turnover();
@@ -300,6 +301,7 @@ export abstract class LiveKicks extends LiveClock {
     this.lastTouch = r.side;
     const way = { x: (this.rng.next() - 0.5) * 2, y: (this.rng.next() - 0.5) * 2 };
     this.emit('drop', text, r);
+    this.react(r, 'error');
     if (way.x * this.dir > 0 && !this.kickoffUp) {
       this.events[this.events.length - 1]!.detail = 'knock-on';
       this.bounce(at, way, 2.5, 12, 2);
