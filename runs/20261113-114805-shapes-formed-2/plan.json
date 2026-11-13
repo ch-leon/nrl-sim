@@ -1,0 +1,68 @@
+{
+  "name": "shapes-formed-2",
+  "description": "#649 step 2 follow-up: picked at the tackle, toward the men, spots within shapes.maxShiftM of the lanes, offered only when within shapes.reachM: how often formed at ball-out, and the shape mix.",
+  "seeds": 100,
+  "scenarios": [
+    {
+      "name": "even 60 v 60",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "expansive v grind",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind"
+        }
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "shift 0, reach 0",
+      "tuning": {
+        "shapes.maxShiftM": 0,
+        "shapes.reachM": 0
+      }
+    },
+    {
+      "name": "shift 7, reach 0",
+      "tuning": {
+        "shapes.maxShiftM": 7,
+        "shapes.reachM": 0
+      }
+    },
+    {
+      "name": "shift 7, reach 10",
+      "tuning": {
+        "shapes.maxShiftM": 7,
+        "shapes.reachM": 10
+      }
+    },
+    {
+      "name": "shift 5, reach 0",
+      "tuning": {
+        "shapes.maxShiftM": 5,
+        "shapes.reachM": 0
+      }
+    },
+    {
+      "name": "shift 5, reach 10",
+      "tuning": {
+        "shapes.maxShiftM": 5,
+        "shapes.reachM": 10
+      }
+    }
+  ]
+}

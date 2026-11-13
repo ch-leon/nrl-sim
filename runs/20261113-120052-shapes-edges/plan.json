@@ -1,0 +1,44 @@
+{
+  "name": "shapes-edges",
+  "description": "#649 step 2: the two preset rows nearest the band's edge (All-out, Compressed), shapes off against on at the final knobs, 200 seeds both ways (400 matches).",
+  "seeds": 200,
+  "base": {},
+  "scenarios": [
+    {
+      "name": "all-out v balanced",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "compressed v slide",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "defence": "compressed"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "off",
+      "tuning": {
+        "shapes.on": 0
+      }
+    }
+  ]
+}

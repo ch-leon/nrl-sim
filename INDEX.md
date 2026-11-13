@@ -331,3 +331,9 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261113-111057-last-tackle-presets | last-tackle-presets | c4205f8 | worktree-agent-a18f30466b7234caa | [report](runs/20261113-111057-last-tackle-presets/report.md) |
 | 20261113-112350-standard | standard | c4205f8 (uncommitted changes) | worktree-agent-a18f30466b7234caa | [report](runs/20261113-112350-standard/report.md) |
 | 20261113-112709-last-tackle-presets-2 | last-tackle-presets-2 | c4205f8 (uncommitted changes) | worktree-agent-a18f30466b7234caa | [report](runs/20261113-112709-last-tackle-presets-2/report.md) |
+| 20261113-094838-standard-shapes-off | standard | a65edf9 (uncommitted changes) | worktree-agent-aaa35ad52c2bade38 | [report](runs/20261113-094838-standard-shapes-off/report.md) |
+| 20261113-114727-shapes-formed-f3135b9 | shapes-formed | f3135b9 + the shape-formed telemetry only (scratch copy) | - | [report](runs/20261113-114727-shapes-formed-f3135b9/report.md) |
+| 20261113-114805-shapes-formed-2 | shapes-formed-2 | f3135b9 (uncommitted changes) | worktree-agent-aaa35ad52c2bade38 | [report](runs/20261113-114805-shapes-formed-2/report.md) |
+| 20261113-115242-attack-shapes | attack-shapes | f3135b9 (uncommitted changes) | worktree-agent-aaa35ad52c2bade38 | [report](runs/20261113-115242-attack-shapes/report.md) |
+| 20261113-115910-standard | standard | f3135b9 (uncommitted changes) | worktree-agent-aaa35ad52c2bade38 | [report](runs/20261113-115910-standard/report.md) |
+| 20261113-120052-shapes-edges | shapes-edges | f3135b9 (uncommitted changes) | worktree-agent-aaa35ad52c2bade38 | [report](runs/20261113-120052-shapes-edges/report.md) |

@@ -1,0 +1,17 @@
+{
+  "name": "shapes-formed",
+  "description": "#649 step 2 follow-up: how often is the shape formed as the ball leaves the ruck (every man it places within 2 m of his spot), per shape, on even sides?",
+  "seeds": 100,
+  "scenarios": [
+    {
+      "name": "even 60 v 60",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    }
+  ],
+  "variants": []
+}
