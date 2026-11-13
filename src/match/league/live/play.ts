@@ -6,7 +6,7 @@ import { speedOf } from '../../core/body';
 import { add, dist, dot, norm, sub, type Vec } from '../../core/vec';
 import { angleFrom, stepChance, type Situation } from '../contest';
 import { PLAYERS, ROLES } from '../roles';
-import { MAX_LAT_M, RUN_CLOSE_M, RUN_IT_CHANCE, RUN_IT_ZONE_M, bombTarget, chipTarget, chooseKick, crossFieldTarget, grubberTarget, kickTarget, pickReceiver, type KickChoice } from '../tactics';
+import { MAX_LAT_M, RUN_CLOSE_M, RUN_IT_CHANCE, RUN_IT_ZONE_M, bombTarget, chipTarget, chooseKick, crossFieldTarget, grubberTarget, kickTarget, pickReceiver, pickReceiverWeighted, type KickChoice } from '../tactics';
 import { zoneOf, type AttackPlan } from '../presets';
 import { FINISHER_M, TRAIT_PTS, announce, bootMult, stepTraits } from '../traits';
 import { traitBoost } from '../../../data/traits';
@@ -141,7 +141,11 @@ export abstract class LivePlay extends LiveKicks {
       const maker = traitBoost(h.traits, 'playmaker');
       const reach = MAX_LAT_M + (maker > 0 ? LIVE.cutOutPerLevelM * maker : 0) + (plan.width > 0 ? 3 : 0);
       const cands = this.candidates(h, plan);
-      let receiver = pickReceiver(h.body.pos, this.dir, cands, reach, Math.min(0.6, LIVE.playmakerWidth * maker + plan.width));
+      const widthBias = Math.min(0.6, LIVE.playmakerWidth * maker + plan.width);
+      // The weighted receiver (#649): while it is on, one roll for who he looks for, before the cut-out's.
+      let receiver = LIVE.receiverMargin > 0
+        ? pickReceiverWeighted(h.body.pos, this.dir, cands, reach, widthBias, LIVE.receiverMargin, LIVE.receiverSpread, this.rng.next())
+        : pickReceiver(h.body.pos, this.dir, cands, reach, widthBias);
       // A Playmaker (or an expansive side) sees the overlap: now and then he skips the near man and throws to the widest one he can reach.
       const cutOut = LIVE.cutOutChance * maker + plan.cutOut;
       if (cutOut > 0 && this.rng.next() < cutOut) {

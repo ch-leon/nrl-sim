@@ -1,0 +1,22 @@
+{
+  "name": "weighted-receiver",
+  "description": "#649 step 1: does picking among the near-best pass options (live.receiverMargin, weighted by live.receiverSpread) vary the first receiver without moving the §7 counts or the six preset rows out of 45–55%? Baseline is the off value (margin 0); the margin sweeps at spread 2, plus the chosen margin with the weighting only in open play (live.receiverAtRuck 0) to show where the first receiver's variety comes from.",
+  "seeds": 60,
+  "scenarios": [
+    { "name": "even 60 v 60", "home": { "rating": 60 }, "away": { "rating": 60 } },
+    { "name": "expansive v grind", "home": { "rating": 60, "tactics": { "attack": "expansive" } }, "away": { "rating": 60, "tactics": { "attack": "grind" } } },
+    { "name": "grind v balanced", "seeds": 100, "track": "home", "bothWays": true, "home": { "rating": 60, "tactics": { "attack": "grind" } }, "away": { "rating": 60 } },
+    { "name": "expansive v balanced", "seeds": 100, "track": "home", "bothWays": true, "home": { "rating": 60, "tactics": { "attack": "expansive" } }, "away": { "rating": 60 } },
+    { "name": "kick-chase v balanced", "seeds": 100, "track": "home", "bothWays": true, "home": { "rating": 60, "tactics": { "attack": "kick-chase" } }, "away": { "rating": 60 } },
+    { "name": "all-out v balanced", "seeds": 100, "track": "home", "bothWays": true, "home": { "rating": 60, "tactics": { "attack": "all-out" } }, "away": { "rating": 60 } },
+    { "name": "rush v slide", "seeds": 100, "track": "home", "bothWays": true, "home": { "rating": 60, "tactics": { "defence": "rush" } }, "away": { "rating": 60 } },
+    { "name": "compressed v slide", "seeds": 100, "track": "home", "bothWays": true, "home": { "rating": 60, "tactics": { "defence": "compressed" } }, "away": { "rating": 60 } }
+  ],
+  "variants": [
+    { "name": "margin 1", "tuning": { "live.receiverMargin": 1, "live.receiverSpread": 2 } },
+    { "name": "margin 2", "tuning": { "live.receiverMargin": 2, "live.receiverSpread": 2 } },
+    { "name": "margin 3", "tuning": { "live.receiverMargin": 3, "live.receiverSpread": 2 } },
+    { "name": "margin 5", "tuning": { "live.receiverMargin": 5, "live.receiverSpread": 2 } },
+    { "name": "margin 3, open play only", "tuning": { "live.receiverMargin": 3, "live.receiverSpread": 2, "live.receiverAtRuck": 0 } }
+  ]
+}

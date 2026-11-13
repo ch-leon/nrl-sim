@@ -74,7 +74,9 @@ describe('the goal-kicker and the captain (N11)', () => {
     expect(runMatch(neutral, away, { seed: 3 })).toEqual(runMatch(plain, away, { seed: 3 }));
   }, 60_000);
 
-  it('the named kicker takes the goal kicks while he is on, and his Kicking moves the conversion rate (40 seeds)', () => {
+  it('the named kicker takes the goal kicks while he is on, and his Kicking moves the conversion rate (80 seeds)', () => {
+    // 80 seeds since the weighted receiver (#649) reshuffled every match: over seeds 1–40 the
+    // 2:30 halves left about 40 kicks a side and a gap of 0.08 by luck; over 1–80 it is 0.71 v 0.54.
     const away = sideSheet('A', { rating: 60 });
     // The fullback (slot 0) kicks; his Kicking is the only thing that differs.
     const withKicker = (kicking: number): TeamSheet => {
@@ -86,7 +88,7 @@ describe('the goal-kicker and the captain (N11)', () => {
       let made = 0;
       let tried = 0;
       let byKicker = 0;
-      for (let seed = 1; seed <= 40; seed++) {
+      for (let seed = 1; seed <= 80; seed++) {
         for (const e of runMatch(sheet, away, { seed }).events) {
           if (e.teamId !== sheet.clubId || (e.kind !== 'conversion' && e.kind !== 'penalty-goal')) continue;
           tried++;

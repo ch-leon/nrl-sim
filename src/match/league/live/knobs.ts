@@ -128,6 +128,15 @@ export const LIVE = {
   dartChance: 0.08,
   /** Engaged carrier's base chance to pass (+ Handling/300, + Playmaker, + preset). */
   passBase: 0.3,
+  /**
+   * The weighted receiver (#649 step 1, BAK-208 §4.2): an option this close to the best pass
+   * score (pickReceiver's units) may get the ball too, weighted exp(−gap / receiverSpread);
+   * one roll per pass decision while on. 0 = off: always the best, no roll.
+   */
+  receiverMargin: 2,
+  receiverSpread: 2,
+  /** …at the play-the-ball too (1), the dummy-half's pass to the first receiver, or only in open play (0). */
+  receiverAtRuck: 1,
 };
 
 /**

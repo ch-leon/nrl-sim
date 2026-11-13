@@ -9,9 +9,10 @@ describe('moment presentation facts', () => {
     const home = labSheet(DEFAULT_HOME); const away = labSheet(DEFAULT_AWAY);
     // Preserve the historical presentation trajectory with all kick types and a scored try.
     const opts = { length: { halves: 2 as const, halfMinutes: 7 } };
-    const sim = new LiveSim(home, away, 2, opts); const control = new LiveSim(home, away, 2, opts);
+    const sim = new LiveSim(home, away, 1, opts); const control = new LiveSim(home, away, 1, opts);
     const found = new Set<string>();
-    // Seed 2 includes every presentation fact after retreat completion (#625).
+    // Seed 2 included every presentation fact after retreat completion (#625); since the weighted
+    // receiver (#649) it has no grubber, and seed 1 has them all.
     // Observe its whole match rather than depending on the opening carries.
     while (!sim.finished) {
       sim.step(); control.step();
@@ -45,7 +46,8 @@ describe('moment presentation facts', () => {
     const kindOf = (e: SimEvent): 'error' | 'miss' | 'bin' | null => ['error', 'drop', 'strip'].includes(e.kind) ? 'error'
       : e.kind === 'sin-bin' ? 'bin' : ['conversion', 'penalty-goal', 'field-goal'].includes(e.kind) && e.detail === 'missed' ? 'miss' : null;
     // Matches until each kind has turned up: a sin bin is rare enough that one match need not have one.
-    for (let seed = 11; seed < 31 && found.size < 3; seed++) {
+    // To seed 60: since the weighted receiver (#649) the first sin bin from seed 11 is seed 32's.
+    for (let seed = 11; seed < 61 && found.size < 3; seed++) {
       const sim = new LiveSim(home, away, seed);
       for (let i = 0; i < 9000 && !sim.finished; i++) {
         sim.step();

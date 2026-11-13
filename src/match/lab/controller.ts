@@ -38,6 +38,11 @@ export interface LabParams {
   weather?: WeatherKind;
   /** Coach-call chips for both sides (#73, `calls=1`). */
   calls?: boolean;
+  /**
+   * Knob overrides by name (`knobs=live.receiverMargin:0,fatigue.runCost:1.2`), as the balance
+   * harness takes them, so a mechanic can be watched on and off on the same seed.
+   */
+  knobs?: Record<string, number>;
   /** Both coaches make their own calls (N9.6, `ai=1`). */
   ai?: boolean;
   /** Played as a final (N9.4, `final=1`): golden point if level at full time. */
@@ -71,7 +76,8 @@ export function parseLabHash(hash: string, defaults: { home: string; away: strin
   const ai = sp.get('ai') === '1';
   const final = sp.get('final') === '1';
   const plays = sp.get('plays') === '1';
-  if (flag) return { seed: flag.seed, tick: flag.tick, home: flag.home, away: flag.away, note: flag.note, traits, tactics, legs, bench, weather, ...(calls ? { calls } : {}), ...(ai ? { ai } : {}), ...(final ? { final } : {}), ...(plays ? { plays } : {}) };
+  const knobs = parseKnobs(sp.get('knobs'));
+  if (flag) return { seed: flag.seed, tick: flag.tick, home: flag.home, away: flag.away, note: flag.note, traits, tactics, legs, bench, weather, ...(calls ? { calls } : {}), ...(ai ? { ai } : {}), ...(final ? { final } : {}), ...(plays ? { plays } : {}), ...(knobs ? { knobs } : {}) };
   const seed = Number(sp.get('seed'));
   const tick = Number(sp.get('tick'));
   return {
@@ -89,7 +95,26 @@ export function parseLabHash(hash: string, defaults: { home: string; away: strin
     ...(ai ? { ai } : {}),
     ...(final ? { final } : {}),
     ...(plays ? { plays } : {}),
+    ...(knobs ? { knobs } : {}),
   };
+}
+
+/** `live.receiverMargin:0,fatigue.runCost:1.2` → overrides; a pair that is not `name:number` is dropped. */
+export function parseKnobs(text: string | null): Record<string, number> | undefined {
+  if (!text) return undefined;
+  const out: Record<string, number> = {};
+  for (const pair of text.split(',')) {
+    const at = pair.lastIndexOf(':');
+    const name = pair.slice(0, at).trim();
+    const value = Number(pair.slice(at + 1));
+    if (at > 0 && name && pair.slice(at + 1).trim() !== '' && Number.isFinite(value)) out[name] = value;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** The `knobs=` value for a set of overrides (parseKnobs reads it back). */
+export function knobsText(knobs: Readonly<Record<string, number>>): string {
+  return Object.entries(knobs).map(([name, value]) => `${name}:${value}`).join(',');
 }
 
 /** `hatk=grind&hdef=rush&aatk=…&adef=…` → per-side overrides (unknown values ignored). */
@@ -105,7 +130,7 @@ function parseTactics(sp: URLSearchParams): LabTactics {
   return { home: side('hatk', 'hdef'), away: side('aatk', 'adef') };
 }
 
-export function labHash(p: Pick<LabParams, 'seed' | 'home' | 'away'> & { tick?: number; traits?: TraitMode; tactics?: LabTactics; legs?: Legs; bench?: Rotation | undefined; weather?: WeatherKind | undefined; calls?: boolean | undefined; ai?: boolean | undefined; final?: boolean | undefined; plays?: boolean | undefined }): string {
+export function labHash(p: Pick<LabParams, 'seed' | 'home' | 'away'> & { tick?: number; traits?: TraitMode; tactics?: LabTactics; legs?: Legs; bench?: Rotation | undefined; weather?: WeatherKind | undefined; calls?: boolean | undefined; ai?: boolean | undefined; final?: boolean | undefined; plays?: boolean | undefined; knobs?: Record<string, number> | undefined }): string {
   const sp = new URLSearchParams({ seed: String(p.seed), home: p.home, away: p.away });
   if (p.tick) sp.set('tick', String(p.tick));
   if (p.traits && p.traits !== 'gen') sp.set('traits', p.traits);
@@ -121,6 +146,7 @@ export function labHash(p: Pick<LabParams, 'seed' | 'home' | 'away'> & { tick?: 
   if (p.ai) sp.set('ai', '1');
   if (p.final) sp.set('final', '1');
   if (p.plays) sp.set('plays', '1');
+  if (p.knobs && Object.keys(p.knobs).length) sp.set('knobs', knobsText(p.knobs));
   return `${LAB_HASH}?${sp.toString()}`;
 }
 
@@ -211,6 +237,6 @@ export class LabController {
 
   /** The URL hash that reopens the lab on these teams and seed (and this tick). */
   hash(withTick = false): string {
-    return labHash({ seed: this.runner.seed, home: this.params.home, away: this.params.away, traits: this.params.traits, tactics: this.params.tactics, legs: this.params.legs, bench: this.params.bench, weather: this.params.weather, calls: this.params.calls, ai: this.params.ai, final: this.params.final, plays: this.params.plays, ...(withTick ? { tick: this.runner.tick } : {}) });
+    return labHash({ seed: this.runner.seed, home: this.params.home, away: this.params.away, traits: this.params.traits, tactics: this.params.tactics, legs: this.params.legs, bench: this.params.bench, weather: this.params.weather, calls: this.params.calls, ai: this.params.ai, final: this.params.final, plays: this.params.plays, knobs: this.params.knobs, ...(withTick ? { tick: this.runner.tick } : {}) });
   }
 }

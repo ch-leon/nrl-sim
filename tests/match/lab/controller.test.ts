@@ -1,7 +1,7 @@
 // tests/match/lab/controller.test.ts — lab state without a DOM (BAK-207 §4):
 // URL hash ↔ params, play/pause/step/scrub, Flag codes that replay.
 import { describe, it, expect } from 'vitest';
-import { LabController, isLabHash, labHash, parseLabHash } from '../../../src/match/lab/controller';
+import { LabController, isLabHash, knobsText, labHash, parseKnobs, parseLabHash } from '../../../src/match/lab/controller';
 import { decodeFlag } from '../../../src/match/core/flag';
 import { replayTo, type MatchSim } from '../../../src/match/core/engine';
 import type { Snapshot } from '../../../src/match/core/snapshot';
@@ -103,5 +103,26 @@ describe('LabController', () => {
     const f = decodeFlag(code)!;
     const other = new LabController(fake, { ...f, traits: 'gen', tactics: { home: {}, away: {} }, legs: 'fresh' });
     expect(other.runner.cur).toEqual(c.runner.cur);
+  });
+});
+
+describe('lab knob overrides (knobs=)', () => {
+  const defaults = { home: 'h', away: 'a' };
+
+  it('reads name:number pairs and drops what is not one', () => {
+    expect(parseKnobs('live.receiverMargin:0,fatigue.runCost:1.2')).toEqual({ 'live.receiverMargin': 0, 'fatigue.runCost': 1.2 });
+    expect(parseKnobs('live.receiverMargin:,nonsense,:3,live.passBase:abc,live.dartChance:0.1')).toEqual({ 'live.dartChance': 0.1 });
+    expect(parseKnobs('')).toBeUndefined();
+    expect(parseKnobs(null)).toBeUndefined();
+    expect(parseKnobs('nonsense')).toBeUndefined();
+  });
+
+  it('survives the hash round trip, and is absent when not given', () => {
+    const knobs = { 'live.receiverMargin': 0, 'presets.defence.rush.lineSpeed': 1.15 };
+    const hash = labHash({ seed: 11, home: 'h', away: 'a', knobs });
+    expect(parseLabHash(hash, defaults).knobs).toEqual(knobs);
+    expect(parseKnobs(knobsText(knobs))).toEqual(knobs);
+    expect(labHash({ seed: 11, home: 'h', away: 'a' })).not.toContain('knobs');
+    expect(parseLabHash('#lab?seed=11', defaults).knobs).toBeUndefined();
   });
 });

@@ -121,16 +121,17 @@ describe('no plays: the match it always was', () => {
 });
 
 describe('the launch and the script (plan §3.3)', () => {
-  it('a block play launches at tackle 2 in the attacking half (seed 7) and the second-row takes the pass', () => {
-    const sim = new PlaySim(flat(['block-play']), A, 7);
+  it('a block play launches at tackle 2 in the attacking half (seed 3) and the second-row takes the pass', () => {
+    const sim = new PlaySim(flat(['block-play']), A, 3);
     let launch: SimEvent | null = null;
-    // Seed 7 reaches tackle 2 in their half and completes the pass after #625.
+    // Seed 7 reached tackle 2 in their half and completed the pass after #625; since the weighted
+    // receiver (#649) its launch there (tick 16739) breaks down, and seed 3 is the first that completes.
     while (!launch) {
       const e = until(sim, (x) => x.kind === 'set-play');
       expect(e).not.toBeNull();
       if (sim.tackleCount === 1 && zoneOf(sim.toLineNow('home')) === 'attackingHalf') launch = e;
     }
-    expect(launch.tick).toBe(8322);
+    expect(launch.tick).toBe(1791);
     expect(launch.detail).toBe('block-play');
     expect(launch.player).toBe(sim.man('home', 5).name); // the halfback calls it
     expect(launch.text).toMatch(/calls the block play/);
@@ -225,7 +226,7 @@ describe('the launch and the script (plan §3.3)', () => {
     // Test the successful script; breakdown odds have their own coverage above.
     sim.force = 0.99;
     const e = until(sim, (x) => x.kind === 'set-play');
-    expect(e?.tick).toBe(3277);
+    expect(e?.tick).toBe(6054);
     sim.retarget();
     const s = sim.script!;
     const wing = sim.man('home', s.edge === 'left' ? 1 : 2);
@@ -286,10 +287,11 @@ describe('calling a play (plan §3.2)', () => {
     const plays: PlayId[] = ['block-play', 'cut-out-winger', 'kick-pass'];
     const ai = new PlaySim(flat(plays), A, 1, { aiCoach: ['home'] });
     const call = until(ai, (e) => e.kind === 'coach-call' && e.side === 'home');
-    expect(call?.detail).toBe('set-play:block-play');
-    expect(call?.tick).toBe(663);
+    // The cut-out since the weighted receiver (#649); the block play at tick 663 before it.
+    expect(call?.detail).toBe('set-play:cut-out-winger');
+    expect(call?.tick).toBe(635);
     const launch = until(ai, (e) => e.kind === 'set-play');
-    expect(launch?.text).toBe('H run the block play');
+    expect(launch?.text).toBe('H run the cut-out to the winger');
     const none = stream(flat(plays), A, 1);
     expect(none.some((p) => p.includes(':coach-call:'))).toBe(false);
     expect(none.some((p) => p.includes(':set-play:home:'))).toBe(true);
@@ -334,16 +336,17 @@ describe('the lab and the harness', () => {
     expect(sheet.plays).toEqual(['block-play', 'inside-ball', 'short-side-raid']);
     expect(withPlays(labSheet(DEFAULT_HOME), false).plays).toBeUndefined();
   });
-  it('the lab’s named seeds: a block play launched (seed 1, tick 1031) and one breaking down (seed 4, tick 514)', () => {
+  // Seed 1 at tick 1031 and seed 4 at tick 514 before the weighted receiver (#649) reshuffled them.
+  it('the lab’s named seeds: a block play launched (seed 3, tick 653) and one breaking down (seed 4, tick 991)', () => {
     const lab = (seed: number): PlaySim =>
       new PlaySim(withPlays({ ...labSheet(DEFAULT_HOME, 'gen', { attack: 'grind' }), rotation: 'standard' }, true), withPlays({ ...labSheet(DEFAULT_AWAY, 'gen', {}), rotation: 'standard' }, true), seed, { energy: LEGS_ENERGY.fresh, weather: 'clear', calls: [] });
-    const one = lab(1);
+    const one = lab(3);
     const launch = until(one, (e) => e.kind === 'set-play' && e.side === 'home');
-    expect([launch?.tick, launch?.detail, one.script?.outcome]).toEqual([1031, 'block-play', 'ok']);
+    expect([launch?.tick, launch?.detail, one.script?.outcome]).toEqual([653, 'block-play', 'ok']);
     expect(one.script?.decoys.map((d) => d.idx % 9)).toEqual([7]);
     const four = lab(4);
     const bd = until(four, (e) => e.kind === 'play-breaks-down');
-    expect([bd?.tick, bd?.detail, bd?.side]).toEqual([514, 'block-play', 'home']);
+    expect([bd?.tick, bd?.detail, bd?.side]).toEqual([991, 'block-play', 'home']);
   }, 60_000);
   it('a scenario names its plays (`plays`), a typo fails fast, and the cell plays them', () => {
     const plan = (plays: PlayId[]): Plan => ({ name: 'p', seeds: 1, minutes: 4, scenarios: [{ name: 's', home: { rating: 60, plays }, away: { rating: 60 } }] });

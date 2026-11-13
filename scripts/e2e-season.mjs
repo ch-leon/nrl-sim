@@ -973,6 +973,20 @@ async function play() {
         break;
       }
       if (got) refused.push(got.call); else empty++;
+      // A half is 2:30 (#678), so the try the step before waited for can come as the half ends: the
+      // card then comes up under this loop and no set is on offer until Continue. Play it and start
+      // the count again; at full time there is no set left to call.
+      if (!got && !halfTimeDone && (await halfTimeCard().count())) {
+        await page.evaluate(() => {
+          const coach = document.querySelector('.nrl-mo-bar [data-coach]');
+          if (coach?.getAttribute('aria-expanded') === 'true') coach.click();
+        });
+        await playHalfTime(rec);
+        await press(page.locator('.nrl-mo-controls [data-speed="1"]'));
+        i = -1;
+        continue;
+      }
+      if (!got && (await page.locator('.nrl-mo-final').count())) return 'no set call before full time';
       await wait(250);
     }
     // Leave the tray shut: open, it hides every speed but the one playing.

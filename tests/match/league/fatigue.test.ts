@@ -184,11 +184,14 @@ describe('legs and the wrestle in the live sim', () => {
       // Seeds 5–8 since the kick contests (#99) reshuffled every match: seeds 1–4 now leave the
       // Stamina-40 side at 0.83, 0.75, 0.84 and 0.79 (0.80; 0.76 before), seeds 5–8 at 0.75. On all
       // eight the Stamina-80 side is at least 0.11 ahead.
-      for (let s = 5; s <= 8; s++) {
+      // Seeds 1–16 since the weighted receiver (#649) reshuffled them again: one seed alone
+      // runs 0.60–0.83 for the Stamina-40 side, so four seeds put the mean (0.78 on 5–8)
+      // over the line by luck. Over 1–16 it is 0.75, the Stamina-80 side 0.11–0.16 ahead.
+      for (let s = 1; s <= 16; s++) {
         const sim = new LiveSim(sheet('H', { stamina: 40 }), sheet('A', { stamina: 80 }), s, { length: { halves: 2, halfMinutes: 7 } });
         play(sim, 600);
-        home += sim.energyOf('home') / 4;
-        away += sim.energyOf('away') / 4;
+        home += sim.energyOf('home') / 16;
+        away += sim.energyOf('away') / 16;
       }
     } finally {
       restore();
