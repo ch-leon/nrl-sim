@@ -52,6 +52,16 @@ export const GOALS = {
   bonusDeadM: 2,
 };
 
+/**
+ * The tick a conversion or penalty goal is struck: lined up for `conversionTicks` once he is on his
+ * spot (`readyAt`, 0 until then), and never later than `conversionMaxTicks` after the phase began.
+ * The sim kicks on it; the snapshot reports it so the view can time the routine to it (#669).
+ */
+export function goalStrikeTick(ph: { t0: number; readyAt: number }): number {
+  const latest = ph.t0 + GOALS.conversionMaxTicks;
+  return ph.readyAt > 0 ? Math.min(ph.readyAt + GOALS.conversionTicks, latest) : latest;
+}
+
 /** The posts a side kicks at: the middle of the try line it attacks. */
 export function postsFor(dir: 1 | -1, fieldLength: number, midY: number): Vec {
   return { x: dir > 0 ? fieldLength : 0, y: midY };

@@ -6,6 +6,8 @@ import type { ContactPlayer } from '../core/snapshot';
 export interface ContactPoint { player: ContactPlayer; x: number; y: number }
 export interface ContactLayout { pose: ContactPose; x: number; y: number; left: boolean; feet: ContactPoint[] }
 const clamp = (n: number) => Math.max(0, Math.min(1, n));
+/** Ticks a bust stays in the shared contact picture: the bump, the spin and most of the fall. */
+export const BUMP_TICKS = 8;
 function move(actor: ContactBody, dx: number, dy: number): ContactBody {
   return { ...actor,
     pose: Object.fromEntries(Object.entries(actor.pose).map(([key, p]) => [key, add(p, dx, dy)])) as unknown as Body,
@@ -17,7 +19,8 @@ function move(actor: ContactBody, dx: number, dy: number): ContactBody {
 export function contactLayout(state: ContactAnimation, points: readonly ContactPoint[], left: boolean): ContactLayout | null {
   if (state.phase === 'ptb') return null;
   const escape = state.kind === 'break' || state.kind === 'steal';
-  if (escape && state.resolvedTick !== null && state.tick - state.resolvedTick >= 4) return null;
+  // A bumped-off man gets his spin (#674) before both go back to their own pictures.
+  if (escape && state.resolvedTick !== null && state.tick - state.resolvedTick >= (state.variant === 'bump' ? BUMP_TICKS : 4)) return null;
   const find = (p: ContactPlayer) => points.find(q => contactPlayerKey(q.player) === contactPlayerKey(p));
   const at = find(state.contact.carrier);
   if (!at || state.contact.defenders.some(p => !find(p))) return null;

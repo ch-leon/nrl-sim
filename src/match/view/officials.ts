@@ -15,10 +15,15 @@ import type { PlayerSnap, Side, Snapshot } from '../core/snapshot';
 export const REF = {
   /** Metres off the play. */
   offM: 6,
-  /** The play he follows: this share the ball, the rest the middle of the bodies on the field (so a pass or a kick moves him at a man's pace, not the ball's). */
-  ballShare: 0.25,
-  /** Closest he stands to the ball or its carrier, metres (nearer only when it is right on him: see fadeM). */
-  clearM: 3.5,
+  /** The play he follows: this share the ball, the rest the middle of the bodies on the field (so a pass or a kick moves him at a man's pace, not the ball's). Small, as the ball's own snap onto a holder moves him by this share of it. */
+  ballShare: 0.15,
+  /**
+   * Closest he stands to the ball or its carrier, metres (nearer only when it is right on him: see fadeM).
+   * Kept small on purpose (#680): the ball snaps 2 to 5 m onto a new holder in a tick (the heel
+   * landing in the dummy half's hands, a kick caught), and the push off it steps by up to its
+   * peak when it does, so a bigger zone darted him 2.7 to 3.1 m at about one play-the-ball in ten.
+   */
+  clearM: 2.5,
   /** Inside this many metres of the ball the push off it fades out (continuity: no jump as it passes through him). */
   fadeM: 1.5,
   /** Metres of room on the far side he needs to stand there (less, and he swings round to the near side). */

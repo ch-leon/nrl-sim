@@ -39,15 +39,26 @@ import { speedOf } from '../core/body';
 import { CARRY_LIFT, flightAt } from '../core/ball';
 import { REACT_SNAP_TICKS, type PlayerSnap, type Snapshot } from '../core/snapshot';
 import { clockText } from './rules';
+import { goalStrikeTick } from './goals';
 import { LIVE } from './live/knobs';
 import { LivePositioning } from './live/positioning';
+import type { Phase } from './live/types';
 export type { ControlInput } from './controls';
 export { LIVE, runOn } from './live/knobs';
 export type { LiveOptions, PlanInput } from './live/types';
 
 export class LiveSim extends LivePositioning implements MatchSim {
+  /**
+   * The phase as it stood after the last tick, and the tick it began (#675): presentation only, the sim never
+   * reads them. Taken at the first tick, not at the build, so a kick-off set again before play starts (the
+   * balance harness's fit fixtures) still began at tick 0.
+   */
+  private phaseSeen: Phase | null = null;
+  private phaseSince = 0;
+
   // ── Tick ──────────────────────────────────────────────────────────────────
   step(): void {
+    if (this.phaseSeen === null) this.phaseSeen = this.phase;
     if (this.finished) {
       // The last tick's events stay until the next step replaces them. A step
       // after full time replaces them with nothing, so they cannot be recorded again.
@@ -139,6 +150,10 @@ export class LiveSim extends LivePositioning implements MatchSim {
       || !['play', 'tackle', 'ruck'].includes(this.phase.kind)) {
       this.pendingControl.home = this.pendingControl.away = null;
     }
+    if (this.phase !== this.phaseSeen) {
+      this.phaseSeen = this.phase;
+      this.phaseSince = this.tick;
+    }
   }
 
   // ── Snapshot ──────────────────────────────────────────────────────────────
@@ -174,6 +189,9 @@ export class LiveSim extends LivePositioning implements MatchSim {
         poseUntil: p.poseUntil,
         caughtTick: p.catchTick,
         ...(kick ? { kick } : {}),
+        // A shot at goal (#669): from his spot to the end of the conversion, for the routine and the tee.
+        ...(ph.kind === 'conversion' && ph.readyAt > 0 && this.players[ph.kicker] === p
+          ? { goalKick: { readyTick: ph.readyAt, strikeTick: goalStrikeTick(ph), toward: this.dirOf(ph.side) } } : {}),
         ...(p.aerialCatchTick !== undefined && p.aerialCatchTick === p.catchTick ? { aerialCatchTick: p.aerialCatchTick } : {}),
         ...(ph.kind === 'try' && scorer === p ? { tryTick: ph.t0 } : {}),
         ...(ph.kind === 'try' && scorer?.side === p.side ? { celebrationTick: ph.t0 } : {}),
@@ -204,6 +222,7 @@ export class LiveSim extends LivePositioning implements MatchSim {
       events: this.events,
       clock: { half: this.half, seconds: this.clockTicks * TICK_S, minute: Math.floor(this.matchSeconds / 60), siren: this.siren, finished: this.finished },
       score: { ...this.points },
+      phase: { kind: ph.kind, since: this.phaseSince, ...(this.golden ? { golden: true } : {}) },
     };
     const w = ph.kind === 'tackle' ? ph.wrestle : null;
     const contact = this.visualContact;

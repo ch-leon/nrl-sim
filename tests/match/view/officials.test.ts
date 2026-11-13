@@ -39,9 +39,11 @@ describe('the referee (#642)', () => {
     expect(refereeSpot(s)).toEqual(refereeSpot(structuredClone(s)));
   });
 
-  it('glides with play: no more than a sprinter’s step a tick, except when the sides are put on their marks', () => {
+  it('glides with play: no more than a sprinter’s step a tick over seeds 1 to 24, except when the sides are put on their marks', () => {
+    // The ball snaps onto a new holder in a tick (the heel into the dummy half's hands); he must not dart after it (#680).
     let worst = 0;
-    for (const snaps of matches) {
+    for (let seed = 1; seed <= 24; seed++) {
+      const snaps = playMatch(seed);
       for (let i = 1; i < snaps.length; i++) {
         const a = snaps[i - 1]!;
         const b = snaps[i]!;
@@ -57,10 +59,9 @@ describe('the referee (#642)', () => {
         worst = Math.max(worst, Math.hypot(p1.x - p0.x, p1.y - p0.y));
       }
     }
-    // 12 m/s is 0.6 m a tick; a kick at goal or a long pass drags him a little faster for a tick or two,
-    // most when it flies past close by and he swings round it (seed 3 after #677: a 4.2 m tick, 1.7 m).
-    expect(worst).toBeLessThan(1.8);
-  });
+    // 12 m/s is 0.6 m a tick. Was 2.7 m over these seeds before #680 (10 of 24 seeds above 1.8 m).
+    expect(worst).toBeLessThan(1.6);
+  }, 120_000);
 
   it('keeps off the carrier; when he would be drawn over him, he is drawn behind', () => {
     let near = 0;
@@ -83,7 +84,7 @@ describe('the referee (#642)', () => {
     }
     // Inside the clear zone only while the ball runs right through his spot; standing far side of play, rarely over the carrier.
     expect(near / held).toBeLessThan(0.03);
-    expect(covers / held).toBeLessThan(0.05);
+    expect(covers / held).toBeLessThan(0.07); // a closer stand-off (#680) puts him over the carrier a little more often; the scene sorts him behind
   });
 
   it('stays on the ground: inside the touchlines and dead-ball lines', () => {

@@ -89,6 +89,13 @@ What's in the game, with the PR that added each.
   - Body language: the defensive line gets ready at the play-the-ball; tired players run hunched and stand hands-on-knees; hands on head after a knock-on or a missed goal; team-mates gather round a try scorer; long hair and shorts hems move with the stride.
   - Ten more traits show when they fire (Offload King, Jets, Last Line, Pickpocket, Poacher, Brick Wall, Hothead, Razzle Dazzle, Gambler, Workhorse), and each player page says what to look for.
 
+- Match watchability, wave 4 ([PR](https://github.com/ch-leon/nrl-sim/pull/681), [tracker](https://github.com/ch-leon/nrl-sim/issues/626)):
+  - Tackles look like what happened: a wrap from the front, a drag from the side, an ankle tap from behind, a front-on stop for a big hit, and a defender spun off on a bust.
+  - The goal kicker has a routine: ball on the tee, steps back, a look at the posts, a breath, then the run-up.
+  - At half-time and full time both sides walk off and fade behind the card, winners celebrating and losers head-down; before golden point each side huddles, then spreads.
+  - The men under a bomb tip their heads back to watch it.
+  - The referee no longer darts when the ball changes hands.
+
 - Defenders other than the markers must physically retreat 10m (or to their goal line) after each ruck before they can rejoin the defence, including after quick heels, handovers, sin bins and substitutions ([PR](https://github.com/ch-leon/nrl-sim/pull/677), [evidence](../specs/625-retreat-validation.md)).
 
 - Ruck markers line up square with the play-the-ball, one behind the other in both attacking directions, with room between bodies ([PR](https://github.com/ch-leon/nrl-sim/pull/621), [spec](../specs/618-marker-alignment.md)).

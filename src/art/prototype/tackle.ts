@@ -78,6 +78,19 @@ export function tacklePoseAt(seconds: number): { carrier: Body; defender: Body; 
 }
 
 /**
+ * A man turning about his own upright axis (#674): every joint swings round the hip,
+ * `cos` 1 as authored, 0 edge-on, −1 mirrored. Heads are anchored at their top-left,
+ * so the head's centre (`HEAD_CENTRE` in) is what swings.
+ */
+const HEAD_CENTRE = 8;
+export function turnBody(p: Body, cos: number): Body {
+  const x = (q: Point): Point => [p.hip[0] + (q[0] - p.hip[0]) * cos, q[1]];
+  const head = x(add(p.head, HEAD_CENTRE, 0));
+  return { hip: p.hip, shoulder: x(p.shoulder), head: [head[0] - HEAD_CENTRE, p.head[1]],
+    knee: x(p.knee), foot: x(p.foot), farKnee: x(p.farKnee), farFoot: x(p.farFoot) };
+}
+
+/**
  * A taller or shorter man on a shared skeleton, matching `stand`: everything above the
  * shins rises by his stature, and less as he leaves his feet (none once he is lying down).
  */

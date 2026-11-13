@@ -67,6 +67,17 @@ The sim remains the authority for movement, participants, timing and possession.
   and 5) the jersey tail and shorts hem trail a pixel behind. Standing, nothing
   moves. Both come from the stride frame the picture already carries, so the
   frame cache gains no entries (the same hits and misses over the same passage).
+- **Eyes on the bomb (#671).** While a bomb is up, the four men nearest where it
+  comes down (within 10 m: the catcher and the chasers) tip their heads back,
+  standing or running with the ball elsewhere (`eyesUp.ts`, `lookUp.ts`). The sim
+  flies a kick on a parabola under gravity, so two ticks of the ball's height give
+  its peak (a bomb is 19 m or more; every other kick in play is 13 m or under, the
+  default kick-off 18) and its pace over the ground gives the landing spot. The
+  head is the contact art's `tiltedHead` put back over the ordinary idle or run
+  frame: 14 degrees back from 4 m, 30 from 10 m, so it levels off as the ball
+  comes down. Nothing below the chin changes. `lookUp` (1 or 2) joins the frame-cache
+  key only when set. Read from the two snapshots the view holds, so pause, seek
+  and replay agree. Kick-offs the sim flies at 20 m (short and long) count as bombs too.
 
 No engine, save, appearance assignment, rules, odds, fatigue or RNG changes.
 The earlier ordinary-player art study keeps its old frame API; `/#lab` and career

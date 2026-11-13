@@ -3,7 +3,7 @@ import { PixelBuffer } from '../pixel';
 import { OUTLINE, type Kit } from '../match/kit';
 import { drawHead, type Facing } from './head';
 import { ballPixels, CENTRE, FOOT, PAINT_FOOT, drawPrototypePlayer, type Appearance } from './player';
-import { add, blend, blendBody, body, contactPainter, flip, standTall, type Body, type Point } from './tackle';
+import { add, blend, blendBody, body, contactPainter, flip, standTall, turnBody, type Body, type Point } from './tackle';
 import { contactPlayerKey, type ContactAnimation } from '../../match/view/contactAnimation';
 import { fitLegs, bentContactArm, type ContactArm } from '../match/limbs';
 export { contactLeg, bentContactArm } from '../match/limbs';
@@ -28,10 +28,26 @@ const FAR = body([46, 67], [54, 59], [47, 42], [42, 71], [40, 75], [51, 71], [53
 const HIGH_DOWN = body([96, 74], [81, 70], [74, 53], [96, 78], [104, 79], [108, 77], [116, 79]);
 const LOW_DOWN = body([111, 77], [93, 76], [86, 59], [119, 79], [125, 80], [110, 80], [118, 81]);
 const FAR_DOWN = body([46, 70], [53, 66], [46, 49], [40, 75], [36, 78], [51, 74], [54, 78]);
+// #674. The ankle tap: his boots taken from behind, the runner pitches forward over them.
+const STUMBLE = body([72, 69], [80, 63], [76, 47], [77, 73], [80, 78], [67, 74], [64, 78]);
+const ANKLE = body([50, 74], [61, 75], [52, 63], [43, 77], [36, 78], [45, 76], [38, 77]);
+const ANKLE_DOWN = body([48, 76], [59, 77], [48, 66], [41, 78], [35, 79], [43, 78], [37, 79]);
+// The drag: a man on his hips from the side, knees trailing, while the runner drives on.
+const DRIVE = body([72, 69], [79, 62], [77, 45], [78, 73], [80, 78], [66, 74], [63, 78]);
+const DRAG = body([59, 74], [67, 70], [58, 55], [54, 77], [47, 79], [56, 77], [49, 78]);
+const DRAG_DOWN = body([50, 76], [62, 74], [51, 62], [44, 78], [38, 79], [46, 78], [40, 79]);
+// The front-on stop: folded over a square shoulder, boots off the turf, then flat on his back.
+const JACK = body([66, 67], [73, 62], [72, 45], [70, 71], [70, 75], [62, 71], [60, 75]);
+const STOP = body([89, 70], [78, 66], [78, 50], [86, 74], [84, 78], [95, 74], [99, 78]);
+const STOP_DOWN = body([84, 74], [72, 71], [74, 58], [90, 77], [96, 79], [88, 77], [94, 79]);
+// The bump: rocked back off the runner's shoulder, spun round, dumped on his back.
+const ROCKED = body([101, 69], [101, 61], [95, 44], [104, 73], [106, 78], [98, 73], [96, 78]);
+const BUMPED = body([104, 75], [114, 73], [112, 58], [98, 77], [92, 79], [100, 78], [94, 79]);
 
+export type ContactRole = 'carrier' | 'upper' | 'low' | 'far' | 'ankle' | 'drag';
 export interface ContactBody {
   player: ContactPlayer; pose: Body; tilt: number; left: boolean;
-  arms: readonly ContactArm[]; grip: number; role: 'carrier' | 'upper' | 'low' | 'far';
+  arms: readonly ContactArm[]; grip: number; role: ContactRole;
   running: boolean;
 }
 export interface ContactPose { carrier: ContactBody; defenders: ContactBody[]; ball: Point; owner: ContactPlayer; ptb: boolean; impact: number }
@@ -45,71 +61,107 @@ export function contactPoseAt(state: ContactAnimation): ContactPose {
     after = Math.max(0, (state.tick - state.resolvedTick) / Math.max(1, state.contact.releaseTick - state.resolvedTick)) * 1.05;
   }
   const completed = after >= 0 && !['break', 'steal'].includes(state.kind);
+  const variant = state.variant;
+  const stop = variant === 'stop';
   const fallTime = state.kind === 'dominant' ? .24 : state.kind === 'low' ? .25 : .32;
-  const fall = completed ? ease(after / fallTime) : 0;
+  // The stop folds him over the shoulder before he goes down.
+  const fall = completed ? ease((after - (stop ? .08 : 0)) / fallTime) : 0;
   const low = state.kind === 'low';
   const escaped = state.kind === 'break'; const stolen = state.kind === 'steal';
+  // Held from behind (or hung on from the side), his legs go and he pitches forward,
+  // unless a man arriving in front drives him back over the top.
+  const fromBehind = variant === 'ankle' || variant === 'drag';
+  const forward = low || (fromBehind && state.joined.length === 1);
   const ptb = state.phase === 'ptb';
   const drive = state.resolvedTick === null ? Math.sin(age * 18) * .75 : 0;
-  const recoil = state.kind === 'dominant' ? -10 * ease(after / .14) : 0;
+  const recoil = state.kind === 'dominant' && !stop ? -10 * ease(after / .14) : 0;
   const hit = Math.max(...state.joined.map(j => Math.max(0, 1 - (state.tick - j.tick) / 3)));
-  let c = blendBody(CARRIER, BRACE, ease(age / .12));
-  c = shift(blendBody(c, low ? FORWARD_DOWN : BACK_DOWN, fall), recoil);
+  const lead = variant === 'ankle' ? STUMBLE : variant === 'drag' ? DRIVE : stop ? JACK : BRACE;
+  let c = blendBody(CARRIER, lead, ease(age / (stop ? .08 : .12)));
+  if (variant === 'drag') {
+    // Legs still pumping: a stride or two with the tackler hanging off him, dying away as he goes down.
+    const step = age * Math.PI * 3; const pump = 1 - fall;
+    const s = Math.sin(step) * pump; const lift = Math.cos(step) * pump;
+    c = { ...c, foot: add(c.foot, 5 * s, -2 * Math.max(0, lift)), knee: add(c.knee, 3 * s, -2 * Math.max(0, lift)),
+      farFoot: add(c.farFoot, -5 * s, -2 * Math.max(0, -lift)), farKnee: add(c.farKnee, -3 * s, -2 * Math.max(0, -lift)) };
+  }
+  c = shift(blendBody(c, forward ? FORWARD_DOWN : BACK_DOWN, fall), recoil);
   // Absorb each actual arrival through the trunk and knees; feet stay planted.
   const squash = (1 - fall) * hit;
   c = { ...c, hip: add(c.hip, 0, squash), shoulder: add(c.shoulder, -2 * squash + drive, squash), head: add(c.head, -2 * squash + drive, squash), knee: add(c.knee, 0, squash) };
   const run = escaped && after >= .15;
-  if (escaped) c = shift(blendBody(BRACE, CARRIER, ease(after / .2)), 34 * ease((after - .1) / .8));
+  if (escaped) {
+    c = shift(blendBody(BRACE, CARRIER, ease(after / .2)), 34 * ease((after - .1) / .8));
+    // The bump: shoulder dropped into the man, then up and away.
+    const bump = Math.sin(Math.PI * clamp(after / .16));
+    c = { ...c, shoulder: add(c.shoulder, 3 * bump, 2 * bump), head: add(c.head, 3 * bump, 2 * bump) };
+  }
   if (stolen) c = shift(BRACE, -4 * ease(after / .18));
-  if (state.variant === 1 && completed) c = { ...c, shoulder: add(c.shoulder, -2 * fall, 0), head: add(c.head, -2 * fall, 0), knee: add(c.knee, -2 * fall, -fall) };
   const recovery = completed ? ease((after - .55) / .45) : 0;
   const ready = ruckPoseAt('ptb', 0);
   const recoveryTarget = shift(ready.pose, CONTACT_X - CENTRE, CONTACT_FOOT - PAINT_FOOT);
   c = blendBody(c, recoveryTarget, recovery);
   if (ptb) c = recoveryTarget;
   c = fitLegs(c);
-  const carrier: ContactBody = { player: state.contact.carrier, pose: c, tilt: (low ? 65 : -75) * fall * (state.variant === 1 ? .8 : 1) * (1 - recovery), left: false,
+  const carrier: ContactBody = { player: state.contact.carrier, pose: c, tilt: (forward ? 65 : -75) * fall * (1 - recovery), left: false,
     arms: [], grip: 0, role: 'carrier', running: run };
   const defenders = state.joined.map(({ player, tick }, index): ContactBody => {
-    const role = index === 2 ? 'far' : index === 1 || low ? 'low' : 'upper';
+    // The man from behind takes the legs or the hips; anyone after him comes in front.
+    const role: ContactRole = fromBehind ? index === 0 ? variant : index === 1 ? 'upper' : 'low'
+      : index === 2 ? 'far' : index === 1 || low ? 'low' : 'upper';
+    const behind = role === 'ankle' || role === 'drag';
+    const square = stop && index === 0;
     // A short completed hold is only known at resolution. Drop into the low
     // wrap over two frames rather than snapping from the preceding high hold.
-    const lowDrop = low && index === 0 ? ease(after / .1) : 1;
-    const target = role === 'far' ? FAR : role === 'low' ? blendBody(HIGH, LOW, lowDrop) : HIGH;
-    const down = role === 'far' ? FAR_DOWN : role === 'low' ? LOW_DOWN : HIGH_DOWN;
+    const lowDrop = low && index === 0 && role === 'low' ? ease(after / .1) : 1;
+    const target = role === 'far' ? FAR : role === 'low' ? blendBody(HIGH, LOW, lowDrop) : role === 'ankle' ? ANKLE : role === 'drag' ? DRAG : square ? STOP : HIGH;
+    const down = role === 'far' ? FAR_DOWN : role === 'low' ? LOW_DOWN : role === 'ankle' ? ANKLE_DOWN : role === 'drag' ? DRAG_DOWN : square ? STOP_DOWN : HIGH_DOWN;
     const join = ease((state.tick - tick) / 3);
     const release = ptb ? 1 : completed ? ease((after - .45 - (role === 'upper' ? .12 : 0)) / .35) : 0;
-    let p = blendBody(shift(stand(target.hip[0]), role === 'far' ? -7 : 9, -3), target, join);
+    let p = blendBody(shift(stand(target.hip[0]), role === 'far' ? -7 : behind ? -8 : 9, -3), target, join);
     p = shift(blendBody(p, down, fall), recoil);
-    p = blendBody(p, stand(role === 'far' ? 30 : role === 'low' ? 132 : 112, role === 'far' ? -5 : role === 'low' ? 5 : -4), release);
+    p = blendBody(p, behind ? stand(36, -4) : stand(role === 'far' ? 30 : role === 'low' ? 132 : 112, role === 'far' ? -5 : role === 'low' ? 5 : -4), release);
     let grip = join * (1 - release);
     let running = false;
+    let turned = false;
     if (escaped) {
       grip *= 1 - ease(after / .12);
-      p = blendBody(target, shift(down, index === 2 ? -5 : 5), ease(after / .25));
+      if (index === 0) {
+        // Bumped off: rocked back, spun right round on his heels, dumped on the turf.
+        p = blendBody(blendBody(target, ROCKED, ease(after / .1)), BUMPED, ease((after - .2) / .2));
+        const cos = Math.cos(2 * Math.PI * ease((after - .04) / .26));
+        p = turnBody(p, cos);
+        turned = cos < 0;
+      } else p = blendBody(target, shift(down, index === 2 ? -5 : 5), ease(after / .25));
     }
     if (stolen) {
       grip = 1 - ease(after / .2);
       p = shift(blendBody(HIGH, stand(96), ease(after / .2)), 28 * ease((after - .15) / .7));
       running = after >= .25;
     }
-    // Cosmetic variation changes the stance, never the outcome, timing or participants.
-    if (state.variant === 1) p = { ...p, knee: add(p.knee, -2, -1), farKnee: add(p.farKnee, 2, 0) };
-    const anchor = role === 'low' ? blend(c.shoulder, c.hip, lowDrop) : c.shoulder;
+    const anchor = role === 'low' ? blend(c.shoulder, c.hip, lowDrop) : role === 'ankle' ? add(c.farFoot, 0, -3)
+      : role === 'drag' ? add(c.hip, -4, 1) : square ? blend(c.shoulder, c.hip, .6) : c.shoulder;
     // Shoulder/jersey contact drives the pose. Arms wrap the body at short range;
     // they no longer bridge the gap between two separated bodies.
-    const dock = role === 'far' ? add(anchor, -5, -2) : role === 'low' ? add(anchor, 5, 3) : add(anchor, 6, 1);
+    const dock = role === 'far' ? add(anchor, -5, -2) : role === 'low' ? add(anchor, 5, 3) : role === 'ankle' ? add(anchor, -4, 1)
+      : role === 'drag' ? add(anchor, -1, 0) : square ? add(anchor, 7, 1) : add(anchor, 6, 1);
     p = shift(p, (dock[0] - p.shoulder[0]) * grip, (dock[1] - p.shoulder[1]) * grip);
     // Heads sit outside the runner's silhouette so close torsos remain readable.
-    const tuckedHead = role === 'far' ? add(p.shoulder, -16, -17) : role === 'low' ? add(p.shoulder, 2, -14) : add(p.shoulder, 0, -17);
+    const tuckedHead = role === 'far' ? add(p.shoulder, -16, -17) : role === 'low' ? add(p.shoulder, 2, -14) : role === 'ankle' ? add(p.shoulder, -6, -13)
+      : role === 'drag' ? add(p.shoulder, -9, -16) : add(p.shoulder, 0, -17);
     p = { ...p, head: blend(p.head, tuckedHead, grip) };
     p = fitLegs(p);
-    const side = role === 'far' ? -1 : 1;
-    const targets = [blend(add(p.shoulder, -3 * side, 7), add(anchor, -side, 3), grip),
-      blend(add(p.shoulder, 3 * side, 8), add(anchor, 2 * side, 5), grip)];
+    const side = role === 'far' || behind ? -1 : 1;
+    // Hands at the boots for the tap, round the waist for the drag, at the chest otherwise.
+    const holds: readonly Point[] = role === 'ankle' ? [add(anchor, -2, 1), add(anchor, 1, -1)]
+      : role === 'drag' ? [add(anchor, 2, -2), add(anchor, 5, 1)] : [add(anchor, -side, 3), add(anchor, 2 * side, 5)];
+    // A bumped man's arms fly up and out; free hands otherwise hang with him.
+    const free: readonly Point[] = escaped && index === 0 ? [add(p.shoulder, -7, -4), add(p.shoulder, 7, -5)] : [add(p.shoulder, -3 * side, 7), add(p.shoulder, 3 * side, 8)];
+    const targets = [blend(free[0]!, holds[0]!, grip), blend(free[1]!, holds[1]!, grip)];
     const arms = [bentContactArm(p.shoulder, targets[0]!, -1), bentContactArm(add(p.shoulder, 2 * side, 2), targets[1]!)];
-    return { player, pose: p, tilt: (role === 'far' ? 20 : role === 'low' ? -12 : -32) * (escaped ? ease(after / .25) : fall * (1 - release)),
-      left: !stolen || !running, arms, grip, role, running };
+    const lean = role === 'far' ? 20 : role === 'low' ? -12 : role === 'ankle' ? 40 : role === 'drag' ? 25 : -32;
+    return { player, pose: p, tilt: lean * (escaped ? ease(after / .25) : behind ? grip : fall * (1 - release)),
+      left: behind ? false : turned ? false : !stolen || !running, arms, grip, role, running };
   });
   const owner = stolen ? defenders[0]!.player : carrier.player;
   const ball = stolen ? blend(add(c.shoulder, 5, 4), add(defenders[0]!.pose.shoulder, 4, 4), ease(after / .18)) : blend(add(c.shoulder, 3, 4), add(ready.ball, CONTACT_X - CENTRE, CONTACT_FOOT - PAINT_FOOT), recovery);

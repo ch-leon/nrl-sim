@@ -26,7 +26,7 @@ export interface FrameCacheStats { hits: number; misses: number; evictions: numb
 /** The fields of a picture that decide which frame is drawn. */
 function frameKey(side: Side, p: PlayerPicture): string {
   // A fresh man's key is as it was: tiredness (#666) only adds entries for the tired.
-  return `${side}/${p.who}/${p.action}/${p.frame}/${p.strideFrame ?? 'legacy'}/${p.facing}/${p.possession}${p.tired ? `/t${p.tired}` : ''}`;
+  return `${side}/${p.who}/${p.action}/${p.frame}/${p.strideFrame ?? 'legacy'}/${p.facing}/${p.possession}${p.tired ? `/t${p.tired}` : ''}${p.lookUp ? `/u${p.lookUp}` : ''}`;
 }
 
 /** CPU frames only: bounded independently of match length and interchanges. */
@@ -42,7 +42,7 @@ export class PlayerFrameCache {
     // A hit is a stamp, not a delete-and-reinsert: the Map is not reshuffled 600 times a second.
     if (hit) { hit.used = ++this.clock; this.counts.hits++; return hit.pixels; }
     this.counts.misses++;
-    const pixels = drawLivePlayer(this.look(p.who), this.kits[side], p.action, p.frame, p.facing, p.possession, p.strideFrame, p.tired);
+    const pixels = drawLivePlayer(this.look(p.who), this.kits[side], p.action, p.frame, p.facing, p.possession, p.strideFrame, p.tired, p.lookUp);
     if (this.frames.size >= this.capacity) this.evict();
     this.frames.set(key, { pixels, used: ++this.clock });
     if (this.frames.size > this.counts.peak) this.counts.peak = this.frames.size;
@@ -89,7 +89,7 @@ class PaintedTexture {
 
 /** The same frame to draw (position, lift and mirroring are not part of it). */
 function samePicture(a: PlayerPicture, b: PlayerPicture): boolean {
-  return a.who === b.who && a.action === b.action && a.frame === b.frame && a.strideFrame === b.strideFrame && a.facing === b.facing && a.possession === b.possession && a.tired === b.tired;
+  return a.who === b.who && a.action === b.action && a.frame === b.frame && a.strideFrame === b.strideFrame && a.facing === b.facing && a.possession === b.possession && a.tired === b.tired && a.lookUp === b.lookUp;
 }
 
 export class MatchActor {
