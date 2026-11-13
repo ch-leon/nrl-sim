@@ -121,7 +121,9 @@ function bombEnds(es: readonly SimEvent[]): string[] {
 
 describe('kick contests in the live sim (#99)', () => {
   // A handful of whole Kick-chase matches: bombs and grubbers aplenty. Few named seeds, not a scan (CI's 10-minute check).
-  const { es, matches } = play([1, 2, 3, 4, 5, 6, 7, 8], (all) => {
+  // 1–12 and 55 (was 1–8): with the last-tackle call (#650) a match has fewer bombs (about 1.3 a match here), and
+  // the first spill from seed 1 on is seed 55's (seed 6's before it).
+  const { es, matches } = play([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 55], (all) => {
     const ends = bombEnds(all);
     return ends.includes('won-contest') && ends.includes('spilled') && ends.includes('caught') && all.filter((e) => e.kind === 'loose-ball' && e.detail === 'in-goal').length >= 6 && all.filter((e) => e.kind === 'set-start' && e.detail === 'scramble').length >= 3;
   });

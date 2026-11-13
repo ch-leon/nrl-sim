@@ -221,6 +221,13 @@ never as zero: the table is left out, or a dash shown for that row):
   share would (a match with no such pair reads 0). **Slots** is how many slots took a
   first pass, a side's mean. Neither is scaled for a stretch. Results from before
   #649 show a dash.
+- **2nd-last kicks / Set start m to go** (#650): kicks in play (a `kick` event) made
+  while the set is on its second-last tackle, a match (a count, scaled for a stretch);
+  and the metres to go, to the line the side with the ball attacks, at the first
+  play-the-ball after the ball changes hands (a kick caught, a handover, a turnover,
+  a kick-off taken by the other side), the match's mean (100 is a side's own line, so
+  lower is better field position for whoever won the ball). Results from before #650
+  show a dash.
 
 Origins and last-tackle plays are shares of the tries or last tackles in the row;
 the `*` marks use a standard error that treats each try (or last tackle) as an

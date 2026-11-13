@@ -71,8 +71,8 @@ export abstract class LiveBase {
   protected kickInAir: KickChoice | null = null;
   /** The kick in the air is a kick-off (chased as a line, not for a regather). */
   protected kickoffUp = false;
-  /** The kicker's call for this last tackle (rolled once): run it, or which kick. */
-  protected kickCall: 'run' | KickChoice | null = null;
+  /** The kicker's call for this last tackle (rolled once): run it, shift it wide (#650), or which kick. */
+  protected kickCall: 'run' | 'pass' | KickChoice | null = null;
   /** The kicker's field-goal call for this set (rolled once, only when one is on). */
   protected fgCall: boolean | null = null;
   /** A field goal about to leave the boot, and one in the air (with how it will end). */

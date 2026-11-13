@@ -225,8 +225,9 @@ describe('out-schemed (#468)', () => {
     expect(losses).toBeGreaterThan(0);
     const flatUs = { ...us, tactics: { attack: 'balanced', defence: 'slide' } as const };
     const flatThem = { ...them, tactics: { attack: 'balanced', defence: 'slide' } as const };
-    // Seed 1 keeps this negative control a real loss after completed retreats (#625).
-    const flat = runMatch(flatUs, flatThem, { seed: 1, length: { halves: 2, halfMinutes: 7 } });
+    // The first of seeds 1–8 that is a real loss keeps this negative control one (seed 1 after completed
+    // retreats, #625, until the last-tackle call, #650, made seed 1 a win).
+    const flat = [1, 2, 3, 4, 5, 6, 7, 8].map((seed) => runMatch(flatUs, flatThem, { seed, length: { halves: 2, halfMinutes: 7 } })).find((r) => r.awayScore > r.homeScore)!;
     expect(flat.awayScore).toBeGreaterThan(flat.homeScore);
     expect(hasReason(why(s, flat, flatUs, flatThem))).toBe(false);
   });

@@ -22,8 +22,8 @@ function surface() {
   };
 }
 
-/** Seed 28 with golden point on (the lab's `final=1`) and the historical seven-minute halves (#678 cut them to 2:30) is level at full time with the lab's default sides (seed 12 before the weighted receiver, #649; 28 is the first of 1–60 since). */
-const GOLDEN_SEED = 28;
+/** Seed 63 with golden point on (the lab's `final=1`) and the historical seven-minute halves (#678 cut them to 2:30) is level at full time with the lab's default sides (seed 12 before the weighted receiver, #649; 28 before the last-tackle call, #650; 63 since (45, the first of 1–100, ends with a man still drawn after the walk-off)). */
+const GOLDEN_SEED = 63;
 
 function play(): Snapshot[] {
   const sim = new LiveSim(labSheet(DEFAULT_HOME), labSheet(DEFAULT_AWAY), GOLDEN_SEED, { goldenPoint: true, length: { halves: 2, halfMinutes: 7 } });

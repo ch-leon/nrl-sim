@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- More options on the last tackle: the kicker weighs kicking, running it and shifting it wide by field position, his side's style, his boot, his outside backs' pace and, in the last minute, the score. Between even sides the last tackle is a kick 62% of the time (was 69%) and a pass 15% (was 8%). Awaiting lab sign-off ([PR](https://github.com/ch-leon/nrl-sim/pull/687), [issue](https://github.com/ch-leon/nrl-sim/issues/650)).
+
 - The pass finds one of the near-best options by weight, not always the single best man, in open play and from dummy half, so a set's first receiver varies more (the chance two first passes on the same tackle find the same man falls from 32% to 26% between even sides). Step 1 of the attack-shapes work; awaiting lab sign-off ([PR](https://github.com/ch-leon/nrl-sim/pull/684), [issue](https://github.com/ch-leon/nrl-sim/issues/649)).
 
 - Developer settings is in Settings on every build (GitHub Pages, the Android test APK and local dev). Overrides and experiments stay off until you turn one on, so a normal career plays as before. Analytics stays on unless the address has `?labs=1` or a developer override, experiment or playtest career is actually on. Before launch, set `VITE_DEV_SETTINGS=0` or remove Developer settings ([PR #683](https://github.com/ch-leon/nrl-sim/pull/683)).
