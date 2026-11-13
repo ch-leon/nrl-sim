@@ -53,7 +53,12 @@ const PANEL_CSS = `
 .nrl-labs-panel .nrl-dev-section { display:flex; flex-direction:column; gap:6px; }
 .nrl-labs-panel .nrl-btn, .nrl-labs-panel .nrl-settings-toggle, .nrl-labs-panel select { min-height:44px; }
 .nrl-labs-panel select { font:inherit; color:inherit; background:var(--nrl-bg, #152030); padding:6px 10px; border:1px solid currentColor; border-radius:4px; }
-.nrl-labs-panel #nrl-dev-field-length { min-height:44px; min-width:44px; }
+.nrl-labs-panel #nrl-dev-field-length {
+  appearance:none; -webkit-appearance:none; height:44px; min-height:44px; min-width:44px; padding-right:30px;
+  background-image:linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position:calc(100% - 15px) 19px, calc(100% - 10px) 19px;
+  background-size:5px 5px; background-repeat:no-repeat;
+}
 .nrl-labs-panel .nrl-dev-row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
 .nrl-labs-panel .nrl-dev-wait { color:var(--nrl-accent, #f4d03f); }
 `;
