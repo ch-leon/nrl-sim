@@ -109,6 +109,12 @@ export interface Snapshot {
   clock?: ClockSnap;
   /** Points, when the sim keeps score. */
   score?: Record<Side, number>;
+  /**
+   * The phase of play and the tick it began (#675), so the view can time the whistle's pictures
+   * (the walk-off, the huddle before golden point) against it; `golden` once golden point is on.
+   * Presentation only: the sim never reads it back.
+   */
+  phase?: { kind: string; since: number; golden?: boolean };
 }
 
 export interface ClockSnap {

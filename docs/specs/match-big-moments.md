@@ -132,6 +132,42 @@ the gap, the routine ends exactly on the strike for any gap; over 40 seeds (327 
 the gap was always 30 ticks, so every beat holds for at least three ticks.
 Nines takes its goals as drop kicks; the tee is the picture asked for in #669, not a rule.
 
+## The whistle: walk-offs and the golden-point huddle (#675)
+
+`Snapshot.phase` reports the phase of play, the tick it began (`since`, kept by
+`LiveSim.step()` when the phase object changes) and `golden` once golden point is on.
+Presentation only, like the facts above: the sim never reads it, and no RNG.
+
+The view (`src/match/view/walkOff.ts`, applied in `liveView.ts` like the try mob) offsets
+where each man is drawn and fades him; the sim's positions are untouched.
+
+- **Half-time:** from the whistle both sides walk (2.4 m/s, the jog's frames) toward the
+  tunnel, off the near touchline on halfway behind the benches, each side to its own half
+  of it, and fade over the last 20 ticks of the sim's break (`halfTimeTicks`, 60). The
+  second half's kick-off fades them in on their spots over 8 ticks, so nobody is seen
+  where the sim puts them for the restart.
+- **Full time:** for 24 ticks the winners celebrate on the spot, each his own way
+  (`fistPump`, `celebrate` or `point`, from his identity), and the losers stand hands on
+  hips or hands on head (#667's poses); then everyone walks off, the losers in the spent
+  trudge (#666), fading from 100 to 140 ticks. A draw has no reactions.
+- **Golden point:** in the break before it each side gathers in a loose huddle round its
+  captain over 24 ticks: each man in from his own side of him, 2.2 m off, drawn at most
+  12 m from where the sim has him. The sim does not know the captain; the halfback (slot
+  5) stands in. The huddle fades over the break's last 10 ticks, and at the kick-off each
+  side fades in huddled round the same man on its kick-off spots, holds, and spreads to
+  its places by tick 34, before the kick at 40.
+
+No handshakes, hugs or any paired interaction. After the whistle the sim stops stepping
+(full time) or is held for the half-time and golden-point card, so the picture keeps its
+own count of the ticks it has stood still at a break (`BreakClock`, at the playback
+speed) and adds it to the sim's; it resets when the phase changes or the picture goes back.
+The huddle's fade is on the sim's clock alone, so a card held over it keeps it formed.
+
+Measured on seed 12 played as a final (the lab's `/#lab?seed=12&final=1`, level at full
+time) at four frames a tick (`tests/match/view/walkOff.test.ts`): the largest step a man
+makes between frames while he can be seen is 1.4 world px through half-time and full time
+and 3.2 px through golden point's huddle and spread.
+
 ## Review
 
 `match-moments-comparison.html` is a standalone offline comparison with shared

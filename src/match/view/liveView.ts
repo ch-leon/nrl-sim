@@ -8,6 +8,7 @@ import type { PlayerSnap, Snapshot, Side } from '../core/snapshot';
 import type { PlayerAnim } from '../../art/match/players';
 import { pictureContext, playerPicture, type PlayerPicture } from './playerPicture';
 import { tryScene, type TryScene } from './tryMob';
+import { breakMan, breakScene } from './walkOff';
 import { screenFacing } from './screenFacing';
 import { advanceContactAnimation, type ContactAnimation } from './contactAnimation';
 import { contactLayout, type ContactLayout, type ContactPoint } from './contactLayout';
@@ -78,13 +79,16 @@ export class LiveView {
   private readonly held = new Map<number, number>();
   /** Substitutes fading in: the tick each came on, by side and slot. */
   private readonly came = new Map<string, number>();
+  /** A break picture (#675) faded someone on the last frame drawn: put everyone back to opaque once it is over. */
+  private faded = false;
 
   constructor(surface: ViewSurface) {
     this.s = surface;
     this.screenDir = Math.sign(surface.fieldToWorld(60, 50).x - surface.fieldToWorld(40, 50).x) || 1;
   }
 
-  draw(prev: Snapshot, cur: Snapshot, alpha: number, timeScale = 1): void {
+  /** `heldTicks`: ticks a break has stood still on screen (the full-time whistle, the half-time card; BreakClock), for the walk-off. */
+  draw(prev: Snapshot, cur: Snapshot, alpha: number, timeScale = 1, heldTicks = 0): void {
     const a = Math.max(0, Math.min(1, alpha));
     const points: ContactPoint[] = [];
     let placed = 0;
@@ -96,6 +100,11 @@ export class LiveView {
       ctx.tryScene = { side: mobNow.side, age: mobNow.age, mob: new Map() };
       for (const o of mobNow.offsets) ctx.tryScene.mob.set(`${o.side}/${o.slot}`, { moving: false, left: false });
     }
+    // The whistle (#675): the walk-off, the huddle before golden point and the kick-off after a break.
+    const drawn = prev.tick + (cur.tick - prev.tick) * a;
+    const phaseAge = drawn - (cur.phase?.since ?? drawn);
+    const brk = breakScene(cur, phaseAge + heldTicks, phaseAge);
+    if (brk) ctx.walkOff = new Map();
     for (let i = 0; i < cur.players.length; i++) {
       const c = cur.players[i]!;
       let p = this.before(prev, c);
@@ -109,7 +118,10 @@ export class LiveView {
       const actor = this.s.players[c.side][c.slot];
       if (!actor) continue;
       if (c.who !== undefined) actor.wear?.(c.who);
+      if (this.faded && !brk) actor.fade?.(1);
       this.fadeIn(actor, prev, cur, c, a);
+      const bm = breakMan(brk, c);
+      if (bm) actor.fade?.(bm.alpha);
       const on = offset(mobNow, c); const was = jumped ? on : offset(mobBefore, c);
       const member = ctx.tryScene?.mob.get(`${c.side}/${c.slot}`);
       if (member) {
@@ -120,8 +132,12 @@ export class LiveView {
         member.left = this.s.fieldToWorld(to.fx, to.fy).x < this.s.fieldToWorld(from.fx, from.fy).x;
       }
       // A sin-binned man sits in his side's bin (#642); everyone else is where the sim (and a try's mob) has him.
-      const f = toFieldPt(this.s.officials?.spot(c, cur) ?? { x: p.x + was.dx + (c.x + on.dx - p.x - was.dx) * a, y: p.y + was.dy + (c.y + on.dy - p.y - was.dy) * a });
+      const f = toFieldPt(this.s.officials?.spot(c, cur) ?? { x: p.x + was.dx + (c.x + on.dx - p.x - was.dx) * a + (bm?.dx ?? 0), y: p.y + was.dy + (c.y + on.dy - p.y - was.dy) * a + (bm?.dy ?? 0) });
       const w = snap(this.s.fieldToWorld(f.fx, f.fy));
+      if (bm && ctx.walkOff) {
+        const ahead = bm.toward && toFieldPt({ x: c.x + bm.dx + bm.toward.x, y: c.y + bm.dy + bm.toward.y });
+        ctx.walkOff.set(`${c.side}/${c.slot}`, { ...bm, ...(ahead ? { left: this.s.fieldToWorld(ahead.fx, ahead.fy).x < this.s.fieldToWorld(f.fx, f.fy).x } : {}) });
+      }
       // Feet y is the iso sort key; a tiny per-slot bias stops z-fighting flicker.
       actor.place(w.x, w.y, w.y + 1 + c.slot * 0.001 + (c.side === 'away' ? 0.0005 : 0));
       actor.setSpriteVisible?.(true);
@@ -152,7 +168,9 @@ export class LiveView {
     // The ball put on a mark (a set piece's restart) snaps the same way.
     const ballPlaced = Math.hypot(cb.x - pb.x, cb.y - pb.y) > BALL_SNAP_M;
     const ba = ballPlaced ? 1 : a;
-    const bf = toFieldPt({ x: pb.x + (cb.x - pb.x) * ba, y: pb.y + (cb.y - pb.y) * ba });
+    // A man walking off or huddling with the ball (#675) takes it with him.
+    const carried = cb.holder ? breakMan(brk, cb.holder) : undefined;
+    const bf = toFieldPt({ x: pb.x + (cb.x - pb.x) * ba + (carried?.dx ?? 0), y: pb.y + (cb.y - pb.y) * ba + (carried?.dy ?? 0) });
     const bw = snap(this.s.fieldToWorld(bf.fx, bf.fy));
     const lift = Math.round((pb.lift + (cb.lift - pb.lift) * ba) * LIFT_PX_PER_M);
     // Heading and flight time for the ball's turn and spin: its screen step this tick, the climb included.
@@ -182,6 +200,7 @@ export class LiveView {
     }
     this.s.officials?.draw(prev, cur, a);
     if (placed >= CUT_BODIES) this.s.cut?.();
+    this.faded = !!brk;
     // Held balls are painted once in the player's hands (or the shared tackle).
     const embedded = !!cb.holder && !!this.s.players[cb.holder.side][cb.holder.slot]?.paint;
     this.s.ball.setRendered?.(!embedded);

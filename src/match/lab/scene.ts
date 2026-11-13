@@ -11,6 +11,7 @@ import { cssZoom } from '../../world/viewport';
 import type { Side, SimEvent } from '../core/snapshot';
 import { toMatchEvent } from '../league/events';
 import { LiveView } from '../view/liveView';
+import { BreakClock } from '../view/walkOff';
 import { PopupLayer } from '../view/popupLayer';
 import { ContestLayer } from '../view/contestLayer';
 import { HALF_BREAK, shownBreak } from '../view/lineBreak';
@@ -48,6 +49,8 @@ export class LabScene extends MatchScene {
   private ids!: Record<Side, string>;
   private sheets!: Record<Side, TeamSheet>;
   private closeupUntil = 0;
+  /** The walk-off plays on after the full-time whistle stops the sim (#675). */
+  private readonly breakClock = new BreakClock();
 
   constructor() {
     super('Lab');
@@ -126,7 +129,7 @@ export class LabScene extends MatchScene {
   override update(time: number, delta: number): void {
     const r = this.controller.runner;
     r.update(delta);
-    this.view?.draw(r.prev, r.cur, r.alpha, r.playing ? r.speed : 0.001);
+    this.view?.draw(r.prev, r.cur, r.alpha, r.playing ? r.speed : 0.001, this.breakClock.advance(r.cur, delta, r.speed, r.finished));
     // The close-up MatchScene picked for a big moment eases back out after a beat.
     if (this.closeupUntil && time > this.closeupUntil) {
       this.closeupUntil = 0;

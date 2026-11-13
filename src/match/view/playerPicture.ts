@@ -54,6 +54,8 @@ export interface PictureContext {
   tryScene?: { side: Side; age: number; mob: Map<string, { moving: boolean; left: boolean }> };
   /** A bomb in the air (#671): the few men under it, looking up. */
   eyesUp?: EyesUp;
+  /** The whistle (#675): each man's walk-off, reaction or huddle picture (walkOff.ts), and which way he walks on screen. */
+  walkOff?: Map<string, { action: LivePlayerAction | null; frame: number; gait: number; slump: boolean; left?: boolean }>;
 }
 /** Ticks after a try before the side that conceded slumps (the scorer is still going over). */
 const SLUMP_AFTER = 8;
@@ -191,6 +193,8 @@ export function playerPicture(p: PlayerSnap, previous: PlayerSnap, tick: number,
     if (stride === -1) { action = 'handsOnHips'; frame = Math.floor(scene.age / NOD_TICKS + p.slot) % 2; }
     else slump = action === 'run';
   }
+  const off = ctx.walkOff?.get(`${p.side}/${p.slot}`);
+  if (off?.action) { action = off.action; frame = off.frame; gait = off.gait; slump = off.slump; if (off.left !== undefined) facing = { ...facing, left: off.left }; }
   // A shot at goal (#669): the kicker's routine up to the strike, then the kick off the tee, facing the posts.
   const shot = goalKickPicture(p, action, frame, tick, possession, screenDir);
   if (shot) { action = shot.action; frame = shot.frame; facing = { facing: shot.facing, left: shot.left }; }

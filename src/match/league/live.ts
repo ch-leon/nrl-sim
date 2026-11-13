@@ -42,13 +42,23 @@ import { clockText } from './rules';
 import { goalStrikeTick } from './goals';
 import { LIVE } from './live/knobs';
 import { LivePositioning } from './live/positioning';
+import type { Phase } from './live/types';
 export type { ControlInput } from './controls';
 export { LIVE, runOn } from './live/knobs';
 export type { LiveOptions, PlanInput } from './live/types';
 
 export class LiveSim extends LivePositioning implements MatchSim {
+  /**
+   * The phase as it stood after the last tick, and the tick it began (#675): presentation only, the sim never
+   * reads them. Taken at the first tick, not at the build, so a kick-off set again before play starts (the
+   * balance harness's fit fixtures) still began at tick 0.
+   */
+  private phaseSeen: Phase | null = null;
+  private phaseSince = 0;
+
   // ── Tick ──────────────────────────────────────────────────────────────────
   step(): void {
+    if (this.phaseSeen === null) this.phaseSeen = this.phase;
     if (this.finished) {
       // The last tick's events stay until the next step replaces them. A step
       // after full time replaces them with nothing, so they cannot be recorded again.
@@ -140,6 +150,10 @@ export class LiveSim extends LivePositioning implements MatchSim {
       || !['play', 'tackle', 'ruck'].includes(this.phase.kind)) {
       this.pendingControl.home = this.pendingControl.away = null;
     }
+    if (this.phase !== this.phaseSeen) {
+      this.phaseSeen = this.phase;
+      this.phaseSince = this.tick;
+    }
   }
 
   // ── Snapshot ──────────────────────────────────────────────────────────────
@@ -208,6 +222,7 @@ export class LiveSim extends LivePositioning implements MatchSim {
       events: this.events,
       clock: { half: this.half, seconds: this.clockTicks * TICK_S, minute: Math.floor(this.matchSeconds / 60), siren: this.siren, finished: this.finished },
       score: { ...this.points },
+      phase: { kind: ph.kind, since: this.phaseSince, ...(this.golden ? { golden: true } : {}) },
     };
     const w = ph.kind === 'tackle' ? ph.wrestle : null;
     const contact = this.visualContact;
