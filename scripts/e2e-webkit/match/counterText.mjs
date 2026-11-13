@@ -32,9 +32,9 @@ export async function runCounterText(browser) {
         const s = window.__nrlState();
         s.settings.textSize = size;
         s.settings.hints = false;
-        // Two 2:30 halves: seed 474 naturally loses 6–11 with a real
+        // Seed 475 naturally loses at both 7:00 and 2:30 halves, with a real
         // Compressed counter line and Out-schemed in the final loss report.
-        s.rngSeed = 474;
+        s.rngSeed = 475;
         s.lineup.tactics = { attack: 'grind', defence: 'slide' };
         s.lineup.rotation = 'standard';
         // Normal reads recent habits (#469): this fixture needs Compressed v Tight.
