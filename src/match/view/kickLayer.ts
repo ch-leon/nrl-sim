@@ -18,6 +18,7 @@ import { LIFT_PX_PER_M } from './liveView';
 import { GROUNDED_LIFT } from './commentary';
 import { RING_STYLES } from '../../art/match/kitClash';
 import { drawRing } from './rings';
+import { screenDensity } from '../../world/viewport';
 
 /** The events a kick in general play starts with. */
 export const KICK_STARTS: ReadonlySet<string> = new Set(['kick', 'kickoff', 'drop-out']);
@@ -244,27 +245,30 @@ export function cameraFrame(replay: Frame | null, kick: Frame | null, handHeld: 
 
 /**
  * The framing that holds the points: the widest whole-number zoom from `base` down
- * (never under 1, where a player is still 20 px tall) at which their box fits inside
- * the view less its margins, centred in the band the overlay leaves clear. Whole
- * numbers keep the pixel art crisp (world/viewport.ts). The points come in order of
- * need: when they cannot all fit even at 1, the first stays inside the band (and
- * LANDING_INSET in from its edges), then each next one as far as it still can.
+ * (never under ×1 in CSS terms, where a player is still 20 px tall) at which their box
+ * fits inside the view less its margins, centred in the band the overlay leaves clear.
+ * Whole numbers of canvas px keep the pixel art crisp (world/viewport.ts). The points
+ * come in order of need: when they cannot all fit even at ×1, the first stays inside
+ * the band (and LANDING_INSET in from its edges), then each next one as far as it still can.
+ * `view` and the zooms are in canvas px, which are `density` to a CSS px (#627); the
+ * margins are CSS px, so they are scaled by it.
  */
-export function kickFrame(points: readonly WorldPt[], view: { width: number; height: number }, base: number): Frame {
+export function kickFrame(points: readonly WorldPt[], view: { width: number; height: number }, base: number, density = screenDensity()): Frame {
   const xs = points.map((p) => p.x);
   const ys = points.map((p) => p.y);
   const x0 = Math.min(...xs);
   const x1 = Math.max(...xs);
   const y0 = Math.min(...ys);
   const y1 = Math.max(...ys);
-  const availW = Math.max(1, view.width - FRAME_MARGIN.left - FRAME_MARGIN.right);
-  const availH = Math.max(1, view.height - FRAME_MARGIN.top - FRAME_MARGIN.bottom);
-  let zoom = Math.max(1, Math.round(base));
-  while (zoom > 1 && ((x1 - x0) * zoom > availW || (y1 - y0) * zoom > availH)) zoom -= 1;
+  const availW = Math.max(1, view.width - (FRAME_MARGIN.left + FRAME_MARGIN.right) * density);
+  const availH = Math.max(1, view.height - (FRAME_MARGIN.top + FRAME_MARGIN.bottom) * density);
+  const widest = Math.max(1, Math.round(density));
+  let zoom = Math.max(widest, Math.round(base));
+  while (zoom > widest && ((x1 - x0) * zoom > availW || (y1 - y0) * zoom > availH)) zoom -= 1;
   // The band's middle, in world px: the box's middle, kept where it holds each point in turn.
   const hw = availW / 2 / zoom;
   const hh = availH / 2 / zoom;
-  const inset = { x: Math.min(LANDING_INSET, availW / 4) / zoom, y: Math.min(LANDING_INSET, availH / 4) / zoom };
+  const inset = { x: Math.min(LANDING_INSET * density, availW / 4) / zoom, y: Math.min(LANDING_INSET * density, availH / 4) / zoom };
   let lo = { x: -Infinity, y: -Infinity };
   let hi = { x: Infinity, y: Infinity };
   for (const [i, p] of points.entries()) {
@@ -279,8 +283,8 @@ export function kickFrame(points: readonly WorldPt[], view: { width: number; hei
   const by = Math.min(hi.y, Math.max(lo.y, (y0 + y1) / 2));
   // The band sits off the screen's middle: the scoreboard above is shorter than the ticker
   // and buttons below, and the Stats panel wider than the left edge's margin.
-  const shiftX = (FRAME_MARGIN.left - FRAME_MARGIN.right) / 2;
-  const shiftY = (FRAME_MARGIN.top - FRAME_MARGIN.bottom) / 2;
+  const shiftX = ((FRAME_MARGIN.left - FRAME_MARGIN.right) * density) / 2;
+  const shiftY = ((FRAME_MARGIN.top - FRAME_MARGIN.bottom) * density) / 2;
   return { cx: bx - shiftX / zoom, cy: by - shiftY / zoom, zoom };
 }
 

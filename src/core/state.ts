@@ -292,7 +292,7 @@ export interface GameState {
   /**
    * coachCalls: the call chips during your matches (#73); on when absent.
    * liveRivals: rival-v-rival matches on the live sim (N9.2); off when absent.
-   * playbackSpeed: the ×1 / ×2 / ×4 / ×8 last picked. Absent (an old save) plays at ×4.
+   * playbackSpeed: the ×1 / ×2 / ×4 / ×8 last picked. Absent (an old save) plays at ×2.
    * keyMoments: slow the match for line breaks, tries and the last two minutes (#366); on when absent.
    * weekSummary: the weekly summary card after each advance (#368); on when absent.
    * hintsSeen: the screens whose first-visit hint has shown (#370). Absent: no hints (a save

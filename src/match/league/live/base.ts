@@ -364,6 +364,8 @@ export abstract class LiveBase {
         drain: drainRate(stamina, traits),
         gassed: false,
         body: makeBody({ x: MID_X, y: MID_Y }, maxSpeedFor(stats.speed), { x: this.dirOf(side), y: 0 }),
+        odometer: 0,
+        react: null, // set at build so every player has one shape: added later it slowed the whole sim by a third
         pose: 'idle',
         poseUntil: 0,
         lockUntil: 0,
@@ -452,6 +454,10 @@ export abstract class LiveBase {
   }
   protected emit(kind: string, text: string, p?: Player, trait?: string): void {
     this.events.push({ tick: this.tick, kind, text, ...(p ? { side: p.side, slot: p.slot, player: p.name } : {}), ...(trait ? { trait } : {}) });
+  }
+  /** Remember, for the picture only, that he just made the error, missed the goal or was binned (#667). */
+  protected react(p: Player, kind: 'error' | 'miss' | 'bin'): void {
+    p.react = { tick: this.tick, kind };
   }
   /** Metres from the carrier to the line he is attacking. */
   protected toLine(p: Player): number {

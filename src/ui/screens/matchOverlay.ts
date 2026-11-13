@@ -39,6 +39,7 @@ import { PLAYS_BY_ID, type PlayId } from '../../data/plays';
 import { PLAYS } from '../../match/league/plays';
 import { surnameOf } from '../../match/view/popups';
 import { TICKER_FIT_CHARS } from '../../match/view/commentary';
+import { StripHold, type CommentWeight } from '../../match/view/stripHold';
 import { lockedCallsLine, officeLevelName, officeLevelOf } from '../coachCallsText';
 import { teamTags } from '../teamTag';
 import { MOMENTUM_STEP_MIN, momentumLabel, momentumLeader, momentumShapes, momentumWindow, type MomentumEvent } from '../../match/view/momentum';
@@ -1122,8 +1123,13 @@ export interface MatchOverlayHandle {
   setTackle?(count: number | null): void;
   /** The live sim's running clock (match seconds and half), finer than the events' whole minutes. */
   setClock(matchSeconds: number, half: 1 | 2 | 'gp'): void;
-  /** A line in the commentary and the log: every line comes this way, from the live playback's commentary (N15.2). */
-  comment(line: string): void;
+  /**
+   * A line in the commentary and the log: every line comes this way, from the live playback's commentary (N15.2).
+   * The log takes every line. The strip holds an 'important' one for a moment (stripHold.ts) before a routine line
+   * can replace it; 'now' takes the strip at once. `follow`: the line adds to the event's own line (the match's memory),
+   * so a score or a call is never tagged on it.
+   */
+  comment(line: string, weight?: CommentWeight, follow?: boolean): void;
   /** Coach calls made and paid off, home and away (#73): the stats line, and the coach's own lines in the log. */
   setCalls?(made: Readonly<Record<'home' | 'away', number>>, paid: Readonly<Record<'home' | 'away', number>>): void;
   /** Show Replay for eight seconds after a try (N15.5). Tapping hides it and calls `onTap`. */
@@ -1159,6 +1165,8 @@ export interface MatchOverlayOptions {
   worn?: { home: string; away: string };
   /** The coach's side: his club is starred on the score bug (#348 M8), and his calls are his in the log. */
   mine?: 'home' | 'away';
+  /** What the match is beyond a round: a final (a knockout: golden point if level) or the player's derby (#640). Tagged on the score bug for the whole match. */
+  occasion?: 'final' | 'derby';
 }
 
 /** A 0xRRGGBB colour as CSS. */
@@ -1231,6 +1239,8 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   const scoreEl = el('span', { class: 'nrl-mo-score nrl-mo-sr', text: '0 – 0' });
   // The team-colour split under the score bug is the momentum line (#366): who is on top, the last few minutes.
   const momentum = momentumLine(worn, codes);
+  // A final or a derby (#640): its tag at the foot of the bug's left end, the momentum line's own row.
+  if (opts.occasion) momentum.row.prepend(el('span', { class: 'nrl-mo-occasion', text: opts.occasion === 'final' ? 'FINAL' : 'DERBY', attrs: { 'data-occasion': opts.occasion } }));
   const board = el(
     'button',
     { class: 'nrl-mo-scoreboard', attrs: { type: 'button', 'aria-expanded': 'false', 'aria-controls': 'nrl-mo-stats', title: 'Match stats' } },
@@ -1505,7 +1515,30 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   /** The lines said since the last event: the tick in hand (its events come after its lines). */
   let batch: HTMLElement[] = [];
   let eventSince = false;
-  const addLine = (text: string, kind = ''): HTMLElement => {
+  const hold = new StripHold();
+  let holdTimer: ReturnType<typeof setTimeout> | null = null;
+  const showOnStrip = (text: string): void => {
+    stripText.classList.remove('nrl-mo-line-wait');
+    stripText.textContent = text;
+  };
+  /** The hold on the strip has run out: the next important line waiting for it goes up. */
+  const releaseStrip = (): void => {
+    holdTimer = null;
+    const next = hold.release(performance.now());
+    if (next !== null) showOnStrip(next);
+    const at = hold.nextAt();
+    if (at !== null) holdTimer = setTimeout(releaseStrip, Math.max(0, at - performance.now()));
+  };
+  const offerToStrip = (text: string, weight: CommentWeight): void => {
+    const now = performance.now();
+    const shown = hold.offer(text, weight, now);
+    if (shown !== null) showOnStrip(shown);
+    if (holdTimer) clearTimeout(holdTimer);
+    holdTimer = null;
+    const at = hold.nextAt();
+    if (at !== null) holdTimer = setTimeout(releaseStrip, Math.max(0, at - now));
+  };
+  const addLine = (text: string, kind = '', strip: CommentWeight | null = 'routine'): HTMLElement => {
     const line = el('div', { class: 'nrl-mo-line' }, el('span', { class: 'nrl-mo-line-t', text: clockEl.textContent ?? '' }), el('span', { class: 'nrl-mo-line-text nrl-name-wrap', text }));
     if (kind) line.dataset.kind = kind;
     feed.prepend(line);
@@ -1513,8 +1546,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       const lines = [...feed.children] as HTMLElement[];
       lines[logLineToDrop(lines.map((l) => l.dataset.kind))]?.remove();
     }
-    stripText.classList.remove('nrl-mo-line-wait');
-    stripText.textContent = text;
+    if (strip) offerToStrip(text, strip);
     if (eventSince) {
       batch = [];
       eventSince = false;
@@ -1524,7 +1556,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   };
   /** The latest line of the tick with no tag yet: the call's line (setCalls follows it at once). */
   const untagged = (): HTMLElement | null => {
-    for (let i = batch.length - 1; i >= 0; i--) if (!batch[i]!.dataset.kind) return batch[i]!;
+    for (let i = batch.length - 1; i >= 0; i--) if (!batch[i]!.dataset.kind && !batch[i]!.dataset.follow) return batch[i]!;
     return null;
   };
   /**
@@ -1532,7 +1564,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
    * first untagged line (a whistle in the same tick comes after the kick).
    */
   const scoreLine = (player: string | undefined): HTMLElement | null => {
-    const open = batch.filter((l) => !l.dataset.kind);
+    const open = batch.filter((l) => !l.dataset.kind && !l.dataset.follow);
     const name = player?.trim().split(/\s+/).pop();
     const named = name ? open.filter((l) => l.textContent?.includes(name)) : [];
     return named[named.length - 1] ?? open[0] ?? null;
@@ -1543,6 +1575,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   // ── Key moments ──
   let bannerTimer: ReturnType<typeof setTimeout> | null = null;
   let bannerWasTry = false;
+  let goldenAnnounced = false;
   /** Built during a burst of events (Skip) and shown once the burst ends. */
   let queued: (() => void) | null = null;
   let flushScheduled = false;
@@ -1645,6 +1678,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       offEvent();
       offFinished();
       if (bannerTimer) clearTimeout(bannerTimer);
+      if (holdTimer) clearTimeout(holdTimer);
       clearReplayOffer();
       replayTag?.remove();
       document.documentElement.style.removeProperty(BOARD_VAR);
@@ -1660,8 +1694,9 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       document.body?.classList.remove(MATCH_ACTIVE_CLASS, MATCH_FINAL_CLASS);
       if (active === handle) active = null;
     },
-    comment(line: string): void {
-      addLine(line);
+    comment(line: string, weight: CommentWeight = 'routine', follow = false): void {
+      const added = addLine(line, '', weight);
+      if (follow) added.dataset.follow = '1';
     },
     setCalls(made, paid): void {
       const mine = opts.mine;
@@ -1697,7 +1732,13 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
         halfText.set('FT');
         return;
       }
-      // Golden point (N9.4): its own clock from 00:00.
+      // Golden point (N9.4): its own clock from 00:00, and the banner once, as the restart is played (#640).
+      if (half === 'gp' && !goldenAnnounced && finalClock === null) {
+        goldenAnnounced = true;
+        showMoment({ head: 'GOLDEN POINT', who: 'Next score wins', sub: '', tone: 'score' });
+        bannerWasTry = false;
+        holdBanner(BANNER_MS.try);
+      }
       clockText.set(formatClockSeconds(matchSeconds, half === 'gp' ? 60 : 2 * halfMinutes));
       halfText.set(half === 1 ? '1H' : half === 2 ? '2H' : 'GP');
     },
@@ -1891,6 +1932,7 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 .nrl-mo-momentum { display: block; flex: 1 1 auto; min-width: 0; height: 8px; }
 /* The leaning side's tag at the line's newest end (#371); the same height when even, so the bug never jumps. */
 .nrl-mo-momentum-tag { flex: 0 0 auto; min-width: 2.4em; height: 1.2em; padding: 0 4px; font-family: var(--nrl-f-label); font-size: 0.625rem; font-weight: 700; line-height: 1.2; letter-spacing: 0.04em; text-align: right; color: var(--nrl-text-2); }
+.nrl-mo-occasion { flex: 0 0 auto; padding: 0 6px; height: 1.2em; font-family: var(--nrl-f-label); font-size: 0.625rem; font-weight: 700; line-height: 1.2; letter-spacing: 0.08em; background: var(--nrl-accent); color: var(--nrl-on-accent); }
 .nrl-mo-momentum-fill { stroke: none; }
 .nrl-mo-momentum-axis { stroke: rgba(255, 255, 255, 0.25); stroke-width: 1px; vector-effect: non-scaling-stroke; }
 /* What a call did (#366): a tag over COACH for two seconds; it never takes a tap or moves the row. */
@@ -2019,6 +2061,10 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 }
 .nrl-mo-coach-badge[data-state="on"] { background: var(--nrl-accent); color: var(--nrl-on-accent); }
 .nrl-mo-coach-badge[data-state="made"] { color: var(--nrl-accent); }
+/* A moment a held call suits (#639): the badge swells once. */
+.nrl-mo-coach-badge[data-pulse] { animation: nrl-mo-coach-pulse var(--nrl-dur-sheet) var(--nrl-ease-out) 3; }
+/* A ring that spreads and fades, three beats on the motion tokens (#597): nothing moves or scales, so reduced motion keeps it. */
+@keyframes nrl-mo-coach-pulse { from { box-shadow: 0 0 0 0 var(--nrl-accent); } to { box-shadow: 0 0 0 8px transparent; } }
 /* Calls and plays together ("2 calls · 1 play", #326): two short lines, so they fit the badge's one width (#608). */
 .nrl-mo-coach-badge[data-parts] { display: flex; flex-direction: column; justify-content: center; align-items: center; line-height: 1.1; }
 .nrl-mo-coach-badge[data-parts] > span { font-size: 0.8em; }

@@ -22,6 +22,7 @@ of them drops only that field, never the rest.
 | Part | What it does | When it applies |
 | --- | --- | --- |
 | **Screens → Open every Office screen** | Staff & Board, Contracts and Finance show as open on the Office tiles and the Playbook's Staff link. It is UI-only (`src/labs/screenOverride.ts`): `GameState.unlocks` is never written, so turning it off locks them again, and the real openings (round 4, round 12, first home game) still land on time. Anything hired, signed or bought while it is on stays in the career, and the page says so. | Straight away, on this browser |
+| **Screens → Render at the old resolution** | The canvas is drawn in CSS pixels as it was before #627 (`src/world/density.ts` reads the override): the match zooms back to ×2 and a phone shows fewer players. It exists to compare frame rate on a real phone against device-density rendering. Nothing is saved. | After a reload, on this browser |
 | **Playtest career** | Set up playtest career, or Return to my career (below). | Refused during a live, parked or resumable match, on the Match scene, and during Advance Until |
 | **Experiments → Match controls** | Unchanged from Labs. Off by default. | The next match |
 | **Reset all** (class `nrl-labs-off`) | Turns the experiments and overrides off and hides the page. The hints already seen stay. In a playtest career it first leaves the way Return does; any playtest keys left behind are cleared. | Mid-match in a playtest career it is refused and changes nothing |

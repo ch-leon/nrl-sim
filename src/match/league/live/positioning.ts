@@ -532,7 +532,9 @@ export abstract class LivePositioning extends LiveContact {
         this.emit('blown', `${p.name} has nothing left in the tank`, p);
       }
       // Sprinting costs the legs more per metre than cruising.
-      this.legs(p, dist(from, p.body.pos) * runCostMult(p.sprinting), stopped ? 'stop' : standing ? 'walk' : 'no');
+      const metres = dist(from, p.body.pos);
+      p.odometer += metres;
+      this.legs(p, metres * runCostMult(p.sprinting), stopped ? 'stop' : standing ? 'walk' : 'no');
       if (p.jink) {
         // The sidestep: a sharp lateral shift spread over a few ticks.
         p.body.pos = clampToGround(add(p.body.pos, { x: 0, y: p.jink.dy / LIVE.stepJinkTicks }), 0.5);

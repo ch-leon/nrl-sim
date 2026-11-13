@@ -184,6 +184,7 @@ export abstract class LiveContact extends LivePenalties {
       case 'strip': {
         // One-on-one, he rips it free: the tackler is the new carrier.
         this.emit('strip', `${t.name} strips the ball from ${c.name}!`, t, credit);
+        this.react(c, 'error');
         this.tagContact(c, [t]);
         this.lock(c, 'tackled', 14);
         this.lock(t, 'tackle', 6);
@@ -245,6 +246,7 @@ export abstract class LiveContact extends LivePenalties {
     // Ball lost in the tackle (2f): a knock-on, more on a big hit and in the rain.
     if (this.rng.next() < lostInContactChance(outcome === 'big-hit', c.stats.handling, this.wx.handling)) {
       this.emit('error', `${c.name} loses the ball in the tackle — knock-on`, c);
+      this.react(c, 'error');
       this.tagContact(c, [t]);
       this.events[this.events.length - 1]!.detail = 'contact';
       this.lock(c, 'tackled', LIVE.contactTicks);

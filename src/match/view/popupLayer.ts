@@ -159,12 +159,20 @@ export class PopupLayer {
     const oldest = this.live.shift();
     if (!oldest) return null;
     oldest.text.setVisible(false);
+    // Its trait line goes with it: left live it would ride the parent's text, now another pop-up's.
+    for (let i = this.live.length - 1; i >= 0; i--) {
+      const l = this.live[i]!;
+      if (l.parent !== oldest) continue;
+      l.text.setVisible(false);
+      this.live.splice(i, 1);
+    }
     return oldest.text;
   }
 
   /** Drop every shout. A replay must not keep the live match's words on the rewound picture. */
   clear(): void {
     for (const l of this.live) l.text.setVisible(false);
+    for (const t of this.pool) t.setVisible(false);
     this.live.length = 0;
   }
 

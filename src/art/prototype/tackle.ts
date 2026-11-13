@@ -77,6 +77,17 @@ export function tacklePoseAt(seconds: number): { carrier: Body; defender: Body; 
   return { carrier, defender, grip, hands };
 }
 
+/**
+ * A taller or shorter man on a shared skeleton, matching `stand`: everything above the
+ * shins rises by his stature, and less as he leaves his feet (none once he is lying down).
+ */
+export function standTall(p: Body, rise: number): Body {
+  const upright = clamp((Math.max(p.foot[1], p.farFoot[1]) - p.shoulder[1] - 6) / 10);
+  const dy = -Math.round(rise * upright);
+  if (!dy) return p;
+  return { ...p, hip: add(p.hip, 0, dy), shoulder: add(p.shoulder, 0, dy), head: add(p.head, 0, dy), knee: add(p.knee, 0, dy), farKnee: add(p.farKnee, 0, dy) };
+}
+
 export function flip(buffer: PixelBuffer): PixelBuffer {
   const out = new PixelBuffer(buffer.w, buffer.h);
   for (let y = 0; y < buffer.h; y++) for (let x = 0; x < buffer.w; x++) {
@@ -97,17 +108,20 @@ export function drawTacklePair(home: Appearance, away: Appearance, homeKit: Kit,
   }
   const pose = tacklePoseAt(t);
   const { arm, legs, torso } = contactPainter(out);
-  const c = pose.carrier; const d = pose.defender;
+  const c = standTall(pose.carrier, home.stature); const d = standTall(pose.defender, away.stature);
+  // Gripping hands ride the carrier's chest; free hands stay with the defender.
+  const lift = (p: Point) => add(p, 0, (c.shoulder[1] - pose.carrier.shoulder[1]) * pose.grip + (d.shoulder[1] - pose.defender.shoulder[1]) * (1 - pose.grip));
+  const hands = pose.hands.map(lift);
   legs(d, away, awayKit); torso(d, away, awayKit);
   // Far arm behind the carrier, near forearm over the carrier's jersey.
-  arm(d.shoulder, blend(d.shoulder, pose.hands[0]!, .55), pose.hands[0]!, away, true);
+  arm(d.shoulder, blend(d.shoulder, hands[0]!, .55), hands[0]!, away, true);
   legs(c, home, homeKit); torso(c, home, homeKit);
   out.blit(drawHead(home, homeKit, facing), Math.round(c.head[0]), Math.round(c.head[1]));
   out.blit(flip(drawHead(away, awayKit, facing)), Math.round(d.head[0]), Math.round(d.head[1]));
   const ball = add(c.shoulder, 0, 3);
   out.blit(ballPixels(), Math.round(ball[0]), Math.round(ball[1]));
   arm(add(c.shoulder, 4, 1), add(c.shoulder, 6, 9), add(ball, 4, 4), home);
-  arm(add(d.shoulder, 2, 2), add(blend(d.shoulder, pose.hands[1]!, .5), 0, 3), pose.hands[1]!, away);
+  arm(add(d.shoulder, 2, 2), add(blend(d.shoulder, hands[1]!, .5), 0, 3), hands[1]!, away);
   out.outline(OUTLINE);
   return out;
 }

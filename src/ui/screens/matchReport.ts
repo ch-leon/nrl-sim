@@ -204,6 +204,49 @@ export function ladderMove(before: number, after: number): { from: string; to: s
 
 // ── Full time (3s) ─────────────────────────────────────────────────────────────
 
+/** How long the full-time score takes to count up (#640), ms. */
+export const COUNT_UP_MS = 800;
+
+/** The score on screen `progress` (0..1) of the way through the count-up: eased out, whole points, the last frame exact. */
+export function countUpValue(target: number, progress: number): number {
+  if (!(progress < 1)) return target;
+  if (!(progress > 0)) return 0;
+  return Math.min(target, Math.round(target * (1 - (1 - progress) ** 3)));
+}
+
+/** The three stat rows on the full-time card (#640), the player's side first (home first in a match he is not in). */
+export function fullTimeStats(r: MatchReport, result: MatchResult): { label: string; first: string; second: string }[] {
+  const flip = r.away.id === PLAYER_ID;
+  const row = (label: string): { home: string; away: string } => r.rows.find((x) => x.label === label) ?? { home: '–', away: '–' };
+  const tries = (id: string): number => result.events.filter((e) => e.kind === 'try' && e.teamId === id).length;
+  const pair = (label: string, h: string, a: string): { label: string; first: string; second: string } => (flip ? { label, first: a, second: h } : { label, first: h, second: a });
+  return [
+    pair('Possession', row('Possession').home, row('Possession').away),
+    pair('Line breaks', row('Line breaks').home, row('Line breaks').away),
+    pair('Tries', String(tries(r.home.id)), String(tries(r.away.id))),
+  ];
+}
+
+const reducedMotion = (): boolean => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+/** Count a score pair up from 0–0 on the card (#640). Reduced motion, or no animation frames (the soak): it is the final score at once. */
+function countUpScore(pts: HTMLElement, first: number, second: number): void {
+  pts.textContent = `${first}–${second}`;
+  if (reducedMotion() || typeof requestAnimationFrame === 'undefined' || (first === 0 && second === 0)) return;
+  const show = (p: number): void => {
+    pts.textContent = `${countUpValue(first, p)}–${countUpValue(second, p)}`;
+  };
+  show(0);
+  const t0 = performance.now();
+  const step = (now: number): void => {
+    const p = (now - t0) / COUNT_UP_MS;
+    show(p);
+    if (p < 1 && pts.isConnected) requestAnimationFrame(step);
+    else pts.textContent = `${first}–${second}`;
+  };
+  requestAnimationFrame(step);
+}
+
 /** How Back to Club leaves the match (MatchScene sets it; nothing in the soak). */
 let fullTimeExit: (() => void) | null = null;
 
@@ -297,9 +340,11 @@ export function showFullTime(r: MatchReport, result: MatchResult, fixture: { rou
   const mine = r.home.id === PLAYER_ID ? r.home : r.away.id === PLAYER_ID ? r.away : null;
   const theirs = mine === r.home ? r.away : r.home;
   const head = el('div', { class: 'nrl-ft-head' }, el('span', { class: 'nrl-ft-title', text: `Full time · ${r.round}` }), ...(r.headline ? [resultTag(r.headline)] : []));
-  const score = mine
-    ? el('div', { class: 'nrl-ft-score' }, el('span', { class: 'nrl-ft-pts', text: `${mine.score}–${theirs.score}` }), el('span', { class: 'nrl-ft-vs', text: `v ${theirs.name}` }))
-    : el('div', { class: 'nrl-ft-score' }, el('span', { class: 'nrl-ft-pts', text: `${r.home.score}–${r.away.score}` }), el('span', { class: 'nrl-ft-vs', text: `${r.home.name} v ${r.away.name}` }));
+  const pts = el('span', { class: 'nrl-ft-pts', attrs: { 'aria-label': `${mine ? mine.score : r.home.score} to ${mine ? theirs.score : r.away.score}` } });
+  countUpScore(pts, mine ? mine.score : r.home.score, mine ? theirs.score : r.away.score);
+  const score = el('div', { class: 'nrl-ft-score' }, pts, el('span', { class: 'nrl-ft-vs', text: mine ? `v ${theirs.name}` : `${r.home.name} v ${r.away.name}` }));
+  // Three stats on the card itself (#640): the report has the rest.
+  const stats = el('div', { class: 'nrl-ft-stats' }, ...fullTimeStats(r, result).map((s) => el('div', { class: 'nrl-ft-stat' }, el('span', { class: 'nrl-ft-stat-v', text: s.first }), el('span', { class: 'nrl-ft-stat-l', text: s.label }), el('span', { class: 'nrl-ft-stat-v', text: s.second }))));
 
   // What the match did to the club: only what can be said for sure.
   const chips = el('div', { class: 'nrl-ft-chips' });
@@ -364,7 +409,7 @@ export function showFullTime(r: MatchReport, result: MatchResult, fixture: { rou
   report.setAttribute('data-report', '');
   const back = button('Back to Club ▸', backToClub, { class: 'nrl-btn-primary' });
   back.setAttribute('data-back-to-club', '');
-  const card = el('div', { class: 'nrl-ft-card nrl-potm-modal' }, head, score, chips, ...(potm ? [potm] : []), el('div', { class: 'nrl-ft-actions' }, report, back));
+  const card = el('div', { class: 'nrl-ft-card nrl-potm-modal' }, head, score, chips, stats, ...(potm ? [potm] : []), el('div', { class: 'nrl-ft-actions' }, report, back));
   const wrap = el('div', { class: 'nrl-mo-ft', attrs: { role: 'dialog', 'aria-label': `Full time, ${r.round}` } }, card);
   mount(wrap);
   closeWithMatch(wrap, () => offWeek?.());
@@ -523,12 +568,29 @@ export const REPORT_CSS = `
 .nrl-ft-potm-text { display: flex; flex-direction: column; min-width: 0; }
 .nrl-ft-potm-label { font-family: var(--nrl-f-label); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); }
 .nrl-ft-potm-line { font-size: 0.9375rem; font-weight: 600; }
-.nrl-ft-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.nrl-ft-stats { display: flex; flex-direction: column; gap: 2px; }
+.nrl-ft-stat { display: grid; grid-template-columns: minmax(0, 1fr) 8.5em minmax(0, 1fr); align-items: baseline; gap: 8px; font-size: 0.9375rem; }
+.nrl-ft-stat-v { font-family: var(--nrl-f-num); font-weight: 600; font-variant-numeric: tabular-nums; }
+.nrl-ft-stat-v:first-child { text-align: right; }
+.nrl-ft-stat-l { text-align: center; font-family: var(--nrl-f-label); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); }
+/* The Player of the Match comes in a beat after the card, on the motion tokens (#597): reduced motion keeps the fade and drops the travel. */
+.nrl-ft-potm { animation: nrl-ft-slide var(--nrl-dur-sheet) var(--nrl-ease-out) calc(var(--nrl-dur-sheet) * 3) backwards; }
+@keyframes nrl-ft-slide { from { opacity: 0; transform: translateX(var(--nrl-rise)); } to { opacity: 1; transform: none; } }
+/* The actions stay in reach when a short screen makes the card scroll (956×330: the stat rows took Back to Club off the bottom). */
+.nrl-ft-actions { display: flex; justify-content: flex-end; gap: 8px; position: sticky; bottom: 0; background: var(--nrl-navy); }
 .nrl-ft-actions .nrl-btn { height: 48px; font-size: 1.125rem; padding: 0 16px; }
 .nrl-ft-actions .nrl-btn-primary { padding: 0 22px; font-size: 1.1875rem; }
 @media (max-height: 400px) {
   .nrl-ft-card { gap: 10px; padding: 16px 20px; }
   .nrl-ft-pts { font-size: 2.375rem; }
+}
+/* Under 360px tall (a phone in landscape with Safari's bars) the three stats share one line, so the card fits unscrolled. */
+@media (max-height: 360px) {
+  .nrl-ft-card { gap: 8px; padding: 12px 20px; }
+  .nrl-ft-stats { flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 2px 16px; }
+  .nrl-ft-stat { grid-template-columns: auto auto auto; gap: 5px; font-size: 0.875rem; }
+  .nrl-ft-stat-l { font-size: 0.75rem; letter-spacing: 0.06em; }
+  .nrl-ft-potm { padding: 8px 0; }
 }
 /* The report (3t): a full sheet over the dimmed pitch, the stats column on the right. */
 .nrl-modal-backdrop.nrl-report-backdrop {

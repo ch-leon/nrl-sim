@@ -3,6 +3,7 @@
 // the CameraController class wires Phaser input to it. The controller NEVER stops
 // event propagation — scene tap handlers guard with `if (cam.wasDragging()) return;`.
 import Phaser from 'phaser';
+import { screenDensity } from './viewport';
 
 /** Clamp a zoom factor to [min, max]. */
 export function clampZoom(z: number, min = 0.5, max = 2.0): number {
@@ -94,11 +95,15 @@ export function isDrag(dx: number, dy: number, threshold = 8): boolean {
   return Math.hypot(dx, dy) >= threshold;
 }
 
+// Units (#627): the canvas renders at the screen's density, so the camera's zoom and
+// the pointer's x/y are in canvas px. minZoom, maxZoom and dragThreshold are given in
+// CSS terms and multiplied by the density where they are used; the camera starts at
+// its zoom times the density, so a scene that never sets a zoom looks as it did.
 export interface CameraOpts {
   world: { x: number; y: number; width: number; height: number };
-  minZoom?: number; // default 0.5
-  maxZoom?: number; // default 2.0
-  dragThreshold?: number; // default 8 (px, screen space)
+  minZoom?: number; // default 0.5 (CSS px per art px)
+  maxZoom?: number; // default 2.0 (CSS px per art px)
+  dragThreshold?: number; // default 8 (CSS px)
   /**
    * When true, the minimum zoom is the viewport fit for `world` (see fitZoom)
    * instead of `minZoom`, so the view can never be larger than the world. It is
@@ -115,6 +120,8 @@ export class CameraController {
   private maxZoom: number;
   private threshold: number;
   private fitView: boolean;
+  /** The density the camera's zoom was last set for: a change rescales it. */
+  private density: number;
 
   // Single-pointer pan state.
   private pointerDown = false;
@@ -150,6 +157,8 @@ export class CameraController {
     this.maxZoom = opts.maxZoom ?? 2.0;
     this.threshold = opts.dragThreshold ?? 8;
     this.fitView = opts.fitView ?? false;
+    this.density = screenDensity();
+    this.cam.setZoom(this.cam.zoom * this.density);
 
     this.cam.setBounds(this.world.x, this.world.y, this.world.width, this.world.height);
     // Enable a second pointer so pinch works on touch devices.
@@ -181,6 +190,11 @@ export class CameraController {
     this.panHeld = held;
   }
 
+  /** True while a one-finger drag is moving the view (a scene that follows something holds still for it). */
+  isPanning(): boolean {
+    return this.pointerDown && this.dragging && !this.panHeld;
+  }
+
   /** True if the just-ended interaction exceeded the drag threshold. */
   wasDragging(): boolean {
     return this.dragging;
@@ -199,7 +213,11 @@ export class CameraController {
   private zoomFloor(): number {
     return this.fitView
       ? fitZoom({ width: this.cam.width, height: this.cam.height }, this.world)
-      : this.minZoom;
+      : this.minZoom * screenDensity();
+  }
+
+  private zoomCeiling(): number {
+    return this.maxZoom * screenDensity();
   }
 
   /**
@@ -208,6 +226,12 @@ export class CameraController {
    * phone) cannot leave the camera zoomed out past the world edge.
    */
   private handleResize(): void {
+    const density = screenDensity();
+    if (density !== this.density) {
+      // Another screen: the same CSS size of art px as before.
+      this.zoomToPoint(this.cam.width / 2, this.cam.height / 2, (this.cam.zoom * density) / this.density);
+      this.density = density;
+    }
     const floor = this.zoomFloor();
     if (this.cam.zoom < floor) {
       this.zoomToPoint(this.cam.width / 2, this.cam.height / 2, floor);
@@ -246,7 +270,7 @@ export class CameraController {
     if (!this.pointerDown) return;
     const totalDx = _p.x - this.startX;
     const totalDy = _p.y - this.startY;
-    if (!this.dragging && isDrag(totalDx, totalDy, this.threshold)) {
+    if (!this.dragging && isDrag(totalDx, totalDy, this.threshold * screenDensity())) {
       this.dragging = true;
     }
     if (this.dragging && !this.panHeld) {
@@ -273,7 +297,7 @@ export class CameraController {
 
   private handleWheel(p: Phaser.Input.Pointer, deltaY: number): void {
     const oldZoom = this.cam.zoom;
-    const newZoom = clampZoom(oldZoom * (deltaY > 0 ? 0.9 : 1.1), this.zoomFloor(), this.maxZoom);
+    const newZoom = clampZoom(oldZoom * (deltaY > 0 ? 0.9 : 1.1), this.zoomFloor(), this.zoomCeiling());
     if (newZoom === oldZoom) return;
     this.zoomToPoint(p.x, p.y, newZoom);
   }
@@ -285,7 +309,7 @@ export class CameraController {
       return;
     }
     const oldZoom = this.cam.zoom;
-    const newZoom = clampZoom((oldZoom * dist) / this.pinchPrevDist, this.zoomFloor(), this.maxZoom);
+    const newZoom = clampZoom((oldZoom * dist) / this.pinchPrevDist, this.zoomFloor(), this.zoomCeiling());
     this.pinchPrevDist = dist;
     // Anchor to the midpoint between the two pointers (screen space).
     if (newZoom !== oldZoom) {

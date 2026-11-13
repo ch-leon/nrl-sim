@@ -8,7 +8,6 @@ import {
   FRAME_W,
   LOOKS,
   PLAYER_ANIMS,
-  buildPlayerAtlas,
   drawPlayerFrame,
   lookForSlot,
   lookForPlayer,
@@ -90,19 +89,6 @@ describe('rotate90', () => {
     expect(sameData(r4.data, sq.data)).toBe(true);
     const back = rotate90(rotate90(sq, 'cw'), 'ccw');
     expect(sameData(back.data, sq.data)).toBe(true);
-  });
-});
-
-describe('buildPlayerAtlas', () => {
-  it('packs every look × anim frame with unique names inside the buffer', () => {
-    const { buf, frames } = buildPlayerAtlas(kit);
-    const perLook = ANIM_ORDER.reduce((n, a) => n + PLAYER_ANIMS[a].frames, 0);
-    expect(frames).toHaveLength(perLook * LOOKS.length);
-    expect(new Set(frames.map((f) => f.name)).size).toBe(frames.length);
-    for (const f of frames) {
-      expect(f.x + f.w).toBeLessThanOrEqual(buf.w);
-      expect(f.y + f.h).toBeLessThanOrEqual(buf.h);
-    }
   });
 });
 

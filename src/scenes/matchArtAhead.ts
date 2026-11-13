@@ -2,9 +2,9 @@ import { activePack } from '../content';
 // src/scenes/matchArtAhead.ts — the next fixture's match art, painted ahead (N10.5,
 // #154). After each week (and when a game starts or loads) the player's next
 // fixture is looked up and its stadium, crowd and kit atlases are painted in the
-// art worker (src/art/match/artWorker.ts), then uploaded as textures one per idle
-// slice while the club screens are up, so the hand-off to the match scene finds
-// them ready. One painting is kept, keyed by the kit design: a kit change, or a
+// art worker (src/art/match/artWorker.ts), then uploaded as textures in idle
+// slices while the club screens are up, so the hand-off to the match scene finds
+// them ready (and the players' two rings painted, ringTexture.ts liveRingPixels). One painting is kept, keyed by the kit design: a kit change, or a
 // different opponent, paints again (and frees the old one's textures). Node and the
 // tests have no Worker and paint in place; a worker that fails or stays silent is
 // dropped and the art painted here.
@@ -21,6 +21,8 @@ import { PixelBuffer, toTexture, type TextureHost } from '../art/pixel';
 import type { IdleSlice } from '../art/grounds';
 import { fixtureArtKey, fixtureArtPieces, paintFixtureArt, reviveFixtureArt, type FixtureArt, type FixtureKits } from '../art/match/fixtureArt';
 import { fieldOffsetX } from './matchField';
+import { liveRingPixels } from '../match/view/ringTexture';
+import { atmosphereGrade, cachedLightmap, lightingForFixture } from '../art/match/atmosphere';
 
 /** How long the art worker gets before the art is painted here instead (ms). */
 const ART_WORKER_TIMEOUT_MS = 20_000;
@@ -29,6 +31,18 @@ const ART_WORKER_TIMEOUT_MS = 20_000;
  * grounds at 17 fps is never idle, so without it nothing would go up before the match.
  */
 const UPLOAD_IDLE_TIMEOUT_MS = 100;
+/**
+ * The work an upload slice may do when its callback came by the timeout, not idle time
+ * (ms). A piece takes 3-17 ms at ×4; one per callback left the last of the 22 for the
+ * hand-off on a 2× screen, whose 85 ms grounds frames are never idle (#627).
+ */
+const UPLOAD_TIMED_OUT_MS = 24;
+
+/** How long a slice may upload for: its idle time, UPLOAD_TIMED_OUT_MS past the timeout, or one piece on a timer (Safari) or in the tests. */
+function uploadBudget(slice?: IdleSlice & { didTimeout?: boolean }): number {
+  if (!slice) return 0;
+  return slice.didTimeout ? UPLOAD_TIMED_OUT_MS : slice.timeRemaining();
+}
 
 /** The next idle slice, or the timeout's end; a timer where there are no idle callbacks (Safari). */
 function whenIdleSoon(fn: (slice?: IdleSlice) => void): void {
@@ -44,8 +58,12 @@ export interface KitSide {
 
 /** The kits a fixture is played in (resolveKits picks the away side's clash strip). */
 export function fixtureKits(home: KitSide, away: KitSide): FixtureKits {
-  const k = resolveKits({ clubId: home.clubId, colors: [home.colors[0], home.colors[1]] }, { clubId: away.clubId, colors: [away.colors[0], away.colors[1]] });
+  const k = resolveSideKits(home, away);
   return { home: k.home, away: k.away };
+}
+
+function resolveSideKits(home: KitSide, away: KitSide): ReturnType<typeof resolveKits> {
+  return resolveKits({ clubId: home.clubId, colors: [home.colors[0], home.colors[1]] }, { clubId: away.clubId, colors: [away.colors[0], away.colors[1]] });
 }
 
 /** The art painted ahead, waiting for its match. */
@@ -204,19 +222,26 @@ export function initMatchArtAhead(host: ArtAheadHost): () => void {
     const serial = ++uploadSerial;
     const todo = fixtureArtPieces(art).filter((p) => !p.texKey);
     let n = 0;
-    const step = (): void => {
+    const step = (slice?: IdleSlice): void => {
       if (ready !== art) return; // taken by its match, or another fixture painted since
       const textures = host.textures();
       if (!textures || busy()) {
         schedule(step);
         return;
       }
-      const piece = todo.shift();
-      if (!piece) return;
-      const key = `ahead-${serial}-${n++}`;
-      toTexture({ textures }, key, piece.buf);
-      piece.texKey = key;
-      piece.buf = UPLOADED;
+      const t0 = performance.now();
+      const budget = uploadBudget(slice);
+      let longest = 0;
+      do {
+        const piece = todo.shift();
+        if (!piece) return;
+        const key = `ahead-${serial}-${n++}`;
+        const t = performance.now();
+        toTexture({ textures }, key, piece.buf);
+        longest = Math.max(longest, performance.now() - t);
+        piece.texKey = key;
+        piece.buf = UPLOADED;
+      } while (todo.length && performance.now() - t0 + longest <= budget); // the next piece fits
       if (todo.length) schedule(step);
     };
     schedule(step);
@@ -226,6 +251,8 @@ export function initMatchArtAhead(host: ArtAheadHost): () => void {
     for (const p of fixtureArtPieces(art)) if (p.texKey && textures?.exists(p.texKey)) textures.remove(p.texKey);
   };
   let queued = false;
+  /** The rings and light maps last warmed for. */
+  let warmedFor = '';
   const look = (): void => {
     // Not during a multi-week run, nor under a match: there the fixture is the one on
     // screen (its art already taken) and the worker would compete with Skip's.
@@ -235,7 +262,31 @@ export function initMatchArtAhead(host: ArtAheadHost): () => void {
     }
     queued = false;
     const sides = nextFixtureSides(getState());
-    if (sides) void fixtureArtFor(fieldOffsetX(), fixtureKits(sides[0], sides[1]));
+    if (!sides) return;
+    const kits = resolveSideKits(sides[0], sides[1]);
+    void fixtureArtFor(fieldOffsetX(), { home: kits.home, away: kits.away });
+    // The players' rings and, after dark, the light maps (dry or wet: the weather is
+    // rolled at kick-off) too, one per idle slice; both are kept for the match.
+    const state = getState();
+    const fixture = nextFixture(state.league.fixtures, state.week, PLAYER_ID);
+    const lighting = lightingForFixture(fixture, state.season);
+    // Once a fixture: any state change looks again, and the cached art needs no second look.
+    const warmKey = `${kits.ringStyles.home}${kits.rings.home}|${kits.ringStyles.away}${kits.rings.away}|${lighting}`;
+    if (warmKey === warmedFor) return;
+    warmedFor = warmKey;
+    const later: (() => void)[] = [
+      () => liveRingPixels(kits.ringStyles.home, kits.rings.home),
+      () => liveRingPixels(kits.ringStyles.away, kits.rings.away),
+      ...(lighting === 'day' ? [] : (['clear', 'rain'] as const).map((w) => () => {
+        const g = atmosphereGrade(w, lighting);
+        if (g.pool !== 0xffffff || g.edge !== 0xffffff) cachedLightmap(fieldOffsetX(), g, 8);
+      })),
+    ];
+    const next = (): void => {
+      later.shift()?.();
+      if (later.length) whenIdleSoon(next);
+    };
+    whenIdleSoon(next);
   };
   const soon = (): void => {
     if (queued) return;

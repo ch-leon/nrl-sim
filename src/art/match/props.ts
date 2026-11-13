@@ -8,7 +8,8 @@
 import { PixelBuffer, mix } from '../pixel';
 import { TILE_W, TILE_H } from '../../config';
 import { OUTLINE, type Kit } from './kit';
-import { CROSSBAR_Z, POST_GY, POST_H } from './stadium';
+import { CROSSBAR_Z, POST_GY, POST_H, POST_SHADOW_TILES } from './stadium';
+import type { Lighting } from './atmosphere';
 
 const POST_WHITE = 0xf6f6f0;
 const POST_SHADE = 0xc8c8c4;
@@ -105,6 +106,51 @@ export function drawShadow(w: number, h: number, alpha = 0.3): PixelBuffer {
       const dx = (x + 0.5 - rx) / rx;
       const dy = (y + 0.5 - ry) / ry;
       if (dx * dx + dy * dy <= 1) b.set(x, y, 0x000000, alpha);
+    }
+  }
+  return b;
+}
+
+// ── Light ────────────────────────────────────────────────────────────────────
+
+/**
+ * Screen px a shadow falls per px of height: the goalposts' (an 84 px post throws
+ * POST_SHADOW_TILES tiles along +gx, so down and to the right on screen). Players,
+ * the ball and anything else on the field throw theirs the same way.
+ */
+export const LIGHT_DX = (POST_SHADOW_TILES * TILE_W) / 2 / POST_H;
+export const LIGHT_DY = (POST_SHADOW_TILES * TILE_H) / 2 / POST_H;
+/**
+ * How much of that slope a shadow keeps by lighting: the day's sun is high and the
+ * posts' own shadow is the full length, so a man's is short; dusk's is low and
+ * longest; the floodlights at night sit between.
+ */
+export const SHADOW_LENGTH: Record<Lighting, number> = { day: 0.45, dusk: 0.9, night: 0.7 };
+/** A player's height (px, feet to crown) for casting his shadow. */
+const PLAYER_SHADOW_H = 34;
+
+/**
+ * A player's shadow, skewed along the light: a squashed foot ellipse and a tapering
+ * body streak running to the head's shadow. The feet sit at the centre of the
+ * buffer, so it is placed at the feet like the round dot it replaces.
+ */
+export function drawPlayerShadow(lighting: Lighting, alpha = 0.28): PixelBuffer {
+  const len = PLAYER_SHADOW_H * SHADOW_LENGTH[lighting];
+  const ex = len * LIGHT_DX;
+  const ey = len * LIGHT_DY;
+  const halfW = Math.ceil(ex) + 8;
+  const halfH = Math.ceil(ey) + 5;
+  const b = new PixelBuffer(halfW * 2, halfH * 2);
+  for (let y = 0; y < b.h; y++) {
+    for (let x = 0; x < b.w; x++) {
+      // Ground space: y doubled, so a circle there is the 2:1 ellipse on screen.
+      const px = x + 0.5 - halfW;
+      const py = (y + 0.5 - halfH) * 2;
+      const sx = ex;
+      const sy = ey * 2;
+      const t = Math.max(0, Math.min(1, (px * sx + py * sy) / (sx * sx + sy * sy)));
+      const r = 5.6 - 2.8 * t;
+      if (Math.hypot(px - sx * t, py - sy * t) <= r) b.set(x, y, 0x000000, alpha);
     }
   }
   return b;

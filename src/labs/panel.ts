@@ -2,7 +2,7 @@
 // Hidden unless ?labs=1 was opened on this browser (or a playtest career is on).
 // Finding it is not security: nothing here unlocks anything paid for.
 import { EXPERIMENTS } from './experiments';
-import { experimentOn, fieldLengthPreference, OPEN_SCREENS, overrideOn, setExperiment, setOverride, testCareer } from './flags';
+import { experimentOn, CSS_PIXELS, fieldLengthPreference, OPEN_SCREENS, overrideOn, setExperiment, setOverride, testCareer } from './flags';
 import { FIELD_LENGTHS, isFieldLength, type FieldLength } from './fieldLength';
 import { applyFieldLength, resetFieldSelection } from './fieldSelection';
 import { currentProbe, enterTestCareer, returnToNormalCareer, transitionRefusal } from './devCareer';
@@ -33,6 +33,11 @@ export function overridesModel(on: (id: string) => boolean) {
     note: 'Staff & Board, Contracts and Finance open now instead of at their round. On this browser only; never saved.',
     on: on(OPEN_SCREENS),
     smallPrint: 'Turning it off locks them again. Anything you hire, sign or buy meanwhile stays in your career.',
+  }, {
+    id: CSS_PIXELS, label: 'Render at the old resolution',
+    note: 'Draws the game in CSS pixels as before #627: the match zooms back in and a phone shows fewer players. For comparing frame rate on a real phone. On this browser only; never saved.',
+    on: on(CSS_PIXELS),
+    smallPrint: 'Reload the page to apply it.',
   }];
 }
 
