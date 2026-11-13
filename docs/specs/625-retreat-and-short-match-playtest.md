@@ -1,7 +1,7 @@
 # #625 retreat fix and #513 pre-merge match comparison
 
 The field-delivery design below is historical. Leon superseded separate builds
-with a normal 2:30 clock and an Experiments selector on13November; see
+with a normal 2:30 clock and an Experiments selector on 13 November; see
 [the current contract](513-short-halves-field-experiment.md).
 
 Leon approved fixing defensive retreat first, then playable 100m, 80m and 60m

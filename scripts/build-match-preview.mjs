@@ -1,4 +1,4 @@
-// Three isolated preview bundles; normal builds retain the production rules.
+// Three fixed-field diagnostic bundles. The normal app uses Experiments instead.
 import { spawnSync } from 'node:child_process';
 import { copyFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
