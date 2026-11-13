@@ -365,6 +365,7 @@ export abstract class LiveBase {
         gassed: false,
         body: makeBody({ x: 50, y: MID_Y }, maxSpeedFor(stats.speed), { x: this.dirOf(side), y: 0 }),
         odometer: 0,
+        react: null, // set at build so every player has one shape: added later it slowed the whole sim by a third
         pose: 'idle',
         poseUntil: 0,
         lockUntil: 0,
