@@ -45,6 +45,19 @@ export interface Candidate {
 export const MAX_LAT_M = 12;
 
 /**
+ * A candidate's pass score from `passer`, or null when he is no option: busy,
+ * not behind the passer, or outside the 2–`maxLat` m window.
+ */
+function receiverScore(passer: Vec, dir: 1 | -1, c: Candidate, maxLat: number, widthBias: number): number | null {
+  if (c.busy) return null;
+  const depth = (passer.x - c.pos.x) * dir;
+  const lat = Math.abs(c.pos.y - passer.y);
+  if (depth < 0.3 || depth > 8 || lat < 2 || lat > maxLat) return null;
+  // Flat and wide beats deep: a deep receiver gives ground back.
+  return -Math.abs(lat - 6) * (1 - widthBias) - 0.7 * depth + (c.prefer ?? 0);
+}
+
+/**
  * Best pass option: behind the passer, 2–`maxLat` m to the side, not too deep.
  * `widthBias` (0..1) softens the preference for the 6 m pass, so a Playmaker
  * happily finds the wider man.
@@ -53,16 +66,34 @@ export function pickReceiver(passer: Vec, dir: 1 | -1, candidates: readonly Cand
   let best: number | null = null;
   let bestScore = -Infinity;
   for (const c of candidates) {
-    if (c.busy) continue;
-    const depth = (passer.x - c.pos.x) * dir;
-    const lat = Math.abs(c.pos.y - passer.y);
-    if (depth < 0.3 || depth > 8 || lat < 2 || lat > maxLat) continue;
-    // Flat and wide beats deep: a deep receiver gives ground back.
-    const score = -Math.abs(lat - 6) * (1 - widthBias) - 0.7 * depth + (c.prefer ?? 0);
-    if (score > bestScore) {
+    const score = receiverScore(passer, dir, c, maxLat, widthBias);
+    if (score !== null && score > bestScore) {
       bestScore = score;
       best = c.idx;
     }
+  }
+  return best;
+}
+
+/**
+ * The weighted receiver (#649 step 1): the same window and score as
+ * `pickReceiver`, but any option within `margin` of the best score may get
+ * the ball, weighted exp(−gap / `spread`) so the best is still the likeliest.
+ * `roll` is one draw in [0, 1), taken by the caller whether or not there is
+ * a choice to make. A margin of 0 (or less) is `pickReceiver` exactly.
+ */
+export function pickReceiverWeighted(passer: Vec, dir: 1 | -1, candidates: readonly Candidate[], maxLat: number, widthBias: number, margin: number, spread: number, roll: number): number | null {
+  const best = pickReceiver(passer, dir, candidates, maxLat, widthBias);
+  if (best === null || margin <= 0) return best;
+  const scores = candidates.map((c) => receiverScore(passer, dir, c, maxLat, widthBias));
+  const top = Math.max(...scores.map((s) => s ?? -Infinity));
+  const weights = scores.map((s) => (s === null || top - s > margin ? 0 : spread > 0 ? Math.exp(-(top - s) / spread) : 1));
+  let left =roll * weights.reduce((a, w) => a + w, 0);
+  for (let i = 0; i < candidates.length; i++) {
+    const w = weights[i]!;
+    if (w <= 0) continue;
+    if (left < w) return candidates[i]!.idx;
+    left -= w;
   }
   return best;
 }

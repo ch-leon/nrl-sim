@@ -211,6 +211,16 @@ never as zero: the table is left out, or a dash shown for that row):
   ends; else a **pass** when more than one man holds the ball in the play (counting
   the dummy-half only if he runs it himself, so his heel to the first receiver is
   not a pass; an offload or cut-out is); else a **run**, including a dart.
+- **1st receiver same man % / 1st receiver slots** (#649): the first receiver is the
+  first man of the attacking side, other than the one who had the ball at the ruck, to
+  hold it in the play after a play-the-ball (a dart, a tackle or a turnover before
+  anyone else has it counts nobody; the pass to the kicker on the last tackle counts).
+  **Same man %** is the chance that two first passes on the same tackle of a set, by
+  the same side in the same match, found the same slot: Σ n(n−1) / Σ N(N−1) over
+  slots and tackles, which small samples do not inflate the way the most-used man's
+  share would (a match with no such pair reads 0). **Slots** is how many slots took a
+  first pass, a side's mean. Neither is scaled for a stretch. Results from before
+  #649 show a dash.
 
 Origins and last-tackle plays are shares of the tries or last tackles in the row;
 the `*` marks use a standard error that treats each try (or last tackle) as an

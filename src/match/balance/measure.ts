@@ -26,7 +26,7 @@ import { DEFAULT_TACTICS } from '../league/presets';
 import { applyTuning } from '../league/tuning';
 import { labSheet, starTraits } from '../lab/sheets';
 import { POSITION_GROUPS, type Cell, type SideSpec } from './plan';
-import { FLOW, LAST_TACKLES, ORIGINS, PlayWatch, ScoreLine, type FlowKey, type LastTackleKey, type OriginKey } from './watch';
+import { FLOW, FirstReceivers, LAST_TACKLES, ORIGINS, PlayWatch, RECEIVERS, ScoreLine, type FlowKey, type LastTackleKey, type OriginKey, type ReceiverKey } from './watch';
 
 /** Exact fit fixtures belong to the headless harness, never the live game or saved sheets. */
 export class BalanceSim extends LiveSim {
@@ -100,6 +100,8 @@ export interface WatchStats {
   flow: Record<FlowKey, Stat>;
   origins: Record<OriginKey, Stat>;
   lastTackles: Record<LastTackleKey, Stat>;
+  /** Absent in results written before #649. */
+  receivers?: Record<ReceiverKey, Stat>;
 }
 
 export interface CellResult {
@@ -522,6 +524,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
     const flowPerSeed: Record<FlowKey, number>[] = [];
     const originsPerSeed: Record<OriginKey, number>[] = [];
     const lastPerSeed: Record<LastTackleKey, number>[] = [];
+    const receiversPerSeed: Record<ReceiverKey, number>[] = [];
     let wrestleTicks = 0;
     let wins = 0;
     let draws = 0;
@@ -556,6 +559,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
       const bins = new BinSwing();
       const score = new ScoreLine(minutes * 60);
       const watch = new PlayWatch();
+      const receivers = new FirstReceivers();
       let inW = 0;
       let lastMen = 0;
       let nextLegs = 3;
@@ -598,7 +602,9 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
             if (pts > 0 && e.side) score.note(sim.matchSeconds, e.side, pts);
           }
         }
-        watch.tick(tickEvents, { phase: sim.phaseKind, lastPlay: sim.lastTackleUp, attacking: sim.inPossession, holder: sim.holderIndex, x: () => sim.ballX });
+        const view = { phase: sim.phaseKind, lastPlay: sim.lastTackleUp, attacking: sim.inPossession, holder: sim.holderIndex, x: () => sim.ballX };
+        watch.tick(tickEvents, view);
+        receivers.tick(view, sim.tackleCount);
         const men = sim.wrestleMen;
         if (men > 0) {
           inW++;
@@ -634,6 +640,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
         flowPerSeed.push(score.result());
         originsPerSeed.push(watch.origins);
         lastPerSeed.push(watch.lastTackles);
+        receiversPerSeed.push(receivers.result());
         const c = countEvents(events);
         c.wrestles = matchWrestles;
         c.held1 = held[1]!;
@@ -681,6 +688,8 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
       flow: Object.fromEntries(FLOW.map((k) => [k, stat(flowPerSeed.map((f) => f[k] * scaled(k)))])) as Record<FlowKey, Stat>,
       origins: Object.fromEntries(ORIGINS.map((k) => [k, stat(originsPerSeed.map((o) => o[k] * scale))])) as Record<OriginKey, Stat>,
       lastTackles: Object.fromEntries(LAST_TACKLES.map((k) => [k, stat(lastPerSeed.map((o) => o[k] * scale))])) as Record<LastTackleKey, Stat>,
+      // A share and a count of distinct slots: neither scales with a stretch's length.
+      receivers: Object.fromEntries(RECEIVERS.map((k) => [k, stat(receiversPerSeed.map((o) => o[k]))])) as Record<ReceiverKey, Stat>,
     };
     const totalWrestles = perSeed.reduce((a, c) => a + c.wrestles, 0);
     return {
