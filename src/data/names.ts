@@ -17,23 +17,30 @@ export function randomName(rng: Rng): string {
 // ── Renames (#398) ───────────────────────────────────────────────────────────
 // A player, your club or a rival can be renamed in-game. The rule is the same
 // everywhere: trimmed, spaces closed up, 2–24 characters, no control characters.
+// The title's club and coach names take the same rule (#616).
 
 /** Shortest and longest name a rename takes, in characters. */
 export const NAME_MIN = 2;
 export const NAME_MAX = 24;
+/**
+ * Longest ground name the title takes (#616). A ground is a place, not a name the game
+ * lays out in tight rows (only the club home's Next line shows it), and the default
+ * "<town> Recreation Ground" is past 24 for any town of seven letters or more.
+ */
+export const GROUND_MAX = NAME_MAX * 2;
 
 /** Control characters (C0, DEL, C1) and the line and paragraph separators. */
 const CONTROL = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/;
 
 export type NameCheck = { ok: true; name: string } | { ok: false; why: string };
 
-/** A typed name as it would be kept, or why it can't be. Pure. */
-export function cleanName(raw: string): NameCheck {
+/** A typed name as it would be kept, or why it can't be (`max` for a ground). Pure. */
+export function cleanName(raw: string, max = NAME_MAX): NameCheck {
   if (CONTROL.test(raw.replace(/[\t\n\r]/g, ' '))) return { ok: false, why: 'Letters, numbers and punctuation only' };
   const name = raw.replace(/\s+/g, ' ').trim();
   const length = [...name].length;
   if (length < NAME_MIN) return { ok: false, why: `At least ${NAME_MIN} characters` };
-  if (length > NAME_MAX) return { ok: false, why: `At most ${NAME_MAX} characters` };
+  if (length > max) return { ok: false, why: `At most ${max} characters` };
   return { ok: true, name };
 }
 

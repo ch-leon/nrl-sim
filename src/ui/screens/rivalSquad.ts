@@ -10,8 +10,7 @@ import { resolveLineup, validTactics } from '../../systems/lineup';
 import type { RivalClub } from '../../core/state';
 import { overallRating, ratingText } from '../../data/player';
 import { traitLabel } from '../../data/traits';
-import { button, el, ensureStyles, openModal, screenKey } from '../dom';
-import { openFixturesScreen, openLadderScreen } from './fixtures';
+import { button, el, ensureStyles, openModal } from '../dom';
 import { playerRivalContext, rivalSheet, rivalStyle } from '../../systems/rivalRound';
 import { hasStaff } from '../../systems/staff';
 import { getState, setState } from '../../core/state';
@@ -103,7 +102,8 @@ const RIVAL_CSS = `
 .nrl-rival-table th:nth-child(n+2):nth-child(-n+4), .nrl-rival-table td:nth-child(n+2):nth-child(-n+4) { width: 48px; }
 .nrl-rival-table td { height: 34px; }
 .nrl-rival-table tbody tr.nrl-rival-row { cursor: pointer; }
-.nrl-rival-table tbody tr.nrl-rival-row:hover { background: rgba(255, 255, 255, 0.04); }
+@media (hover: hover) and (pointer: fine) { .nrl-rival-table tbody tr.nrl-rival-row:hover { background: rgba(255, 255, 255, 0.04); } }
+.nrl-rival-table tbody tr.nrl-rival-row:active { background: rgba(255, 255, 255, 0.04); }
 .nrl-rival-table tbody tr.nrl-rival-row:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: -2px; }
 @media (pointer: coarse) { .nrl-rival-table td { height: 44px; } }
 .nrl-rival-name { font-weight: 500; }
@@ -153,6 +153,7 @@ export function rivalClubEditor(
       el('div', { class: 'nrl-kit-label', text: 'Club name' }),
       nameField({
         value: d.name,
+        kept: club.name,
         label: 'Club name',
         attr: 'data-rival-rename',
         focus: false,
@@ -225,7 +226,7 @@ export function openRivalSquad(opened: RivalClub): HTMLElement {
     const theirs = rivalSheet(club, context).roster ?? [];
     const behind = hasStaff(getState(), 'analyst') ? whenBehindLine(style) : null;
     const line = (text: string, attrs: Record<string, string>): HTMLElement => el('p', { text, attrs: { ...attrs, title: text } });
-    const title = el('h2', { text: club.name });
+    const title = el('h2', { class: 'nrl-name-wrap', text: club.name });
     if (draft) {
       const chip = el('span', { class: 'nrl-rival-chip', attrs: { 'aria-hidden': 'true' } });
       chip.style.background = `linear-gradient(90deg, ${draft.colors[0]} 60%, ${draft.colors[1]} 60%)`;
@@ -258,15 +259,9 @@ export function openRivalSquad(opened: RivalClub): HTMLElement {
           if (!res.ok) return res.why;
           draft = null;
           if (res.patch) {
+            // The League sheet under this one draws itself again on the change, where it was scrolled to (#603).
             setState(res.patch);
             save(getState());
-            // The League sheet under this one is drawn once: draw it again with the new name, then this sheet over it.
-            const key = screenKey();
-            if (key === 'fixtures' || key === 'ladder') {
-              (key === 'ladder' ? openLadderScreen : openFixturesScreen)();
-              openRivalSquad(live());
-              return null;
-            }
           }
           render();
           return null;

@@ -8,11 +8,12 @@ import { bus } from '../../core/events';
 import { getState, type GameState, type Objective } from '../../core/state';
 import { getActiveSlot } from '../../core/save';
 import { BOARD } from '../../config';
+import { fmtMoney } from '../../utils/money';
 import { objectiveLine, objectiveRisk, sackedSummary } from '../../systems/board';
 import { financeSummary } from './finance';
 import { ladderPosition } from '../../systems/fixtures';
 import { ATTACK_COACHES, ATTACK_SPECIALITIES, STAFF, STAFF_ROLES, attackCoach, attackCoachRefusal, attackCoachWage, hireAttackCoach, hireStaff, releaseStaff, staffWage } from '../../systems/staff';
-import { el, button, openModal, openScreen, closeScreen, ensureStyles } from '../dom';
+import { el, button, openModal, openScreen, closeScreen, ensureStyles, guardDoubleTap } from '../dom';
 
 /** How an objective stands (3k): ON TRACK / AT RISK while the season runs, MET / FAILED once reviewed, PENDING before a ball is kicked. */
 export type ObjectiveStatus = 'on-track' | 'at-risk' | 'pending' | 'met' | 'failed' | 'off-track';
@@ -92,10 +93,10 @@ export function staffRows(state: GameState): HTMLElement[] {
     const def = STAFF[role];
     const member = state.staff.find((m) => m.role === role);
     const who = member
-      ? `${def.title}: ${member.name} · $${member.wage.toLocaleString('en-US')}/wk`
-      : `${def.title} · $${staffWage(state, role).toLocaleString('en-US')}/wk`;
+      ? `${def.title}: ${member.name} · ${fmtMoney(member.wage)}/wk`
+      : `${def.title} · ${fmtMoney(staffWage(state, role))}/wk`;
     const row = el('div', { class: 'nrl-staff-row', attrs: { 'data-staff': role } },
-      el('div', { class: 'nrl-staff-info' }, el('strong', { text: who }), el('span', { class: 'nrl-staff-blurb', text: def.blurb })),
+      el('div', { class: 'nrl-staff-info' }, el('strong', { class: 'nrl-name-wrap', text: who }), el('span', { class: 'nrl-staff-blurb', text: def.blurb })),
       member
         ? button('Release', () => { releaseStaff(role); }, { class: 'nrl-btn-danger' })
         : button('Hire', () => { hireStaff(role); }, { class: 'nrl-btn-primary' }),
@@ -105,8 +106,6 @@ export function staffRows(state: GameState): HTMLElement[] {
   rows.push(attackCoachRow(state));
   return rows;
 }
-
-const money = (n: number): string => `$${n.toLocaleString('en-US')}`;
 
 /** The roles on the panel: the three, and the attack coach. */
 export const STAFF_ROW_COUNT = STAFF_ROLES.length + 1;
@@ -122,7 +121,7 @@ export function attackCoachRow(state: GameState): HTMLElement {
     const def = ATTACK_COACHES[coach.speciality];
     return el('div', { class: 'nrl-staff-row', attrs: { 'data-staff': 'attackCoach', 'data-speciality': coach.speciality } },
       el('div', { class: 'nrl-staff-info' },
-        el('strong', { text: `${def.title}: ${coach.name} · ${money(coach.wage)}/wk` }),
+        el('strong', { class: 'nrl-name-wrap', text: `${def.title}: ${coach.name} · ${fmtMoney(coach.wage)}/wk` }),
         el('span', { class: 'nrl-staff-blurb', text: `${def.blurb} Plays you buy stay if he goes.` })),
       button('Release', () => { releaseStaff('attackCoach'); }, { class: 'nrl-btn-danger' }));
   }
@@ -131,9 +130,9 @@ export function attackCoachRow(state: GameState): HTMLElement {
     const why = attackCoachRefusal(state, sp);
     const b = button('', () => { hireAttackCoach(sp); }, { class: 'nrl-btn-primary nrl-staff-hire' });
     b.append(el('span', { class: 'nrl-staff-hire-name', text: `Hire ${def.short}` }),
-      el('small', { text: why ?? `${money(attackCoachWage(state, sp))}/wk` }));
+      el('small', { text: why ?? `${fmtMoney(attackCoachWage(state, sp))}/wk` }));
     b.setAttribute('data-hire-attack', sp);
-    b.title = why ? `${def.title}: ${why.toLowerCase()} (you have ${state.reputation})` : `${def.title} · ${money(attackCoachWage(state, sp))}/wk. ${def.blurb}`;
+    b.title = why ? `${def.title}: ${why.toLowerCase()} (you have ${state.reputation})` : `${def.title} · ${fmtMoney(attackCoachWage(state, sp))}/wk. ${def.blurb}`;
     if (why) { b.disabled = true; b.setAttribute('data-locked', ''); }
     return b;
   }));
@@ -157,6 +156,8 @@ export function openStaffScreen(): HTMLElement {
   const left = el('div', { class: 'nrl-staff-board' });
   const label = el('div', { class: 'nrl-label nrl-staff-label' });
   const list = el('div', { class: 'nrl-staff-list' });
+  // Hire and Release share a spot: the second tap of a double tap must not undo the first (#598).
+  guardDoubleTap(list);
   const render = (): void => {
     const s = getState();
     left.replaceChildren(buildObjectivesSection(s));

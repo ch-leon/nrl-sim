@@ -1,6 +1,6 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav } from '../common.mjs';
+import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, skipFromPill } from '../common.mjs';
 
 /**
  * The phone play-test's guards (Wave 4 prompt 09, #399), at 667×375 (the narrowest
@@ -182,8 +182,7 @@ export async function runPlaytest(browser, W = 667, H = 375) {
         await page.waitForSelector('[data-back-to-club]:visible', { timeout: 300000 });
         rec.notes.push('played through full time at ×8');
       } else {
-        await page.locator('.nrl-mo-skip').tap();
-        await page.locator('.nrl-mo-skip').tap();
+        await skipFromPill(page);
       }
       await page.waitForSelector('[data-back-to-club]:visible', { timeout: 30000 });
       await page.locator('.nrl-mo-ft [data-report]').tap();

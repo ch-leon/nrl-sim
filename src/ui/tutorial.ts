@@ -220,6 +220,8 @@ interface ActiveTutorial {
   replay: boolean;
   /** Stops watching the toast lane for an Undo toast to keep clear of (#412). */
   offToast: (() => void) | null;
+  /** Stops waiting for the anchor's sheet to finish its entrance (#611). */
+  offSheet: (() => void) | null;
 }
 
 let active: ActiveTutorial | null = null;
@@ -273,7 +275,7 @@ export function startTutorial(force = false): void {
     attrs: { 'data-tutorial': 'overlay' },
   });
   mount(overlay);
-  active = { index: firstStepIndex(getState()), overlay, offEvent: null, retryTimer: null, offMatch: holdForMatch(overlay), replay: force, offToast: null };
+  active = { index: firstStepIndex(getState()), overlay, offEvent: null, retryTimer: null, offMatch: holdForMatch(overlay), replay: force, offToast: null, offSheet: null };
   renderStep();
 }
 
@@ -346,6 +348,10 @@ function clearStepBindings(a: ActiveTutorial): void {
   if (a.offToast) {
     a.offToast();
     a.offToast = null;
+  }
+  if (a.offSheet) {
+    a.offSheet();
+    a.offSheet = null;
   }
 }
 
@@ -433,10 +439,16 @@ function renderStep(): void {
   // show. The poll stops with the step.
   const show = (found: { el: HTMLElement; fallback: boolean } | null): void => {
     a.overlay.replaceChildren();
+    a.offSheet?.();
+    a.offSheet = null;
     if (found) {
       scrollAnchorIntoView(found.el);
       renderCutout(a, found.el);
       dockClear(renderBubble(a, step, { centered: false, forceNext: found.fallback }), found.el);
+      // #611: a sheet the step just opened is still rising, so that box is 12px low: measure again as it lands, not at the next poll.
+      a.offSheet = onSheetIn(found.el, () => {
+        if (active === a && STEPS[a.index] === step && !a.overlay.hidden) follow();
+      });
     } else {
       renderBubble(a, step, { centered: true, forceNext: true });
     }
@@ -495,6 +507,31 @@ function findAnchor(selector: string): { el: HTMLElement; fallback: boolean } | 
     if (r.width > 0 && r.height > 0) return { el: found, fallback: i > 0 && !choices[0]!.trim().startsWith('.nrl-nav') && found.closest('.nrl-nav') !== null };
   }
   return null;
+}
+
+/** The sheets that rise as they open (nrl-sheet-up in ui/dom.ts): a screen, and Office's tiles. */
+const RISING_SHEET = '.nrl-screen-region, .nrl-nav-sheet';
+
+/**
+ * Call `fn` once, when the sheet `anchorEl` sits in ends its entrance (#611). A
+ * sheet that came in without one (swapped for the sheet before it) never calls:
+ * nothing moved, so the box measured as it opened was right. Returns the teardown.
+ */
+export function onSheetIn(anchorEl: Pick<HTMLElement, 'closest'>, fn: () => void): () => void {
+  const sheet = anchorEl.closest<HTMLElement>(RISING_SHEET);
+  if (!sheet) return () => {};
+  const landed = (e: Event): void => {
+    if (e.target !== sheet) return; // something inside the sheet finished its own animation
+    off();
+    fn();
+  };
+  const off = (): void => {
+    sheet.removeEventListener('animationend', landed);
+    sheet.removeEventListener('animationcancel', landed);
+  };
+  sheet.addEventListener('animationend', landed);
+  sheet.addEventListener('animationcancel', landed);
+  return off;
 }
 
 /** Centre the anchor in view before highlighting (mobile-friendly). */

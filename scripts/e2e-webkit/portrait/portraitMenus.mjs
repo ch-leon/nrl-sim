@@ -1,6 +1,6 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, reachProblems, openNav } from '../common.mjs';
+import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, reachProblems, openNav, skipFromPill } from '../common.mjs';
 
 // ── Portrait menus (#350 P1) ─────────────────────────────────────────────────
 /**
@@ -181,8 +181,8 @@ export async function runPortraitMenus(browser) {
     rmSync(OUT, { recursive: true, force: true });
     mkdirSync(OUT, { recursive: true });
     const report = { size: tag, safe, steps: [], errors: [] };
-    // Reduced motion: the sheets come up without their 180ms rise, so each of the ~200 opens
-    // is measured at once (the CI job's 20 minutes are close to full).
+    // Reduced motion: the sheets come up without their rise (they only fade, #597), so each of
+    // the ~200 opens is measured at once (the CI job's 20 minutes are close to full).
     const ctx = await browser.newContext({
       viewport: { width: W, height: H }, deviceScaleFactor: run.dpr, hasTouch: true, isMobile: true, userAgent: IPHONE_UA, reducedMotion: 'reduce',
     });
@@ -245,7 +245,7 @@ export async function runPortraitMenus(browser) {
       else if (m.id === 'office') await press('.nrl-nav [data-nav-more]');
       else if (!m.from) await openNav(page, m.id);
       if (m.wait) await page.waitForSelector(m.wait);
-      await page.waitForTimeout(50); // a frame for the sheet's layout (no rise: reduced motion)
+      await page.waitForTimeout(50); // a frame for the sheet's layout (no rise, only the fade: reduced motion)
     };
 
     await step('title', async (rec) => {
@@ -397,8 +397,7 @@ export async function runPortraitMenus(browser) {
         return out;
       });
       await step('report-upright', async (rec) => {
-        await press('[data-skip-pill]');
-        await press('[data-skip-pill]');
+        await skipFromPill(page);
         await page.waitForSelector('[data-back-to-club]', { timeout: 30000 });
         await turn(W, H);
         await page.waitForTimeout(400);

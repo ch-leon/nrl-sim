@@ -29,6 +29,9 @@ const RENAME_CSS = `
 .nrl-rename-why { min-height: 1.2em; font-size: 0.6875rem; line-height: 1.2; color: var(--nrl-muted); }
 .nrl-rename-why.nrl-attn { color: var(--nrl-neg); }
 .nrl-rename .nrl-btn { flex: 1 1 0; min-width: 0; min-height: 44px; padding: 0 8px; }
+/* Beside the box (Kit) the button keeps its word (#609): the box asks for more of the row as its
+   text grows, and at Larger text on a 667px phone that left RENAME as RENAM. */
+.nrl-rename-row > .nrl-rename-input ~ .nrl-btn { min-width: min-content; }
 /* The Rename button beside a sheet's ◂ back: small, never wider than its word. */
 .nrl-btn.nrl-rename-open { flex: 0 0 auto; min-height: 44px; padding: 0 12px; font-size: 0.875rem; }
 `;
@@ -36,6 +39,8 @@ const RENAME_CSS = `
 export interface NameFieldOpts {
   /** The name as it stands; the box opens on it. */
   value: string;
+  /** The name as kept in the save (default `value`; a screen that keeps a draft says). Never a fault (#616). */
+  kept?: string;
   /** What is being named, for a screen reader ("Player name", "Club name"). */
   label: string;
   /** Keep the clean name; return a reason to show when it can't be kept, else null. */
@@ -69,6 +74,15 @@ export function nameField(opts: NameFieldOpts): HTMLElement {
   const save = button(opts.saveLabel ?? 'Save', () => submit(), { class: 'nrl-btn-primary nrl-rename-save' });
   const check = (): void => {
     const c = cleanName(input.value);
+    // The name as kept is not a fault (#616): a save can hold a club named before the
+    // rule (the title took 120 letters). It stays until a new name is saved; only a new one is checked.
+    if (!c.ok && input.value === (opts.kept ?? opts.value)) {
+      save.disabled = true;
+      input.setAttribute('aria-invalid', 'false');
+      why.className = 'nrl-rename-why';
+      why.textContent = `${NAME_MAX} characters at most`;
+      return;
+    }
     save.disabled = !c.ok;
     input.setAttribute('aria-invalid', String(!c.ok));
     why.className = `nrl-rename-why${c.ok ? '' : ' nrl-attn'}`;

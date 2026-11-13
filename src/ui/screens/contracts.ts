@@ -16,7 +16,8 @@ import {
   contractRows, renewalFee, renewalWeeklyCost, renewEarly, renewsOnLoan, sellPlayer, transferFee,
 } from '../../systems/contracts';
 import { SQUAD_MIN, difficultyMultipliers } from '../../config';
-import { el, button, openScreen, screenHead, backButton } from '../dom';
+import { fmtMoneyShort } from '../../utils/money';
+import { ARMED_CLASS, armGuard, armedTap, el, button, openScreen, screenHead, backButton } from '../dom';
 import { EXPIRY_WINDOW_WEEKS, ensureFinanceStyles, fmtMoney, openFinanceScreen } from './finance';
 
 const REASONS: Record<string, string> = {
@@ -30,19 +31,32 @@ function act(result: { ok: boolean; reason?: string }): void {
   if (!result.ok) bus.emit('ui:notify', { text: REASONS[result.reason ?? ''] ?? 'Not possible.', kind: 'info' });
 }
 
-/** Short money for a button: $900, $12k, $12.5k (the labels are written in caps so the k stays small). */
-function fmtShort(n: number): string {
-  const abs = Math.abs(Math.round(n));
-  if (abs < 1000) return fmtMoney(n);
-  return `${n < 0 ? '-' : ''}$${(abs / 1000).toFixed(1).replace(/\.0$/, '')}k`;
-}
+/** Short money for a button: $900, $12k, $12.5k, $2m (the labels are written in caps so the k stays small). */
+const fmtShort = (n: number): string => fmtMoneyShort(n, { places: 1 });
 
 /**
  * The action waiting for its second tap (N14, #263): the player page's two-tap
  * guard instead of a `window.confirm`, which a phone shows as a browser dialog.
- * `release:<id>` or `sell:<id>`; any other tap or a re-render with the player gone clears it.
+ * `release:<id>` or `sell:<id>`; a tap anywhere else, or four seconds, clears it (#612).
  */
 let armed: string | null = null;
+/** Calls off the armed button's wait (dom.ts armGuard), and puts that button back as it was. */
+let stopWait: (() => void) | null = null;
+/** When the armed button was armed, so a quick double tap does not take both steps (#617). */
+let armedAt = 0;
+let atRest: (() => void) | null = null;
+
+/**
+ * Arm `key`, or nothing. Disarming on its own (the wait ran out, a tap landed
+ * elsewhere) rewrites the one button in place: no row is rebuilt under that tap,
+ * and nothing moves (F3 below).
+ */
+function arm(key: string | null): void {
+  armed = key;
+  armedAt = performance.now();
+  stopWait?.();
+  stopWait = key ? armGuard(() => { armed = null; stopWait = null; atRest?.(); }) : null;
+}
 
 /** A tap on a guarded action: the first arms it (the label asks again), the second does it. */
 export function guardTap(current: string | null, key: string): { armed: string | null; run: boolean } {
@@ -89,6 +103,7 @@ function render(sub: HTMLElement, tbody: HTMLElement): void {
   sub.textContent = contractsSummary(s.squad, wageMult);
   const rows: HTMLElement[] = [];
   const rerender = (): void => render(sub, tbody);
+  atRest = null;
   for (const row of heldRows(order, contractRows(s), gone)) {
     if (row.kind === 'gone') {
       const done = button(row.done, () => {});
@@ -116,7 +131,7 @@ function render(sub: HTMLElement, tbody: HTMLElement): void {
       renew.disabled = true;
     } else {
       renew = button(`RENEW ${fmtMoney(renewalFee(s, p))}`, () => {
-        armed = null;
+        arm(null);
         const res = renewEarly(getState(), p.id);
         if (res.ok) renewed.add(p.id);
         act(res);
@@ -127,20 +142,24 @@ function render(sub: HTMLElement, tbody: HTMLElement): void {
     renew.setAttribute('data-contract-renew', p.id);
     const releaseArmed = armed === `release:${p.id}`;
     const sellArmed = armed === `sell:${p.id}`;
-    const release = button(releaseArmed ? 'REALLY RELEASE?' : `RELEASE ${fmtShort(RELEASE_PAYOUT_WEEKS * p.wage)}`, () => {
+    const releaseLabel = `RELEASE ${fmtShort(RELEASE_PAYOUT_WEEKS * p.wage)}`;
+    const sellLabel = `SELL +${fmtShort(transferFee(p))}`;
+    const release = button(releaseArmed ? 'REALLY RELEASE?' : releaseLabel, () => {
       const g = guardTap(armed, `release:${p.id}`);
-      armed = g.armed;
+      if (g.run && !armedTap(performance.now() - armedAt)) return; // the tap that armed it, twice
+      arm(g.armed);
       if (g.run) {
         const res = releasePlayer(getState(), p.id);
         if (res.ok) gone.set(p.id, { text: `${p.name} · released`, done: 'RELEASED ✓' });
         act(res);
       }
       rerender();
-    }, { class: releaseArmed ? 'nrl-btn-danger nrl-contract-armed' : 'nrl-btn-danger' });
+    }, { class: releaseArmed ? `nrl-btn-danger ${ARMED_CLASS}` : 'nrl-btn-danger' });
     release.title = `Two taps: pays out ${fmtMoney(RELEASE_PAYOUT_WEEKS * p.wage)}`;
-    const sell = button(sellArmed ? 'REALLY SELL?' : `SELL +${fmtShort(transferFee(p))}`, () => {
+    const sell = button(sellArmed ? 'REALLY SELL?' : sellLabel, () => {
       const g = guardTap(armed, `sell:${p.id}`);
-      armed = g.armed;
+      if (g.run && !armedTap(performance.now() - armedAt)) return; // the tap that armed it, twice
+      arm(g.armed);
       if (g.run) {
         const fee = transferFee(p);
         const res = sellPlayer(getState(), p.id);
@@ -148,8 +167,12 @@ function render(sub: HTMLElement, tbody: HTMLElement): void {
         act(res);
       }
       rerender();
-    }, { class: sellArmed ? 'nrl-btn-danger nrl-contract-armed' : 'nrl-btn-danger' });
+    }, { class: sellArmed ? `nrl-btn-danger ${ARMED_CLASS}` : 'nrl-btn-danger' });
     sell.title = `Two taps: a transfer fee of ${fmtMoney(transferFee(p))}`;
+    if (releaseArmed || sellArmed) {
+      const [btn, label] = releaseArmed ? [release, releaseLabel] : [sell, sellLabel];
+      atRest = () => { btn.classList.remove(ARMED_CLASS); btn.textContent = label; };
+    }
 
     rows.push(el('tr', { attrs: { 'data-contract': p.id } },
       who,
@@ -166,7 +189,7 @@ function render(sub: HTMLElement, tbody: HTMLElement): void {
 /** Open the Contracts sheet (lights Finance, which holds it). Re-renders on state changes until closed. */
 export function openContractsScreen(): HTMLElement {
   ensureFinanceStyles();
-  armed = null;
+  arm(null);
   order = contractRows(getState()).map((p) => p.id);
   renewed.clear();
   gone.clear();
@@ -186,5 +209,5 @@ export function openContractsScreen(): HTMLElement {
   const off = bus.on('state:changed', () => {
     if (sheet.isConnected) render(sub, tbody);
   });
-  return openScreen(sheet, off, 'contracts');
+  return openScreen(sheet, () => { off(); arm(null); }, 'contracts');
 }

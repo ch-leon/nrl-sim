@@ -20,7 +20,7 @@ import { advanceInProgress } from '../core/advance';
 import { weekHeld } from '../core/time';
 import { BOARD, WEEKS_PER_SEASON } from '../config';
 import { RISK_WORD, type ObjectiveRisk } from '../systems/board';
-import { el, button, openModal, closeModal, activeScreen, dialogOpen, screenKey } from './dom';
+import { el, button, hintScroll, openModal, closeModal, activeScreen, dialogOpen, screenKey } from './dom';
 import { CLUB_HOME_KEY } from './screens/clubHome';
 import { boardChip, fmtMoney, fmtMoneyShort } from './hud';
 import { MATCH_ACTIVE_CLASS } from './screens/matchOverlay';
@@ -172,12 +172,26 @@ export function weekSummary(before: WeekSnapshot, after: WeekSnapshot): WeekSumm
   };
 }
 
-/** Lines a list shows before folding the rest into "+n more", so a busy week still fits at 667×375. */
+/** Items a list shows before folding the rest into "+n more". */
 export const LIST_MAX = 3;
 
 /** Up to `max` items, then "+n more". */
 export function capList(items: readonly string[], max: number = LIST_MAX): string[] {
   return items.length <= max ? [...items] : [...items.slice(0, max - 1), `+${items.length - max + 1} more`];
+}
+
+/** Lines the injuries-and-bans section shows in all (#610). */
+export const SIDELINE_MAX = 4;
+
+/**
+ * The injuries-and-bans section's lines (#610): the men out (hurt, then banned) and
+ * one "Back: …" line, capped together. Each list was capped on its own, so a week
+ * with three hurt, two banned and two back ran to seven lines and off the card's
+ * foot. The men out fold into "+n more"; the Back line keeps its place.
+ */
+export function sidelineLines(v: Pick<WeekSummary, 'injuries' | 'bans' | 'back'>, max: number = SIDELINE_MAX): string[] {
+  const back = v.back.length ? [`Back: ${capList(v.back).join(', ')}`] : [];
+  return [...capList([...v.injuries, ...v.bans], max - back.length), ...back];
 }
 
 /** "+$1,234" / "-$1,234". */
@@ -203,11 +217,7 @@ function section(title: string, lines: readonly string[], empty: string): HTMLEl
 
 /** The card: two columns (the squad, then the money and the board) over Advance Week and Close. */
 export function openWeekSummary(v: WeekSummary, opts: { onAdvance: () => void; coach?: CoachSuggestion }): HTMLElement {
-  const squad = [
-    ...capList(v.injuries),
-    ...capList(v.bans),
-    ...(v.back.length ? [`Back: ${capList(v.back).join(', ')}`] : []),
-  ];
+  const squad = sidelineLines(v);
   const moneyIn = v.money.filter((m) => m.amount > 0).map((m) => `${m.label} ${fmtMoneyShort(m.amount)}`);
   const moneyOut = v.money.filter((m) => m.amount < 0).map((m) => `${m.label} ${fmtMoneyShort(-m.amount)}`);
   const money = el('div', { class: 'nrl-summary-sec' },
@@ -223,14 +233,17 @@ export function openWeekSummary(v: WeekSummary, opts: { onAdvance: () => void; c
   advance.setAttribute('data-summary-advance', '');
   const close = button('Close', () => closeModal());
   close.setAttribute('data-summary-close', '');
+  const cols = el('div', { class: 'nrl-summary-cols' },
+    el('div', { class: 'nrl-summary-col' },
+      section('Training', v.gains, 'No gains to speak of.'),
+      section('Injuries & bans', squad, 'Nobody new on the sidelines.')),
+    el('div', { class: 'nrl-summary-col' }, money, board));
+  // What a short phone or a larger text still cuts off fades at the foot (#610): a line was cut through its letters with no cue.
+  hintScroll(cols);
   const content = el('div', { class: 'nrl-summary', attrs: { 'data-week-summary': '' } },
     el('h2', { text: `${v.title} summary` }),
     coachLine(opts.coach?.screen ? opts.coach.text : summaryRemark(v)),
-    el('div', { class: 'nrl-summary-cols' },
-      el('div', { class: 'nrl-summary-col' },
-        section('Training', v.gains, 'No gains to speak of.'),
-        section('Injuries & bans', squad, 'Nobody new on the sidelines.')),
-      el('div', { class: 'nrl-summary-col' }, money, board)),
+    cols,
     el('div', { class: 'nrl-decisions-actions' }, advance, close));
   return openModal(content, { class: 'nrl-summary-modal', region: true, closeButton: true });
 }

@@ -4,7 +4,7 @@
 // (each man in the slot he was picked for, at the stats his fit leaves him).
 import { describe, it, expect } from 'vitest';
 import {
-  FIT, LINEUP_SLOTS, POSITION_SHORT, autoPick, describeFills, effectiveRating, lineupAverage, occupant, placeAt, placeSigning, positionFit,
+  FIT, LINEUP_SLOTS, POSITION_SHORT, autoPick, describeFills, effectiveRating, lineupAverage, lineupChanges, occupant, placeAt, placeSigning, positionFit,
   resolveLineup, signingNote, spotOf, statsAt, swapSpots,
 } from '../../src/systems/lineup';
 import { ROLES } from '../../src/match/league/roles';
@@ -217,6 +217,15 @@ describe('the screen’s taps', () => {
     const two: Lineup = { ...l, bench: l.bench.slice(0, 2) };
     expect(swapSpots(two, { kind: 'bench', index: 2 }, { kind: 'bench', index: 3 })).toBe(two);
     expect(swapSpots(l, { kind: 'bench', index: 0 }, { kind: 'bench', index: 0 })).toBe(l);
+  });
+  it('lineupChanges counts the spots that hold a different man (#614: what AUTO PICK reports)', () => {
+    expect(lineupChanges(l, l)).toBe(0);
+    expect(lineupChanges(l, { ...l, rotation: 'heavy', captain: 'prop-65' })).toBe(0);
+    expect(lineupChanges(l, swapSpots(l, { kind: 'starter', slot: 1 }, { kind: 'starter', slot: 3 }))).toBe(2);
+    expect(lineupChanges(l, placeAt(l, { kind: 'starter', slot: 7 }, l.bench[0]!))).toBe(2);
+    // An empty slot, and a bench one man short: each is a spot that changed.
+    expect(lineupChanges(l, { ...l, starters: l.starters.map((id, i) => (i === 0 ? null : id)) })).toBe(1);
+    expect(lineupChanges({ ...l, bench: l.bench.slice(0, 3) }, l)).toBe(1);
   });
 });
 
