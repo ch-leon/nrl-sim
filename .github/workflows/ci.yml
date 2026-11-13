@@ -91,7 +91,8 @@ jobs:
   # their verdict.
   webkit-shard:
     name: webkit (${{ matrix.group }})
-    runs-on: ubuntu-latest
+    # Playwright 1.56.1 supports WebKit on 24.04; ubuntu-latest can select 26.04.
+    runs-on: ubuntu-24.04
     # Cold WebKit dependency installs can take 13 minutes before layout/playthrough checks begin.
     # Keep the complete checks running on slower runners; no per-check timeouts are relaxed.
     timeout-minutes: 30
