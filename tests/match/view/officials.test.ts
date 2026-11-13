@@ -18,11 +18,11 @@ const world = (p: { x: number; y: number }) => {
   return fieldToWorldPoint(f.fx, f.fy, fieldOffsetX());
 };
 
-/** Every snapshot of a whole match. */
+/** Historical seven-minute halves provide the penalty/try presentation witnesses. */
 function playMatch(seed: number): Snapshot[] {
   const home = sideSheet('H', { rating: 62 });
   const away = sideSheet('A', { rating: 58 });
-  const sim = new LiveSim(home, away, seed);
+  const sim = new LiveSim(home, away, seed, { length: { halves: 2, halfMinutes: 7 } });
   const snaps: Snapshot[] = [sim.snapshot()];
   while (!sim.finished && sim.tick < 30_000) {
     sim.step();
@@ -119,7 +119,8 @@ describe('the bench and the sin bin (#642)', () => {
   const away = sideSheet('A', { rating: 58 });
 
   it('seats the four reserves at kick-off, and an interchange swaps who is sitting', () => {
-    const sim = new LiveSim(home, away, 3);
+    // Keep enough play for the existing fatigue/substitution thresholds.
+    const sim = new LiveSim(home, away, 3, { length: { halves: 2, halfMinutes: 7 } });
     const first = benchSeated(home, 'home', sim.snapshot());
     expect(first).toEqual(home.bench!.map((b) => b.name));
     let changed: string[] | null = null;

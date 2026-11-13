@@ -65,6 +65,7 @@ const PANEL_CSS = `
   background-size:5px 5px; background-repeat:no-repeat;
 }
 .nrl-labs-panel .nrl-dev-row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.nrl-labs-panel .nrl-dev-row > label { display:inline-flex; align-items:center; min-height:44px; }
 .nrl-labs-panel .nrl-dev-wait { color:var(--nrl-accent, #f4d03f); }
 `;
 
