@@ -5,8 +5,8 @@
 // title screen is done, and only after the page goes idle, so neither the first
 // load nor the title waits on it, and nothing reaches PostHog (or the browser's
 // storage) before the player has left the title. Until it arrives, events wait
-// in a short queue; when analytics is off (no token, dev, tests, the lab, Labs,
-// an automated run: config.ts) or the SDK fails to load or start, every call is
+// in a short queue; when analytics is off (no token, dev, tests, the lab, an
+// active Labs session, an automated run: config.ts) or the SDK fails to load or start, every call is
 // a no-op and the queue is dropped. No call here throws into the game.
 //
 // What may be sent is events.ts's list. Dedup:
@@ -18,7 +18,7 @@
 
 /// <reference types="vite/client" />
 import { buildLabel } from '../ui/buildInfo';
-import { labsVisible } from '../labs/flags';
+import { labsBlocksAnalytics } from '../labs/flags';
 import { analyticsSetup, type AnalyticsEnv, type AnalyticsPage, type AnalyticsSetup } from './config';
 import { sanitizeException, EXCEPTION_BURST_MAX, EXCEPTION_WINDOW_MS, type SafeException } from './exceptions';
 import { sanitize, type EventContext, type EventName, type EventProps } from './events';
@@ -128,7 +128,7 @@ export interface StartOptions {
 function readPage(): AnalyticsPage {
   let labs = false;
   try {
-    labs = labsVisible();
+    labs = labsBlocksAnalytics();
   } catch {
     labs = true; // can't tell: treat it as Labs, off
   }

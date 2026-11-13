@@ -41,12 +41,15 @@ describe('when analytics may run (config.ts)', () => {
     expect(analyticsSetup({ ...PROD, DEV: true, MODE: 'test', VITE_POSTHOG_DEV: '1' }, PAGE)).toEqual({ off: 'test' });
   });
 
-  it('is off in the match lab, Labs, the test careers and automated browsers', () => {
+  it('is off in the match lab, an active Labs session, ?labs=1, the test careers and automated browsers', () => {
     expect(analyticsSetup(PROD, { ...PAGE, hash: '#lab' })).toEqual({ off: 'lab' });
     expect(analyticsSetup(PROD, { ...PAGE, hash: '#lab?seed=4' })).toEqual({ off: 'lab' });
     expect(analyticsSetup(PROD, { ...PAGE, hash: '#label' })).toEqual({ token: TOKEN, host: POSTHOG_EU_HOST });
+    // page.labs is an active session (labsBlocksAnalytics), not the Settings entry being listed.
+    expect(analyticsSetup(PROD, { ...PAGE, labs: false })).toEqual({ token: TOKEN, host: POSTHOG_EU_HOST });
     expect(analyticsSetup(PROD, { ...PAGE, labs: true })).toEqual({ off: 'labs' });
     expect(analyticsSetup(PROD, { ...PAGE, search: '?labs=1' })).toEqual({ off: 'labs' });
+    expect(analyticsSetup(PROD, { ...PAGE, search: '?labs=0' })).toEqual({ token: TOKEN, host: POSTHOG_EU_HOST });
     expect(analyticsSetup(PROD, { ...PAGE, search: '?e2e' })).toEqual({ off: 'e2e' });
     expect(analyticsSetup(PROD, { ...PAGE, automated: true })).toEqual({ off: 'automated' });
   });

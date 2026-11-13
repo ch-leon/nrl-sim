@@ -1,6 +1,6 @@
 # Overview
 
-Last updated: 2026-11-07
+Last updated: 2026-11-13
 
 ## The pitch
 
@@ -26,8 +26,9 @@ premium game with a free demo and a one-off unlock
 - **Match lab:** https://ch-leon.github.io/nrl-sim/#lab. Pick two teams and a seed,
   then watch, pause, step and scrub the match sim. This is where a match mechanic is
   signed off.
-- **Labs:** add `?labs=1` to the URL to show a hidden experiments panel. Every
-  experiment is off by default.
+- **Developer settings:** in Settings on current builds. Everything there is off
+  until you turn it on. `?labs=1` still opens it. Before launch, set
+  `VITE_DEV_SETTINGS=0` or remove the page.
 - **Android:** CI builds a sideloadable test APK from `main`
   ([PR](https://github.com/ch-leon/nrl-sim/pull/394)). Saves stay on the phone; no
   login or payments.

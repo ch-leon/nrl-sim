@@ -77,6 +77,10 @@ update, above). There is no cloud save and no account — this is a local-only t
   never shadow the bundled build.
 - **Not commercial.** `VITE_COMMERCIAL` is not set, so the paywall stays off, same as the
   web build.
+- **Developer settings is in Settings**, same as the web build, until
+  `VITE_DEV_SETTINGS=0`. Nothing on that page is on until a tester turns it on,
+  and a normal career is unchanged. Before launch, set the switch off or remove
+  the page.
 
 ## A note on obfuscation (not real protection)
 
