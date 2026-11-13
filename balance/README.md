@@ -225,6 +225,14 @@ never as zero: the table is left out, or a dash shown for that row):
   shapes picked at the play-the-ball (`src/match/league/shapes.ts`), both sides, as
   shares of the picks; the per-match counts are `watch.shapes` in `results*.jsonl`. A
   row with no shape picked (`shapes.on` 0) or from before step 2 shows a dash.
+- **Shape formed % / Formed pod, edge, back door % / Shape short m** (#649 step 2): of the
+  shaped play-the-balls, the share where the shape was formed as the ball left the ruck:
+  every man it places (not the dummy-half, the man who played the ball or a man still
+  locked) within 2 m (`SHAPE_FORMED_M`) of his spot, measured to the nearest point of his
+  run-on line (from where the shape stands him to where he comes onto the ball). Pooled
+  over the row; the ± treats each play-the-ball as a draw. **Short m** is the mean
+  distance short, a man's mean per play-the-ball. The sim notes each ball-out in a view
+  channel (`shapeBallOut`); nothing in it reads it. A dash with no shaped play-the-ball.
 
 Origins and last-tackle plays are shares of the tries or last tackles in the row;
 the `*` marks use a standard error that treats each try (or last tackle) as an

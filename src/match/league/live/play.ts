@@ -420,8 +420,8 @@ export abstract class LivePlay extends LiveKicks {
     const pace = !w || handover ? null : secs <= WRESTLE.quickS ? 'quick' : secs >= WRESTLE.slowS ? 'slow' : null;
     this.lock(c, 'down', down);
     for (const i of w ? w.men : [ph.tackler]) this.lock(this.players[i]!, 'down', down);
-    // The attack shape for this play-the-ball (#649 step 2): its one roll, while shapes are on.
-    this.shape = this.chooseShape(handover, pace);
+    // The attack shape picked as this tackle was made (#649 step 2), unless the play-the-ball is quick.
+    this.shape = this.keepShape(ph.t0, handover, pace);
     this.phase = { kind: 'ruck', t0: this.tick, carrier: ph.carrier, tackler: ph.tackler, stage: 'down', handover, heldAt: 0, down, pace, contactStartedTick: ph.t0 };
     this.startRetreat();
     if (this.siren) this.endHalf(); // the tackle is made: the ball is dead

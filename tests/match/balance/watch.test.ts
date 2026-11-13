@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Side, SimEvent } from '../../../src/match/core/snapshot';
 import { MATCH_MINUTES, measureCell, type CellResult } from '../../../src/match/balance/measure';
 import { reportMarkdown, sharesOf } from '../../../src/match/balance/report';
-import { FirstReceivers, PlayWatch, ScoreLine, type TickView } from '../../../src/match/balance/watch';
+import { FirstReceivers, PlayWatch, SHAPE_FORMED_M, ScoreLine, ShapesFormed, type TickView } from '../../../src/match/balance/watch';
 
 const ev = (tick: number, kind: string, side?: Side, detail?: string): SimEvent => ({ tick, kind, text: '', ...(side ? { side } : {}), ...(detail ? { detail } : {}) });
 
@@ -253,21 +253,33 @@ describe('the report', () => {
   });
   it('adds the first-receiver columns after the last tackles, with a dash for results from before them (#649)', () => {
     expect(reportMarkdown({ plan, meta, results: [old] })).toContain('| Last tackle pass % | 1st receiver same man % | 1st receiver slots |');
-    // Step 2 (#649) added the shape columns after them; a result from before step 1 has neither.
-    const { receivers: _, shapes: __, ...older } = fresh!;
+    // Step 2 (#649) added the shape and shape-formed columns after them; a result from before step 1 has none.
+    const { receivers: _, shapes: __, shapesFormed: ___, ...older } = fresh!;
     const md = reportMarkdown({ plan, meta, results: [{ ...old, watch: older }] });
     // The baseline's second (watchability) row.
     const line = md.split('\n').filter((l) => l.startsWith('| baseline | ')).pop()!;
-    expect(line.trim().endsWith('| — | — | — | — | — | — |')).toBe(true);
-    expect(line.split('—').length).toBe(7);
+    expect(line.trim().endsWith(`|${' — |'.repeat(11)}`)).toBe(true);
+    expect(line.split('—').length).toBe(12);
   });
-  it('adds the shape columns last: shares of the shapes picked, a dash with none picked (#649 step 2)', () => {
-    expect(reportMarkdown({ plan, meta, results: [old] })).toContain('| 1st receiver slots | Shape spread % | Shape forward pod % | Shape edge shift % | Shape back door % |');
+  it('adds the shape columns after them: shares of the shapes picked, a dash with none picked (#649 step 2)', () => {
+    expect(reportMarkdown({ plan, meta, results: [old] })).toContain('| 1st receiver slots | Shape spread % | Shape forward pod % | Shape edge shift % | Shape back door % | Shape formed % |');
     const line = (md: string): string => md.split('\n').filter((l) => l.startsWith('| baseline | ')).pop()!;
-    const on = line(reportMarkdown({ plan, meta, results: [old] })).split('|').slice(-5, -1).map(Number);
+    const on = line(reportMarkdown({ plan, meta, results: [old] })).split('|').slice(-10, -6).map(Number);
     expect(on.reduce((a, b) => a + b, 0)).toBeGreaterThanOrEqual(99);
     const none = { spread: stat(0), pod: stat(0), edge: stat(0), backDoor: stat(0) };
-    expect(line(reportMarkdown({ plan, meta, results: [{ ...old, watch: { ...fresh!, shapes: none } }] })).trim().endsWith('| — | — | — | — |')).toBe(true);
+    const cells = line(reportMarkdown({ plan, meta, results: [{ ...old, watch: { ...fresh!, shapes: none } }] })).split('|').slice(-10, -6).map((c) => c.trim());
+    expect(cells).toEqual(['—', '—', '—', '—']);
+  });
+  it('adds the shape-formed columns last: the share formed at ball-out, per shape, and the distance short (#649 step 2)', () => {
+    expect(reportMarkdown({ plan, meta, results: [old] })).toContain('| Shape formed % | Formed pod % | Formed edge % | Formed back door % | Shape short m |');
+    const w = new ShapesFormed();
+    w.tick({ tick: 10, name: 'pod', shorts: [0.5, 1.9] }); // formed
+    w.tick({ tick: 10, name: 'pod', shorts: [0.5, 1.9] }); // the same ball-out again: not counted twice
+    w.tick({ tick: 40, name: 'pod', shorts: [0.5, SHAPE_FORMED_M + 0.1] }); // one man short
+    w.tick({ tick: 70, name: 'edge', shorts: [1, 3] });
+    w.tick(null);
+    expect(w.result()).toMatchObject({ podN: 2, podFormed: 1, edgeN: 1, edgeFormed: 0, backDoorN: 0 });
+    expect(w.result().podShort).toBeCloseTo(1.2 + 1.3);
   });
 });
 

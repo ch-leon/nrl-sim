@@ -47,7 +47,22 @@ export const SHAPES = {
   holdTicks: 30,
   /** Inside this many metres of the line the `line` row replaces the red zone's. */
   lineM: 10,
-  /** The edge shift goes to the short side this share of the time (the same roll), when the short side is at least `shortSideM` wide. */
+  /**
+   * No man's spot is further than this from where his lane would stand him off the same
+   * ruck: a far spot is brought in along the line to it (0 = as the table says).
+   */
+  maxShiftM: 7,
+  /**
+   * A shape is offered only on a side where every man it places is within this many
+   * metres of his spot as the tackle is made (it falls back to the spread when no side
+   * is); 0 = any distance.
+   */
+  reachM: 12,
+  /**
+   * The edge shift goes to the side where more of the men it stacks already stand; when
+   * the other side is reachable too (and, if it is the narrower side, at least
+   * `shortSideM` wide), to that side this share of the time (the same roll).
+   */
   shortShare: 0.3,
   shortSideM: 20,
   /** How much a preset wants each shape (relative weights). */
@@ -111,22 +126,24 @@ export interface ShapeCall {
   side: 'home' | 'away';
   name: ShapeName;
   sign: 1 | -1;
+  /** The tick it was picked (the tackle it is for). */
+  at: number;
   /** Its spots by slot (null: he holds his lane), and whether `dy` is a share of the room to touch: read off the table once, at the pick. */
   bySlot: readonly (ShapeSpot | null)[];
   room: boolean;
 }
 
 /** A shape call for `side`, its spots resolved by slot for the way it is played. */
-export function shapeCall(side: 'home' | 'away', name: ShapeName, sign: 1 | -1): ShapeCall {
+export function shapeCall(side: 'home' | 'away', name: ShapeName, sign: 1 | -1, at = 0): ShapeCall {
   const bySlot: (ShapeSpot | null)[] = [null, null, null, null, null, null, null, null, null];
-  if (name === 'spread') return { side, name, sign, bySlot, room: false };
+  if (name === 'spread') return { side, name, sign, at, bySlot, room: false };
   const def = SHAPES.spots[name];
   const map = sign > 0 ? SLOT_RIGHT : SLOT_LEFT;
   for (const man of Object.keys(map) as ShapeMan[]) {
     const spot = def[man];
     if (spot && bySlot[map[man]] === null) bySlot[map[man]] = { dy: spot.dy, depth: spot.depth };
   }
-  return { side, name, sign, bySlot, room: def.room > 0 };
+  return { side, name, sign, at, bySlot, room: def.room > 0 };
 }
 
 export type TackleBucket = keyof typeof SHAPES.tackles;
@@ -148,25 +165,32 @@ export function shapeWeights(preset: AttackPreset, zone: Zone | 'line', bucket: 
   return out;
 }
 
+/** Which way a shape may be played this ruck: its first side, and the other when that is on too (the edge shift's alternative); a shape with neither is not offered. */
+export interface ShapeSides {
+  first: 1 | -1;
+  alt: 1 | -1 | null;
+}
+
 /**
- * The shape for one roll in [0, 1): the weights' cumulative pick. The open side
- * is the wider one; the edge shift goes short when the roll falls in the last
- * `shortShare` of its band and the short side is `shortSideM` wide or more.
+ * The shape for one roll in [0, 1): the weights' cumulative pick, among the shapes
+ * `sides` offers (the spread always is, toward `open`). The edge shift goes to its
+ * `alt` side when the roll falls in the last `shortShare` of its band.
  */
-export function pickShape(weights: Readonly<Record<ShapeName, number>>, roll: number, markY: number): { name: ShapeName; sign: 1 | -1 } {
-  const open: 1 | -1 = markY <= FIELD_WIDTH / 2 ? 1 : -1;
-  const total = SHAPE_NAMES.reduce((a, n) => a + weights[n], 0);
+export function pickShape(weights: Readonly<Record<ShapeName, number>>, roll: number, sides: Readonly<Partial<Record<ShapeName, ShapeSides>>>, open: 1 | -1): { name: ShapeName; sign: 1 | -1 } {
+  const w = (n: ShapeName): number => (n === 'spread' || sides[n] ? weights[n] : 0);
+  const total = SHAPE_NAMES.reduce((a, n) => a + w(n), 0);
   if (total <= 0) return { name: 'spread', sign: open };
   let left = roll * total;
   for (const n of SHAPE_NAMES) {
-    const w = weights[n];
-    if (w <= 0) continue;
-    if (left < w) {
-      const shortRoom = open > 0 ? markY : FIELD_WIDTH - markY;
-      const short = n === 'edge' && shortRoom >= SHAPES.shortSideM && left / w >= 1 - SHAPES.shortShare;
-      return { name: n, sign: short ? (-open as 1 | -1) : open };
+    const wn = w(n);
+    if (wn <= 0) continue;
+    if (left < wn) {
+      const side = sides[n];
+      if (!side) return { name: n, sign: open };
+      const alt = n === 'edge' && side.alt !== null && left / wn >= 1 - SHAPES.shortShare;
+      return { name: n, sign: alt ? side.alt! : side.first };
     }
-    left -= w;
+    left -= wn;
   }
   return { name: 'spread', sign: open };
 }

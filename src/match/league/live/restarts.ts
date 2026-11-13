@@ -67,6 +67,8 @@ export abstract class LiveRestarts extends LivePlay {
     if (ph.heldAt === 0) ph.heldAt = this.tick;
     if (this.tick < ph.heldAt + LIVE.dhHoldTicks) return;
     this.lastPlay = this.tackles === SET_TACKLES - 1;
+    // The ball is leaving the ruck: where the shape's men are, for the harness (#649).
+    this.noteShapeBallOut();
     const intent = this.pendingControl[this.attacking];
     if (intent && (intent.kind === 'pass-left' || intent.kind === 'pass-right')) {
       this.pendingControl[this.attacking] = null;

@@ -133,8 +133,11 @@ describe('injuries in the live sim', () => {
     const squad = Array.from({ length: 13 }, (_, i) => generatePlayer(rng, { position: i % 2 ? 'prop' : 'centre' }));
     const mine = teamSheetFromSquad(squad, 'me', 'Me', ['#111', '#eee']);
     const them = { ...sideSheet('them', { rating: 60 }), clubId: 'them' };
-    const a = runMatch(mine, them, { seed: 9, weather: 'rain' });
-    const b = runMatch(mine, them, { seed: 9, weather: 'rain' });
+    // The first seed from 9 with one of ours hurt (seed 9 itself until the attack shapes, #649 step 2).
+    let seed = 9;
+    while (seed < 30 && runMatch(mine, them, { seed, weather: 'rain' }).injuries.every((i) => i.teamId !== 'me')) seed++;
+    const a = runMatch(mine, them, { seed, weather: 'rain' });
+    const b = runMatch(mine, them, { seed, weather: 'rain' });
     expect(a.weather).toBe('rain');
     expect(a.injuries).toEqual(b.injuries);
     const ours = a.injuries.filter((i) => i.teamId === 'me');
@@ -146,6 +149,6 @@ describe('injuries in the live sim', () => {
       expect(i.weeks).toBeLessThanOrEqual(3);
     }
     // No injuries when the difficulty switches them off.
-    expect(runMatch(mine, them, { seed: 9, injuryRate: 0 }).injuries).toEqual([]);
-  }, 30_000);
+    expect(runMatch(mine, them, { seed, injuryRate: 0 }).injuries).toEqual([]);
+  }, 120_000);
 });

@@ -41,9 +41,10 @@ import { contractsEndingSoon } from '../../src/systems/contracts';
 // #625: completed retreats, including handovers, change match outcomes and later
 // season draws. The final standing-marker/deep-cover corrections restore this historical
 // season fingerprint; UI-read and no-read seasons still agree.
-// The attack shapes (#649 step 2) add a roll at each play-the-ball and change match outcomes,
-// so later season draws. Previous pin: 1788836146 (it still is with shapes.on 0).
-const MAIN_SEED_AFTER_SEASON = 4195872732;
+// The attack shapes (#649 step 2) add a roll at each tackle and change match outcomes. Its
+// first cut moved this to 4195872732; picked at the tackle, within reach, the season ends on
+// the same stream as with shapes.on 0, the pin above.
+const MAIN_SEED_AFTER_SEASON = 1788836146;
 
 describe('the rng stream (#369)', () => {
   it.each([0, 1])('weekly potential and dot reads preserve the season stream with habit AI=%i', (ai) => {

@@ -58,11 +58,12 @@ describe('the #322 Speed levers', () => {
         away: { rating: 60, tactics: { defence: 'slide' as const } },
       },
     });
-    const off = measureCell(cell({ ...ON, 'race.on': 0 }), SEEDS);
-    const on = measureCell(cell({ ...ON, 'race.on': 1, 'race.perPoint': 0.02, 'race.single': 0 }), SEEDS);
+    // Twice the seeds since the attack shapes (#649 step 2): over 30 both ways the race's extra busts read 0.98 a match.
+    const off = measureCell(cell({ ...ON, 'race.on': 0 }), SEEDS * 2);
+    const on = measureCell(cell({ ...ON, 'race.on': 1, 'race.perPoint': 0.02, 'race.single': 0 }), SEEDS * 2);
     // The harness now reports counts per five-minute default; compare the established
     // fourteen-minute rate so shortening the clock does not dilute the physics threshold.
     const extraBustsPer14Minutes = (on.trackedCounts!.busts.mean - off.trackedCounts!.busts.mean) * 14 / MATCH_MINUTES;
     expect(extraBustsPer14Minutes).toBeGreaterThan(MARGIN);
-  }, 120_000);
+  }, 240_000);
 });

@@ -156,13 +156,19 @@ export abstract class LiveBase {
   protected readonly playUsed: Record<Side, boolean> = { home: false, away: false };
   protected scripted: ScriptedPlay | null = null;
   /**
-   * The attack shape picked as the last ruck formed (#649 step 2): null when
-   * none was (shapes off, a handover, a quick or restart play-the-ball, the
-   * last tackle), and then everyone holds his base lane as before.
+   * The attack shape picked as the last tackle was made (#649 step 2), kept through
+   * its ruck: null when none was (shapes off, a handover, a quick or restart
+   * play-the-ball, the last tackle), and then everyone holds his base lane as before.
    */
   protected shape: ShapeCall | null = null;
   /** Shapes picked so far, both sides together (a view channel, like `playsRun`: not events; the harness counts them). */
   readonly shapesPicked: Record<ShapeName, number> = { spread: 0, pod: 0, edge: 0, backDoor: 0 };
+  /**
+   * The last shaped play-the-ball as the ball left the ruck: its tick, the shape, and how far
+   * each man it places was from his spot (metres). A view channel for the harness: nothing in
+   * the sim reads it; null until the first.
+   */
+  shapeBallOut: { tick: number; name: ShapeName; shorts: number[] } | null = null;
   protected playKick: { side: Side; edge: number; chasers: number[] } | null = null;
   protected tucked = -1;
   protected readonly autoUsed: Record<Side, AutoUsed> = { home: { ...NO_AUTO_USED, lastSet: {} }, away: { ...NO_AUTO_USED, lastSet: {} } };
@@ -562,7 +568,9 @@ export abstract class LiveBase {
 
   protected abstract announcePaid(vs: readonly CallVerdict[]): void;
   protected abstract playCall(): CoachCall | null;
-  protected abstract chooseShape(handover: boolean, pace: 'quick' | 'slow' | null): ShapeCall | null;
+  protected abstract noteShapeBallOut(): void;
+  protected abstract chooseShape(c: Player): ShapeCall | null;
+  protected abstract keepShape(tackleAt: number, handover: boolean, pace: 'quick' | 'slow' | null): ShapeCall | null;
   protected abstract swapIn(p: Player, bi: number, fresh?: boolean): void;
   abstract get matchSeconds(): number;
   protected abstract toLineFor(side: Side, p: Vec): number;

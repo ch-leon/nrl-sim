@@ -297,8 +297,8 @@ describe('measuring and reporting', () => {
     // The attack shapes (#649 step 2) add a roll at each play-the-ball and move the attackers
     // into shape, re-pinning both; at shapes.on 0 they are 10-0:120:785e83425993f65b /
     // 6-0:119:0c43dd4315fca6d2, the pins before it.
-    { attack: 'balanced' as const, expected: '0-4:135:7796fbc5e338d880' },
-    { attack: 'expansive' as const, expected: '11-4:132:994746e9d4dd5c41' },
+    { attack: 'balanced' as const, expected: '12-4:146:14f92e624847723e' },
+    { attack: 'expansive' as const, expected: '0-6:139:cb2999499f127dfb' },
   ])('pins an even $attack / Slide match (seed 1)', async ({ attack, expected }) => {
     const sim = new LiveSim(sideSheet('H', { rating: 60, tactics: { attack } }), sideSheet('A', { rating: 60 }), 1);
     const parts: string[] = [];
@@ -331,8 +331,8 @@ describe('measuring and reporting', () => {
     // The attack shapes (#649 step 2) re-pin both (6-7:137:d1d03788b03a1934 and
     // 7-6:160:ef629166efdf6fe6 before them, as they are at shapes.on 0); a launched play still
     // overrides the shape, and both still launch one.
-    { name: 'plays-on', aiCoach: false, expected: '7-0:144:bec3a284f5d7d61e' },
-    { name: 'plays-on-hard', aiCoach: true, expected: '6-12:157:6925272ea38d5ff8' },
+    { name: 'plays-on', aiCoach: false, expected: '0-0:145:7384b0d2b13284e0' },
+    { name: 'plays-on-hard', aiCoach: true, expected: '0-4:153:795761cf8dcd6844' },
   ])('pins $name: an even Balanced / Slide match with set plays (seed 1)', async ({ aiCoach, expected }) => {
     const home = { ...sideSheet('H', { rating: 60 }), plays: ['block-play' as const, 'cut-out-winger' as const, 'kick-pass' as const] };
     const sim = new LiveSim(home, sideSheet('A', { rating: 60 }), 1, aiCoach ? { aiCoach: ['home'] } : {});

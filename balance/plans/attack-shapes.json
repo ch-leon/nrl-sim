@@ -1,6 +1,6 @@
 {
   "name": "attack-shapes",
-  "description": "#649 step 2: does picking an attack shape at each play-the-ball (forward pod, edge shift, back door or the plain spread; shapes.on) vary the first receiver and spread the try origins without moving the §7 counts, completion or the six preset rows out of 45–55%? Baseline is the off value (shapes.on 0, the weighted receiver on as shipped); 'on' is the proposed default. 'on, no hold' drops the shape as the ball is played (shapes.holdTicks 0), to show what holding it into the first pass adds; 'on, flat weights' gives every preset Balanced's weights, to show what the preset weighting does to the preset rows. The scenarios are standard.json's, with 60 matches on the plain rows.",
+  "description": "#649 step 2: does picking an attack shape as each tackle is made (forward pod, edge shift, back door or the plain spread; shapes.on) get the shape formed by the time the ball leaves the ruck, vary the first receiver and spread the try origins, without moving the §7 counts, completion or the six preset rows out of 45–55%? Baseline is the off value (shapes.on 0, the weighted receiver on as shipped); 'on' is the proposed default. 'on, spots as the table' lifts the two limits that get the men there in time (shapes.maxShiftM 0 and shapes.reachM 0), to show what they buy. The scenarios are standard.json's, with 60 matches on the plain rows.",
   "seeds": 60,
   "base": { "shapes.on": 0 },
   "scenarios": [
@@ -20,13 +20,6 @@
   ],
   "variants": [
     { "name": "on", "tuning": { "shapes.on": 1 } },
-    { "name": "on, no hold", "tuning": { "shapes.on": 1, "shapes.holdTicks": 0 } },
-    { "name": "on, flat weights", "tuning": {
-      "shapes.on": 1,
-      "shapes.weights.grind.spread": 1, "shapes.weights.grind.pod": 1, "shapes.weights.grind.edge": 1, "shapes.weights.grind.backDoor": 1,
-      "shapes.weights.expansive.spread": 1, "shapes.weights.expansive.pod": 1, "shapes.weights.expansive.edge": 1, "shapes.weights.expansive.backDoor": 1,
-      "shapes.weights.kick-chase.spread": 1, "shapes.weights.kick-chase.pod": 1, "shapes.weights.kick-chase.edge": 1, "shapes.weights.kick-chase.backDoor": 1,
-      "shapes.weights.all-out.spread": 1, "shapes.weights.all-out.pod": 1, "shapes.weights.all-out.edge": 1, "shapes.weights.all-out.backDoor": 1
-    } }
+    { "name": "on, spots as the table", "tuning": { "shapes.on": 1, "shapes.maxShiftM": 0, "shapes.reachM": 0 } }
   ]
 }

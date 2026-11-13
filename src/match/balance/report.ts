@@ -155,6 +155,24 @@ export function sharesOf<K extends string>(counts: Record<K, Stat>, keys: readon
 
 const pctStat = (s: Stat): Stat => ({ mean: s.mean * 100, se: s.se * 100 });
 
+type Shaped = 'pod' | 'edge' | 'backDoor';
+/** The share of these shapes' play-the-balls that were formed at ball-out (pooled; its ± treats each as a draw), or nothing with none. */
+function formedShare(w: WatchStats, r: CellResult, ks: readonly Shaped[]): Stat | undefined {
+  const f = w.shapesFormed;
+  if (!f) return undefined;
+  const n = ks.reduce((a, k) => a + f[`${k}N`].mean, 0);
+  if (n <= 0) return undefined;
+  const p = ks.reduce((a, k) => a + f[`${k}Formed`].mean, 0) / n;
+  return { mean: 100 * p, se: 100 * Math.sqrt((p * (1 - p)) / (n * r.seeds)) };
+}
+/** The mean distance short of the spot, metres, over shaped play-the-balls (a man's mean per ruck); nothing with none. */
+function formedShort(w: WatchStats): Stat | undefined {
+  const f = w.shapesFormed;
+  if (!f) return undefined;
+  const n = f.podN.mean + f.edgeN.mean + f.backDoorN.mean;
+  return n > 0 ? { mean: (f.podShort.mean + f.edgeShort.mean + f.backDoorShort.mean) / n, se: 0 } : undefined;
+}
+
 /** One shape's share of the shapes picked in a row, or nothing when none were (off, or a run from before #649 step 2). */
 function shapeShare(w: WatchStats, r: CellResult, k: ShapeName): Stat | undefined {
   if (!w.shapes || SHAPE_NAMES.every((n) => w.shapes![n].mean === 0)) return undefined;
@@ -174,6 +192,12 @@ const WATCH_COLUMNS: readonly { head: string; digits: number; get: (w: WatchStat
   { head: '1st receiver slots', digits: 1, get: (w) => w.receivers?.slots },
   // The attack shapes picked (#649 step 2), as shares of the picks; a dash with none picked (shapes off) or in results from before them.
   ...SHAPE_NAMES.map((k) => ({ head: `Shape ${SHAPE_LABEL[k].toLowerCase()} %`, digits: 0, get: (w: WatchStats, r: CellResult) => shapeShare(w, r, k) })),
+  // Formed as the ball left the ruck (#649 step 2): every man the shape places within SHAPE_FORMED_M of his spot.
+  { head: 'Shape formed %', digits: 0, get: (w: WatchStats, r: CellResult) => formedShare(w, r, ['pod', 'edge', 'backDoor']) },
+  { head: 'Formed pod %', digits: 0, get: (w: WatchStats, r: CellResult) => formedShare(w, r, ['pod']) },
+  { head: 'Formed edge %', digits: 0, get: (w: WatchStats, r: CellResult) => formedShare(w, r, ['edge']) },
+  { head: 'Formed back door %', digits: 0, get: (w: WatchStats, r: CellResult) => formedShare(w, r, ['backDoor']) },
+  { head: 'Shape short m', digits: 1, get: (w: WatchStats) => formedShort(w) },
 ];
 
 /** The watchability table for one scenario's rows, or nothing when none of them has the measures (a run from before #648). */

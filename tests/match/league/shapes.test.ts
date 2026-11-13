@@ -24,16 +24,20 @@ describe('attack shapes: the table', () => {
     // Every preset can reach every shape somewhere (none vanishingly rare by construction).
     for (const p of ATTACK_PRESETS) for (const n of SHAPE_NAMES) expect(shapeWeights(p, 'midfield', 'middle')[n]).toBeGreaterThan(0);
   });
-  it('picks by cumulative weight over one roll, toward the open side; the edge goes short in the top of its band when there is room', () => {
+  it('picks by cumulative weight over one roll among the shapes on offer; the edge takes its other side in the top of its band', () => {
     const w: Record<ShapeName, number> = { spread: 1, pod: 1, edge: 1, backDoor: 1 };
-    expect(pickShape(w, 0.1, 20)).toEqual({ name: 'spread', sign: 1 });
-    expect(pickShape(w, 0.3, 20)).toEqual({ name: 'pod', sign: 1 });
-    expect(pickShape(w, 0.55, 50)).toEqual({ name: 'edge', sign: -1 });
-    expect(pickShape(w, 0.9, 50)).toEqual({ name: 'backDoor', sign: -1 });
-    // Edge band is 0.5–0.75: its top shortShare (0.3) goes to the short side when that is 20 m or wider.
-    expect(pickShape(w, 0.74, 30)).toEqual({ name: 'edge', sign: -1 });
-    expect(pickShape(w, 0.74, 12)).toEqual({ name: 'edge', sign: 1 });
-    expect(pickShape({ spread: 0, pod: 0, edge: 0, backDoor: 0 }, 0.5, 30).name).toBe('spread');
+    const all = { pod: { first: 1, alt: null }, edge: { first: -1, alt: 1 }, backDoor: { first: -1, alt: null } } as const;
+    expect(pickShape(w, 0.1, all, 1)).toEqual({ name: 'spread', sign: 1 });
+    expect(pickShape(w, 0.3, all, 1)).toEqual({ name: 'pod', sign: 1 });
+    expect(pickShape(w, 0.55, all, 1)).toEqual({ name: 'edge', sign: -1 });
+    expect(pickShape(w, 0.9, all, 1)).toEqual({ name: 'backDoor', sign: -1 });
+    // Edge band is 0.5–0.75: its top shortShare (0.3) goes to its other side when it has one.
+    expect(pickShape(w, 0.74, all, 1)).toEqual({ name: 'edge', sign: 1 });
+    expect(pickShape(w, 0.74, { ...all, edge: { first: -1, alt: null } }, 1)).toEqual({ name: 'edge', sign: -1 });
+    // A shape not on offer (out of reach) is not picked: its share goes to the rest.
+    expect(pickShape(w, 0.55, { pod: all.pod }, 1)).toEqual({ name: 'pod', sign: 1 });
+    expect(pickShape(w, 0.99, {}, -1)).toEqual({ name: 'spread', sign: -1 });
+    expect(pickShape({ spread: 0, pod: 0, edge: 0, backDoor: 0 }, 0.5, all, 1).name).toBe('spread');
   });
   it('names each man once per shape, either way it is played, and keeps every spot on the field', () => {
     for (const name of ['pod', 'edge', 'backDoor'] as const) {
@@ -68,7 +72,7 @@ describe('attack shapes: the table', () => {
 describe('attack shapes: in the sim', () => {
   const home = labSheet(DEFAULT_HOME, 'gen');
   const away = labSheet(DEFAULT_AWAY, 'gen');
-  type Hooked = { rng: { next: () => number }; chooseShape: (h: boolean, p: 'quick' | 'slow' | null) => unknown };
+  type Hooked = { rng: { next: () => number }; chooseShape: (c: unknown) => unknown };
   const play = (seed: number): { events: number; home: number; away: number; draws: number; shapeDraws: number; picks: number; shown: Set<string> } => {
     const sim = new LiveSim(home, away, seed);
     const hooked = sim as unknown as Hooked;
@@ -80,9 +84,9 @@ describe('attack shapes: in the sim', () => {
     const choose = hooked.chooseShape.bind(sim);
     let shapeDraws = 0;
     let bad = 0;
-    hooked.chooseShape = (h, p) => {
+    hooked.chooseShape = (c) => {
       const d0 = draws;
-      const s = choose(h, p);
+      const s = choose(c);
       shapeDraws += draws - d0;
       if (draws - d0 !== (s ? 1 : 0)) bad++;
       return s;
@@ -105,7 +109,7 @@ describe('attack shapes: in the sim', () => {
 
   it('is a set of knobs by name, with its neighbours', () => {
     const names = listKnobs().map((k) => k.path);
-    for (const k of ['shapes.on', 'shapes.holdTicks', 'shapes.lineM', 'shapes.shortShare', 'shapes.weights.grind.pod', 'shapes.zones.line.backDoor', 'shapes.tackles.early.pod', 'shapes.spots.edge.nearWing.dy', 'shapes.spots.backDoor.nearHalf.depth']) {
+    for (const k of ['shapes.on', 'shapes.holdTicks', 'shapes.lineM', 'shapes.reachM', 'shapes.maxShiftM', 'shapes.shortShare', 'shapes.weights.grind.pod', 'shapes.zones.line.backDoor', 'shapes.tackles.early.pod', 'shapes.spots.edge.nearWing.dy', 'shapes.spots.backDoor.nearHalf.depth']) {
       expect(names).toContain(k);
     }
   });
@@ -120,7 +124,7 @@ describe('attack shapes: in the sim', () => {
         expect({ events: off.events, home: off.home, away: off.away, draws: off.draws }).toEqual(OFF[seed]);
       }
       // Its other knobs do nothing while it is off.
-      const r2 = applyTuning({ 'shapes.holdTicks': 0, 'shapes.weights.balanced.pod': 9, 'shapes.spots.pod.prop.dy': 8 });
+      const r2 = applyTuning({ 'shapes.holdTicks': 0, 'shapes.reachM': 0, 'shapes.maxShiftM': 0, 'shapes.weights.balanced.pod': 9, 'shapes.spots.pod.prop.dy': 8 });
       try {
         const off = play(1);
         expect({ events: off.events, home: off.home, away: off.away, draws: off.draws }).toEqual(OFF[1]);
@@ -139,6 +143,65 @@ describe('attack shapes: in the sim', () => {
     expect(on.draws).not.toBe(OFF[11]!.draws);
     expect(on.shown.size).toBeGreaterThanOrEqual(3);
   });
+  type Inside = LiveSim & { phase: { kind: string; t0?: number; pace?: string | null }; shape: { at: number; name: string } | null; shapeInForce: () => unknown; shapeBallOut: { tick: number; shorts: number[] } | null };
+  it('picks at the tackle: the shape is in force from the tackle it was picked at, and a quick play-the-ball drops it', () => {
+    let tackles = 0;
+    let quick = 0;
+    for (let seed = 1; seed <= 4 && quick === 0; seed++) {
+      const sim = new LiveSim(home, away, seed) as unknown as Inside;
+      while (!sim.finished) {
+        sim.step();
+        const ph = sim.phase;
+        if (ph.kind === 'tackle' && sim.shape && sim.shape.at === ph.t0 && sim.shape.name !== 'spread') {
+          tackles++;
+          expect(sim.shapeInForce()).toBe(sim.shape);
+        }
+        if (ph.kind === 'ruck' && ph.pace === 'quick') {
+          quick++;
+          expect(sim.shapeInForce()).toBeNull();
+        }
+      }
+    }
+    expect(tackles).toBeGreaterThan(10);
+    expect(quick).toBeGreaterThan(0);
+  }, 60_000);
+  it('is formed as the ball leaves the ruck: every man it places within 2 m of his spot, most of the time', () => {
+    let n = 0;
+    let formed = 0;
+    for (const seed of [1, 2, 3]) {
+      const sim = new LiveSim(home, away, seed) as unknown as Inside;
+      let last = -1;
+      while (!sim.finished) {
+        sim.step();
+        const o = sim.shapeBallOut;
+        if (!o || o.tick === last) continue;
+        last = o.tick;
+        n++;
+        if (o.shorts.every((d) => d <= 2)) formed++;
+      }
+    }
+    expect(n).toBeGreaterThan(20);
+    expect(formed / n).toBeGreaterThan(0.75);
+    // Without the levers (spots as the table says, offered from any distance) it mostly is not.
+    const restore = applyTuning({ 'shapes.maxShiftM': 0, 'shapes.reachM': 0 });
+    try {
+      let m = 0;
+      let ok = 0;
+      const sim = new LiveSim(home, away, 1) as unknown as Inside;
+      let last = -1;
+      while (!sim.finished) {
+        sim.step();
+        const o = sim.shapeBallOut;
+        if (!o || o.tick === last) continue;
+        last = o.tick;
+        m++;
+        if (o.shorts.every((d) => d <= 2)) ok++;
+      }
+      expect(ok / m).toBeLessThan(formed / n);
+    } finally {
+      restore();
+    }
+  }, 60_000);
 });
 
 /** Seeds 1 and 11 at the off value: what a65edf9 plays (the 30-match totals agree too, in the commit message). */

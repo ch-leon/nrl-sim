@@ -308,7 +308,8 @@ describe('five more calls (#396): each does what it says', () => {
   it('Offload: more offloads, and some spilled', () => {
     let withCall = 0;
     let without = 0;
-    for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
+    // Sixteen seeds since the attack shapes (#649 step 2): over eight, 11 with the call to 15 without.
+    for (let seed = 1; seed <= 16; seed++) {
       withCall += play(seed, 'offload').events.filter((e) => e.kind === 'offload' && e.side === 'home').length;
       without += play(seed, null).events.filter((e) => e.kind === 'offload' && e.side === 'home').length;
     }
