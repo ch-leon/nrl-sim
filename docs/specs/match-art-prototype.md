@@ -19,11 +19,31 @@ and big-moment animation work follow that release and phone play-test.
   Catches keep the running legs, then tuck into a carry after four simulation ticks.
 - `LiveView` draws only the carrier and defenders named by the sim in a shared
   contact layer. Arrivals follow recorded join ticks. Low tackles, dominant hits,
-  wraps, breaks and legal one-on-one steals follow the recorded result, with
-  deterministic cosmetic variation. Real field movement remains authoritative.
+  wraps, breaks and legal one-on-one steals follow the recorded result. Real field
+  movement remains authoritative.
+- Contact variety (#674): the picture is chosen from the snapshot's own geometry,
+  not a hash. `contactApproach` takes the line from the first defender to the
+  carrier against the carrier's heading (the sim's own tackle-angle geometry):
+  a cosine of at least `APPROACH_FRONT` (.6) is front-on, below `APPROACH_BEHIND` (0)
+  is from behind, between is from the side. `contactVariant` then picks the picture:
+  a held tackle is the front-on wrap (`square`, with the quick `low` stop), the
+  `drag` (a man on the hips from the side, knees trailing, while the runner's legs
+  pump a stride or two before he goes down) or the `ankle` tap (a dive at the boots
+  from behind; the runner pitches forward over them, or back over the top when a
+  second man hits him from the front). A big hit from the front is the `stop`
+  (folded over a square shoulder, boots off the turf, flat on his back with the
+  tackler driving through on top); from the side it keeps the backward recoil. A bust
+  is the `bump`: a dropped shoulder, the defender rocked back, spun right round on his
+  heels (`turnBody`) and dumped, drawn for `BUMP_TICKS` (8) instead of four. A strip
+  is unchanged. Men joining after an ankle tap or a drag come in front. The variant is
+  read from each tick's snapshot alone, never from the fold: a held pair moves
+  together, so it holds for the whole hold and fall, and pause, seek and replay draw
+  the same picture. Over the whole seed-11 lab match (161 contacts): square 77,
+  drag 39, bump 18, stop 15, ankle 11, strip 1. The only contacts that change picture
+  while drawn are late busts out of a hold, which turn into the bump as they happen.
 - Falls and releases fit the actual ruck duration. Defenders return to their real
-  positions before play-the-ball; breaks and steals return to individual movement
-  after four ticks. Possession is drawn once, in the holder's hands, with a separate
+  positions before play-the-ball; a bust returns to individual movement after the
+  bump's eight ticks, a steal after four. Possession is drawn once, in the holder's hands, with a separate
   sprite for a flying or loose ball.
 - Contact snapshots include join, result, phase and release timing. Skipped display
   frames, replay, seeking and resume do not need to have observed the first hit.
@@ -147,8 +167,8 @@ exercise the same exact-participant contract now exposed by `LiveSim`:
   the low-tackle artwork; it is a visual subtype, not a new simulation outcome.
 - The current ball holder remains authoritative. Unknown legacy contact data
   falls back to ordinary player art; the view never infers participants from
-  distance or rolls another outcome. The visual variation uses a stable hash,
-  not the match RNG.
+  distance or rolls another outcome. The visual variant is read from the
+  snapshot's positions and headings (#674), never the match RNG.
 
 The snapshot/event additions are render metadata only. Fends, offloads, contact
 errors, touch and scoring in contact use individual character poses; the shared
@@ -210,8 +230,9 @@ possession transfers, deterministic variation and old-recording fallback.
 `tests/art/prototype/contact.test.ts` checks ownership, participants, continuation
 after breaks/steals and sprite bounds across the new situations. The live-sim
 tests check participant references against actual snapshots and verify that extra
-render reads do not change seeded matches. Browser checks include all seven cases,
-variation, and portrait/landscape layouts down to 360 pixels wide.
+render reads do not change seeded matches. Browser checks include all eight cases,
+the three approaches (front, behind, side), and portrait/landscape layouts down to
+360 pixels wide.
 
 Contact-art regression checks also enforce short arms and close torso contact
 through every situation, movement variation, fall and release.

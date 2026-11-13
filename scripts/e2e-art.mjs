@@ -95,8 +95,10 @@ try {
     const original = await pixels('#new-pitch');
     await page.locator('#contact-variation').click();
     await page.locator('#case-outcome').click();
-    assert.notEqual(await pixels('#new-pitch'), original, 'stance variation is visible');
-    await page.locator('#contact-variation').click();
+    // The approach picks the tackle picture (#674); a bust or a strip is drawn the same from any angle.
+    if (situation === 'break' || situation === 'steal') assert.equal(await pixels('#new-pitch'), original, 'the outcome, not the approach, draws a bust or strip');
+    else assert.notEqual(await pixels('#new-pitch'), original, 'the approach is visible');
+    for (let i = 0; i < 2; i++) await page.locator('#contact-variation').click();
     await page.locator('#case-outcome').click();
     assert.equal(await pixels('#new-pitch'), original, 'replay rebuilds the same outcome');
     await page.locator('#case-finish').click();
