@@ -9,6 +9,7 @@ import { screenFacing } from './screenFacing';
 import { legsBand } from './legsLayer';
 import { FATIGUE } from '../league/fatigue';
 import { eyesUp, type EyesUp } from './eyesUp';
+import { goalKickPicture } from './goalKick';
 
 export interface PlayerPicture {
   /** -1 plants the feet; otherwise the continuing run cycle, independent of hand progress. */
@@ -190,6 +191,9 @@ export function playerPicture(p: PlayerSnap, previous: PlayerSnap, tick: number,
     if (stride === -1) { action = 'handsOnHips'; frame = Math.floor(scene.age / NOD_TICKS + p.slot) % 2; }
     else slump = action === 'run';
   }
+  // A shot at goal (#669): the kicker's routine up to the strike, then the kick off the tee, facing the posts.
+  const shot = goalKickPicture(p, action, frame, tick, possession, screenDir);
+  if (shot) { action = shot.action; frame = shot.frame; facing = { facing: shot.facing, left: shot.left }; }
   const lift = MOMENT_ACTIONS.includes(action as MomentAction) ? momentLift(action as MomentAction, frame) : 0;
   const strideFrame = ['run', 'carry', 'catch', 'pass', 'airCatch', 'fend', 'handsOnHead', 'handsOnHips', 'armsFolded'].includes(action)
     ? gait : undefined;

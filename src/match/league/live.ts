@@ -39,6 +39,7 @@ import { speedOf } from '../core/body';
 import { CARRY_LIFT, flightAt } from '../core/ball';
 import { REACT_SNAP_TICKS, type PlayerSnap, type Snapshot } from '../core/snapshot';
 import { clockText } from './rules';
+import { goalStrikeTick } from './goals';
 import { LIVE } from './live/knobs';
 import { LivePositioning } from './live/positioning';
 export type { ControlInput } from './controls';
@@ -174,6 +175,9 @@ export class LiveSim extends LivePositioning implements MatchSim {
         poseUntil: p.poseUntil,
         caughtTick: p.catchTick,
         ...(kick ? { kick } : {}),
+        // A shot at goal (#669): from his spot to the end of the conversion, for the routine and the tee.
+        ...(ph.kind === 'conversion' && ph.readyAt > 0 && this.players[ph.kicker] === p
+          ? { goalKick: { readyTick: ph.readyAt, strikeTick: goalStrikeTick(ph), toward: this.dirOf(ph.side) } } : {}),
         ...(p.aerialCatchTick !== undefined && p.aerialCatchTick === p.catchTick ? { aerialCatchTick: p.aerialCatchTick } : {}),
         ...(ph.kind === 'try' && scorer === p ? { tryTick: ph.t0 } : {}),
         ...(ph.kind === 'try' && scorer?.side === p.side ? { celebrationTick: ph.t0 } : {}),

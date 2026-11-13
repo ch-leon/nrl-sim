@@ -446,7 +446,7 @@ until 2d's dead-ball restarts).
 | `goals.halfPosts` | `src/match/league/goals.ts` | 2.75 m | Half the gap between the uprights. |
 | `goals.errorDeg` / `goals.errorPerM` / `goals.errorPerSkill` | `goals.ts` | 5° / 1/40 per m / 1.2% per Skill point | The kick's sideways error (one standard deviation). |
 | `goals.minBackM` / `goals.maxBackM` | `goals.ts` | 10 / 35 m | How far out a conversion is taken. |
-| `goals.conversionTicks` / `goals.conversionMaxTicks` | `goals.ts` | 30 / 160 | Lining it up once on the spot (1.5 s); the longest the conversion waits for him. |
+| `goals.conversionTicks` / `goals.conversionMaxTicks` | `goals.ts` | 30 / 160 | Lining it up once on the spot (1.5 s); the longest the conversion waits for him. The view plays the kicker's routine across the first (#669, `goalStrikeTick` in `goals.ts`). |
 | `goals.fieldGoalLastS` | `goals.ts` | 140 s | Field goals only in the last 2:20 of the match. Was 180 s, the last sixth of 18:00. |
 | `goals.fieldGoalSoonExtraS` | `goals.ts` | 47 s | An AI coach holds his attack call this long before a field goal is on. Was 60; 60 × 7/9, rounded. |
 | `goals.fieldGoalMargin.0` / `.1` | `goals.ts` | −1 / 0 | …with the kicker's side level or a point behind. |

@@ -39,6 +39,12 @@ export interface PlayerSnap {
   caughtTick?: number;
   /** Presentation facts only; deadlines and outcomes still belong to the sim. */
   kick?: { startedTick: number; strikeTick: number; untilTick: number; kind: 'punt' | 'grubber' | 'drop' };
+  /**
+   * A shot at goal (#669), on the kicker from the tick he is on his spot (`readyTick`) to the end of the
+   * conversion: the tick the boot meets the ball (the kick's `startedTick` and `strikeTick`) and the way
+   * the posts are along the field (+1 toward x = 100). The view plays his routine between the two. Presentation only.
+   */
+  goalKick?: { readyTick: number; strikeTick: number; toward: 1 | -1 };
   aerialCatchTick?: number;
   tryTick?: number;
   celebrationTick?: number;

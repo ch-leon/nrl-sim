@@ -110,6 +110,28 @@ breaker, and the beaten tackler named by `break-tackle` is immediately chasing,
 so there is no fact that says he missed *and* is free. Hands on hips, head
 down, is painted for the conceding side after a try (#668).
 
+## The goal kicker's routine (#669)
+
+A conversion or penalty goal waits `goals.conversionTicks` (30 ticks, 1.5 s) from the
+tick the kicker reaches his spot (`readyAt` on the conversion phase) to the strike, never
+later than `goals.conversionMaxTicks` after the phase began. `goalStrikeTick()` in
+`goals.ts` is that rule, and the sim kicks on it. `PlayerSnap.goalKick` carries
+`readyTick`, `strikeTick` and `toward` (the posts' way along the field) on the kicker from
+his spot to the end of the conversion: built in `snapshot()` from the phase, never read
+by the sim, no RNG.
+
+Between the two ticks the view (`src/match/view/goalKick.ts`) draws `goalRoutine`
+(`moments.ts`), one pose a beat, the beats shares of the gap (`ROUTINE_BEATS`): the ball
+set on a small tee (5 ticks at the sim's gap), stood over it (3), three paces back (4), a
+look up at the posts, head back (6), a breath, chest up (6), the run in (6). From the
+strike the sim's kick is drawn as `teeKick`: the drop kick's strike and follow-through
+with the tee left on the ground and the real flying ball. He faces the posts throughout.
+The tee and the stood-up ball are painted onto the frame after the legs take his
+height, so they sit on the ground row for every build. Because the beats are shares of
+the gap, the routine ends exactly on the strike for any gap; over 40 seeds (327 shots)
+the gap was always 30 ticks, so every beat holds for at least three ticks.
+Nines takes its goals as drop kicks; the tee is the picture asked for in #669, not a rule.
+
 ## Review
 
 `match-moments-comparison.html` is a standalone offline comparison with shared
