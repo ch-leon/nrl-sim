@@ -152,7 +152,9 @@ matches a row). No star means it may be noise: run more seeds before deciding.
 the average wrestle; **Legs end** each side's average energy at the last 3-minute
 mark. **sinBins** is men sent to the bin a match, **shortMin** the minutes of clock one
 side was alone a man short and **binSwing** the points the full side scored minus the
-short side's over them (so binSwing / shortMin × 5 is the swing per five-minute bin). Every other number (strips, intercepts, quick play-the-balls, wrestles held by
+short side's over them (so binSwing / shortMin × 5 is the swing per five-minute bin). **heldUp** is
+carriers held up over the line a match (#652) and **heldUpMatches** the share of matches (%) with at
+least one, a share like completion (not scaled for a stretch). Every other number (strips, intercepts, quick play-the-balls, wrestles held by
 1/2/3 men, legs at every mark, standard errors) is in `results*.jsonl`.
 
 ## Watchability (#648)

@@ -11,7 +11,7 @@ import { zoneOf, type AttackPlan } from '../presets';
 import { FINISHER_M, TRAIT_PTS, announce, bootMult, stepTraits } from '../traits';
 import { traitBoost } from '../../../data/traits';
 import { tiredness } from '../fatigue';
-import { WRESTLE, ruckTicks } from '../wrestle';
+import { HELD_UP, WRESTLE, ruckTicks } from '../wrestle';
 import { GOALS } from '../goals';
 import { PENALTY } from '../penalties';
 import { CALLS } from '../calls';
@@ -36,6 +36,8 @@ export abstract class LivePlay extends LiveKicks {
     // Try: over the line with the ball. With nobody near him he goes round
     // under the posts for the five-point bonus try first (Nines).
     if (inGoal(h.body.pos, this.dir) || (this.dir > 0 ? h.body.pos.x >= FIELD_LENGTH : h.body.pos.x <= 0)) {
+      // Carried over this tick with men on him: they may hold him up (#652).
+      if (HELD_UP.on === 1 && this.overLineAt < 0 && this.carriedOver(h) && this.heldUpAtLine(h)) return;
       if (!this.goForBonus(h)) {
         this.score(h);
         return;
@@ -190,6 +192,12 @@ export abstract class LivePlay extends LiveKicks {
         return;
       }
     }
+  }
+
+  /** He ran it over the line this tick (a step back he was short of it), not caught or picked up already over it. */
+  private carriedOver(h: Player): boolean {
+    const was = h.body.pos.x - h.body.vel.x * TICK_S;
+    return this.dir > 0 ? was < FIELD_LENGTH : was > 0;
   }
 
   private steppedOn(h: Player): number {

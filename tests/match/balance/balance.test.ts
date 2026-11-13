@@ -325,8 +325,10 @@ describe('measuring and reporting', () => {
     // Short-match default re-pins these at two 2:30 halves, keeping the same play/AI coverage.
     // The weighted receiver (#649) re-pins both (10-6:141:7f3f6474439483eb and
     // 12-6:152:590616020216c265 before it); both still launch a play and the AI coach still calls one.
-    { name: 'plays-on', aiCoach: false, expected: '6-7:137:d1d03788b03a1934' },
-    { name: 'plays-on-hard', aiCoach: true, expected: '7-6:160:ef629166efdf6fe6' },
+    // Held up over the line (#652) re-pins both: each has a carrier met on the line, so the held-up
+    // roll is drawn (6-7:137:d1d03788b03a1934 and 7-6:160:ef629166efdf6fe6 before it).
+    { name: 'plays-on', aiCoach: false, expected: '16-6:143:fa58061ff69eb427' },
+    { name: 'plays-on-hard', aiCoach: true, expected: '10-6:155:e32ad1bdf721a1a7' },
   ])('pins $name: an even Balanced / Slide match with set plays (seed 1)', async ({ aiCoach, expected }) => {
     const home = { ...sideSheet('H', { rating: 60 }), plays: ['block-play' as const, 'cut-out-winger' as const, 'kick-pass' as const] };
     const sim = new LiveSim(home, sideSheet('A', { rating: 60 }), 1, aiCoach ? { aiCoach: ['home'] } : {});

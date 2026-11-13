@@ -76,7 +76,7 @@ export const COUNTS = [
   'lostInContact', 'injuries', 'lineBreaks', 'coachCalls', 'callsPaid', 'completion',
   'sinBins', 'shortMin', 'binSwing', 'points', 'margin', 'homeMargin', 'goldenPoint', 'goldenPointWon', 'draws', 'possession',
   'bombs', 'bombsWon', 'bombsSpilled', 'grubbers', 'grubberTries', 'grubberRepeats', 'grubberDropouts', 'grubberTurnovers', 'kickTries',
-  'scrambles',
+  'scrambles', 'heldUp', 'heldUpMatches',
 ] as const;
 export type CountKey = (typeof COUNTS)[number];
 
@@ -383,6 +383,9 @@ export function countEvents(es: readonly SimEvent[], side?: Side): Record<CountK
       case 'run-down':
         c.runDowns++;
         break;
+      case 'held-up':
+        c.heldUp++;
+        break;
       case 'blown':
         c.blown++;
         break;
@@ -659,6 +662,8 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
         c.margin = Math.abs(sim.points.home - sim.points.away);
         c.homeMargin = sim.points.home - sim.points.away;
         c.draws = sim.points.home === sim.points.away ? 1 : 0;
+        // Held up over the line (#652): the share of matches with at least one (%), a share like completion.
+        c.heldUpMatches = c.heldUp > 0 ? 100 : 0;
         perSeed.push(c);
         if (sim.points.home > sim.points.away) wins++;
         else if (sim.points.home === sim.points.away) draws++;
@@ -680,7 +685,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
       noteTracked(playOne(sides.home, sides.away, s, false), false);
       if (bothWays) noteTracked(playOne(sides.away, sides.home, s, true), true);
     }
-    const counts = Object.fromEntries(COUNTS.map((k) => [k, stat(perSeed.map((c) => c[k] * (k === 'completion' || k === 'possession' ? 1 : scale)))])) as Record<CountKey, Stat>;
+    const counts = Object.fromEntries(COUNTS.map((k) => [k, stat(perSeed.map((c) => c[k] * (k === 'completion' || k === 'possession' || k === 'heldUpMatches' ? 1 : scale)))])) as Record<CountKey, Stat>;
     const sideStats = (matches: SideCounts[]): Record<SideCountKey, Stat> => Object.fromEntries(SIDE_COUNTS.map((k) => [k, stat(matches.map((c) => c[k] * scale))])) as Record<SideCountKey, Stat>;
     // Lead changes, tries by origin and last tackles are counts (scaled to a full match); the late margins are shares and points, which a stretch does not scale.
     const scaled = (k: string): number => (k === 'leadChanges' ? scale : 1);
