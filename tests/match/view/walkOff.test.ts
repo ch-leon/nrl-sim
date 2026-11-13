@@ -1,6 +1,10 @@
 // tests/match/view/walkOff.test.ts — the whistle's pictures (#675): the walk-off at half-time and
 // full time, the huddle before golden point, and nobody snapping when the next phase takes over.
 import { describe, expect, it } from 'vitest';
+import { LivePlayback, type LivePlaybackScene } from '../../../src/match/view/livePlayback';
+import { sideSheet } from '../../../src/match/balance/measure';
+import { createNewGame } from '../../../src/core/state';
+import type Phaser from 'phaser';
 import { LiveSim } from '../../../src/match/league/live';
 import { labSheet, DEFAULT_HOME, DEFAULT_AWAY } from '../../../src/match/lab/sheets';
 import { LiveView, type ActorView } from '../../../src/match/view/liveView';
@@ -124,5 +128,72 @@ describe('the whistle (#675)', () => {
     expect(clock.advance(s, 100_000, 1, true)).toBe(FT_GONE); // and no further than the picture needs
     expect(clock.advance(snaps[ft - 50]!, 500, 1, true)).toBe(0); // a seek back: not a break
     expect(clock.advance(snaps[gp]!, 0, 1, true)).toBe(0);
+  });
+
+  it('starts again after a seek forward within the same break, not only back (#682)', () => {
+    const clock = new BreakClock();
+    expect(clock.advance(snaps[ht + 2]!, 0, 1, false)).toBe(0);
+    expect(clock.advance(snaps[ht + 2]!, 500, 1, true)).toBe(10); // the card has held the picture for 10 ticks
+    // Play carries on from the card: a frame is a tick or a few, at ×1 or at ×8, and the clock stays.
+    expect(clock.advance(snaps[ht + 3]!, 50, 1, false)).toBe(10);
+    expect(clock.advance(snaps[ht + 19]!, 100, 8, false)).toBe(10); // 100 ms at ×8 is 16 ticks
+    // A jump of 40 ticks in a 16 ms frame is a seek, in the same phase: the old clock is not carried over.
+    expect(clock.advance(snaps[ht + 59]!, 16, 1, false)).toBe(0);
+    expect(snaps[ht + 59]!.phase!.since).toBe(snaps[ht + 2]!.phase!.since);
+    // A held picture that is sought forward restarts from nothing too.
+    clock.advance(snaps[ht + 59]!, 500, 1, true);
+    expect(clock.advance(snaps[ht + 100]!, 0, 1, true)).toBe(0);
+  });
+});
+
+// ── The half-time card against the player's own pause (#682) ────────────────
+
+/** Anything a Phaser layer asks of the scene: a callable that returns itself. */
+const noop: unknown = new Proxy(function () {}, { get: (_t, p) => (p === Symbol.toPrimitive ? () => 0 : noop), apply: () => noop });
+function fakeScene(): LivePlaybackScene & Phaser.Scene {
+  const actor = () => ({ sprite: { x: 0, y: 0, flipX: false }, place() {}, play() {} });
+  const base = {
+    players: { home: Array.from({ length: 9 }, actor), away: Array.from({ length: 9 }, actor) },
+    ball: { place() {} },
+    cameras: { main: { zoom: 1, worldView: { x: 0, y: 0, width: 800, height: 400 }, shake() {} } },
+    fieldToWorld: (fx: number, fy: number) => ({ x: fx * 10, y: fy * 4 }),
+    focus: { carrier() {} },
+    sideColors: { home: 0xffffff, away: 0 },
+  };
+  return new Proxy(base, { get: (t, p) => (p in t ? (t as Record<string | symbol, unknown>)[p] : noop) }) as unknown as LivePlaybackScene & Phaser.Scene;
+}
+
+describe('the walk-off behind the half-time card and under a pause (#682)', () => {
+  it('plays on behind the card, stands still under the player’s pause, and plays on again when it is let go', () => {
+    createNewGame('Walk-off', 682);
+    const pb = new LivePlayback(fakeScene(), {
+      home: sideSheet('H', { rating: 70 }), away: sideSheet('A', { rating: 45 }), seed: 11, weather: 'clear', calls: [], speed: 8,
+      keyMoments: () => false, fixture: undefined, overlay: null, closeUpDone: () => {},
+    });
+    const inner = pb as unknown as { runner: { cur: Snapshot; tick: number }; view: { draw: (...a: unknown[]) => void } };
+    const shown: number[] = [];
+    const draw = inner.view.draw.bind(inner.view);
+    inner.view.draw = (...a: unknown[]) => { shown.push((a[4] as number | undefined) ?? 0); draw(...a); };
+    for (let i = 0; i < 400_000 && !pb.finished && inner.runner.cur.phase?.kind !== 'half-time'; i++) pb.update(16);
+    expect(inner.runner.cur.phase?.kind).toBe('half-time');
+    const frames = (n: number): number => { for (let i = 0; i < n; i++) pb.update(16); return shown[shown.length - 1]!; };
+    const tick = inner.runner.tick;
+    // The plan card holds the sim; the walk-off plays on behind it.
+    pb.hold(true);
+    const a = frames(10);
+    expect(a).toBeGreaterThan(5);
+    expect(frames(10)).toBeGreaterThan(a);
+    // The player pauses over it (the pause sheet): the picture, walk-off included, stands still.
+    pb.hold();
+    const b = frames(1);
+    expect(frames(60)).toBe(b);
+    pb.release();
+    expect(frames(10)).toBeGreaterThan(b);
+    // A pause with no card is the same: the sim is stood still and so is the picture.
+    pb.release(true);
+    pb.hold();
+    const c = frames(1);
+    expect(frames(60)).toBe(c);
+    expect(inner.runner.tick).toBe(tick);
   });
 });

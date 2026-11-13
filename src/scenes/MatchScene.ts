@@ -1589,7 +1589,7 @@ export class MatchScene extends Phaser.Scene {
     if (!(pb instanceof LivePlayback) || !side || this.planCard) return;
     this.sheet?.close();
     this.toggleTray(false);
-    pb.hold();
+    pb.hold(true);
     if (this.planBtn) this.planBtn.hidden = true;
     const other = side === 'home' ? 'away' : 'home';
     const s = pb.score;
@@ -1608,7 +1608,7 @@ export class MatchScene extends Phaser.Scene {
       onPick: (t) => pb.setTactics(side, t),
       onDone: () => {
         this.planCard = null;
-        pb.release();
+        pb.release(true);
       },
     });
   }

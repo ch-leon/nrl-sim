@@ -139,12 +139,16 @@ export class BreakClock {
 
   /**
    * Called once a frame with the snapshot on screen. `stalled`: the sim is not stepping (full time,
-   * or held for a card) though the picture should play on. Resets when the phase changes or the
-   * picture goes back (a seek).
+   * or held for a card) though the picture should play on; a sim held by the player's own pause
+   * is not stalled, so the picture stands still with it. Resets when the phase changes or the
+   * picture jumps (#682): back, or forward by more ticks than this frame's time can have played
+   * (a seek; the clock it carried belonged to the other end of the break).
    */
   advance(cur: Snapshot, deltaMs: number, speed: number, stalled: boolean): number {
     const since = cur.phase?.since ?? -1;
-    if (since !== this.since || cur.tick < this.tick) { this.since = since; this.held = 0; }
+    const played = Math.ceil(Math.max(0, deltaMs) * Math.max(0, speed) / TICK_MS) + 1;
+    const jumped = this.tick >= 0 && (cur.tick < this.tick || cur.tick - this.tick > played);
+    if (since !== this.since || jumped) { this.since = since; this.held = 0; }
     this.tick = cur.tick;
     if (stalled && (cur.phase?.kind === 'half-time' || cur.phase?.kind === 'full-time')) {
       // Enough to see every break picture through; no further, so it never grows without bound.
