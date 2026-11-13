@@ -85,7 +85,7 @@ function persist(): boolean {
 export function labsVisible(): boolean { const s = state(); return s.visible || s.testCareer !== undefined; }
 export function experimentOn(id: string): boolean { const s = state(); return s.visible && s.on[id] === true; }
 export function setExperiment(id: string, on: boolean): void { state().on[id] = on; persist(); }
-export function fieldLengthPreference(): FieldLength { const s = state(); return s.visible ? s.fieldLength ?? 100 : 100; }
+export function fieldLengthPreference(): FieldLength { const s = state(); return (s.visible || s.testCareer !== undefined) ? s.fieldLength ?? 100 : 100; }
 /** Roll back an unsaved choice: physics must agree with the setting after reload. */
 export function setFieldLengthPreference(length: FieldLength): boolean {
   if (!isFieldLength(length)) return false;

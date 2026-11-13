@@ -8,7 +8,7 @@ import { fieldFromWorkerName, type FieldLength } from '../labs/fieldLength';
 export function resolveBootField(input: { worker: boolean; workerName?: unknown; stored?: unknown }): FieldLength {
   if (input.worker) return fieldFromWorkerName(input.workerName);
   const settings = readLabs(input.stored);
-  return settings.visible ? settings.fieldLength ?? 100 : 100;
+  return (settings.visible || settings.testCareer !== undefined) ? settings.fieldLength ?? 100 : 100;
 }
 export function bootFieldLength(): FieldLength {
   if (typeof window === 'undefined') return resolveBootField({ worker: true, workerName: (globalThis as { name?: unknown }).name });

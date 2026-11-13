@@ -215,7 +215,7 @@ export class LabPanel {
       this.log,
       el('div', { class: 'nrl-lab-hint nrl-lab-more', text: p.note ? `Flag note: ${p.note}` : MATCH_PREVIEW
         ? `Unmerged comparison. Keep speed at 1×. Viewing timer excludes pauses and half-time; stepping or seeking invalidates it. ${MATCH_PREVIEW.fieldLength === 60 ? '40/20 is off: its zones overlap on a 60m field.' : 'Normal kicking distances apply.'}`
-        : `Nines match: two ${NINES.halfMinutes}:00 halves, the clock in the label, ⏩ skips to the next break. ⚑ Flag anything that looks wrong.` }),
+        : `Nines match: two halves of ${NINES.halfMinutes} minutes, the clock in the label, ⏩ skips to the next break. ⚑ Flag anything that looks wrong.` }),
     );
     this.log.classList.add('nrl-lab-more');
     if (MATCH_PREVIEW) {
