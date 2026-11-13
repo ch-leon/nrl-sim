@@ -951,11 +951,15 @@ async function play() {
     let call = null;
     let empty = 0;
     const refused = [];
-    for (let i = 0; i < 40 && !call; i++) {
+    // Only a set's own call names itself on the badge: a kick-off call, a penalty call and Fresh legs
+    // are made without it (MatchScene.makeCall), so they are passed over here. The match holds at ×1
+    // while the tray is open (#639), and a kick-off's restart can last 10 s of it: 30 s of tries.
+    for (let i = 0; i < 120 && !call; i++) {
       const got = await page.evaluate(() => {
         const coach = document.querySelector('.nrl-mo-bar [data-coach]');
         if (coach?.getAttribute('aria-expanded') !== 'true') coach?.click();
-        const b = document.querySelector('.nrl-mo-calls:not([hidden]) [data-call]');
+        const b = [...document.querySelectorAll('.nrl-mo-calls:not([hidden]) [data-call]')]
+          .find((el) => !/^(kickoff-short|kickoff-long|take-two|tap-go|fresh-legs)$/.test(el.getAttribute('data-call') ?? ''));
         if (!b) return null;
         b.click();
         const badge = document.querySelector('.nrl-mo-coach-badge');
@@ -974,7 +978,7 @@ async function play() {
       const coach = document.querySelector('.nrl-mo-bar [data-coach]');
       if (coach?.getAttribute('aria-expanded') === 'true') coach.click();
     });
-    if (!call) throw new Error(refused.length ? `no call landed (${refused.slice(-3).join(', ')} refused)` : 'the tray offered no call for 10 s');
+    if (!call) throw new Error(refused.length ? `no call landed (${refused.slice(-3).join(', ')} refused)` : 'the tray offered no set call for 30 s');
     if (!call.lit) throw new Error(`${call.call} was made but its tile was not lit`);
     if (call.tray) throw new Error(`the tray stayed open after ${call.call} was made`);
     rec.notes.push(`called ${call.call}; badge reads "${call.badge}"${refused.length ? ` (${refused.length} refused first)` : ''}${empty ? `; ${empty} looks at an empty tray` : ''}`);
