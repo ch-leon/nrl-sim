@@ -1123,6 +1123,11 @@ async function play() {
     // Settings is an Office tile (the floating gear is gone).
     await navTo('settings');
     await page.waitForSelector('.nrl-settings-modal');
+    // A dialog grows in from --nrl-pop (0.97, #606): measured mid-way the toggle reads 50×43, not 52×44.
+    await page.evaluate(() => {
+      const m = document.querySelector('.nrl-settings-modal');
+      return Promise.all([...(m?.getAnimations() ?? []), ...(m?.parentElement?.getAnimations() ?? [])].map((a) => a.finished.catch(() => {})));
+    });
     const mute = await smallestBox('.nrl-audio-row input[type="checkbox"]');
     if (mute) rec.notes.push(`mute ${mute.w}×${mute.h}`);
     if (tooSmall(mute)) found.push(`Mute ${mute.w}×${mute.h}`);
