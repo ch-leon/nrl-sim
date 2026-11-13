@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- The pass finds one of the near-best options by weight, not always the single best man, in open play and from dummy half, so a set's first receiver varies more (the chance two first passes on the same tackle find the same man falls from 32% to 26% between even sides). Step 1 of the attack-shapes work; awaiting lab sign-off ([PR](https://github.com/ch-leon/nrl-sim/pull/683), [issue](https://github.com/ch-leon/nrl-sim/issues/649)).
+
 - Normal 2:30 clock halves on a 100m field; the existing Experiments panel offers browser-local 100m/80m/60m choices between matches ([PR #678](https://github.com/ch-leon/nrl-sim/pull/678)).
 
 - Match watchability, wave 1 ([PR](https://github.com/ch-leon/nrl-sim/pull/676), [tracker](https://github.com/ch-leon/nrl-sim/issues/626)):
