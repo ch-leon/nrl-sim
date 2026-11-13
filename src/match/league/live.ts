@@ -177,7 +177,7 @@ export class LiveSim extends LivePositioning implements MatchSim {
         ...(p.aerialCatchTick !== undefined && p.aerialCatchTick === p.catchTick ? { aerialCatchTick: p.aerialCatchTick } : {}),
         ...(ph.kind === 'try' && scorer === p ? { tryTick: ph.t0 } : {}),
         ...(ph.kind === 'try' && scorer?.side === p.side ? { celebrationTick: ph.t0 } : {}),
-        ...(p.react && this.tick - p.react.tick < REACT_SNAP_TICKS ? { reactTick: p.react.tick, react: p.react.kind } : {}),
+        ...(p.react !== null && this.tick - p.react.tick < REACT_SNAP_TICKS ? { reactTick: p.react.tick, react: p.react.kind } : {}),
         ...(p.binUntilS >= 0 ? { binned: true } : {}),
       };
     });
