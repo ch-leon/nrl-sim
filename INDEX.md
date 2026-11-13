@@ -323,3 +323,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261113-053136-standard | standard | f02f4fa | main | [report](runs/20261113-053136-standard/report.md) |
 | 20261113-055251-standard | standard | 0059bae | main | [report](runs/20261113-055251-standard/report.md) |
 | 20261113-063655-standard | standard | 2fd3316 | main | [report](runs/20261113-063655-standard/report.md) |
+| 20261113-085114-standard-receiver-on-v-off | standard, receiver on v off | a65edf9 | claude/exciting-goldberg-3lccgc | [report](runs/20261113-085114-standard-receiver-on-v-off/report.md) |
