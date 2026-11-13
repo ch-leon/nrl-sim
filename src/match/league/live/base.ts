@@ -380,6 +380,7 @@ export abstract class LiveBase {
         wantsSprint: false,
         sprinting: false,
         catchTick: 0,
+        react: null,
         decided: false,
         steppedOn: -1,
         jink: null,
