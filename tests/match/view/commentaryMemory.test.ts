@@ -89,21 +89,22 @@ describe('the match memory', () => {
   });
 
   it('says a close margin late, off a kick at goal, and not early, repeated, or when the game is gone', () => {
-    const c = new Commentator(5, NAMES);
+    // These scripted times describe the original fourteen-minute commentary fixture.
+    const c = new Commentator(5, NAMES, undefined, { matchMinutes: 14 });
     expect(extras(c, ev('conversion', { detail: 'good' }), score(6, 4), 5)).toEqual([]);
     const late = extras(c, ev('conversion', { detail: 'good' }), score(8, 6), 11.2);
     expect(late).toHaveLength(1);
     expect(isLine(late[0], 'memory:close-late', { margin: 2, n: 'three minutes', leader: 'Larrikins' })).toBe(true);
     expect(extras(c, ev('conversion', { detail: 'missed' }), score(8, 6), 11.8)).toEqual([]);
-    expect(extras(new Commentator(5, NAMES), ev('conversion', { detail: 'good' }), score(26, 6), 12)).toEqual([]);
-    const level = extras(new Commentator(5, NAMES), ev('conversion', { detail: 'good' }), score(6, 6), 12.5);
+    expect(extras(new Commentator(5, NAMES, undefined, { matchMinutes: 14 }), ev('conversion', { detail: 'good' }), score(26, 6), 12)).toEqual([]);
+    const level = extras(new Commentator(5, NAMES, undefined, { matchMinutes: 14 }), ev('conversion', { detail: 'good' }), score(6, 6), 12.5);
     expect(isLine(level[0], 'memory:level-late', { n: 'two minutes' })).toBe(true);
     // No clock, no "to play".
     expect(extras(new Commentator(5, NAMES), ev('conversion', { detail: 'good' }), score(8, 6))).toEqual([]);
   });
 
   it('says a long scoreless spell once, by side, and rearms when the side scores', () => {
-    const c = new Commentator(5, NAMES);
+    const c = new Commentator(5, NAMES, undefined, { matchMinutes: 14 });
     expect(extras(c, ev('handover'), score(0, 0), 3)).toEqual([]);
     expect(isLine(extras(c, ev('handover'), score(0, 0), 7)[0], 'memory:scoreless', { n: '7' })).toBe(true);
     expect(extras(c, ev('handover'), score(0, 0), 8)).toEqual([]);
@@ -112,6 +113,13 @@ describe('the match memory', () => {
     expect(extras(c, ev('handover'), score(4, 0), 6.5)).toEqual([]);
     expect(isLine(extras(c, ev('handover'), score(4, 0), 11.6)[0], 'memory:drought', { team: 'Larrikins', n: '6th', m: '4' })).toBe(true);
     expect(extras(c, ev('handover'), score(4, 0), 11.9)).toEqual([]);
+  });
+
+  it('uses the actual five-minute default for time remaining, and stops at full time', () => {
+    const c = new Commentator(5, NAMES);
+    const late = extras(c, ev('conversion', { detail: 'good' }), score(8, 6), 3.5);
+    expect(isLine(late[0], 'memory:close-late', { margin: 2, n: 'two minutes', leader: 'Larrikins' })).toBe(true);
+    expect(extras(new Commentator(5, NAMES), ev('conversion', { detail: 'good' }), score(8, 6), 5)).toEqual([]);
   });
 
   it('holds the memory lines, tries, sin bins, clean breaks and penalties, and not a half break or a tackle', () => {

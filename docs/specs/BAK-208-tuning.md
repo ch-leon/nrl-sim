@@ -318,7 +318,7 @@ grubber outcomes and flags those tries, repeat sets at 0.05–0.30, and
 drop-outs at 0–0.15. Repeat/drop-out band edges remain provisional; see
 `docs/status/2026-10-balance.md`. These rare counts print to three decimals.
 
-Per full Nines match (two 7:00 halves), both sides combined, 60-rated teams: tackles
+Historical calibration per 14-minute Nines match (two 7:00 halves), both sides combined, 60-rated teams. These bands are a reference, not approved 5-minute targets: tackles
 117–163 · line breaks 10–19 · offloads 6–11 · errors 8–12 · kicks 16–25 · tries 4–7 ·
 completion 70–80%; stronger team wins ~70% at a 20-point rating gap. The count bands
 were the 9:00-half bands ×7/9, rounded, on 2026-10-25, so a shorter match is not marked
@@ -379,7 +379,7 @@ and `NINES` in `src/match/league/rules.ts` is that same object, so the knob name
 
 | Knob | File | Value | Effect |
 |---|---|---|---|
-| `rules.halfMinutes` | `src/content/au.ts` (`NINES`, `rules.ts`) | 7 | Length of each half (minutes of sim time). Was 9. |
+| `rules.halfMinutes` | `src/content/au.ts` (`NINES`, `rules.ts`) | 2.5 | Length of each half (match-clock minutes). Was 7; Leon selected 2:30 on 13 Nov 2026. Viewing time at ×1 varies with stoppages and play-on. |
 | `rules.tryPoints` / `rules.conversionPoints` / `rules.fieldGoalPoints` | `au.ts` | 4 / 2 / 1 | Points for a try, a conversion and a field goal (penalty goals come with 2e). |
 | `rules.halfTimeTicks` | `au.ts` | 60 (3 s) | The break on screen before the second-half kick-off. |
 | `rules.halfTimeLegsBack` | `au.ts` | 0.5 | At half-time each player gets back this share of the legs he has lost (BAK-208 §8.2); his gas tank is filled to his legs. |
@@ -1704,3 +1704,64 @@ the replaced player’s eligibility. Possession changes and restarts clear the o
 ruck obligation, including a launched territorial kick (the receiving side becomes
 the attack). Normal tactical positioning, kick distances and fatigue costs remain
 as configured. This correction is held for Leon’s play-test before merge.
+
+## Short-match comparison (#513, draft)
+
+`npm run build:match-preview -- <output-directory>` builds three separate bundles
+and a comparison page. Build flag `NRL_MATCH_PREVIEW_LENGTH=100|80|60` selects the
+physical length and 2.5-minute clock halves before modules/Workers initialise.
+Omitting it uses the normal application: 2:30 halves and a 100m default, with
+field choices under Experiments. Unsupported values fail the diagnostic build.
+These fixed-field artifacts are for diagnostics; publish a normal build for
+the runtime selector.
+
+| Setting | Preview value | Meaning |
+|---|---|---|
+| Field length | 100 / 80 / 60m | Try line to try line; width stays 68m and in-goals stay 10m. |
+| Half length | 2.5 clock minutes | Viewing target is 2–2.5 actual minutes at ×1 per half; measured separately. |
+| Field projection | 0.24 longitudinal tiles/metre, width 18 tiles | Keep players/metre sizes and 10m markings consistent; normal legacy in-goal art stays unchanged. |
+| Kick-off receiving anchor | min(28m, halfway −10m −6m) from own line | Keep the existing 6m nudge and role depths, with every receiver at least 10m on its side of halfway; the 100m formation is unchanged. |
+| 40/20 availability | On only when field length >60m | Disable in the 60m prototype where own-40 and opposing-20 meet. Called and automatic kicks agree. Ordinary kicks remain unchanged. |
+| Neutral fixture | Rating 60 in every stat, seed 1, four reserves, no traits | Identical starting teams in each bundle; balanced attack/slide defence and standard rotation. |
+
+The preview lab uses career smart pace and key-moment caps at the selected ×1,
+and records viewed milliseconds per half, excluding pause and half-time. It drops
+the lab’s additional slow-motion beat so it does not add a second pacing layer.
+Changing speed/stepping/seeking or hiding the tab invalidates comparison timing;
+hiding or rotating upright also pauses. Restart clears queued coach calls and resets
+the timer. Viewing time uses elapsed wall time, independently of Phaser’s
+smoothed frame delta.
+Normal lab playback is unchanged. Fatigue, sprint gas, substitutions and ordinary
+kick distances have not been compressed with the match: these are play-test
+limitations to compare rather than hidden balance tuning. PWA registration and
+cache generation are disabled for the three separate preview bundles.
+
+
+## 13 November revision: default short halves and runtime fields
+
+Normal AU/UK Nines matches now use two 2.5-minute clock halves, on a 100m field
+unless changed in Experiments. This supersedes the earlier separate-build-only
+proposal. [PR #678](https://github.com/ch-leon/nrl-sim/pull/678) remains draft.
+[Implementation contract](513-short-halves-field-experiment.md) records the
+user’s request and the separate career-balance pass required before merge.
+
+| Setting | Current value | Meaning |
+|---|---|---|
+| `rules.halfMinutes` | 2.5 | Normal clock default, including workers and the Guide. |
+| Experiments field length | 100m default;80m/60m optional | Under browser-local Labs settings, never a career rule. Apply saves/readbacks/reloads between matches; live, parked, resumable and advancing states refuse changes. |
+| Worker field | Validated suffix on existing match/art worker names | Freezes the same field for skip, background, replay and stadium painting before imports initialise. |
+| Match identity | Revision4, includes physical field length | A different field or historical engine cannot silently replay old inputs. |
+| Cheap-score calibration | Reference seven-minute half; multiply raw score by `rules.halfMinutes / 7` before rounding | Preserve the same two draws and strength inputs while keeping rival fast-sim totals on the shorter clock’s scale. At100m this is duration scaling, not an added field multiplier. |
+
+The existing fatigue, gas, coach-call, sin-bin and golden-point windows are not
+retuned by the field selector. At 60m the 40/20 call is disabled; ordinary kick
+distances stay in metres. Legacy `build:match-preview` bundles remain fixed-field
+diagnostic artifacts; the hosted candidate is the normal single application,
+with no compile-time field override.
+
+The balance harness normalises stretch counts to `MATCH_MINUTES`, which is now 5
+by default. Explicit historical 7-minute mechanics fixtures remain 14-minute
+experiments and must declare their units. Previous 14-minute reports in this
+reference remain historical measurements. Live-match neutral 40-seed combined
+points were 10.15/12.825/17.675 at 100m/80m/60m; those live-sim measurements do not
+establish full-career economic or progression equivalence.

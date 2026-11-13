@@ -7,7 +7,9 @@ import { REACT_SNAP_TICKS, type SimEvent } from '../../../src/match/core/snapsho
 describe('moment presentation facts', () => {
   it('reports actual kicks, successful high takes and the scored try, without render reads affecting play', () => {
     const home = labSheet(DEFAULT_HOME); const away = labSheet(DEFAULT_AWAY);
-    const sim = new LiveSim(home, away, 2); const control = new LiveSim(home, away, 2);
+    // Preserve the historical presentation trajectory with all kick types and a scored try.
+    const opts = { length: { halves: 2 as const, halfMinutes: 7 } };
+    const sim = new LiveSim(home, away, 2, opts); const control = new LiveSim(home, away, 2, opts);
     const found = new Set<string>();
     // Seed 2 includes every presentation fact after retreat completion (#625).
     // Observe its whole match rather than depending on the opening carries.

@@ -151,7 +151,8 @@ describe('the clock and the half label (#602)', () => {
     expect(clock.textContent).toBe('01:15');
     // Resumed, then the second half.
     expect(writes([clock, half], () => { for (let f = 0; f < 120; f++) o.setClock(halfSecs + f / 60, 2); })).toEqual([2, 1]);
-    expect([clock.textContent, half.textContent]).toEqual([`${String(NINES.halfMinutes).padStart(2, '0')}:01`, '2H']);
+    // A 2:30 half continues at 02:31; fractional minutes are not clock text.
+    expect([clock.textContent, half.textContent]).toEqual(['02:31', '2H']);
     // Golden point counts its own clock from 00:00.
     expect(writes([clock, half], () => { for (let f = 0; f < 90; f++) o.setClock(f / 60, 'gp'); })).toEqual([2, 1]);
     expect([clock.textContent, half.textContent]).toEqual(['00:01', 'GP']);

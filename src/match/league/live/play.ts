@@ -16,7 +16,7 @@ import { GOALS } from '../goals';
 import { PENALTY } from '../penalties';
 import { CALLS } from '../calls';
 import { bombPeak } from '../kickContest';
-import { TOUCH, inOwnInGoal } from '../touch';
+import { FORTY_TWENTY_ENABLED, TOUCH, inOwnInGoal } from '../touch';
 import { BIN } from '../sinbin';
 import { PLAYS } from '../plays';
 import { PLAYS_BY_ID } from '../../../data/plays';
@@ -333,7 +333,7 @@ export abstract class LivePlay extends LiveKicks {
           const aim = land - TOUCH.touchRollM <= 20 ? '40-20' : 'touch';
           return { ...base, to: this.touchTarget(h, land, TOUCH.fortyTwentyInsideM, boot.acc * CALLS.fortyTwenty.scatter), receiver: this.indexOf(fb), peak: 11, aim, ...trait };
         }
-        if (this.lastPlay && toLine >= FIELD_LENGTH - 40 && this.rng.next() < TOUCH.fortyTwenty + TOUCH.fortyTwentyTrait * lever) {
+        if (FORTY_TWENTY_ENABLED && this.lastPlay && toLine >= FIELD_LENGTH - 40 && this.rng.next() < TOUCH.fortyTwenty + TOUCH.fortyTwentyTrait * lever) {
           return { ...base, to: this.touchTarget(h, TOUCH.fortyTwentyLandM, TOUCH.fortyTwentyInsideM, boot.acc * 0.6), receiver: this.indexOf(fb), peak: 11, aim: '40-20', ...trait };
         }
         if (this.rng.next() < TOUCH.findTouch[zoneOf(toLine)]) {

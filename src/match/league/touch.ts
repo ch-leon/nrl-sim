@@ -94,8 +94,10 @@ export function inOwnInGoal(p: Vec, dir: 1 | -1): boolean {
 /** The 40/20's lines: kicked from behind his own 40, out inside their 20 (metres from each try line). */
 export const FORTY_TWENTY_FROM_M = 40;
 export const FORTY_TWENTY_INTO_M = 20;
+/** Both kick zones need distinct space between them; a 60m preview has none. */
+export const FORTY_TWENTY_ENABLED = FIELD_LENGTH > FORTY_TWENTY_FROM_M + FORTY_TWENTY_INTO_M;
 
 /** A 40/20: kicked from inside the kicker's own 40, bounced into touch inside the other side's 20 (metres to the line he attacks, at the kick and where it went out). */
 export function isFortyTwenty(kickToLine: number, outToLine: number): boolean {
-  return kickToLine >= FIELD_LENGTH - FORTY_TWENTY_FROM_M && outToLine <= FORTY_TWENTY_INTO_M && outToLine >= 0;
+  return FORTY_TWENTY_ENABLED && kickToLine >= FIELD_LENGTH - FORTY_TWENTY_FROM_M && outToLine <= FORTY_TWENTY_INTO_M && outToLine >= 0;
 }

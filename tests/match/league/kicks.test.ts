@@ -117,7 +117,8 @@ describe('kicks in the live sim', () => {
     const home = sheet('H');
     const away = sheet('A');
     for (let s = 1; s <= 16; s++) {
-      const sim = new LiveSim(home, away, s);
+      // Historical fourteen-minute exposure keeps both successful and failed red-zone chases.
+      const sim = new LiveSim(home, away, s, { length: { halves: 2, halfMinutes: 7 } });
       let open: { side: string; tick: number } | null = null;
       while (!sim.finished && sim.tick < 80_000) {
         sim.step();
