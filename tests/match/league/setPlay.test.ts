@@ -131,7 +131,7 @@ describe('the launch and the script (plan §3.3)', () => {
       expect(e).not.toBeNull();
       if (sim.tackleCount === 1 && zoneOf(sim.toLineNow('home')) === 'attackingHalf') launch = e;
     }
-    // No tick pinned: it moves whenever a default reshuffles the seed (11464 since the last-tackle call, #650; 1791 before).
+    // No tick pinned: it moves whenever a default reshuffles the seed (1791 before the last-tackle call, #650).
     expect(launch.detail).toBe('block-play');
     expect(launch.player).toBe(sim.man('home', 5).name); // the halfback calls it
     expect(launch.text).toMatch(/calls the block play/);
@@ -226,7 +226,7 @@ describe('the launch and the script (plan §3.3)', () => {
     // Test the successful script; breakdown odds have their own coverage above.
     sim.force = 0.99;
     const e = until(sim, (x) => x.kind === 'set-play');
-    // No tick pinned (6054 before the last-tackle call, #650, 5110 after): the script is what is tested.
+    // No tick pinned (6054 before the last-tackle call, #650): the script is what is tested.
     expect(e).not.toBeNull();
     sim.retarget();
     const s = sim.script!;
@@ -287,8 +287,8 @@ describe('calling a play (plan §3.2)', () => {
   it('Hard’s AI coach calls one of his three, and it is run; with no AI coach only the half calls them', () => {
     const plays: PlayId[] = ['block-play', 'cut-out-winger', 'kick-pass'];
     const ai = new PlaySim(flat(plays), A, 1, { aiCoach: ['home'] });
-    // His first set-play call, whatever his other calls before it: since the last-tackle call (#650) a shift
-    // comes first on this seed (the cut-out at tick 635 after #649, the block play at 663 before it).
+    // His first set-play call, whatever his other calls come before it (pinned to the cut-out at tick 635
+    // after #649, and the block play at 663 before it, until the last-tackle call, #650, put a shift first).
     const call = until(ai, (e) => e.kind === 'coach-call' && e.side === 'home' && (e.detail ?? '').startsWith('set-play:'));
     expect(plays.map((p) => `set-play:${p}`)).toContain(call?.detail);
     const launch = until(ai, (e) => e.kind === 'set-play');
@@ -340,13 +340,13 @@ describe('the lab and the harness', () => {
   });
   // Seed 1 at tick 1031 and seed 4 at tick 514 before the weighted receiver (#649) reshuffled them; seed 3 at 653
   // and seed 4's block play breaking down at 991 before the last-tackle call (#650): seed 4's first breakdown is now the
-  // away side's, and seed 11 is the first of 1–12 whose is the home side's.
-  it('the lab’s named seeds: a block play launched (seed 3, tick 603) and a home play breaking down (seed 11, tick 1579)', () => {
+  // away side's, and seed 9 or 11 the first of 1–12 whose is the home side's.
+  it('the lab’s named seeds: a block play launched (seed 3, tick 690) and a home play breaking down (seed 11, tick 1579)', () => {
     const lab = (seed: number): PlaySim =>
       new PlaySim(withPlays({ ...labSheet(DEFAULT_HOME, 'gen', { attack: 'grind' }), rotation: 'standard' }, true), withPlays({ ...labSheet(DEFAULT_AWAY, 'gen', {}), rotation: 'standard' }, true), seed, { energy: LEGS_ENERGY.fresh, weather: 'clear', calls: [] });
     const one = lab(3);
     const launch = until(one, (e) => e.kind === 'set-play' && e.side === 'home');
-    expect([launch?.tick, launch?.detail, one.script?.outcome]).toEqual([603, 'block-play', 'ok']);
+    expect([launch?.tick, launch?.detail, one.script?.outcome]).toEqual([690, 'block-play', 'ok']);
     expect(one.script?.decoys.map((d) => d.idx % 9)).toEqual([7]);
     const eleven = lab(11);
     const bd = until(eleven, (e) => e.kind === 'play-breaks-down');

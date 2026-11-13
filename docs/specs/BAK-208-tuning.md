@@ -144,7 +144,7 @@ Weighting only open play (`live.receiverAtRuck` 0) leaves the first receiver as 
 | `hangTime` | `ball.ts` | 2√(2·peak / 9.81) | Peaks: long 12 (3.1 s), bomb 20 (4 s), cross-field 13, chip 5, kick-off 18 (16 before #397; Short and Long kick-offs 20), grubber 0.9 (ground). |
 | `RUN_CLOSE_M` / `RUN_IT_ZONE_M` / `RUN_IT_CHANCE` / `ATTACK_KICK_M` | `tactics.ts` | 6 / 40 / 20% / 50 m | **Off value of the last-tackle call only** (`lastTackle.on` 0): run the last inside 6 m; 1 in 5 inside 40. With it on, the `lastTackle.*` table below owns the last and these three are not read. `ATTACK_KICK_M` (territory beyond 50) still shapes `kickWeights`, as does the 40 m line. |
 | Last-tackle call on (`lastTackle.on`) | `lastTackle.ts`; `callLastPlay` in `live/play.ts` | 1 (**0 = off**) | #650 part 1. On: the kicker's last-tackle call is one roll among kick / run it / shift it wide by the weights below, then for a kick `chooseKick`'s roll as before; the second-last's early kick is called at the play-the-ball (below). 0: the call as before #650, no new roll, every seed as a65edf9. |
-| Zone weights (`lastTackle.zones.<zone>.kick / run / pass`) | `lastTackle.ts` | own 20 1 / 0.04 / 0.04 · own half 1 / 0.08 / 0.1 · midfield 1 / 0.12 / 0.18 · attacking half 1 / 0.25 / 0.25 · red zone 1 / 0.3 / 0.3 | The share of each is its weight over the three. Raise a run or pass weight for more of it in that zone. The old "1 in 5 inside 40" is the attacking-half and red-zone run weights (0.25 on a kick of 1 is 1 in 5 before the pass weight). |
+| Zone weights (`lastTackle.zones.<zone>.kick / run / pass`) | `lastTackle.ts` | own 20 1 / 0.025 / 0.025 · own half 1 / 0.05 / 0.06 · midfield 1 / 0.07 / 0.11 · attacking half 1 / 0.15 / 0.15 · red zone 1 / 0.18 / 0.18 | The share of each is its weight over the three. Raise a run or pass weight for more of it in that zone. The old "1 in 5 inside 40" is folded into the attacking-half and red-zone run weights (the kicker's own run is now about 1 in 8 there, with as many passes wide; darts and a kicker not there to take it add more runs). These are the first cut's run and pass weights × 0.6: at full strength All-out won 55.8% (400 seeds both ways). |
 | `lastTackle.closeM` | `lastTackle.ts` | 6 m | Inside this the kick weight is 0: run or pass only (was `RUN_CLOSE_M`, which ran every one). |
 | Style lean (`lastTackle.presets.<preset>.kick / pass`) | `lastTackle.ts` | Tight 1.15 / 0.8 · Balanced 1 / 1 · Expansive 0.8 / 1.6 · Kick-chase 1.8 / 0.6 · All-out 0.6 / 1.6 | × the zone's kick and pass weights (run ×1). Kick-chase kicks the last most, All-out least; the kick type is still the preset's `kickBias`. |
 | `lastTackle.lateS` / `lastTackle.trailRun` / `lastTackle.leadKick` | `lastTackle.ts` | 60 s / ×2 / ×2 | The score and the clock, read only here (#651 is the match-wide version): in the match's last 60 s (or golden point) a side behind doubles its run and pass weights, a side in front its kick weight. 1 / 1 turns the read off. |
@@ -178,19 +178,26 @@ second-last's early kick keeps its rolls; the own 20 adds one for styles with no
 `earlyTerritory`. Shift it wide is a pass to the widest man behind the kicker within
 `MAX_LAT_M` (+3 m for a wide style) once `live.passCooldown` has run, with no roll of its own
 (the pass's own interception and handling odds as usual); with nobody there he takes it on.
-Measured by `balance/plans/last-tackle.json` (run `20261113-094245-last-tackle`) and
-`standard.json` on (`20261113-095632-standard`) against off (`20261113-095318-standard-lt-off`),
-13 November 2026, 2:30 halves. Even 60 v 60, off → on: last tackle kick 69 → 58%, run 22 →
-25%, pass 9 → 17% (kick and pass beyond luck in every scenario; run 24–34% everywhere);
-kicks 5.9 → 5.2 a match and kick metres 151 → 129 (both beyond luck); where a won ball's set
-starts 55.8 → 53.8 m to go; completion 72.8 → 72.9%; errors 3.8 → 3.5, tries 1.6 → 1.8 (not
-beyond luck). Completion stays in its band in every scenario (70.4–75.5%). The six preset
-rows (points share, ±3.3) on (off): Tight 53.0 (49.3), Expansive 48.0 (48.0), Kick-chase
-**43.8** (48.8), All-out 55.0 (51.0), Rush 51.3 (51.3), Compressed 49.8 (44.5). **Kick-chase
-misses 45%**: it was 45.5 over 300 matches in a tuning run (`lt-lean2`) with a lighter lean,
-and 44.1 with no lean, so it is the other side's new options, not its own lean, that cost it.
-Kick-chase still kicks the last most (61% with Balanced, against 57% for two Balanced sides)
-and All-out least (52%, pass 23%). A first cut that rolled the early kick at the
+Measured 13 November 2026, 2:30 halves. The first cut (run and pass weights 1.67× today's) was
+run in `balance/plans/last-tackle.json` (`20261113-094245-last-tackle`); at 100 seeds both ways
+it read Kick-chase 43.8% and All-out 55.0%. At 400 seeds both ways
+(`balance/plans/last-tackle-presets.json`, `20261113-111057-last-tackle-presets`) it was
+Kick-chase 46.1 (off 50.1) and All-out **55.8** (off 52.1), ±1.6. The same run swept the run and pass
+weights: halving them in the own 20, own half and midfield gave 46.2 / 54.1, taking them out
+there 46.5 / 54.9 (Kick-chase did not move: its loss is not the deep running), all of them ×
+0.6 46.9 / 54.4, which is the default. At the default
+(`balance/plans/last-tackle-presets-2.json`, `20261113-112709-last-tackle-presets-2`, 400
+seeds both ways, ±1.6), points share on (off): Tight 52.8 (51.9), Expansive 46.9 (49.6),
+Kick-chase 46.9 (50.1), All-out 54.3 (52.1); and from `standard.json` on
+(`20261113-112350-standard`, 100 seeds both ways, ±3.2) against off
+(`20261113-095318-standard-lt-off`): Rush 49.8 (51.3), Compressed 50.5 (44.5). All six inside
+45–55%. Even 60 v 60 over 200 matches (`last-tackle-presets`, the × 0.6 row): last tackle
+kick 69 → 62%, run 23 → 23%, pass 8 → 15% (kick and pass beyond luck), kicks 6.0 → 5.4 a
+match (beyond luck), completion 74.0 → 73.5%, errors 3.6 → 3.5, tries 1.8 → 1.9. Completion
+stays in its band in every standard scenario (70.4–75.2%). Kick-chase kicks the last most (66%
+with Balanced) and All-out least (56%, pass 19%). The run share hardly moves because most
+last-tackle runs were never the kicker's choice (a dart, or the kicker not there to take it);
+his own runs and the shift wide are new. A first cut that rolled the early kick at the
 play-the-ball (the dummy-half finding the kicker) put Tight near 58% and was dropped.
 
 ## 7. Traits (§3)

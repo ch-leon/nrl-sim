@@ -1,0 +1,17 @@
+{
+  "name": "last-tackle-presets",
+  "description": "#650 part 1: are Kick-chase and All-out inside 45–55% with the last-tackle call on (they read 43.8 and 55.0 at 100 seeds both ways in standard.json), and if not, how much running and passing of the last in a side's own half and midfield (where a kick used to be the right play) can stay? 400 seeds both ways on the two rows; even 60 v 60 at 200 for the issue's target (kick down from off, run and pass each over 10%). Baseline is off (lastTackle.on 0).",
+  "seeds": 200,
+  "base": { "lastTackle.on": 0 },
+  "scenarios": [
+    { "name": "even 60 v 60", "home": { "rating": 60 }, "away": { "rating": 60 } },
+    { "name": "kick-chase v balanced", "seeds": 400, "track": "home", "bothWays": true, "home": { "rating": 60, "tactics": { "attack": "kick-chase" } }, "away": { "rating": 60 } },
+    { "name": "all-out v balanced", "seeds": 400, "track": "home", "bothWays": true, "home": { "rating": 60, "tactics": { "attack": "all-out" } }, "away": { "rating": 60 } }
+  ],
+  "variants": [
+    { "name": "on", "tuning": { "lastTackle.on": 1 } },
+    { "name": "deep x0.5", "tuning": { "lastTackle.on": 1, "lastTackle.zones.own20.run": 0.02, "lastTackle.zones.own20.pass": 0.02, "lastTackle.zones.ownHalf.run": 0.04, "lastTackle.zones.ownHalf.pass": 0.05, "lastTackle.zones.midfield.run": 0.06, "lastTackle.zones.midfield.pass": 0.09 } },
+    { "name": "deep 0", "tuning": { "lastTackle.on": 1, "lastTackle.zones.own20.run": 0, "lastTackle.zones.own20.pass": 0, "lastTackle.zones.ownHalf.run": 0, "lastTackle.zones.ownHalf.pass": 0, "lastTackle.zones.midfield.run": 0, "lastTackle.zones.midfield.pass": 0 } },
+    { "name": "all x0.6", "tuning": { "lastTackle.on": 1, "lastTackle.zones.own20.run": 0.024, "lastTackle.zones.own20.pass": 0.024, "lastTackle.zones.ownHalf.run": 0.048, "lastTackle.zones.ownHalf.pass": 0.06, "lastTackle.zones.midfield.run": 0.072, "lastTackle.zones.midfield.pass": 0.108, "lastTackle.zones.attackingHalf.run": 0.15, "lastTackle.zones.attackingHalf.pass": 0.15, "lastTackle.zones.redZone.run": 0.18, "lastTackle.zones.redZone.pass": 0.18 } }
+  ]
+}

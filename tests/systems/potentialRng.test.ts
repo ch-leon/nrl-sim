@@ -41,9 +41,9 @@ import { contractsEndingSoon } from '../../src/systems/contracts';
 // #625: completed retreats, including handovers, change match outcomes and later
 // season draws. The final standing-marker/deep-cover corrections restore this historical
 // season fingerprint; UI-read and no-read seasons still agree.
-// #650: the last-tackle call adds a roll per last-tackle call, changing match outcomes and so the
-// season's later draws (1788836146 before it); UI-read and no-read seasons still agree.
-const MAIN_SEED_AFTER_SEASON = 3329112261;
+// #650: the last-tackle call at its default leaves this fingerprint as it was (its first cut, with
+// run and pass weights 1.67× the default, moved it to 3329112261).
+const MAIN_SEED_AFTER_SEASON = 1788836146;
 
 describe('the rng stream (#369)', () => {
   it.each([0, 1])('weekly potential and dot reads preserve the season stream with habit AI=%i', (ai) => {

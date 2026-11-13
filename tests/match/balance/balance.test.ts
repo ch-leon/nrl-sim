@@ -296,8 +296,8 @@ describe('measuring and reporting', () => {
     // live.receiverMargin 0 they were 1-0:127:3176e88b734d4e28 / 0-0:141:a6acfd1ea8357fe9.
     // The last-tackle call (#650) adds a roll per last-tackle call and re-pins both; at lastTackle.on 0
     // they are 10-0:120:785e83425993f65b / 6-0:119:0c43dd4315fca6d2.
-    { attack: 'balanced' as const, expected: '18-6:142:fa8b92eb5afedb8a' },
-    { attack: 'expansive' as const, expected: '10-6:120:f85edc3cc736a212' },
+    { attack: 'balanced' as const, expected: '10-0:143:c8e680f4a9f93b72' },
+    { attack: 'expansive' as const, expected: '6-6:131:964b190f1b7b3aab' },
   ])('pins an even $attack / Slide match (seed 1)', async ({ attack, expected }) => {
     const sim = new LiveSim(sideSheet('H', { rating: 60, tactics: { attack } }), sideSheet('A', { rating: 60 }), 1);
     const parts: string[] = [];
@@ -327,8 +327,9 @@ describe('measuring and reporting', () => {
     // Short-match default re-pins these at two 2:30 halves, keeping the same play/AI coverage.
     // The weighted receiver (#649) re-pins both (10-6:141:7f3f6474439483eb and
     // 12-6:152:590616020216c265 before it); both still launch a play and the AI coach still calls one.
-    // The last-tackle call (#650) re-pins both (6-7:137:d1d03788b03a1934 and 7-6:160:ef629166efdf6fe6 before it).
-    { name: 'plays-on', aiCoach: false, expected: '14-4:144:be9435f5804649dc' },
+    // The last-tackle call (#650) re-pins plays-on (6-7:137:d1d03788b03a1934 before it) and plays-on-hard
+    // (7-6:160:ef629166efdf6fe6 before it).
+    { name: 'plays-on', aiCoach: false, expected: '4-0:137:57361c8ca339e953' },
     { name: 'plays-on-hard', aiCoach: true, expected: '10-6:150:b55e8ecc71438834' },
   ])('pins $name: an even Balanced / Slide match with set plays (seed 1)', async ({ aiCoach, expected }) => {
     const home = { ...sideSheet('H', { rating: 60 }), plays: ['block-play' as const, 'cut-out-winger' as const, 'kick-pass' as const] };

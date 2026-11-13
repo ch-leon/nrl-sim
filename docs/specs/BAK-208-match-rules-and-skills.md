@@ -195,7 +195,7 @@ back, 12% spilled). Tuning §31.
 The kicker makes **one call** for the last tackle. **More options on the last (#650 part 1,
 `lastTackle.on`, awaiting lab sign-off):** one roll among **kick**, **run it** and **shift it
 wide** (to the widest man behind him in reach, who plays on), weighted by zone (own 20 kick
-1 / run 0.04 / pass 0.04, rising to red zone 1 / 0.3 / 0.3; no kick inside 6 m), × the side's
+1 / run 0.025 / pass 0.025, rising to red zone 1 / 0.18 / 0.18; no kick inside 6 m), × the side's
 style (Kick-chase kick ×1.8, Tight ×1.15, Expansive ×0.8, All-out ×0.6; Expansive and All-out
 pass ×1.6, Tight ×0.8, Kick-chase ×0.6), × who is on the field (the kicker's Skill over 60
 and his Big Boot lift the kick; the centre and wingers' Speed over the other side's lifts run

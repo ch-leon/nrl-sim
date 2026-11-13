@@ -16,13 +16,17 @@ export type LastPlay = 'kick' | 'run' | 'pass';
  */
 export const LAST_TACKLE = {
   on: 1,
-  /** Kick, run and pass weights by zone (the share is each over their sum). */
+  /**
+   * Kick, run and pass weights by zone (the share is each over their sum). The run and pass
+   * weights are the first cut's × 0.6: at full strength All-out won 55.8% of its even matches
+   * (400 seeds both ways, balance/plans/last-tackle-presets.json).
+   */
   zones: {
-    own20: { kick: 1, run: 0.04, pass: 0.04 },
-    ownHalf: { kick: 1, run: 0.08, pass: 0.1 },
-    midfield: { kick: 1, run: 0.12, pass: 0.18 },
-    attackingHalf: { kick: 1, run: 0.25, pass: 0.25 },
-    redZone: { kick: 1, run: 0.3, pass: 0.3 },
+    own20: { kick: 1, run: 0.025, pass: 0.025 },
+    ownHalf: { kick: 1, run: 0.05, pass: 0.06 },
+    midfield: { kick: 1, run: 0.07, pass: 0.11 },
+    attackingHalf: { kick: 1, run: 0.15, pass: 0.15 },
+    redZone: { kick: 1, run: 0.18, pass: 0.18 },
   } as Record<Zone, Record<LastPlay, number>>,
   /** Inside this many metres of the line nobody kicks the last: run or pass only (was RUN_CLOSE_M). */
   closeM: 6,
