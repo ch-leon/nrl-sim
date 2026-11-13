@@ -6,8 +6,12 @@ export type Head = typeof HEAD_OPTIONS[number];
 export type Facing = 'front' | 'back';
 export interface HeadLook { skin: number; hair: number; head: Head; beard: boolean }
 
-/** Large, original three-quarter heads: two eyes, visible cheek and recognisable hair outlines. */
-export function drawHead(a: HeadLook, kit: Kit, facing: Facing): PixelBuffer {
+/**
+ * Large, original three-quarter heads: two eyes, visible cheek and recognisable hair outlines.
+ * `sway` (#670) lifts (-1) or drops (+1) the long hair a pixel against the stride: mullet, ponytail,
+ * braids and the headband's tails. Everything else on the head stays put.
+ */
+export function drawHead(a: HeadLook, kit: Kit, facing: Facing, sway = 0): PixelBuffer {
   const b = new PixelBuffer(17, 18);
   const skinShade = shade(a.skin, .74);
   const skinLight = mix(a.skin, 0xffefd9, .17);
@@ -37,19 +41,21 @@ export function drawHead(a: HeadLook, kit: Kit, facing: Facing): PixelBuffer {
     b.line(4, 3, 10, 2, hairLight); b.fillRect(3, 4, 3, 2, hairLight);
     b.fillRect(2, 7, 2, 5, hairShade);
   }
+  const s = Math.max(-1, Math.min(1, Math.round(sway)));
   if (a.head === 'mullet') {
-    polygon([[2, 7], [5, 8], [5, 16], [2, 17], [1, 13]], a.hair);
-    b.fillRect(2, 10, 1, 5, hairLight); b.fillRect(4, 12, 1, 5, hairShade);
+    // The roots stay at the neck; the tail below them swings.
+    polygon([[2, 7], [5, 8], [5, 16 + s], [2, 17 + s], [1, 13 + s]], a.hair);
+    b.fillRect(2, 10 + s, 1, 5, hairLight); b.fillRect(4, 12 + s, 1, 5, hairShade);
   }
   if (a.head === 'ponytail') {
-    polygon([[2, 5], [4, 6], [3, 10], [3, 14], [1, 16], [0, 13], [0, 8]], a.hair);
-    b.fillRect(1, 7, 2, 1, kit.trim); b.fillRect(0, 9, 1, 4, hairLight);
+    polygon([[2, 5], [4, 6], [3, 10 + s], [3, 14 + s], [1, 16 + s], [0, 13 + s], [0, 8 + s]], a.hair);
+    b.fillRect(1, 7, 2, 1, kit.trim); b.fillRect(0, 9 + s, 1, 4, hairLight);
   }
   if (a.head === 'braids') {
     for (const x of [4, 7, 10, 13]) b.line(x, 2, x - 1, 6, hairShade);
-    b.fillRect(1, 8, 2, 8, a.hair); b.fillRect(4, 11, 1, 6, hairShade);
-    for (const y of [9, 12, 15]) b.set(1, y, hairLight);
-    b.set(1, 16, kit.trim);
+    b.fillRect(1, 8, 2, 8 + s, a.hair); b.fillRect(4, 11 + s, 1, 6, hairShade);
+    for (const y of [9, 12, 15]) b.set(1, y + s, hairLight);
+    b.set(1, 16 + s, kit.trim);
   }
   if (a.head === 'buzz') {
     polygon([[4, 4], [6, 2], [11, 2], [14, 4], [14, 6], [6, 5], [3, 7]], mix(a.hair, a.skin, .25));
@@ -81,7 +87,7 @@ export function drawHead(a: HeadLook, kit: Kit, facing: Facing): PixelBuffer {
   if (a.head === 'headband') {
     b.fillRect(2, 6, 13, 2, 0xf3e8d2);
     b.fillRect(2, 7, 13, 1, mix(kit.trim, 0xf3e8d2, .4));
-    b.line(2, 8, 0, 11, 0xf3e8d2); b.line(2, 8, 2, 13, 0xf3e8d2);
+    b.line(2, 8, 0, 11 + s, 0xf3e8d2); b.line(2, 8, 2 + Math.min(0, s), 13 + s, 0xf3e8d2);
   }
 
   if (facing === 'front') {

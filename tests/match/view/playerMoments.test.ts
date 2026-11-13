@@ -27,7 +27,7 @@ describe('big-moment sampling', () => {
     const up = { ...scorer, pose: 'celebrate' };
     expect(playerPicture(up, scorer, 110, holder, 1)).toMatchObject({ action: 'tryRise', frame: 0 });
     expect(playerPicture(up, up, 119, holder, 1)).toMatchObject({ action: 'tryRise', frame: 5 });
-    expect(['fistPump', 'point', 'celebrate']).toContain(playerPicture(up, up, 120, holder, 1).action);
+    expect(['fistPump', 'point', 'celebrate', 'kneeSlide']).toContain(playerPicture(up, up, 120, holder, 1).action);
     expect(playerPicture({ ...p, pose: 'down' }, p, 120, null, 1).action).toBe('down');
   });
   it('keeps reactions stable across seeks and assigns no celebration to opponents', () => {
@@ -38,5 +38,17 @@ describe('big-moment sampling', () => {
     const reactions = new Set(Array.from({ length: 9 }, (_, slot) => playerPicture({ ...friend, slot, who: `team-${slot}` }, friend, 122, null, 1).action));
     expect(reactions.size).toBeGreaterThan(1);
     expect(playerPicture({ ...p, side: 'away', pose: 'idle' }, p, 122, null, 1).action).toBe('idle');
+  });
+  it('reaches all four solo celebrations, the knee slide included, and never the paired chest bump', () => {
+    const friend = { ...p, pose: 'celebrate', celebrationTick: 100 };
+    const reactions = new Set(Array.from({ length: 60 }, (_, slot) => playerPicture({ ...friend, slot, who: `squad-${slot}` }, friend, 122, null, 1).action));
+    expect(reactions).toEqual(new Set(['fistPump', 'point', 'celebrate', 'kneeSlide']));
+  });
+  it('keeps a fending carrier striding: the legs follow the run cycle, the arm the fend', () => {
+    const fend = { ...p, pose: 'fend', poseUntil: 106, speed: 6 };
+    const strides = [100, 101, 102, 103].map(t => playerPicture(fend, fend, t, holder, 1));
+    for (const picture of strides) expect(picture.action).toBe('fend');
+    expect(new Set(strides.map(s => s.strideFrame)).size).toBeGreaterThan(1);
+    expect(playerPicture({ ...fend, speed: 0 }, fend, 101, holder, 1).strideFrame).toBe(-1);
   });
 });

@@ -27,6 +27,9 @@ export interface LabsState {
 /** The override that opens the Office screens before their round (#519). Browser-local, never saved. */
 export const OPEN_SCREENS = 'open-screens';
 
+/** The override that renders the canvas in CSS pixels, as before #627: the fallback if device-density rendering is slow on a phone. Browser-local, never saved. */
+export const CSS_PIXELS = 'css-pixels';
+
 const empty = (): LabsState => ({ visible: false, on: {}, hintsSeen: [] });
 const flagMap = (x: unknown): x is Record<string, boolean> =>
   !!x && typeof x === 'object' && !Array.isArray(x) && Object.values(x).every((v) => typeof v === 'boolean');

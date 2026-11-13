@@ -155,6 +155,69 @@ side was alone a man short and **binSwing** the points the full side scored minu
 short side's over them (so binSwing / shortMin × 5 is the swing per five-minute bin). Every other number (strips, intercepts, quick play-the-balls, wrestles held by
 1/2/3 men, legs at every mark, standard errors) is in `results*.jsonl`.
 
+## Watchability (#648)
+
+Under each scenario's table the report has a second one, for whether the matches
+were worth watching. It is read off the events the sim already emits and the ball's
+position and holder; nothing in the sim changes, so every seed plays the same match
+with or without it. The columns (`src/match/balance/watch.ts`), in `results*.jsonl`
+as a `watch` field after `ms` (older results lack it and are read as not measured,
+never as zero: the table is left out, or a dash shown for that row):
+
+- **Lead changes**: a side taking the lead from the side that last held it. 0-0 to
+  the first score is not one; level and then ahead again by the same side is not
+  one. A stretch's count is scaled to 14 minutes like the other counts.
+- **Within 6, 1 min out %**: matches where the points were within 6 (inclusive) when
+  the last minute began (the match clock at full time, 14:00, less 60 s; a stretch's
+  own end).
+- **Decided last min %**: matches won by a side that was not in front when the last
+  minute began, so the points that won it came in the last minute. Anything scored
+  from then on counts (a conversion taken after the siren, golden point). A draw is
+  decided by nobody.
+- **Winner's biggest deficit**: the most points the eventual winner ever trailed by,
+  0 if it never trailed or the match was drawn. Mean over matches.
+- **Try kick / set play / offload / break 20 m+ / drive <5 m / other %**: how each
+  try came about, as a share of tries. Rules, first that fits wins:
+  1. **kick**: the scoring side's own `bomb`, `grubber`, `chip` or `cross-field`
+     kick within 12 s (240 ticks) before the try, with no tackle, stoppage or loss
+     of the ball by the kicking side in between. The other side regathering ends it;
+     the kicker's own regather, scramble or the defender spilling it does not. A
+     `long` kick is territory and is not an origin.
+  2. **set play**: a `set-play` event by the scoring side within 3 s (`plays.scriptTicks`)
+     before the try, with no tackle, `play-breaks-down` or stoppage since: the play
+     the coach called was still running. Only sides with `plays` in their sheet have
+     any.
+  3. **offload**: an `offload` by the scoring side earlier in the same play (no
+     tackle or stoppage since).
+  4. **break 20 m+**: a `line-break` by the scoring side in the same play (none of
+     the above, no tackle since) and the try scored 20 m or more further up the
+     pitch than where the break was made. A break nearer the line is not counted
+     here (the break happens near the line most of the time: tries after any break
+     are roughly a quarter of all tries, after one of 20 m or more far fewer).
+  5. **drive <5 m**: the scoring side's last tackle (its play-the-ball) was within
+     5 m of the line it scored at, and nothing has stopped play since (a penalty
+     tap, kick or turnover would).
+  6. **other**: everything else (a long run from further out, a return off the
+     other side's kick, a try off a penalty tap or a scrum-style restart, a kick
+     the rules above do not own).
+  Known limits: the sim emits no event for a pass, a carry, or where a set started,
+  so "kick-chase" and "second-phase" tries cannot be told apart from "other", and a
+  drive is judged by where the play-the-ball was, not by the carrier being driven
+  back. Telling them apart would need a `pass` event (or a count of passes in the
+  play) and a start-of-set marker; the harness does not change the sim to get them.
+- **Last tackle kick / run / pass %**: the play on the final tackle of a set (the
+  play that begins with the last-tackle flag up, after the dummy-half's heel): a
+  **kick** when its side kicks (any kick, or a field-goal attempt) before the play
+  ends; else a **pass** when more than one man holds the ball in the play (counting
+  the dummy-half only if he runs it himself, so his heel to the first receiver is
+  not a pass; an offload or cut-out is); else a **run**, including a dart.
+
+Origins and last-tackle plays are shares of the tries or last tackles in the row;
+the `*` marks use a standard error that treats each try (or last tackle) as an
+independent draw, the most such a share can claim. The percentages and the per-match
+counts behind them (`watch.origins`, `watch.lastTackles`, in the same scale as the
+other counts) are in `results*.jsonl`.
+
 ## Always on
 
 `.github/workflows/balance.yml` runs `standard.json` on every push to `main` that

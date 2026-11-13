@@ -3,7 +3,8 @@
 // change against the baseline (or a previous run) flagged when it is bigger
 // than luck would explain. Pure: results in, Markdown out.
 import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL } from '../league/presets';
-import { SIDE_COUNTS, MATCH_MINUTES, type CellResult, type CountKey, type Stat } from './measure';
+import { SIDE_COUNTS, MATCH_MINUTES, type CellResult, type CountKey, type Stat, type WatchStats } from './measure';
+import { LAST_TACKLES, ORIGINS } from './watch';
 
 /**
  * §7 balance targets per full Nines match, both sides combined. Tackles, line
@@ -48,6 +49,9 @@ export function delta(cur: { mean: number; se: number }, base: { mean: number; s
   const s = `${d >= 0 ? '+' : ''}${d.toFixed(1)}`;
   return flag && se > 0 && Math.abs(d) > 2 * se ? `${s}*` : s;
 }
+
+/** Try origins' headings. */
+const ORIGIN_LABEL: Record<(typeof ORIGINS)[number], string> = { kick: 'kick', setPlay: 'set play', offload: 'offload', break: 'break 20 m+', drive: 'drive <5 m', other: 'other' };
 
 const pct = (v: number): string => `${Math.round(v * 100)}%`;
 /** A tenth. Side win is read against the 42–58% band; retain a tenth when reading endpoints. */
@@ -108,6 +112,7 @@ export function reportMarkdown(r: ReportInput): string {
       out.push(`| ${row.variant} | ${cells.join(' | ')} | ${pct(row.homeWin)}${row.draw > 0 ? ` (${pct(row.draw)} drawn)` : ''} |${side} ${row.wrestleSecs.toFixed(2)} | ${legsEnd(row)} |`);
     }
     out.push('');
+    out.push(...watchTable(rows, base));
     const prev = r.previous?.filter((x) => x.scenario === sc) ?? [];
     if (prev.length) {
       const moved: string[] = [];
@@ -128,6 +133,57 @@ export function reportMarkdown(r: ReportInput): string {
   const secs = r.results.reduce((a, x) => a + x.ms, 0) / 1000;
   out.push(`_${r.results.length} cells in ${secs.toFixed(0)} s._`, '');
   return out.join('\n');
+}
+
+/**
+ * A set of per-match counts as shares of their total, in percent. The standard
+ * error treats the events (tries, last tackles) as independent draws, which is
+ * all a share of a few per match can claim; `matches` is how many matches the
+ * counts came over and `minutes` how long each was (a stretch's counts are
+ * scaled, its events are not).
+ */
+export function sharesOf<K extends string>(counts: Record<K, Stat>, keys: readonly K[], matches: number, minutes: number): { shares: Record<K, Stat>; perMatch: number } {
+  const total = keys.reduce((a, k) => a + counts[k].mean, 0);
+  const n = total * matches * (minutes / MATCH_MINUTES);
+  const shares = Object.fromEntries(keys.map((k) => {
+    const p = total > 0 ? counts[k].mean / total : 0;
+    return [k, { mean: 100 * p, se: n > 0 ? 100 * Math.sqrt((p * (1 - p)) / n) : 0 }];
+  })) as Record<K, Stat>;
+  return { shares, perMatch: total };
+}
+
+const pctStat = (s: Stat): Stat => ({ mean: s.mean * 100, se: s.se * 100 });
+
+/** The watchability columns, in order: header, and the value of each for one result (undefined when it predates them). */
+const WATCH_COLUMNS: readonly { head: string; digits: number; get: (w: WatchStats, r: CellResult) => Stat }[] = [
+  { head: 'Lead changes', digits: 2, get: (w) => w.flow.leadChanges },
+  { head: 'Within 6, 1 min out %', digits: 0, get: (w) => pctStat(w.flow.closeLate) },
+  { head: 'Decided last min %', digits: 0, get: (w) => pctStat(w.flow.decidedLate) },
+  { head: 'Winner\'s biggest deficit', digits: 1, get: (w) => w.flow.comeback },
+  ...ORIGINS.map((k) => ({ head: `Try ${ORIGIN_LABEL[k]} %`, digits: 0, get: (w: WatchStats, r: CellResult) => sharesOf(w.origins, ORIGINS, r.seeds, r.minutes).shares[k] })),
+  ...LAST_TACKLES.map((k) => ({ head: `Last tackle ${k} %`, digits: 0, get: (w: WatchStats, r: CellResult) => sharesOf(w.lastTackles, LAST_TACKLES, r.seeds, r.minutes).shares[k] })),
+];
+
+/** The watchability table for one scenario's rows, or nothing when none of them has the measures (a run from before #648). */
+function watchTable(rows: readonly CellResult[], base: CellResult): string[] {
+  if (!rows.some((x) => x.watch)) return [];
+  const out: string[] = [];
+  out.push(`| Variant | ${WATCH_COLUMNS.map((c) => c.head).join(' | ')} |`, `|---|${WATCH_COLUMNS.map(() => '---:').join('|')}|`);
+  for (const row of rows) {
+    const cells = WATCH_COLUMNS.map((c) => {
+      if (!row.watch) return '—';
+      const v = c.get(row.watch, row);
+      const d = row === base || !base.watch ? '' : ` (${delta(v, c.get(base.watch, base), Math.min(row.seeds, base.seeds) >= MIN_SEEDS_TO_FLAG)})`;
+      return `${v.mean.toFixed(c.digits)}${d}`;
+    });
+    out.push(`| ${row.variant} | ${cells.join(' | ')} |`);
+  }
+  const w = base.watch;
+  if (w) {
+    out.push('', `_Tries ${sharesOf(w.origins, ORIGINS, base.seeds, base.minutes).perMatch.toFixed(1)} and last tackles ${sharesOf(w.lastTackles, LAST_TACKLES, base.seeds, base.minutes).perMatch.toFixed(1)} a match in the baseline row. Origins and last-tackle plays are shares of those; their ± test treats each try or last tackle as an independent draw. The attribution rules are in balance/README.md._`);
+  }
+  out.push('');
+  return out;
 }
 
 /** Opt-in counter report. Matrix rows use the documented `<attack> v <defence>` names. */

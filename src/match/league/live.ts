@@ -37,7 +37,7 @@ import { SET_TACKLES } from '../../config';
 import { TICK_S, type MatchSim } from '../core/engine';
 import { speedOf } from '../core/body';
 import { CARRY_LIFT, flightAt } from '../core/ball';
-import type { PlayerSnap, Snapshot } from '../core/snapshot';
+import { REACT_SNAP_TICKS, type PlayerSnap, type Snapshot } from '../core/snapshot';
 import { clockText } from './rules';
 import { LIVE } from './live/knobs';
 import { LivePositioning } from './live/positioning';
@@ -164,6 +164,7 @@ export class LiveSim extends LivePositioning implements MatchSim {
         headX: p.body.heading.x,
         headY: p.body.heading.y,
         speed: speedOf(p.body),
+        odometer: p.odometer,
         // As things stand after the tick: the tick he runs dry he is blown, not sprinting.
         ...(p.sprinting && !p.gas.blown ? { sprint: true } : {}),
         ...(p.gas.blown ? { blown: true } : {}),
@@ -176,6 +177,7 @@ export class LiveSim extends LivePositioning implements MatchSim {
         ...(p.aerialCatchTick !== undefined && p.aerialCatchTick === p.catchTick ? { aerialCatchTick: p.aerialCatchTick } : {}),
         ...(ph.kind === 'try' && scorer === p ? { tryTick: ph.t0 } : {}),
         ...(ph.kind === 'try' && scorer?.side === p.side ? { celebrationTick: ph.t0 } : {}),
+        ...(p.react !== null && this.tick - p.react.tick < REACT_SNAP_TICKS ? { reactTick: p.react.tick, react: p.react.kind } : {}),
         ...(p.binUntilS >= 0 ? { binned: true } : {}),
       };
     });

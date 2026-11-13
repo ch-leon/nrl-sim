@@ -1,6 +1,6 @@
 // src/match/view/popups.ts — what to shout about (BAK-208 §6). Pure: maps a
 // sim event to the pop-up word over the player's head, its tone and whether it
-// is a big moment (slow-motion beat). popupLayer.ts draws them.
+// is a big moment (impact.ts gives it a tier). popupLayer.ts draws them.
 import { CALL_LABEL, isCoachCall } from '../league/calls';
 import { playOfDetail } from '../league/plays';
 import type { SimEvent } from '../core/snapshot';
@@ -12,7 +12,7 @@ export interface Popup {
   /** Second line: the player's surname (a bonus try's says where it was scored from). */
   sub: string;
   tone: PopupTone;
-  /** A big moment: larger text, slow-motion beat. */
+  /** A big moment: larger text, and an impact tier (impact.ts). */
   big: boolean;
   /** How long it stays up, real ms. */
   ms: number;
@@ -25,9 +25,7 @@ export const TRAIT_COLOR = '#d9a5ff';
 
 export const POPUP_MS = 1200;
 export const POPUP_BIG_MS = 1700;
-/** Slow-motion beat on a big moment: real ms and time factor. */
-export const SLOWMO_MS = 320;
-export const SLOWMO_FACTOR = 0.3;
+// What a big moment does to the clock and camera is impact.ts (#631).
 
 const WORDS: Readonly<Record<string, { word: string; tone: PopupTone; big?: boolean }>> = {
   'break-tackle': { word: 'BUST!', tone: 'attack', big: true },
@@ -47,6 +45,8 @@ const WORDS: Readonly<Record<string, { word: string; tone: PopupTone; big?: bool
   drop: { word: 'DROPPED!', tone: 'bad' },
   // Kick contests (#99): a loose ball both sides are near, over the man nearest it.
   'loose-ball': { word: 'LOOSE BALL!', tone: 'neutral' },
+  // A clean break only (#638); popupFor drops a half break.
+  'line-break': { word: 'LINE BREAK!', tone: 'attack', big: true },
   try: { word: 'TRY!', tone: 'attack', big: true },
   // Legs and the wrestle (§8): a quick play-the-ball off a short wrestle, a player whose legs are gone (COOKED!, not to be confused with running out of gas).
   'quick-ptb': { word: 'QUICK PTB!', tone: 'attack' },
@@ -100,6 +100,15 @@ const KICK_WORDS: Readonly<Record<string, string>> = {
   'cross-field': 'CROSS-FIELD!',
 };
 
+/**
+ * A coach's call that paid off (#639), over the man who made it count: the call's own result
+ * ("SHIFT LEFT +18M") under COACH'S CALL!. It stays up as long as a big moment but takes no
+ * impact tier (it is shown directly, not through impactTier): the moment it settles on has had its own.
+ */
+export function callPaidPopup(result: string): Popup {
+  return { word: "COACH'S CALL!", sub: result.toUpperCase(), tone: 'attack', big: false, ms: POPUP_BIG_MS };
+}
+
 export function surnameOf(name: string | undefined): string {
   if (!name) return '';
   const parts = name.trim().split(/\s+/);
@@ -112,6 +121,7 @@ export function surnameOf(name: string | undefined): string {
  * one, so every firing trait is seen.
  */
 export function popupFor(e: SimEvent): Popup | null {
+  if (e.kind === 'line-break' && e.detail === 'half') return null;
   const w = WORDS[e.kind] ?? (e.trait && e.kind === 'tackle' ? { word: 'DRIVE!', tone: 'attack' as const } : undefined);
   if (!w) return null;
   // A kick at goal that misses reads as a miss, whichever kind it was.

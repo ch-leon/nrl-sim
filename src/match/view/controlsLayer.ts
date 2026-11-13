@@ -11,6 +11,7 @@ import type { LivePlayback, LivePlaybackScene } from './livePlayback';
 import { hintSeen, markHintSeen } from '../../labs/flags';
 import { button } from '../../ui/dom';
 import { COLOR_TOKENS } from '../../ui/tokens';
+import { cssZoom } from '../../world/viewport';
 
 export const GESTURE = { swipePx: 30, stepPx: 22, swipeMs: 600, cancelPx: 15, kickAlignment: 0.6 };
 export interface GesturePoint extends Vec { pointers?: number; atMs?: number }
@@ -165,7 +166,7 @@ export class ControlsLayer {
     if (classifyGesture(this.points, performance.now() - this.started, this.context()) !== 'kick') return;
     const ball = this.pb.controlPicture.ball, aim = this.aim();
     const a = this.world(ball), b = this.world(aim);
-    const zoom = this.scene.cameras.main.zoom;
+    const zoom = cssZoom(this.scene.cameras.main);
     this.line.lineStyle(2 / zoom, Number.parseInt(COLOR_TOKENS.accent.slice(1), 16), 1);
     const n = Math.max(2, Math.ceil(dist(a, b) * zoom / 8));
     for (let i = 0; i < n; i += 2) this.line.lineBetween(a.x + (b.x - a.x) * i / n, a.y + (b.y - a.y) * i / n, a.x + (b.x - a.x) * (i + 1) / n, a.y + (b.y - a.y) * (i + 1) / n);
@@ -173,7 +174,7 @@ export class ControlsLayer {
     this.label.setText(controlKickBand(dist(ball, aim), LIVE.controlsChipFromM, LIVE.controlsBombFromM, this.pb.controlDirection > 0 ? FIELD_LENGTH - ball.x : ball.x).toUpperCase()).setPosition((a.x + b.x) / 2, (a.y + b.y) / 2 - 8 / zoom).setScale(1 / zoom).setVisible(true);
   }
   private update = (): void => {
-    const zoom = this.scene.cameras.main.zoom;
+    const zoom = cssZoom(this.scene.cameras.main);
     const ball = this.world(this.pb.controlPicture.ball);
     this.feedback.setPosition(ball.x, ball.y - 24 / zoom).setScale(1 / zoom).setVisible(!this.pb.finished && performance.now() < this.feedbackUntil);
     const text = this.pb.controlAttacking === this.mine ? 'Skip set' : 'Skip to our ball';

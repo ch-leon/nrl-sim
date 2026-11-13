@@ -145,6 +145,7 @@ export abstract class LivePenalties extends LiveRestarts {
     this.refreshOnField();
     this.emit('sin-bin', `${culprit.name} is sent to the sin bin — ${binReasonText(reason)}`, culprit);
     this.events[this.events.length - 1]!.detail = reason;
+    this.react(culprit, 'bin');
   }
 
   /** Time served: back on from the touchline. */
@@ -219,6 +220,7 @@ export abstract class LivePenalties extends LiveRestarts {
     if (g.good) this.points[g.side] += NINES.fieldGoalPoints;
     this.emit('field-goal', g.good ? `FIELD GOAL! ${k.name} — ${this.names.home} ${this.points.home} – ${this.points.away} ${this.names.away}` : `${k.name}'s field goal goes wide`, k);
     this.events[this.events.length - 1]!.detail = g.good ? 'good' : 'missed';
+    if (!g.good) this.react(k, 'miss');
     if (g.good) {
       this.ball = { kind: 'held', by: g.kicker };
       this.phase = { kind: 'goal', t0: this.tick, side: g.side };

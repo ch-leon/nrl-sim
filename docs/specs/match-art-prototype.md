@@ -14,7 +14,7 @@ and big-moment animation work follow that release and phone play-test.
 
 ## Live match integration
 
-- `MatchScene` paints stable player identities in reusable 44×40 textures. Kicks,
+- `MatchScene` paints stable player identities in reusable 44×42 textures. Kicks,
   fends, dummy-half pickups and celebrations share the approved head proportions.
   Catches keep the running legs, then tuck into a carry after four simulation ticks.
 - `LiveView` draws only the carrier and defenders named by the sim in a shared
@@ -29,13 +29,63 @@ and big-moment animation work follow that release and phone play-test.
   frames, replay, seeking and resume do not need to have observed the first hit.
   Old recordings without contact references use individual character poses.
 - Appearance uses the existing player ID mapping and follows interchanges.
+  Build, height and head (#643) are a pure function of the player's id and his own
+  squad position (`appearanceFor(id, position)`; the match builds `castLooks` from
+  both sheets' rosters and benches): props and locks are stocky, fullbacks, wingers
+  and centres lean, second-rowers athletic or stocky, the rest by hash. Height is
+  −2…+2 rows by position (second-rowers tallest, hookers and halves shortest), carried
+  in the shins: painters draw the approved 40-row figure and `stand` fits it to the
+  42-row frame with the boots on row 37, repeating or dropping shin rows; the shared
+  contact picture lifts each upright man's skeleton the same way (`standTall`).
+  All eleven head styles are reachable, about one player in eleven each.
+- A fend (#644) is drawn on the run cycle: the legs stride with the odometer while
+  the near arm locks out straight, palm first, and the ball goes under the far arm.
+  Away from the shared contact picture a tackle and a beaten or tackled man have
+  three beats over the pose's last frames (reach, wrap, drive low; jolt, rock back,
+  regather). The `sleeves` pattern has a trim cuff across the upper arm. From
+  behind, each player shows a 3×5 number (the hoarding digits in
+  `art/match/font.ts`) on a plain panel, painted after the arms so they pass behind
+  the jersey. Nothing in a save carries a jersey number, so `castLooks` gives each
+  man his place on the match's team sheet: starters by slot, the bench after them.
+  Ruck, kick and celebration poses keep the plain back.
   Simulation-tick frame selection keeps pauses and replays consistent. The CPU
-  frame cache is capped at 512; each fixture owns one texture per player and one
-  contact texture, all freed at scene shutdown.
+  frame cache is capped at 768 (7 KB a frame, 5.4 MB; #646: a whole match draws about
+  3,600 distinct frames, and a lookup misses one time in twenty at 768, one in nine at
+  512); each fixture owns one texture per player and one contact texture, all freed at
+  scene shutdown. A miss is a 0.1 ms repaint; the cost that scales with players is the
+  upload of a changed pose (about seven a tick), so a frame is looked up and uploaded
+  only when an actor's picture changes. The team rings are painted once per side as
+  pixels (`ringTexture.ts`, 4 texels per art pixel, hard-edged) and drawn as Images
+  sharing one texture, not as 36 Graphics redrawn every frame.
+- Facing follows the heading as it moves on screen, not the field axes (#629):
+  `screenFacing` projects the sim heading through `fieldToGrid` and `gridToScreen`;
+  up the screen shows the back, down it the face, and a leftward heading flips the
+  sprite. The player picture, the contact layer and the held ball's hand all use it.
+  Within 0.2 of an axis (`FACING_BAND`, about 12°) the previous snapshot's heading
+  decides, so a run along a boundary holds its view; no view state is stored.
+- The run cycle follows ground covered, not time (#630). `LiveSim` keeps an odometer
+  (metres each player has run under his own steering) and puts it on `PlayerSnap`;
+  only the view reads it. `strideFor` takes one six-frame cycle per `STRIDE_METRES`
+  (4 m, two steps), so a jog and a sprint plant their feet over the same ground and
+  9 m/s shows about two-thirds of a frame a tick. Below `JOG_SPEED` (3 m/s, averaged
+  with the previous tick) the stride ramps in with shorter jogging frames
+  (`strideFrame` 6–11, no flight); under 0.6 m/s the feet plant.
+- Each leg goes contact, support, push-off, trail, knee lift and reach, the far leg
+  half a cycle behind, so beats 2 and 5 are flight with both boots off the turf.
+  The far arm pumps against the near leg and the near arm against the far leg; a
+  carry keeps the ball tucked while the far arm swings. Standing players breathe
+  over two frames (the chest rises a pixel). Proportions, palette and the 44×40
+  frame are unchanged. Run and carry pictures key on the stride alone and idle on
+  its two breaths, so the busiest five seconds of seed 11 request 465 distinct
+  frames, inside the 512-frame cache (407 before the jogging frames).
 
 Contest odds, RNG, movement, fatigue and strip rules are unchanged. Portraits and
 grounds characters remain a later art pass. The larger head catalogue stays
-available in the art study; existing careers retain their assigned hair and colours.
+available in the match since #643; existing careers keep their skin, hair colour,
+beard, tape and boots. Some players changed look once with #643: about half changed
+head style (a legacy style over its 1/11 share passes the rest to the six new ones),
+props, locks, second-rowers and outside backs whose hashed build disagreed with their
+position changed build, and everyone gained a height.
 
 ## Review
 

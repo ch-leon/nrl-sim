@@ -35,12 +35,14 @@ import {
   RAIN_ANGLE,
   atmosphereGrade,
   atmosphereParticles,
-  buildLightmap,
+  cachedLightmap,
   drawGlow,
   drawGust,
   drawLeaf,
   drawRainStreaks,
+  floodlightRamp,
   gradeIsNeutral,
+  lightsOnMs,
   lightingForFixture,
   type AtmosphereGrade,
   type Lighting,
@@ -169,7 +171,7 @@ export function attachMatchAtmosphere(scene: Phaser.Scene, opts: AtmosphereOptio
   // ── Light ──────────────────────────────────────────────────────────────────
   if (!gradeIsNeutral(grade)) {
     if (grade.pool !== 0xffffff || grade.edge !== 0xffffff) {
-      const lm = buildLightmap(offsetX, grade, 8);
+      const lm = cachedLightmap(offsetX, grade, 8);
       const key = `atm-lightmap~${++serial}`;
       toTexture(scene, key, lm.buf);
       scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.LINEAR);
@@ -194,7 +196,21 @@ export function attachMatchAtmosphere(scene: Phaser.Scene, opts: AtmosphereOptio
         );
       }
     }
-    spawnLights(scene, grade, offsetX, add);
+    const banks = spawnLights(scene, grade, offsetX, add);
+    // Dusk and night (#673): the floodlights come on bank by bank over the first seconds,
+    // from the wall clock. A day fixture, and reduced motion, have them as they were.
+    if (lighting !== 'day' && !reduced && banks.length > 0) {
+      const t0 = scene.time.now;
+      const full = lightsOnMs(FLOODLIGHT_TOWERS.length);
+      const step = (): void => {
+        const ms = scene.time.now - t0;
+        for (const b of banks) b.o.setAlpha(b.alpha * floodlightRamp(ms, b.bank));
+        if (ms >= full) scene.events.off(Phaser.Scenes.Events.UPDATE, step);
+      };
+      step();
+      scene.events.on(Phaser.Scenes.Events.UPDATE, step);
+      offs.push(() => scene.events.off(Phaser.Scenes.Events.UPDATE, step));
+    }
   }
 
   // ── Weather emitters ───────────────────────────────────────────────────────
@@ -287,7 +303,7 @@ export function attachMatchAtmosphere(scene: Phaser.Scene, opts: AtmosphereOptio
   for (const seat of crowdSeats()) {
     if (seat.layer !== 'back') continue; // the stands that face the camera
     const w = isoProject(seat.gx, seat.gy, seat.z, offsetX);
-    const pt = { x: w.x, y: w.y - 7 };
+    const pt = { x: w.x, y: w.y - 18 }; // a fan's head (crowd.ts: waist-up, 20 px)
     seats.all.push(pt);
     const side = shirtSide(shirtForSeat(seat));
     if (side) seats[side].push(pt);
@@ -377,19 +393,31 @@ export function attachMatchAtmosphere(scene: Phaser.Scene, opts: AtmosphereOptio
   return handle;
 }
 
-/** Floodlight glows + beams and the lit grandstand (all additive). */
+/** A light that comes on with its floodlight bank: the object, its full alpha, and which bank. */
+interface BankLight {
+  o: { setAlpha(alpha: number): unknown };
+  alpha: number;
+  bank: number;
+}
+
+/** Floodlight glows + beams and the lit grandstand (all additive); returns each with its bank, for the switch-on. */
 function spawnLights(
   scene: Phaser.Scene,
   grade: AtmosphereGrade,
   offsetX: number,
   add: <T extends Phaser.GameObjects.GameObject>(o: T) => T,
-): void {
+): BankLight[] {
   const lamps = floodlightLamps(offsetX);
+  const banks: BankLight[] = [];
+  /** The grandstand's own lights come on with the last bank. */
+  const last = FLOODLIGHT_TOWERS.length - 1;
 
   if (grade.beams > 0) {
-    const g = add(scene.add.graphics()).setDepth(DEPTH_GLOW).setBlendMode(Phaser.BlendModes.ADD);
-    g.fillStyle(grade.lampColor, grade.beams);
     FLOODLIGHT_TOWERS.forEach((t, i) => {
+      // One beam per bank, so each comes on with its own lamps.
+      const g = add(scene.add.graphics()).setDepth(DEPTH_GLOW).setBlendMode(Phaser.BlendModes.ADD);
+      g.fillStyle(grade.lampColor, grade.beams);
+      banks.push({ o: g, alpha: 1, bank: i });
       const lamp = lamps[i]!;
       // Aim each bank part-way from its nearest field corner toward the centre.
       const cx = Math.max(0, Math.min(FIELD_LONG, t.gx));
@@ -415,7 +443,7 @@ function spawnLights(
   if (grade.standGlow > 0) {
     const strip = (seg: { a: Pt; b: Pt }, thick: number, alpha: number, tint: number): void => {
       const len = Math.hypot(seg.b.x - seg.a.x, seg.b.y - seg.a.y);
-      add(
+      const img = add(
         scene.add
           .image((seg.a.x + seg.b.x) / 2, (seg.a.y + seg.b.y) / 2, KEY_GLOW)
           .setDisplaySize(len * 1.08, thick)
@@ -425,31 +453,27 @@ function spawnLights(
           .setBlendMode(Phaser.BlendModes.ADD)
           .setDepth(DEPTH_GLOW),
       );
+      banks.push({ o: img, alpha, bank: last });
     };
     strip(backStandWindowBand(offsetX), 34, grade.standGlow * 0.55, 0xffdc9a);
     strip(backStandTiers(offsetX), 90, grade.standGlow * 0.32, 0xfff0d0);
   }
 
   if (grade.glow > 0) {
-    for (const lamp of lamps) {
-      add(
-        scene.add
-          .image(lamp.x, lamp.y, KEY_GLOW)
-          .setDisplaySize(230, 230)
-          .setTint(grade.lampColor)
-          .setAlpha(grade.glow * 0.5)
-          .setBlendMode(Phaser.BlendModes.ADD)
-          .setDepth(DEPTH_GLOW),
-      );
-      add(
-        scene.add
-          .image(lamp.x, lamp.y, KEY_GLOW)
-          .setDisplaySize(52, 44)
-          .setTint(0xffffff)
-          .setAlpha(Math.min(1, grade.glow * 1.1))
-          .setBlendMode(Phaser.BlendModes.ADD)
-          .setDepth(DEPTH_GLOW),
-      );
-    }
+    lamps.forEach((lamp, i) => {
+      const halo = grade.glow * 0.5;
+      const core = Math.min(1, grade.glow * 1.1);
+      banks.push({
+        o: add(scene.add.image(lamp.x, lamp.y, KEY_GLOW).setDisplaySize(230, 230).setTint(grade.lampColor).setAlpha(halo).setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH_GLOW)),
+        alpha: halo,
+        bank: i,
+      });
+      banks.push({
+        o: add(scene.add.image(lamp.x, lamp.y, KEY_GLOW).setDisplaySize(52, 44).setTint(0xffffff).setAlpha(core).setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH_GLOW)),
+        alpha: core,
+        bank: i,
+      });
+    });
   }
+  return banks;
 }

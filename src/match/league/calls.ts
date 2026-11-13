@@ -554,6 +554,21 @@ export class CallJudge {
   }
 }
 
+/** The calls that go with a last tackle: the kick (or the run) the set's end asks for. */
+const LAST_TACKLE_CALLS: ReadonlySet<CoachCall> = new Set<CoachCall>(['run-it', 'bomb', 'field-goal', 'grubber', 'forty-twenty']);
+
+/**
+ * A moment a held call suits (#639), for the COACH badge to pulse at: a penalty won (a penalty
+ * call can be made), a restart (a kick-off call can be made) or the last tackle with a kick call
+ * on. `usable` is the calls the sim takes now. Presentation only: it never makes a call.
+ */
+export function callMoment(usable: readonly CoachCall[], attacking: boolean, lastTackle: boolean): 'penalty' | 'restart' | 'last-tackle' | null {
+  if (usable.some(callIsPenalty)) return 'penalty';
+  if (usable.some(callIsKickoff)) return 'restart';
+  if (attacking && lastTackle && usable.some((c) => LAST_TACKLE_CALLS.has(c))) return 'last-tackle';
+  return null;
+}
+
 /** The commentary line for a call that paid off (a set play by its play's name, #326). */
 export function paidOffText(team: string, c: CoachCall, play?: PlayId): string {
   return `${play && PLAYS_BY_ID[play] ? PLAYS_BY_ID[play].name : CALL_LABEL[c]} pays off for ${team}`;

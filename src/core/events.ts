@@ -69,11 +69,17 @@ export interface Events {
   // live sim on this seed and the result comes with 'match:finished'.
   'match:started': { fixture: Fixture; home: TeamSheet; away: TeamSheet; live: LiveMatchData };
   'match:event': MatchEvent; // re-emitted during playback pacing
+  /** One of the player's own calls paid off, on screen (not in a skipped stretch): the rising tone (#639). */
+  'match:call-paid': { call: string };
   'match:finished': { fixture: Fixture; result: MatchResult };
   /** Structural fixture accepted once; report subscribers are presentation-only. */
   'match:committed': { fixture: Fixture; result: MatchResult };
   /** Save & exit left a live match parked: the week stays held and the club's Advance Week resumes it. */
   'match:parked': { tick: number };
+  /** The referee awards a penalty (the contract MatchEvent has no kind for one): presentation only, for the whistle. */
+  'match:penalty': { tick: number };
+  /** A line break the view calls clean (#638): open grass ahead. Presentation only, for the whoosh and the crowd; a half break sends none. */
+  'match:clean-break': { tick: number };
   'board:sacked': { season: number; reason: string };
   // forcedSales (N12.5): who the week's forced sales let go, so a multi-week advance
   // can stop on a sale; the economy emits the warning after the sales.

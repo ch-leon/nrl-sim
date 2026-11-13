@@ -1,14 +1,13 @@
 // src/art/match/fixtureArt.ts — everything a fixture's match scene paints for its
 // colours, painted in one go (N10.5): the stadium's background and foreground
-// layers, the crowd atlas and the two sides' player atlases. Pure and Phaser-free,
+// layers and the crowd atlas (the players are drawn live, matchPlayers.ts). Pure and Phaser-free,
 // so the art worker (artWorker.ts) can paint the next fixture during the week and
 // MatchScene only uploads it (or finds it uploaded ahead). The same pixels as
 // painting them in the scene.
 import { PixelBuffer } from '../pixel';
 import type { Kit } from './kit';
 import { paintBackground, paintForeground } from './stadium';
-import { buildPlayerAtlas, type AtlasFrame } from './players';
-import { buildCrowdAtlas, crowdShirts } from './crowd';
+import { buildCrowdAtlas, crowdShirts, type CrowdAtlasFrame } from './crowd';
 
 /**
  * Largest texture edge of a layer's chunk (N10.5: was 1024). A ×4 phone in software GL
@@ -35,7 +34,7 @@ export interface LayerChunk extends TexturePiece {
 
 /** An atlas: its pixels and named frames. */
 export interface AtlasPixels extends TexturePiece {
-  frames: AtlasFrame[];
+  frames: CrowdAtlasFrame[];
 }
 
 /** The two kits a fixture is played in (the away side in its clash strip if it needs one). */
@@ -50,8 +49,6 @@ export interface FixtureArt {
   bg: LayerChunk[];
   fg: LayerChunk[];
   crowd: AtlasPixels;
-  home: AtlasPixels;
-  away: AtlasPixels;
 }
 
 /** The cache key for a fixture's art: the field offset and both kits, field by field. */
@@ -91,14 +88,12 @@ export function paintFixtureArt(offsetX: number, kits: FixtureKits): FixtureArt 
     bg: chunkLayer('match-bg', paintBackground(offsetX, kits.home, kits.away)),
     fg: chunkLayer('match-fg', paintForeground(offsetX, kits.home, kits.away)),
     crowd: buildCrowdAtlas(crowdShirts(kits.home, kits.away)),
-    home: buildPlayerAtlas(kits.home),
-    away: buildPlayerAtlas(kits.away),
   };
 }
 
-/** Every texture in the art: the layers' chunks, then the crowd and the two player atlases. */
+/** Every texture in the art: the layers' chunks, then the crowd atlas. */
 export function fixtureArtPieces(art: FixtureArt): TexturePiece[] {
-  return [...art.bg, ...art.fg, art.crowd, art.home, art.away];
+  return [...art.bg, ...art.fg, art.crowd];
 }
 
 /** Every pixel buffer in the art, for a Worker's transfer list. */
@@ -114,5 +109,5 @@ export function reviveFixtureArt(raw: FixtureArt): FixtureArt {
   const buf = (b: PixelBuffer): PixelBuffer => new PixelBuffer(b.w, b.h, b.data);
   const layer = (l: LayerChunk[]): LayerChunk[] => l.map((c) => ({ name: c.name, buf: buf(c.buf), x: c.x, y: c.y }));
   const atlas = (a: AtlasPixels): AtlasPixels => ({ buf: buf(a.buf), frames: a.frames });
-  return { key: raw.key, bg: layer(raw.bg), fg: layer(raw.fg), crowd: atlas(raw.crowd), home: atlas(raw.home), away: atlas(raw.away) };
+  return { key: raw.key, bg: layer(raw.bg), fg: layer(raw.fg), crowd: atlas(raw.crowd) };
 }

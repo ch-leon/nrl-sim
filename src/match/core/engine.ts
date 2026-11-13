@@ -28,6 +28,22 @@ export type SimFactory = (seed: number) => MatchSim;
 export type RunSpeed = 0.25 | 0.5 | 1 | 2 | 4 | 8;
 export const RUN_SPEEDS: readonly RunSpeed[] = [0.25, 0.5, 1, 2, 4];
 
+/** A ramped slow-motion beat is integrated in slices this long. */
+const RAMP_SLICE_MS = 8;
+
+/**
+ * The time factor `left` real ms before a ramped beat of `total` ms ends: down
+ * from 1 to `factor` over the first `ramp` ms, level, then back up over the last
+ * `ramp` ms (the two ramps shrink to meet when the beat is shorter than both).
+ */
+export function slowFactorAt(total: number, left: number, factor: number, ramp: number): number {
+  if (ramp <= 0) return factor;
+  const r = Math.min(ramp, total / 2);
+  const elapsed = total - left;
+  const k = Math.max(0, Math.min(1, Math.min(elapsed, left) / r));
+  return 1 - (1 - factor) * k;
+}
+
 /** Longest a single update may fast-forward (a background tab coming back). */
 const MAX_TICKS_PER_UPDATE = 200;
 /** Recent events kept for the lab log. */
@@ -46,6 +62,11 @@ export class Runner {
   /** Slow-motion beat: real ms left and the time factor while it lasts. */
   private slowMs = 0;
   private slowFactor = 1;
+  /** A ramped beat (#631): its whole length and the ease in and out, real ms. 0 ramp: a step, as ever. */
+  private slowTotal = 0;
+  private slowRamp = 0;
+  /** A freeze (hit-stop, #631): real ms during which the sim's clock stands still. */
+  private freezeMs = 0;
   /** Last few events, for a live log. */
   readonly recent: SimEvent[] = [];
   /** Every event since tick 0 on this seed (rebuilt by seek), for feeds and stats. */
@@ -110,17 +131,52 @@ export class Runner {
     if (s > 0) this._speed = s;
   }
 
-  /** Run at `factor` speed for the next `ms` of real time (a beat of slow-motion). */
-  slowMo(ms: number, factor: number): void {
-    this.slowMs = Math.max(this.slowMs, ms);
-    this.slowFactor = Math.max(0.05, Math.min(1, factor));
+  /**
+   * Run at `factor` speed for the next `ms` of real time (a beat of slow-motion).
+   * With `rampMs` the time eases down to `factor` over that long and back up over
+   * the last `rampMs` (#631), instead of switching on and off. A ramped beat in
+   * progress is not cut short by a shorter one.
+   */
+  slowMo(ms: number, factor: number, rampMs = 0): void {
+    const f = Math.max(0.05, Math.min(1, factor));
+    if (this.slowRamp > 0 && ms < this.slowMs) return;
+    if (rampMs > 0) {
+      this.slowMs = this.slowTotal = ms;
+      this.slowRamp = rampMs;
+    } else {
+      this.slowMs = Math.max(this.slowMs, ms);
+      this.slowRamp = 0;
+    }
+    this.slowFactor = f;
+  }
+
+  /** Stand still for the next `ms` of real time: no tick falls due (a hit-stop). The picture holds. */
+  freeze(ms: number): void {
+    this.freezeMs = Math.max(this.freezeMs, ms);
   }
 
   /** Feed real elapsed time; steps every tick that has fallen due. */
   update(realMs: number): void {
     if (!this._playing || this.sim.finished) return;
-    const ms = Math.max(0, realMs);
-    if (this.slowMs > 0) {
+    let ms = Math.max(0, realMs);
+    if (this.freezeMs > 0) {
+      const held = Math.min(ms, this.freezeMs);
+      this.freezeMs -= held;
+      ms -= held;
+    }
+    if (this.slowMs > 0 && this.slowRamp > 0) {
+      // A ramped beat: integrate its factor in short slices, so the ease is smooth at any frame length.
+      const spent = Math.min(ms, this.slowMs);
+      let left = spent;
+      let gained = 0;
+      while (left > 0) {
+        const dt = Math.min(left, RAMP_SLICE_MS);
+        gained += dt * slowFactorAt(this.slowTotal, this.slowMs - dt / 2, this.slowFactor, this.slowRamp);
+        this.slowMs -= dt;
+        left -= dt;
+      }
+      this.acc += (gained + (ms - spent)) * this._speed;
+    } else if (this.slowMs > 0) {
       // Spend the slow beat first at its factor, the remainder at full rate.
       const slow = Math.min(ms, this.slowMs);
       this.slowMs -= slow;
@@ -157,6 +213,8 @@ export class Runner {
     this.recent.length = 0;
     this.history.length = 0;
     this.slowMs = 0;
+    this.slowRamp = 0;
+    this.freezeMs = 0;
     this._prev = this._cur = this.sim.snapshot();
     for (let i = 0; i < target && !this.sim.finished; i++) this.stepOnce();
     this.onEvents = cb;
