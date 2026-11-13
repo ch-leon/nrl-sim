@@ -127,12 +127,18 @@ export async function runMatchPlays(browser, sizes = [[844, 390], [667, 375], [5
         const sheetPlays = await page.evaluate(() => { const sc = window.__nrlGame.scene.getScene('Match'); return [...sc.playback.playsOf(sc.callSide)]; });
         if (sheetPlays.join(',') !== (withPlays ? PLAYS.join(',') : '')) problems.push(`the match's plays are [${sheetPlays.join(',')}]`);
 
-        // With the ball.
+        // With the ball. Possession can change between a wait and the read that follows it (at the
+        // kick-off it does within a second: his side has the ball until it is kicked away), so the
+        // read is taken again until it is still his ball in the read itself.
         await openTray();
-        await waitTitle('Your ball');
-        if (withPlays) await page.waitForFunction(() => document.querySelectorAll('[data-tray-plays]:not([hidden]) [data-play]').length > 0, null, { timeout: 5000 });
-        await settle();
-        const atk = await read();
+        let atk = null;
+        for (let i = 0; i < 8; i++) {
+          await waitTitle('Your ball');
+          if (withPlays) await page.waitForFunction(() => document.querySelectorAll('[data-tray-plays]:not([hidden]) [data-play]').length > 0, null, { timeout: TRAY_OPEN_WAIT_MS }).catch(() => {});
+          await settle();
+          atk = await read();
+          if (atk.title === 'Your ball' && (!withPlays || atk.shown)) break;
+        }
         await page.screenshot({ path: join(OUT, `attacking-${tag}-${w}x${h}.png`) });
         const t = atk.tray;
         if (t.left < -1 || t.top < -1 || t.right > atk.vw + 1 || t.bottom > atk.vh + 1) problems.push('the open tray is off screen');
@@ -227,10 +233,14 @@ export async function runMatchPlays(browser, sizes = [[844, 390], [667, 375], [5
         const openLeft = await page.evaluate(() => document.querySelector('.nrl-mo-log-toggle').getBoundingClientRect().left);
         if (Math.abs(openLeft - bar.logLeft) > 0.5) problems.push(`bottom row: LOG's left edge is ${openLeft.toFixed(1)}px with the tray open, ${bar.logLeft.toFixed(1)}px with it shut`);
 
-        // Defending: no plays.
-        await waitTitle('Their ball');
-        await settle();
-        const def = await read();
+        // Defending: no plays. The same care: read again until it is still their ball in the read.
+        let def = null;
+        for (let i = 0; i < 8; i++) {
+          await waitTitle('Their ball');
+          await settle();
+          def = await read();
+          if (def.title === 'Their ball') break;
+        }
         await page.screenshot({ path: join(OUT, `defending-${tag}-${w}x${h}.png`) });
         if (def.shown || def.tiles.length) problems.push('the Plays section shows while defending');
         if (!withPlays && def.shape !== TODAY_TRAY) problems.push(`defending, the tray is not today's: ${def.shape}`);
