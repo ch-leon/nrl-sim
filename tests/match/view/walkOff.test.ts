@@ -22,11 +22,11 @@ function surface() {
   };
 }
 
-/** Seed 12 with golden point on (the lab's `final=1`) is level at full time with the lab's default sides. */
+/** Seed 12 with golden point on (the lab's `final=1`) and the historical seven-minute halves (#678 cut them to 2:30) is level at full time with the lab's default sides. */
 const GOLDEN_SEED = 12;
 
 function play(): Snapshot[] {
-  const sim = new LiveSim(labSheet(DEFAULT_HOME), labSheet(DEFAULT_AWAY), GOLDEN_SEED, { goldenPoint: true });
+  const sim = new LiveSim(labSheet(DEFAULT_HOME), labSheet(DEFAULT_AWAY), GOLDEN_SEED, { goldenPoint: true, length: { halves: 2, halfMinutes: 7 } });
   const snaps: Snapshot[] = [sim.snapshot()];
   while (!sim.finished) { sim.step(); snaps.push(sim.snapshot()); }
   return snaps;

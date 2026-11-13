@@ -17,7 +17,8 @@ interface Tick { prev: Snapshot; cur: Snapshot; kick: string }
 
 /** Every tick of a match with the kind of the kick last struck (a kick-off or drop-out by its event). */
 function playMatch(seed: number): Tick[] {
-  const sim = new LiveSim(sideSheet('H', { rating: 62 }), sideSheet('A', { rating: 58 }), seed);
+  // Historical seven-minute halves (#678 cut them to 2:30) keep the bombs these checks watch.
+  const sim = new LiveSim(sideSheet('H', { rating: 62 }), sideSheet('A', { rating: 58 }), seed, { length: { halves: 2, halfMinutes: 7 } });
   const out: Tick[] = [];
   let prev = sim.snapshot();
   let kick = '';
