@@ -208,8 +208,8 @@ describe('measuring a cell', () => {
     const r = measureCell(cell, 2, 2, 5);
     const again = measureCell(cell, 2, 2, 5);
     expect(again.watch).toEqual(r.watch); // deterministic
-    // A 2-minute stretch scales counts x7: each match's lead changes read 0, 7, 14…, so the mean of two is a multiple of 3.5.
-    const steps = r.watch!.flow.leadChanges.mean / 3.5;
+    // A two-minute stretch scales to the configured whole match; averaging two seeds halves that step.
+    const steps = r.watch!.flow.leadChanges.mean / (MATCH_MINUTES / 4);
     expect(Math.abs(steps - Math.round(steps))).toBeLessThan(1e-9);
     expect(r.watch!.flow.closeLate.mean).toBeLessThanOrEqual(1);
   });

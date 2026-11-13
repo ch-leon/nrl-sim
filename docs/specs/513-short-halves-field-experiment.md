@@ -2,8 +2,7 @@
 
 Leon requested this revision on 13 November 2026: 2.5-minute halves, a normal
 100m field, and 100m/80m/60m choices in the existing Experiments section. These
-replace the separate-build-only delivery in draft PR #678. Keep the short-match and separate career-balance PRs held
-for his play-test; do not merge. Retreat PR #677 was merged by another process
+replace the separate-build-only delivery in draft PR #678. Leon subsequently authorized merging both PRs once the required checks are green. Retreat PR #677 was merged by another process
 on 13 November; this candidate includes it.
 
 ## Design
@@ -54,4 +53,5 @@ kicking distances, bins, fatigue and substitutions unchanged as prototype limits
   change, otherwise preserve previous run attribution and confirm parity.
 - [ ] Independent Claude review, typecheck, complete unit suite, production build,
   PR CI/WebKit and QA. Update hub/spec/PR description around the final feature.
-  Publish one private candidate with the existing Experiments UI; keep unmerged.
+  Publish one private candidate with the existing Experiments UI. Leon released the
+  play-test hold on 13 November, conditional on green CI/WebKit/QA and checker approval.
