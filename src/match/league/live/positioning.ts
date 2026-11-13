@@ -6,7 +6,8 @@ import type { Side } from '../../core/snapshot';
 import { add, clamp, dist, type Vec } from '../../core/vec';
 import { ROLES, formationTarget } from '../roles';
 import { gapTarget, intercept, supportSpots, type Candidate } from '../tactics';
-import type { AttackPlan } from '../presets';
+import { zoneOf, type AttackPlan } from '../presets';
+import { SHAPES, pickShape, shapeCall, shapeSpot, shapeWeights, tackleBucket, type ShapeCall, type ShapeName, type ShapeSides } from '../shapes';
 import { speedMult } from '../traits';
 import { FATIGUE, afterRun, legsSpeed } from '../fatigue';
 import { GAS, canSprint, paceMult, runCostMult, stepGas } from '../gas';
@@ -82,6 +83,144 @@ export abstract class LivePositioning extends LiveContact {
       .filter((d) => d !== t && d !== this.fullback(t.side))
       .sort((a, b) => dist(a.body.pos, this.mark) - dist(b.body.pos, this.mark))[0];
     return second ? [t, second] : [t];
+  }
+
+  /**
+   * The attack shape for the ruck this tackle will make (#649 step 2), picked as the
+   * tackle is made (the carrier held, or smashed down by a big hit) so the side has the
+   * whole tackle and play-the-ball to get into it. One roll while `shapes.on`, weighted by
+   * the side's attack preset, the zone where he is held (inside `shapes.lineM` its own
+   * row) and the tackle count the ruck will have, among the shapes its men can reach
+   * (`shapes.reachM`). No roll on the last tackle (the kicker's) or a handover, or after
+   * the siren; `keepShape` drops it at the ruck if the play-the-ball is quick.
+   */
+  protected chooseShape(c: Player): ShapeCall | null {
+    if (SHAPES.on <= 0 || this.siren || c.side !== this.attacking) return null;
+    const bucket = tackleBucket(this.tackles + 1, SET_TACKLES);
+    if (bucket === null) return null;
+    const at = c.body.pos;
+    const toLine = this.toLineFor(this.attacking, at);
+    const weights = shapeWeights(this.tactics[this.attacking].attack, toLine <= SHAPES.lineM ? 'line' : zoneOf(toLine), bucket);
+    const open: 1 | -1 = at.y <= MID_Y ? 1 : -1;
+    const sides: Partial<Record<ShapeName, ShapeSides>> = {};
+    for (const name of ['pod', 'edge', 'backDoor'] as const) {
+      // Toward the side where more of the men it places already stand (the open side on a tie);
+      // the other way when that one is out of reach; the edge shift may take the other too.
+      const ok = (sign: 1 | -1): boolean => this.shapeReachable(shapeCall(this.attacking, name, sign), at, sign !== open);
+      const lean = this.shapeLean(shapeCall(this.attacking, name, open), shapeCall(this.attacking, name, -open as 1 | -1), at.y);
+      const first = lean === 0 ? open : lean;
+      const second = -first as 1 | -1;
+      const a = ok(first);
+      const b = ok(second);
+      if (a || b) sides[name] = { first: a ? first : second, alt: name === 'edge' && a && b ? second : null };
+    }
+    const { name, sign } = pickShape(weights, this.rng.next(), sides, open);
+    this.shapesPicked[name]++;
+    return shapeCall(this.attacking, name, sign, this.tick);
+  }
+
+  /** Every man the shape places (the free ones, not the dummy-half) within `shapes.reachM` of his spot off a tackle at `at`; a room-scaled shape on the narrow side also needs `shapes.shortSideM` of it. */
+  private shapeReachable(call: ShapeCall, at: Vec, narrow: boolean): boolean {
+    if (call.room && narrow && (call.sign > 0 ? FIELD_WIDTH - at.y : at.y) < SHAPES.shortSideM) return false;
+    if (SHAPES.reachM <= 0) return true;
+    const dh = this.dummyHalf(this.attacking);
+    for (const p of this.side(this.attacking)) {
+      if (p === dh || this.locked(p) || !this.onField(p)) continue;
+      const spot = this.shapeTarget(call, p.slot, at);
+      if (spot && dist(p.body.pos, spot.pos) > SHAPES.reachM) return false;
+    }
+    return true;
+  }
+
+  /**
+   * A man's spot in the shape off `origin` (`shapeSpot`), brought within `shapes.maxShiftM`
+   * of where his lane would stand him (`formationTarget`), so no shape asks more ground of
+   * him than he can cover between the tackle and the ball coming out. His depth is read back
+   * off the spot. Null when the shape leaves him in his lane.
+   */
+  protected shapeTarget(call: ShapeCall, slot: number, origin: Vec): { pos: Vec; depth: number } | null {
+    const at = shapeSpot(call, slot, origin.y, origin.x, this.dir);
+    if (!at || SHAPES.maxShiftM <= 0) return at;
+    const lane = formationTarget(ROLES[slot]!, origin, this.dir, true);
+    const dx = at.pos.x - lane.x;
+    const dy = at.pos.y - lane.y;
+    const d = Math.hypot(dx, dy);
+    if (d <= SHAPES.maxShiftM) return at;
+    const k = SHAPES.maxShiftM / d;
+    const pos = { x: lane.x + dx * k, y: lane.y + dy * k };
+    return { pos, depth: (origin.x - pos.x) * this.dir };
+  }
+
+  /** Which way the men a shape places lean: +1 / −1 when more of them already stand on that side of `y` played that way, 0 on a tie. */
+  private shapeLean(plus: ShapeCall, minus: ShapeCall, y: number): 0 | 1 | -1 {
+    let n = 0;
+    for (const p of this.side(this.attacking)) {
+      if (plus.bySlot[p.slot] && Math.sign(p.body.pos.y - y) === plus.sign) n++;
+      if (minus.bySlot[p.slot] && Math.sign(p.body.pos.y - y) === minus.sign) n--;
+    }
+    return n > 0 ? plus.sign : n < 0 ? minus.sign : 0;
+  }
+
+  /** At the ruck: the shape picked at this tackle, unless the play-the-ball is quick (no time to set), a handover, or after the siren. */
+  protected keepShape(tackleAt: number, handover: boolean, pace: 'quick' | 'slow' | null): ShapeCall | null {
+    const s = this.shape;
+    return s && s.at >= tackleAt && !handover && pace !== 'quick' && !this.siren ? s : null;
+  }
+
+  /**
+   * The shape the attack is in this tick, or null: from the tackle it was picked at,
+   * through its ruck, and the first `shapes.holdTicks` after the ball is played. A set
+   * play overrides it, and so does a coach's call that says where the ball goes (Hit-up,
+   * Shift left or right, a set play waiting); an Offload call leaves it be.
+   */
+  protected shapeInForce(): ShapeCall | null {
+    const s = this.shape;
+    if (s === null || s.side !== this.attacking || this.scripted !== null) return null;
+    const call = this.playCall();
+    if (call !== null && call !== 'offload') return null;
+    const ph = this.phase;
+    if (ph.kind === 'tackle') return s.at >= ph.t0 ? s : null;
+    if (ph.kind === 'ruck') return s;
+    return ph.kind === 'play' && s.at <= this.ruckPlayedAt && this.tick < this.ruckPlayedAt + SHAPES.holdTicks ? s : null;
+  }
+
+  /**
+   * Where the shape is measured from: the tackled man while the tackle is on, the mark
+   * through the ruck (so the spots stand still while the men get there), and the ball
+   * (`ball`, the carrier's spot) once it is out.
+   */
+  protected shapeOrigin(ball: Vec): Vec {
+    const ph = this.phase;
+    if (ph.kind === 'tackle') return this.players[ph.carrier]!.body.pos;
+    return ph.kind === 'ruck' ? this.mark : { x: ball.x, y: this.mark.y };
+  }
+
+  /**
+   * As the ball leaves the ruck (#649): how far each man the shape places is from his spot,
+   * for the harness (`shapeBallOut`). His spot is the run-on line from where the shape stands
+   * him to where he comes onto the ball (`live.ruckAdvanceM`); the distance is to the nearest
+   * point of it. The dummy-half, the man who played the ball and any locked man are left
+   * out. No dice, no effect on play.
+   */
+  protected noteShapeBallOut(): void {
+    const s = this.shapeInForce();
+    if (!s || s.name === 'spread') return;
+    const shorts: number[] = [];
+    // The man who has just played the ball is at the mark, not in the shape.
+    const ph = this.phase;
+    const played = ph.kind === 'ruck' ? this.players[ph.carrier] : undefined;
+    for (const p of this.side(this.attacking)) {
+      if (p === this.dummyHalf(this.attacking) || p === played || this.locked(p) || !this.onField(p)) continue;
+      const at = this.shapeTarget(s, p.slot, this.mark);
+      if (!at) continue;
+      const advance = Math.max(0, Math.min(LIVE.ruckAdvanceM, at.depth - 3));
+      const a = at.pos;
+      const b = { x: a.x + this.dir * advance, y: a.y };
+      const len = Math.abs(b.x - a.x);
+      const u = len > 0 ? clamp(((p.body.pos.x - a.x) * this.dir) / len, 0, 1) : 0;
+      shorts.push(dist(p.body.pos, { x: a.x + this.dir * len * u, y: a.y }));
+    }
+    if (shorts.length) this.shapeBallOut = { tick: this.tick, name: s.name, shorts };
   }
 
   protected dummyHalfSpot(): Vec {
@@ -283,8 +422,12 @@ export abstract class LivePositioning extends LiveContact {
     const handoverMarkers = ph.kind === 'ruck' && ph.handover && ph.stage !== 'dh' ? this.currentMarkers() : [];
     const spots = supportSpots(anchor, this.dir);
     const broken = this.lineBroken();
+    // The attack shape (#649): its spots off the mark; null (off, or none this ruck) leaves every lane as it was.
+    const shape = this.shapeInForce();
+    const origin = shape ? this.shapeOrigin(anchor) : anchor;
     for (const p of attackers) {
       const role = ROLES[p.slot]!;
+      const inShape = shape ? this.shapeTarget(shape, p.slot, origin) : null;
       p.through = false;
       if (this.targetRetreat(p)) continue;
       if (handoverMarkers.includes(p)) {
@@ -324,14 +467,18 @@ export abstract class LivePositioning extends LiveContact {
         // The ball is heeled: the backline comes onto it, so the first receiver
         // hits the pass at pace instead of standing flat-footed. The forwards
         // standing close to the ruck keep enough depth to stay a pass option.
-        const spot = formationTarget(role, anchor, this.dir, true);
-        const advance = Math.max(0, Math.min(LIVE.ruckAdvanceM, role.atk - 3));
+        const spot = inShape ? inShape.pos : formationTarget(role, anchor, this.dir, true);
+        const advance = Math.max(0, Math.min(LIVE.ruckAdvanceM, (inShape ? inShape.depth : role.atk) - 3));
         p.target = clampToGround({ x: spot.x + this.dir * advance, y: spot.y }, 1);
       } else if (this.anticipatingGrubber(p)) {
         // The chase is on before the boot: come up in his lane, then onto the spot once it is aimed.
         p.target = this.grubberChaseSpot(p);
         p.wantsSprint = this.pendingKick?.kind === 'grubber' || dist(p.body.pos, p.target) > 8;
         p.through = true;
+      } else if (inShape && (ph.kind !== 'play' || !supports.includes(p))) {
+        // Into the shape: in the tackle and at the ruck ahead of standing by the tackled man (a held man
+        // cannot offload); once the ball is out, the carrier's support comes first.
+        p.target = inShape.pos;
       } else if (supports.includes(p)) {
         const s = spots[supports.indexOf(p) as 0 | 1];
         // Take the side he's already on.

@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- Attack shapes at the play-the-ball: when a tackle is made the side with the ball picks a shape for the next play (the plain spread, a forward pod beside the ruck, an edge shift to one side, or a back-door ball with a lead runner and a half behind him), weighted by its attack style, field position and tackle count. The men are in place as the ball comes out in over nine play-the-balls in ten. The shapes are small (each man stays within about 7 m of his lane), so they are easier to see from above than at phone zoom. Step 2 of the attack-shapes work; awaiting lab sign-off ([PR](https://github.com/ch-leon/nrl-sim/pull/689), [issue](https://github.com/ch-leon/nrl-sim/issues/649)).
+
 - The pass finds one of the near-best options by weight, not always the single best man, in open play and from dummy half, so a set's first receiver varies more (the chance two first passes on the same tackle find the same man falls from 32% to 26% between even sides). Step 1 of the attack-shapes work; awaiting lab sign-off ([PR](https://github.com/ch-leon/nrl-sim/pull/684), [issue](https://github.com/ch-leon/nrl-sim/issues/649)).
 
 - Developer settings is in Settings on every build (GitHub Pages, the Android test APK and local dev). Overrides and experiments stay off until you turn one on, so a normal career plays as before. Analytics stays on unless the address has `?labs=1` or a developer override, experiment or playtest career is actually on. Before launch, set `VITE_DEV_SETTINGS=0` or remove Developer settings ([PR #683](https://github.com/ch-leon/nrl-sim/pull/683)).

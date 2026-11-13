@@ -147,7 +147,8 @@ describe('bonus-zone tries (Nines)', () => {
   it('a carrier clear over the line goes round under the posts: a five-point try, grounded in the zone', () => {
     let bonus = 0;
     let plain = 0;
-    for (let seed = 1; seed <= 10 && (bonus < 2 || plain < 2); seed++) {
+    // Up to 30 seeds (10 before the attack shapes, #649 step 2, left seeds 1–10 without a bonus try); it stops at two of each.
+    for (let seed = 1; seed <= 30 && (bonus < 2 || plain < 2); seed++) {
       const { events } = play(seed);
       for (const t of events.filter((x) => x.e.kind === 'try')) {
         const scorer = t.snap.players.find((p) => p.side === t.e.side && p.slot === t.e.slot)!;
@@ -163,5 +164,5 @@ describe('bonus-zone tries (Nines)', () => {
     // Some tries are scored with a man on the carrier (four), and some clear (five).
     expect(bonus).toBeGreaterThan(0);
     expect(plain).toBeGreaterThan(0);
-  }, 30_000);
+  }, 90_000);
 });

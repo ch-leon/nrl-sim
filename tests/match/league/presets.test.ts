@@ -126,8 +126,10 @@ describe('tactics in the live sim', () => {
   it('a Kick-chase side kicks more often and bombs more; All-out offloads most of all', () => {
     // Kick-chase on both sides against Balanced on both, over 10-minute matches: one side's
     // extra kicks in a 2½-minute window are within the noise.
-    const bal = events(sheet('H'), away, SEEDS + 4, SECS * 4);
-    const kc = events(sheet('H', 'kick-chase'), sheet('A', 'kick-chase'), SEEDS + 4, SECS * 4);
+    // Forty matches since the attack shapes (#649 step 2): over sixteen, with whole 5-minute matches
+    // (#678) about six kicks each, Kick-chase had 96 kicks to Balanced's 99.
+    const bal = events(sheet('H'), away, 40, SECS * 4);
+    const kc = events(sheet('H', 'kick-chase'), sheet('A', 'kick-chase'), 40, SECS * 4);
     expect(count(kc, 'kick')).toBeGreaterThan(count(bal, 'kick'));
     expect(count(kc, 'kick', undefined, 'bomb')).toBeGreaterThan(count(bal, 'kick', undefined, 'bomb'));
     // Six times the seeds: offloads in 2½ minutes are few, and All-out's doubling needs ~70 matches to clear the noise.

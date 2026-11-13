@@ -23,10 +23,11 @@ import { LiveSim, type LiveOptions, type PlanInput } from '../league/live';
 import { aiCoachSides, type CallInput } from '../league/calls';
 import { NINES, fullMatch, type MatchLength } from '../league/rules';
 import { DEFAULT_TACTICS } from '../league/presets';
+import { SHAPE_NAMES, type ShapeName } from '../league/shapes';
 import { applyTuning } from '../league/tuning';
 import { labSheet, starTraits } from '../lab/sheets';
 import { POSITION_GROUPS, type Cell, type SideSpec } from './plan';
-import { FLOW, FirstReceivers, LAST_TACKLES, ORIGINS, PlayWatch, RECEIVERS, ScoreLine, type FlowKey, type LastTackleKey, type OriginKey, type ReceiverKey } from './watch';
+import { FLOW, FirstReceivers, LAST_TACKLES, ORIGINS, PlayWatch, RECEIVERS, SHAPES_FORMED, ScoreLine, ShapesFormed, type ShapeFormedKey, type FlowKey, type LastTackleKey, type OriginKey, type ReceiverKey } from './watch';
 
 /** Exact fit fixtures belong to the headless harness, never the live game or saved sheets. */
 export class BalanceSim extends LiveSim {
@@ -102,6 +103,10 @@ export interface WatchStats {
   lastTackles: Record<LastTackleKey, Stat>;
   /** Absent in results written before #649. */
   receivers?: Record<ReceiverKey, Stat>;
+  /** Attack shapes picked a match, both sides (#649 step 2); absent in results written before it. */
+  shapes?: Record<ShapeName, Stat>;
+  /** Shapes formed at ball-out, per match counts (#649 step 2); absent in results written before it. */
+  shapesFormed?: Record<ShapeFormedKey, Stat>;
 }
 
 export interface CellResult {
@@ -525,6 +530,8 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
     const originsPerSeed: Record<OriginKey, number>[] = [];
     const lastPerSeed: Record<LastTackleKey, number>[] = [];
     const receiversPerSeed: Record<ReceiverKey, number>[] = [];
+    const shapesPerSeed: Record<ShapeName, number>[] = [];
+    const formedPerSeed: Record<ShapeFormedKey, number>[] = [];
     let wrestleTicks = 0;
     let wins = 0;
     let draws = 0;
@@ -560,6 +567,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
       const score = new ScoreLine(minutes * 60);
       const watch = new PlayWatch();
       const receivers = new FirstReceivers();
+      const formed = new ShapesFormed();
       let inW = 0;
       let lastMen = 0;
       let nextLegs = 3;
@@ -605,6 +613,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
         const view = { phase: sim.phaseKind, lastPlay: sim.lastTackleUp, attacking: sim.inPossession, holder: sim.holderIndex, x: () => sim.ballX };
         watch.tick(tickEvents, view);
         receivers.tick(view, sim.tackleCount);
+        formed.tick(sim.shapeBallOut);
         const men = sim.wrestleMen;
         if (men > 0) {
           inW++;
@@ -641,6 +650,8 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
         originsPerSeed.push(watch.origins);
         lastPerSeed.push(watch.lastTackles);
         receiversPerSeed.push(receivers.result());
+        shapesPerSeed.push({ ...sim.shapesPicked });
+        formedPerSeed.push(formed.result());
         const c = countEvents(events);
         c.wrestles = matchWrestles;
         c.held1 = held[1]!;
@@ -690,6 +701,10 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
       lastTackles: Object.fromEntries(LAST_TACKLES.map((k) => [k, stat(lastPerSeed.map((o) => o[k] * scale))])) as Record<LastTackleKey, Stat>,
       // A share and a count of distinct slots: neither scales with a stretch's length.
       receivers: Object.fromEntries(RECEIVERS.map((k) => [k, stat(receiversPerSeed.map((o) => o[k]))])) as Record<ReceiverKey, Stat>,
+      // Shapes picked are counts, scaled to a full match like the origins.
+      shapes: Object.fromEntries(SHAPE_NAMES.map((k) => [k, stat(shapesPerSeed.map((o) => o[k] * scale))])) as Record<ShapeName, Stat>,
+      // Counts per match, not scaled: the report takes their ratios.
+      shapesFormed: Object.fromEntries(SHAPES_FORMED.map((k) => [k, stat(formedPerSeed.map((o) => o[k]))])) as Record<ShapeFormedKey, Stat>,
     };
     const totalWrestles = perSeed.reduce((a, c) => a + c.wrestles, 0);
     return {

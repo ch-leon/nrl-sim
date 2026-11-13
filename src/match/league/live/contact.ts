@@ -286,6 +286,8 @@ export abstract class LiveContact extends LivePenalties {
       this.lock(c, 'tackled', LIVE.contactTicks, add(c.body.pos, drive));
       this.lock(t, 'tackle', LIVE.contactTicks, add(t.body.pos, drive));
       this.phase = { kind: 'tackle', t0: this.tick, carrier: this.indexOf(c), tackler: this.indexOf(t), big: true, wrestle: null, wreck: 0 };
+      // The tackle is made: the attack picks its shape for the ruck (#649 step 2; one roll while shapes are on).
+      this.shape = this.chooseShape(c);
       return;
     }
     // Held: the wrestle (§8.1). A Wrecking Ball sometimes keeps his legs pumping — more fight, more ground.
@@ -297,6 +299,8 @@ export abstract class LiveContact extends LivePenalties {
     this.hold(c, 'tackled');
     this.hold(t, 'tackle');
     this.phase = { kind: 'tackle', t0: this.tick, carrier: this.indexOf(c), tackler: this.indexOf(t), big: false, wrestle, wreck };
+    // Held: the attack picks its shape for the ruck (#649 step 2; one roll while shapes are on). A late bust leaves it unused.
+    this.shape = this.chooseShape(c);
   }
 
   /** The rushed All-out offload uses the receiver's existing handling roll. */

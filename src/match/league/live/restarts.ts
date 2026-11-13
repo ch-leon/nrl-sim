@@ -67,6 +67,8 @@ export abstract class LiveRestarts extends LivePlay {
     if (ph.heldAt === 0) ph.heldAt = this.tick;
     if (this.tick < ph.heldAt + LIVE.dhHoldTicks) return;
     this.lastPlay = this.tackles === SET_TACKLES - 1;
+    // The ball is leaving the ruck: where the shape's men are, for the harness (#649).
+    this.noteShapeBallOut();
     const intent = this.pendingControl[this.attacking];
     if (intent && (intent.kind === 'pass-left' || intent.kind === 'pass-right')) {
       this.pendingControl[this.attacking] = null;
@@ -326,6 +328,8 @@ export abstract class LiveRestarts extends LivePlay {
     // Play-the-ball: the nearest defender stands at the mark as the tackler would.
     const marker = [...this.side(other(ph.side))].sort((a, b) => dist(a.body.pos, ph.spot) - dist(b.body.pos, ph.spot))[0]!;
     this.lock(p, 'ptb', LIVE.ptbTicks);
+    // A restart's play-the-ball is played off the lanes the side set for it: no shape, no roll (#649).
+    this.shape = null;
     this.phase = { kind: 'ruck', t0: this.tick, carrier: ph.player, tackler: this.indexOf(marker), stage: 'ptb', handover: false, heldAt: 0, down: 0, pace: null };
     this.startRetreat();
   }

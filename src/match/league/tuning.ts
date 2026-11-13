@@ -28,6 +28,7 @@ import { KICK_CONTEST } from './kickContest';
 import { WRESTLE } from './wrestle';
 import { BIN } from './sinbin';
 import { PLAYS } from './plays';
+import { SHAPES } from './shapes';
 import { DIFFICULTIES, DIFFICULTY } from '../../config';
 
 /**
@@ -77,6 +78,7 @@ export const KNOBS = {
   goals: GOALS,
   bin: BIN,
   plays: PLAYS,
+  shapes: SHAPES,
   difficulty: DIFFICULTY_EDGE,
 } as const;
 

@@ -277,3 +277,34 @@ export class FirstReceivers {
 }
 
 const sideOf = (holder: number): Side => (holder < PLAYERS ? 'home' : 'away');
+
+/** Attack shapes formed as the ball leaves the ruck (#649 step 2): per shape, the shaped play-the-balls, the ones formed, and the summed mean distance short. */
+export const SHAPES_FORMED = ['podN', 'podFormed', 'podShort', 'edgeN', 'edgeFormed', 'edgeShort', 'backDoorN', 'backDoorFormed', 'backDoorShort'] as const;
+export type ShapeFormedKey = (typeof SHAPES_FORMED)[number];
+/** A man this close to his spot (metres) is in the shape; a shape is formed when every man it places is. */
+export const SHAPE_FORMED_M = 2;
+
+/**
+ * Whether the attack shape was formed as the ball left the ruck (#649 step 2). The
+ * sim notes, at each shaped ball-out, how far each man the shape places was from his
+ * spot (`shapeBallOut`, a view channel); this counts them per shape: formed when every
+ * one is within SHAPE_FORMED_M, and the mean distance short.
+ */
+export class ShapesFormed {
+  private readonly n: Record<ShapeFormedKey, number> = Object.fromEntries(SHAPES_FORMED.map((k) => [k, 0])) as Record<ShapeFormedKey, number>;
+  private last = -1;
+
+  /** One tick, after the step: the sim's latest shaped ball-out (or null). */
+  tick(out: { tick: number; name: string; shorts: readonly number[] } | null): void {
+    if (!out || out.tick === this.last || out.name === 'spread') return;
+    this.last = out.tick;
+    const k = out.name as 'pod' | 'edge' | 'backDoor';
+    this.n[`${k}N`]++;
+    if (out.shorts.every((d) => d <= SHAPE_FORMED_M)) this.n[`${k}Formed`]++;
+    this.n[`${k}Short`] += out.shorts.reduce((a, d) => a + d, 0) / out.shorts.length;
+  }
+
+  result(): Record<ShapeFormedKey, number> {
+    return { ...this.n };
+  }
+}

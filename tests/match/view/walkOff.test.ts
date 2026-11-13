@@ -22,14 +22,20 @@ function surface() {
   };
 }
 
-/** Seed 28 with golden point on (the lab's `final=1`) and the historical seven-minute halves (#678 cut them to 2:30) is level at full time with the lab's default sides (seed 12 before the weighted receiver, #649; 28 is the first of 1–60 since). */
-const GOLDEN_SEED = 28;
-
+/**
+ * A match level at full time with golden point on (the lab's `final=1`), the lab's default sides
+ * and the historical seven-minute halves (#678 cut them to 2:30): the first such seed. It was a pinned
+ * seed (12, then 28 after the weighted receiver, #649) until the attack shapes (#649 step 2), and
+ * every new roll moved it; seed 4 is the first now.
+ */
 function play(): Snapshot[] {
-  const sim = new LiveSim(labSheet(DEFAULT_HOME), labSheet(DEFAULT_AWAY), GOLDEN_SEED, { goldenPoint: true, length: { halves: 2, halfMinutes: 7 } });
-  const snaps: Snapshot[] = [sim.snapshot()];
-  while (!sim.finished) { sim.step(); snaps.push(sim.snapshot()); }
-  return snaps;
+  for (let seed = 1; seed <= 60; seed++) {
+    const sim = new LiveSim(labSheet(DEFAULT_HOME), labSheet(DEFAULT_AWAY), seed, { goldenPoint: true, length: { halves: 2, halfMinutes: 7 } });
+    const snaps: Snapshot[] = [sim.snapshot()];
+    while (!sim.finished) { sim.step(); snaps.push(sim.snapshot()); }
+    if (snaps.some((x) => x.phase?.kind === 'half-time' && !!x.phase.golden)) return snaps;
+  }
+  throw new Error('no match in seeds 1–60 went to golden point');
 }
 
 describe('the whistle (#675)', () => {

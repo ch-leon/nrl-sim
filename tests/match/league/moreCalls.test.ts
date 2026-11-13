@@ -44,12 +44,20 @@ interface Played {
 /**
  * Seeds for the penalty pair: a home penalty in range is rare in a 6-minute half,
  * and one the captain doesn't tap himself (Tap and go's moment) rarer still.
- * The completed retreat (#625) reshuffled the previous fixtures: seed 6 had
- * both Take the two and Tap and go on at tick 4506. The weighted receiver
- * (#649) reshuffled them again: of seeds 1–40 only seed 7 has both (Take the
- * two at tick 884, Tap and go at 5064).
+ * They were pinned (seed 6 with both after #625, seed 7 after the weighted
+ * receiver, #649) and every new roll moved them, so since the attack shapes
+ * (#649 step 2) each call's seed is found: the first with that call on offer
+ * (96 for Take the two and 111 for Tap and go when it was written).
  */
-const PENALTY_SEEDS = [7];
+const penaltySeeds = new Map<CoachCall, number[]>();
+function PENALTY_SEEDS(call: 'take-two' | 'tap-go'): number[] {
+  const known = penaltySeeds.get(call);
+  if (known) return known;
+  let found: number[] = [];
+  for (let seed = 1; seed <= 250 && found.length === 0; seed++) if (play(seed, call).legal.length > 0) found = [seed];
+  penaltySeeds.set(call, found);
+  return found;
+}
 
 /** Play with the home coach making `call` whenever he may (as a player at the tray does: a tap, in on the next tick). */
 function play(seed: number, call: CoachCall | null, minutes = 6, side: 'home' | 'away' = 'home'): Played {
@@ -173,8 +181,8 @@ describe('five more calls (#396): when the sim takes them', () => {
   it('the penalty pair only on a penalty his side has won, in range, and not the captain’s own choice', () => {
     const refused = new Set<string>();
     let on = 0;
-    for (const seed of PENALTY_SEEDS) {
-      for (const c of ['take-two', 'tap-go'] as const) {
+    for (const c of ['take-two', 'tap-go'] as const) {
+      for (const seed of PENALTY_SEEDS(c)) {
         const p = play(seed, c);
         on += p.legal.length;
         for (const r of p.refusals) refused.add(r);
@@ -208,7 +216,8 @@ describe('five more calls (#396): each does what it says', () => {
     let kicks = 0;
     let inReach = 0;
     let found = 0;
-    for (let seed = 1; seed <= 40; seed++) {
+    // Forty seeds, and on until one finds touch (seeds 1–40 had one before the attack shapes, #649 step 2).
+    for (let seed = 1; seed <= 120 && (seed <= 40 || found === 0); seed++) {
       const calls: CallInput[] = [];
       const sim = new LiveSim(H, A, seed, { length: { halves: 1, halfMinutes: 6 }, calls });
       let aimed = false;
@@ -252,7 +261,7 @@ describe('five more calls (#396): each does what it says', () => {
 
   it('Take the two: the captain’s call is overruled and the goal is attempted', () => {
     let made = 0;
-    for (const seed of PENALTY_SEEDS) {
+    for (const seed of PENALTY_SEEDS('take-two')) {
       const p = play(seed, 'take-two');
       for (const after of afterCalls(p, 'take-two')) {
         made++;
@@ -265,7 +274,7 @@ describe('five more calls (#396): each does what it says', () => {
 
   it('Tap and go: the penalty is tapped, and the set’s call is still his', () => {
     let made = 0;
-    for (const seed of PENALTY_SEEDS) {
+    for (const seed of PENALTY_SEEDS('tap-go')) {
       const calls: CallInput[] = [];
       const sim = new LiveSim(H, A, seed, { length: { halves: 1, halfMinutes: 6 }, calls });
       const events: SimEvent[] = [];
@@ -299,7 +308,8 @@ describe('five more calls (#396): each does what it says', () => {
   it('Offload: more offloads, and some spilled', () => {
     let withCall = 0;
     let without = 0;
-    for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
+    // Sixteen seeds since the attack shapes (#649 step 2): over eight, 11 with the call to 15 without.
+    for (let seed = 1; seed <= 16; seed++) {
       withCall += play(seed, 'offload').events.filter((e) => e.kind === 'offload' && e.side === 'home').length;
       without += play(seed, null).events.filter((e) => e.kind === 'offload' && e.side === 'home').length;
     }

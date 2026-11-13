@@ -28,8 +28,8 @@ let bytes: Map<string, string>;
 const storage = { getItem: (key: string): string | null => bytes.get(key) ?? null,
   setItem: (key: string, value: string): void => { bytes.set(key, value); }, removeItem: (key: string): void => { bytes.delete(key); } };
 
-function prototype(slots = 3): GameState {
-  createNewGame('Calendar test', 42);
+function prototype(slots = 3, gameSeed = 42): GameState {
+  createNewGame('Calendar test', gameSeed);
   initLeague(getState());
   const state = getState();
   state.weather = 'clear'; // Match reload starts from the same explicit forecast.
@@ -229,19 +229,33 @@ describe('one interval and one canonical fixture finalisation', () => {
   });
 
   it('the real report subscriber cannot persist echoed/foreign POTM awards and matches headless awards', () => {
-    const strong=():GameState=>{
-      const state=prototype();
+    // The award has to go to the player's side for there to be a tally to guard: the first game seed
+    // from 42 whose opening match gives it one. It was 42 itself until the attack shapes (#649 step 2)
+    // reshuffled that match (the strong side lost it 6–12).
+    const strong=(gameSeed:number):GameState=>{
+      const state=prototype(3,gameSeed);
       state.squad=state.squad.map(p=>({...p,stats:{speed:95,strength:95,stamina:95,handling:95,kicking:95,footyIQ:95},ceilings:{speed:100,strength:100,stamina:100,handling:100,kicking:100,footyIQ:100},injuryRisk:0}));
       return state;
     };
-    stubDocument(); activate(strong()); const off=initMatchReport(); systems(); advanceWeek();
-    const first=starts[0]!; const result=runMatch(first.home,first.away,first.live);
-    bus.emit('match:finished',{fixture:{...first.fixture,id:'foreign'},result});
-    expect(getState().potmTally).toBeUndefined();
-    bus.emit('match:finished',{fixture:first.fixture,result}); const watched=structuredClone(getState().potmTally);
-    expect(Object.keys(watched!.counts).length).toBeGreaterThan(0);
-    bus.emit('match:finished',{fixture:first.fixture,result}); expect(getState().potmTally).toEqual(watched); off();
-    bus.clear(); clearTickHooks(); clearSeasonHooks(); clearHeldWeek(); activate(strong());
+    let watched: GameState['potmTally'];
+    let gameSeed = 42;
+    for (; gameSeed < 52 && !watched; gameSeed++) {
+      bus.clear(); clearTickHooks(); clearSeasonHooks(); clearHeldWeek(); starts = [];
+      bus.on('match:started', value => starts.push(value));
+      stubDocument(); activate(strong(gameSeed)); const off=initMatchReport(); systems(); advanceWeek();
+      const first=starts[0]!; const result=runMatch(first.home,first.away,first.live);
+      bus.emit('match:finished',{fixture:{...first.fixture,id:'foreign'},result});
+      expect(getState().potmTally).toBeUndefined();
+      bus.emit('match:finished',{fixture:first.fixture,result});
+      if (getState().potmTally) {
+        watched=structuredClone(getState().potmTally);
+        expect(Object.keys(watched!.counts).length).toBeGreaterThan(0);
+        bus.emit('match:finished',{fixture:first.fixture,result}); expect(getState().potmTally).toEqual(watched);
+      }
+      off();
+    }
+    expect(watched).toBeDefined();
+    bus.clear(); clearTickHooks(); clearSeasonHooks(); clearHeldWeek(); activate(strong(gameSeed - 1));
     const offHeadless=initMatchReport(); systems(); advanceWeeks(1);
     expect(getState().potmTally).toEqual(watched); offHeadless();
   });

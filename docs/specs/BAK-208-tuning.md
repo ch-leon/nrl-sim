@@ -106,6 +106,16 @@ Tests: `tests/match/league/live.test.ts` (contest block).
 | Weighted receiver margin (`live.receiverMargin`) | `live/knobs.ts`; `pickReceiverWeighted` in `tactics.ts` | 2 (score points; **0 = off**) | How far behind the best pass score an option may be and still get the ball (#649 step 1, BAK-208 §4.2). 0: always the best, and no roll is drawn, every seed as before #649. Higher: more men in the draw (most passes have 2–4 options, the second-best a median 0.9 behind). |
 | Weighted receiver spread (`live.receiverSpread`) | `live/knobs.ts` | 2 | Each option inside the margin is weighted exp(−gap / spread), so the best stays the likeliest. Lower: the best man nearly always; higher: closer to an even pick. |
 | Weighted at the ruck (`live.receiverAtRuck`) | `live/restarts.ts` `stepRuck` | 1 | 1: the dummy-half's pass to the first receiver is weighted too; 0: only the engaged carrier's pass in open play. The first receiver's variety comes almost entirely from this (harness run `weighted-receiver`, §5 note below). |
+| Attack shapes (`shapes.on`) | `src/match/league/shapes.ts`; picked in `live/positioning.ts` `chooseShape` (called from `live/contact.ts` as the tackle is made), kept at the ruck by `keepShape`, steered to in `assignTargets` | 1 (**0 = off**) | As each tackle is made the side picks a shape for its play-the-ball (spread, forward pod, edge shift, back door; #649 step 2, BAK-208 §4.2), one roll. 0: no roll, every man in his lane, every seed as before step 2. |
+| `shapes.holdTicks` | `shapes.ts` | 30 (1.5 s) | The shape holds this long after the ball is played (its lanes off the mark, depths off the ball), then the base lanes. 0: only through the tackle and the ruck. |
+| `shapes.maxShiftM` | `shapes.ts`; `shapeTarget` in `live/positioning.ts` | 7 m (0 = as the table says) | No man's spot is further than this from where his lane would stand him off the same ruck: a far spot is brought in along the line to it. The men have about 2 s from the tackle to the ball coming out, at cruise; 0 left the shape formed at ball-out in about a third of play-the-balls, 7 in 94%. Higher: bigger, plainer shapes, formed less often (10: 87%). |
+| `shapes.reachM` | `shapes.ts`; `shapeReachable` in `live/positioning.ts` | 12 m (0 = any distance) | A shape is offered only on a side where every man it places (the free ones, not the dummy-half) is within this of his spot as the tackle is made; with neither side in reach it falls back to the spread (no extra roll). Lower: fewer shapes, more of them formed. |
+| `shapes.lineM` | `shapes.ts` | 10 m | Inside this of the line (where the carrier is held) the `line` zone row replaces the red zone's (no back door). |
+| `shapes.shortShare` / `shapes.shortSideM` | `shapes.ts` | 0.3 / 20 m | Every shape goes to the side where more of the men it places already stand (the open side on a tie), or the other when only that is in reach. The edge shift goes to its other side this share of its picks (the same roll) when both are in reach, and a room-scaled shape takes the narrower side only when it is at least this wide. |
+| `shapes.weights.<preset>.<shape>` | `shapes.ts` | Tight 0.8 / 2.5 / 0.5 / 0.7 · Balanced 1 / 1 / 1 / 1 · Expansive 0.8 / 0.5 / 2 / 1.5 · Kick-chase 1 / 1.2 / 0.8 / 0.8 · All-out 0.6 / 0.7 / 1.6 / 1.6 (spread / pod / edge / back door) | How much each attack preset wants each shape (relative). |
+| `shapes.zones.<zone>.<shape>` | `shapes.ts` | own 20 1 / 1.6 / 0.5 / 0.6 · own half 1 / 1.2 / 0.8 / 0.8 · midfield 1s · attacking half 1 / 0.9 / 1.2 / 1.2 · red zone 1 / 1.1 / 1.3 / 1.2 · line 1 / 2 / 1 / 0 | Multipliers by the mark's zone (`zoneOf`, or `line` inside `shapes.lineM`). |
+| `shapes.tackles.<bucket>.<shape>` | `shapes.ts` | early (tackles made ≤ 1) 1 / 1.5 / 0.7 / 0.8 · middle 1s · late (the second-last) 1 / 0.7 / 1.3 / 1.2 | Multipliers by the tackle count at the ruck. The last tackle takes no shape. |
+| `shapes.spots.<shape>.<man>.dy` / `.depth` | `shapes.ts` | pod: prop 3 / 3, backrow 6.5 / 3.5, near half 14 / 6, far half −14 / 6 · edge (`room` 1, dy a share of the room to touch): prop 0.04 / 1.5 (flat: no pass option), near half 0.12 / 4, far half 0.28 / 6, far edge 0.45 / 6, fullback 0.6 / 9, near edge 0.78 / 6, near winger 0.94 / 7 · back door: prop 4 / 3, near half 6 / 8, near edge 12 / 6, fullback 10 / 11 | Each man's spot: metres across from the ruck toward the shape's side (or a share of the room) and metres behind the ball. Near and far swap with the side; a man a shape does not list holds his lane. The ruck advance (`live.ruckAdvanceM`) applies to the shape's depth as to a role's. |
 | `live.runOnM` | `live/knobs.ts` | 3 m | Receiver runs through the catch point by this much. |
 | `live.ruckAdvanceM` | `live/knobs.ts` | 3 m (capped at `atk` − 3 per role) | Backline comes up as the ball is heeled. |
 | `leadPoint` | `live/contact.ts` | `runOn(v0, ACCEL, vMax, t)`, never ahead of the passer | Where the pass is thrown. |
@@ -114,7 +124,8 @@ Tests: `tests/match/league/live.test.ts` (contest block).
 
 Tests: `tests/match/league/flow.test.ts` (catch speed, loose passes, carry speed),
 `tests/match/league/receiver.test.ts` (the weighted receiver: the pick, off equals the
-base commit, one roll per decision while on).
+base commit, one roll per decision while on), `tests/match/league/shapes.test.ts` (the
+shapes: the weights, the pick, the spots, off equals the base commit, one roll per shape).
 
 **The weighted receiver (#649 step 1).** One roll per pass decision while
 `live.receiverMargin` > 0, drawn whether or not more than one man is inside the margin:
@@ -135,6 +146,43 @@ Grind 78.6 → 74.2% (still in band), tries in Expansive v Balanced 2.1 → 1.6 
 plays, pooled over the standard plan, did not move (that is for the shapes, step 2).
 Margin 3 took Expansive v Balanced to 42% and margin 5 Grind and Compressed to 56–57%.
 Weighting only open play (`live.receiverAtRuck` 0) leaves the first receiver as it was.
+
+**The attack shapes (#649 step 2).** One roll as each tackle is made while `shapes.on` is
+1 (`chooseShape`, from `live/contact.ts` after the held tackle's fight roll, or as a big
+hit lands): none on a tackle that makes the last tackle or a handover, or after the siren.
+A quick play-the-ball drops the shape (`keepShape`, no roll), as does a late bust out of
+the wrestle; a restart's play-the-ball has none.
+
+*Formed at ball-out* (the harness's "Shape formed %": every man the shape places, not the
+dummy-half or the man playing the ball, within 2 m of his run-on line as the ball leaves
+the ruck). The first cut (f3135b9, picked as the ruck formed, spots as the table) formed
+9% of shaped play-the-balls on even sides (pod 12%, edge 1%, back door 14%; 4.6 m short on
+average; run `shapes-formed-f3135b9`). The men have about 2 s between the tackle and the
+ball coming out, at cruise, and the spots were 10–20 m from where they stood. Tried, in
+order (`shapes-formed-2`, even sides and Expansive v Tight, 100 seeds): picking at the
+tackle, toward the side its men already lean, with the shape ahead of standing by the
+held man, lifted it to 32%; a reach limit alone barely moved it (the far men are the
+ones it is for) and took the edge shift off the menu; bringing each spot within
+`shapes.maxShiftM` of the man's lane did it: 7 m, 86%; 7 m and `shapes.reachM` 12, 94%
+(pod 97, edge 85, back door 98; 0.3 m short); 5 m, 89%; 10 m and reach 14, 87% with bigger
+shapes. 7 and 12 shipped.
+
+Measured with `balance/plans/attack-shapes.json` (standard.json's scenarios, 60 matches on
+the plain rows, the six preset rows 100 both ways; off is the baseline, and 'spots as the
+table' lifts both limits) and `standard.json` on against a copy with `shapes.on` 0
+(13 November 2026, 2:30 halves). Shapes picked, pooled: spread 28%, pod 33%, edge 18%, back
+door 21% (about 41 a match, both sides); no row has a shape under 12% (edge in Tight v
+Balanced) or over 46% (pod there). Formed at ball-out 92–95% in every row. The six preset
+rows (points share) off → on: Tight 49.3 → 50.3, Expansive 48.0 → 53.0, Kick-chase 48.8 →
+48.5, All-out 51.0 → 51.5, Rush 51.3 → 48.0, Compressed 44.5 → 49.0; over 400 matches
+(`shapes-edges`, seeds 1–200 both ways) All-out 53.7 → 52.5 and Compressed 47.3 → 51.4.
+Completion stays in band in every row of both plans. Beyond luck in the §7 columns:
+tackles up 1.2–2.2 a match in six scenarios, line breaks down 0.8 in Slide v Rush, tries up 0.3–0.4 in
+Expansive v Tight and Expansive v Balanced. The first receiver does not move: same man
+26.8 → 27.0%, slots 5.42 → 5.40 pooled (step 1 left it where four even options leave it,
+and a formed shape gives each tackle its own man as often as it changes him). Try origins
+pooled off → on: drive inside 5 m 34.7 → 37.2%, break 20 m+ 8.1 → 7.9%, kick 10.3 → 10.1%,
+offload 4.2 → 4.4%: not more spread (with the spots as the table, 35.6 / 8.0 / 12.7%).
 
 ## 6. Kicks and catches (§4.3–4.4)
 
