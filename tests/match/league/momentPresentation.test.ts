@@ -39,24 +39,27 @@ describe('moment presentation facts', () => {
   });
   it('stamps the man behind an error, a missed goal or a sin bin, on the tick the sim says so (#667)', () => {
     const home = labSheet(DEFAULT_HOME); const away = labSheet(DEFAULT_AWAY);
-    const sim = new LiveSim(home, away, 11);
     const found = new Set<string>();
     const kindOf = (e: SimEvent): 'error' | 'miss' | 'bin' | null => ['error', 'drop', 'strip'].includes(e.kind) ? 'error'
       : e.kind === 'sin-bin' ? 'bin' : ['conversion', 'penalty-goal', 'field-goal'].includes(e.kind) && e.detail === 'missed' ? 'miss' : null;
-    for (let i = 0; i < 9000 && !sim.finished; i++) {
-      sim.step();
-      const s = sim.snapshot();
-      for (const e of s.events) {
-        const kind = kindOf(e);
-        if (!kind) continue;
-        // A strip is told about the tackler; the reaction is the stripped carrier's, on the other side.
-        const who = e.kind === 'strip' ? s.players.find(p => p.reactTick === s.tick && p.side !== e.side) : e;
-        const p = s.players.find(q => q.side === who!.side && q.slot === who!.slot)!;
-        expect(p).toMatchObject({ reactTick: s.tick, react: kind });
-        found.add(kind);
+    // Matches until each kind has turned up: a sin bin is rare enough that one match need not have one.
+    for (let seed = 11; seed < 31 && found.size < 3; seed++) {
+      const sim = new LiveSim(home, away, seed);
+      for (let i = 0; i < 9000 && !sim.finished; i++) {
+        sim.step();
+        const s = sim.snapshot();
+        for (const e of s.events) {
+          const kind = kindOf(e);
+          if (!kind) continue;
+          // A strip is told about the tackler; the reaction is the stripped carrier's, on the other side.
+          const who = e.kind === 'strip' ? s.players.find(p => p.reactTick === s.tick && p.side !== e.side) : e;
+          const p = s.players.find(q => q.side === who!.side && q.slot === who!.slot)!;
+          expect(p).toMatchObject({ reactTick: s.tick, react: kind });
+          found.add(kind);
+        }
+        // Reported for a short while only.
+        for (const p of s.players) if (p.reactTick !== undefined) expect(s.tick - p.reactTick).toBeLessThan(REACT_SNAP_TICKS);
       }
-      // Reported for a short while only.
-      for (const p of s.players) if (p.reactTick !== undefined) expect(s.tick - p.reactTick).toBeLessThan(REACT_SNAP_TICKS);
     }
     expect(found).toEqual(new Set(['error', 'miss', 'bin']));
   });
