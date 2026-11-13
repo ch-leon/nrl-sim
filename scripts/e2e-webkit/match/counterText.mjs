@@ -32,9 +32,9 @@ export async function runCounterText(browser) {
         const s = window.__nrlState();
         s.settings.textSize = size;
         s.settings.hints = false;
-        // #618: seed 468 no longer ranks Out-schemed in the final loss report.
-        // #625: the defensive retreat turns seed 469 into a win.
-        s.rngSeed = 470;
+        // Seed 475 naturally loses at both 7:00 and 2:30 halves, with a real
+        // Compressed counter line and Out-schemed in the final loss report.
+        s.rngSeed = 475;
         s.lineup.tactics = { attack: 'grind', defence: 'slide' };
         s.lineup.rotation = 'standard';
         // Normal reads recent habits (#469): this fixture needs Compressed v Tight.
@@ -112,6 +112,13 @@ export async function runCounterText(browser) {
       await page.evaluate(() => window.__nrlGame.scene.getScene('Match').playback.release());
       await skipFromPill(page);
       await page.waitForSelector('.nrl-mo-ft [data-report]', { timeout: 30000 });
+      rec.result = await page.locator('.nrl-mo-ft').evaluate(card => ({
+        kind: card.querySelector('.nrl-rp-tag')?.getAttribute('data-kind'),
+        score: card.querySelector('.nrl-ft-pts')?.textContent,
+      }));
+      if (rec.result.kind !== 'loss') {
+        throw new Error(`Counter fixture must lose to show the loss report: ${JSON.stringify(rec.result)}`);
+      }
       await page.locator('.nrl-mo-ft [data-report]').tap();
       await page.locator('[data-why-lost] summary').tap();
       const row = page.locator('.nrl-report-why-row').filter({ hasText: 'Out-schemed:' });

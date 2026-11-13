@@ -241,8 +241,8 @@ Tests: `tests/match/league/presets.test.ts` (direction of each preset, §7 bands
 | `REPLAY_BLOCK_MS` | `replay.ts` | 300 ms | The re-sim on the main thread, when no Worker is there, may block the page this long. The Worker path times only the hand-off. |
 | `POPUP_EDGE` / `POPUP_HALF_W` / `POPUP_LINE_H` / `POPUP_GAP` | `src/match/view/popups.ts` | 8 / 64 / 22 / 2 screen px | A pop-up is clamped inside the camera (N15.6, finding 4). The text hangs up from its anchor; at ×8 a 40 px lift over a man near the top used to leave the screen. Two shouts pulled onto the same edge drop apart by `POPUP_GAP`; a trait line stays on its shout. **Assumed (needs Leon)**: the inset. |
 | `CONTEST_MS` / `DRIVE_DUST_M` / `BREAK_SPAN_M` | `src/match/view/contestLayer.ts` | 800 ms / 1 m / 12 m | A big hit puffs dust a metre behind the carrier (the sim already drove him `LIVE.driveBack`, 2.5 m; the view does not move him again). A line break flashes across 12 m of the defensive line, on the point where it broke, not on the sprinter's feet as he runs off it. It fades over the last 280 ms. **Assumed (needs Leon)**: the look, and that the shove is the big hit rather than a new metre of wrestle. |
-| `REF.offM` / `REF.ballShare` / `REF.farRoomM` / `REF.swingM` | `src/match/view/officials.ts` | 6 m / 0.25 / 6 m / 10 m | The referee (#642), placed by a pure function of the snapshot (`refereeSpot`): 6 m off the play, which is a quarter the ball and three quarters the middle of all eighteen bodies (so a pass or a kick moves him at a man's pace). He stands on the far side of it (behind the ruck from the camera), and swings round to trail it along the field when play is within 6–16 m of the far touchline. Under 1.6 m a tick except when the ball or the sides are put on a mark. **Assumed (needs Leon)**: where he stands. |
-| `REF.clearM` / `REF.fadeM` | `officials.ts` | 3.5 m / 1.5 m | He is pushed off the carrier to 3.5 m; the push fades out within 1.5 m of him, so a ball running straight through his spot swings him round it instead of jumping him across (inside 3.5 m on about 2% of carried ticks). Should he stand over the carrier on screen, he is drawn behind him (`refCoversCarrier`, about 3% of carried ticks). Signals: an arm up while a try is given (a scorer has `tryTick`), pointing during a penalty. His strip is the one of `REFEREE_STRIPS` (lime, pink, cyan, orange, black) furthest from both kits worn (`refereeKit`, `src/art/match/bench.ts`). |
+| `REF.offM` / `REF.ballShare` / `REF.farRoomM` / `REF.swingM` | `src/match/view/officials.ts` | 6 m / 0.15 / 6 m / 10 m | The referee (#642), placed by a pure function of the snapshot (`refereeSpot`): 6 m off the play, which is 15% the ball and 85% the middle of all eighteen bodies (so a pass or a kick moves him at a man's pace). He stands on the far side of it (behind the ruck from the camera), and swings round to trail it along the field when play is within 6–16 m of the far touchline. Under 1.6 m a tick over seeds 1 to 24 (worst 1.39 m; it was 2.7 m with 10 of 24 seeds over 1.8 m before #680) except when the ball or the sides are put on a mark. **Assumed (needs Leon)**: where he stands. |
+| `REF.clearM` / `REF.fadeM` | `officials.ts` | 2.5 m / 1.5 m | He is pushed off the carrier to 2.5 m (it was 3.5 m: the ball snaps 2 to 5 m onto a new holder in a tick and the push stepped by up to its peak, which was the dart of #680); the push fades out within 1.5 m of him, so a ball running straight through his spot swings him round it instead of jumping him across (inside 2.5 m on about 2% of carried ticks). Should he stand over the carrier on screen, he is drawn behind him (`refCoversCarrier`, about 4 to 5% of carried ticks). Signals: an arm up while a try is given (a scorer has `tryTick`), pointing during a penalty. His strip is the one of `REFEREE_STRIPS` (lime, pink, cyan, orange, black) furthest from both kits worn (`refereeKit`, `src/art/match/bench.ts`). |
 | `BENCH.seatM` / `BENCH.seats` / `BENCH.fromHalfwayM` / `BENCH.backM` | `officials.ts` | 2.4 m / 5 / 5 m / 2.2 m | The benches on the near touchline, 2.2 m back on the apron: home short of halfway, away past it. The reserves sit on them seen from behind, numbers on their backs; whoever is on the sheet and not on the field sits there, so an interchange changes who is sitting (`benchSeated`). |
 | `BENCH.binGapM` / `BENCH.arrivedM` | `officials.ts` | 3.2 m / 2.5 m | Each side's sin bin, 3.2 m past the outer end of its bench: a yellow box and stool. A binned man walks off as the sim has him; once within 2.5 m of a touchline he is drawn sitting in his side's bin, a yellow card over him (`binnedSpot`; the one line in `liveView.ts`). |
 | `CROWD_FW` × `CROWD_FH` / `SEAT_STEP` | `src/art/match/crowd.ts`, `stadium.ts` | 16 × 26 px / 0.42 tiles | Spectators (#641): drawn waist-up at the players' scale, a 10 px head to a player's 13, six looks (short, long, a cap or beanie in the other team colour, curls, bald) in eight shirts, mirrored per seat. Shoulder to shoulder along a row; 10% of grandstand seats, 22% of the hill and 7% of the near terraces empty: about 1,000 fans (was 1,200 at 9 × 13 px). The atlas is 576 × 466 px, painted in the art worker. |
@@ -318,7 +318,7 @@ grubber outcomes and flags those tries, repeat sets at 0.05–0.30, and
 drop-outs at 0–0.15. Repeat/drop-out band edges remain provisional; see
 `docs/status/2026-10-balance.md`. These rare counts print to three decimals.
 
-Per full Nines match (two 7:00 halves), both sides combined, 60-rated teams: tackles
+Historical calibration per 14-minute Nines match (two 7:00 halves), both sides combined, 60-rated teams. These bands are a reference, not approved 5-minute targets: tackles
 117–163 · line breaks 10–19 · offloads 6–11 · errors 8–12 · kicks 16–25 · tries 4–7 ·
 completion 70–80%; stronger team wins ~70% at a 20-point rating gap. The count bands
 were the 9:00-half bands ×7/9, rounded, on 2026-10-25, so a shorter match is not marked
@@ -379,7 +379,7 @@ and `NINES` in `src/match/league/rules.ts` is that same object, so the knob name
 
 | Knob | File | Value | Effect |
 |---|---|---|---|
-| `rules.halfMinutes` | `src/content/au.ts` (`NINES`, `rules.ts`) | 7 | Length of each half (minutes of sim time). Was 9. |
+| `rules.halfMinutes` | `src/content/au.ts` (`NINES`, `rules.ts`) | 2.5 | Length of each half (match-clock minutes). Was 7; Leon selected 2:30 on 13 Nov 2026. Viewing time at ×1 varies with stoppages and play-on. |
 | `rules.tryPoints` / `rules.conversionPoints` / `rules.fieldGoalPoints` | `au.ts` | 4 / 2 / 1 | Points for a try, a conversion and a field goal (penalty goals come with 2e). |
 | `rules.halfTimeTicks` | `au.ts` | 60 (3 s) | The break on screen before the second-half kick-off. |
 | `rules.halfTimeLegsBack` | `au.ts` | 0.5 | At half-time each player gets back this share of the legs he has lost (BAK-208 §8.2); his gas tank is filled to his legs. |
@@ -446,7 +446,7 @@ until 2d's dead-ball restarts).
 | `goals.halfPosts` | `src/match/league/goals.ts` | 2.75 m | Half the gap between the uprights. |
 | `goals.errorDeg` / `goals.errorPerM` / `goals.errorPerSkill` | `goals.ts` | 5° / 1/40 per m / 1.2% per Skill point | The kick's sideways error (one standard deviation). |
 | `goals.minBackM` / `goals.maxBackM` | `goals.ts` | 10 / 35 m | How far out a conversion is taken. |
-| `goals.conversionTicks` / `goals.conversionMaxTicks` | `goals.ts` | 30 / 160 | Lining it up once on the spot (1.5 s); the longest the conversion waits for him. |
+| `goals.conversionTicks` / `goals.conversionMaxTicks` | `goals.ts` | 30 / 160 | Lining it up once on the spot (1.5 s); the longest the conversion waits for him. The view plays the kicker's routine across the first (#669, `goalStrikeTick` in `goals.ts`). |
 | `goals.fieldGoalLastS` | `goals.ts` | 140 s | Field goals only in the last 2:20 of the match. Was 180 s, the last sixth of 18:00. |
 | `goals.fieldGoalSoonExtraS` | `goals.ts` | 47 s | An AI coach holds his attack call this long before a field goal is on. Was 60; 60 × 7/9, rounded. |
 | `goals.fieldGoalMargin.0` / `.1` | `goals.ts` | −1 / 0 | …with the kicker's side level or a point behind. |
@@ -1704,3 +1704,64 @@ the replaced player’s eligibility. Possession changes and restarts clear the o
 ruck obligation, including a launched territorial kick (the receiving side becomes
 the attack). Normal tactical positioning, kick distances and fatigue costs remain
 as configured. This correction is held for Leon’s play-test before merge.
+
+## Short-match comparison (#513, draft)
+
+`npm run build:match-preview -- <output-directory>` builds three separate bundles
+and a comparison page. Build flag `NRL_MATCH_PREVIEW_LENGTH=100|80|60` selects the
+physical length and 2.5-minute clock halves before modules/Workers initialise.
+Omitting it uses the normal application: 2:30 halves and a 100m default, with
+field choices under Experiments. Unsupported values fail the diagnostic build.
+These fixed-field artifacts are for diagnostics; publish a normal build for
+the runtime selector.
+
+| Setting | Preview value | Meaning |
+|---|---|---|
+| Field length | 100 / 80 / 60m | Try line to try line; width stays 68m and in-goals stay 10m. |
+| Half length | 2.5 clock minutes | Viewing target is 2–2.5 actual minutes at ×1 per half; measured separately. |
+| Field projection | 0.24 longitudinal tiles/metre, width 18 tiles | Keep players/metre sizes and 10m markings consistent; normal legacy in-goal art stays unchanged. |
+| Kick-off receiving anchor | min(28m, halfway −10m −6m) from own line | Keep the existing 6m nudge and role depths, with every receiver at least 10m on its side of halfway; the 100m formation is unchanged. |
+| 40/20 availability | On only when field length >60m | Disable in the 60m prototype where own-40 and opposing-20 meet. Called and automatic kicks agree. Ordinary kicks remain unchanged. |
+| Neutral fixture | Rating 60 in every stat, seed 1, four reserves, no traits | Identical starting teams in each bundle; balanced attack/slide defence and standard rotation. |
+
+The preview lab uses career smart pace and key-moment caps at the selected ×1,
+and records viewed milliseconds per half, excluding pause and half-time. It drops
+the lab’s additional slow-motion beat so it does not add a second pacing layer.
+Changing speed/stepping/seeking or hiding the tab invalidates comparison timing;
+hiding or rotating upright also pauses. Restart clears queued coach calls and resets
+the timer. Viewing time uses elapsed wall time, independently of Phaser’s
+smoothed frame delta.
+Normal lab playback is unchanged. Fatigue, sprint gas, substitutions and ordinary
+kick distances have not been compressed with the match: these are play-test
+limitations to compare rather than hidden balance tuning. PWA registration and
+cache generation are disabled for the three separate preview bundles.
+
+
+## 13 November revision: default short halves and runtime fields
+
+Normal AU/UK Nines matches now use two 2.5-minute clock halves, on a 100m field
+unless changed in Experiments. This supersedes the earlier separate-build-only
+proposal. [PR #678](https://github.com/ch-leon/nrl-sim/pull/678) remains draft.
+[Implementation contract](513-short-halves-field-experiment.md) records the
+user’s request and the separate career-balance pass required before merge.
+
+| Setting | Current value | Meaning |
+|---|---|---|
+| `rules.halfMinutes` | 2.5 | Normal clock default, including workers and the Guide. |
+| Experiments field length | 100m default;80m/60m optional | Under browser-local Labs settings, never a career rule. Apply saves/readbacks/reloads between matches; live, parked, resumable and advancing states refuse changes. |
+| Worker field | Validated suffix on existing match/art worker names | Freezes the same field for skip, background, replay and stadium painting before imports initialise. |
+| Match identity | Revision4, includes physical field length | A different field or historical engine cannot silently replay old inputs. |
+| Cheap-score calibration | Reference seven-minute half; multiply raw score by `rules.halfMinutes / 7` before rounding | Preserve the same two draws and strength inputs while keeping rival fast-sim totals on the shorter clock’s scale. At100m this is duration scaling, not an added field multiplier. |
+
+The existing fatigue, gas, coach-call, sin-bin and golden-point windows are not
+retuned by the field selector. At 60m the 40/20 call is disabled; ordinary kick
+distances stay in metres. Legacy `build:match-preview` bundles remain fixed-field
+diagnostic artifacts; the hosted candidate is the normal single application,
+with no compile-time field override.
+
+The balance harness normalises stretch counts to `MATCH_MINUTES`, which is now 5
+by default. Explicit historical 7-minute mechanics fixtures remain 14-minute
+experiments and must declare their units. Previous 14-minute reports in this
+reference remain historical measurements. Live-match neutral 40-seed combined
+points were 10.15/12.825/17.675 at 100m/80m/60m; those live-sim measurements do not
+establish full-career economic or progression equivalence.

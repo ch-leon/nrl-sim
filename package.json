@@ -8,6 +8,7 @@
     "dev": "vite",
     "prebuild": "vite-node scripts/gen-icons.mjs",
     "build": "tsc --noEmit && vite build",
+    "build:match-preview": "node scripts/build-match-preview.mjs",
     "build:android": "vite-node scripts/gen-icons.mjs && tsc --noEmit && NRL_NATIVE=1 vite build && node scripts/obfuscate-dist.mjs",
     "test": "vitest run",
     "preview": "vite preview",

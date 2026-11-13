@@ -82,7 +82,7 @@ export function reportMarkdown(r: ReportInput): string {
     return out.join('\n');
   }
   out.push(
-    `${r.plan.seeds} matches per row, ${r.plan.minutes ? `${r.plan.minutes}-minute stretches, counts scaled to a ${MATCH_MINUTES}-minute match` : `whole matches (two ${MATCH_MINUTES / 2}:00 halves)`}; counts are both sides. Wins are on points. ` +
+    `${r.plan.seeds} matches per row, ${r.plan.minutes ? `${r.plan.minutes}-minute stretches, counts scaled to a ${MATCH_MINUTES}-minute match` : `whole matches (two ${MATCH_MINUTES / 2}-minute halves)`}; counts are both sides. Wins are on points. ` +
       `✓ inside the §7 target, ↑ above, ↓ below. A change marked * is bigger than luck explains (over 2 standard errors, flagged only with ${MIN_SEEDS_TO_FLAG}+ matches a row); unmarked ones may be noise.`,
     '',
   );

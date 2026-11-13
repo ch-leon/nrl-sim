@@ -50,7 +50,7 @@ export async function runDevSettings(browser) {
       const problems = [];
       const heads = [...panel.querySelectorAll('h2, h3')].map((h) => h.textContent);
       if (heads.join('|') !== 'Developer settings|Screens|Playtest career|Experiments|Reset') problems.push(`headings ${heads.join('|')}`);
-      for (const t of panel.querySelectorAll('button, label')) {
+      for (const t of panel.querySelectorAll('button, label, select')) {
         const r = t.getBoundingClientRect();
         if (r.height < 44 - 0.5) problems.push(`"${t.textContent.slice(0, 24)}" is ${r.height.toFixed(1)}px tall`);
         if (r.right > innerWidth + 1 || r.left < -1) problems.push(`"${t.textContent.slice(0, 24)}" is off the side`);

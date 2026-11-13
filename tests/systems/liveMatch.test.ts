@@ -67,6 +67,7 @@ function watch(
   call?: { side: 'home' | 'away'; call: CoachCall },
   stopAt = Infinity,
   plan?: { side: 'home' | 'away'; tactics: TeamTactics },
+  stopWhen?: (sim: LiveSim) => boolean,
 ): { result: MatchResult | null; calls: CallInput[]; plans: PlanInput[]; tick: number } {
   const live = s.live!;
   const calls = live.calls ?? [];
@@ -75,7 +76,7 @@ function watch(
   const r = new Runner((seed) => new LiveSim(s.home, s.away, seed, { ...asPlayed(live), calls, plans }), live.seed);
   r.onEvents = (events) => rec.add(events, r.cur);
   r.onStep = () => rec.clock((r.current as LiveSim).matchSeconds);
-  while (!r.finished && r.tick < stopAt) {
+  while (!r.finished && r.tick < stopAt && !stopWhen?.(r.current as LiveSim)) {
     const sim = r.current as LiveSim;
     if (call && r.tick >= (live.resumeAt ?? 0) && sim.callRefusal(call.side, call.call) === null) {
       calls.push({ tick: r.tick + 1, side: call.side, call: call.call });
@@ -418,7 +419,8 @@ describe('live match (beta): the match on screen is the match', () => {
     const plain = runMatch(s.home, s.away, opts);
     expect(result!.events).not.toEqual(plain.events);
     // The first half is the same match: the plan comes in at the second half's kick-off.
-    const firstHalf = (r: MatchResult): unknown[] => r.events.filter((e) => e.t < NINES.halfMinutes);
+    // Contract minutes are floored; the half-time event is the authoritative boundary.
+    const firstHalf = (r: MatchResult): unknown[] => r.events.slice(0, r.events.findIndex((e) => e.kind === 'half-time'));
     expect(firstHalf(plain).length).toBeGreaterThan(10);
     expect(firstHalf(result!)).toEqual(firstHalf(plain));
     expect(runMatch(s.home, s.away, { ...opts, plans: [...plans] })).toEqual(result);
@@ -432,7 +434,8 @@ describe('live match (beta): the match on screen is the match', () => {
     const first = started[0]!;
     const side = first.fixture.homeId === PLAYER_ID ? 'home' : 'away';
     const plan = { side: side as 'home' | 'away', tactics: { attack: 'grind', defence: 'compressed' } as TeamTactics };
-    const cut = watch(first, undefined, 16000, plan);
+    // Kill during second-half play, after the plan is applied, at any supported match length.
+    const cut = watch(first, undefined, Infinity, plan, (sim) => sim.snapshot().clock?.half === 2 && sim.phaseKind === 'play');
     expect(cut.result).toBeNull();
     const rec = readLiveMatch()!;
     expect(rec.plans).toEqual(cut.plans);

@@ -29,6 +29,7 @@ import type { DifficultyEdge } from '../league/spread';
 import type { TeamTactics } from '../league/presets';
 import { NINES } from '../league/rules';
 import { LiveView, type ViewSurface } from './liveView';
+import { BreakClock } from './walkOff';
 import { PopupLayer } from './popupLayer';
 import { callPaidPopup, popupFor } from './popups';
 import { impactTier, playImpact } from './impact';
@@ -288,6 +289,8 @@ export interface LivePlaybackOptions {
 export class LivePlayback {
   private readonly runner: Runner;
   private readonly view: LiveView;
+  /** Ticks a break has stood still on screen (#675): the walk-off goes on behind the card and after full time. */
+  private readonly breakClock = new BreakClock();
   private readonly popups: PopupLayer;
   private readonly wrestleBar: WrestleBar;
   private readonly sprintLayer: SprintLayer;
@@ -777,7 +780,8 @@ export class LivePlayback {
     const r = this.runner;
     this.applyPace(deltaMs);
     r.update(deltaMs);
-    this.view.draw(r.prev, r.cur, r.alpha, r.playing ? r.speed : 0.001);
+    // The walk-off and the huddle play on behind the half-time card and after the full-time whistle (#675).
+    this.view.draw(r.prev, r.cur, r.alpha, r.playing ? r.speed : 0.001, this.breakClock.advance(r.cur, deltaMs, r.speed, !r.playing || r.finished));
     this.showClock();
     if (this.closeupUntil && this.now > this.closeupUntil) {
       this.closeupUntil = 0;

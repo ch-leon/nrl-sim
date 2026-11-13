@@ -11,6 +11,7 @@ import { cssZoom } from '../../world/viewport';
 import type { Side, SimEvent } from '../core/snapshot';
 import { toMatchEvent } from '../league/events';
 import { LiveView } from '../view/liveView';
+import { BreakClock } from '../view/walkOff';
 import { PopupLayer } from '../view/popupLayer';
 import { ContestLayer } from '../view/contestLayer';
 import { HALF_BREAK, shownBreak } from '../view/lineBreak';
@@ -22,6 +23,10 @@ import { TRAIT_FAST_FROM, TRAIT_SLOW_FACTOR, TRAIT_SLOW_MS, TraitLayer, TraitRos
 import { LegsLayer } from '../view/legsLayer';
 import { FATIGUE } from '../league/fatigue';
 import type { LabController } from './controller';
+import { MATCH_PREVIEW } from '../preview';
+import { blendPace, KeyMoments, playbackPace } from '../view/livePlayback';
+import { NINES } from '../league/rules';
+import type { LiveSim } from '../league/live';
 
 export interface LabSceneData {
   home: TeamSheet;
@@ -48,6 +53,12 @@ export class LabScene extends MatchScene {
   private ids!: Record<Side, string>;
   private sheets!: Record<Side, TeamSheet>;
   private closeupUntil = 0;
+  /** The walk-off plays on after the full-time whistle stops the sim (#675). */
+  private readonly breakClock = new BreakClock();
+  private previewPace = 1;
+  private previewMoments = new KeyMoments();
+  private previewTick = 0;
+  private previewAt = 0;
 
   constructor() {
     super('Lab');
@@ -76,8 +87,24 @@ export class LabScene extends MatchScene {
     this.legsLayer = new LegsLayer(this, DEPTH_POPUP - 2, FATIGUE);
     const r = this.controller.runner;
     r.onEvents = (events) => this.onSimEvents(events);
+    const onVisibility = (): void => {
+      if (MATCH_PREVIEW && document.hidden && r.playing) {
+        this.controller.watchClock?.invalidate();
+        r.pause();
+      }
+    };
+    const onResize = (): void => {
+      if (MATCH_PREVIEW && innerHeight > innerWidth && r.playing) {
+        this.controller.watchClock?.invalidate();
+        r.pause();
+      }
+    };
+    if (MATCH_PREVIEW) document.addEventListener('visibilitychange', onVisibility);
+    if (MATCH_PREVIEW) window.addEventListener('resize', onResize);
     this.view.draw(r.prev, r.cur, 0, 1);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('resize', onResize);
       r.onEvents = null;
       this.popups?.destroy();
       this.popups = null;
@@ -98,6 +125,7 @@ export class LabScene extends MatchScene {
     const r = this.controller.runner;
     for (const sim of events) {
       const e = shownBreak(sim, r.cur);
+      if (MATCH_PREVIEW) this.previewMoments.note(e);
       this.contest?.note(e, r.cur);
       // The trait cues (#654): the same layer a real match draws, so the lab can sign each one off.
       const cue = this.traits?.note(e, r.cur);
@@ -125,8 +153,25 @@ export class LabScene extends MatchScene {
 
   override update(time: number, delta: number): void {
     const r = this.controller.runner;
-    r.update(delta);
-    this.view?.draw(r.prev, r.cur, r.alpha, r.playing ? r.speed : 0.001);
+    let shownSpeed = r.speed;
+    if (MATCH_PREVIEW) {
+      const now = performance.now();
+      const viewingDelta = this.previewAt ? now - this.previewAt : 0;
+      this.previewAt = now;
+      if (r.tick < this.previewTick) { this.previewMoments = new KeyMoments(); this.previewPace = 1; }
+      const phase = (r.current as LiveSim).phaseKind;
+      const chosen = r.speed;
+      this.previewMoments.phase(phase);
+      this.previewPace = blendPace(this.previewPace, playbackPace(phase), delta);
+      const cap = this.previewMoments.cap(r.cur.clock, NINES.halfMinutes);
+      shownSpeed = Math.min(chosen * this.previewPace, cap ?? Infinity);
+      this.controller.watchClock?.advance(viewingDelta, r.cur.clock?.half ?? 1, chosen, phase, r.playing);
+      r.setSpeed(shownSpeed);
+      r.update(delta);
+      r.setSpeed(chosen);
+      this.previewTick = r.tick;
+    } else r.update(delta);
+    this.view?.draw(r.prev, r.cur, r.alpha, r.playing ? shownSpeed : 0.001, this.breakClock.advance(r.cur, delta, shownSpeed, r.finished));
     // The close-up MatchScene picked for a big moment eases back out after a beat.
     if (this.closeupUntil && time > this.closeupUntil) {
       this.closeupUntil = 0;

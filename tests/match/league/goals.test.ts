@@ -59,7 +59,8 @@ describe('conversions in the live sim', () => {
     let good = 0;
     let all = 0;
     for (const seed of [1, 2]) {
-      const { sim, events } = play(seed);
+      // Preserve the original scoring exposure for conversion makes and misses.
+      const { sim, events } = play(seed, { halves: 2, halfMinutes: 7 });
       const tries = events.filter((x) => x.e.kind === 'try');
       const convs = events.filter((x) => x.e.kind === 'conversion');
       expect(convs).toHaveLength(tries.length);

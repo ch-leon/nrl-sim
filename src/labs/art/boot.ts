@@ -7,7 +7,7 @@ import { ART_LAB_CSS } from './style';
 import { drawTacklePair, tacklePoseAt, PAIR_X, PAIR_FOOT } from '../../art/prototype/tackle';
 import { BRAND } from '../../brand';
 import { RECOGNITION_CAST, recognitionAt } from './recognition';
-import { CONTACT_CASES, CASE_CARRIER, CASE_DEFENDERS, caseDefinition, caseDuration, contactCaseAt, type ContactCaseId } from './contactCases';
+import { CONTACT_CASES, CASE_APPROACHES, CASE_CARRIER, CASE_DEFENDERS, caseDefinition, caseDuration, contactCaseAt, type ContactCaseId } from './contactCases';
 import { CONTACT_W, CONTACT_X, CONTACT_FOOT, contactPoseAt, drawContact } from '../../art/prototype/contact';
 import { contactPlayerKey } from '../../match/view/contactAnimation';
 import type { ContactPlayer } from '../../match/core/snapshot';
@@ -35,7 +35,7 @@ export function bootArtLab(): void {
     <header><div><p class="eyebrow" id="art-brand"></p><h1>Make contact count.</h1><p class="intro">Read the hit, the help and who comes away with the ball.</p></div><a href="${location.pathname}">Back to game</a></header>
     <div class="mode-switch"><button id="passage" aria-pressed="true">Passage of play</button><button id="contact-cases" aria-pressed="false">Tackle situations</button><button id="tackle-loop" aria-pressed="false">Original wrap</button><button id="recognise" aria-pressed="false">Nine-player test</button><button id="rearrange" hidden>Change positions</button></div>
     <p class="note" id="study-note">Compare the carry, catch and contact at playing size.</p>
-    <div class="contact-controls" id="contact-controls" hidden><label>Situation<select id="contact-case">${CONTACT_CASES.map(c => `<option value="${c.id}">${c.label}</option>`).join('')}</select></label><button id="contact-variation">Stance variation: A</button><button id="case-contact">First contact</button><button id="case-outcome">Outcome</button><button id="case-finish">Follow-through</button></div>
+    <div class="contact-controls" id="contact-controls" hidden><label>Situation<select id="contact-case">${CONTACT_CASES.map(c => `<option value="${c.id}">${c.label}</option>`).join('')}</select></label><button id="contact-variation">Approach: front</button><button id="case-contact">First contact</button><button id="case-outcome">Outcome</button><button id="case-finish">Follow-through</button></div>
     <div class="topline"><div class="toggle"><button id="compare" aria-pressed="true">Compare</button><button id="new-only" aria-pressed="false">Prototype only</button></div><div class="toggle"><button id="zoom" aria-pressed="false">Close up</button><button id="turn" aria-pressed="false">Turn players</button></div></div>
     <section class="stage" aria-label="Match artwork comparison">
       <figure class="panel old"><figcaption>CURRENT</figcaption><canvas class="pitch" id="old-pitch" role="img" aria-label="Current pixel artwork playing the same passage"></canvas></figure>
@@ -265,7 +265,7 @@ export function bootArtLab(): void {
   const refreshCase = () => {
     time = 0; scrub.max = String(caseDuration(contactCase));
     el('study-note').textContent = caseDefinition(contactCase).note;
-    el('contact-variation').textContent = `Stance variation: ${variation ? 'B' : 'A'}`;
+    el('contact-variation').textContent = `Approach: ${CASE_APPROACHES[variation]}`;
     invalidate();
   };
   el('contact-cases').onclick = () => {
@@ -276,7 +276,7 @@ export function bootArtLab(): void {
     playing = !matchMedia('(prefers-reduced-motion: reduce)').matches; syncPlay(); refreshCase();
   };
   el<HTMLSelectElement>('contact-case').onchange = e => { contactCase = (e.target as HTMLSelectElement).value as ContactCaseId; refreshCase(); };
-  el('contact-variation').onclick = () => { variation = 1 - variation; refreshCase(); };
+  el('contact-variation').onclick = () => { variation = (variation + 1) % CASE_APPROACHES.length; refreshCase(); };
   for (const [id, seconds] of [['case-contact', () => .75], ['case-outcome', () => caseDefinition(contactCase).end / 20 + .15], ['case-finish', () => caseDefinition(contactCase).end / 20 + .85]] as const) {
     el(id).onclick = () => { time = seconds(); playing = false; syncPlay(); draw(); };
   }

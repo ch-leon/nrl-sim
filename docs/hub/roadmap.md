@@ -7,7 +7,7 @@ live gameplay change; work still open below has not shipped.
 
 ## Now
 
-- **Match watchability** ([tracker #626](https://github.com/ch-leon/nrl-sim/issues/626)): a review of how the live match looks, moves, sounds and plays, filed as 49 issues. Waves 1 to 3 (phone view, pacing, facing, run cycle, impact, sound, harness telemetry; then commentary, player variety, ball and camera, coach-call payoff, match occasion, frame-time work; then referee and stadium life, a bigger crowd, body language and trait cues) are in [PR #676](https://github.com/ch-leon/nrl-sim/pull/676), awaiting a phone play-test: frame rate at the new resolution and the new sounds have not been checked on a device. The gameplay issues (attack shapes, last-tackle options, score and clock, held-up) follow, measured against the new harness telemetry.
+- **Match watchability** ([tracker #626](https://github.com/ch-leon/nrl-sim/issues/626)): a review of how the live match looks, moves, sounds and plays, filed as 49 issues. Waves 1 to 3 (phone view, pacing, facing, run cycle, impact, sound, harness telemetry; then commentary, player variety, ball and camera, coach-call payoff, match occasion, frame-time work; then referee and stadium life, a bigger crowd, body language and trait cues) merged in [PR #676](https://github.com/ch-leon/nrl-sim/pull/676); wave 4 (contact variety, the kicker's routine, walk-offs, eyes on the bomb) is in [PR #681](https://github.com/ch-leon/nrl-sim/pull/681). Still owed a phone play-test: frame rate at the new resolution and the new sounds have not been checked on a device. The gameplay issues (attack shapes, last-tackle options, score and clock, held-up) follow, each its own PR measured against the new harness telemetry; an open runner calling for the ball ([#672](https://github.com/ch-leon/nrl-sim/issues/672)) waits on attack shapes, since the sim picks its receiver only as the pass leaves.
 
 - **Defensive retreat play-test** ([PR #677](https://github.com/ch-leon/nrl-sim/pull/677)): watch a match at ×1 and check that defenders get back 10m before rejoining play, especially on dummy-half darts.
 
@@ -33,9 +33,6 @@ live gameplay change; work still open below has not shipped.
   no match changed. Expansive is still about 41% of level-rating games (−8.4 against
   strength), well under the other attacks. The next pass looks at why a rushing line
   shuts out the wide game; it is not a Speed question.
-- **Labs: shorter matches** ([issue #513](https://github.com/ch-leon/nrl-sim/issues/513)):
-  about 4 minutes of watching at ×1, behind a Labs toggle that is off by default.
-  Planned and awaiting Leon's go; no PR yet.
 
 ## Next
 

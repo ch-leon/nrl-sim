@@ -393,6 +393,7 @@ const CALL_CAPTION: Readonly<Record<string, string>> = {
   'tackles 1–4': 'tackles 1–4',
   'not inside their 25': 'in their 25',
   'not behind your 40': 'behind your 40',
+  '40/20 off on this field': '40/20 off',
   'out of reach of their 20': 'out of reach',
   'the kick’s away': 'kick’s away',
   'no penalty': 'no penalty',

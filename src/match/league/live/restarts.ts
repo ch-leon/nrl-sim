@@ -7,7 +7,7 @@ import { dist, type Vec } from '../../core/vec';
 import { FULLBACK } from '../roles';
 import { pickReceiver } from '../tactics';
 import { NINES } from '../rules';
-import { GOALS, conversionSpot, goalChance, postsFor } from '../goals';
+import { conversionSpot, goalChance, goalStrikeTick, postsFor } from '../goals';
 import { PENALTY, offsideChance } from '../penalties';
 import { TOUCH, exitPoint, inOwnInGoal, isFortyTwenty, ownLineX, touchRestartSpot, twentySpot } from '../touch';
 import { LIVE } from './knobs';
@@ -350,8 +350,7 @@ export abstract class LiveRestarts extends LivePlay {
     const posts = postsFor(this.dirOf(ph.side), FIELD_LENGTH, MID_Y);
     if (ph.good === null) {
       if (ph.readyAt === 0 && dist(k.body.pos, ph.spot) < 1) ph.readyAt = this.tick;
-      const ready = ph.readyAt > 0 && this.tick >= ph.readyAt + GOALS.conversionTicks;
-      if (!ready && this.tick < ph.t0 + GOALS.conversionMaxTicks) return;
+      if (this.tick < goalStrikeTick(ph)) return;
       ph.good = this.rng.next() < goalChance(k.body.pos, posts, k.stats.kicking, this.goalAcc(k));
       this.lock(k, 'kick', LIVE.kickLockTicks);
       this.ball = kickFlight(k.body.pos, this.goalAim(posts, this.dirOf(ph.side), ph.good), this.tick, null, 7);

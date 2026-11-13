@@ -7,6 +7,7 @@ import { formatBuildLabel } from './src/ui/buildInfo';
 import { claudeDirIgnored } from './src/utils/devWatch';
 import { minifyCssConsts } from './src/utils/cssMinify';
 import { PWA_MANIFEST, brandIndexHtml } from './src/brandBuild';
+import { resolveMatchPreview } from './src/match/preview';
 
 // BAK-204 (WU-16): installable, offline-capable PWA via generateSW.
 // The Phaser chunk is large, so the Workbox precache size cap is raised to ~6MB.
@@ -19,6 +20,7 @@ import { PWA_MANIFEST, brandIndexHtml } from './src/brandBuild';
 // sub-path), the PWA service worker is turned off so a stale cache can never shadow
 // the bundled build, and no source maps are emitted (docs/android-test-build.md).
 const native = process.env.NRL_NATIVE === '1';
+const matchPreview = resolveMatchPreview(process.env.NRL_MATCH_PREVIEW_LENGTH);
 const base = native ? '/' : (process.env.BASE_PATH ?? '/');
 
 // Build label (N7, GitHub #181): the date and the short SHA of the commit being
@@ -67,6 +69,7 @@ export default defineConfig(({ command }) => ({
     __NRL_BUILD__: JSON.stringify(BUILD_LABEL),
     // #89: src/fx/pwa.ts skips service-worker registration in the native app.
     __NRL_NATIVE__: JSON.stringify(native),
+    __NRL_MATCH_PREVIEW__: JSON.stringify(matchPreview),
   },
   plugins: [
     {
@@ -97,7 +100,7 @@ export default defineConfig(({ command }) => ({
       // #89: no service worker in the native Android build. The APK ships the build
       // directly, so a SW would only add a second, cache-first copy that could go
       // stale; src/fx/pwa.ts also skips registration when __NRL_NATIVE__ is set.
-      disable: native,
+      disable: native || matchPreview !== null,
       // 'prompt' (N7, #181): a new build waits for the player to tap Reload on
       // the update bar (src/fx/pwa.ts, src/ui/updatePrompt.ts) instead of
       // swapping itself in mid-session, which could reload a match in progress.

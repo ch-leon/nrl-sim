@@ -18,7 +18,7 @@ describe('contact situation artwork', () => {
   });
   it('bounds both leg segments through every join, fall, escape and release', () => {
     const distance = (a: readonly number[], b: readonly number[]) => Math.hypot(a[0]! - b[0]!, a[1]! - b[1]!);
-    for (const { id } of CONTACT_CASES) for (const variant of [0, 1]) for (let t = .6; t < caseDuration(id); t += .025) {
+    for (const { id } of CONTACT_CASES) for (const variant of [0, 1, 2]) for (let t = .6; t < caseDuration(id); t += .025) {
       const state = contactCaseAt(id, t, variant).state!;
       // Include compressed live rucks as well as the slower review choreography.
       for (const releaseTicks of [undefined, 7, 14]) {
@@ -42,15 +42,18 @@ describe('contact situation artwork', () => {
     const distance = (a: readonly number[], b: readonly number[]) => Math.hypot(a[0]! - b[0]!, a[1]! - b[1]!);
     // A far-away target must never make an arm grow to reach it.
     expect(distance([0, 0], bentContactArm([0, 0], [100, 20]).hand)).toBeLessThanOrEqual(9.001);
-    for (const { id } of CONTACT_CASES) for (const variant of [0, 1]) for (let t = .6; t < caseDuration(id); t += .05) {
+    for (const { id } of CONTACT_CASES) for (const variant of [0, 1, 2]) for (let t = .6; t < caseDuration(id); t += .05) {
       const pose = contactPoseAt(contactCaseAt(id, t, variant).state!);
       for (const d of pose.defenders) for (const arm of d.arms) {
         expect(distance(arm.shoulder, arm.elbow)).toBeLessThanOrEqual(5.001);
         expect(distance(arm.elbow, arm.hand)).toBeLessThanOrEqual(5.001);
         expect(distance(arm.shoulder, arm.hand)).toBeLessThanOrEqual(9.001);
       }
+      // A full grip puts the shoulder on the runner: chest or hips, or his boots for an ankle tap (#674).
+      const c = pose.carrier.pose;
       for (const d of pose.defenders.filter(d => d.grip >= .999)) {
-        expect(Math.min(distance(d.pose.shoulder, pose.carrier.pose.hip), distance(d.pose.shoulder, pose.carrier.pose.shoulder))).toBeLessThanOrEqual(6.5);
+        const on = d.role === 'ankle' ? [c.foot, c.farFoot] : [c.hip, c.shoulder];
+        expect(Math.min(...on.map(p => distance(d.pose.shoulder, p)))).toBeLessThanOrEqual(6.5);
       }
     }
   });
@@ -66,7 +69,7 @@ describe('contact situation artwork', () => {
   });
   it('fits the different falls, joins, releases and escapes for all builds and head silhouettes', () => {
     for (const { id, end } of CONTACT_CASES) for (const build of ['lean', 'athletic', 'stocky'] as const) {
-      for (const facing of ['front', 'back'] as const) for (const variation of [0, 1]) {
+      for (const facing of ['front', 'back'] as const) for (const variation of [0, 1, 2]) {
         for (const t of [.7, end / 20 + .2, end / 20 + .85, caseDuration(id) - .05]) {
           const state = contactCaseAt(id, t, variation).state!;
           const pixels = drawContact(state, p => ({ ...appearanceFor(p.who), build }), p => p.side === 'home' ? kit : away, facing);

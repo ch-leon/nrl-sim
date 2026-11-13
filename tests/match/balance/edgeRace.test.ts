@@ -5,7 +5,7 @@
 // at other flat Speeds it does not), and with the edge race on fast backs carrying
 // wide bust more.
 import { describe, expect, it } from 'vitest';
-import { BalanceSim, measureCell } from '../../../src/match/balance/measure';
+import { BalanceSim, MATCH_MINUTES, measureCell } from '../../../src/match/balance/measure';
 import { sideSheet } from '../../../src/match/balance/measure';
 import { applyTuning, type Overrides } from '../../../src/match/league/tuning';
 import type { AttackPreset, DefencePreset } from '../../../src/match/league/presets';
@@ -14,7 +14,7 @@ import type { SideSpec } from '../../../src/match/balance/plan';
 /** Every #322 lever off (the shipped defaults), and every one on. */
 const OFF: Overrides = { 'race.on': 0, 'counters.slide.expansiveSigned': 0, 'counters.compressed.expansiveRelative': 0 };
 const SEEDS = 30;
-/** Busts a match the tracked side gains; +2.2 measured over these seeds. */
+/** Extra busts per fourteen minutes for the tracked side; keep the historical rate threshold. */
 const MARGIN = 1;
 const ON: Overrides = { 'race.on': 1, 'race.single': 0, 'counters.slide.expansiveSigned': 1, 'counters.compressed.expansiveRelative': 1 };
 
@@ -60,6 +60,9 @@ describe('the #322 Speed levers', () => {
     });
     const off = measureCell(cell({ ...ON, 'race.on': 0 }), SEEDS);
     const on = measureCell(cell({ ...ON, 'race.on': 1, 'race.perPoint': 0.02, 'race.single': 0 }), SEEDS);
-    expect(on.trackedCounts!.busts.mean - off.trackedCounts!.busts.mean).toBeGreaterThan(MARGIN);
+    // The harness now reports counts per five-minute default; compare the established
+    // fourteen-minute rate so shortening the clock does not dilute the physics threshold.
+    const extraBustsPer14Minutes = (on.trackedCounts!.busts.mean - off.trackedCounts!.busts.mean) * 14 / MATCH_MINUTES;
+    expect(extraBustsPer14Minutes).toBeGreaterThan(MARGIN);
   }, 120_000);
 });

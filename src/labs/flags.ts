@@ -4,6 +4,7 @@
 // values (visible, on, hintsSeen only) still read as they always did.
 import { browserStorage } from '../core/storage/local';
 import { LABS_KEY } from '../core/storageKeys';
+import { isFieldLength, type FieldLength } from './fieldLength';
 
 /** The playtest career in use on this browser (#519): what it was set up as, and the slot of the career put away. */
 export interface TestCareerMarker {
@@ -20,6 +21,8 @@ export interface LabsState {
   hintsSeen: string[];
   /** Developer overrides (#519), e.g. OPEN_SCREENS. Absent in a value from before them. */
   overrides?: Record<string, boolean>;
+  /** Physical field experiment, applied by restarting between matches. */
+  fieldLength?: FieldLength;
   /** Set while the playtest career is the one being played (#519). */
   testCareer?: TestCareerMarker;
 }
@@ -49,6 +52,7 @@ export function readLabs(raw: unknown): LabsState {
     const out: LabsState = { visible: s.visible, on: { ...s.on }, hintsSeen: [...s.hintsSeen] };
     // The newer fields are read on their own: a bad one is dropped, never the rest.
     if (flagMap(s.overrides) && Object.keys(s.overrides).length) out.overrides = { ...s.overrides };
+    if (isFieldLength(s.fieldLength) && s.fieldLength !== 100) out.fieldLength = s.fieldLength;
     const marker = readMarker(s.testCareer);
     if (marker) out.testCareer = marker;
     return out;
@@ -84,6 +88,18 @@ function persist(): boolean {
 export function labsVisible(): boolean { const s = state(); return s.visible || s.testCareer !== undefined; }
 export function experimentOn(id: string): boolean { const s = state(); return s.visible && s.on[id] === true; }
 export function setExperiment(id: string, on: boolean): void { state().on[id] = on; persist(); }
+export function fieldLengthPreference(): FieldLength { const s = state(); return (s.visible || s.testCareer !== undefined) ? s.fieldLength ?? 100 : 100; }
+/** Roll back an unsaved choice: physics must agree with the setting after reload. */
+export function setFieldLengthPreference(length: FieldLength): boolean {
+  if (!isFieldLength(length)) return false;
+  const previous = state();
+  cached = { ...previous };
+  if (length === 100) delete cached.fieldLength;
+  else cached.fieldLength = length;
+  if (persist()) return true;
+  cached = previous;
+  return false;
+}
 /** A developer override (#519): only while the page is shown, like an experiment. */
 export function overrideOn(id: string): boolean { const s = state(); return labsVisible() && s.overrides?.[id] === true; }
 export function setOverride(id: string, on: boolean): void {
@@ -108,7 +124,11 @@ export function testCareer(): TestCareerMarker | null { return state().testCaree
 export function setTestCareer(marker: TestCareerMarker | null): boolean {
   const s = state();
   if (marker) s.testCareer = { ...marker };
-  else delete s.testCareer;
+  else {
+    delete s.testCareer;
+    // A hidden playtest-only field must not revive on a later ?labs=1 boot.
+    if (!s.visible) delete s.fieldLength;
+  }
   return persist();
 }
 
@@ -129,7 +149,9 @@ export function developerSession(): DeveloperSession | null {
   const s = state();
   if (!labsVisible()) return null;
   const on = (m: Record<string, boolean> | undefined): string[] => Object.keys(m ?? {}).filter((k) => m![k] === true).sort();
-  return { testCareer: s.testCareer !== undefined, overrides: on(s.overrides), experiments: on(s.on) };
+  const experiments = on(s.on);
+  if (fieldLengthPreference() !== 100) experiments.push(`field-${fieldLengthPreference()}m`);
+  return { testCareer: s.testCareer !== undefined, overrides: on(s.overrides), experiments: experiments.sort() };
 }
 
 /** Null restores browser state; an object supplies isolated test state. */

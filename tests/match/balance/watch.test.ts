@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Side, SimEvent } from '../../../src/match/core/snapshot';
-import { measureCell, type CellResult } from '../../../src/match/balance/measure';
+import { MATCH_MINUTES, measureCell, type CellResult } from '../../../src/match/balance/measure';
 import { reportMarkdown, sharesOf } from '../../../src/match/balance/report';
 import { PlayWatch, ScoreLine, type TickView } from '../../../src/match/balance/watch';
 
@@ -181,7 +181,7 @@ describe('last tackles', () => {
 describe('shares', () => {
   const st = (mean: number) => ({ mean, se: 0 });
   it('shares a set of counts in percent, with the binomial error over the events', () => {
-    const { shares, perMatch } = sharesOf({ a: st(3), b: st(1) }, ['a', 'b'], 100, 14);
+    const { shares, perMatch } = sharesOf({ a: st(3), b: st(1) }, ['a', 'b'], 100, MATCH_MINUTES);
     expect(perMatch).toBe(4);
     expect(shares.a.mean).toBeCloseTo(75);
     expect(shares.b.mean).toBeCloseTo(25);
@@ -208,8 +208,8 @@ describe('measuring a cell', () => {
     const r = measureCell(cell, 2, 2, 5);
     const again = measureCell(cell, 2, 2, 5);
     expect(again.watch).toEqual(r.watch); // deterministic
-    // A 2-minute stretch scales counts x7: each match's lead changes read 0, 7, 14…, so the mean of two is a multiple of 3.5.
-    const steps = r.watch!.flow.leadChanges.mean / 3.5;
+    // A two-minute stretch scales to the configured whole match; averaging two seeds halves that step.
+    const steps = r.watch!.flow.leadChanges.mean / (MATCH_MINUTES / 4);
     expect(Math.abs(steps - Math.round(steps))).toBeLessThan(1e-9);
     expect(r.watch!.flow.closeLate.mean).toBeLessThanOrEqual(1);
   });
