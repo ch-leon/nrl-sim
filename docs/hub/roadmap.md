@@ -30,9 +30,9 @@ live gameplay change; work still open below has not shipped.
   strength), well under the other attacks. The next pass looks at why a rushing line
   shuts out the wide game; it is not a Speed question.
 - **Shorter-match comparison** ([draft PR #678](https://github.com/ch-leon/nrl-sim/pull/678)):
-  Leon approved separate 100m/80m/60m preview builds after the retreat fix, targeting
-  2–2.5 minutes of actual watching per half at ×1. The first comparison uses 2:30
-  clock halves. Hold both drafts until his play-test; no production setting changed.
+  Leon approved 2:30 default clock halves and a 100m default field, with 80m/60m
+  choices in Experiments. Choices apply between matches and are browser-local.
+  A separate career-balance pass is required before merging; keep all drafts held.
 
 ## Next
 

@@ -301,7 +301,7 @@ grubber outcomes and flags those tries, repeat sets at 0.05–0.30, and
 drop-outs at 0–0.15. Repeat/drop-out band edges remain provisional; see
 `docs/status/2026-10-balance.md`. These rare counts print to three decimals.
 
-Per full Nines match (two 7:00 halves), both sides combined, 60-rated teams: tackles
+Historical calibration per 14-minute Nines match (two 7:00 halves), both sides combined, 60-rated teams. These bands are a reference, not approved 5-minute targets: tackles
 117–163 · line breaks 10–19 · offloads 6–11 · errors 8–12 · kicks 16–25 · tries 4–7 ·
 completion 70–80%; stronger team wins ~70% at a 20-point rating gap. The count bands
 were the 9:00-half bands ×7/9, rounded, on 2026-10-25, so a shorter match is not marked
@@ -362,7 +362,7 @@ and `NINES` in `src/match/league/rules.ts` is that same object, so the knob name
 
 | Knob | File | Value | Effect |
 |---|---|---|---|
-| `rules.halfMinutes` | `src/content/au.ts` (`NINES`, `rules.ts`) | 7 | Length of each half (minutes of sim time). Was 9. |
+| `rules.halfMinutes` | `src/content/au.ts` (`NINES`, `rules.ts`) | 2.5 | Length of each half (match-clock minutes). Was 7; Leon selected 2:30 on 13 Nov 2026. Viewing time at ×1 varies with stoppages and play-on. |
 | `rules.tryPoints` / `rules.conversionPoints` / `rules.fieldGoalPoints` | `au.ts` | 4 / 2 / 1 | Points for a try, a conversion and a field goal (penalty goals come with 2e). |
 | `rules.halfTimeTicks` | `au.ts` | 60 (3 s) | The break on screen before the second-half kick-off. |
 | `rules.halfTimeLegsBack` | `au.ts` | 0.5 | At half-time each player gets back this share of the legs he has lost (BAK-208 §8.2); his gas tank is filled to his legs. |
@@ -1712,3 +1712,33 @@ Normal lab playback is unchanged. Fatigue, sprint gas, substitutions and ordinar
 kick distances have not been compressed with the match: these are play-test
 limitations to compare rather than hidden balance tuning. PWA registration and
 cache generation are disabled for the three separate preview bundles.
+
+
+## 13 November revision: default short halves and runtime fields
+
+Normal AU/UK Nines matches now use two 2.5-minute clock halves, on a100m field
+unless changed in Experiments. This supersedes the earlier separate-build-only
+proposal. [PR #678](https://github.com/ch-leon/nrl-sim/pull/678) remains draft.
+[Implementation contract](513-short-halves-field-experiment.md) records the
+user’s request and the separate career-balance pass required before merge.
+
+| Setting | Current value | Meaning |
+|---|---|---|
+| `rules.halfMinutes` | 2.5 | Normal clock default, including workers and the Guide. |
+| Experiments field length | 100m default;80m/60m optional | Under browser-local Labs settings, never a career rule. Apply saves/readbacks/reloads between matches; live, parked, resumable and advancing states refuse changes. |
+| Worker field | Validated suffix on existing match/art worker names | Freezes the same field for skip, background, replay and stadium painting before imports initialise. |
+| Match identity | Revision4, includes physical field length | A different field or historical engine cannot silently replay old inputs. |
+| Cheap-score calibration | Reference seven-minute half; multiply raw score by `rules.halfMinutes / 7` before rounding | Preserve the same two draws and strength inputs while keeping rival fast-sim totals on the shorter clock’s scale. At100m this is duration scaling, not an added field multiplier. |
+
+The existing fatigue, gas, coach-call, sin-bin and golden-point windows are not
+retuned by the field selector. At60m the40/20 call is disabled; ordinary kick
+distances stay in metres. Legacy `build:match-preview` bundles remain fixed-field
+diagnostic artifacts; the hosted candidate is the normal single application,
+with no compile-time field override.
+
+The balance harness normalises stretch counts to `MATCH_MINUTES`, which is now5
+by default. Explicit historical7-minute mechanics fixtures remain14-minute
+experiments and must declare their units. Previous14-minute reports in this
+reference remain historical measurements. Live-match neutral40-seed combined
+points were10.15/12.825/17.675 at100m/80m/60m; those live-sim measurements do not
+establish full-career economic or progression equivalence.

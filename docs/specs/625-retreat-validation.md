@@ -1,5 +1,10 @@
 # Retreat and short-match play-test evidence
 
+**13 November update:** Leon requested normal 2:30 halves and runtime field
+selection through Experiments, plus a separate career-balance pass before merge.
+The measurements below describe the first fixed-field comparison and remain
+valid live-sim measurements. [Current contract](513-short-halves-field-experiment.md).
+
 This page covers the [retreat PR #677](https://github.com/ch-leon/nrl-sim/pull/677).
 Leon must play-test it before it merges. The short-field comparison lives in the
 stacked [field comparison PR #678](https://github.com/ch-leon/nrl-sim/pull/678);
