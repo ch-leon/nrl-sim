@@ -37,6 +37,77 @@ export const WRESTLE = {
   wreckFight: 0.3,
 };
 
+/**
+ * Held up over the line (#652, BAK-208 §8.1; tuning reference §11). A carrier
+ * in contact as he reaches the try line (driven over in the wrestle, or met on
+ * it in open play) can be held up by any defender on him: no try, a
+ * play-the-ball 10 m out (a handover on the last). One roll, only then; a lone
+ * tackler's odds fall with the carrier's drive (Leon, 13 Nov 2026).
+ * Overridable by name (`heldUp.base`).
+ */
+export const HELD_UP = {
+  /** 1 on; 0 off: no roll, and a carrier carried or driven over with men on him scores as before. */
+  on: 1,
+  /** Chance two average fresh men hold up an average fresh carrier who reaches the line with no drive left. */
+  base: 0.75,
+  /** Added for each man more than two in the tackle, taken off for each fewer. */
+  perMan: 0.15,
+  /**
+   * A lone tackler is a contest only when the carrier has at most this share of his drive left.
+   * 1 (the default, Leon 13 Nov 2026): always passed, any lone tackler contests. 0.35 is the first rule.
+   */
+  oneManFight: 1,
+  /** Met on the line in open play: free defenders this close (m) as he carries it over are on him. */
+  reachM: 2.5,
+  /** Taken off × his drive at the line: the share of his fight left in the wrestle, or of his top speed in open play. */
+  drive: 0.3,
+  /** Taken off per m/s he was quicker than the first tackler at contact (his momentum), capped either way. */
+  momentumPerMs: 0.02,
+  momentumCap: 0.06,
+  /** Per point of the men's average hold over the carrier's own (holdOf: Strength, less the legs each has lost). */
+  strength: 0.4,
+  /** A Wrecking Ball carrier, off per level multiplier; a Brick Wall among two or three men, on per level multiplier. */
+  wreckingBall: 0.1,
+  brickWall: 0.1,
+  /** Never surer than this. */
+  max: 0.8,
+  /** The restart: a play-the-ball this far out from the line, level with where he was held (not nearer touch than touch.restartInM). */
+  restartM: 10,
+};
+
+/** What the held-up roll reads, at the moment he reaches the line. */
+export interface HeldUpInputs {
+  /** Defenders in the tackle (1–3). */
+  men: number;
+  /** Their average hold (holdOf) and the carrier's own, with each man's legs. */
+  hold: number;
+  carrierHold: number;
+  /** His drive at the line (0–1): the share of his fight left in the wrestle, or of his top speed met on the line. */
+  fightLeft: number;
+  /** Carrier speed minus the first tackler's at contact, m/s. */
+  speedDiff: number;
+  /** Trait level multipliers (0 = none): the carrier's Wrecking Ball, the best Brick Wall among the men. */
+  wreckingBall: number;
+  brickWall: number;
+}
+
+/** Whether the line is a contest at all: two or more on him, or one with at most `oneManFight` of his drive left (always, at 1). No roll otherwise. */
+export function heldUpContest(men: number, fightLeft: number): boolean {
+  return men >= 2 || (men === 1 && fightLeft <= HELD_UP.oneManFight);
+}
+
+/** The chance he is held up (0 when it is no contest). */
+export function heldUpChance(x: HeldUpInputs): number {
+  if (!heldUpContest(x.men, x.fightLeft)) return 0;
+  let p = HELD_UP.base + HELD_UP.perMan * (Math.min(WRESTLE.maxMen, x.men) - 2);
+  p -= HELD_UP.drive * Math.max(0, Math.min(1, x.fightLeft));
+  p -= Math.max(-HELD_UP.momentumCap, Math.min(HELD_UP.momentumCap, x.speedDiff * HELD_UP.momentumPerMs));
+  p += HELD_UP.strength * (x.hold - x.carrierHold);
+  p -= HELD_UP.wreckingBall * x.wreckingBall;
+  if (x.men >= 2) p += HELD_UP.brickWall * x.brickWall;
+  return Math.max(0, Math.min(HELD_UP.max, p));
+}
+
 /** The carrier's fight in seconds-against-one-man: stats, legs, and the opening roll in [0, 1). */
 export function fightOf(s: ContestStats & { stamina: number }, energy: number, roll: number): number {
   const stat = 1 + (s.strength - 50) / 120 + (s.stamina - 50) / 240;
@@ -86,6 +157,8 @@ export interface WrestleState {
   t0: number;
   /** Metres made in the tackle. */
   metres: number;
+  /** Carrier speed minus the first tackler's at contact, m/s (his momentum, for the held-up roll). Set when the wrestle starts. */
+  speedDiff?: number;
 }
 
 export type WrestleEnd = 'held' | 'free' | null;

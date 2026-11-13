@@ -338,7 +338,26 @@ All in `src/match/league/wrestle.ts`; `live/contact.ts` `stepWrestle` runs it (a
 | `wrestle.quickS` / `wrestle.slowS` | 0.35 s / 1.2 s | … for a wrestle this short / long (linear between). QUICK PTB! / slow line at the ends. |
 | `wrestle.wrestleMaxS` | 3 s | Held at the latest. |
 
-Tests: `tests/match/league/fatigue.test.ts`.
+**Held up over the line** (#652 part 1, BAK-208 §8.1). Also in `wrestle.ts` (`HELD_UP`,
+`heldUpChance`); `live/contact.ts` `holdUp` draws the one roll, from `stepWrestle` (driven
+over in the wrestle) and from `stepPlay`'s try check (`heldUpAtLine`, carried over in open
+play). The roll is drawn only when he is in contact at the line and it is a contest.
+
+| Knob | Value | Effect |
+|---|---|---|
+| `heldUp.on` | 1 (**0 = off**) | 0: no roll, every carrier over the line scores, every seed exactly as before #652. |
+| `heldUp.reachM` | 2.5 m | Carried over in open play: free defenders (not down, not beaten, onside) this close are on him, three at most. Higher: more men on him at the line, more contests. |
+| `heldUp.oneManFight` | 1 | A lone tackler is a contest only when the carrier's drive is at most this (the share of his fight left in the wrestle, or of his top speed in open play). At 1 the threshold is always passed: any lone tackler contests and the odds alone fall with drive (Leon, 13 Nov 2026). 0.35 is the first rule (a lone tackler only on a carrier with little drive left; with `heldUp.base` 0.6, a held-up in 3–8% of matches). |
+| `heldUp.base` | 0.75 | Chance two average fresh men hold up an average fresh carrier with no drive left (0.6 under the first rule). |
+| `heldUp.perMan` | 0.15 | Added for a third man, taken off for a lone one. |
+| `heldUp.drive` | 0.3 | Taken off × his drive at the line (0–1). A carrier at full pace with two on him: about 0.47; one man on a carrier at 90% of his top speed: about 0.33. |
+| `heldUp.momentumPerMs` / `heldUp.momentumCap` | 0.02 / ±0.06 | Taken off per m/s he is quicker than the first man (added when slower), capped. |
+| `heldUp.strength` | 0.4 | × (the men's average `holdOf` − his own): Strength /120, each less the legs he has lost (`wrestle.holdLegs`). 20 Strength points ≈ 7%. |
+| `heldUp.wreckingBall` / `heldUp.brickWall` | 0.1 / 0.1 per level multiplier | A Wrecking Ball carrier is held up less; a Brick Wall among two or three men more (named on the pop-up). |
+| `heldUp.max` | 0.8 | Never surer. |
+| `heldUp.restartM` | 10 m | The restart: a play-the-ball this far out, level with where he was held (at least `touch.restartInM` in from touch), by the man held up, the tackle counted; on the last, a handover there (the other side's play-the-ball, a fresh set). |
+
+Tests: `tests/match/league/fatigue.test.ts`, `tests/match/league/heldUp.test.ts`.
 
 ## 12. Balance targets (§7) and how to measure
 

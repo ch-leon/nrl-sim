@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- A carrier at the try line can be held up: any tackler on him there may stop the try, more surely with two or three men on him and less surely against a carrier at full pace. Play restarts with a play-the-ball 10 m out (a handover on the last). It shows as `HELD UP!` with a commentary line, in about a third of matches between even sides, for about 0.2 fewer tries a match. Awaiting lab sign-off ([PR](https://github.com/ch-leon/nrl-sim/pull/686), [issue](https://github.com/ch-leon/nrl-sim/issues/652)).
+
 - The pass finds one of the near-best options by weight, not always the single best man, in open play and from dummy half, so a set's first receiver varies more (the chance two first passes on the same tackle find the same man falls from 32% to 26% between even sides). Step 1 of the attack-shapes work; awaiting lab sign-off ([PR](https://github.com/ch-leon/nrl-sim/pull/684), [issue](https://github.com/ch-leon/nrl-sim/issues/649)).
 
 - Developer settings is in Settings on every build (GitHub Pages, the Android test APK and local dev). Overrides and experiments stay off until you turn one on, so a normal career plays as before. Analytics stays on unless the address has `?labs=1` or a developer override, experiment or playtest career is actually on. Before launch, set `VITE_DEV_SETTINGS=0` or remove Developer settings ([PR #683](https://github.com/ch-leon/nrl-sim/pull/683)).

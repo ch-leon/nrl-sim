@@ -47,9 +47,11 @@ interface Played {
  * The completed retreat (#625) reshuffled the previous fixtures: seed 6 had
  * both Take the two and Tap and go on at tick 4506. The weighted receiver
  * (#649) reshuffled them again: of seeds 1–40 only seed 7 has both (Take the
- * two at tick 884, Tap and go at 5064).
+ * two at tick 884, Tap and go at 5064). Held up at the line (#652) reshuffled
+ * them again: of seeds 1–60, Take the two is on in 7, 50 and 59, Tap and go only
+ * in 59 (both at tick 4856). Two seeds, so one more reshuffle need not lose both.
  */
-const PENALTY_SEEDS = [7];
+const PENALTY_SEEDS = [7, 59];
 
 /** Play with the home coach making `call` whenever he may (as a player at the tray does: a tap, in on the next tick). */
 function play(seed: number, call: CoachCall | null, minutes = 6, side: 'home' | 'away' = 'home'): Played {

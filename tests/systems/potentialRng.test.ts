@@ -41,7 +41,10 @@ import { contractsEndingSoon } from '../../src/systems/contracts';
 // #625: completed retreats, including handovers, change match outcomes and later
 // season draws. The final standing-marker/deep-cover corrections restore this historical
 // season fingerprint; UI-read and no-read seasons still agree.
-const MAIN_SEED_AFTER_SEASON = 1788836146;
+// #652: held up with any tackler at the line draws a roll at the line in most matches,
+// changing match outcomes and later season draws. UI-read and no-read seasons still
+// agree. Previous pin: 1788836146.
+const MAIN_SEED_AFTER_SEASON = 3769124340;
 
 describe('the rng stream (#369)', () => {
   it.each([0, 1])('weekly potential and dot reads preserve the season stream with habit AI=%i', (ai) => {

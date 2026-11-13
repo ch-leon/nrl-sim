@@ -133,8 +133,11 @@ describe('injuries in the live sim', () => {
     const squad = Array.from({ length: 13 }, (_, i) => generatePlayer(rng, { position: i % 2 ? 'prop' : 'centre' }));
     const mine = teamSheetFromSquad(squad, 'me', 'Me', ['#111', '#eee']);
     const them = { ...sideSheet('them', { rating: 60 }), clubId: 'them' };
-    const a = runMatch(mine, them, { seed: 9, weather: 'rain' });
-    const b = runMatch(mine, them, { seed: 9, weather: 'rain' });
+    // The first of a few seeds where one of ours is hurt (seed 9 was until held up at the line, #652, reshuffled it).
+    let seed = 9;
+    let a = runMatch(mine, them, { seed, weather: 'rain' });
+    while (seed < 16 && !a.injuries.some((i) => i.teamId === 'me')) a = runMatch(mine, them, { seed: ++seed, weather: 'rain' });
+    const b = runMatch(mine, them, { seed, weather: 'rain' });
     expect(a.weather).toBe('rain');
     expect(a.injuries).toEqual(b.injuries);
     const ours = a.injuries.filter((i) => i.teamId === 'me');

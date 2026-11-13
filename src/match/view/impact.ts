@@ -6,7 +6,7 @@
 //
 //   1  A try, a clean line break, a 40/20: about ×0.35 for 900 ms, eased in and
 //      out, and the close-up.
-//   2  A big hit, a bust, a strip, an intercept: a ~90 ms freeze on the contact
+//   2  A big hit, a bust, a strip, an intercept, a held-up: a ~90 ms freeze on the contact
 //      tick, a shake the same size on screen at any zoom, a dust puff there (the
 //      contest layer draws it).
 //   3  Every other big pop-up: the pop-up alone.
@@ -27,7 +27,7 @@ export const FREEZE_MS = 90;
 export const SHAKE_MS = 110;
 export const SHAKE_PX = 4;
 
-const TIER2_KINDS: ReadonlySet<string> = new Set(['big-hit', 'break-tackle', 'strip', 'intercept']);
+const TIER2_KINDS: ReadonlySet<string> = new Set(['big-hit', 'break-tackle', 'strip', 'intercept', 'held-up']);
 const TIER1_KINDS: ReadonlySet<string> = new Set(['try', 'line-break', '40-20']);
 
 /**

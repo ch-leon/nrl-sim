@@ -26,7 +26,7 @@ export const BANDS: Partial<Record<CountKey, readonly [number, number]>> = {
 };
 
 /** The columns of the summary table. */
-const COLUMNS: readonly CountKey[] = ['tackles', 'lineBreaks', 'breaks', 'lateBusts', 'offloads', 'errors', 'kicks', 'tries', 'bonusTries', 'bigHits', 'runDowns', 'gassed', 'subs', 'goals', 'fieldGoals', 'touchFinds', 'fortyTwenties', 'deadBalls', 'kickMetres', 'penalties', 'sixAgains', 'penaltyGoals', 'sinBins', 'shortMin', 'binSwing', 'lostInContact', 'injuries', 'completion', 'grubbers', 'grubberTries', 'grubberRepeats', 'grubberDropouts', 'grubberTurnovers'];
+const COLUMNS: readonly CountKey[] = ['tackles', 'lineBreaks', 'breaks', 'lateBusts', 'offloads', 'errors', 'kicks', 'tries', 'bonusTries', 'bigHits', 'runDowns', 'heldUp', 'heldUpMatches', 'gassed', 'subs', 'goals', 'fieldGoals', 'touchFinds', 'fortyTwenties', 'deadBalls', 'kickMetres', 'penalties', 'sixAgains', 'penaltyGoals', 'sinBins', 'shortMin', 'binSwing', 'lostInContact', 'injuries', 'completion', 'grubbers', 'grubberTries', 'grubberRepeats', 'grubberDropouts', 'grubberTurnovers'];
 
 /** ✓ inside the §7 band, ↑ above, ↓ below, '' when the metric has no band. */
 export function bandMark(key: CountKey, v: number): string {

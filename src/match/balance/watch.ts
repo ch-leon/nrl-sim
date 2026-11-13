@@ -32,8 +32,11 @@ export const BREAK_TRY_M = 20;
 export const DRIVE_M = 5;
 /** The kicks a try can come from (a long kick is territory, not a try's origin). */
 const ORIGIN_KICKS: ReadonlySet<string> = new Set(['bomb', 'grubber', 'chip', 'cross-field']);
-/** Events after which the play (set play, offload, break, play-the-ball spot) is over; a kick survives them unless they are the kicker's own loss. */
-const STOPPAGES: ReadonlySet<string> = new Set(['handover', 'intercept', 'strip', 'penalty', 'dead-ball', 'touch', 'on-full', 'drop-out', 'kickoff', 'half-time', 'full-time', 'conversion', 'field-goal', 'penalty-goal']);
+/**
+ * Events after which the play (set play, offload, break, play-the-ball spot) is over; a kick survives them unless they are the kicker's own loss.
+ * A held-up (#652) restarts with a play-the-ball 10 m out, so the play-the-ball before it no longer makes a try a drive.
+ */
+const STOPPAGES: ReadonlySet<string> = new Set(['handover', 'intercept', 'strip', 'penalty', 'dead-ball', 'touch', 'on-full', 'drop-out', 'kickoff', 'half-time', 'full-time', 'conversion', 'field-goal', 'penalty-goal', 'held-up']);
 /** Losing the ball: ends the kick link only when it is the kicking side that lost it. */
 const SPILLS: ReadonlySet<string> = new Set(['error', 'drop', 'loose']);
 

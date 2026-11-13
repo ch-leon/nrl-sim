@@ -400,7 +400,7 @@ for one / two / three men. The defenders have **grip**: the first man 1.3 s, eac
 - **Grip gone first → BROKE FREE!** A late bust: the tacklers go down and sit out, the
   carrier bursts away. Rare between fresh, even sides; it is where strength mismatches
   and tired tacklers show.
-- **Driven over the line** in the tackle → try.
+- **Driven over the line** in the tackle → try, unless he is held up (below).
 - **Metres after contact**: he drives forward at 1.5 m/s × fight left ÷ men on him.
 - **Ruck speed** from how long it lasted: 5 ticks down at ≤ 0.35 s to 18 at ≥ 1.2 s (the
   old fixed 10 sits at ~0.65 s, the average). **QUICK PTB!** at ≤ 0.35 s, a "slow
@@ -415,6 +415,54 @@ Stamina 30 v 80: ~10 late busts a match.
 
 Lab: **Legs** = fresh / last 10 min (38%, tired) / cooked (18%, spent),
 `#lab?legs=late`; the label reads `legs 74/71%` (home / away average).
+
+**Held up over the line** (#652 part 1 — *awaiting lab sign-off*). A carrier in contact
+as he reaches the try line can be held up: no try. In contact means driven over in the
+wrestle (the men in it), or carried over in open play with free defenders within
+`heldUp.reachM` (2.5 m) of him (three at most). **Any defender on him at the line can hold
+him up**: one roll, and only then. The chance starts at 75% for two average fresh men on a
+carrier with no **drive** left (the share of his fight left in the wrestle, or of his top
+speed in open play); +15% a third man, −15% a lone one; −30% × his drive; −2% per m/s he
+is quicker than the first man (±6% at most, his momentum); +0.4 × (the men's average hold
+− his own), which is Strength /120 less the legs each has lost (§8.1's `holdOf`); −10% a
+level multiplier for a Wrecking Ball carrier, +10% for a Brick Wall among two or three men
+(named on the pop-up); never above 80%. Two men on a carrier at full pace: about 47%; one
+man on a carrier at 90% of his top speed: about 33%.
+
+*A lone tackler* (Leon's decision, 13 Nov 2026). The first rule let a lone tackler hold
+him up only when the carrier had little drive left (at most 0.35), with the chance
+starting at 60%. Two men seldom reach a carrier at the line in this sim (most tries are
+scored with no defender or one within 2.5 m), so that rule gave a held-up in 3–8% of
+five-minute matches. Leon chose to let any lone tackler contest, at the higher odds, so a
+held-up is seen in a good share of five-minute matches. The first rule is still there by
+override: `heldUp.oneManFight` 0.35 and `heldUp.base` 0.6.
+
+*The restart.* The rules (NRL International Rules, held up in-goal): a play-the-ball 10 m
+from the goal line, level with where he was held up, by the player held up, and the
+tackle count goes on; held up on the last, a handover 10 m out there. The sim plays it
+that way, through the touch restart's set piece (§4.4): the held-up counts as a tackle,
+the other side retreats and he plays it 10 m out (at least 10 m in from touch); on the
+last tackle it is a HANDOVER and the defending side plays it there with a fresh set. The
+nearest existing cases were not used: a goal-line drop-out is the sim's restart for the
+*defending* carrier held in his own in-goal and for a ball dead off the defence, and a
+knock-on in the tackle is a turnover, the ball loose for the other side; neither is the rule for an
+attacker held up, and a drop-out would hand the attack a fresh set for being stopped.
+A held-up on the siren ends the half. Shown as **HELD UP!** over the first man (impact
+tier 2: the freeze, the shake and the dust), a commentary line naming him, and the sim's
+line naming every man in it; the crowd and the sound do not react (they read the
+contract's event kinds, which have no held-up). Off: `heldUp.on` 0, no roll, every seed
+as before. Tuning §11.
+
+Measured (`balance/plans/held-up.json`, 60 matches a row, 200 for the preset rows, two
+2.5-minute halves; its variant "on, any lone tackler, base 0.75" is the default): 18–40%
+of matches have a held-up (0.2–0.5 a match), for 0.1–0.3 fewer tries a match; the first
+rule ("on" there) gave 3–8%. `standard.json` off against on at the default (same seeds): 20–40% of whole matches
+have a held-up (0.3–0.6 a match; 10% of the late-legs stretch); tries 2.0 → 1.8 a match
+averaged over its 13 rows (−0.1 to −0.3 a row, none beyond luck); completion inside its
+band in every row. The six preset rows, as points shares: Tight 49.3 → 49.8%, Kick-chase
+48.8 → 51.5%, All-out 51.0 → 52.0%, Rush 51.3 → 54.3%, Compressed 44.5 → 48.3% (under 45
+off, inside on); Expansive 48.0 → 42.5% at the row's 100 seeds both ways, but 49.5 → 48.2%
+at 400 seeds both ways (an extra run), so its drop at 100 is luck, not the default.
 
 ### 8.2 Sprint, gas and getting legs back (Leon, 2026-10-18) — *implemented in F2*
 
@@ -527,6 +575,7 @@ makes the break but can't finish it, the workhorse who is never quick and never 
 | F2+ | Sprint follow-ups (kick chase, line speed on cruise, lab legs bar, stamina knobs) — *shipped* (N9.3) | §8.2, §11 |
 | N13.5 | A side's plan can change at half-time and after a try, by a rule the match opts into — *shipped* (off unless a side is named; N14 wires the rivals). Tuning §30 | §5 |
 | #649.1 | The weighted receiver: the pass goes to one of the near-best options by weight, not always the best — *awaiting lab sign-off*. Tuning §5 | §4.2 |
+| #652.1 | Held up over the line: any defender on a carrier in contact at the line can hold him up (a lone tackler too, Leon 13 Nov 2026); play-the-ball 10 m out, the tackle counted — *awaiting lab sign-off*. Tuning §11 | §8.1 |
 
 Then BAK-207 Phase 2 (full match, scoring, halves) and Phase 3 (balance).
 
