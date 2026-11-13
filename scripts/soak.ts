@@ -13,6 +13,7 @@
 //                                        rating the wins ÷ games and the break-rule switches (N14.2)
 //   npm run soak -- --tune pace.extraPerStat=0.045   a match knob overridden by name for the whole run, as the
 //                                        balance harness names it (repeatable; #322)
+//   npm run soak -- --career-agency --jobs 4   fixed 44-seed, two-season AU Normal managed/idle gate
 //
 // Since the switch-over to the live match sim (BAK-207 Phase 4) every match the
 // player's club plays is a whole live match, about 15 s a season headless, so the
@@ -40,14 +41,19 @@ import { attackVsDefence, fieldedTable, levelWinRates, shapeTable, offTheLevelMe
 import { DIFFICULTIES, type Difficulty } from '../src/config';
 import { applyTuning } from '../src/match/league/tuning';
 import { shardCases } from '../src/qa/shard';
+import { careerAgencyCases, careerAgencyMarkdown, careerAgencyReport } from '../src/qa/careerAgency';
 
 const args = process.argv.slice(2).filter((a) => a !== '--');
+const agency = args.includes('--career-agency');
+if (agency && ['seasons', 'seeds', 'weeks', 'pack', 'personas', 'managed-only', 'difficulties', 'live-rivals', 'shard'].some(name => args.includes(`--${name}`))) {
+  throw new Error('--career-agency uses the complete fixed two-season AU Normal cohort; sizing, mode, pack, difficulty and shard options cannot be combined with it');
+}
 const opt = (name: string, dflt: number): number => {
   const i = args.indexOf(`--${name}`);
   return i >= 0 ? Number(args[i + 1]) : dflt;
 };
-const seasons = opt('seasons', 5);
-const seeds = opt('seeds', 20);
+const seasons = agency ? 2 : opt('seasons', 5);
+const seeds = agency ? 44 : opt('seeds', 20);
 const str = (name: string): string | undefined => {
   const i = args.indexOf(`--${name}`);
   return i >= 0 ? args[i + 1] : undefined;
@@ -92,7 +98,8 @@ if (childIn) {
 // Every run, in the order they print. --live-rivals is for the fresh games; the old saves stay a save check.
 const live = liveRivals ? { liveRivals: true } : {};
 const specs: SoakOptions[] = [];
-for (let seed = 1; seed <= seeds; seed++) {
+if (agency) specs.push(...careerAgencyCases());
+else for (let seed = 1; seed <= seeds; seed++) {
   if (personaConfigs) {
     for (const config of personaConfigs) for (const difficulty of difficulties ?? config.difficulties) {
       specs.push({ seed: seed * 7919, seasons, mode: 'persona', persona: config.id, difficulty, pack, ...live, ...(str('weeks') ? { weeks: opt('weeks', 1) } : {}) });
@@ -293,8 +300,11 @@ if (liveRivals) {
   }
 }
 
+const agencyReport = agency ? careerAgencyReport(results) : undefined;
+if (agencyReport) console.log(`\n${careerAgencyMarkdown(agencyReport)}`);
+
 if (jsonOut) {
-  writeFileSync(jsonOut, JSON.stringify({ seasons, seeds, liveRivals, ...(shard ? { shard } : {}), results, summary }, null, 1));
+  writeFileSync(jsonOut, JSON.stringify({ seasons, seeds, liveRivals, tuning, ...(shard ? { shard } : {}), ...(agencyReport ? { agency: agencyReport } : {}), results, summary }, null, 1));
   console.log(`\nWrote ${jsonOut}`);
 }
 
@@ -312,6 +322,9 @@ if (forfeiting.length) {
   console.log(`\nForfeits: ${forfeiting.length} of ${results.length} runs forfeited rounds (${[...by].map(([m, n]) => `${m} ${n}`).join(', ')}); ${whole} forfeited a whole season.`);
 } else console.log(`\nForfeits: none in ${results.length} runs.`);
 
-const all = results.flatMap((r) => r.problems.map((p) => `seed ${r.seed} ${r.mode}${r.fromVersion !== undefined ? ` from v${r.fromVersion}` : ''}: ${p}`));
+const all = [
+  ...results.flatMap((r) => r.problems.map((p) => `seed ${r.seed} ${r.mode}${r.fromVersion !== undefined ? ` from v${r.fromVersion}` : ''}: ${p}`)),
+  ...(agencyReport?.problems ?? []),
+];
 console.log(all.length ? `\n${all.length} problems:\n${all.join('\n')}` : '\nNo problems.');
 process.exit(all.length ? 1 : 0);

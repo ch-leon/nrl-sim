@@ -8,7 +8,7 @@
 // tests/fixtures/saves, tests/qa/corpus.test.ts). Used by scripts/soak.ts (npm run
 // soak) and, at a smaller size, by tests/qa/soak.test.ts. Never imported by the
 // game. No Phaser.
-import { createNewGame, FINANCE_LINES, getState, loadState, setState, type FinanceLine, type Fixture, type GameState, type Player } from '../core/state';
+import { createNewGame, FINANCE_LINES, getState, loadState, setState, type FinanceLine, type Fixture, type GameState, type PendingEvent, type Player } from '../core/state';
 import { advanceWeek, clearSeasonHooks, clearTickHooks, weekHeld, withFastForward } from '../core/time';
 import { bus, type Events } from '../core/events';
 import { migrateState, MIGRATIONS } from '../core/save';
@@ -25,7 +25,7 @@ import { registerAgingSystem } from '../systems/aging';
 import { registerYouthSystem } from '../systems/youth';
 import { registerStatsSystem } from '../systems/stats';
 import { registerBoardSystem } from '../systems/board';
-import { chooseEvent, registerEventsSystem } from '../systems/events';
+import { chooseEvent, registerEventsSystem, signRivalPlayer } from '../systems/events';
 import { registerRivalsSystem, RIVAL_SQUAD_MIN } from '../systems/rivals';
 import { STRENGTH_MAX, STRENGTH_MIN } from '../systems/league';
 import { BENCH } from '../match/league/bench';
@@ -509,6 +509,39 @@ function weeklyNet(s: GameState): number {
   return weeklyIncome(s) + gate - weeklyWages(s) - weeklyUpkeep(s) - weeklyOverhead(s);
 }
 
+/** Keep the first-choice policy, but budget visible guaranteed costs like other commitments. No rolls or future-income credit. */
+export function managedEventChoice(state: GameState, event: PendingEvent): number | undefined {
+  const card = cardById(event.cardId);
+  const index = card?.choices.findIndex(choice => {
+    let candidate = state;
+    let cashCost = 0, wageRise = 0, signingWages = 0;
+    let signs = false;
+    for (const effect of choice.effects) {
+      if (effect.kind === 'money') {
+        cashCost += Math.max(0, -effect.amount);
+        candidate = { ...candidate, money: candidate.money + effect.amount };
+      } else if (effect.kind === 'playerWage') {
+        const before = weeklyWages(candidate);
+        candidate = { ...candidate, squad: candidate.squad.map(p => p.id === event.subjectId ? { ...p, wage: Math.round(p.wage * (1 + effect.pct)) } : p) };
+        wageRise += Math.max(0, weeklyWages(candidate) - before);
+      } else if (effect.kind === 'signSubject') {
+        const signed = signRivalPlayer(candidate, event.rivalId, event.subjectId, event.fee ?? 0);
+        if (typeof signed === 'string') return false;
+        signs = true;
+        signingWages += weeklyWages(signed) - weeklyWages(candidate);
+        candidate = { ...signed, money: signed.money - (event.fee ?? 0) };
+      }
+      // Other effects do not guarantee new financing costs in the current deck.
+      // In particular, don't roll chances or count conditional/weekly future receipts.
+    }
+    if (cashCost > 0 && (candidate.money < MANAGED.BUILD_RESERVE || weeklyNet(candidate) < 0)) return false;
+    if (wageRise > 0 && (candidate.money - wageRise * WEEKS_PER_SEASON < MANAGED.STAFF_RESERVE || weeklyNet(candidate) < 0)) return false;
+    if (signs && (candidate.money - signingWages * MANAGED.WAGE_WEEKS < MANAGED.STAR_RESERVE || weeklyNet(candidate) < -MANAGED.BURN_ALLOWED)) return false;
+    return true;
+  });
+  return index === undefined || index < 0 ? undefined : index;
+}
+
 /** Check the candidate facility's real upkeep and projected gates before adding a recurring bill. */
 function canCarryFacility(s: GameState, defId: FacilityDefId, level: 1 | 2 | 3 = 1): boolean {
   const existing = s.facilities.find((facility) => facility.defId === defId);
@@ -569,7 +602,7 @@ function trySign(p: Player): number | null {
 }
 
 /**
- * A plain, sensible manager: answers cards with choice 0; builds a Training
+ * A plain, sensible manager: takes the first budget-safe card choice; builds a Training
  * Paddock then a Team Gym once it can keep a reserve; seats a sold-out crowd
  * with a Grandstand and its upgrades (#169); keeps SQUAD_FLOOR players (the
  * best free agent it can pay for, fee plus WAGE_WEEKS of wages); and signs one
@@ -581,7 +614,8 @@ function trySign(p: Player): number | null {
 function manage(): Signed {
   const s = getState();
   for (const ev of s.eventDeck.pending) {
-    if (cardById(ev.cardId)) chooseEvent(ev.id, 0);
+    const choice = managedEventChoice(getState(), ev);
+    if (choice !== undefined) chooseEvent(ev.id, choice);
   }
   // Training focus (N11): the squad's weakest stat.
   setTrainingFocus(weakestStat(getState().squad));

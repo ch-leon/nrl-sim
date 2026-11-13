@@ -14,7 +14,7 @@ on:
         description: Playthrough sizes, space-separated (WxH)
         default: 844x390 1280x800
       only:
-        description: Run one job only (qa = soak and playthroughs, perf = the budget)
+        description: Run one group (qa = soak, career agency and playthroughs; perf = the budget)
         type: choice
         options: [all, qa, perf]
         default: all
@@ -34,6 +34,36 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  career-agency:
+    if: ${{ inputs.only != 'perf' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Managed career agency (fixed 44 paired seeds, two seasons)
+        run: |
+          mkdir -p e2e-output/career-agency
+          status=0
+          npm run soak -- --career-agency --jobs "$(nproc)" --json e2e-output/career-agency/results.json 2>&1 | tee e2e-output/career-agency/soak.log || status=1
+          {
+            echo '## Career agency'
+            sed -n '/## Career agency:/,$p' e2e-output/career-agency/soak.log
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $status
+      - name: Keep every career sample and the comparison
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: career-agency
+          path: e2e-output/career-agency
+          retention-days: 7
+          if-no-files-found: error
+
   qa:
     if: ${{ inputs.only != 'perf' }}
     runs-on: ubuntu-latest
