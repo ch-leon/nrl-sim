@@ -337,3 +337,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261113-115242-attack-shapes | attack-shapes | f3135b9 (uncommitted changes) | worktree-agent-aaa35ad52c2bade38 | [report](runs/20261113-115242-attack-shapes/report.md) |
 | 20261113-115910-standard | standard | f3135b9 (uncommitted changes) | worktree-agent-aaa35ad52c2bade38 | [report](runs/20261113-115910-standard/report.md) |
 | 20261113-120052-shapes-edges | shapes-edges | f3135b9 (uncommitted changes) | worktree-agent-aaa35ad52c2bade38 | [report](runs/20261113-120052-shapes-edges/report.md) |
+| 2026-11-14-persona-playtesters | persona playtesters 2026-11-14 | 82f7913e | cursor/persona-balance-diary-53a2 | [report](runs/2026-11-14-persona-playtesters/report.md) |
