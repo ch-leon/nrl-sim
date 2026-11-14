@@ -39,6 +39,12 @@ npm run soak:personas -- --seasons 5 --seeds 20 --shard 1/4 --jobs 4 --json work
 npm run soak:personas -- --pack uk --seasons 5 --seeds 20 --jobs 4 --json work/personas-uk.json --report work/personas-uk.md
 ```
 
+Persona matches use `fullMatch()`: two halves of `rules.halfMinutes` (2.5), five
+minutes of match clock. Field length is the process's frozen `FIELD_LENGTH`.
+Headless Node reads it from the worker name. `NRL_SOAK_FIELD=80` sets that name
+to `match-skip--field-80` before the field module loads. `runMatch` has no
+field-length argument. The report states the values the process actually used.
+
 These are 240 careers per pack before sharding (20 seeds × four personas × three
 difficulties), up to five seasons each, stopping when sacked. Seeds are `i * 7919`
 for `i=1..--seeds`, as on soak. `--jobs` partitions cases across processes and
@@ -68,15 +74,24 @@ real game actions advance the game's RNG. There are no LLM or API calls.
 Weekly and match-prep hooks call real game operations, using the soak manager's
 existing build placement helper and weekly budget calculation. Min-maxer uses
 weakest-stat training on the best nine, reserve-limited improvements/renewals,
-training/gate investment, counter-table tactics with squad fit breaking ties,
-and executable coach-family plays ranked by current fit, failure odds and contact
-bonuses. Event utility is a transparent estimate of visible effects, including
-probabilities and modifier duration. Casual stays shallow, builds only the first
-cheap training facility, renews stars, signs for shortages and hires Welfare late.
-Careless buys stars without wage reserves, trains randomly and chooses mismatches;
-facilities are neglected (there is no upkeep toggle). Newcomer keeps defaults,
+training buildings (they raise the XP rate), the Scout Office, the Coach's Office,
+the Academy and a grandstand when the hill is sold out, counter-table tactics with
+squad fit breaking ties, and executable coach-family plays ranked by current fit,
+failure odds and contact bonuses. It spends every banked stat point on the
+highest-weighted shown stat for that position (Offload King also leans on strength
+and handling) and lets the match AI call for its side. Event utility is a
+transparent estimate of visible effects, including probabilities and modifier
+duration. Casual stays shallow, builds only the first cheap training facility,
+renews stars, signs for shortages, hires Welfare late, and spends points with the
+game's spend-by-focus rule. Careless buys stars without wage reserves, trains
+randomly, chooses mismatches and may release a depth player; each week it either
+spends that player's points on random shown stats or leaves them unspent.
+Facilities are neglected (there is no upkeep toggle). Newcomer keeps defaults,
 first-button cards and Balanced training, skipping decisions through inaction;
-it signs only below the playable minimum and never opens coach/playbook menus.
+it signs only below the playable minimum, never opens coach/playbook menus, and
+spends half of each player's banked points. Potential is visible on every player.
+There is no scout-fog concealment; the Scout Office changes the free-agent pool
+and the signing fee.
 
 Persona weeks use `advanceWeekAsTapped`, the existing headless tapped-week driver,
 so actual kickoff sheets and results are observable. Rivals keep the normal cheap
@@ -93,8 +108,28 @@ The old idle/managed fast-forward path is retained.
   individual training curve. Null means unreached/censored; rollups show both the
   reached mean and reached/censored counts.
 - **Money:** weekly cash series, transaction-level minimum cash, completed-season
-  closing cash and P&L using the existing finance lines. Partial and sacked seasons
+  closing cash and P&L using the existing finance lines (gate, sponsor, grant,
+  prize, wages, upkeep, overhead, events, transfers, contracts, facilities, other).
+  The #595 salary and cap quotes are not the live cash loop. Partial and sacked seasons
   remain visible and marked incomplete; completed-season averages exclude them.
+  A week ending below zero counts as a debt week. Broke is still any bankruptcy
+  warning, forced sale, or a sacking with a missed solvency objective.
+- **Diary:** one row per played week, per career: what the persona did (focus,
+  points spent and on which stats, signings, releases, facilities, staff, events,
+  tactics, set plays, whether the AI called), the result, end cash and the week's
+  income and spend by finance line, XP from training and matches, level-ups,
+  stars gained, and squad overall. CSV files hold the lowest seed and the average
+  across seeds for each persona and difficulty. The Markdown report prints both
+  as compact weekly tables.
+- **Progression detail:** total XP, level and stars per player at each season
+  rollover; weeks for an opening-squad player to gain a star or reach their
+  potential stars; how many of the squad are at their stat ceiling at the end of
+  seasons 1, 3 and 5. Balance flags (warnings only) mark cash that looks too easy
+  or too hard, a weekly climb above $5,000, ceilings in season 1, and a star
+  curve that is under 8 weeks or reaches fewer than a quarter of opening players.
+  A week below zero is a debt week. "Broke" still means any week below zero, a forced
+  sale, or a solvency sacking. The hard-money flag is an average completed season
+  ending below zero, or a solvency sacking in at least a quarter of careers.
 - **Broke:** any bankruptcy warning or forced sale, or a sacking with a structured
   missed solvency objective. Counts and the career-level rate are separate.
 - **Outliers:** attack × opposing defence and each taken play's win share versus

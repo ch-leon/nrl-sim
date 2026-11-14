@@ -15,7 +15,7 @@ import { migrateState, MIGRATIONS } from '../core/save';
 import { EVENTS, GRID_H, GRID_W, ON_FIELD, SEASON_ROUNDS, SQUAD_CAP, WEEKS_PER_SEASON, difficultyMultipliers, type Difficulty } from '../config';
 import { finalsSeeds, initLeague, isFinalsRound, registerFixturesSystem } from '../systems/fixtures';
 import { registerUnlockSystem, isFacilityOpen } from '../systems/unlocks';
-import { isTrainingFocus, registerTrainingSystem, setTrainingFocus, weakestStat } from '../systems/training';
+import { isTrainingFocus, registerTrainingSystem, setSpendMode, setTrainingFocus, weakestStat } from '../systems/training';
 import { hasStaff, hireStaff, staffWage, type HireRole } from '../systems/staff';
 import { classifyReason, homeGate, registerEconomySystem, registerFinanceSystem, weeklyIncome, weeklyOverhead, weeklyUpkeep, weeklyWages } from '../systems/economy';
 import { registerFreeAgencySystem, signPlayer, signingFee } from '../systems/freeagency';
@@ -32,6 +32,10 @@ import { BENCH } from '../match/league/bench';
 import { onRivalPlanChanges, rivalSheet } from '../systems/rivalRound';
 import { BACKS, PACK, type StyleEntry, type TeamTactics } from '../match/league/presets';
 import { runMatch } from '../match/league/match';
+import { fullMatch } from '../match/league/rules';
+import { FIELD_LENGTH } from '../match/core/field';
+import { MATCH_PREVIEW } from '../match/preview';
+import { FORTY_TWENTY_ENABLED } from '../match/league/touch';
 import { overallRating } from '../data/player';
 import { cardById } from '../data/events';
 import { FACILITY_CATALOG, upgradeCost, type FacilityDefId } from '../data/facility';
@@ -259,6 +263,8 @@ export interface SoakResult {
   seasons: SeasonSample[];
   problems: string[];
   ms: number;
+  /** Clock and field the live matches in this process actually used. */
+  match?: { fieldLength: number; halfMinutes: number; halves: number; totalMinutes: number };
 }
 
 /** Register every system main.ts registers (the UI-only ones aside). */
@@ -679,7 +685,17 @@ function manage(): Signed {
  * on Hard, his coach. It is not a fast-forward, so an Assistant Coach does
  * not change the player's plan. Call outside withFastForward.
  */
-export function advanceWeekAsTapped(): void {
+/** Clock and field frozen for this process. Field length is not a runMatch argument. */
+export function measuredMatch(): { fieldLength: number; halfMinutes: number; halves: number; totalMinutes: number; fortyTwenty: boolean; how: string } {
+  const length = fullMatch();
+  const name = (globalThis as { name?: unknown }).name;
+  const how = MATCH_PREVIEW
+    ? `FIELD_LENGTH is ${FIELD_LENGTH}m because NRL_MATCH_PREVIEW_LENGTH=${MATCH_PREVIEW.fieldLength} (vite define __NRL_MATCH_PREVIEW__, read in src/match/core/field.ts).`
+    : `FIELD_LENGTH is ${FIELD_LENGTH}m from bootFieldLength() in src/match/fieldSettings.ts. Headless Node treats the process as a worker and reads globalThis.name (${typeof name === 'string' ? name : 'unset'}). The only names that select 80m or 60m are match-skip|background|replay|art--field-80|60 (src/labs/fieldLength.ts). Experiments can store 100, 80 or 60 in the browser and reload; runMatch has no field-length argument.`;
+  return { fieldLength: FIELD_LENGTH, halfMinutes: length.halfMinutes, halves: length.halves, totalMinutes: length.halves * length.halfMinutes, fortyTwenty: FORTY_TWENTY_ENABLED, how };
+}
+
+export function advanceWeekAsTapped(opts: { playerAiCoach?: boolean } = {}): void {
   const kickOff: { match: Events['match:started'] | null } = { match: null };
   const off = bus.on('match:started', (m) => { kickOff.match = m; });
   try {
@@ -690,12 +706,18 @@ export function advanceWeekAsTapped(): void {
   const m = kickOff.match;
   if (!m) return;
   const { seed, weather, injuryRate, goldenPoint, aiCoach, difficultyEdge, breakRuleSides, aiRival } = m.live;
+  const coaches = [...(aiCoach ?? [])];
+  if (opts.playerAiCoach) {
+    const side = m.fixture.homeId === getState().clubId ? 'home' as const : 'away' as const;
+    if (!coaches.includes(side)) coaches.push(side);
+  }
+  const length = fullMatch();
   const result = runMatch(m.home, m.away, {
-    seed, weather,
+    seed, weather, length,
     ...(injuryRate !== undefined ? { injuryRate } : {}),
     // The rival's difficulty edge (N12.2): Hard and Easy play him up or down, as matchday does.
     ...(difficultyEdge ? { difficultyEdge } : {}),
-    ...(aiCoach?.length ? { aiCoach } : {}),
+    ...(coaches.length ? { aiCoach: coaches } : {}),
     // The rival's plan changes at the breaks (N14.1), as fast-forward plays it.
     ...(aiRival ? { aiRival } : {}),
     ...(breakRuleSides?.length ? { breakRuleSides } : {}),
@@ -742,6 +764,8 @@ export function runSoak(opts: SoakOptions): SoakResult {
   const observer = config ? observeCareer(s => bestNineMean(s.squad)) : undefined;
   if (observer && initialLoad) observer.metrics.saves.push(initialLoad);
   const manager = config ? createPersonaManager(config, opts.seed, { buildFirstFree, weeklyNet }) : undefined;
+  const matchUsed = config ? measuredMatch() : undefined;
+  if (config) setSpendMode('manual');
   const seasons: SeasonSample[] = [];
   let minMoney = getState().money;
   // The season's P&L (#161): every money movement, by line, checked against the
@@ -795,7 +819,10 @@ export function runSoak(opts: SoakOptions): SoakResult {
   let styleFrom = 0;
   const tapped = opts.liveRivals || !!config;
   const play = tapped ? (fn: () => void): void => fn() : withFastForward;
-  const playWeek = tapped ? advanceWeekAsTapped : advanceWeek;
+  const playWeek = (): void => {
+    if (tapped) advanceWeekAsTapped({ playerAiCoach: manager?.wantsLiveCalls() ?? false });
+    else advanceWeek();
+  };
   try {
   play(() => {
     for (let i = 0; i < (opts.weeks ?? opts.seasons * (WEEKS_PER_SEASON + (getState().preseason === undefined ? 0 : 2))); i++) {
@@ -805,6 +832,7 @@ export function runSoak(opts: SoakOptions): SoakResult {
       const styles = opts.liveRivals ? rivalStylesNow(getState()) : null;
       let ticking = false;
       try {
+        observer?.openWeek();
         if (opts.mode === 'managed' || manager) {
           const w = manager ? manager.weekly() : manage();
           signed = { count: signed.count + w.count, fees: signed.fees + w.fees, overall: signed.overall + w.overall };
@@ -813,6 +841,7 @@ export function runSoak(opts: SoakOptions): SoakResult {
         observer?.beforeWeek();
         ticking = true;
         playWeek();
+        manager?.spendPoints();
       } catch (err) {
         if (observer) {
           observer.metrics.stability.crashes++;
@@ -830,7 +859,7 @@ export function runSoak(opts: SoakOptions): SoakResult {
       if (styles && s.season === before) styleGames.push(...newStyleGames(styles, s, planChanges));
       minMoney = Math.min(minMoney, s.money);
       check(s);
-      observer?.afterWeek();
+      observer?.afterWeek(manager?.takeLog());
       if (s.season === before && s.week === SEASON_ROUNDS + 1) {
         gap = gapSample(s);
         const near = recordAgainst(s, nearestRivals(s));
@@ -906,8 +935,9 @@ export function runSoak(opts: SoakOptions): SoakResult {
   }
   observer?.finish();
   setState({});
-  return { ...(config && observer ? { persona: config, career: observer.metrics, fromSave: opts.fromSave !== undefined } : {}), seed: opts.seed, mode: opts.mode, ...(config ? { difficulty: getState().settings.difficulty, pack: getState().pack === 'uk' ? 'uk' as const : 'au' as const } : { ...(opts.difficulty ? { difficulty: opts.difficulty } : {}), ...(opts.pack ? { pack: opts.pack } : {}) }), ...(opts.fromVersion !== undefined ? { fromVersion: opts.fromVersion } : {}), ...(opts.liveRivals ? { liveRivals: true, styleGames } : {}), start, seasons, problems, ms: Date.now() - t0 };
+  return { ...(config && observer ? { persona: config, career: observer.metrics, fromSave: opts.fromSave !== undefined } : {}), seed: opts.seed, mode: opts.mode, ...(config ? { difficulty: getState().settings.difficulty, pack: getState().pack === 'uk' ? 'uk' as const : 'au' as const } : { ...(opts.difficulty ? { difficulty: opts.difficulty } : {}), ...(opts.pack ? { pack: opts.pack } : {}) }), ...(matchUsed ? { match: { fieldLength: matchUsed.fieldLength, halfMinutes: matchUsed.halfMinutes, halves: matchUsed.halves, totalMinutes: matchUsed.totalMinutes } } : {}), ...(opts.fromVersion !== undefined ? { fromVersion: opts.fromVersion } : {}), ...(opts.liveRivals ? { liveRivals: true, styleGames } : {}), start, seasons, problems, ms: Date.now() - t0 };
   } finally {
+    if (config) setSpendMode('auto');
     stopPlanChanges?.();
     observer?.dispose();
   }

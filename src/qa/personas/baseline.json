@@ -1,73 +1,13 @@
 {
   "schema": 1,
-  "description": "AU season-one measurement: origin/main abb51c8 with #534 harness; 4 personas × easy/normal/hard × seed 7919; 29 elapsed weeks each. No tuning overrides.",
+  "description": "Persona harness baseline; 1 seasons, 1 seeds, au; field 100m; 2x2.5 min; weeks=whole seasons.",
   "cases": [
     {
-      "key": "{\"config\":{\"id\":\"careless\",\"label\":\"Careless player\",\"goals\":[\"Expose the floor of play\"],\"difficulties\":[\"easy\",\"normal\",\"hard\"],\"mistakeRate\":0.6,\"events\":\"random\",\"training\":\"random\",\"facilities\":{\"policy\":\"neglect\",\"builds\":[],\"reserve\":0},\"recruits\":{\"policy\":\"stars\",\"floor\":13,\"reserve\":0,\"wageWeeks\":0,\"renewStars\":false},\"staff\":{\"roles\":[],\"fromWeek\":1,\"reserve\":0},\"tactics\":\"mismatch\",\"attackCoach\":\"mismatch\",\"setPlays\":\"poor-fit\"},\"seed\":7919,\"difficulty\":\"easy\",\"pack\":\"au\",\"liveRivals\":false,\"fromVersion\":null}",
-      "endpoint": "season:1",
-      "regularWinRate": 0.6666666666666666,
-      "minMoney": -205351,
-      "endMoney": -111354,
-      "broke": true,
-      "weeksToOverall": {
-        "70": null,
-        "80": null,
-        "90": null
-      },
-      "failures": 0,
-      "repairs": 0
-    },
-    {
-      "key": "{\"config\":{\"id\":\"careless\",\"label\":\"Careless player\",\"goals\":[\"Expose the floor of play\"],\"difficulties\":[\"easy\",\"normal\",\"hard\"],\"mistakeRate\":0.6,\"events\":\"random\",\"training\":\"random\",\"facilities\":{\"policy\":\"neglect\",\"builds\":[],\"reserve\":0},\"recruits\":{\"policy\":\"stars\",\"floor\":13,\"reserve\":0,\"wageWeeks\":0,\"renewStars\":false},\"staff\":{\"roles\":[],\"fromWeek\":1,\"reserve\":0},\"tactics\":\"mismatch\",\"attackCoach\":\"mismatch\",\"setPlays\":\"poor-fit\"},\"seed\":7919,\"difficulty\":\"normal\",\"pack\":\"au\",\"liveRivals\":false,\"fromVersion\":null}",
-      "endpoint": "season:1",
-      "regularWinRate": 0.5,
-      "minMoney": -184808,
-      "endMoney": -148608,
-      "broke": true,
-      "weeksToOverall": {
-        "70": null,
-        "80": null,
-        "90": null
-      },
-      "failures": 0,
-      "repairs": 0
-    },
-    {
-      "key": "{\"config\":{\"id\":\"careless\",\"label\":\"Careless player\",\"goals\":[\"Expose the floor of play\"],\"difficulties\":[\"easy\",\"normal\",\"hard\"],\"mistakeRate\":0.6,\"events\":\"random\",\"training\":\"random\",\"facilities\":{\"policy\":\"neglect\",\"builds\":[],\"reserve\":0},\"recruits\":{\"policy\":\"stars\",\"floor\":13,\"reserve\":0,\"wageWeeks\":0,\"renewStars\":false},\"staff\":{\"roles\":[],\"fromWeek\":1,\"reserve\":0},\"tactics\":\"mismatch\",\"attackCoach\":\"mismatch\",\"setPlays\":\"poor-fit\"},\"seed\":7919,\"difficulty\":\"hard\",\"pack\":\"au\",\"liveRivals\":false,\"fromVersion\":null}",
-      "endpoint": "season:1",
-      "regularWinRate": 0.375,
-      "minMoney": -179403,
-      "endMoney": -178163,
-      "broke": true,
-      "weeksToOverall": {
-        "70": null,
-        "80": null,
-        "90": null
-      },
-      "failures": 0,
-      "repairs": 0
-    },
-    {
-      "key": "{\"config\":{\"id\":\"casual-weekly\",\"label\":\"Casual weekly player\",\"goals\":[\"Stay competitive\",\"Finish seasons solvent\"],\"difficulties\":[\"easy\",\"normal\",\"hard\"],\"mistakeRate\":0.2,\"events\":\"first\",\"training\":\"balanced\",\"facilities\":{\"policy\":\"first\",\"builds\":[\"trainingPaddock\"],\"reserve\":40000},\"recruits\":{\"policy\":\"short\",\"floor\":16,\"reserve\":30000,\"wageWeeks\":8,\"renewStars\":true},\"staff\":{\"roles\":[\"welfare\"],\"fromWeek\":16,\"reserve\":60000},\"tactics\":\"defaults\",\"attackCoach\":\"none\",\"setPlays\":\"none\"},\"seed\":7919,\"difficulty\":\"easy\",\"pack\":\"au\",\"liveRivals\":false,\"fromVersion\":null}",
+      "key": "{\"config\":{\"id\":\"careless\",\"label\":\"Careless player\",\"goals\":[\"Expose the floor of play\"],\"difficulties\":[\"easy\",\"normal\",\"hard\"],\"mistakeRate\":0.6,\"events\":\"random\",\"training\":\"random\",\"facilities\":{\"policy\":\"neglect\",\"builds\":[],\"reserve\":0},\"recruits\":{\"policy\":\"stars\",\"floor\":13,\"reserve\":0,\"wageWeeks\":0,\"renewStars\":false},\"staff\":{\"roles\":[],\"fromWeek\":1,\"reserve\":0},\"tactics\":\"mismatch\",\"attackCoach\":\"mismatch\",\"setPlays\":\"poor-fit\",\"points\":{\"policy\":\"random\",\"hold\":0.5},\"calling\":\"none\",\"releases\":\"depth\"},\"seed\":7919,\"difficulty\":\"easy\",\"pack\":\"au\",\"liveRivals\":false,\"fromVersion\":null,\"fieldLength\":100,\"halfMinutes\":2.5}",
       "endpoint": "season:1",
       "regularWinRate": 0.7083333333333334,
-      "minMoney": 34698,
-      "endMoney": 133106,
-      "broke": false,
-      "weeksToOverall": {
-        "70": 25,
-        "80": null,
-        "90": null
-      },
-      "failures": 0,
-      "repairs": 0
-    },
-    {
-      "key": "{\"config\":{\"id\":\"casual-weekly\",\"label\":\"Casual weekly player\",\"goals\":[\"Stay competitive\",\"Finish seasons solvent\"],\"difficulties\":[\"easy\",\"normal\",\"hard\"],\"mistakeRate\":0.2,\"events\":\"first\",\"training\":\"balanced\",\"facilities\":{\"policy\":\"first\",\"builds\":[\"trainingPaddock\"],\"reserve\":40000},\"recruits\":{\"policy\":\"short\",\"floor\":16,\"reserve\":30000,\"wageWeeks\":8,\"renewStars\":true},\"staff\":{\"roles\":[\"welfare\"],\"fromWeek\":16,\"reserve\":60000},\"tactics\":\"defaults\",\"attackCoach\":\"none\",\"setPlays\":\"none\"},\"seed\":7919,\"difficulty\":\"normal\",\"pack\":\"au\",\"liveRivals\":false,\"fromVersion\":null}",
-      "endpoint": "season:1",
-      "regularWinRate": 0.5833333333333334,
-      "minMoney": -105320,
-      "endMoney": -79080,
+      "minMoney": -136712,
+      "endMoney": 111521,
       "broke": true,
       "weeksToOverall": {
         "70": null,
@@ -78,11 +18,11 @@
       "repairs": 0
     },
     {
-      "key": "{\"config\":{\"id\":\"casual-weekly\",\"label\":\"Casual weekly player\",\"goals\":[\"Stay competitive\",\"Finish seasons solvent\"],\"difficulties\":[\"easy\",\"normal\",\"hard\"],\"mistakeRate\":0.2,\"events\":\"first\",\"training\":\"balanced\",\"facilities\":{\"policy\":\"first\",\"builds\":[\"trainingPaddock\"],\"reserve\":40000},\"recruits\":{\"policy\":\"short\",\"floor\":16,\"reserve\":30000,\"wageWeeks\":8,\"renewStars\":true},\"staff\":{\"roles\":[\"welfare\"],\"fromWeek\":16,\"reserve\":60000},\"tactics\":\"defaults\",\"attackCoach\":\"none\",\"setPlays\":\"none\"},\"seed\":7919,\"difficulty\":\"hard\",\"pack\":\"au\",\"liveRivals\":false,\"fromVersion\":null}",
+      "key": "{\"config\":{\"id\":\"careless\",\"label\":\"Careless player\",\"goals\":[\"Expose the floor of play\"],\"difficulties\":[\"easy\",\"normal\",\"hard\"],\"mistakeRate\":0.6,\"events\":\"random\",\"training\":\"random\",\"facilities\":{\"policy\":\"neglect\",\"builds\":[],\"reserve\":0},\"recruits\":{\"policy\":\"stars\",\"floor\":13,\"reserve\":0,\"wageWeeks\":0,\"renewStars\":false},\"staff\":{\"roles\":[],\"fromWeek\":1,\"reserve\":0},\"tactics\":\"mismatch\",\"attackCoach\":\"mismatch\",\"setPlays\":\"poor-fit\",\"points\":{\"policy\":\"random\",\"hold\":0.5},\"calling\":\"none\",\"releases\":\"depth\"},\"seed\":7919,\"difficulty\":\"normal\",\"pack\":\"au\",\"liveRivals\":false,\"fromVersion\":null,\"fieldLength\":100,\"halfMinutes\":2.5}",
       "endpoint": "season:1",
-      "regularWinRate": 0.5416666666666666,
-      "minMoney": -165180,
-      "endMoney": -103980,
+      "regularWinRate": 0.5,
+      "minMoney": -91473,
+      "endMoney": -50985,
       "broke": true,
       "weeksToOverall": {
         "70": null,
@@ -93,26 +33,11 @@
       "repairs": 0
     },
     {
-      "key": "{\"config\":{\"id\":\"min-maxer\",\"label\":\"Min-maxer\",\"goals\":[\"Win\",\"Grow the best nine\",\"Keep spending reserves\"],\"difficulties\":[\"easy\",\"normal\",\"hard\"],\"mistakeRate\":0.03,\"events\":\"value\",\"training\":\"weakest\",\"facilities\":{\"policy\":\"invest\",\"builds\":[\"trainingPaddock\",\"teamGym\",\"grandstand\"],\"reserve\":40000},\"recruits\":{\"policy\":\"improve\",\"floor\":17,\"reserve\":50000,\"wageWeeks\":8,\"renewStars\":true},\"staff\":{\"roles\":[\"assistantCoach\",\"analyst\",\"welfare\"],\"fromWeek\":1,\"reserve\":40000},\"tactics\":\"counter-fit\",\"attackCoach\":\"fit\",\"setPlays\":\"strongest\"},\"seed\":7919,\"difficulty\":\"easy\",\"pack\":\"au\",\"liveRivals\":false,\"fromVersion\":null}",
+      "key": "{\"config\":{\"id\":\"careless\",\"label\":\"Careless player\",\"goals\":[\"Expose the floor of play\"],\"difficulties\":[\"easy\",\"normal\",\"hard\"],\"mistakeRate\":0.6,\"events\":\"random\",\"training\":\"random\",\"facilities\":{\"policy\":\"neglect\",\"builds\":[],\"reserve\":0},\"recruits\":{\"policy\":\"stars\",\"floor\":13,\"reserve\":0,\"wageWeeks\":0,\"renewStars\":false},\"staff\":{\"roles\":[],\"fromWeek\":1,\"reserve\":0},\"tactics\":\"mismatch\",\"attackCoach\":\"mismatch\",\"setPlays\":\"poor-fit\",\"points\":{\"policy\":\"random\",\"hold\":0.5},\"calling\":\"none\",\"releases\":\"depth\"},\"seed\":7919,\"difficulty\":\"hard\",\"pack\":\"au\",\"liveRivals\":false,\"fromVersion\":null,\"fieldLength\":100,\"halfMinutes\":2.5}",
       "endpoint": "season:1",
-      "regularWinRate": 0.7916666666666666,
-      "minMoney": -100768,
-      "endMoney": 64022,
-      "broke": true,
-      "weeksToOverall": {
-        "70": 12,
-        "80": null,
-        "90": null
-      },
-      "failures": 0,
-      "repairs": 0
-    },
-    {
-      "key": "{\"config\":{\"id\":\"min-maxer\",\"label\":\"Min-maxer\",\"goals\":[\"Win\",\"Grow the best nine\",\"Keep spending reserves\"],\"difficulties\":[\"easy\",\"normal\",\"hard\"],\"mistakeRate\":0.03,\"events\":\"value\",\"training\":\"weakest\",\"facilities\":{\"policy\":\"invest\",\"builds\":[\"trainingPaddock\",\"teamGym\",\"grandstand\"],\"reserve\":40000},\"recruits\":{\"policy\":\"improve\",\"floor\":17,\"reserve\":50000,\"wageWeeks\":8,\"renewStars\":true},\"staff\":{\"roles\":[\"assistantCoach\",\"analyst\",\"welfare\"],\"fromWeek\":1,\"reserve\":40000},\"tactics\":\"counter-fit\",\"attackCoach\":\"fit\",\"setPlays\":\"strongest\"},\"seed\":7919,\"difficulty\":\"normal\",\"pack\":\"au\",\"liveRivals\":false,\"fromVersion\":null}",
-      "endpoint": "season:1",
-      "regularWinRate": 0.9583333333333334,
-      "minMoney": -105277,
-      "endMoney": 153143,
+      "regularWinRate": 0.5,
+      "minMoney": -151817,
+      "endMoney": -90497,
       "broke": true,
       "weeksToOverall": {
         "70": null,
@@ -123,26 +48,11 @@
       "repairs": 0
     },
     {
-      "key": "{\"config\":{\"id\":\"min-maxer\",\"label\":\"Min-maxer\",\"goals\":[\"Win\",\"Grow the best nine\",\"Keep spending reserves\"],\"difficulties\":[\"easy\",\"normal\",\"hard\"],\"mistakeRate\":0.03,\"events\":\"value\",\"training\":\"weakest\",\"facilities\":{\"policy\":\"invest\",\"builds\":[\"trainingPaddock\",\"teamGym\",\"grandstand\"],\"reserve\":40000},\"recruits\":{\"policy\":\"improve\",\"floor\":17,\"reserve\":50000,\"wageWeeks\":8,\"renewStars\":true},\"staff\":{\"roles\":[\"assistantCoach\",\"analyst\",\"welfare\"],\"fromWeek\":1,\"reserve\":40000},\"tactics\":\"counter-fit\",\"attackCoach\":\"fit\",\"setPlays\":\"strongest\"},\"seed\":7919,\"difficulty\":\"hard\",\"pack\":\"au\",\"liveRivals\":false,\"fromVersion\":null}",
-      "endpoint": "season:1",
-      "regularWinRate": 0.6666666666666666,
-      "minMoney": -151079,
-      "endMoney": -39837,
-      "broke": true,
-      "weeksToOverall": {
-        "70": null,
-        "80": null,
-        "90": null
-      },
-      "failures": 0,
-      "repairs": 0
-    },
-    {
-      "key": "{\"config\":{\"id\":\"newcomer\",\"label\":\"Newcomer\",\"goals\":[\"Follow obvious buttons\",\"Survive season one\"],\"difficulties\":[\"easy\",\"normal\",\"hard\"],\"mistakeRate\":0.15,\"events\":\"first\",\"training\":\"balanced\",\"facilities\":{\"policy\":\"none\",\"builds\":[],\"reserve\":0},\"recruits\":{\"policy\":\"minimum\",\"floor\":13,\"reserve\":0,\"wageWeeks\":0,\"renewStars\":false},\"staff\":{\"roles\":[],\"fromWeek\":1,\"reserve\":0},\"tactics\":\"defaults\",\"attackCoach\":\"none\",\"setPlays\":\"none\"},\"seed\":7919,\"difficulty\":\"easy\",\"pack\":\"au\",\"liveRivals\":false,\"fromVersion\":null}",
+      "key": "{\"config\":{\"id\":\"casual-weekly\",\"label\":\"Casual weekly player\",\"goals\":[\"Stay competitive\",\"Finish seasons solvent\"],\"difficulties\":[\"easy\",\"normal\",\"hard\"],\"mistakeRate\":0.2,\"events\":\"first\",\"training\":\"balanced\",\"facilities\":{\"policy\":\"first\",\"builds\":[\"trainingPaddock\"],\"reserve\":40000},\"recruits\":{\"policy\":\"short\",\"floor\":16,\"reserve\":30000,\"wageWeeks\":8,\"renewStars\":true},\"staff\":{\"roles\":[\"welfare\"],\"fromWeek\":16,\"reserve\":60000},\"tactics\":\"defaults\",\"attackCoach\":\"none\",\"setPlays\":\"none\",\"points\":{\"policy\":\"focus\",\"hold\":0},\"calling\":\"none\",\"releases\":\"none\"},\"seed\":7919,\"difficulty\":\"easy\",\"pack\":\"au\",\"liveRivals\":false,\"fromVersion\":null,\"fieldLength\":100,\"halfMinutes\":2.5}",
       "endpoint": "season:1",
       "regularWinRate": 0.625,
-      "minMoney": 84291,
-      "endMoney": 255551,
+      "minMoney": 101934,
+      "endMoney": 328644,
       "broke": false,
       "weeksToOverall": {
         "70": null,
@@ -153,11 +63,11 @@
       "repairs": 0
     },
     {
-      "key": "{\"config\":{\"id\":\"newcomer\",\"label\":\"Newcomer\",\"goals\":[\"Follow obvious buttons\",\"Survive season one\"],\"difficulties\":[\"easy\",\"normal\",\"hard\"],\"mistakeRate\":0.15,\"events\":\"first\",\"training\":\"balanced\",\"facilities\":{\"policy\":\"none\",\"builds\":[],\"reserve\":0},\"recruits\":{\"policy\":\"minimum\",\"floor\":13,\"reserve\":0,\"wageWeeks\":0,\"renewStars\":false},\"staff\":{\"roles\":[],\"fromWeek\":1,\"reserve\":0},\"tactics\":\"defaults\",\"attackCoach\":\"none\",\"setPlays\":\"none\"},\"seed\":7919,\"difficulty\":\"normal\",\"pack\":\"au\",\"liveRivals\":false,\"fromVersion\":null}",
+      "key": "{\"config\":{\"id\":\"casual-weekly\",\"label\":\"Casual weekly player\",\"goals\":[\"Stay competitive\",\"Finish seasons solvent\"],\"difficulties\":[\"easy\",\"normal\",\"hard\"],\"mistakeRate\":0.2,\"events\":\"first\",\"training\":\"balanced\",\"facilities\":{\"policy\":\"first\",\"builds\":[\"trainingPaddock\"],\"reserve\":40000},\"recruits\":{\"policy\":\"short\",\"floor\":16,\"reserve\":30000,\"wageWeeks\":8,\"renewStars\":true},\"staff\":{\"roles\":[\"welfare\"],\"fromWeek\":16,\"reserve\":60000},\"tactics\":\"defaults\",\"attackCoach\":\"none\",\"setPlays\":\"none\",\"points\":{\"policy\":\"focus\",\"hold\":0},\"calling\":\"none\",\"releases\":\"none\"},\"seed\":7919,\"difficulty\":\"normal\",\"pack\":\"au\",\"liveRivals\":false,\"fromVersion\":null,\"fieldLength\":100,\"halfMinutes\":2.5}",
       "endpoint": "season:1",
       "regularWinRate": 0.4583333333333333,
-      "minMoney": -107649,
-      "endMoney": -71369,
+      "minMoney": -77451,
+      "endMoney": -41171,
       "broke": true,
       "weeksToOverall": {
         "70": null,
@@ -168,11 +78,101 @@
       "repairs": 0
     },
     {
-      "key": "{\"config\":{\"id\":\"newcomer\",\"label\":\"Newcomer\",\"goals\":[\"Follow obvious buttons\",\"Survive season one\"],\"difficulties\":[\"easy\",\"normal\",\"hard\"],\"mistakeRate\":0.15,\"events\":\"first\",\"training\":\"balanced\",\"facilities\":{\"policy\":\"none\",\"builds\":[],\"reserve\":0},\"recruits\":{\"policy\":\"minimum\",\"floor\":13,\"reserve\":0,\"wageWeeks\":0,\"renewStars\":false},\"staff\":{\"roles\":[],\"fromWeek\":1,\"reserve\":0},\"tactics\":\"defaults\",\"attackCoach\":\"none\",\"setPlays\":\"none\"},\"seed\":7919,\"difficulty\":\"hard\",\"pack\":\"au\",\"liveRivals\":false,\"fromVersion\":null}",
+      "key": "{\"config\":{\"id\":\"casual-weekly\",\"label\":\"Casual weekly player\",\"goals\":[\"Stay competitive\",\"Finish seasons solvent\"],\"difficulties\":[\"easy\",\"normal\",\"hard\"],\"mistakeRate\":0.2,\"events\":\"first\",\"training\":\"balanced\",\"facilities\":{\"policy\":\"first\",\"builds\":[\"trainingPaddock\"],\"reserve\":40000},\"recruits\":{\"policy\":\"short\",\"floor\":16,\"reserve\":30000,\"wageWeeks\":8,\"renewStars\":true},\"staff\":{\"roles\":[\"welfare\"],\"fromWeek\":16,\"reserve\":60000},\"tactics\":\"defaults\",\"attackCoach\":\"none\",\"setPlays\":\"none\",\"points\":{\"policy\":\"focus\",\"hold\":0},\"calling\":\"none\",\"releases\":\"none\"},\"seed\":7919,\"difficulty\":\"hard\",\"pack\":\"au\",\"liveRivals\":false,\"fromVersion\":null,\"fieldLength\":100,\"halfMinutes\":2.5}",
       "endpoint": "season:1",
-      "regularWinRate": 0.625,
-      "minMoney": -109050,
-      "endMoney": -7280,
+      "regularWinRate": 0.5416666666666666,
+      "minMoney": -104009,
+      "endMoney": -691,
+      "broke": true,
+      "weeksToOverall": {
+        "70": null,
+        "80": null,
+        "90": null
+      },
+      "failures": 0,
+      "repairs": 0
+    },
+    {
+      "key": "{\"config\":{\"id\":\"min-maxer\",\"label\":\"Min-maxer\",\"goals\":[\"Win\",\"Grow the best nine\",\"Keep spending reserves\"],\"difficulties\":[\"easy\",\"normal\",\"hard\"],\"mistakeRate\":0.03,\"events\":\"value\",\"training\":\"weakest\",\"facilities\":{\"policy\":\"invest\",\"builds\":[\"trainingPaddock\",\"weightsRoom\",\"videoRoom\",\"teamGym\",\"scoutOffice\",\"coachsOffice\",\"academy\",\"grandstand\"],\"reserve\":40000},\"recruits\":{\"policy\":\"improve\",\"floor\":17,\"reserve\":50000,\"wageWeeks\":8,\"renewStars\":true},\"staff\":{\"roles\":[\"assistantCoach\",\"analyst\",\"welfare\"],\"fromWeek\":1,\"reserve\":40000},\"tactics\":\"counter-fit\",\"attackCoach\":\"fit\",\"setPlays\":\"strongest\",\"points\":{\"policy\":\"optimal\",\"hold\":0},\"calling\":\"ai\",\"releases\":\"none\"},\"seed\":7919,\"difficulty\":\"easy\",\"pack\":\"au\",\"liveRivals\":false,\"fromVersion\":null,\"fieldLength\":100,\"halfMinutes\":2.5}",
+      "endpoint": "season:1",
+      "regularWinRate": 0.5833333333333334,
+      "minMoney": -144169,
+      "endMoney": 32649,
+      "broke": true,
+      "weeksToOverall": {
+        "70": null,
+        "80": null,
+        "90": null
+      },
+      "failures": 0,
+      "repairs": 0
+    },
+    {
+      "key": "{\"config\":{\"id\":\"min-maxer\",\"label\":\"Min-maxer\",\"goals\":[\"Win\",\"Grow the best nine\",\"Keep spending reserves\"],\"difficulties\":[\"easy\",\"normal\",\"hard\"],\"mistakeRate\":0.03,\"events\":\"value\",\"training\":\"weakest\",\"facilities\":{\"policy\":\"invest\",\"builds\":[\"trainingPaddock\",\"weightsRoom\",\"videoRoom\",\"teamGym\",\"scoutOffice\",\"coachsOffice\",\"academy\",\"grandstand\"],\"reserve\":40000},\"recruits\":{\"policy\":\"improve\",\"floor\":17,\"reserve\":50000,\"wageWeeks\":8,\"renewStars\":true},\"staff\":{\"roles\":[\"assistantCoach\",\"analyst\",\"welfare\"],\"fromWeek\":1,\"reserve\":40000},\"tactics\":\"counter-fit\",\"attackCoach\":\"fit\",\"setPlays\":\"strongest\",\"points\":{\"policy\":\"optimal\",\"hold\":0},\"calling\":\"ai\",\"releases\":\"none\"},\"seed\":7919,\"difficulty\":\"normal\",\"pack\":\"au\",\"liveRivals\":false,\"fromVersion\":null,\"fieldLength\":100,\"halfMinutes\":2.5}",
+      "endpoint": "season:1",
+      "regularWinRate": 0.5,
+      "minMoney": -140410,
+      "endMoney": -98569,
+      "broke": true,
+      "weeksToOverall": {
+        "70": null,
+        "80": null,
+        "90": null
+      },
+      "failures": 0,
+      "repairs": 0
+    },
+    {
+      "key": "{\"config\":{\"id\":\"min-maxer\",\"label\":\"Min-maxer\",\"goals\":[\"Win\",\"Grow the best nine\",\"Keep spending reserves\"],\"difficulties\":[\"easy\",\"normal\",\"hard\"],\"mistakeRate\":0.03,\"events\":\"value\",\"training\":\"weakest\",\"facilities\":{\"policy\":\"invest\",\"builds\":[\"trainingPaddock\",\"weightsRoom\",\"videoRoom\",\"teamGym\",\"scoutOffice\",\"coachsOffice\",\"academy\",\"grandstand\"],\"reserve\":40000},\"recruits\":{\"policy\":\"improve\",\"floor\":17,\"reserve\":50000,\"wageWeeks\":8,\"renewStars\":true},\"staff\":{\"roles\":[\"assistantCoach\",\"analyst\",\"welfare\"],\"fromWeek\":1,\"reserve\":40000},\"tactics\":\"counter-fit\",\"attackCoach\":\"fit\",\"setPlays\":\"strongest\",\"points\":{\"policy\":\"optimal\",\"hold\":0},\"calling\":\"ai\",\"releases\":\"none\"},\"seed\":7919,\"difficulty\":\"hard\",\"pack\":\"au\",\"liveRivals\":false,\"fromVersion\":null,\"fieldLength\":100,\"halfMinutes\":2.5}",
+      "endpoint": "season:1",
+      "regularWinRate": 0.5833333333333334,
+      "minMoney": -145274,
+      "endMoney": -77732,
+      "broke": true,
+      "weeksToOverall": {
+        "70": null,
+        "80": null,
+        "90": null
+      },
+      "failures": 0,
+      "repairs": 0
+    },
+    {
+      "key": "{\"config\":{\"id\":\"newcomer\",\"label\":\"Newcomer\",\"goals\":[\"Follow obvious buttons\",\"Survive season one\"],\"difficulties\":[\"easy\",\"normal\",\"hard\"],\"mistakeRate\":0.15,\"events\":\"first\",\"training\":\"balanced\",\"facilities\":{\"policy\":\"none\",\"builds\":[],\"reserve\":0},\"recruits\":{\"policy\":\"minimum\",\"floor\":13,\"reserve\":0,\"wageWeeks\":0,\"renewStars\":false},\"staff\":{\"roles\":[],\"fromWeek\":1,\"reserve\":0},\"tactics\":\"defaults\",\"attackCoach\":\"none\",\"setPlays\":\"none\",\"points\":{\"policy\":\"partial\",\"hold\":0},\"calling\":\"none\",\"releases\":\"none\"},\"seed\":7919,\"difficulty\":\"easy\",\"pack\":\"au\",\"liveRivals\":false,\"fromVersion\":null,\"fieldLength\":100,\"halfMinutes\":2.5}",
+      "endpoint": "season:1",
+      "regularWinRate": 0.5,
+      "minMoney": 79682,
+      "endMoney": 165922,
+      "broke": false,
+      "weeksToOverall": {
+        "70": null,
+        "80": null,
+        "90": null
+      },
+      "failures": 0,
+      "repairs": 0
+    },
+    {
+      "key": "{\"config\":{\"id\":\"newcomer\",\"label\":\"Newcomer\",\"goals\":[\"Follow obvious buttons\",\"Survive season one\"],\"difficulties\":[\"easy\",\"normal\",\"hard\"],\"mistakeRate\":0.15,\"events\":\"first\",\"training\":\"balanced\",\"facilities\":{\"policy\":\"none\",\"builds\":[],\"reserve\":0},\"recruits\":{\"policy\":\"minimum\",\"floor\":13,\"reserve\":0,\"wageWeeks\":0,\"renewStars\":false},\"staff\":{\"roles\":[],\"fromWeek\":1,\"reserve\":0},\"tactics\":\"defaults\",\"attackCoach\":\"none\",\"setPlays\":\"none\",\"points\":{\"policy\":\"partial\",\"hold\":0},\"calling\":\"none\",\"releases\":\"none\"},\"seed\":7919,\"difficulty\":\"normal\",\"pack\":\"au\",\"liveRivals\":false,\"fromVersion\":null,\"fieldLength\":100,\"halfMinutes\":2.5}",
+      "endpoint": "season:1",
+      "regularWinRate": 0.5,
+      "minMoney": -36390,
+      "endMoney": 14890,
+      "broke": true,
+      "weeksToOverall": {
+        "70": null,
+        "80": null,
+        "90": null
+      },
+      "failures": 0,
+      "repairs": 0
+    },
+    {
+      "key": "{\"config\":{\"id\":\"newcomer\",\"label\":\"Newcomer\",\"goals\":[\"Follow obvious buttons\",\"Survive season one\"],\"difficulties\":[\"easy\",\"normal\",\"hard\"],\"mistakeRate\":0.15,\"events\":\"first\",\"training\":\"balanced\",\"facilities\":{\"policy\":\"none\",\"builds\":[],\"reserve\":0},\"recruits\":{\"policy\":\"minimum\",\"floor\":13,\"reserve\":0,\"wageWeeks\":0,\"renewStars\":false},\"staff\":{\"roles\":[],\"fromWeek\":1,\"reserve\":0},\"tactics\":\"defaults\",\"attackCoach\":\"none\",\"setPlays\":\"none\",\"points\":{\"policy\":\"partial\",\"hold\":0},\"calling\":\"none\",\"releases\":\"none\"},\"seed\":7919,\"difficulty\":\"hard\",\"pack\":\"au\",\"liveRivals\":false,\"fromVersion\":null,\"fieldLength\":100,\"halfMinutes\":2.5}",
+      "endpoint": "season:1",
+      "regularWinRate": 0.4583333333333333,
+      "minMoney": -150126,
+      "endMoney": -88926,
       "broke": true,
       "weeksToOverall": {
         "70": null,

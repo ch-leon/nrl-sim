@@ -1,6 +1,6 @@
 # Features
 
-Last updated: 2026-11-13
+Last updated: 2026-11-14
 
 What's in the game, with the PR that added each.
 
@@ -63,6 +63,8 @@ What's in the game, with the PR that added each.
 - Android test APK ([PR](https://github.com/ch-leon/nrl-sim/pull/394)); CI ([PR](https://github.com/ch-leon/nrl-sim/pull/442))
 
 ## Recently added
+
+- The scripted persona playtesters record a weekly money and XP diary and spend stat points in character (optimal, spend-by-focus, random, or half). This is a measurement tool. A normal career still spends points by focus automatically.
 
 - Developer settings is in Settings on every build (GitHub Pages, the Android test APK and local dev). Overrides and experiments stay off until you turn one on, so a normal career plays as before. Analytics stays on unless the address has `?labs=1` or a developer override, experiment or playtest career is actually on. Before launch, set `VITE_DEV_SETTINGS=0` or remove Developer settings ([PR #683](https://github.com/ch-leon/nrl-sim/pull/683)).
 
