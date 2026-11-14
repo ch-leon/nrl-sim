@@ -1,12 +1,12 @@
-// #478: fresh Easy/Hard games, shortlist/full/sign/undo on landscape phones
-// and Club home upright. Screenshots stay in CI's e2e-webkit-screens artifact.
+// #478: fresh Easy/Hard games, shortlist/full/sign/undo on landscape phones.
+// Screenshots stay in CI's e2e-webkit-screens artifact.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { BASE, OUT_ROOT, IPHONE_UA, openNav, SHEET_EXIT } from '../common.mjs';
 
 export async function runRecruit(browser) {
   let failures = 0;
-  for (const [width, height] of [[667, 375], [844, 390], [390, 844]]) {
+  for (const [width, height] of [[667, 375], [844, 390]]) {
     for (const difficulty of ['easy', 'hard']) {
       const tag = `${width}x${height}-${difficulty}`;
       const out = join(OUT_ROOT, 'webkit', `recruit-${tag}`);
@@ -45,7 +45,7 @@ export async function runRecruit(browser) {
         check(!await page.locator('[data-sort-menu]').isVisible(), 'sort hidden on shortlist');
         const picked = await page.locator('[data-coach-pick]').evaluate((e) => e.closest('[data-row-player]').getAttribute('data-row-player'));
         await shot('shortlist');
-        // Visible chip text must fit its cell, including at upright phone width.
+        // Visible chip text must fit its cell at phone landscape.
         check(await page.locator('[data-coach-pick]').evaluate((e) => {
           const r = e.getBoundingClientRect(), parent = e.parentElement.getBoundingClientRect();
           return r.left >= parent.left && r.right <= parent.right + 1 && r.bottom <= parent.bottom + 1;

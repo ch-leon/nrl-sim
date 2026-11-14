@@ -259,7 +259,7 @@ function openLeagueScreen(key: 'fixtures' | 'ladder'): HTMLElement {
   // Each column goes back where it was, and the preview over the sheet is of the match now coming.
   const redraw = (): void => {
     const were = cols.map((c) => c.where());
-    const top = sheet.scrollTop; // upright, the sheet scrolls as one (portrait.ts)
+    const top = sheet.scrollTop; // the sheet's own scroll, put back after the redraw
     draw();
     sheet.scrollTop = top;
     cols.forEach((c, i) => c.resume(were[i]));

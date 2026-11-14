@@ -8,7 +8,7 @@ export async function runDerby(browser) {
   mkdirSync(out, { recursive: true });
   const town = JSON.parse(readFileSync('src/data/towns.json', 'utf8')).find(t => t.name === 'Launceston' && t.country === 'AU');
   const reports = [];
-  for (const [width, height] of [[667, 375], [844, 390], [390, 844]]) {
+  for (const [width, height] of [[667, 375], [844, 390]]) {
     const context = await browser.newContext({ viewport: { width, height }, hasTouch: true });
     const page = await context.newPage();
     const tag = `${width}x${height}`;
@@ -32,15 +32,6 @@ export async function runDerby(browser) {
       await playTrials(page);
       const state = await page.evaluate(() => window.__nrlState());
       if (state.home.lat !== town.lat || !state.objectives.some(o => o.rivalId === 'rival-larrikins' && o.text.endsWith(', our derby rival'))) throw new Error('Listed town did not produce its nearest derby objective');
-      // Club home is intentionally portrait-only; turning sideways returns to the grounds.
-      if (width >= height) await page.setViewportSize({ width: 390, height: 844 });
-      await openNav(page, 'club');
-      const next = page.locator('.nrl-club-home-next');
-      await next.scrollIntoViewIfNeeded();
-      if (!(await next.textContent()).includes('Derby')) throw new Error('Missing Derby tag');
-      if (await next.evaluate(n => n.scrollWidth > n.clientWidth)) throw new Error('Derby row overflows');
-      await shot('tag-portrait');
-      if (width >= height) await page.setViewportSize({ width, height });
       await openNav(page, 'staff');
       const objective = page.locator('.nrl-board-obj').filter({ hasText: 'our derby rival' });
       await objective.scrollIntoViewIfNeeded();
@@ -49,19 +40,21 @@ export async function runDerby(browser) {
       const preview = page.getByText('Derby week against Launceston Larrikins.', { exact: false }).last();
       await preview.scrollIntoViewIfNeeded();
       await shot('news-before');
-      if (width < height) await page.setViewportSize({ width: 844, height: 390 });
       await openNav(page, 'club');
       await page.locator('[data-hud="advance"]').tap();
       await page.waitForFunction(() => document.querySelector('[data-ask-proceed]') || document.querySelector('.nrl-mo-controls'));
       const proceed = page.locator('[data-ask-proceed]');
       if (await proceed.isVisible()) await proceed.tap();
       await page.waitForSelector('.nrl-mo-controls', { timeout: 60000 });
+      const occasion = page.locator('[data-occasion="derby"]');
+      await occasion.waitFor();
+      if ((await occasion.textContent()) !== 'DERBY') throw new Error('Missing Derby tag on the score bug');
+      await shot('derby-tag');
       await skipFromPill(page);
       await page.waitForSelector('.nrl-mo-ft [data-back-to-club]', { timeout: 120000 });
       await page.locator('.nrl-mo-ft [data-back-to-club]').evaluate(n => n.click());
       await page.waitForSelector('body:not(.nrl-match-active) .nrl-dock');
       await page.waitForFunction(() => window.__nrlState().week === 2);
-      if (width < height) await page.setViewportSize({ width, height });
       await openNav(page, 'news');
       const result = page.getByText(/Derby (win over|loss to|draw with) Launceston Larrikins/).last();
       await result.scrollIntoViewIfNeeded();

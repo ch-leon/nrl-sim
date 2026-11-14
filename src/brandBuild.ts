@@ -25,7 +25,7 @@ export const PWA_MANIFEST = {
   name: BRAND.name,
   short_name: BRAND.shortName,
   display: 'standalone' as const,
-  orientation: 'any' as const, // #350: the menus work upright; the match and the grounds ask to turn
+  orientation: 'landscape' as const, // a phone plays in landscape; portrait is the rotate card
   theme_color: BRAND.colors.app,
   background_color: BRAND.colors.app,
   icons: [

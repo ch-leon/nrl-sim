@@ -1,14 +1,14 @@
-// #477: planted test states, real Club home taps, and the weekly landscape card.
+// #477: planted test states and the weekly summary card, at phone landscape.
 // Evidence goes to the existing screens CI artifact, never into git.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { OUT_ROOT, BASE, IPHONE_UA, openNav, reachProblems, skipFromPill } from '../common.mjs';
+import { OUT_ROOT, BASE, IPHONE_UA, reachProblems, skipFromPill } from '../common.mjs';
 
 export async function runCoachSays(browser) {
   const out = join(OUT_ROOT, 'webkit', 'coach-says');
   mkdirSync(out, { recursive: true });
   const records = [];
-  for (const [width, height] of [[390, 844], [667, 375], [844, 390]]) {
+  for (const [width, height] of [[667, 375], [844, 390]]) {
     const context = await browser.newContext({ viewport: { width, height }, hasTouch: true, isMobile: true, userAgent: IPHONE_UA });
     const page = await context.newPage();
     page.setDefaultTimeout(20000);
@@ -37,40 +37,7 @@ export async function runCoachSays(browser) {
         // These planted scenarios exercise rules 3/4 after their destinations open.
         s.unlocks.screens = ['finance', 'staff'];
       });
-      if (width < height) {
-        const cases = [
-          ['decision', 'news', 'Answer the'],
-          ['lineup', 'lineup', "can't play"],
-          ['money', 'finance', 'weeks of cash left'],
-          ['board', 'staff', "The board's goal is at risk"],
-        ];
-        for (const [rule, screen, words] of cases) {
-          await page.evaluate((rule) => {
-            const s = window.__nrlState();
-            s.eventDeck.pending = [];
-            s.squad.forEach((p) => { p.injuredWeeks = 0; p.suspendedWeeks = 0; });
-            s.objectives = [];
-            s.money = rule === 'money' ? 1000 : 200000;
-            if (rule === 'decision') window.__nrlShowCard('fanDay');
-            if (rule === 'lineup') s.squad[0].injuredWeeks = 2;
-            if (rule === 'board') s.objectives = [{ id: 'cash', kind: 'solvent', text: 'Keep $300,000', target: 300000, status: 'pending' }];
-          }, rule);
-          // Navigate away and reopen, exercising the real sheet refresh route.
-          await openNav(page, 'squad');
-          await page.locator('.nrl-nav [data-nav-home]').tap();
-          const row = page.locator('.nrl-club-home-coach');
-          await row.waitFor();
-          const text = await row.textContent();
-          rec.lines.push(text);
-          if (!text.includes(words)) throw new Error(`${rule}: wrong line: ${text}`);
-          if (await page.locator('.nrl-club-home-body > .nrl-club-home-row').first().getAttribute('class') !== await row.getAttribute('class')) throw new Error('Coach says is not the first row');
-          if (!await row.locator('[data-coach-line] img').count()) throw new Error('guide face missing');
-          rec.problems.push(...await reachProblems(page, '[data-club-home]', ['.nrl-club-home-coach']));
-          await shot(rule);
-          await row.tap();
-          await page.waitForSelector(`[data-screen-key="${screen}"]`);
-        }
-      } else {
+      {
         await page.evaluate(() => {
           const s = window.__nrlState();
           s.money = 1000;

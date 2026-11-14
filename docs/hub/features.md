@@ -46,7 +46,7 @@ What's in the game, with the PR that added each.
 ## UI and accessibility
 
 - Broadcast Quiet look ([PR](https://github.com/ch-leon/nrl-sim/pull/381))
-- Upright menus, 5-tab bar ([PR](https://github.com/ch-leon/nrl-sim/pull/436))
+- 5-tab bar ([PR](https://github.com/ch-leon/nrl-sim/pull/436)). On a phone, the game plays in landscape: holding it upright covers everything with “Turn your phone sideways”, and the Android app locks to landscape.
 - Three-tap onboarding, Undo ([PR](https://github.com/ch-leon/nrl-sim/pull/380))
 - Text size, non-colour cues ([PR](https://github.com/ch-leon/nrl-sim/pull/385))
 - Touch polish: press feedback, motion tokens, mis-tap guards, scroll cues ([PR](https://github.com/ch-leon/nrl-sim/pull/617))
@@ -63,6 +63,8 @@ What's in the game, with the PR that added each.
 - Android test APK ([PR](https://github.com/ch-leon/nrl-sim/pull/394)); CI ([PR](https://github.com/ch-leon/nrl-sim/pull/442))
 
 ## Recently added
+
+- Portrait is blocked on a touch phone. The title, menus, grounds and live match all sit under “Turn your phone sideways” until the phone is landscape, and the Android app locks to landscape. The upright Club home sheet is gone. A desktop window is never blocked ([PR #690](https://github.com/ch-leon/nrl-sim/pull/690)).
 
 - The scripted persona playtesters record a weekly money and XP diary and spend stat points in character (optimal, spend-by-focus, random, or half). This is a measurement tool. A normal career still spends points by focus automatically ([PR #691](https://github.com/ch-leon/nrl-sim/pull/691)).
 

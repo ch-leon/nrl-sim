@@ -197,7 +197,11 @@ export async function playPhoneWeek(page, onResult = async () => {}) {
   await page.waitForFunction(b => { const s = window.__nrlState(); return `${s.season}:${s.week}:${s.preseason}` !== b; }, before);
 }
 
-/** Play the separate trial phase so existing probes still start at round 1. */
+/**
+ * Play the separate trial phase so existing probes still start at round 1.
+ * A tall viewport is turned sideways first: a touch phone held upright is the
+ * rotate card, and the match is played at 844×390, then the viewport is put back.
+ */
 export async function playTrials(page, onResult) {
   const size = page.viewportSize();
   if (size.width < size.height) await page.setViewportSize({ width: 844, height: 390 });

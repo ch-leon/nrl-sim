@@ -589,9 +589,9 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
     return check(rec, { box: '.nrl-player-modal', rows: '.nrl-player-stats .nrl-statrow', card: '.nrl-player-stats', exit: '.nrl-player-modal [data-back]',
       primary: ['[data-player-action="renew"]', '[data-player-action="sell"]', '[data-player-action="release"]'] }, null);
   });
-  // #538: the temporary Potential line also fits phone portrait, without a redesign.
-  await step('popup-player-potential-390x844', async () => {
-    await page.setViewportSize({ width: 390, height: 844 });
+  // #538: the temporary Potential line also fits a phone on its side, without a redesign.
+  await step('popup-player-potential-667x375', async () => {
+    await page.setViewportSize({ width: 667, height: 375 });
     await page.waitForTimeout(250);
     return page.evaluate(() => {
       const line = document.querySelector('[data-potential]');
@@ -600,8 +600,8 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
       const r = line.getBoundingClientRect();
       const col = document.querySelector('.nrl-player-about').getBoundingClientRect();
       const out = [];
-      if (r.left < 0 || r.right > 390 || r.height < 10 || r.top < 0 || r.bottom > 844
-        || r.top < col.top - 1 || r.bottom > col.bottom + 1 || line.scrollWidth > line.clientWidth + 1) out.push('Potential line clipped at 390x844');
+      if (r.left < 0 || r.right > innerWidth || r.height < 10 || r.top < 0 || r.bottom > innerHeight
+        || r.top < col.top - 1 || r.bottom > col.bottom + 1 || line.scrollWidth > line.clientWidth + 1) out.push('Potential line clipped at 667x375');
       if (document.querySelector('.nrl-player-curve') || document.body.textContent.includes('Projected peak:')) out.push('old projection remains');
       return out;
     });

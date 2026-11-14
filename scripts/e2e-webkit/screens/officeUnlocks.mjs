@@ -7,7 +7,7 @@ export async function runOfficeUnlocks(browser) {
   const out = join(OUT_ROOT, 'webkit', 'office-unlocks');
   mkdirSync(out, { recursive: true });
   const results = [];
-  for (const [width, height] of [[667, 375], [844, 390], [390, 844]]) {
+  for (const [width, height] of [[667, 375], [844, 390]]) {
     const context = await browser.newContext({ viewport: { width, height }, hasTouch: true, isMobile: true, userAgent: IPHONE_UA });
     const page = await context.newPage();
     page.setDefaultTimeout(20000);
@@ -21,11 +21,6 @@ export async function runOfficeUnlocks(browser) {
       record.rounds.push({ tag, tiles });
       await page.screenshot({ path: join(out, `${width}x${height}-${tag}.png`) });
       await page.locator('[data-nav-more]').tap();
-      if (width < height) {
-        await page.locator(SHEET_EXIT).tap();
-        await page.screenshot({ path: join(out, `${width}x${height}-${tag}-club.png`) });
-        await page.setViewportSize({ width: 844, height: 390 });
-      }
       return tiles;
     };
     try {
