@@ -30,14 +30,15 @@
 // fresh-game runs. The game plays those only in a week that is not
 // fast-forwarded, so the runs advance a week at a time like a player tapping
 // Advance Week, and in Node (no Worker) each round's seven matches play in place.
+import './primeField';
 import { preparePack } from '../src/content';
 import { spawn } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { PERSONAS, personaById } from '../src/qa/personas';
-import { compareBaseline, makeBaseline, personaReport, summarisePersonas, type PersonaBaseline } from '../src/qa/personas/report';
-import { attackVsDefence, fieldedTable, levelWinRates, shapeTable, offTheLevelMean, runSoak, styleTable, summariseSeasons, tallyNet, LEVEL_OFF_MEAN, STYLE_GAP_BAND, type FinanceLine, type SoakOptions, type SoakResult } from '../src/qa/soak';
+import { compareBaseline, makeBaseline, personaDiaryFiles, personaReport, summarisePersonas, type PersonaBaseline } from '../src/qa/personas/report';
+import { attackVsDefence, fieldedTable, levelWinRates, measuredMatch, shapeTable, offTheLevelMean, runSoak, styleTable, summariseSeasons, tallyNet, LEVEL_OFF_MEAN, STYLE_GAP_BAND, type FinanceLine, type SoakOptions, type SoakResult } from '../src/qa/soak';
 import { DIFFICULTIES, type Difficulty } from '../src/config';
 import { applyTuning } from '../src/match/league/tuning';
 import { shardCases } from '../src/qa/shard';
@@ -91,7 +92,14 @@ if (childIn) {
   const out = str('out')!;
   const specs = JSON.parse(readFileSync(childIn, 'utf8')) as SoakOptions[];
   for (const spec of specs) await preparePack(spec.pack ?? 'au');
-  writeFileSync(out, JSON.stringify(specs.map((o) => runSoak(o))));
+  const done = [];
+  for (const spec of specs) {
+    const result = runSoak(spec);
+    const who = typeof spec.persona === 'string' ? spec.persona : spec.persona?.id;
+    if (who) console.error(`persona ${who} ${spec.difficulty ?? 'normal'} seed ${spec.seed}: ${result.problems.length} problems, ${Math.round(result.ms / 1000)}s`);
+    done.push(result);
+  }
+  writeFileSync(out, JSON.stringify(done));
   process.exit(0);
 }
 
@@ -147,20 +155,32 @@ if (personaConfigs) {
   const baselinePath = str('baseline') ?? 'src/qa/personas/baseline.json';
   const baseline = JSON.parse(readFileSync(baselinePath, 'utf8')) as PersonaBaseline;
   const comparison = compareBaseline(results, baseline);
-  const report = personaReport(results, comparison);
+  const match = measuredMatch();
+  const report = personaReport(results, comparison, match);
   const machinePath = jsonOut ?? 'work/personas.json';
   const reportPath = str('report') ?? machinePath.replace(/\.json$/, '') + '.md';
   if (machinePath === reportPath) throw new Error('--json and --report must be different files');
   for (const path of [machinePath, reportPath]) mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(machinePath, JSON.stringify({ schema: 1, seasons, seeds, pack, ...(shard ? { shard } : {}), results, perRun: results.map(r => ({ seed: r.seed, summary: summarisePersonas([r])[0] })), summary: summarisePersonas(results), comparison }, null, 2));
+  const diaryDir = str('diary') ?? reportPath.replace(/\.md$/, '') + '-diary';
+  mkdirSync(diaryDir, { recursive: true });
+  for (const file of personaDiaryFiles(results)) writeFileSync(join(diaryDir, file.name), file.csv);
+  const payload = { schema: 2, seasons, seeds, pack, match, ...(shard ? { shard } : {}), results, perRun: results.map(r => ({ seed: r.seed, persona: typeof r.persona === 'object' ? r.persona?.id : r.persona, difficulty: r.difficulty, summary: summarisePersonas([r])[0] })), summary: summarisePersonas(results), comparison };
+  writeFileSync(machinePath, JSON.stringify(payload));
+  const summaryPayload = { ...payload, results: results.map(r => {
+    if (!r.career) return r;
+    const { diary, cash, matches, ...career } = r.career;
+    return { ...r, career: { ...career, diaryWeeks: diary.length, seasons: career.seasons.map(({ players, ...season }) => season) }, matchCount: matches.length, cashPoints: cash.length };
+  }) };
+  writeFileSync(machinePath.replace(/\.json$/, '.summary.json'), JSON.stringify(summaryPayload));
   writeFileSync(reportPath, report);
+  console.log(`Match: ${match.halves} x ${match.halfMinutes} min = ${match.totalMinutes} min, field ${match.fieldLength}m. ${match.how}`);
   const baselineOut = str('write-baseline');
   if (baselineOut) {
     mkdirSync(dirname(baselineOut), { recursive: true });
-    writeFileSync(baselineOut, JSON.stringify(makeBaseline(results, `Measured with #534 persona harness; ${seasons} seasons, ${seeds} seeds, ${pack}; weeks=${str('weeks') ?? 'whole seasons'}.`), null, 2));
+    writeFileSync(baselineOut, JSON.stringify(makeBaseline(results, `Persona harness baseline; ${seasons} seasons, ${seeds} seeds, ${pack}; field ${match.fieldLength}m; ${match.halves}x${match.halfMinutes} min; weeks=${str('weeks') ?? 'whole seasons'}.`), null, 2));
   }
   console.log(report);
-  console.log(`\nWrote ${machinePath} and ${reportPath}`);
+  console.log(`\nWrote ${machinePath}, ${reportPath} and ${diaryDir}`);
   process.exit(results.some(r => r.problems.length) ? 1 : 0);
 }
 
