@@ -204,8 +204,8 @@ ${MOTION_CSS}
   .nrl-title-setup:has(.nrl-title-confirm) { grid-template-areas: "start form" "veteran form"; }
   .nrl-title-setup:has(.nrl-title-confirm) .nrl-title-kit { display: none; }
 }
-/* An iPhone SE on its side (568×320, #350 T1): the setup scrolls, so the build label follows it
-   instead of sitting in the corner over the panel. Landscape only: portrait is #350 P1's. */
+/* An iPhone SE on its side (568×320): the setup scrolls, so the build label follows it
+   instead of sitting in the corner over the panel. A phone held upright gets the rotate card. */
 @media (max-width: 600px) and (orientation: landscape) {
   .nrl-title-build { position: static; align-self: flex-end; margin-top: 8px; }
 }

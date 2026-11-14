@@ -6,9 +6,8 @@ import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, reachProblems, SHEET_
 /**
  * The sizes the dock phase runs at: #344's three (844×390 with an iPhone 14's insets, 667×375,
  * 956×330); an iPhone SE on its side (568×320, where Settings scrolls to Coach calls); and two
- * narrow upright windows with a mouse (375×667, 320×568: a desktop window, which keeps the
- * stacked two-row dock; a phone held upright gets the portrait bar, runPortraitMenus), where the
- * dock stacks into two rows.
+ * narrow upright windows with a mouse (375×667, 320×568: a desktop window, fine pointer,
+ * which is never the rotate card), where the dock stacks into two rows.
  */
 const DOCK_RUNS = [
   { w: 844, h: 390, safe: { l: 47, t: 0, r: 47, b: 21 } },

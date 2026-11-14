@@ -5,8 +5,8 @@ import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav }
 /**
  * The Coach calls page (Office ▸ Coach calls): a new club opens it from the
  * Office sheet and sees the four groups, at least one locked; then the Coach's
- * Office tile in Build opens it too (See coach calls). Upright at 390×844 (the
- * menus' portrait, with the five tabs) and sideways at 844×390: nothing wider than
+ * Office tile in Build opens it too (See coach calls). At phone landscape
+ * (667×375 and 844×390): nothing wider than
  * the screen, the body scrolls, and See coach calls is a 44px tap. Any seed: a new
  * club never has a Coach's Office. A few seconds.
  */

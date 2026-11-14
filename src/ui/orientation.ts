@@ -1,55 +1,35 @@
-// src/ui/orientation.ts — which views need a phone held sideways (#350 P1).
+// src/ui/orientation.ts — a phone held upright is blocked, everywhere.
 //
-// Upright, the menus work (Leon's Option B, 29 Oct 2026): the title, every sheet
-// the five tabs and Office open, the match report. The live match and the grounds
-// (the club view, placing or moving a building, a building's card) are drawn for
-// landscape, so while one of those is up on a touch device held upright we cover
-// the game with a "Turn your phone sideways" card. iOS Safari won't let a web page
-// lock orientation, so the card asks instead.
-//
-// The Phaser loop sleeps whenever the phone is upright: on a menu the grounds are
-// hidden behind it, and under the card a match must not run on. Desktop windows
-// are never blocked, however narrow: the gate and the CSS both need a coarse
-// (touch) pointer.
-//
-// Where the browser allows it (installed PWA / fullscreen on Android) we also ask
-// for a landscape lock while a landscape-only view is up, and unlock otherwise;
-// failures are ignored.
+// On a touch device in portrait the whole game is covered: the title, every
+// menu and sheet, the match report, the grounds and the live match. The Phaser
+// loop sleeps until the phone is sideways again. iOS Safari will not let a page
+// lock orientation, so the card asks, and where the browser allows it (an
+// installed app, mostly Android) we also ask for a landscape lock. Desktop
+// windows are never blocked, however narrow: the gate and the CSS both need a
+// coarse (touch) pointer.
 
 import { BRAND, type Brand } from '../brand';
 import { COLOR_TOKENS as C } from './tokens';
 
-/** A touch device held upright: the menus' portrait layout and the gate. Shared by the CSS and the JS. */
+/** A touch device held upright. Shared by the CSS and the JS. */
 export const PORTRAIT_QUERY = '(orientation: portrait) and (pointer: coarse)';
 
 /**
- * What is on screen, as far as orientation goes: a menu (title, a sheet, a dialog,
- * the match report) or one of the views drawn for landscape.
+ * Whether the game shows ('play') or the rotate card covers it ('rotate').
+ * Only a touch device held upright is ever blocked, and then the whole game is.
+ * Pure.
  */
-export type OrientationView = 'menu' | 'match' | 'grounds' | 'placement' | 'facility';
-
-/** The views that need the phone sideways (#350): the live match and the grounds. */
-export const LANDSCAPE_ONLY: ReadonlySet<OrientationView> = new Set(['match', 'grounds', 'placement', 'facility']);
-
-/**
- * Whether `view` shows ('menu') or the rotate card covers it ('rotate'). Only a
- * touch device held upright is ever blocked, and then only on a landscape-only
- * view. Pure.
- */
-export function orientationGate(g: { portrait: boolean; coarse: boolean; view: OrientationView }): 'menu' | 'rotate' {
-  return g.portrait && g.coarse && LANDSCAPE_ONLY.has(g.view) ? 'rotate' : 'menu';
+export function orientationGate(g: { portrait: boolean; coarse: boolean }): 'play' | 'rotate' {
+  return g.portrait && g.coarse ? 'rotate' : 'play';
 }
 
 /** The rotate card's title. */
 export const ROTATE_TITLE = 'Turn your phone sideways';
 
-/** The rotate card's line (#350), with the game's name from the brand (#363). */
+/** The rotate card's line, with the game's name from the brand (#363). */
 export function rotateText(brand: Brand = BRAND): string {
-  return `In ${brand.name}, the match and the grounds play in landscape. Turn your phone sideways to carry on.`;
+  return `In ${brand.name}, the game plays in landscape. Turn your phone sideways to carry on.`;
 }
-
-/** The card's way back to the menus, shown only over the grounds (nothing is in play there). */
-export const ROTATE_BACK_LABEL = '◂ Back to the menus';
 
 /** <html> carries this while the rotate card is up. */
 export const ROTATE_ON_CLASS = 'nrl-rotate-on';
@@ -111,11 +91,6 @@ function ensureRotateStyles(): void {
 .nrl-rotate-title { font-family: "Barlow Condensed", sans-serif; font-weight: 700; font-size: 1.375rem;
   letter-spacing: 0.04em; text-transform: uppercase; margin: 0 0 6px; }
 .nrl-rotate-text { margin: 0; font-size: 0.875rem; color: ${C.text2}; }
-.nrl-rotate-back {
-  margin-top: 16px; min-height: 44px; min-width: 44px; padding: 0 16px; border: 0; border-radius: 10px;
-  background: ${C.button}; color: ${C.text}; font: 600 0.9375rem "IBM Plex Sans", system-ui, sans-serif; cursor: pointer;
-}
-.nrl-rotate-back[hidden] { display: none; }
 @keyframes nrl-rotate-turn {
   0%, 20% { transform: rotate(0deg); }
   50%, 80% { transform: rotate(-90deg); }
@@ -128,27 +103,21 @@ function ensureRotateStyles(): void {
 }
 
 /** Options for {@link initLandscapeGuard}. */
-export interface LandscapeGuardOpts extends LandscapeGuardHooks {
-  /** What is on screen now. Default: a match, so every upright screen is blocked (the match lab, `/#lab`). */
-  view?: () => OrientationView;
-  /** The card's ◂ Back over the grounds. Absent: no button. */
-  onBack?: () => void;
-}
+export type LandscapeGuardOpts = LandscapeGuardHooks;
 
 /** Handle to the mounted guard. */
 export interface LandscapeGuard {
-  /** Re-read the view and show or hide the card (call after anything that changes the view). */
+  /** Re-read orientation and show or hide the card. */
   refresh(): void;
-  /** Swap the view getter (the club game sets it once the save is loaded). */
-  setView(view: () => OrientationView): void;
   /** Whether the phone is upright on a touch device now. */
   upright(): boolean;
 }
 
 /**
- * Mount the rotate card and pause / resume through the hooks: the loop sleeps
- * whenever the phone is upright, the card shows when the view also needs
- * landscape. Call once at boot, before the title screen.
+ * Mount the rotate card and pause / resume through the hooks. The loop sleeps,
+ * and the card covers the game, whenever a touch device is held upright. Call
+ * once at boot, before the title screen. A coarse-pointer device is also asked
+ * to lock landscape; that fails on iOS Safari and the failure is ignored.
  */
 export function initLandscapeGuard(opts: LandscapeGuardOpts): LandscapeGuard {
   ensureRotateStyles();
@@ -162,36 +131,24 @@ export function initLandscapeGuard(opts: LandscapeGuardOpts): LandscapeGuard {
   const text = document.createElement('p');
   text.className = 'nrl-rotate-text';
   text.textContent = rotateText();
-  const back = document.createElement('button');
-  back.type = 'button';
-  back.className = 'nrl-rotate-back';
-  back.setAttribute('data-rotate-back', '');
-  back.textContent = ROTATE_BACK_LABEL;
-  back.hidden = true;
-  back.addEventListener('click', () => opts.onBack?.());
-  card.firstElementChild?.append(text, back);
+  card.firstElementChild?.append(text);
   document.body.appendChild(card);
 
-  let view = opts.view ?? ((): OrientationView => 'match');
   const coarse = window.matchMedia('(pointer: coarse)');
   let upright = false;
-  let locked: boolean | null = null;
+  let locked = false;
 
   const refresh = (): void => {
-    const v = view();
-    const gate = orientationGate({ portrait: upright, coarse: coarse.matches, view: v });
+    const gate = orientationGate({ portrait: upright, coarse: coarse.matches });
     document.documentElement.classList.toggle(ROTATE_ON_CLASS, gate === 'rotate');
-    back.hidden = !(gate === 'rotate' && v === 'grounds' && opts.onBack);
-    // Best effort, touch only: real locks only work installed / fullscreen (mainly Android).
-    const wantLock = coarse.matches && LANDSCAPE_ONLY.has(v);
-    if (wantLock === locked || !coarse.matches) return;
-    locked = wantLock;
+    // Best effort, touch only. Real locks work installed / fullscreen (mainly Android).
+    if (!coarse.matches || locked) return;
+    locked = true;
     const o = screen.orientation as (ScreenOrientation & { lock?: (o: string) => Promise<void> }) | undefined;
     try {
-      if (wantLock) o?.lock?.('landscape').catch(() => undefined);
-      else o?.unlock?.();
+      void o?.lock?.('landscape')?.catch(() => undefined);
     } catch {
-      /* not supported here */
+      /* iOS Safari throws instead of rejecting */
     }
   };
 
@@ -211,10 +168,6 @@ export function initLandscapeGuard(opts: LandscapeGuardOpts): LandscapeGuard {
 
   return {
     refresh,
-    setView: (fn) => {
-      view = fn;
-      refresh();
-    },
     upright: () => upright,
   };
 }
