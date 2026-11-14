@@ -112,8 +112,7 @@ The old idle/managed fast-forward path is retained.
   prize, wages, upkeep, overhead, events, transfers, contracts, facilities, other).
   The #595 salary and cap quotes are not the live cash loop. Partial and sacked seasons
   remain visible and marked incomplete; completed-season averages exclude them.
-  A week ending below zero counts as a debt week. Broke is still any bankruptcy
-  warning, forced sale, or a sacking with a missed solvency objective.
+  A week ending below zero counts as a debt week. Broke is defined once, under Broke.
 - **Diary:** one row per played week, per career: what the persona did (focus,
   points spent and on which stats, signings, releases, facilities, staff, events,
   tactics, set plays, whether the AI called), the result, end cash and the week's
@@ -127,11 +126,12 @@ The old idle/managed fast-forward path is retained.
   seasons 1, 3 and 5. Balance flags (warnings only) mark cash that looks too easy
   or too hard, a weekly climb above $5,000, ceilings in season 1, and a star
   curve that is under 8 weeks or reaches fewer than a quarter of opening players.
-  A week below zero is a debt week. "Broke" still means any week below zero, a forced
-  sale, or a solvency sacking. The hard-money flag is an average completed season
-  ending below zero, or a solvency sacking in at least a quarter of careers.
-- **Broke:** any bankruptcy warning or forced sale, or a sacking with a structured
-  missed solvency objective. Counts and the career-level rate are separate.
+  The hard-money flag is an average completed season ending below zero, or a
+  solvency sacking in at least a quarter of careers.
+- **Broke:** the career received a bankruptcy warning (the balance went below zero;
+  a forced sale is counted on that same warning) or was sacked with a missed
+  solvency objective. A debt week is separate: a week that ended below zero, which
+  is what raises the warning. Counts and the career-level rate are separate.
 - **Outliers:** attack × opposing defence and each taken play's win share versus
   games without that cell. Flag ≥15 percentage points difference only with at
   least 10 games in both groups. Tables show sample sizes and null comparisons.

@@ -171,7 +171,7 @@ if (personaConfigs) {
     const { diary, cash, matches, ...career } = r.career;
     return { ...r, career: { ...career, diaryWeeks: diary.length, seasons: career.seasons.map(({ players, ...season }) => season) }, matchCount: matches.length, cashPoints: cash.length };
   }) };
-  writeFileSync(machinePath.replace(/\.json$/, '.summary.json'), JSON.stringify(summaryPayload, null, 2));
+  writeFileSync(machinePath.replace(/\.json$/, '.summary.json'), JSON.stringify(summaryPayload));
   writeFileSync(reportPath, report);
   console.log(`Match: ${match.halves} x ${match.halfMinutes} min = ${match.totalMinutes} min, field ${match.fieldLength}m. ${match.how}`);
   const baselineOut = str('write-baseline');

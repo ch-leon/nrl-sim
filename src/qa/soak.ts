@@ -765,7 +765,6 @@ export function runSoak(opts: SoakOptions): SoakResult {
   if (observer && initialLoad) observer.metrics.saves.push(initialLoad);
   const manager = config ? createPersonaManager(config, opts.seed, { buildFirstFree, weeklyNet }) : undefined;
   const matchUsed = config ? measuredMatch() : undefined;
-  if (config) setSpendMode('manual');
   const seasons: SeasonSample[] = [];
   let minMoney = getState().money;
   // The season's P&L (#161): every money movement, by line, checked against the
@@ -824,6 +823,7 @@ export function runSoak(opts: SoakOptions): SoakResult {
     else advanceWeek();
   };
   try {
+  if (config) setSpendMode('manual');
   play(() => {
     for (let i = 0; i < (opts.weeks ?? opts.seasons * (WEEKS_PER_SEASON + (getState().preseason === undefined ? 0 : 2))); i++) {
       if (getState().sacked || (config && opts.weeks === undefined && seasons.length >= opts.seasons)) break;
