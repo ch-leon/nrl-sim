@@ -16,12 +16,17 @@ export const DIVISION_TIERS = ['local', 'championship', 'premier'] as const;
 /** Rival transfer wallets start here. Difficulty does not scale them. */
 export const AI_OPENING_CASH = 60_000;
 
-export interface SignedDeal {
+export interface SignedTerm {
   /** Annual salary. Immutable for the term. Not a market quote. */
   salary: number;
   startSeason: number;
-  /** Inclusive. A one-season deal ends in its start season. */
+  /** Inclusive. A one-season deal ends in its start season. At most three seasons. */
   endSeason: number;
+}
+
+export interface SignedDeal extends SignedTerm {
+  /** A new agreement that starts the season after this one ends. */
+  renewal?: SignedTerm;
 }
 
 export interface CapAccount {
@@ -68,10 +73,37 @@ export function seasonsForWeeks(weeks: number): number {
   return Math.min(3, Math.max(1, Math.ceil(weeks / WEEKS_PER_SEASON)));
 }
 
+/** Weeks still to play in the competitive season, including the current week. */
+export function weeksLeftInSeason(week: number): number {
+  return Math.max(1, WEEKS_PER_SEASON - Math.max(1, Math.trunc(week)) + 1);
+}
+
+/** A one-season signing whose displayed weeks are the rest of this season. */
+export function signForRestOfSeason(player: Player, season: number, week: number): Player {
+  const contractWeeks = weeksLeftInSeason(week);
+  return commitPlayer({ ...player, contractWeeks }, season, 1);
+}
+
 /** A new promise at the market quote. Opening construction uses admitOpeningSquad instead. */
 export function commitPlayer(player: Player, season: number, seasons = seasonsForWeeks(player.contractWeeks)): Player {
   const span = Math.min(3, Math.max(1, seasons));
   return { ...player, deal: { salary: salaryDemand(player), startSeason: season, endSeason: season + span - 1 } };
+}
+
+/**
+ * Early renewal starts a new one-season agreement. It begins the season after
+ * the promise already signed, so the stored span never grows past three seasons.
+ * With no current deal, the new agreement is this season.
+ */
+export function renewedAgreement(deal: SignedDeal | undefined, season: number, salary: number): SignedDeal {
+  if (!deal || deal.endSeason < season) return { salary, startSeason: season, endSeason: season };
+  const startSeason = deal.endSeason + 1;
+  return {
+    salary: deal.salary,
+    startSeason: deal.startSeason,
+    endSeason: deal.endSeason,
+    renewal: { salary, startSeason, endSeason: startSeason },
+  };
 }
 
 /**
@@ -98,8 +130,11 @@ export function publishedCap(account: CapAccount): number {
 
 export function activeSalary(player: { deal?: SignedDeal }, season: number): number {
   const deal = player.deal;
-  if (!deal || season < deal.startSeason || season > deal.endSeason) return 0;
-  return deal.salary;
+  if (!deal) return 0;
+  if (season >= deal.startSeason && season <= deal.endSeason) return deal.salary;
+  const next = deal.renewal;
+  if (next && season >= next.startSeason && season <= next.endSeason) return next.salary;
+  return 0;
 }
 
 export function commitment(players: readonly { deal?: SignedDeal }[], season: number): number {
@@ -168,9 +203,20 @@ export function expireEndedDeals(
   const keep: Player[] = [];
   const gone: Player[] = [];
   for (const player of squad) {
-    if (player.deal && player.deal.endSeason < season) {
-      const { deal: _deal, ...rest } = player;
-      gone.push({ ...rest, contractWeeks: 0, departed: true });
+    const deal = player.deal;
+    if (deal && deal.endSeason < season) {
+      const next = deal.renewal;
+      if (next && next.startSeason <= season && next.endSeason >= season) {
+        const seasons = next.endSeason - season + 1;
+        keep.push({
+          ...player,
+          deal: { salary: next.salary, startSeason: next.startSeason, endSeason: next.endSeason },
+          contractWeeks: Math.max(1, seasons * WEEKS_PER_SEASON),
+        });
+      } else {
+        const { deal: _deal, ...rest } = player;
+        gone.push({ ...rest, contractWeeks: 0, departed: true });
+      }
     } else keep.push(player);
   }
   return { squad: keep, freeAgents: [...freeAgents, ...gone], capAccount: reconcileProtection(keep, account, season) };

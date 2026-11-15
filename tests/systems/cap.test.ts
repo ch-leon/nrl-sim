@@ -1,15 +1,18 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
-import { createNewGame, getState, SAVE_VERSION, type GameState } from '../../src/core/state';
+import { createNewGame, getState, loadState, SAVE_VERSION, type GameState } from '../../src/core/state';
 import { earnMoney, spendMoney } from '../../src/data/club';
 import { FINANCE_STARTING_CASH, FINANCE_TIERS } from '../../src/data/financeRules';
 import { bus } from '../../src/core/events';
 import {
-  __setStorage, __unlockSaves, exportOriginalSave, importSave, installImportedSave, loadSlot, save, setActiveSlot, writeSlot,
+  __setStorage, __unlockSaves, exportOriginalSave, importSave, installImportedSave, LAST_PRE_FINANCE_VERSION, loadSlot, save, setActiveSlot, writeSlot,
 } from '../../src/core/save';
 import { slotKey } from '../../src/core/storageKeys';
 import { initLeague } from '../../src/systems/fixtures';
-import { applyEconomy } from '../../src/systems/economy';
-import { clearSeasonHooks, clearTickHooks } from '../../src/core/time';
+import { applyEconomy, registerEconomySystem } from '../../src/systems/economy';
+import { advanceWeek, advanceWeeks, clearSeasonHooks, clearTickHooks } from '../../src/core/time';
+import { WEEKS_PER_SEASON } from '../../src/config';
+import { signPlayer } from '../../src/systems/freeagency';
+import { renewEarly } from '../../src/systems/contracts';
 import {
   capTotals, commitment, expireEndedDeals, relegateCap, SINGLE_LEAGUE_TIER, tierCap,
 } from '../../src/systems/cap';
@@ -141,5 +144,64 @@ describe('rejected import', () => {
     writeSlot(2, destination);
     expect(installImportedSave(old, 2).ok).toBe(false);
     expect(JSON.parse(bytes.get(slotKey(2))!).clubName).toBe('Cap');
+  });
+
+  it('refuses version 27 and still loads a v28 finance career', () => {
+    expect(LAST_PRE_FINANCE_VERSION).toBe(27);
+    expect(SAVE_VERSION).toBeGreaterThan(LAST_PRE_FINANCE_VERSION);
+    const current = started();
+    expect(importSave(JSON.stringify({ ...current, version: LAST_PRE_FINANCE_VERSION })).ok).toBe(false);
+    expect(importSave(JSON.stringify({ ...current, version: LAST_PRE_FINANCE_VERSION + 1 })).ok).toBe(true);
+  });
+});
+
+describe('signings and renewals', () => {
+  it('a new signing shows the weeks left in the season and leaves only when that deal ends', () => {
+    const state = started();
+    loadState({ ...getState(), preseason: 0, week: 1 });
+    registerEconomySystem();
+    const id = state.freeAgents[0]!.id;
+    const name = state.freeAgents[0]!.name;
+    expect(signPlayer(getState(), id).ok).toBe(true);
+    const signed = getState().squad.find(player => player.id === id)!;
+    expect(signed.contractWeeks).toBe(WEEKS_PER_SEASON);
+    expect(signed.deal).toMatchObject({ startSeason: 1, endSeason: 1 });
+    const warnings: string[] = [];
+    bus.on('ui:notify', note => { if (note.text.includes(name) && note.text.includes('expires')) warnings.push(note.text); });
+    advanceWeeks(WEEKS_PER_SEASON - 1);
+    expect(getState().season).toBe(1);
+    expect(getState().squad.some(player => player.id === id)).toBe(true);
+    expect(warnings.some(text => text.includes('8 weeks'))).toBe(true);
+    expect(warnings.some(text => text.includes('4 weeks'))).toBe(true);
+    expect(warnings.some(text => text.includes('1 week'))).toBe(true);
+    advanceWeek();
+    expect(getState().season).toBe(2);
+    expect(getState().squad.some(player => player.id === id)).toBe(false);
+  });
+
+  it('renews early over several seasons and each save still loads', () => {
+    started();
+    registerEconomySystem();
+    const id = getState().squad[0]!.id;
+    for (let season = 1; season <= 4; season++) {
+      const squad = getState().squad.map(player => player.id === id
+        ? { ...player, contractWeeks: 4, deal: { salary: player.deal?.salary ?? 20_000, startSeason: season, endSeason: season } }
+        : player);
+      loadState({ ...getState(), season, week: 2, preseason: 0, money: 1_000_000, squad });
+      expect(renewEarly(getState(), id).ok).toBe(true);
+      const deal = getState().squad.find(player => player.id === id)!.deal!;
+      expect(deal.endSeason - deal.startSeason).toBeLessThanOrEqual(2);
+      expect(deal.renewal).toMatchObject({ startSeason: season + 1, endSeason: season + 1 });
+      const loaded = importSave(JSON.stringify(getState()));
+      expect(loaded.ok, loaded.ok ? '' : loaded.message).toBe(true);
+      if (!loaded.ok) return;
+      loadState(loaded.state);
+      loadState({ ...getState(), week: WEEKS_PER_SEASON, preseason: 0 });
+      advanceWeek();
+      expect(getState().season).toBe(season + 1);
+      const promoted = getState().squad.find(player => player.id === id)!.deal!;
+      expect(promoted).toMatchObject({ startSeason: season + 1, endSeason: season + 1 });
+      expect(promoted.renewal).toBeUndefined();
+    }
   });
 });

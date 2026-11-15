@@ -118,7 +118,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
         heading: 'Advancing further',
         bullets: [
           'The ▾ beside Play Week runs ×4 weeks, to the finals or to the season’s end.',
-          `A long advance stops early when something needs you: fewer than 13 fit (the Academy would call up juniors to make the side), an injury, a contract about to run out, a decision card in News, or money: the week the club goes into the red, a forced sale, and the week the balance passes the ${fmtMoney(ECON.FORCED_SALE_FLOOR)} floor (not every week in the red).`,
+          `A long advance stops early when something needs you: fewer than 13 fit (the Academy would call up juniors to make the side), an injury, a contract about to run out, a decision card in News, or money: the week the balance goes into the red, and the week the balance passes the ${fmtMoney(ECON.FORCED_SALE_FLOOR)} floor (not every week in the red). A negative balance does not sell a player.`,
         ],
       },
       {
@@ -160,7 +160,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
       },
       {
         heading: 'The Finance screen',
-        text: `This season’s books by line, the weekly run-rate and how many weeks of runway it leaves, and the ledger (the board’s objectives and patience are on Staff & Board, in Office). Below $0 the board warns, the balance turns red with “in debt” and this screen counts the weeks to the fire sale at the current burn; below ${fmtMoney(ECON.FORCED_SALE_FLOOR)} it sells your highest-paid player each week (never below 13), and the squad’s morale drops by ${ECON.FORCED_SALE_MORALE_HIT} each time. The balance at the left of the dock turns amber when the money would last fewer than ${RUNWAY_LOW_WEEKS} weeks at this week’s spending and red under ${RUNWAY_SHORT_WEEKS}; tap it to open this screen.`,
+        text: `This season’s books by line, the cash in the bank, and the salary cap: what this season’s deals add up to and what is already promised next season. Salaries sit on the cap. They are not a weekly bill, and a negative balance does not sell a player. The balance at the left of the dock turns amber when the money would last fewer than ${RUNWAY_LOW_WEEKS} weeks at this week’s spending and red under ${RUNWAY_SHORT_WEEKS}; tap it to open this screen.`,
       },
     ],
   },
@@ -188,7 +188,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
       {
         heading: 'Contracts',
         bullets: [
-          `Deals run 52 weeks. You are warned at 8, 4 and 1 weeks; when one ends the player re-signs at his asking wage. If the club can’t pay, the board lends the money (up to ${fmtMoney(BOARD.LOAN_CAP)} a season, repaid at the season’s end, before the board judges whether you finished solvent); past that he leaves as a free agent.`,
+          'A new signing covers the rest of this season. You are warned at 8, 4 and 1 weeks. When the deal ends he is unsigned unless you have renewed early. Renewing early starts a new one-season agreement after this one. The board does not lend.',
           'Renew early for a fee of two weeks of the new wage; the ask rises when he is unhappy and when the club’s reputation is high.',
           'Sell for a transfer fee (rating² × $10, more for the young, less for the old) or release for two weeks’ wage. The squad can never drop below 13.',
         ],
@@ -308,7 +308,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
         heading: 'Reputation and the board',
         bullets: [
           'Reputation moves with the finish: the top four gain (+4 for first, down to +1), the bottom four lose (−1 to −4), each finals win adds 1 and a lost grand final 3. It then settles 10% of the way back toward 30, so a club has to keep earning it.',
-          `The board sets objectives each season (a ladder finish, staying solvent, beating a rival, building) and keeps 5 points of patience: a missed objective costs one, a clean sweep earns one back, zero and you are sacked. Each one met pays ${fmtMoney(BOARD.GRANT_PER_MET)} and ${BOARD.REP_PER_MET} reputation. Easy pays ${percent(DIFFICULTY.easy.prize)} of the grant and Hard ${percent(DIFFICULTY.hard.prize)}.`,
+          `The board sets objectives each season (a ladder finish, beating a rival, or building) and keeps 5 points of patience: a missed objective costs one, a clean sweep earns one back, zero and you are sacked. Cash is not an objective. Each one met pays ${fmtMoney(BOARD.GRANT_PER_MET)} and ${BOARD.REP_PER_MET} reputation. Easy pays ${percent(DIFFICULTY.easy.prize)} of the grant and Hard ${percent(DIFFICULTY.hard.prize)}.`,
         ],
       },
       {

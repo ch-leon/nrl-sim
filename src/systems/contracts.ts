@@ -6,7 +6,7 @@
 import { getState, setState, type GameState, type Player } from '../core/state';
 import { bus } from '../core/events';
 import { earnMoney, spendMoney } from '../data/club';
-import { commitPlayer } from './cap';
+import { renewedAgreement, salaryDemand } from './cap';
 import { marketWage, overallRating } from '../data/player';
 import { BOARD, CONTRACTS, MORALE, SQUAD_MIN, difficultyMultipliers } from '../config';
 import { fmtMoney } from '../utils/money';
@@ -128,11 +128,9 @@ export function renewEarly(state: GameState, playerId: string): SignResult {
   else spendMoney(fee, `renew:${playerId}`);
   const after = getState();
   const wage = renewalWage(p, state);
-  // The signed annual salary stays put. The old cash fee still buys another
-  // season on the cap; the fee-free renewal is #558.
-  const deal = p.deal
-    ? { ...p.deal, endSeason: Math.max(p.deal.endSeason, state.season + 1) }
-    : commitPlayer({ ...p, contractWeeks: CONTRACTS.NEW_CONTRACT_WEEKS }, state.season, 2).deal!;
+  // A new one-season agreement starts after the current promise. The old cash
+  // fee still applies; the fee-free renewal is #558. The annual salary is unchanged.
+  const deal = renewedAgreement(p.deal, state.season, p.deal?.salary ?? salaryDemand(p));
   setState({
     squad: after.squad.map((x) => x.id === playerId ? { ...x, wage, contractWeeks: CONTRACTS.NEW_CONTRACT_WEEKS, deal } : x),
   });

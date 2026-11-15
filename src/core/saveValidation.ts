@@ -69,9 +69,15 @@ export function isPlacedFacility(v: unknown): v is PlacedFacility {
 /** Finance gained its books in v10 and the overhead line in v17. Missing
  * historical overhead is defaulted by that migration; every other line must
  * already exist. Deltas are signed amounts, not nonnegative balances. */
-function isDeal(v: unknown): boolean {
+function isTerm(v: unknown, after?: number): boolean {
   return record(v) && integer(v.salary) && Number.isSafeInteger(v.salary)
-    && integer(v.startSeason, 1) && integer(v.endSeason, v.startSeason as number) && (v.endSeason as number) <= (v.startSeason as number) + 2;
+    && integer(v.startSeason, after ?? 1) && integer(v.endSeason, v.startSeason as number)
+    && (v.endSeason as number) <= (v.startSeason as number) + 2;
+}
+function isDeal(v: unknown): boolean {
+  if (!isTerm(v)) return false;
+  if (!record(v) || v.renewal === undefined) return true;
+  return isTerm(v.renewal, (v.endSeason as number) + 1) && record(v.renewal) && v.renewal.startSeason === (v.endSeason as number) + 1;
 }
 function isCapAccount(v: unknown): boolean {
   return record(v) && v.rulesVersion === 1 && oneOf(v.tier, ['local', 'championship', 'premier'])

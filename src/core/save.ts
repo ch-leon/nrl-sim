@@ -83,8 +83,10 @@ function getStore(): LocalSaveStore | null {
 // ── Migration ────────────────────────────────────────────────────────────────
 //
 // v24 exception (Leon, 10 Nov 2026): new careers only. v28 (Leon, 15 Nov 2026)
-// is the finance boundary: every earlier career is rejected before any of these
-// historical steps can run. There is no converter for old cash, wages or contracts.
+// is the finance boundary: saves at LAST_PRE_FINANCE_VERSION and earlier are
+// rejected before any of these historical steps can run. There is no converter
+// for old cash, wages or contracts. A later SAVE_VERSION bump migrates v28
+// careers with a normal step; it does not refuse them.
 //
 // HOW TO ADD A STATE CHANGE (e.g. new GameState fields):
 //   1. Bump SAVE_VERSION in state.ts (N → N+1) and update GameState + createNewGame.
@@ -95,6 +97,9 @@ function getStore(): LocalSaveStore | null {
 // Steps are applied in order from the save's version up to SAVE_VERSION, so a
 // v1 save passes through every step. Each step must be pure and only know about
 // its own version pair. Saves newer than SAVE_VERSION are refused, not touched.
+
+/** Saves at this version or earlier are pre-finance. The cutoff does not move when SAVE_VERSION does. */
+export const LAST_PRE_FINANCE_VERSION = 27;
 
 type RawState = Record<string, unknown>;
 
@@ -346,8 +351,8 @@ function migrateChecked(raw: unknown): MigrateResult {
       message: `This save is from a newer version of ${BRAND.name} (save v${version}, this game supports v${SAVE_VERSION}). Update the game to load it.`,
     };
   }
-  // Finance careers start at v28. Earlier saves are kept and are not converted.
-  if (version < SAVE_VERSION) {
+  // Pre-finance careers are kept and are not converted. v28 and later migrate.
+  if (version <= LAST_PRE_FINANCE_VERSION) {
     return { ok: false, outcome: 'unrecoverable', reason: 'corrupt',
       message: `This save is from an older version of ${BRAND.name} (save v${version}). Please start a new career. Your original save has been kept.` };
   }

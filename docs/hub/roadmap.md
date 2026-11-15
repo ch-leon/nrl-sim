@@ -27,7 +27,10 @@ live gameplay change; work still open below has not shipped.
   model is approved for initial testing: [contract](../specs/finance-prototype.md),
   executable quotes and opening inventory ([PR #595](https://github.com/ch-leon/nrl-sim/pull/595)).
   New careers now keep cash and the annual cap apart ([#557](https://github.com/ch-leon/nrl-sim/issues/557)):
-  salaries are a season commitment and do not leave the bank. Signing fees and
+  salaries are a season commitment and do not leave the bank. Until
+  [#558](https://github.com/ch-leon/nrl-sim/issues/558) the cap is display-only
+  and cash is loose, because the old weekly income is still paid and signings
+  are not checked against the cap. Signing fees and
   renewals ([#558](https://github.com/ch-leon/nrl-sim/issues/558)), match-income
   receipts ([#559](https://github.com/ch-leon/nrl-sim/issues/559)), cap upgrades
   ([#560](https://github.com/ch-leon/nrl-sim/issues/560)) and the finance-screen
