@@ -5,6 +5,7 @@ import { importSave } from '../../core/save';
 import { PROGRESSION } from '../../config';
 import { isFinalsRound, finalsSeeds } from '../../systems/fixtures';
 import { classifyReason } from '../../systems/economy';
+import { capTotals } from '../../systems/cap';
 import { overallRating, playerStars, shownStats } from '../../data/player';
 import { ageMod, facilityXpMultiplier, injuryMult, traitMult } from '../../systems/training';
 import { foldEvents, playerOfTheMatch } from '../../systems/stats';
@@ -83,6 +84,11 @@ export interface DiaryRow {
   premiers: boolean;
   cash: number;
   cashDelta: number;
+  /** Signed cap totals, recorded apart from the cash lines. */
+  capUsed: number;
+  capLimit: number;
+  capNext: number;
+  capProtected: number;
   finance: Record<FinanceLine, number>;
   xpGained: number;
   xpTraining: number;
@@ -340,7 +346,9 @@ export function observeCareer(rating: (s: GameState) => number) {
         staff: (log?.staff ?? []).join('; '), events: (log?.events ?? []).join('; '), tactics: log?.tactics || `${s.lineup.tactics.attack}/${s.lineup.tactics.defence}`,
         setPlays: (log?.setPlays ?? s.lineup.plays).join(' '), calling: log?.calling ?? 'none', callsMade: played?.callsMade ?? 0,
         match: matchText, ladder, premiers: history?.premiership ?? false,
-        cash: s.money, cashDelta: s.money - (weekStartMoney ?? snap.money), finance: { ...weekFinance },
+        cash: s.money, cashDelta: s.money - (weekStartMoney ?? snap.money),
+        ...(() => { const cap = capTotals(s.squad, s.capAccount, s.season); return { capUsed: cap.current, capLimit: cap.cap, capNext: cap.next, capProtected: cap.protectedExcess }; })(),
+        finance: { ...weekFinance },
         xpGained, xpTraining, xpMatch, levelUps, starsGained,
         squadOverall: squadOverall(s.squad), bestNine: rating(s), topOverall: topOverall(s.squad),
         atCeiling: s.squad.filter(playerAtCeiling).length, squadSize: s.squad.length, inDebt: s.money < 0,

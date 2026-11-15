@@ -31,7 +31,7 @@ import { bus } from '../../src/core/events';
 import {
   clearTickHooks, advanceWeek, TICK_ORDER,
 } from '../../src/core/time';
-import { LEAGUE, SQUAD_CAP, SQUAD_MIN } from '../../src/config';
+import { LEAGUE, SQUAD_CAP, SQUAD_MIN, WEEKS_PER_SEASON } from '../../src/config';
 
 beforeEach(() => {
   bus.clear();
@@ -264,7 +264,8 @@ describe('signPlayer', () => {
     expect(st.squad).toHaveLength(squadBefore + 1);
     expect(st.freeAgents.some((p) => p.id === agent.id)).toBe(false);
     const inSquad = st.squad.find((p) => p.id === agent.id)!;
-    expect(inSquad.contractWeeks).toBe(NEW_CONTRACT_WEEKS);
+    expect(inSquad.contractWeeks).toBe(WEEKS_PER_SEASON - st.week + 1);
+    expect(inSquad.deal).toMatchObject({ startSeason: st.season, endSeason: st.season });
     expect(signed).not.toBeNull();
     expect(signed!.id).toBe(agent.id);
   });

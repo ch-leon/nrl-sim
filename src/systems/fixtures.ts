@@ -786,7 +786,7 @@ export function registerFixturesSystem(): void {
     const rng = makeRng(s2.rngSeed);
     const fixtures = generateFixtures(clubIds, rng);
     if (s2.preseason !== undefined) fixtures.unshift(...generateTrialFixtures(clubIds, s2.rngSeed));
-    const clubs = rolloverRivals(withRivalSquads(s2.league.clubs, s2.rngSeed, PLAYER_ID), rng, PLAYER_ID).clubs;
+    const clubs = rolloverRivals(withRivalSquads(s2.league.clubs, s2.rngSeed, PLAYER_ID), rng, PLAYER_ID, s2.season).clubs;
     setState({
       league: { ...s2.league, clubs, fixtures, ladder: emptyLadder(clubIds) },
       rngSeed: rng.state(),

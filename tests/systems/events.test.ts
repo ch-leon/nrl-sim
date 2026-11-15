@@ -378,7 +378,7 @@ describe('rival player cards (#74)', () => {
     const picked = s.league.clubs.find((c) => c.id === ev!.rivalId)!.squad!.find((p) => p.id === ev!.subjectId)!;
     const st = { ...s, eventDeck: { ...s.eventDeck, pending: [ev] } };
     const r = resolveEvent(st, ev.id, 0, 10)!;
-    expect(r.state.squad.some((p) => p.id === picked.id && p.contractWeeks === 52)).toBe(true);
+    expect(r.state.squad.some((p) => p.id === picked.id && p.contractWeeks === WEEKS_PER_SEASON - st.week + 1 && p.deal?.endSeason === st.season)).toBe(true);
     expect(r.state.league.clubs.find((c) => c.id === ev!.rivalId)!.squad!.some((p) => p.id === picked.id)).toBe(false);
     expect(r.money).toEqual([{ amount: -ev.fee!, reason: 'event: Unsettled at a rival' }]);
     expect(r.news[0]!.text).toContain(ev.vars!.rival!);

@@ -49,8 +49,9 @@ export async function runCoachSays(browser) {
         await page.waitForSelector('.nrl-mo-controls', { timeout: 60000 });
         await skipFromPill(page);
         await page.waitForSelector('.nrl-mo-ft [data-back-to-club]', { timeout: 120000 });
-        // Clear generated cards and keep one known suggestion for the actual
-        // once-a-week summary, which waits until Back to Club.
+        // Clear generated cards so the summary has one known line. Salaries no
+        // longer leave the bank, so a $1,000 balance is not a short runway:
+        // the week finishes in the black and the coach says so.
         await page.evaluate(() => {
           const s = window.__nrlState();
           s.eventDeck.pending = [];
@@ -62,7 +63,7 @@ export async function runCoachSays(browser) {
         await page.waitForSelector('[data-week-summary]');
         const line = await page.locator('[data-week-summary] .nrl-coach-text').textContent();
         rec.lines.push(line);
-        if (!line.includes("weeks of cash left. No building till that's sorted.")) throw new Error(`wrong weekly suggestion: ${line}`);
+        if (!line.includes('The books are ahead this week; keep some aside for the lean ones.')) throw new Error(`wrong weekly suggestion: ${line}`);
         rec.problems.push(...await reachProblems(page, '[data-week-summary]', ['[data-summary-advance]', '[data-summary-close]']));
         await shot('weekly-summary');
       }

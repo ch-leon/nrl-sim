@@ -179,23 +179,17 @@ describe('advanceUntil — a club in debt', () => {
     expect(run.weeksPlayed).toBe(WEEKS_PER_SEASON);
     expect(getState().season).toBe(startSeason + 1);
     expect(getState().money).toBe(-20_000 - 2_000 * WEEKS_PER_SEASON);
-    // The economy still warns every week in the red; only the advance stopped stopping.
-    expect(toasts.filter((t) => t.text.startsWith('The club is in the red')).length).toBe(WEEKS_PER_SEASON);
+    expect(toasts.filter((t) => t.text.startsWith('The club is in the red'))).toHaveLength(0);
   });
 
-  it('into the red, then one forced sale a week down to the minimum, each a stop, then the target (N14.3)', async () => {
+  it('into the red, then the floor, without selling anyone, then the target', async () => {
     setState({ money: 25_000 });
     burnEachWeek(10_000);
     const squadBefore = getState().squad.length;
-    expect(squadBefore).toBeGreaterThan(SQUAD_MIN);
-    const sold = squadBefore - SQUAD_MIN;
     const { stops, calls } = await playThrough({ kind: 'finals' });
-    expect(stops[0]).toBe('Club has gone into debt.');
-    // The club sinks in steps: a sale a week, each named, until the squad is at the minimum.
-    expect(stops.slice(1)).toHaveLength(sold);
-    for (const stop of stops.slice(1)) expect(stop).toMatch(/^Forced sale: [^,]+ sold to cover debts\.$/);
-    expect(calls).toBe(sold + 2);
-    expect(getState().squad.length).toBe(SQUAD_MIN);
+    expect(stops).toEqual(['Club has gone into debt.', 'Balance below the fire-sale floor (-$100,000).']);
+    expect(calls).toBe(3);
+    expect(getState().squad).toHaveLength(squadBefore);
     expect(getState().week).toBe(25);
     expect(getState().money).toBeLessThan(ECON.FORCED_SALE_FLOOR);
   });
