@@ -5,10 +5,10 @@
 
 import { getState, setState, type GameState, type Player } from '../core/state';
 import { bus } from '../core/events';
-import { earnMoney, spendMoney } from '../data/club';
-import { renewedAgreement, salaryDemand } from './cap';
+import { earnMoney } from '../data/club';
+import { renewalAsk, renewedAgreement } from './cap';
 import { marketWage, overallRating } from '../data/player';
-import { BOARD, CONTRACTS, MORALE, SQUAD_MIN, difficultyMultipliers } from '../config';
+import { BOARD, CONTRACTS, MORALE, difficultyMultipliers } from '../config';
 import { fmtMoney } from '../utils/money';
 import { REP_BASELINE, REP_MAX } from './league';
 import type { SignResult } from './freeagency';
@@ -104,56 +104,47 @@ export function repayBoardLoan(): number {
   return owed;
 }
 
-/** A renewal the club can't pay for today, but the board would advance (N14.3). */
-export function renewsOnLoan(state: GameState, p: Player): boolean {
-  const fee = renewalFee(state, p);
-  return state.money < fee && fee <= boardLoanRoom(state);
+/** Renewals cost nothing, and the board does not lend for them. */
+export function renewsOnLoan(_state: GameState, _p: Player): boolean {
+  return false;
 }
 
 /**
- * Reasons: 'not-found', 'already-fresh' (contract already full length),
- * 'insufficient-funds' (short, and more than the board would advance). Short but
- * within the board's room, the fee is advanced as a board loan (N14.3).
+ * Queue one new season at his ability now. It starts the season after the
+ * current promise, costs no cash, and does not change this deal's salary or
+ * the weeks left on it. A second call in the same season changes nothing.
+ * Reasons: 'not-found', 'already-renewed'.
  */
 export function renewEarly(state: GameState, playerId: string): SignResult {
   const p = state.squad.find((x) => x.id === playerId);
-  if (!p) return { ok: false, reason: 'not-found' };
-  if (p.contractWeeks >= CONTRACTS.NEW_CONTRACT_WEEKS) return { ok: false, reason: 'already-fresh' };
-  const fee = renewalFee(state, p);
-  const onLoan = state.money < fee;
-  if (onLoan && !takeBoardLoan(fee)) return { ok: false, reason: 'insufficient-funds' };
-
-  // On a loan the balance can stay below zero, which spendMoney refuses: the fee is paid all the same.
-  if (onLoan) earnMoney(-fee, `renew:${playerId}`);
-  else spendMoney(fee, `renew:${playerId}`);
-  const after = getState();
-  const wage = renewalWage(p, state);
-  // A new one-season agreement starts after the current promise. The old cash
-  // fee still applies; the fee-free renewal is #558. The annual salary is unchanged.
-  const deal = renewedAgreement(p.deal, state.season, p.deal?.salary ?? salaryDemand(p));
+  if (!p) return { ok: false, reason: 'not-found', message: 'Player not found.' };
+  if (p.deal?.renewal) {
+    return {
+      ok: false,
+      reason: 'already-renewed',
+      message: `A renewal is already queued from season ${p.deal.renewal.startSeason}. Nothing was charged.`,
+    };
+  }
+  const ask = renewalAsk(p, hasStaff(state, 'welfare'));
+  const deal = renewedAgreement(p.deal, state.season, ask.salary);
+  const start = deal.renewal?.startSeason ?? deal.startSeason;
+  const changed = p.deal !== undefined && ask.salary !== p.deal.salary;
   setState({
-    squad: after.squad.map((x) => x.id === playerId ? { ...x, wage, contractWeeks: CONTRACTS.NEW_CONTRACT_WEEKS, deal } : x),
+    squad: state.squad.map((x) => x.id === playerId ? { ...x, deal } : x),
   });
-  bus.emit('ui:notify', {
-    text: onLoan
-      ? `Re-signed ${p.name} for ${CONTRACTS.NEW_CONTRACT_WEEKS} weeks on a board loan of ${fmtMoney(fee)}, repaid at the season's end`
-      : `Re-signed ${p.name} for ${CONTRACTS.NEW_CONTRACT_WEEKS} weeks`,
-    kind: 'success',
-  });
+  const text = `Renewal queued for ${p.name} from season ${start} at ${fmtMoney(ask.salary)} a season. No fee.${changed ? ` ${ask.why}.` : ''}`;
+  bus.emit('ui:notify', { text, kind: 'success' });
   return { ok: true };
 }
 
-/** Sell a squad player for their transfer fee. Reasons: 'not-found', 'squad-min'. */
+/**
+ * A sale needs a buyer who pays and takes the player. That path is not in
+ * yet, so this refuses and changes nothing. Reasons: 'not-found', 'no-buyer'.
+ */
 export function sellPlayer(state: GameState, playerId: string): SignResult {
   const p = state.squad.find((x) => x.id === playerId);
-  if (!p) return { ok: false, reason: 'not-found' };
-  if (state.squad.length <= SQUAD_MIN) return { ok: false, reason: 'squad-min' };
-
-  const fee = transferFee(p);
-  setState({ squad: state.squad.filter((x) => x.id !== playerId) });
-  earnMoney(fee, `sell:${playerId}`);
-  bus.emit('ui:notify', { text: `Sold ${p.name} for ${fmtMoney(fee)}`, kind: 'success' });
-  return { ok: true };
+  if (!p) return { ok: false, reason: 'not-found', message: 'Player not found.' };
+  return { ok: false, reason: 'no-buyer', message: 'No club has bought him. Nothing was changed.' };
 }
 
 /** Squad contracts sorted by weeks remaining (soonest first), then name. */
@@ -171,7 +162,7 @@ export const CONTRACT_DOT_WEEKS = 4;
 /** Squad players whose contracts end within `weeks` (juniors and departed players aside), soonest first. Pure. */
 export function contractsEndingSoon(state: Pick<GameState, 'squad'>, weeks = CONTRACT_DOT_WEEKS): Player[] {
   return state.squad
-    .filter((p) => !p.departed && !p.junior && p.contractWeeks <= weeks)
+    .filter((p) => !p.departed && !p.junior && !p.deal?.renewal && p.contractWeeks <= weeks)
     .sort((a, b) => a.contractWeeks - b.contractWeeks || a.name.localeCompare(b.name));
 }
 

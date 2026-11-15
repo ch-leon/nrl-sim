@@ -129,7 +129,7 @@ export function financeSummary(state: GameState): FinanceSummary {
   const cap = capTotals(state.squad, state.capAccount, state.season);
 
   const expiring = state.squad
-    .filter((p) => p.contractWeeks <= EXPIRY_WINDOW_WEEKS)
+    .filter((p) => !p.deal?.renewal && p.contractWeeks <= EXPIRY_WINDOW_WEEKS)
     .map((p) => ({ id: p.id, name: p.name, contractWeeks: p.contractWeeks, wage: p.wage }))
     .sort((a, b) => a.contractWeeks - b.contractWeeks);
 

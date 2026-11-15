@@ -1,6 +1,6 @@
 // QA only. Decisions call the same system operations as the club screens and soak manager.
 import { getState, setState, type GameState, type Player, type PlayerStats } from '../../core/state';
-import { ON_FIELD, SQUAD_CAP, WEEKS_PER_SEASON, difficultyMultipliers } from '../../config';
+import { ON_FIELD, SQUAD_CAP, WEEKS_PER_SEASON } from '../../config';
 import { makeRng } from '../../utils/rng';
 import { overallRating, POSITION_GROUPS, shownStats, type PositionGroup } from '../../data/player';
 import { cardById, type EventEffect } from '../../data/events';
@@ -12,7 +12,8 @@ import { hasTrait } from '../../data/traits';
 import { chooseEvent } from '../../systems/events';
 import { setTrainingFocus, spendByFocus, TRAINING_FOCI, weakestStat } from '../../systems/training';
 import { releasePlayer, signPlayer, signingFee } from '../../systems/freeagency';
-import { renewalFee, renewEarly } from '../../systems/contracts';
+import { renewEarly } from '../../systems/contracts';
+import { capRoomFor, salaryDemand } from '../../systems/cap';
 import { attackCoach, attackCoachWage, ATTACK_SPECIALITIES, hasStaff, hireAttackCoach, hireStaff, staffWage } from '../../systems/staff';
 import { buyPlay, ownedPlays, takePlay } from '../../systems/playbook';
 import { autoPickKeepingPlan, commitLineup, isFieldable, resolveLineup, setTactics } from '../../systems/lineup';
@@ -186,7 +187,7 @@ export function createPersonaManager(config: PersonaConfig, seed: number, ops: S
       if (config.recruits.renewStars) {
         for (const p of [...getState().squad].sort(byRating).slice(0, ON_FIELD)) {
           const s = getState();
-          if (p.contractWeeks <= 4 && s.money - renewalFee(s, p) - p.wage * config.recruits.wageWeeks >= config.recruits.reserve) renewEarly(s, p.id);
+          if (p.contractWeeks <= 4 && !p.deal?.renewal) renewEarly(s, p.id);
         }
       }
       // One star a week, or enough affordable players to reach the shallow squad floor.
@@ -197,9 +198,9 @@ export function createPersonaManager(config: PersonaConfig, seed: number, ops: S
         if (!short && !['improve', 'stars'].includes(config.recruits.policy)) break;
         const ninth = [...s.squad].sort(byRating)[ON_FIELD - 1];
         const candidates = s.freeAgents.filter(p => !p.junior && isFieldable(p)
-          && s.money - signingFee(s, p) - p.wage * config.recruits.wageWeeks >= config.recruits.reserve
-          && (short || config.recruits.policy === 'stars' || overallRating(p) > (ninth ? overallRating(ninth) : 0))
-          && (config.recruits.policy !== 'improve' || ops.weeklyNet(s) - p.wage * difficultyMultipliers(s.settings.difficulty).wages >= -3000))
+          && s.money - signingFee(s, p) >= config.recruits.reserve
+          && capRoomFor(s.squad, s.capAccount, s.season, salaryDemand(p))
+          && (short || config.recruits.policy === 'stars' || overallRating(p) > (ninth ? overallRating(ninth) : 0)))
           .sort(config.recruits.policy === 'minimum' ? (a, b) => a.wage - b.wage || byRating(a, b) : byRating);
         const p = candidates[0];
         if (!p) break;

@@ -15,13 +15,12 @@ import { fmtMoney } from '../../utils/money';
 import { BOARD, DIFFICULTY, ECON, LEAGUE, PRIZE, SQUAD_MIN, SEASON_ROUNDS, FINALS_WEEKS, WEEKS_PER_SEASON, TRAINING_FOCUS, WILDCARDS } from '../../config';
 import { activePack } from '../../content';
 import { inlineIqStat } from '../../content/pack';
-import { ATTACK_COACHES, ATTACK_SPECIALITIES, STAFF, WELFARE_RENEWAL_CUT } from '../../systems/staff';
+import { ATTACK_COACHES, ATTACK_SPECIALITIES, STAFF } from '../../systems/staff';
 import { playsOfFamily } from '../../data/plays';
 import { PLAYS } from '../../match/league/plays';
 import { LEVEL_MULT } from '../../data/facility';
 import { sponsorReturn } from '../../systems/economy';
 import { REP_BASELINE } from '../../systems/league';
-import { RUNWAY_LOW_WEEKS, RUNWAY_SHORT_WEEKS } from '../hud';
 import { officeUnlockLine } from '../coachCallsText';
 
 const percent = (x: number): string => `${Math.round(x * 100)}%`;
@@ -152,15 +151,15 @@ export const CLUB_PAGES: readonly GuidePage[] = [
       {
         heading: 'Going out',
         bullets: [
-          `Wages every week (Easy pays ${percent(DIFFICULTY.easy.wages)}, Hard ${percent(DIFFICULTY.hard.wages)}); wages climb with a player’s rating and with the club’s standing.`,
-          'Upkeep on every facility: about 1% of its build cost a week, more at higher levels.',
-          'Running costs (staff, travel, insurance) every week whatever you have built: $1,500 on Normal, $1,200 on Easy, $1,800 on Hard, plus the wages of any staff you hire.',
-          'Signing fees, early-renewal fees, building, moving (10% of the build cost) and demolishing (30% back).',
+          'A signing fee: one year’s wage up front, or a quarter of that for an Academy prospect. A Scout Office takes 10% off the fee per level. The salary then sits on the cap, not the bank, and difficulty does not scale either number.',
+          'Releasing a player: a quarter of the salary still to run, and never more than one year’s salary. It is refused when the cash is short. The signing fee is not refunded.',
+          'Building, moving (10% of the build cost) and demolishing (30% back).',
+          'A renewal costs no cash. The new salary starts when the current deal ends.',
         ],
       },
       {
         heading: 'The Finance screen',
-        text: `This season’s books by line, the cash in the bank, and the salary cap: what this season’s deals add up to and what is already promised next season. Salaries sit on the cap. They are not a weekly bill, and a negative balance does not sell a player. The balance at the left of the dock turns amber when the money would last fewer than ${RUNWAY_LOW_WEEKS} weeks at this week’s spending and red under ${RUNWAY_SHORT_WEEKS}; tap it to open this screen.`,
+        text: 'This season’s books by line, the cash in the bank, and the salary cap: what this season’s deals add up to and what is already promised next season. Salaries sit on the cap. They are not a weekly bill, and a negative balance does not sell a player. The balance at the left of the dock is the cash in the bank; tap it to open this screen.',
       },
     ],
   },
@@ -188,9 +187,9 @@ export const CLUB_PAGES: readonly GuidePage[] = [
       {
         heading: 'Contracts',
         bullets: [
-          'A new signing covers the rest of this season. You are warned at 8, 4 and 1 weeks. When the deal ends he is unsigned unless you have renewed early. Renewing early starts a new one-season agreement after this one. The board does not lend.',
-          'Renew early for a fee of two weeks of the new wage; the ask rises when he is unhappy and when the club’s reputation is high.',
-          'Sell for a transfer fee (rating² × $10, more for the young, less for the old) or release for two weeks’ wage. The squad can never drop below 13.',
+          'A new signing covers the rest of this season and needs both the cash for the fee and room under the salary cap. You are warned at 8, 4 and 1 weeks, unless a renewal is already queued. When the deal ends he is unsigned unless you have renewed. Renewing queues one new season after this deal, and a second renewal in the same season does nothing. The board does not lend.',
+          'The renewal ask follows his ability now, with a small change for age and potential. It does not move because he is unhappy, and the club’s reputation does not inflate it. A signed salary stays fixed until that deal ends.',
+          'There is no buyer for a sale yet. Release costs the payout shown, and it is refused when the cash is short. The squad can never drop below 13.',
         ],
       },
       {
@@ -199,13 +198,13 @@ export const CLUB_PAGES: readonly GuidePage[] = [
           'Three hires the facilities don’t cover, beside the board’s objectives on the Staff & Board screen (in Office). Each is paid a wage a week with the running costs and stays until you let him go.',
           `${STAFF.assistantCoach.title} (${fmtMoney(STAFF.assistantCoach.wage)} a week on Normal): changes your plan at the break when you fast-forward a match, the same way a rival’s does. A match you watch, and Skip, stay on the plan you set.`,
           `${STAFF.analyst.title} (${fmtMoney(STAFF.analyst.wage)} a week on Normal): on the next-match card and the rival’s squad page, says what they switch to when they are behind.`,
-          `${STAFF.welfare.title} (${fmtMoney(STAFF.welfare.wage)} a week on Normal): halves the odds of a player’s grievance card (a meeting, a pay-rise demand, a homesick youngster) and takes ${percent(WELFARE_RENEWAL_CUT)} off renewal asks.`,
+          `${STAFF.welfare.title} (${fmtMoney(STAFF.welfare.wage)} a week on Normal): halves the odds of a player’s grievance card (a meeting, a pay-rise demand, a homesick youngster) and takes 3% off a new agreement.`,
         ],
       },
       {
         heading: 'Recruiting',
         bullets: [
-          'The free-agent pool holds 12 and refreshes every 4 weeks; rivals sign from the same pool, so a good one does not wait. A signing fee by rating and age applies (a Scout Office takes 10% off per level).',
+          'The free-agent pool holds 12 and refreshes every 4 weeks; rivals sign from the same pool and cannot go over the salary cap, so a good one does not wait. A signing costs one year’s wage up front (a quarter for an Academy prospect). A Scout Office takes 10% off the fee per level.',
           `The pool sits around the league: at a new club its players are about ${LEAGUE.MEAN - LEAGUE.POOL_BELOW} overall, with a star now and then. Reputation, a Scout Office and an Academy lift it.`,
           'Each pre-season the Academy brings 3 prospects aged 17–19 into the pool, 4 with an Academy built and 5 at level 3; from level 2 they arrive as Young Guns.',
           `Short of ${SQUAD_MIN} fit before a match, the Academy calls up juniors to make the side, on the junior wage to the season’s end (better ones with an Academy built).`,

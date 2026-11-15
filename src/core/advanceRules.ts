@@ -31,6 +31,8 @@ export interface SquadMember {
   name: string;
   injuredWeeks: number;
   contractWeeks: number;
+  /** Set when a renewal is already queued, so the current countdown is not an expiry. */
+  deal?: { renewal?: unknown };
 }
 
 /** First week of the finals block (QF). */
@@ -114,6 +116,7 @@ export function contractAlerts(
       if (p.contractWeeks <= EXPIRING_WEEKS) out.push(`${p.name} left the club (contract expired).`);
       continue;
     }
+    if (p.deal?.renewal || now.deal?.renewal) continue;
     if (p.contractWeeks > EXPIRING_WEEKS && now.contractWeeks > 0 && now.contractWeeks <= EXPIRING_WEEKS) {
       out.push(`${p.name}'s contract is up in ${now.contractWeeks} week${now.contractWeeks === 1 ? '' : 's'}.`);
     }

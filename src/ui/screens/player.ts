@@ -18,9 +18,11 @@ import { getState, setState, type GameState, type Player, type PlayerStats, type
 import { save } from '../../core/save';
 import { marketWage, overallRating, ratingText, shownStats } from '../../data/player';
 import { ROMAN, TRAITS, headlineTrait, traitTip } from '../../data/traits';
-import { PROGRESSION, CONTRACTS, MORALE, SQUAD_CAP, SQUAD_MIN, difficultyMultipliers } from '../../config';
-import { renewalFee, renewalWeeklyCost, renewEarly, sellPlayer, transferFee } from '../../systems/contracts';
-import { RELEASE_PAYOUT_WEEKS, releasePlayer, signingFee, signingFeeBasis } from '../../systems/freeagency';
+import { PROGRESSION, MORALE, SQUAD_CAP, SQUAD_MIN } from '../../config';
+import { renewEarly, sellPlayer } from '../../systems/contracts';
+import { releasePlayer, signingFee, signingFeeBasis } from '../../systems/freeagency';
+import { capRoomFor, releaseTerms, renewalAsk, salaryDemand } from '../../systems/cap';
+import { hasStaff } from '../../systems/staff';
 import { signWithUndo } from '../../systems/undo';
 import { activePack } from '../../content';
 import { PLAYER_ID } from '../../systems/fixtures';
@@ -138,52 +140,57 @@ export function playerActions(p: Player, ctx: PlayerContext, state: GameState): 
   if (ctx.kind === 'rival') return [];
   if (ctx.kind === 'freeAgent') {
     const fee = signingFee(state, p);
+    const salary = salaryDemand(p);
     const full = state.squad.length >= SQUAD_CAP;
     const broke = state.money < fee;
+    const overCap = !capRoomFor(state.squad, state.capAccount, state.season, salary);
     return [{
       id: 'sign',
       label: `Sign · ${fmtMoney(fee)}`,
-      detail: `${signingFeeBasis(state, p)} · then ${fmtMoney(paidWage(p, state))}/wk`,
-      enabled: !full && !broke,
-      ...(full ? { why: `Squad full (${SQUAD_CAP})` } : broke ? { why: 'Not enough money for the fee' } : {}),
+      detail: `${signingFeeBasis(state, p)} · ${fmtMoney(salary)} a season on the cap`,
+      enabled: !full && !broke && !overCap,
+      ...(full ? { why: `Squad full (${SQUAD_CAP})` }
+        : broke ? { why: `Not enough cash. The signing fee is ${fmtMoney(fee)}.` }
+        : overCap ? { why: `Not enough cap room. He costs ${fmtMoney(salary)} a season.` }
+        : {}),
     }];
   }
-  const fee = renewalFee(state, p);
-  const fresh = p.contractWeeks >= CONTRACTS.NEW_CONTRACT_WEEKS;
-  const broke = state.money < fee;
+  const ask = renewalAsk(p, hasStaff(state, 'welfare'));
+  const queued = p.deal?.renewal;
+  const start = queued?.startSeason ?? (p.deal ? p.deal.endSeason + 1 : state.season);
+  const changed = p.deal && ask.salary !== p.deal.salary ? ` ${ask.why}.` : '';
   const atMin = state.squad.length <= SQUAD_MIN;
   const minWhy = `Squad at the minimum (${SQUAD_MIN})`;
+  const terms = releaseTerms(p, state.season, state.week);
+  const short = state.money < terms.payout;
   return [
     {
       id: 'renew',
-      // #420: a Renew that can't be had shows no price; the line above it says why (with the fee when it is the money).
-      label: fresh || broke ? 'Renew' : `Renew · ${fmtMoney(fee)}`,
-      detail: `${fmtMoney(renewalWeeklyCost(state, p))}/wk for ${CONTRACTS.NEW_CONTRACT_WEEKS} weeks`,
-      enabled: !fresh && !broke,
-      ...(fresh ? { why: 'Contract already full length' } : broke ? { why: `Not enough money for the ${fmtMoney(fee)} fee` } : {}),
+      label: queued ? 'Renewal queued' : 'Renew',
+      detail: queued
+        ? `From season ${queued.startSeason} at ${fmtMoney(queued.salary)} a season. No fee.`
+        : `From season ${start} at ${fmtMoney(ask.salary)} a season. No fee.${changed}`,
+      enabled: !queued,
+      ...(queued ? { why: `Already queued from season ${queued.startSeason}.` } : {}),
     },
     {
       id: 'sell',
-      label: `Sell +${fmtMoney(transferFee(p))}`,
-      enabled: !atMin,
+      label: 'No buyer',
+      detail: 'No club has bought him yet. Nothing is sold.',
+      enabled: true,
+      danger: true,
       confirm: 'Really sell?',
-      ...(atMin ? { why: minWhy } : {}),
     },
     {
       id: 'release',
-      label: `Release · ${fmtMoney(RELEASE_PAYOUT_WEEKS * p.wage)}`,
-      detail: `${RELEASE_PAYOUT_WEEKS}×wage settlement`,
-      enabled: !atMin,
+      label: `Release · ${fmtMoney(terms.payout)}`,
+      detail: `Frees ${fmtMoney(terms.capFreed)} of this season's cap${terms.nextCapFreed ? ` and ${fmtMoney(terms.nextCapFreed)} next season` : ''}. No signing fee back.`,
+      enabled: !atMin && !short,
       danger: true,
       confirm: 'Really release?',
-      ...(atMin ? { why: minWhy } : {}),
+      ...(atMin ? { why: minWhy } : short ? { why: `Not enough cash. Releasing him costs ${fmtMoney(terms.payout)}.` } : {}),
     },
   ];
-}
-
-/** The weekly wage as the club pays it (the difficulty's multiplier applied). */
-function paidWage(p: Player, state: Pick<GameState, 'settings'>): number {
-  return Math.round(p.wage * difficultyMultipliers(state.settings.difficulty).wages);
 }
 
 const ordinal = (n: number): string => {
@@ -248,10 +255,13 @@ function rolesOf(r: ReturnType<typeof sideRoles>, id: string): { starter: boolea
 export function playerPageModel(p: Player, ctx: PlayerContext, state: GameState): PlayerPageModel {
   const squad = ctx.kind === 'squad';
   const headline = headlineTrait(p.position, p.traits);
-  const wage = paidWage(p, state);
+  const queuedDeal = p.deal?.renewal;
+  const annual = p.deal?.salary ?? salaryDemand(p);
   const contract = ctx.kind === 'freeAgent'
-    ? { text: `Asks ${fmtMoney(wage)}/wk on a ${CONTRACTS.NEW_CONTRACT_WEEKS}-week deal`, expiring: false }
-    : { text: `${weeksText(p.contractWeeks)} left · ${fmtMoney(wage)}/wk`, expiring: p.contractWeeks <= MORALE.EXPIRING_WEEKS };
+    ? { text: `Fee ${fmtMoney(signingFee(state, p))} · ${fmtMoney(salaryDemand(p))} a season for the rest of this season`, expiring: false }
+    : queuedDeal
+      ? { text: `${weeksText(p.contractWeeks)} left on this deal · renewed from season ${queuedDeal.startSeason} at ${fmtMoney(queuedDeal.salary)}/season`, expiring: false }
+      : { text: `${weeksText(p.contractWeeks)} left · ${fmtMoney(annual)}/season on the cap`, expiring: p.contractWeeks <= MORALE.EXPIRING_WEEKS };
   const seasonsAtClub = p.joinedSeason !== undefined ? state.season - p.joinedSeason + 1 : null;
   // Keep the squad focus visible: it now controls level-point spending.
   const focus = state.training?.focus ?? 'balanced';
@@ -426,14 +436,16 @@ html[data-text-size] .nrl-player-name { font-size: 1.125rem; overflow-wrap: brea
 
 const FAILURE: Record<string, string> = {
   'squad-full': 'Squad is full — release a player first.',
-  'insufficient-funds': 'Not enough money.',
+  'insufficient-funds': 'Not enough cash.',
+  'over-cap': 'Not enough salary-cap room.',
   'not-found': 'That player is no longer there.',
-  'already-fresh': 'Contract is already full length.',
+  'already-renewed': 'A renewal is already queued.',
+  'no-buyer': 'No club has bought him. Nothing was changed.',
   'squad-min': `Squad can't go below ${SQUAD_MIN}.`,
 };
 
 /** Run an action through the system function that owns it. */
-function runAction(id: PlayerActionId, playerId: string): { ok: boolean; reason?: string } {
+function runAction(id: PlayerActionId, playerId: string): { ok: boolean; reason?: string; message?: string } {
   const s = getState();
   switch (id) {
     case 'sign': return signWithUndo(playerId); // with a 5-second Undo (#370)
@@ -635,7 +647,7 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
           if (a.confirm && !armedTap(performance.now() - armedAt)) return;
           arm(null);
           const res = runAction(a.id, p.id);
-          if (!res.ok) bus.emit('ui:notify', { text: FAILURE[res.reason ?? ''] ?? 'Not possible.', kind: 'info' });
+          if (!res.ok) bus.emit('ui:notify', { text: res.message ?? FAILURE[res.reason ?? ''] ?? 'Not possible.', kind: 'info' });
         }, { class: primary ? 'nrl-btn-primary' : ask ? `nrl-btn-danger ${ARMED_CLASS}` : 'nrl-btn-danger' });
         if (ask) atRest = () => { btn.classList.remove(ARMED_CLASS); btn.textContent = a.label; };
         btn.setAttribute('data-player-action', a.id);

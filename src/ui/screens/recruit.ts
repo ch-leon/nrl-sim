@@ -12,8 +12,9 @@ import { overallRating, ratingText } from '../../data/player';
 import {
   signingFee, signingFeeBasis, weeksToPoolRefresh, FREE_AGENT_POOL_SIZE,
 } from '../../systems/freeagency';
+import { capRoomFor, salaryDemand } from '../../systems/cap';
 import { signWithUndo } from '../../systems/undo';
-import { SQUAD_CAP, difficultyMultipliers } from '../../config';
+import { SQUAD_CAP } from '../../config';
 import { POSITION_SHORT } from '../../systems/lineup';
 import { openPlayerPage, positionLabel } from './player';
 import { squadTabs } from './squad';
@@ -461,21 +462,25 @@ export function openRecruitScreen(): void {
       : 'No affordable shortlist today. Show all free agents to browse the pool.' }));
     for (const { p: agent, fee, ovr } of visible) {
       const reach = !fullView && agent.id === shortlist.reachId;
+      const salary = salaryDemand(agent);
+      const overCap = !capRoomFor(s.squad, s.capAccount, s.season, salary);
       const short = fee - s.money;
-      // The signing fee: a transfer-style fee by rating and age (#146).
-      const action = button(full ? 'SQUAD FULL' : short > 0 ? `NEED ${fmtMoneyShort(short, { roundUp: true })}` : 'SIGN', () => {
+      const blocked = full || short > 0 || overCap;
+      const action = button(full ? 'SQUAD FULL' : overCap ? 'OVER CAP' : short > 0 ? `NEED ${fmtMoneyShort(short, { roundUp: true })}` : 'SIGN', () => {
         const res = signWithUndo(agent.id); // "Signed …" with a 5-second Undo (#370)
-        if (!res.ok) bus.emit('ui:notify', { text: signFailureText(res.reason), kind: 'info' });
-      }, { class: `nrl-row-action${full || short > 0 ? '' : ' nrl-btn-primary'}` });
+        if (!res.ok) bus.emit('ui:notify', { text: signFailureText(res.reason, res.message), kind: 'info' });
+      }, { class: `nrl-row-action${blocked ? '' : ' nrl-btn-primary'}` });
       action.addEventListener('click', (e) => e.stopPropagation());
-      action.disabled = full || short > 0;
+      action.disabled = blocked;
       action.title = full
-        ? `Squad full (${SQUAD_CAP}): release or sell a player first`
-        : short > 0
-          ? `The ${fmtMoney(fee)} fee is ${fmtMoney(short)} more than the bank`
-          : `Signing fee ${fmtMoney(fee)} (${signingFeeBasis(s, agent)}), then ${fmtMoney(agent.wage)}/wk`;
+        ? `Squad full (${SQUAD_CAP}): release a player first`
+        : overCap
+          ? `Not enough cap room. He costs ${fmtMoney(salary)} a season.`
+          : short > 0
+            ? `The ${fmtMoney(fee)} fee is ${fmtMoney(short)} more than the bank`
+            : `Signing fee ${fmtMoney(fee)} (${signingFeeBasis(s, agent)}), then ${fmtMoney(salary)} a season on the cap`;
       const chips = traitChips(agent);
-      if (agent.junior) chips.unshift(el('span', { class: 'nrl-chip nrl-chip-academy', text: 'Academy', attrs: { title: 'Academy prospect: a 4×wage fee' } }));
+      if (agent.junior) chips.unshift(el('span', { class: 'nrl-chip nrl-chip-academy', text: 'Academy', attrs: { title: "Academy prospect: a quarter of one year's wage" } }));
       if (agent.id === shortlist.pickId) chips.unshift(el('span', {
         class: 'nrl-chip', text: "Coach's pick",
         attrs: { 'data-coach-pick': '', title: 'The biggest affordable improvement at his position in the starting side.' },
@@ -487,10 +492,12 @@ export function openRecruitScreen(): void {
       who.style.whiteSpace = 'normal';
       if (reach) {
         const income = weeklyIncome(s);
-        const gap = fee + 8 * agent.wage * difficultyMultipliers(s.settings.difficulty).wages - s.money;
-        const reason = income > 0 ? `Fee ${fmtMoney(fee)}: about ${Math.ceil(gap / income)} weeks away`
-            : `Fee ${fmtMoney(fee)}: more weekly income needed`;
-        const note = el('span', { text: reason, attrs: { title: 'Saving the fee plus eight weeks of wages, estimated from weekly income before expenses; gates and spending can change it.' } });
+        const gap = fee - s.money;
+        const reason = overCap
+          ? `Cap: he costs ${fmtMoney(salary)} a season`
+          : income > 0 && gap > 0 ? `Fee ${fmtMoney(fee)}: about ${Math.ceil(gap / income)} weeks away`
+          : `Fee ${fmtMoney(fee)}: more cash needed`;
+        const note = el('span', { text: reason, attrs: { title: 'The signing fee against weekly income. Gates and spending can change it. The salary sits on the cap, not the bank.' } });
         note.style.color = 'var(--nrl-alert)';
         note.style.flexBasis = '100%';
         who.append(note);
@@ -503,7 +510,7 @@ export function openRecruitScreen(): void {
         el('span', { class: 'nrl-num', text: String(agent.age) }),
         el('span', { class: 'nrl-num nrl-row-ovr', text: ratingText(ovr), attrs: { title: 'Overall rating' } }),
         feeCell,
-        el('span', { class: 'nrl-num nrl-row-dim', text: fmtMoney(agent.wage), attrs: { title: 'Weekly wage' } }),
+        el('span', { class: 'nrl-num nrl-row-dim', text: fmtMoney(salary), attrs: { title: 'Annual salary on the cap' } }),
         action,
       ], () => openPlayerPage(agent, { kind: 'freeAgent' })));
     }
@@ -518,7 +525,7 @@ export function openRecruitScreen(): void {
 
   const head = screenHead('', { lead: [squadTabs('recruit')], sub, controls: [sort.button] });
   const screen = el('div', { class: 'nrl-screen nrl-sq nrl-recruit' }, head,
-    gridHead(['Player', 'Pos', 'Age', ['Ovr', 'nrl-col-ovr'], 'Fee', 'Wage', '']), list);
+    gridHead(['Player', 'Pos', 'Age', ['Ovr', 'nrl-col-ovr'], 'Fee', 'Cap', '']), list);
   // openScreen closes any other open screen (running its teardown) first.
   openScreen(screen, onRecruitClosed, 'recruit');
   render();
@@ -528,10 +535,12 @@ export function openRecruitScreen(): void {
 }
 
 /** Map a signPlayer failure reason to player-facing copy. */
-function signFailureText(reason?: string): string {
+function signFailureText(reason?: string, message?: string): string {
+  if (message) return message;
   switch (reason) {
     case 'squad-full': return 'Squad is full — release a player first.';
-    case 'insufficient-funds': return 'Not enough money for the signing fee.';
+    case 'insufficient-funds': return 'Not enough cash for the signing fee.';
+    case 'over-cap': return 'Not enough salary-cap room.';
     case 'not-found': return 'That free agent is no longer available.';
     default: return 'Could not sign player.';
   }

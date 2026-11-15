@@ -12,13 +12,14 @@ import { createNewGame, FINANCE_LINES, getState, loadState, setState, type Finan
 import { advanceWeek, clearSeasonHooks, clearTickHooks, weekHeld, withFastForward } from '../core/time';
 import { bus, type Events } from '../core/events';
 import { migrateState, MIGRATIONS } from '../core/save';
-import { EVENTS, GRID_H, GRID_W, ON_FIELD, SEASON_ROUNDS, SQUAD_CAP, WEEKS_PER_SEASON, difficultyMultipliers, type Difficulty } from '../config';
+import { EVENTS, GRID_H, GRID_W, ON_FIELD, SEASON_ROUNDS, SQUAD_CAP, WEEKS_PER_SEASON, type Difficulty } from '../config';
 import { finalsSeeds, initLeague, isFinalsRound, registerFixturesSystem } from '../systems/fixtures';
 import { registerUnlockSystem, isFacilityOpen } from '../systems/unlocks';
 import { isTrainingFocus, registerTrainingSystem, setSpendMode, setTrainingFocus, weakestStat } from '../systems/training';
 import { hasStaff, hireStaff, staffWage, type HireRole } from '../systems/staff';
 import { classifyReason, homeGate, registerEconomySystem, registerFinanceSystem, weeklyIncome, weeklyOverhead, weeklyUpkeep, weeklyWages } from '../systems/economy';
 import { registerFreeAgencySystem, signPlayer, signingFee } from '../systems/freeagency';
+import { capRoomFor, salaryDemand } from '../systems/cap';
 import { registerPlayerMatchSystem } from '../systems/matchday';
 import { registerMoraleSystem } from '../systems/morale';
 import { registerAgingSystem } from '../systems/aging';
@@ -520,7 +521,7 @@ export function managedEventChoice(state: GameState, event: PendingEvent): numbe
   const card = cardById(event.cardId);
   const index = card?.choices.findIndex(choice => {
     let candidate = state;
-    let cashCost = 0, wageRise = 0, signingWages = 0;
+    let cashCost = 0, wageRise = 0;
     let signs = false;
     for (const effect of choice.effects) {
       if (effect.kind === 'money') {
@@ -533,8 +534,9 @@ export function managedEventChoice(state: GameState, event: PendingEvent): numbe
       } else if (effect.kind === 'signSubject') {
         const signed = signRivalPlayer(candidate, event.rivalId, event.subjectId, event.fee ?? 0);
         if (typeof signed === 'string') return false;
+        const added = signed.squad.find(p => p.id === event.subjectId);
+        if (!added?.deal || !capRoomFor(candidate.squad, candidate.capAccount, candidate.season, added.deal.salary)) return false;
         signs = true;
-        signingWages += weeklyWages(signed) - weeklyWages(candidate);
         candidate = { ...signed, money: signed.money - (event.fee ?? 0) };
       }
       // Other effects do not guarantee new financing costs in the current deck.
@@ -542,7 +544,7 @@ export function managedEventChoice(state: GameState, event: PendingEvent): numbe
     }
     if (cashCost > 0 && (candidate.money < MANAGED.BUILD_RESERVE || weeklyNet(candidate) < 0)) return false;
     if (wageRise > 0 && (candidate.money - wageRise * WEEKS_PER_SEASON < MANAGED.STAFF_RESERVE || weeklyNet(candidate) < 0)) return false;
-    if (signs && (candidate.money - signingWages * MANAGED.WAGE_WEEKS < MANAGED.STAR_RESERVE || weeklyNet(candidate) < -MANAGED.BURN_ALLOWED)) return false;
+    if (signs && candidate.money < MANAGED.STAR_RESERVE) return false;
     return true;
   });
   return index === undefined || index < 0 ? undefined : index;
@@ -650,7 +652,8 @@ function manage(): Signed {
   let st = getState();
   while (st.squad.length < MANAGED.SQUAD_FLOOR) {
     const fits = st.freeAgents
-      .filter((p) => !p.junior && signingFee(st, p) + p.wage * MANAGED.WAGE_WEEKS < st.money)
+      .filter((p) => !p.junior && signingFee(st, p) < st.money
+        && capRoomFor(st.squad, st.capAccount, st.season, salaryDemand(p)))
       .sort((a, b) => overallRating(b) - overallRating(a))[0];
     if (!fits) break;
     const fee = trySign(fits);
@@ -664,9 +667,9 @@ function manage(): Signed {
       .filter((p) => !p.junior && overallRating(p) >= ninth + MANAGED.STAR_MARGIN)
       .sort((a, b) => overallRating(b) - overallRating(a))[0];
     if (star) {
-      const budget = st.money - MANAGED.STAR_RESERVE - star.wage * MANAGED.WAGE_WEEKS;
-      const burn = weeklyNet(st) - star.wage * difficultyMultipliers(st.settings.difficulty).wages;
-      if (budget > 0 && signingFee(st, star) <= budget && burn >= -MANAGED.BURN_ALLOWED) {
+      const budget = st.money - MANAGED.STAR_RESERVE;
+      if (budget > 0 && signingFee(st, star) <= budget
+        && capRoomFor(st.squad, st.capAccount, st.season, salaryDemand(star))) {
         const fee = trySign(star);
         if (fee !== null) record(star, fee);
       }

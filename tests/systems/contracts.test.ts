@@ -73,30 +73,54 @@ describe('renewal asks track the club (N6, #167)', () => {
     expect(clubWageFactor({ reputation: 30, season: 5 })).toBeCloseTo(1 + 4 * CONTRACTS.RENEW_SEASON_INFLATION, 6);
     expect(clubWageFactor({ reputation: 100, season: 5 })).toBeCloseTo((1 + CONTRACTS.RENEW_REP_PREMIUM) * (1 + 4 * CONTRACTS.RENEW_SEASON_INFLATION), 6);
   });
-  it('the ask, the weekly cost and an early renewal all use the club factor', () => {
-    const p = mk('a');
+  it('the old weekly ask still uses the club factor; a queued renewal does not', () => {
+    const p = mk('a', { deal: { salary: 20_000, startSeason: 1, endSeason: 2 } });
     setup([p]);
-    loadState({ ...getState(), reputation: 100, season: 3 });
+    loadState({ ...getState(), reputation: 100, season: 3, squad: [{ ...p, deal: { salary: 20_000, startSeason: 1, endSeason: 3 } }] });
     const factor = clubWageFactor(getState());
-    expect(renewalWage(p, getState())).toBe(Math.round(marketWage(p) * factor));
-    expect(renewalWeeklyCost(getState(), p)).toBe(renewalWage(p, getState()));
+    const held = getState().squad[0]!;
+    expect(renewalWage(held, getState())).toBe(Math.round(marketWage(held) * factor));
+    expect(renewalWeeklyCost(getState(), held)).toBe(renewalWage(held, getState()));
     expect(renewEarly(getState(), 'a').ok).toBe(true);
-    expect(getState().squad[0]!.wage).toBe(Math.round(marketWage(p) * factor));
+    expect(getState().squad[0]!.wage).toBe(held.wage);
+    expect(getState().squad[0]!.deal!.salary).toBe(20_000);
+    expect(getState().money).toBe(1_000_000);
   });
 });
 
 describe('early renewal', () => {
-  it('charges 2 × new weekly wage and sets 52 weeks', () => {
-    setup([mk('a')]);
-    const p = getState().squad[0];
-    const wage = renewalWage(p, getState());
-    expect(wage).toBe(marketWage(p)); // neutral morale, a new club at the baseline reputation
-    expect(renewalFee(getState(), p)).toBe(2 * wage);
-    expect(renewEarly(getState(), 'a').ok).toBe(true);
-    expect(getState().money).toBe(1_000_000 - 2 * wage);
-    expect(getState().squad[0]).toMatchObject({ wage, contractWeeks: 52 });
+  it('queues the next season at the ability ask, leaves this deal and the weeks, and charges nothing', () => {
+    const deal = { salary: 20_000, startSeason: 1, endSeason: 2 };
+    setup([mk('a', { deal, contractWeeks: 40 })]);
+    const before = getState();
+    const p = before.squad[0]!;
+    expect(renewalFee(before, p)).toBe(2 * renewalWeeklyCost(before, p));
+    expect(renewEarly(before, 'a').ok).toBe(true);
+    const queued = getState().squad[0]!;
+    expect(getState().money).toBe(before.money);
+    expect(queued.wage).toBe(p.wage);
+    expect(queued.contractWeeks).toBe(40);
+    expect(queued.deal!.salary).toBe(20_000);
+    expect(queued.deal!.renewal).toMatchObject({ startSeason: 3, endSeason: 3 });
+    expect(queued.deal!.renewal!.salary).not.toBe(0);
+    const again = renewEarly(getState(), 'a');
+    expect(again.ok).toBe(false);
+    expect(again.reason).toBe('already-renewed');
+    expect(getState().money).toBe(before.money);
+    expect(getState().squad[0]!.deal).toEqual(queued.deal);
+    expect(getState().squad[0]!.contractWeeks).toBe(40);
   });
-  it('unhappy players ask more; difficulty scales the fee', () => {
+  it('does not warn that a queued renewal is expiring, and does not reset the weeks to 52', () => {
+    setup([mk('a', { contractWeeks: 10, deal: { salary: 20_000, startSeason: 1, endSeason: 1 } })]);
+    expect(renewEarly(getState(), 'a').ok).toBe(true);
+    expect(getState().squad[0]!.contractWeeks).toBe(10);
+    const msgs: string[] = [];
+    bus.on('ui:notify', (n) => msgs.push(n.text));
+    for (let i = 0; i < 9; i++) tickContracts(getState());
+    expect(msgs.filter((text) => text.includes('expires'))).toEqual([]);
+    expect(getState().squad[0]!.contractWeeks).toBe(1);
+  });
+  it('unhappy players ask more on the old weekly formula; difficulty scales that fee only', () => {
     setup([mk('a', { morale: 1 }), mk('b', { morale: 100 })]);
     const [a, b] = getState().squad;
     expect(renewalWage(a, getState())).toBeGreaterThan(renewalWage(b, getState()));
@@ -104,22 +128,24 @@ describe('early renewal', () => {
     loadState({ ...getState(), settings: { ...getState().settings, difficulty: 'hard' } });
     expect(renewalFee(getState(), a)).toBeGreaterThan(normal);
   });
-  it('refuses when broke and the board has no room left', () => {
-    setup([mk('a')], 10);
+  it('a broke club still queues the renewal and does not borrow', () => {
+    setup([mk('a', { deal: { salary: 20_000, startSeason: 1, endSeason: 1 } })], 10);
     loadState({ ...getState(), boardLoan: { owed: BOARD.LOAN_CAP } });
-    expect(renewEarly(getState(), 'a')).toEqual({ ok: false, reason: 'insufficient-funds' });
+    expect(renewEarly(getState(), 'a').ok).toBe(true);
     expect(getState().money).toBe(10);
+    expect(getState().boardLoan.owed).toBe(BOARD.LOAN_CAP);
+    expect(getState().squad[0]!.contractWeeks).toBe(20);
   });
 });
 
 describe('the board loan', () => {
-  it('refuses a renewal the club cannot pay, and does not borrow', () => {
-    setup([mk('a')], -20_000);
+  it('a renewal the club cannot pay is still free, and does not borrow', () => {
+    setup([mk('a', { deal: { salary: 20_000, startSeason: 1, endSeason: 1 } })], -20_000);
     expect(takeBoardLoan(5_000)).toBe(false);
-    expect(renewEarly(getState(), 'a')).toEqual({ ok: false, reason: 'insufficient-funds' });
+    expect(renewEarly(getState(), 'a').ok).toBe(true);
     expect(getState().money).toBe(-20_000);
     expect(getState().boardLoan.owed).toBe(0);
-    expect(getState().squad[0]!.contractWeeks).not.toBe(CONTRACTS.NEW_CONTRACT_WEEKS);
+    expect(getState().squad[0]!.contractWeeks).toBe(20);
   });
 
   it('a club that can pay does not borrow', () => {
@@ -141,7 +167,8 @@ describe('the board loan', () => {
     setup([mk('a')], -1_000_000);
     loadState({ ...getState(), boardLoan: { owed: BOARD.LOAN_CAP - 1 } });
     expect(boardLoanRoom(getState())).toBe(1);
-    expect(renewEarly(getState(), 'a').ok).toBe(false);
+    expect(renewEarly(getState(), 'a').ok).toBe(true);
+    expect(getState().boardLoan.owed).toBe(BOARD.LOAN_CAP - 1);
     const before = getState().money;
     expect(repayBoardLoan()).toBe(BOARD.LOAN_CAP - 1);
     expect(getState().money).toBe(before - (BOARD.LOAN_CAP - 1));
@@ -151,21 +178,24 @@ describe('the board loan', () => {
 });
 
 describe('selling', () => {
-  it('pays the fee and removes the player', () => {
+  it('refuses, because there is no buyer, and changes nothing', () => {
     const squad = Array.from({ length: SQUAD_MIN + 1 }, (_, i) => mk(`p${i}`));
     setup(squad, 0);
     const fee = transferFee(squad[0]);
     expect(fee).toBe(overallRating(squad[0]) ** 2 * 10);
-    expect(sellPlayer(getState(), 'p0').ok).toBe(true);
-    expect(getState().money).toBe(fee);
-    expect(getState().squad.find((p) => p.id === 'p0')).toBeUndefined();
+    const res = sellPlayer(getState(), 'p0');
+    expect(res).toMatchObject({ ok: false, reason: 'no-buyer' });
+    expect(getState().money).toBe(0);
+    expect(getState().squad.find((p) => p.id === 'p0')).toBeDefined();
   });
   it('young high-rated players fetch more than old ones', () => {
     expect(transferFee(mk('y', { age: 20 }))).toBeGreaterThan(transferFee(mk('o', { age: 34 })));
   });
-  it('refuses at squad minimum', () => {
+  it('refuses at squad minimum without removing anyone', () => {
     setup(Array.from({ length: SQUAD_MIN }, (_, i) => mk(`p${i}`)), 0);
-    expect(sellPlayer(getState(), 'p0')).toEqual({ ok: false, reason: 'squad-min' });
+    expect(sellPlayer(getState(), 'p0')).toMatchObject({ ok: false, reason: 'no-buyer' });
+    expect(getState().squad).toHaveLength(SQUAD_MIN);
+    expect(getState().money).toBe(0);
   });
 });
 

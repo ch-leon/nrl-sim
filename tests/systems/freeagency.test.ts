@@ -3,7 +3,6 @@ import {
   FREE_AGENT_POOL_SIZE,
   REFRESH_EVERY_WEEKS,
   SIGNING_FEE_WEEKS,
-  SCOUT_FEE_DISCOUNT_PER_LEVEL,
   RELEASE_PAYOUT_WEEKS,
   NEW_CONTRACT_WEEKS,
   signingFee,
@@ -25,7 +24,8 @@ import {
 import { makeRng } from '../../src/utils/rng';
 import { FREE_AGENT_SPREAD, overallRating } from '../../src/data/player';
 import { SPECIAL_MAGNITUDE } from '../../src/data/facility';
-import { transferFee } from '../../src/systems/contracts';
+import { releaseTerms, salaryDemand } from '../../src/systems/cap';
+import { signingFeeQuote } from '../../src/data/financeRules';
 import { REP_BASELINE } from '../../src/systems/league';
 import { bus } from '../../src/core/events';
 import {
@@ -210,36 +210,36 @@ describe('the pool follows the league (N12)', () => {
   });
 });
 
-describe('signingFee (#146)', () => {
+describe('signingFee', () => {
   const at = (overall: number, over: Partial<Player> = {}): Player => ({
     ...getState().freeAgents[0]!, id: `fa${overall}`, age: 25,
     stats: { speed: overall, strength: overall, stamina: overall, handling: overall, kicking: overall, footyIQ: overall }, ...over,
   });
 
-  it('is a transfer-style fee that grows with overall and falls with age', () => {
+  it('is one year\'s wage, higher for a better player and lower for an older one', () => {
     const s = getState();
-    expect(signingFee(s, at(55))).toBe(transferFee(at(55)));
-    expect(signingFee(s, at(55))).toBe(55 * 55 * 10);
-    expect(signingFee(s, at(80))).toBeGreaterThan(signingFee(s, at(65)));
+    const prime = at(80);
+    expect(signingFee(s, prime)).toBe(signingFeeQuote(salaryDemand(prime), false, 0));
+    expect(signingFee(s, at(80))).toBeGreaterThan(signingFee(s, at(55)));
     expect(signingFee(s, at(65))).toBeGreaterThan(signingFee(s, at(55)));
     expect(signingFee(s, at(80, { age: 34 }))).toBeLessThan(signingFee(s, at(80)));
-    expect(signingFee(s, at(80))).toBeGreaterThan(10 * SIGNING_FEE_WEEKS * at(80).wage); // not four weeks' wages any more
-    expect(signingFeeBasis(s, at(55))).toBe('by rating and age');
+    expect(signingFeeBasis(s, at(55))).toBe("one year's wage");
   });
 
-  it('Academy prospects still cost SIGNING_FEE_WEEKS × wage', () => {
-    const s = getState();
+  it('Academy prospects pay a quarter, and not again after they have left', () => {
     const junior = at(40, { junior: true, wage: 400 });
-    expect(signingFee(s, junior)).toBe(SIGNING_FEE_WEEKS * 400);
-    expect(signingFeeBasis(s, junior)).toContain('Academy');
+    expect(signingFee(getState(), junior)).toBe(signingFeeQuote(salaryDemand(junior), true, 0));
+    expect(signingFee(getState(), { ...junior, departed: true })).toBe(signingFeeQuote(salaryDemand(junior), false, 0));
+    expect(signingFeeBasis(getState(), junior)).toContain('Academy');
   });
 
-  it('a Scout Office takes SCOUT_FEE_DISCOUNT_PER_LEVEL off per level', () => {
-    const base = signingFee(getState(), at(70));
+  it('a Scout Office takes 10% off the fee per level and nothing off the salary', () => {
+    const player = at(70);
     for (const level of [1, 2, 3] as const) {
       setState({ facilities: [{ id: 'sc', defId: 'scoutOffice', level, x: 0, y: 0 }] });
-      expect(signingFee(getState(), at(70))).toBe(Math.round(base * (1 - SCOUT_FEE_DISCOUNT_PER_LEVEL * level)));
-      expect(signingFeeBasis(getState(), at(70))).toContain(`Scout Office −${Math.round(SCOUT_FEE_DISCOUNT_PER_LEVEL * level * 100)}%`);
+      expect(signingFee(getState(), player)).toBe(signingFeeQuote(salaryDemand(player), false, level));
+      expect(salaryDemand(player)).toBe(signingFeeQuote(salaryDemand(player), false, 0));
+      expect(signingFeeBasis(getState(), player)).toContain(`Scout Office −${level * 10}%`);
     }
   });
 });
@@ -272,7 +272,7 @@ describe('signPlayer', () => {
 
   it('leaves the lineup alone unless the coach\'s tap asks (#416: the soak and the rivals never place him)', () => {
     const agent = { ...firstAgent(), injuredWeeks: 0, stats: { speed: 99, strength: 99, stamina: 99, handling: 99, kicking: 99, footyIQ: 99 } };
-    setState({ freeAgents: [agent, ...getState().freeAgents.slice(1)] });
+    setState({ money: 5_000_000, freeAgents: [agent, ...getState().freeAgents.slice(1)] });
     const lineup = getState().lineup;
     const plain = signPlayer(getState(), agent.id);
     expect(plain).toEqual({ ok: true });
@@ -281,7 +281,7 @@ describe('signPlayer', () => {
 
   it('with intoLineup a man who out-rates a starter goes into the nine before player:signed (#416)', () => {
     const agent = { ...firstAgent(), injuredWeeks: 0, stats: { speed: 99, strength: 99, stamina: 99, handling: 99, kicking: 99, footyIQ: 99 } };
-    setState({ freeAgents: [agent, ...getState().freeAgents.slice(1)] });
+    setState({ money: 5_000_000, freeAgents: [agent, ...getState().freeAgents.slice(1)] });
     let inNine = false;
     bus.on('player:signed', () => { inNine = getState().lineup.starters.includes(agent.id); });
     const res = signPlayer(getState(), agent.id, { intoLineup: true });
@@ -357,10 +357,10 @@ describe('signPlayer', () => {
 });
 
 describe('releasePlayer', () => {
-  it('pays 2×wage, removes from squad, returns to freeAgents', () => {
+  it('pays the release payout, removes him, and does not refund a signing fee or keep the deal', () => {
     const target = getState().squad[0]!;
-    const payout = RELEASE_PAYOUT_WEEKS * target.wage;
-    const moneyBefore = getState().money;
+    const terms = releaseTerms(target, getState().season, getState().week);
+    setState({ money: terms.payout });
     const squadBefore = getState().squad.length;
     const faBefore = getState().freeAgents.length;
 
@@ -368,11 +368,14 @@ describe('releasePlayer', () => {
     expect(res.ok).toBe(true);
 
     const st = getState();
-    expect(st.money).toBe(moneyBefore - payout);
+    expect(st.money).toBe(0);
     expect(st.squad).toHaveLength(squadBefore - 1);
     expect(st.squad.some((p) => p.id === target.id)).toBe(false);
     expect(st.freeAgents).toHaveLength(faBefore + 1);
-    expect(st.freeAgents.some((p) => p.id === target.id)).toBe(true);
+    const back = st.freeAgents.find((p) => p.id === target.id)!;
+    expect(back.deal).toBeUndefined();
+    expect(back.junior).toBeUndefined();
+    expect(back.departed).toBe(true);
   });
 
   it('emits ui:notify info on release', () => {
@@ -392,12 +395,18 @@ describe('releasePlayer', () => {
     expect(getState().squad).toHaveLength(squadBefore);
   });
 
-  it('is allowed to take money negative (economy handles bankruptcy)', () => {
+  it('refuses when the cash is a dollar short and changes nothing', () => {
     const target = getState().squad[0]!;
-    setState({ money: 0 });
+    const payout = releaseTerms(target, getState().season, getState().week).payout;
+    expect(payout).toBeGreaterThan(0);
+    setState({ money: payout - 1 });
+    const squadBefore = getState().squad.map((p) => p.id);
     const res = releasePlayer(getState(), target.id);
-    expect(res.ok).toBe(true);
-    expect(getState().money).toBe(-(RELEASE_PAYOUT_WEEKS * target.wage));
+    expect(res.ok).toBe(false);
+    expect(res.reason).toBe('insufficient-funds');
+    expect(res.message).toContain('Not enough cash');
+    expect(getState().money).toBe(payout - 1);
+    expect(getState().squad.map((p) => p.id)).toEqual(squadBefore);
   });
 
   it('rejects with squad-min at SQUAD_MIN without mutating', () => {

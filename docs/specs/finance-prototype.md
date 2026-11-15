@@ -16,9 +16,11 @@ This slice publishes executable quotes in
 and this delivery contract. #557 now separates cash from the annual cap for
 new careers: salaries are season commitments, weekly wage/upkeep/overhead
 deductions are retired, and saves from before that format are rejected rather
-than converted. Signing fees, renewals, receipt-backed match income, cap
-upgrades and the full finance presentation remain #558–#561. End-to-end
-balance is #562.
+than converted. #558 now charges the signing fee, queues a fee-free
+renewal and pays the release payout, and refuses a signing that does not fit
+the cash and the cap. Receipt-backed match income, cap upgrades and the full
+finance presentation remain #559–#561. End-to-end balance is #562. A funded
+sale between clubs is #572, so the old sell button refuses until that exists.
 
 ## 1. Decisions and units
 

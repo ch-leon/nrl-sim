@@ -10,8 +10,7 @@ import { FACILITY_CATALOG, type FacilityDefId } from '../../src/data/facility';
 import { GRID_H, GRID_W } from '../../src/config';
 import { validatePlacement } from '../../src/world/placement';
 import { classifyReason, financeNet, registerFinanceSystem } from '../../src/systems/economy';
-import { signingFee } from '../../src/systems/freeagency';
-import { sellPlayer } from '../../src/systems/contracts';
+import { releasePlayer, signingFee } from '../../src/systems/freeagency';
 import {
   UNDO_MS, commitUndo, currentOffer, demolishWithUndo, initUndo, offerBuild, signWithUndo, undoNow,
 } from '../../src/systems/undo';
@@ -158,7 +157,8 @@ describe('sign', () => {
   it('cannot be undone once he has gone again', () => {
     const agent = getState().freeAgents[0]!;
     signWithUndo(agent.id);
-    expect(sellPlayer(getState(), agent.id).ok).toBe(true);
+    setState({ money: 1_000_000 });
+    expect(releasePlayer(getState(), agent.id).ok).toBe(true);
     expect(currentOffer()!.canRevert(getState())).toBe(false);
     expect(undoNow()).toBe(false);
   });

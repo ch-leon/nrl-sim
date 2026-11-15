@@ -221,7 +221,7 @@ export function tickContracts(state: GameState): GameState {
     if (player.contractWeeks <= 0) return player;
     changed = true;
     const weeks = player.contractWeeks - 1;
-    if (weeks > 0) {
+    if (weeks > 0 && !player.deal?.renewal) {
       const warning = warnForWeeks(player.name, weeks);
       if (warning) notifyContractWarning(warning);
     }
