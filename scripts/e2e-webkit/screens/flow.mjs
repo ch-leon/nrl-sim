@@ -300,13 +300,18 @@ export async function runFlow(browser, { w: W, h: H, text }) {
       return { id: r.getAttribute('data-contract') ?? r.getAttribute('data-contract-gone'), top: Math.round(r.getBoundingClientRect().top), btn: b ? { x: b.left + b.width / 2, y: b.top + b.height / 2 } : null };
     }));
     const before = await rows();
-    const first = before.find((r) => r.btn);
-    if (!first) return ['no Renew on Contracts'];
+    const open = await page.evaluate(() => [...document.querySelectorAll('[data-contract-renew]')].filter((b) => !b.disabled).map((b) => {
+      const box = b.getBoundingClientRect();
+      return { id: b.closest('tr')?.getAttribute('data-contract') ?? '', x: box.left + box.width / 2, y: box.top + box.height / 2 };
+    }));
+    const first = open[0] ? { id: open[0].id, btn: { x: open[0].x, y: open[0].y } } : before.find((r) => r.btn);
+    if (!first?.btn) return ['no Renew on Contracts'];
     // The table fits the sheet at this text size: SELL whole, no sideways scroll (#350, #371).
     const out = await flowReach(page, [`[data-contract-renew="${first.id}"]`, '.nrl-contracts-table tbody tr:first-child .nrl-contract-actions .nrl-btn:last-child']);
     const wide = await page.evaluate(() => { const e = document.querySelector('.nrl-contracts-scroll'); return e.scrollWidth - e.clientWidth; });
     if (wide > 1) out.push(`the table is ${wide}px wider than the sheet`);
-    const renewed = () => page.locator('[data-contract-renew]:disabled').count();
+    // A renewal that is not due yet is also disabled. Count the ones that actually queued.
+    const renewed = () => page.locator('[data-contract-renew]').evaluateAll((els) => els.filter((e) => /RENEWED/i.test(e.textContent ?? '')).length);
     await page.touchscreen.tap(first.btn.x, first.btn.y);
     await page.waitForTimeout(300);
     if ((await renewed()) !== 1) return [...out, `${await renewed()} rows read Renewed after one tap (money short?)`];
