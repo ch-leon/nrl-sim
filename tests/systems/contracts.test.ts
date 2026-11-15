@@ -4,12 +4,10 @@ import { migrateState } from '../../src/core/save';
 import { applyBoardReview } from '../../src/systems/board';
 import { bus } from '../../src/core/events';
 import { registerFinanceSystem, tickContracts } from '../../src/systems/economy';
-import { BOARD_LOAN, boardLoanRoom, takeBoardLoan, clubWageFactor, repayBoardLoan, renewEarly, renewsOnLoan, renewalFee, renewalWage, renewalWeeklyCost, sellPlayer, transferFee, marketWage } from '../../src/systems/contracts';
+import { boardLoanRoom, takeBoardLoan, clubWageFactor, repayBoardLoan, renewEarly, renewsOnLoan, renewalFee, renewalWage, renewalWeeklyCost, sellPlayer, transferFee, marketWage } from '../../src/systems/contracts';
 import { marketWage as playerMarketWage, wageForOverall } from '../../src/data/player';
 import { BOARD, CONTRACTS } from '../../src/config';
 import { marketWage as rivalMarketWage } from '../../src/systems/rivals';
-import { refreshFreeAgents } from '../../src/systems/freeagency';
-import { makeRng } from '../../src/utils/rng';
 import { overallRating } from '../../src/data/player';
 import { SQUAD_MIN } from '../../src/config';
 
@@ -41,13 +39,13 @@ describe('expiry warnings', () => {
 });
 
 describe('departures', () => {
-  it('expired players stay in the pool through a re-roll', () => {
+  it('a week hitting zero does not release the player or borrow', () => {
     setup([mk('a', { contractWeeks: 1 }), mk('b')], 0);
-    loadState({ ...getState(), boardLoan: { owed: BOARD.LOAN_CAP } }); // the board has no room left
     tickContracts(getState());
-    expect(getState().freeAgents.map((p) => p.id)).toContain('a');
-    refreshFreeAgents(getState(), makeRng(5));
-    expect(getState().freeAgents.map((p) => p.id)).toContain('a');
+    expect(getState().squad.map(p => p.id)).toContain('a');
+    expect(getState().squad.find(p => p.id === 'a')!.contractWeeks).toBe(0);
+    expect(getState().money).toBe(0);
+    expect(getState().boardLoan.owed).toBe(0);
   });
 });
 
@@ -114,19 +112,14 @@ describe('early renewal', () => {
   });
 });
 
-// N14.3: a renewal in debt goes on a board loan, repaid at the rollover.
 describe('the board loan', () => {
-  it('an early renewal the club can\'t afford is advanced by the board: the fee is owed, the balance unchanged', () => {
+  it('refuses a renewal the club cannot pay, and does not borrow', () => {
     setup([mk('a')], -20_000);
-    const fee = renewalFee(getState(), getState().squad[0]!);
-    expect(renewsOnLoan(getState(), getState().squad[0]!)).toBe(true);
-    const reasons: string[] = [];
-    bus.on('money:changed', (m) => reasons.push(m.reason));
-    expect(renewEarly(getState(), 'a')).toEqual({ ok: true });
-    expect(getState().money).toBe(-20_000); // the loan in, the fee out
-    expect(getState().boardLoan.owed).toBe(fee);
-    expect(reasons).toEqual([BOARD_LOAN, 'renew:a']);
-    expect(getState().squad[0]!.contractWeeks).toBe(CONTRACTS.NEW_CONTRACT_WEEKS);
+    expect(takeBoardLoan(5_000)).toBe(false);
+    expect(renewEarly(getState(), 'a')).toEqual({ ok: false, reason: 'insufficient-funds' });
+    expect(getState().money).toBe(-20_000);
+    expect(getState().boardLoan.owed).toBe(0);
+    expect(getState().squad[0]!.contractWeeks).not.toBe(CONTRACTS.NEW_CONTRACT_WEEKS);
   });
 
   it('a club that can pay does not borrow', () => {
@@ -136,13 +129,12 @@ describe('the board loan', () => {
     expect(getState().boardLoan.owed).toBe(0);
   });
 
-  it('an expiring contract in debt renews on a loan of the four weeks\' wage', () => {
+  it('an expiring week in debt does not renew or borrow', () => {
     setup([mk('a', { contractWeeks: 1 }), mk('b')], -5_000);
-    const ask = renewalWage(getState().squad[0]!, getState());
     tickContracts(getState());
-    expect(getState().squad.find((p) => p.id === 'a')!.contractWeeks).toBe(52);
-    expect(getState().boardLoan.owed).toBe(ask * 4);
-    expect(getState().money).toBe(-5_000 + ask * 4);
+    expect(getState().squad.find((p) => p.id === 'a')!.contractWeeks).toBe(0);
+    expect(getState().boardLoan.owed).toBe(0);
+    expect(getState().money).toBe(-5_000);
   });
 
   it('never past the cap, and repaid in full on the board\'s line', () => {
@@ -208,9 +200,11 @@ describe('the board loan at the rollover and in old saves (N14.3)', () => {
     setup([mk('a')], -10_000);
     loadState({ ...getState(), season: 2, week: 1, finance: [emptyFinance(1), emptyFinance(2)] });
     const off = registerFinanceSystem();
-    expect(takeBoardLoan(5_000)).toBe(true);
+    expect(takeBoardLoan(5_000)).toBe(false);
     off();
-    expect(getState().finance.find((f) => f.season === 2)!.boardGrant).toBe(5_000);
+    expect(getState().money).toBe(-10_000);
+    expect(getState().boardLoan.owed).toBe(0);
+    expect(getState().finance.find((f) => f.season === 2)!.boardGrant).toBe(0);
     expect(getState().finance.find((f) => f.season === 1)!.boardGrant).toBe(0);
   });
 

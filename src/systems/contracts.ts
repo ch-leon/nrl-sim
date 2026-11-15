@@ -6,6 +6,7 @@
 import { getState, setState, type GameState, type Player } from '../core/state';
 import { bus } from '../core/events';
 import { earnMoney, spendMoney } from '../data/club';
+import { commitPlayer } from './cap';
 import { marketWage, overallRating } from '../data/player';
 import { BOARD, CONTRACTS, MORALE, SQUAD_MIN, difficultyMultipliers } from '../config';
 import { fmtMoney } from '../utils/money';
@@ -87,15 +88,11 @@ export function boardLoanRoom(state: Pick<GameState, 'boardLoan'>): number {
 }
 
 /**
- * The board advances `amount` (N14.3) when it has the room: the money comes in on
- * the board's line and is owed until the rollover. False, and nothing moves, when
- * it hasn't.
+ * New borrowing is retired (#557). Nothing is advanced and nothing is owed.
+ * A balance already on the books can still be repaid.
  */
-export function takeBoardLoan(amount: number): boolean {
-  if (amount <= 0 || amount > boardLoanRoom(getState())) return false;
-  earnMoney(amount, BOARD_LOAN);
-  setState({ boardLoan: { owed: getState().boardLoan.owed + amount } });
-  return true;
+export function takeBoardLoan(_amount: number): boolean {
+  return false;
 }
 
 /** At the rollover, after the prize and before the board's verdict: the season's loan is repaid in full. */
@@ -131,9 +128,13 @@ export function renewEarly(state: GameState, playerId: string): SignResult {
   else spendMoney(fee, `renew:${playerId}`);
   const after = getState();
   const wage = renewalWage(p, state);
+  // The signed annual salary stays put. The old cash fee still buys another
+  // season on the cap; the fee-free renewal is #558.
+  const deal = p.deal
+    ? { ...p.deal, endSeason: Math.max(p.deal.endSeason, state.season + 1) }
+    : commitPlayer({ ...p, contractWeeks: CONTRACTS.NEW_CONTRACT_WEEKS }, state.season, 2).deal!;
   setState({
-    squad: after.squad.map((x) =>
-      x.id === playerId ? { ...x, wage, contractWeeks: CONTRACTS.NEW_CONTRACT_WEEKS } : x),
+    squad: after.squad.map((x) => x.id === playerId ? { ...x, wage, contractWeeks: CONTRACTS.NEW_CONTRACT_WEEKS, deal } : x),
   });
   bus.emit('ui:notify', {
     text: onLoan

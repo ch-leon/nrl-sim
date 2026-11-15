@@ -5,7 +5,7 @@ import { UK_CAREER_PROFILE } from '../../src/content/career/uk';
 import { createNewGame, getState, setState, SAVE_VERSION, type GameState } from '../../src/core/state';
 import { bus } from '../../src/core/events';
 import { advanceWeek, advanceWeeks, clearHeldWeek, clearSeasonHooks, clearTickHooks, registerTickHook, TICK_ORDER, weekHeld } from '../../src/core/time';
-import { __setStorage, __unlockSaves, exportRecoverySaves, importSave, installImportedSave, loadSlot, migrateState, setActiveSlot, writeSlot } from '../../src/core/save';
+import { __setStorage, __unlockSaves, exportOriginalSave, importSave, installImportedSave, loadSlot, migrateState, setActiveSlot, writeSlot } from '../../src/core/save';
 import { setCareerNamespace } from '../../src/core/storage/local';
 import { DEV_TEST_PREFIX, slotKey } from '../../src/core/storageKeys';
 import { setupStructuralDivisionCareer, currentDivision, currentDivisionClubIds, prepareDivisionFinals } from '../../src/systems/divisionCareer';
@@ -48,7 +48,7 @@ function fixtureHooks(playerWins = true): void {
 describe('isolated fresh regional setup', () => {
   it.each(['au', 'uk'] as const)('installs the %s calendar, legal trials, Local lineup and canonical world', pack => {
     const s = setup(pack);
-    expect(s.version).toBe(27); expect(s.preseason).toBe(0);
+    expect(s.version).toBe(SAVE_VERSION); expect(s.preseason).toBe(0);
     expect(s.competitions!.calendar).toMatchObject({ mode: 'structural', status: 'active', season: 1, elapsedIntervals: 0 });
     expect(s.competitions!.calendar!.slots).toHaveLength(25);
     expect(s.competitions!.calendar!.slots.filter(x => x.kind === 'rest').map(x => x.id)).toEqual([2, 3]);
@@ -180,10 +180,9 @@ describe('saved world boundaries and supported migration', () => {
     createNewGame('Existing', 26, pack === 'uk' ? { home: { town: 'Here', country: 'GB' } } : {}); initLeague(getState());
     const old = { ...getState(), version: 26 }; const original = JSON.stringify(old);
     bytes.set(DEV_TEST_PREFIX + slotKey(1), original); bytes.set(slotKey(1), 'normal career');
-    const loaded = loadSlot(); expect(loaded.status).toBe('ok');
-    if (loaded.status !== 'ok') throw new Error('v26 load failed');
-    expect(loaded.state).toEqual({ ...old, version: SAVE_VERSION }); expect(loaded.state.competitions).toBeUndefined();
-    expect(writeSlot(1, loaded.state)).toBe(true); expect(exportRecoverySaves(1)).toContain(original);
+    const loaded = loadSlot(); expect(loaded.status).toBe('corrupt');
+    expect(loaded).toMatchObject({ message: expect.stringMatching(/start a new career/i) });
+    expect(bytes.get(DEV_TEST_PREFIX + slotKey(1))).toBe(original); expect(exportOriginalSave(1)).toBe(original);
     expect(bytes.get(slotKey(1))).toBe('normal career'); expect(JSON.stringify(old)).toBe(original);
   });
 

@@ -13,9 +13,12 @@ not reserve the next save version.
 
 This slice publishes executable quotes in
 [`financeRules.ts`](../../src/data/financeRules.ts), an opening-inventory audit
-and this delivery contract. It does **not** enable the finance loop, create
-wallets/contracts, settle a result or replace player-facing screens. Those
-transactions remain #557–#561; end-to-end balance is #562.
+and this delivery contract. #557 now separates cash from the annual cap for
+new careers: salaries are season commitments, weekly wage/upkeep/overhead
+deductions are retired, and saves from before that format are rejected rather
+than converted. Signing fees, renewals, receipt-backed match income, cap
+upgrades and the full finance presentation remain #558–#561. End-to-end
+balance is #562.
 
 ## 1. Decisions and units
 

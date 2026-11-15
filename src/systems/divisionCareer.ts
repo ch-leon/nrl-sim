@@ -10,6 +10,7 @@ import { divisionForClub } from '../data/competitionDivisions';
 import { createCompetitionInstance, competitionFixtureId, validateCompetitions, type CompetitionFixture, type CompetitionInstance } from '../data/competition';
 import { activateStructuralCalendar, competitionLadder, hasStructuralCalendar, structuralRuntimeAllowed } from './competitionCalendar';
 import { hashString } from './rivals';
+import { freshCapAccount, tierForRank } from './cap';
 import { makeRng } from '../utils/rng';
 import { structuralOpenCup } from './openCupCareer';
 
@@ -63,8 +64,10 @@ export function setupStructuralDivisionCareer(profile: RegionalCareerProfile, se
   const instances = [...leagues, ...trialInstances(world, profile, seed)];
   const cup = structuralOpenCup(profile, activePack(), seed, world.clubs.map(c => c.id), state.clubId, options.enterOpenCup);
   if (cup) instances.push(cup);
+  const start = world.divisions.find(d => d.id === world.profile.startingDivisionId)!;
   const next = activateStructuralCalendar({ ...state, rngSeed: (seed ^ hashString(`${profile.id}:calendar`)) >>> 0,
     squad: world.squad, freeAgents: [], lineup: autoPick(world.squad), objectives: [],
+    capAccount: freshCapAccount(tierForRank(start.rank)),
     league: { clubs: world.clubs, fixtures: [], ladder: competitionLadder(local) },
     competitions: { schemaVersion: 1, instances, world: { profile: world.profile, divisions: world.divisions } } }, profile.calendarSlots);
   setState(next);

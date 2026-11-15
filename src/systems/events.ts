@@ -18,6 +18,7 @@ import {
 } from '../data/events';
 import { BOARD, EVENTS, ON_FIELD, SQUAD_CAP, WEEKS_PER_SEASON, WILDCARDS } from '../config';
 import { marketWage, withDerivedStrength } from './rivals';
+import { commitPlayer } from './cap';
 import { NEW_CONTRACT_WEEKS, signingFee } from './freeagency';
 import { hasStaff, WELFARE_CARDS } from './staff';
 import { isFieldable } from './lineup';
@@ -428,9 +429,9 @@ export function signRivalPlayer(state: GameState, rivalId: string | undefined, p
   if (!club || !player) return 'the player is no longer available';
   if (state.squad.length >= SQUAD_CAP) return 'the squad is full';
   if (state.money < fee) return "the club couldn't afford the fee";
-  const signed: Player = {
+  const signed: Player = commitPlayer({
     ...player, wage: marketWage(player), contractWeeks: NEW_CONTRACT_WEEKS, morale: 70, joinedSeason: state.season,
-  };
+  }, state.season, 1);
   const clubs = state.league.clubs.map((c) =>
     (c.id === club.id ? withDerivedStrength({ ...c, squad: c.squad!.filter((p) => p.id !== player.id) }) : c));
   return { ...state, squad: [...state.squad, signed], league: { ...state.league, clubs } };

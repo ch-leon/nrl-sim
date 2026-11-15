@@ -1,13 +1,14 @@
 // tests/systems/difficulty.test.ts — GitHub #48: each difficulty applies its multipliers.
 import { describe, it, expect } from 'vitest';
 import {
-  DIFFICULTY, DIFFICULTIES, STARTING_MONEY, isValidColorPair,
+  DIFFICULTY, DIFFICULTIES, isValidColorPair,
   PLAYER_PRIMARY_COLORS, PLAYER_SECONDARY_COLORS, DEFAULT_PLAYER_COLORS,
 } from '../../src/config';
 import { createNewGame, getState, setState } from '../../src/core/state';
 import { bestNineMean } from '../../src/qa/soak';
 import { weeklyWages } from '../../src/systems/economy';
 import { initLeague, PLAYER_ID } from '../../src/systems/fixtures';
+import { FINANCE_STARTING_CASH } from '../../src/data/financeRules';
 import { rivalEdge } from '../../src/match/league/spread';
 import { injuryChance } from '../../src/match/league/weather';
 
@@ -34,7 +35,7 @@ describe('difficulty multipliers', () => {
   it.each(DIFFICULTIES)('%s scales starting money', (d) => {
     const s = createNewGame('T', 1, { difficulty: d });
     expect(s.settings.difficulty).toBe(d);
-    expect(s.money).toBe(Math.round(STARTING_MONEY * DIFFICULTY[d].startingMoney));
+    expect(s.money).toBe(FINANCE_STARTING_CASH[d]);
   });
 
   it('defaults to normal', () => {

@@ -20,6 +20,8 @@ import { bus } from '../core/events';
 import { registerTickHook } from '../core/time';
 import { LEAGUE, ON_FIELD, SEASON_ROUNDS, STAT_MAX, WEEKS_PER_SEASON } from '../config';
 import { generatePlayerAround, withShownStats, shownStats, marketWage, overallRating, POSITIONS, wageForOverall } from '../data/player';
+import { admitOpeningSquad, AI_OPENING_CASH, commitPlayer, freshCapAccount, SINGLE_LEAGUE_TIER, tierCap } from './cap';
+import type { FinanceTier } from '../data/financeRules';
 import { makeRng, type Rng } from '../utils/rng';
 import { ageAndRetirePlayers } from './aging';
 import { STRENGTH_MAX, STRENGTH_MIN } from './league';
@@ -180,11 +182,19 @@ export function rivalSquadSeed(rngSeed: number, clubId: string): number {
   return (hashString(clubId) ^ Math.imul(rngSeed >>> 0, 2654435761)) >>> 0;
 }
 
-/** Give every rival without a squad a generated one and derive strength from it. */
-export function withRivalSquads(clubs: readonly RivalClub[], rngSeed: number, playerId = 'player'): RivalClub[] {
+/** Give every rival without a squad a generated one and derive strength from it.
+ * The squad is admitted under `tier` before it is installed. */
+export function withRivalSquads(clubs: readonly RivalClub[], rngSeed: number, playerId = 'player', tier: FinanceTier = SINGLE_LEAGUE_TIER): RivalClub[] {
   return clubs.map((c) => {
     if (c.id === playerId || (c.squad && c.squad.length > 0)) return c;
-    return withDerivedStrength({ ...c, squad: generateRivalSquad(c, rivalSquadSeed(rngSeed, c.id)) });
+    const admitted = admitOpeningSquad(generateRivalSquad(c, rivalSquadSeed(rngSeed, c.id)), tierCap(tier), 1);
+    if (!admitted) throw new Error(`Opening squad for ${c.id} does not fit the ${tier} cap`);
+    return withDerivedStrength({
+      ...c,
+      squad: admitted,
+      cash: c.cash ?? AI_OPENING_CASH,
+      capAccount: c.capAccount ?? freshCapAccount(tier),
+    });
   });
 }
 
@@ -332,6 +342,8 @@ export interface SigningOptions {
   start?: number;
   /** Lowest overall that makes the news (default: notableOverall of the pool as the week began). */
   notable?: number;
+  /** Season the new one-season deal starts in. */
+  season?: number;
 }
 
 /**
@@ -344,7 +356,7 @@ export interface SigningOptions {
  * can take a player a later one wanted. Signings at `notable` or above make the news.
  */
 export function rivalSigningTick(clubs: readonly RivalClub[], freeAgents: readonly Player[], rng: Rng, opts: SigningOptions = {}): SigningResult {
-  const { playerId = 'player', perClub = RIVAL_SIGNINGS_PER_WEEK, start = 0, notable = notableOverall(freeAgents) } = opts;
+  const { playerId = 'player', perClub = RIVAL_SIGNINGS_PER_WEEK, start = 0, notable = notableOverall(freeAgents), season = 1 } = opts;
   let pool = [...freeAgents];
   const news: string[] = [];
   const signed: SigningResult['signed'] = [];
@@ -365,12 +377,16 @@ export function rivalSigningTick(clubs: readonly RivalClub[], freeAgents: readon
       // player (one at most); if that still doesn't fit, there's no deal.
       const room = makeRoom(squad, target);
       if (!room) break;
+      const account = club.capAccount ?? freshCapAccount(SINGLE_LEAGUE_TIER);
+      // Record the annual deal. Refusing it here would change who plays; the
+      // annual cap check on later deals is #558/#572. Opening admission already ran.
+      const signedPlayer = commitPlayer({ ...target, morale: 50, departed: false }, season);
       if (room.released) pool.push({ ...room.released, injuredWeeks: 0 });
       pool = pool.filter((p) => p.id !== target.id);
       const ovr = overallRating(target);
       signed.push({ clubId: club.id, playerId: target.id, overall: ovr, reason: need?.kind ?? 'upgrade' });
       if (ovr >= notable) news.push(`${club.name} sign ${Math.round(ovr)}-rated ${target.position} ${target.name}.`);
-      club = withDerivedStrength({ ...club, squad: [...room.squad, { ...target, morale: 50, departed: false }] });
+      club = withDerivedStrength({ ...club, capAccount: account, squad: [...room.squad, signedPlayer] });
     }
     out[i] = club;
   }
@@ -513,7 +529,7 @@ export interface RolloverResult {
  * club's weakest positions, and re-derive strength. Development happens during
  * the season (developRivalsWeek, #143), not here.
  */
-export function rolloverRivals(clubs: readonly RivalClub[], rng: Rng, playerId = 'player'): RolloverResult {
+export function rolloverRivals(clubs: readonly RivalClub[], rng: Rng, playerId = 'player', season = 1): RolloverResult {
   let retired = 0;
   let juniors = 0;
   const out = clubs.map((club) => {
@@ -521,12 +537,13 @@ export function rolloverRivals(clubs: readonly RivalClub[], rng: Rng, playerId =
     const aged = ageAndRetirePlayers(club.squad, [], rng);
     retired += aged.retired.length;
     const squad = aged.squad.map((p) => (p.injuredWeeks > 0 ? { ...p, injuredWeeks: 0 } : p));
+    const account = club.capAccount ?? freshCapAccount(SINGLE_LEAGUE_TIER);
     while (squad.length < RIVAL_SQUAD_MIN) {
       const anchor = (club.strength + RIVAL_LEAGUE_MEAN) / 2;
-      squad.push(rivalPlayer(rng, club.id, weakestPosition(squad), anchor - RIVAL_JUNIOR_GAP, rng.int(17, 19)));
+      squad.push(commitPlayer(rivalPlayer(rng, club.id, weakestPosition(squad), anchor - RIVAL_JUNIOR_GAP, rng.int(17, 19)), season, 1));
       juniors++;
     }
-    return withDerivedStrength({ ...club, squad });
+    return withDerivedStrength({ ...club, squad, capAccount: account });
   });
   return { clubs: out, retired, juniors };
 }
@@ -557,7 +574,7 @@ export function registerRivalsSystem(): void {
     }
     const perClub = s.week > SEASON_ROUNDS ? RIVAL_SIGNINGS_OFFSEASON : RIVAL_SIGNINGS_PER_WEEK;
     const r = rivalSigningTick(healed, s.freeAgents, makeRng(rivalWeekSeed(s)), {
-      perClub, start: s.week, notable: Math.round(poolTarget(s)) + RIVAL_NOTABLE_ABOVE_TARGET,
+      perClub, start: s.week, season: s.season, notable: Math.round(poolTarget(s)) + RIVAL_NOTABLE_ABOVE_TARGET,
     });
     const clubs = developRivalsWeek(r.clubs, makeRng(rivalDevelopSeed(s)));
     setState({ league: { ...s.league, clubs }, freeAgents: r.freeAgents });

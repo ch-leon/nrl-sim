@@ -46,20 +46,16 @@ export function finalsTarget(state: Pick<GameState, 'reputation' | 'settings'>):
 }
 
 /**
- * The board's 2–3 goals for `state.season`: always a finals target and a
- * solvency floor; clubs with a derby or reputation ≥ 25 get a third.
+ * The board's goals for `state.season`: a finals target, and a derby, rival or
+ * building goal when the club is known enough. Cash solvency is not a goal:
+ * a season is not failed because the bank moved.
  */
 export function generateObjectives(state: GameState): Objective[] {
   const rng = makeRng(state.season * 7919 + state.league.clubs.length * 31 + 17);
   const season = state.season;
   const top = finalsTarget(state);
-  const floor = BOARD.SOLVENT_FLOOR[state.settings.difficulty ?? 'normal'];
   const out: Objective[] = [
     { id: `s${season}-finals`, kind: 'finals', text: `Finish in the top ${top}`, target: top, status: 'pending' },
-    {
-      id: `s${season}-solvent`, kind: 'solvent', target: floor, status: 'pending',
-      text: floor > 0 ? `Finish the season with at least ${fmtMoney(floor)}` : 'Finish the season solvent',
-    },
   ];
   const derby = derbyRival(state);
   if (state.reputation < 25 && !derby) return out;

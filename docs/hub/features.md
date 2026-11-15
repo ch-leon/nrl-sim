@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- A new career keeps club cash and the salary cap apart. Player salaries are a season commitment against the cap and no longer come out of the bank each week, and the weekly running costs and facility upkeep do not either. Gates, sponsors and prize money still land as cash and do not change the cap. The Finance screen shows the cash balance, this season's cap and next season's commitments. Careers saved before this change are refused and kept, so they can be exported; they are not converted. Signing fees, renewals and cap upgrades are still the next finance slices ([#557](https://github.com/ch-leon/nrl-sim/issues/557)).
+
 - Portrait is blocked on a touch phone. The title, menus, grounds and live match all sit under “Turn your phone sideways” until the phone is landscape, and the Android app locks to landscape. The upright Club home sheet is gone. A desktop window is never blocked ([PR #690](https://github.com/ch-leon/nrl-sim/pull/690)).
 
 - The scripted persona playtesters record a weekly money and XP diary and spend stat points in character (optimal, spend-by-focus, random, or half). This is a measurement tool. A normal career still spends points by focus automatically ([PR #691](https://github.com/ch-leon/nrl-sim/pull/691)).
@@ -119,10 +121,10 @@ What's in the game, with the PR that added each.
   week, long lists show there is more below, and the dock's tabs hold their
   place ([issue](https://github.com/ch-leon/nrl-sim/issues/596)).
 
-- The finance testing model now has headless salary, fee, income and cap quotes,
-  a versioned contract and a reproducible opening-roster inventory. This prepares
-  the fresh-career economy; cash/cap transactions and player-facing finance are
-  subsequent work ([PR #595](https://github.com/ch-leon/nrl-sim/pull/595)).
+- The finance testing model has headless salary, fee, income and cap quotes,
+  a versioned contract and a reproducible opening-roster inventory
+  ([PR #595](https://github.com/ch-leon/nrl-sim/pull/595)). New careers now use
+  the cash and cap split described above.
 
 - The isolated developer regional career includes an optional cross-division
   Open Cup, with a saved deterministic draw, implicit byes, profile-based dates,
