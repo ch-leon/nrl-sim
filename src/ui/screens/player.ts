@@ -166,7 +166,7 @@ export function playerActions(p: Player, ctx: PlayerContext, state: GameState): 
   return [
     {
       id: 'renew',
-      label: queued ? 'Renewal queued' : 'Renew',
+      label: 'Renew',
       detail: queued
         ? `From season ${queued.startSeason} at ${fmtMoney(queued.salary)} a season. No fee.`
         : `From season ${start} at ${fmtMoney(ask.salary)} a season. No fee.${changed}`,

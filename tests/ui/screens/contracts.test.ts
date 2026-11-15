@@ -122,15 +122,19 @@ describe('Sell and Release disarm (#612)', () => {
   });
   afterEach(() => { slot.close?.(); slot.close = null; vi.useRealTimers(); vi.unstubAllGlobals(); });
 
-  it('the sale button does not arm and does not remove the player', () => {
+  it('the first tap arms a sale and the second does not remove the player', () => {
     const id = rows()[0]!.attrs['data-contract']!;
     const n = getState().squad.length;
+    const money = getState().money;
     expect(sell(0).textContent).toBe('NO BUYER');
-    expect(sell(0).disabled).toBe(true);
     sell(0).click();
-    expect(sell(0).textContent).toBe('NO BUYER');
+    expect(sell(0).textContent).toBe('REALLY SELL?');
+    expect(sell(0).classList.contains(ARMED_CLASS)).toBe(true);
+    vi.advanceTimersByTime(400);
+    sell(0).click();
     expect(getState().squad.some((p) => p.id === id)).toBe(true);
     expect(getState().squad).toHaveLength(n);
+    expect(getState().money).toBe(money);
   });
 
   it('the same for Release: 150ms is ignored, 300ms goes through (#617)', () => {

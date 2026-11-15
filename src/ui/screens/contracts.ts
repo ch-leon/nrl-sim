@@ -13,7 +13,7 @@ import { getState, type Player } from '../../core/state';
 import { overallRating } from '../../data/player';
 import { releasePlayer } from '../../systems/freeagency';
 import { releaseTerms, renewalAsk } from '../../systems/cap';
-import { contractRows, renewEarly } from '../../systems/contracts';
+import { contractRows, renewEarly, sellPlayer } from '../../systems/contracts';
 import { hasStaff } from '../../systems/staff';
 import { SQUAD_MIN } from '../../config';
 import { fmtMoneyShort } from '../../utils/money';
@@ -138,7 +138,7 @@ function render(sub: HTMLElement, tbody: HTMLElement): void {
 
     let renew: HTMLButtonElement;
     if (queued || renewed.has(p.id)) {
-      renew = button(queued ? 'QUEUED' : 'RENEWED ✓', () => {});
+      renew = button('RENEWED ✓', () => {});
       renew.disabled = true;
       renew.title = queued
         ? `A renewal is already queued from season ${queued.startSeason} at ${fmtMoney(queued.salary)} a season.`
@@ -170,10 +170,20 @@ function render(sub: HTMLElement, tbody: HTMLElement): void {
     }, { class: releaseArmed ? `nrl-btn-danger ${ARMED_CLASS}` : 'nrl-btn-danger' });
     const nextFreed = terms.nextCapFreed > 0 ? ` and ${fmtMoney(terms.nextCapFreed)} next season` : '';
     release.title = `Two taps: pays ${fmtMoney(terms.payout)} and frees ${fmtMoney(terms.capFreed)} of this season's cap${nextFreed}. The signing fee is not refunded.`;
-    const sell = button('NO BUYER', () => {});
-    sell.disabled = true;
-    sell.title = 'No club has bought him. A sale waits until there is a buyer.';
-    if (releaseArmed) atRest = () => { release.classList.remove(ARMED_CLASS); release.textContent = releaseLabel; };
+    const sellArmed = armed === `sell:${p.id}`;
+    const sellLabel = 'NO BUYER';
+    const sell = button(sellArmed ? 'REALLY SELL?' : sellLabel, () => {
+      const g = guardTap(armed, `sell:${p.id}`);
+      if (g.run && !armedTap(performance.now() - armedAt)) return;
+      arm(g.armed);
+      if (g.run) act(sellPlayer(getState(), p.id));
+      rerender();
+    }, { class: sellArmed ? `nrl-btn-danger ${ARMED_CLASS}` : 'nrl-btn-danger' });
+    sell.title = 'Two taps. No club has bought him, so nothing is sold.';
+    if (releaseArmed || sellArmed) {
+      const [btn, label] = releaseArmed ? [release, releaseLabel] : [sell, sellLabel];
+      atRest = () => { btn.classList.remove(ARMED_CLASS); btn.textContent = label; };
+    }
 
     rows.push(el('tr', { attrs: { 'data-contract': p.id } },
       who,
