@@ -141,12 +141,14 @@ function render(sub: HTMLElement, tbody: HTMLElement): void {
       el('span', { class: 'nrl-contract-pos', text: p.position })));
 
     let renew: HTMLButtonElement;
-    if (queued || renewed.has(p.id)) {
+    if (queued) {
+      renew = button('QUEUED', () => {});
+      renew.disabled = true;
+      renew.title = `A renewal is already queued from season ${queued.startSeason} at ${fmtMoney(queued.salary)} a season.`;
+    } else if (renewed.has(p.id)) {
       renew = button('RENEWED ✓', () => {});
       renew.disabled = true;
-      renew.title = queued
-        ? `A renewal is already queued from season ${queued.startSeason} at ${fmtMoney(queued.salary)} a season.`
-        : 'Renewed this visit.';
+      renew.title = 'Renewed this visit.';
     } else if (blocked) {
       renew = button('RENEW', () => { act(renewEarly(getState(), p.id)); });
       renew.disabled = true;
