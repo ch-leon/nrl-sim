@@ -114,6 +114,7 @@ describe('playerPageModel', () => {
     const s = getState();
     const p = s.squad[0]!;
     p.contractWeeks = 10;
+    p.deal = { salary: p.deal?.salary ?? 20_000, startSeason: s.season, endSeason: s.season };
     const ask = renewalAsk(p, false);
     const terms = releaseTerms(p, s.season, s.week);
     const [renew, sell, release] = playerActions(p, { kind: 'squad' }, s);
@@ -121,7 +122,7 @@ describe('playerPageModel', () => {
     expect(renew!.detail).toContain(`${ask.salary.toLocaleString('en-US')}`);
     expect(renew!.detail).toContain('No fee');
     expect(renew!.enabled).toBe(true);
-    expect(sell).toMatchObject({ enabled: true, confirm: 'Really sell?', label: 'No buyer' });
+    expect(sell).toMatchObject({ enabled: false, why: 'No club has bought him yet.', label: 'No buyer' });
     expect(release!.label).toContain(terms.payout.toLocaleString('en-US'));
     expect(release!.detail).toContain('cap');
     expect(release!.danger).toBe(true);
@@ -132,7 +133,7 @@ describe('playerPageModel', () => {
     expect(playerActions(p, { kind: 'squad' }, { ...s, money: 0 })[0]!.enabled).toBe(true);
     const thin = { ...s, squad: s.squad.slice(0, SQUAD_MIN), money: 1_000_000 };
     const acts = playerActions(thin.squad[0]!, { kind: 'squad' }, thin);
-    expect(acts[1]).toMatchObject({ enabled: true, label: 'No buyer' });
+    expect(acts[1]).toMatchObject({ enabled: false, why: 'No club has bought him yet.' });
     expect(acts[2]).toMatchObject({ enabled: false, why: `Squad at the minimum (${SQUAD_MIN})` });
     const broke = playerActions(p, { kind: 'squad' }, { ...s, money: 0 })[2]!;
     if (terms.payout > 0) expect(broke.enabled).toBe(false);

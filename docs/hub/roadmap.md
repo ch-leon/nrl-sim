@@ -29,10 +29,13 @@ live gameplay change; work still open below has not shipped.
   New careers now keep cash and the annual cap apart ([#557](https://github.com/ch-leon/nrl-sim/issues/557)):
   salaries are a season commitment and do not leave the bank. Signings, renewals
   and releases now follow the cash and cap rules ([#558](https://github.com/ch-leon/nrl-sim/issues/558)):
-  a signing needs the fee and cap room, a renewal is free and starts at expiry,
-  and a release is refused when the cash is short. Rival later signings are
+  a signing needs the fee and cap room, a renewal is free, only in the last
+  season of the current deal, and must fit the cap in the season it starts.
+  A release is refused when the cash is short. Choosing two or three seasons
+  at signing is not in this slice; it stays with the finance presentation
+  ([#561](https://github.com/ch-leon/nrl-sim/issues/561)). Rival later signings are
   refused when they do not fit the cap. Charging their wallets waits until they
-  have match income, because the opening float cannot fund an annual fee every
+  have match income ([#559](https://github.com/ch-leon/nrl-sim/issues/559)), because the opening float cannot fund an annual fee every
   week. Match-income
   receipts ([#559](https://github.com/ch-leon/nrl-sim/issues/559)), cap upgrades
   ([#560](https://github.com/ch-leon/nrl-sim/issues/560)), the finance-screen

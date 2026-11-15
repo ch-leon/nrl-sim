@@ -90,7 +90,7 @@ describe('renewal asks track the club (N6, #167)', () => {
 
 describe('early renewal', () => {
   it('queues the next season at the ability ask, leaves this deal and the weeks, and charges nothing', () => {
-    const deal = { salary: 20_000, startSeason: 1, endSeason: 2 };
+    const deal = { salary: 20_000, startSeason: 1, endSeason: 1 };
     setup([mk('a', { deal, contractWeeks: 40 })]);
     const before = getState();
     const p = before.squad[0]!;
@@ -101,7 +101,7 @@ describe('early renewal', () => {
     expect(queued.wage).toBe(p.wage);
     expect(queued.contractWeeks).toBe(40);
     expect(queued.deal!.salary).toBe(20_000);
-    expect(queued.deal!.renewal).toMatchObject({ startSeason: 3, endSeason: 3 });
+    expect(queued.deal!.renewal).toMatchObject({ startSeason: 2, endSeason: 2 });
     expect(queued.deal!.renewal!.salary).not.toBe(0);
     const again = renewEarly(getState(), 'a');
     expect(again.ok).toBe(false);

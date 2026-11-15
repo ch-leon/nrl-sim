@@ -19,7 +19,7 @@ import { save } from '../../core/save';
 import { marketWage, overallRating, ratingText, shownStats } from '../../data/player';
 import { ROMAN, TRAITS, headlineTrait, traitTip } from '../../data/traits';
 import { PROGRESSION, MORALE, SQUAD_CAP, SQUAD_MIN } from '../../config';
-import { renewEarly, sellPlayer } from '../../systems/contracts';
+import { renewEarly, renewalRefusal, sellPlayer } from '../../systems/contracts';
 import { releasePlayer, signingFee, signingFeeBasis } from '../../systems/freeagency';
 import { capRoomFor, releaseTerms, renewalAsk, salaryDemand } from '../../systems/cap';
 import { hasStaff } from '../../systems/staff';
@@ -157,8 +157,9 @@ export function playerActions(p: Player, ctx: PlayerContext, state: GameState): 
   }
   const ask = renewalAsk(p, hasStaff(state, 'welfare'));
   const queued = p.deal?.renewal;
-  const start = queued?.startSeason ?? (p.deal ? p.deal.endSeason + 1 : state.season);
+  const start = queued?.startSeason ?? (p.deal && p.deal.endSeason >= state.season ? p.deal.endSeason + 1 : state.season);
   const changed = p.deal && ask.salary !== p.deal.salary ? ` ${ask.why}.` : '';
+  const blocked = renewalRefusal(state, p);
   const atMin = state.squad.length <= SQUAD_MIN;
   const minWhy = `Squad at the minimum (${SQUAD_MIN})`;
   const terms = releaseTerms(p, state.season, state.week);
@@ -169,17 +170,17 @@ export function playerActions(p: Player, ctx: PlayerContext, state: GameState): 
       label: 'Renew',
       detail: queued
         ? `From season ${queued.startSeason} at ${fmtMoney(queued.salary)} a season. No fee.`
-        : `From season ${start} at ${fmtMoney(ask.salary)} a season. No fee.${changed}`,
-      enabled: !queued,
-      ...(queued ? { why: `Already queued from season ${queued.startSeason}.` } : {}),
+        : blocked
+          ? blocked.message
+          : `From season ${start} at ${fmtMoney(ask.salary)} a season. No fee.${changed}`,
+      enabled: !blocked,
+      ...(blocked ? { why: blocked.message } : {}),
     },
     {
       id: 'sell',
       label: 'No buyer',
-      detail: 'No club has bought him yet. Nothing is sold.',
-      enabled: true,
-      danger: true,
-      confirm: 'Really sell?',
+      enabled: false,
+      why: 'No club has bought him yet.',
     },
     {
       id: 'release',
@@ -440,6 +441,7 @@ const FAILURE: Record<string, string> = {
   'over-cap': 'Not enough salary-cap room.',
   'not-found': 'That player is no longer there.',
   'already-renewed': 'A renewal is already queued.',
+  'not-final-season': 'A renewal waits until the last season of his deal.',
   'no-buyer': 'No club has bought him. Nothing was changed.',
   'squad-min': `Squad can't go below ${SQUAD_MIN}.`,
 };

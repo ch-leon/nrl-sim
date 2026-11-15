@@ -262,24 +262,24 @@ export interface ReleaseTerms {
 
 /**
  * Cash to release him, and the cap it frees. A quarter of the salary still to
- * run, and never more than this year's salary. A queued renewal counts. The
- * signing fee is not refunded.
+ * run, and never more than the larger of this deal and a queued renewal.
+ * The signing fee is not refunded.
  */
 export function releaseTerms(player: { deal?: SignedDeal }, season: number, week: number): ReleaseTerms {
   const deal = player.deal;
   const salary = deal?.salary ?? 0;
+  const renewalSalary = deal?.renewal?.salary ?? 0;
   let quarter = 0;
   if (deal && salary > 0) {
     const current = termRemaining(deal, season, week);
     if (current > 0) quarter += releasePayoutQuote(salary, Math.min(3, current));
-    const next = deal.renewal;
-    if (next) {
-      const later = termRemaining(next, season, week);
-      if (later > 0) quarter += releasePayoutQuote(next.salary, Math.min(3, later));
-    }
+  }
+  if (deal?.renewal && renewalSalary > 0) {
+    const later = termRemaining(deal.renewal, season, week);
+    if (later > 0) quarter += releasePayoutQuote(renewalSalary, Math.min(3, later));
   }
   return {
-    payout: Math.min(salary, quarter),
+    payout: Math.min(Math.max(salary, renewalSalary), quarter),
     capFreed: activeSalary(player, season),
     nextCapFreed: activeSalary(player, season + 1),
   };

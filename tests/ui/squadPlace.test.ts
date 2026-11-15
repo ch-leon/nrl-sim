@@ -78,7 +78,7 @@ describe('AUTO PICK’s toast (#614)', () => {
 });
 
 describe('the player page’s columns (#614)', () => {
-  it('keep their scroll through CAPTAIN, an armed Sell and Rename', () => {
+  it('keep their scroll through CAPTAIN and Rename; Sell stays closed', () => {
     const id = getState().lineup.starters[3]!;
     openPlayerPage(getState().squad.find((p) => p.id === id)!, { kind: 'squad' });
     const page = q('[data-player-page]');
@@ -86,7 +86,7 @@ describe('the player page’s columns (#614)', () => {
     const scrolled = [27, 150, 20]; // the card, the stats and traits, the jobs and deals
     const scroll = (): void => cols().forEach((c, i) => { c.scrollTop = scrolled[i]!; });
     expect(cols().map((c) => c.className.split(' ').pop())).toEqual(['nrl-player-card', 'nrl-player-about', 'nrl-player-side']);
-    for (const redraw of ['[data-player-role="captain"]', '[data-player-action="sell"]', '[data-rename-open]']) {
+    for (const redraw of ['[data-player-role="captain"]', '[data-rename-open]']) {
       const before = cols();
       scroll();
       q(redraw).click();
@@ -94,7 +94,8 @@ describe('the player page’s columns (#614)', () => {
       expect(cols().map((c) => c.scrollTop), redraw).toEqual(scrolled);
     }
     expect(getState().lineup.captain).toBe(id);
-    expect(q('[data-player-action="sell"]').textContent).toBe('Really sell?');
+    expect(q('[data-player-action="sell"]').textContent).toBe('No buyer');
+    expect((q('[data-player-action="sell"]') as StubNode).disabled).toBe(true);
     expect(page.querySelector('[data-player-rename]')).not.toBeNull();
   });
 });

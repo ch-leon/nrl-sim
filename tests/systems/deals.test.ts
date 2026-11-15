@@ -5,14 +5,18 @@ import { bus } from '../../src/core/events';
 import { importSave } from '../../src/core/save';
 import { signingFee, signPlayer, releasePlayer } from '../../src/systems/freeagency';
 import { renewEarly } from '../../src/systems/contracts';
-import { commitment, publishedCap, releaseTerms, salaryDemand } from '../../src/systems/cap';
+import { commitment, publishedCap, releaseTerms, renewalAsk, salaryDemand } from '../../src/systems/cap';
 import { trainWeek } from '../../src/systems/training';
+import { registerEconomySystem } from '../../src/systems/economy';
+import { advanceWeek, clearTickHooks } from '../../src/core/time';
+import { WEEKS_PER_SEASON } from '../../src/config';
 import { POSITIONS } from '../../src/data/player';
 import { rivalSigningTick } from '../../src/systems/rivals';
 import { makeRng } from '../../src/utils/rng';
 
 beforeEach(() => {
   bus.clear();
+  clearTickHooks();
   initLeague(createNewGame('Deals', 3));
 });
 
@@ -78,7 +82,7 @@ describe('a signing needs the cash and the cap, both or neither', () => {
 describe('a renewal is free and does not touch this deal', () => {
   it('queues one season after the current promise, and a second call changes nothing', () => {
     const player = getState().squad[0]!;
-    const deal = { salary: player.deal!.salary, startSeason: 1, endSeason: 3 };
+    const deal = { salary: player.deal!.salary, startSeason: 1, endSeason: 1 };
     loadState({
       ...getState(),
       money: 123_456,
@@ -91,7 +95,7 @@ describe('a renewal is free and does not touch this deal', () => {
     expect(queued.contractWeeks).toBe(60);
     expect(queued.wage).toBe(player.wage);
     expect(queued.deal!.salary).toBe(deal.salary);
-    expect(queued.deal!.renewal).toMatchObject({ startSeason: 4, endSeason: 4 });
+    expect(queued.deal!.renewal).toMatchObject({ startSeason: 2, endSeason: 2 });
     const first = queued.deal;
     expect(renewEarly(getState(), player.id).reason).toBe('already-renewed');
     expect(getState().money).toBe(before);
@@ -102,6 +106,69 @@ describe('a renewal is free and does not touch this deal', () => {
     expect(loaded.ok).toBe(true);
     if (!loaded.ok) return;
     expect(loaded.state.squad.find(p => p.id === player.id)!.deal).toEqual(first);
+  });
+
+  it('refuses a renewal before the last season of the deal', () => {
+    const player = getState().squad[0]!;
+    const deal = { salary: 20_000, startSeason: 1, endSeason: 3 };
+    loadState({
+      ...getState(),
+      squad: getState().squad.map(p => p.id === player.id ? { ...p, deal, contractWeeks: 60 } : p),
+    });
+    const before = books();
+    const refused = renewEarly(getState(), player.id);
+    expect(refused.reason).toBe('not-final-season');
+    expect(refused.message).toContain('season 3');
+    expect(books()).toEqual(before);
+  });
+
+  it('fills the season the renewal starts in exactly, and refuses one dollar over', () => {
+    const s = getState();
+    const player = s.squad[0]!;
+    const ask = renewalAsk(player, false).salary;
+    const cap = publishedCap(s.capAccount);
+    const others = s.squad.filter(p => p.id !== player.id);
+    const fill = (over: number) => {
+      const bill = cap - ask + over;
+      const base = Math.floor(bill / others.length);
+      const extra = bill - base * others.length;
+      return s.squad.map(p => p.id === player.id
+        ? { ...p, deal: { salary: 1_000, startSeason: 1, endSeason: 1 } }
+        : { ...p, deal: { salary: base + (p.id === others[0]!.id ? extra : 0), startSeason: 1, endSeason: 2 } });
+    };
+    loadState({ ...s, squad: fill(1) });
+    const before = books();
+    const refused = renewEarly(getState(), player.id);
+    expect(refused.reason).toBe('over-cap');
+    expect(refused.message).toContain('salary-cap');
+    expect(books()).toEqual(before);
+
+    loadState({ ...s, squad: fill(0) });
+    expect(renewEarly(getState(), player.id).ok).toBe(true);
+    expect(commitment(getState().squad, 2)).toBe(cap);
+  });
+
+  it('a queued renewal takes over at the rollover, with that salary and a season of weeks', () => {
+    registerEconomySystem();
+    const player = getState().squad[0]!;
+    loadState({
+      ...getState(),
+      preseason: 0,
+      week: 2,
+      squad: getState().squad.map(p => p.id === player.id
+        ? { ...p, contractWeeks: 10, deal: { salary: 10_000, startSeason: 1, endSeason: 1 } }
+        : p),
+    });
+    const who = getState().squad.find(p => p.id === player.id)!;
+    const ask = renewalAsk(who, false).salary;
+    expect(renewEarly(getState(), player.id).ok).toBe(true);
+    expect(getState().squad.find(p => p.id === player.id)!.deal!.renewal!.salary).toBe(ask);
+    loadState({ ...getState(), week: WEEKS_PER_SEASON, preseason: 0 });
+    advanceWeek();
+    const kept = getState().squad.find(p => p.id === player.id)!;
+    expect(getState().season).toBe(2);
+    expect(kept.deal).toEqual({ salary: ask, startSeason: 2, endSeason: 2 });
+    expect(kept.contractWeeks).toBe(WEEKS_PER_SEASON);
   });
 
   it('training does not reprice the salary already signed', () => {
@@ -130,9 +197,32 @@ describe('a release previews the payout and refuses when the cash is short', () 
     expect(commitment(getState().squad, 1)).toBe(capBefore - terms.capFreed);
     expect(getState().freeAgents.find(p => p.id === player.id)!.deal).toBeUndefined();
   });
+
+  it('a queued renewal is part of the payout, capped at the larger salary, and leaves next season', () => {
+    const player = getState().squad[0]!;
+    const renewalSalary = 40_000;
+    const deal = {
+      salary: 1_000, startSeason: 1, endSeason: 1,
+      renewal: { salary: renewalSalary, startSeason: 2, endSeason: 2 },
+    };
+    loadState({
+      ...getState(),
+      money: 1_000_000,
+      squad: getState().squad.map(p => p.id === player.id ? { ...p, deal } : p),
+    });
+    const held = getState().squad.find(p => p.id === player.id)!;
+    const terms = releaseTerms(held, 1, getState().week);
+    expect(terms.nextCapFreed).toBe(renewalSalary);
+    expect(terms.payout).toBeGreaterThan(deal.salary);
+    expect(terms.payout).toBeLessThanOrEqual(renewalSalary);
+    const nextBefore = commitment(getState().squad, 2);
+    expect(releasePlayer(getState(), player.id).ok).toBe(true);
+    expect(commitment(getState().squad, 2)).toBe(nextBefore - renewalSalary);
+    expect(getState().money).toBe(1_000_000 - terms.payout);
+  });
 });
 
-describe('a rival later signing uses the same cap and cash', () => {
+describe('a rival later signing is checked against the cap, not the wallet', () => {
   it('refuses when the new salary does not fit the cap, and still signs when it does', () => {
     const s = getState();
     const club = s.league.clubs.find(c => c.id !== s.clubId && c.squad && c.squad.length > 0)!;

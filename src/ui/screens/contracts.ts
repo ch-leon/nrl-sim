@@ -13,7 +13,7 @@ import { getState, type Player } from '../../core/state';
 import { overallRating } from '../../data/player';
 import { releasePlayer } from '../../systems/freeagency';
 import { releaseTerms, renewalAsk } from '../../systems/cap';
-import { contractRows, renewEarly, sellPlayer } from '../../systems/contracts';
+import { contractRows, renewEarly, renewalRefusal, sellPlayer } from '../../systems/contracts';
 import { hasStaff } from '../../systems/staff';
 import { SQUAD_MIN } from '../../config';
 import { fmtMoneyShort } from '../../utils/money';
@@ -24,6 +24,7 @@ const REASONS: Record<string, string> = {
   'insufficient-funds': 'Not enough cash.',
   'over-cap': 'Not enough salary-cap room.',
   'already-renewed': 'A renewal is already queued.',
+  'not-final-season': 'A renewal waits until the last season of his deal.',
   'squad-min': `Squad can't go below ${SQUAD_MIN}.`,
   'not-found': 'Player not found.',
   'no-buyer': 'No club has bought him. Nothing was changed.',
@@ -126,11 +127,14 @@ function render(sub: HTMLElement, tbody: HTMLElement): void {
     const weeks = p.contractWeeks;
     const ask = renewalAsk(p, hasStaff(s, 'welfare'));
     const queued = p.deal?.renewal;
-    const start = queued?.startSeason ?? (p.deal ? p.deal.endSeason + 1 : s.season);
+    const start = queued?.startSeason ?? (p.deal && p.deal.endSeason >= s.season ? p.deal.endSeason + 1 : s.season);
     const changed = p.deal && ask.salary !== p.deal.salary ? ` ${ask.why}.` : '';
+    const blocked = renewalRefusal(s, p);
     const meta = queued
       ? `age ${p.age} · renewal queued from season ${queued.startSeason} at ${fmtMoney(queued.salary)}/season`
-      : `age ${p.age} · morale ${p.morale} · renews from season ${start} at ${fmtMoney(ask.salary)}/season, no fee${changed}`;
+      : blocked
+        ? `age ${p.age} · ${blocked.message}`
+        : `age ${p.age} · morale ${p.morale} · renews from season ${start} at ${fmtMoney(ask.salary)}/season, no fee${changed}`;
     const who = el('td', { class: 'nrl-contract-info', attrs: { title: meta } }, el('div', { class: 'nrl-contract-who' },
       el('span', { class: 'nrl-contract-name', text: p.name }),
       el('span', { class: 'nrl-contract-meta', text: meta }),
@@ -143,6 +147,10 @@ function render(sub: HTMLElement, tbody: HTMLElement): void {
       renew.title = queued
         ? `A renewal is already queued from season ${queued.startSeason} at ${fmtMoney(queued.salary)} a season.`
         : 'Renewed this visit.';
+    } else if (blocked) {
+      renew = button('RENEW', () => { act(renewEarly(getState(), p.id)); });
+      renew.disabled = true;
+      renew.title = blocked.message;
     } else {
       renew = button('RENEW', () => {
         arm(null);

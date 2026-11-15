@@ -6,7 +6,7 @@
 import { getState, setState, type GameState, type Player } from '../core/state';
 import { bus } from '../core/events';
 import { earnMoney } from '../data/club';
-import { renewalAsk, renewedAgreement } from './cap';
+import { activeSalary, commitment, publishedCap, renewalAsk, renewedAgreement } from './cap';
 import { marketWage, overallRating } from '../data/player';
 import { BOARD, CONTRACTS, MORALE, difficultyMultipliers } from '../config';
 import { fmtMoney } from '../utils/money';
@@ -110,21 +110,48 @@ export function renewsOnLoan(_state: GameState, _p: Player): boolean {
 }
 
 /**
- * Queue one new season at his ability now. It starts the season after the
- * current promise, costs no cash, and does not change this deal's salary or
- * the weeks left on it. A second call in the same season changes nothing.
- * Reasons: 'not-found', 'already-renewed'.
+ * Why a renewal cannot be queued, or null when it can. A renewal is a new
+ * promise: only in the last season of the current deal, and only when that
+ * season's cap can hold the new salary.
  */
-export function renewEarly(state: GameState, playerId: string): SignResult {
-  const p = state.squad.find((x) => x.id === playerId);
-  if (!p) return { ok: false, reason: 'not-found', message: 'Player not found.' };
+export function renewalRefusal(state: GameState, p: Player): { reason: string; message: string } | null {
   if (p.deal?.renewal) {
     return {
-      ok: false,
       reason: 'already-renewed',
       message: `A renewal is already queued from season ${p.deal.renewal.startSeason}. Nothing was charged.`,
     };
   }
+  if (p.deal && state.season < p.deal.endSeason) {
+    return {
+      reason: 'not-final-season',
+      message: `A renewal can be queued in season ${p.deal.endSeason}, the last season of his deal.`,
+    };
+  }
+  const ask = renewalAsk(p, hasStaff(state, 'welfare'));
+  const start = p.deal && p.deal.endSeason >= state.season ? p.deal.endSeason + 1 : state.season;
+  const used = commitment(state.squad, start) - activeSalary(p, start);
+  const cap = publishedCap(state.capAccount);
+  if (used + ask.salary > cap) {
+    const room = Math.max(0, cap - used);
+    return {
+      reason: 'over-cap',
+      message: `Not enough salary-cap room. From season ${start} he costs ${fmtMoney(ask.salary)} and ${fmtMoney(room)} is free.`,
+    };
+  }
+  return null;
+}
+
+/**
+ * Queue one new season at his ability now. It starts the season after the
+ * current promise, costs no cash, and does not change this deal's salary or
+ * the weeks left on it. A second call in the same season changes nothing.
+ * Reasons: 'not-found', 'already-renewed', 'not-final-season', 'over-cap'.
+ */
+export function renewEarly(state: GameState, playerId: string): SignResult {
+  const p = state.squad.find((x) => x.id === playerId);
+  if (!p) return { ok: false, reason: 'not-found', message: 'Player not found.' };
+  const blocked = renewalRefusal(state, p);
+  if (blocked) return { ok: false, reason: blocked.reason, message: blocked.message };
   const ask = renewalAsk(p, hasStaff(state, 'welfare'));
   const deal = renewedAgreement(p.deal, state.season, ask.salary);
   const start = deal.renewal?.startSeason ?? deal.startSeason;
