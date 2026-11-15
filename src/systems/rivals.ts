@@ -20,7 +20,7 @@ import { bus } from '../core/events';
 import { registerTickHook } from '../core/time';
 import { LEAGUE, ON_FIELD, SEASON_ROUNDS, STAT_MAX, WEEKS_PER_SEASON } from '../config';
 import { generatePlayerAround, withShownStats, shownStats, marketWage, overallRating, POSITIONS, wageForOverall } from '../data/player';
-import { admitOpeningSquad, AI_OPENING_CASH, commitPlayer, freshCapAccount, SINGLE_LEAGUE_TIER, tierCap } from './cap';
+import { admitOpeningSquad, AI_OPENING_CASH, capRoomFor, commitPlayer, freshCapAccount, SINGLE_LEAGUE_TIER, tierCap } from './cap';
 import type { FinanceTier } from '../data/financeRules';
 import { makeRng, type Rng } from '../utils/rng';
 import { ageAndRetirePlayers } from './aging';
@@ -378,10 +378,17 @@ export function rivalSigningTick(clubs: readonly RivalClub[], freeAgents: readon
       const room = makeRoom(squad, target);
       if (!room) break;
       const account = club.capAccount ?? freshCapAccount(SINGLE_LEAGUE_TIER);
-      // Record the annual deal. Refusing it here would change who plays; the
-      // annual cap check on later deals is #558/#572. Opening admission already ran.
       const signedPlayer = commitPlayer({ ...target, morale: 50, departed: false }, season);
-      if (room.released) pool.push({ ...room.released, injuredWeeks: 0 });
+      const salary = signedPlayer.deal?.salary ?? 0;
+      // The annual cap applies to a later signing. Rival cash is not debited
+      // here: a rival's wallet is the opening float and they have no match
+      // income until #559, so charging the annual fee would stop them replacing
+      // players. A funded move between clubs is #572.
+      if (!capRoomFor(room.squad, account, season, salary)) break;
+      if (room.released) {
+        const { deal: _releasedDeal, ...bare } = room.released;
+        pool.push({ ...bare, injuredWeeks: 0, contractWeeks: 0 });
+      }
       pool = pool.filter((p) => p.id !== target.id);
       const ovr = overallRating(target);
       signed.push({ clubId: club.id, playerId: target.id, overall: ovr, reason: need?.kind ?? 'upgrade' });

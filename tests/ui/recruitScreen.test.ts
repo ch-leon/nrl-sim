@@ -68,10 +68,11 @@ describe('Recruit screen', () => {
   it('marks only the one reach fee in warning colour and explains the saving estimate', () => {
     const pool = getState().freeAgents.slice(0, 5).map((p, i) => ({ ...p, junior: true, wage: i === 0 ? 300 : 20,
       stats: { speed: i === 0 ? 90 : 40, strength: 40, stamina: 40, handling: 40, kicking: 40, footyIQ: 40 } }));
-    setState({ money: 1000, freeAgents: pool }); openRecruitScreen();
+    const fee = signingFee(getState(), pool[0]!);
+    setState({ money: Math.floor(fee / 1.2), freeAgents: pool }); openRecruitScreen();
     const reach = rows().find((r) => r.attrs['data-row-player'] === pool[0]!.id)!;
     expect(reach.children[4]!.style.color).toBe('var(--nrl-alert)');
-    expect(reach.textContent).toMatch(/Fee \$1,200: about \d+ weeks away/);
+    expect(reach.textContent).toMatch(new RegExp(`Fee \\$${fee.toLocaleString('en-US')}: about \\d+ weeks away`));
     expect(screen().querySelectorAll('[data-coach-pick]')).toHaveLength(1);
     expect(rows().filter((r) => r.children[4]!.style.color === 'var(--nrl-alert)')).toHaveLength(1);
   });

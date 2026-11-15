@@ -16,9 +16,11 @@ This slice publishes executable quotes in
 and this delivery contract. #557 now separates cash from the annual cap for
 new careers: salaries are season commitments, weekly wage/upkeep/overhead
 deductions are retired, and saves from before that format are rejected rather
-than converted. Signing fees, renewals, receipt-backed match income, cap
-upgrades and the full finance presentation remain #558–#561. End-to-end
-balance is #562.
+than converted. #558 now charges the signing fee, queues a fee-free
+renewal and pays the release payout, and refuses a signing that does not fit
+the cash and the cap. Receipt-backed match income, cap upgrades and the full
+finance presentation remain #559–#561. End-to-end balance is #562. A funded
+sale between clubs is #572, so the old sell button refuses until that exists.
 
 ## 1. Decisions and units
 
@@ -93,15 +95,21 @@ Do not call this opening function on promotion, transfer, rollover or import.
   quote alone is not a sale, and no-buyer/cancelled/stale offers change nothing.
 - A release costs `min(annual salary, 0.25 × unexpired salary commitment)`.
   Count the unplayed fraction of the current saved calendar plus full remaining
-  contract seasons. No signing-fee refund. Insufficient cash or a squad-minimum
+  contract seasons, including a queued renewal. When a renewal is queued, the
+  annual salary in that cap is the larger of the current deal and the renewal.
+  No signing-fee refund. Insufficient cash or a squad-minimum
   breach refuses the action without changing anything.
 - A season deal expires at an explicit season end, after every actual final or
   series. An in-season one-season deal covers the rest of that season; show
   that expiry before signing. Two/three-season deals add one/two full seasons.
 - A renewal is queued during the final contract season, costs no cash and starts
-  at expiry. Display next-season commitments. Review expiring deals before the
+  at expiry. It is a new promise and must fit that season's published cap.
+  Display next-season commitments. Review expiring deals before the
   next season starts; do not automatically replace cheap deals mid-season or
   finance an unaffordable ask with a loan. Unrenewed players become unsigned.
+  The signing screen offers one season, the rest of this season. Choosing two
+  or three seasons when signing is not in #558; that choice stays with the
+  finance presentation ([#561](https://github.com/ch-leon/nrl-sim/issues/561)).
 
 ## 3. Cash settlement
 
@@ -187,6 +195,11 @@ second facilities/business simulation. Initially AI uses no hidden facility
 bonuses. It may buy one level after a completed season when cap usage is at
 least 85% and cash covers its price plus a 2M reserve. Validate buyer funds and
 future commitments on every deal; cash-rich AI cannot exceed its published cap.
+
+#558 checks a rival's later free-agent signing against that published cap and
+refuses it when the salary does not fit. It does not debit the wallet. Rivals
+have no match receipts until #559, and the 60,000 opening float cannot fund an
+annual fee every week. #559 debits those wallets once the receipts exist.
 
 ### Relegation and minimum squads
 

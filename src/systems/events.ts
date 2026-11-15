@@ -18,7 +18,7 @@ import {
 } from '../data/events';
 import { BOARD, EVENTS, ON_FIELD, SQUAD_CAP, WEEKS_PER_SEASON, WILDCARDS } from '../config';
 import { marketWage, withDerivedStrength } from './rivals';
-import { signForRestOfSeason } from './cap';
+import { capRoomFor, salaryDemand, signForRestOfSeason } from './cap';
 import { signingFee } from './freeagency';
 import { hasStaff, WELFARE_CARDS } from './staff';
 import { isFieldable } from './lineup';
@@ -181,7 +181,9 @@ export function rivalStars(state: GameState): { club: RivalClub; player: Player;
       .sort((a, b) => overallRating(b) - overallRating(a) || a.id.localeCompare(b.id))[0];
     if (!best || overallRating(best) <= cut) continue;
     const fee = signingFee(state, best);
-    if (fee <= state.money) out.push({ club, player: best, fee });
+    if (fee <= state.money && capRoomFor(state.squad, state.capAccount, state.season, salaryDemand(best))) {
+      out.push({ club, player: best, fee });
+    }
   }
   return out;
 }
@@ -429,6 +431,10 @@ export function signRivalPlayer(state: GameState, rivalId: string | undefined, p
   if (!club || !player) return 'the player is no longer available';
   if (state.squad.length >= SQUAD_CAP) return 'the squad is full';
   if (state.money < fee) return "the club couldn't afford the fee";
+  const salary = salaryDemand(player);
+  if (!capRoomFor(state.squad, state.capAccount, state.season, salary)) {
+    return `not enough salary-cap room (${fmtMoney(salary)} a season)`;
+  }
   const signed: Player = signForRestOfSeason({
     ...player, wage: marketWage(player), morale: 70, joinedSeason: state.season,
   }, state.season, state.week);

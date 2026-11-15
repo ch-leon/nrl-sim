@@ -6,7 +6,7 @@ import { WEEKS_PER_SEASON } from '../config';
 import { overallRating, shownStats } from '../data/player';
 import {
   annualCapQuote, annualSalaryQuote, FINANCE_RULES_VERSION, FINANCE_TIERS, openingSalaryOffers,
-  type FinanceLevel, type FinanceTier,
+  releasePayoutQuote, type FinanceLevel, type FinanceTier,
 } from '../data/financeRules';
 
 /** The supported single league contains the premier clubs, so it uses that cap.
@@ -66,6 +66,32 @@ export function salaryDemand(player: Pick<Player, 'stats' | 'position' | 'age' |
   const keys = shownStats(player.position);
   const ceiling = keys.reduce((sum, key) => sum + (player.ceilings?.[key] ?? player.stats[key]), 0) / keys.length;
   return annualSalaryQuote(rating, player.age, Math.max(0, ceiling - rating));
+}
+
+/** A new agreement, priced on ability now. Age and potential only nudge it. Welfare trims 3%. */
+export function renewalAsk(
+  player: Pick<Player, 'stats' | 'position' | 'age' | 'ceilings'>,
+  welfare: boolean,
+): { salary: number; why: string } {
+  const rating = overallRating(player);
+  const keys = shownStats(player.position);
+  const ceiling = keys.reduce((sum, key) => sum + (player.ceilings?.[key] ?? player.stats[key]), 0) / keys.length;
+  const headroom = Math.max(0, ceiling - rating);
+  const salary = annualSalaryQuote(rating, player.age, headroom, welfare);
+  const why = [`ability ${Math.round(rating)}`];
+  if (player.age <= 21) why.push('young, so a little dearer');
+  else if (player.age >= 34) why.push('34 or older, so cheaper');
+  else if (player.age >= 30) why.push('30 or older, so a little cheaper');
+  if (headroom > 10) why.push('room to improve');
+  if (welfare) why.push('Welfare trims 3%');
+  return { salary, why: why.join('; ') };
+}
+
+/** Season-equivalents still to run, including the unplayed part of the current season. */
+function termRemaining(term: SignedTerm, season: number, week: number): number {
+  if (season > term.endSeason) return 0;
+  if (season < term.startSeason) return term.endSeason - term.startSeason + 1;
+  return weeksLeftInSeason(week) / WEEKS_PER_SEASON + (term.endSeason - season);
 }
 
 export function seasonsForWeeks(weeks: number): number {
@@ -224,6 +250,39 @@ export function expireEndedDeals(
 
 export function capRoomFor(players: readonly Player[], account: CapAccount, season: number, salary: number): boolean {
   return commitment(players, season) + salary <= publishedCap(account);
+}
+
+export interface ReleaseTerms {
+  payout: number;
+  /** This season's salary, which leaves the cap. */
+  capFreed: number;
+  /** Next season's salary, which leaves next season's commitments. */
+  nextCapFreed: number;
+}
+
+/**
+ * Cash to release him, and the cap it frees. A quarter of the salary still to
+ * run, and never more than the larger of this deal and a queued renewal.
+ * The signing fee is not refunded.
+ */
+export function releaseTerms(player: { deal?: SignedDeal }, season: number, week: number): ReleaseTerms {
+  const deal = player.deal;
+  const salary = deal?.salary ?? 0;
+  const renewalSalary = deal?.renewal?.salary ?? 0;
+  let quarter = 0;
+  if (deal && salary > 0) {
+    const current = termRemaining(deal, season, week);
+    if (current > 0) quarter += releasePayoutQuote(salary, Math.min(3, current));
+  }
+  if (deal?.renewal && renewalSalary > 0) {
+    const later = termRemaining(deal.renewal, season, week);
+    if (later > 0) quarter += releasePayoutQuote(renewalSalary, Math.min(3, later));
+  }
+  return {
+    payout: Math.min(Math.max(salary, renewalSalary), quarter),
+    capFreed: activeSalary(player, season),
+    nextCapFreed: activeSalary(player, season + 1),
+  };
 }
 
 export function tierCap(tier: FinanceTier): number {

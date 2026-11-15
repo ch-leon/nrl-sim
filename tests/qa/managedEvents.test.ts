@@ -6,7 +6,6 @@ import { MANAGED, managedEventChoice, runSoak } from '../../src/qa/soak';
 import { SQUAD_CAP } from '../../src/config';
 import { EVENT_CARDS, type EventEffect } from '../../src/data/events';
 import { signRivalPlayer } from '../../src/systems/events';
-import { weeklyWages } from '../../src/systems/economy';
 
 describe('managed events use the same budgets as other optional commitments', () => {
   const play = (cardId: string, wage: number) => {
@@ -45,11 +44,11 @@ describe('managed events use the same budgets as other optional commitments', ()
     },
   );
 
-  it.each([{ wage: 4000, signs: false }, { wage: 100, signs: true }])(
-    'an event signing checks wages beyond its affordable fee ($wage wages)', ({ wage, signs }) => {
+  it.each([{ wage: 4000 }, { wage: 100 }])(
+    'an event signing takes the fee when cash and cap allow ($wage wages do not block it)', ({ wage }) => {
       const { state, subject } = play('rivalUnsettled', wage);
-      expect(state.squad.some(p => p.id === subject.id)).toBe(signs);
-      expect(state.finance.find(f => f.season === 1)!.events).toBe(signs ? -1000 : 0);
+      expect(state.squad.some(p => p.id === subject.id)).toBe(true);
+      expect(state.finance.find(f => f.season === 1)!.events).toBe(-1000);
     },
   );
 
@@ -74,7 +73,7 @@ describe('managed events use the same budgets as other optional commitments', ()
     const signed = signRivalPlayer(healthy, event.rivalId, event.subjectId, event.fee!);
     if (typeof signed === 'string') throw new Error(signed);
     expect(signed.money).toBe(healthy.money); // The event ledger, not this pure helper, debits the fee.
-    const reserve = MANAGED.STAR_RESERVE + (weeklyWages(signed) - weeklyWages(healthy)) * MANAGED.WAGE_WEEKS + event.fee!;
+    const reserve = MANAGED.STAR_RESERVE + event.fee!;
     expect(managedEventChoice({ ...healthy, money: reserve }, event)).toBe(0);
     expect(managedEventChoice({ ...healthy, money: reserve - 1 }, event)).toBe(1);
   });
