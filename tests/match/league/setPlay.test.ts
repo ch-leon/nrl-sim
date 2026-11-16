@@ -298,15 +298,16 @@ describe('calling a play (plan §3.2)', () => {
     expect(replay.calls?.made[0]).toBe(sim.callsMade.home);
   }, 60_000);
 
-  it('Hard’s AI coach calls one of his three before a shift; with no AI coach only the half calls them', () => {
+  it('Hard’s AI coach calls one of his three, and it is run; with no AI coach only the half calls them', () => {
     const plays: PlayId[] = ['block-play', 'cut-out-winger', 'kick-pass'];
     const ai = new PlaySim(flat(plays), A, 1, { aiCoach: ['home'] });
-    const call = until(ai, (e) => e.kind === 'coach-call' && e.side === 'home');
-    // Which of the three, and when, moves with every new roll (the block play at tick 663, then the
-    // cut-out at 635 after the weighted receiver, #649): it is one of his three, and his side runs it.
+    // His first set-play call, whatever his other calls come before it (pinned to the cut-out at tick 635
+    // after #649, and the block play at 663 before it, until the last-tackle call, #650, put a shift first).
+    const call = until(ai, (e) => e.kind === 'coach-call' && e.side === 'home' && (e.detail ?? '').startsWith('set-play:'));
     expect(plays.map((p) => `set-play:${p}`)).toContain(call?.detail);
     const launch = until(ai, (e) => e.kind === 'set-play');
-    expect(launch?.text).toMatch(/^H run the /);
+    expect(launch?.side).toBe('home');
+    expect(launch?.detail).toBe(call!.detail!.slice('set-play:'.length));
     const none = stream(flat(plays), A, 1);
     expect(none.some((p) => p.includes(':coach-call:'))).toBe(false);
     expect(none.some((p) => p.includes(':set-play:home:'))).toBe(true);

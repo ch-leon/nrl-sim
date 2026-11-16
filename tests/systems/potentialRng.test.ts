@@ -41,10 +41,14 @@ import { contractsEndingSoon } from '../../src/systems/contracts';
 // #625: completed retreats, including handovers, change match outcomes and later
 // season draws. The final standing-marker/deep-cover corrections restore this historical
 // season fingerprint; UI-read and no-read seasons still agree.
+// #650: the last-tackle call at its default leaves this fingerprint as it was (its first cut, with
+// run and pass weights 1.67× the default, moved it to 3329112261).
 // The attack shapes (#649 step 2) add a roll at each tackle and change match outcomes. Its
 // first cut moved this to 4195872732; picked at the tackle, within reach, the season ends on
 // the same stream as with shapes.on 0, the pin above.
-const MAIN_SEED_AFTER_SEASON = 1788836146;
+// With the shapes and the last-tackle call both on (merged together, 16 Nov 2026) the season ends on a new
+// stream; either alone leaves 1788836146.
+const MAIN_SEED_AFTER_SEASON = 2881251055;
 
 describe('the rng stream (#369)', () => {
   it.each([0, 1])('weekly potential and dot reads preserve the season stream with habit AI=%i', (ai) => {

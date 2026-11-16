@@ -190,6 +190,9 @@ const WATCH_COLUMNS: readonly { head: string; digits: number; get: (w: WatchStat
   // Who took the dummy-half's ball (#649); a dash in results from before it.
   { head: '1st receiver same man %', digits: 0, get: (w) => w.receivers?.sameMan },
   { head: '1st receiver slots', digits: 1, get: (w) => w.receivers?.slots },
+  // Kicks on the second-last tackle and where a won ball's set starts (#650); a dash in results from before it.
+  { head: '2nd-last kicks', digits: 2, get: (w) => w.territory?.earlyKicks },
+  { head: 'Set start m to go', digits: 1, get: (w) => w.territory?.startM },
   // The attack shapes picked (#649 step 2), as shares of the picks; a dash with none picked (shapes off) or in results from before them.
   ...SHAPE_NAMES.map((k) => ({ head: `Shape ${SHAPE_LABEL[k].toLowerCase()} %`, digits: 0, get: (w: WatchStats, r: CellResult) => shapeShare(w, r, k) })),
   // Formed as the ball left the ruck (#649 step 2): every man the shape places within SHAPE_FORMED_M of his spot.

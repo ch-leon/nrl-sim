@@ -225,8 +225,8 @@ describe('out-schemed (#468)', () => {
     expect(losses).toBeGreaterThan(0);
     const flatUs = { ...us, tactics: { attack: 'balanced', defence: 'slide' } as const };
     const flatThem = { ...them, tactics: { attack: 'balanced', defence: 'slide' } as const };
-    // The negative control is a real loss: the first seed that gives one (seed 1 until the attack
-    // shapes, #649 step 2, turned it into a win).
+    // The negative control is a real loss: the first seed that gives one (seed 1 until the last-tackle
+    // call, #650, and the attack shapes, #649 step 2, turned it into a win).
     let flatSeed = 1;
     while (flatSeed < 20 && (() => { const r = runMatch(flatUs, flatThem, { seed: flatSeed, length: { halves: 2, halfMinutes: 7 } }); return r.awayScore <= r.homeScore; })()) flatSeed++;
     const flat = runMatch(flatUs, flatThem, { seed: flatSeed, length: { halves: 2, halfMinutes: 7 } });

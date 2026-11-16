@@ -114,7 +114,9 @@ describe('attack shapes: in the sim', () => {
     }
   });
   it('off (shapes.on 0) draws no roll and shows no shape: the match as before it (seeds 1 and 11, pinned from a65edf9)', () => {
-    const restore = applyTuning({ 'shapes.on': 0 });
+    // The last-tackle call (#650) merged first and also rolls dice, so it is switched off too: with both
+    // off the match is a65edf9's, as pinned here.
+    const restore = applyTuning({ 'shapes.on': 0, 'lastTackle.on': 0 });
     try {
       for (const seed of [1, 11]) {
         const off = play(seed);

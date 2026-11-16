@@ -216,8 +216,9 @@ describe('five more calls (#396): each does what it says', () => {
     let kicks = 0;
     let inReach = 0;
     let found = 0;
-    // Forty seeds, and on until one finds touch (seeds 1–40 had one before the attack shapes, #649 step 2).
-    for (let seed = 1; seed <= 120 && (seed <= 40 || found === 0); seed++) {
+    // Forty seeds, and on until one finds touch (seeds 1–40 had one before the attack shapes, #649 step 2; with
+    // the last-tackle call, #650, on as well the first is seed 138, so the search runs to 160).
+    for (let seed = 1; seed <= 160 && (seed <= 40 || found === 0); seed++) {
       const calls: CallInput[] = [];
       const sim = new LiveSim(H, A, seed, { length: { halves: 1, halfMinutes: 6 }, calls });
       let aimed = false;

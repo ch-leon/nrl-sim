@@ -296,9 +296,11 @@ describe('measuring and reporting', () => {
     // live.receiverMargin 0 they were 1-0:127:3176e88b734d4e28 / 0-0:141:a6acfd1ea8357fe9.
     // The attack shapes (#649 step 2) add a roll at each play-the-ball and move the attackers
     // into shape, re-pinning both; at shapes.on 0 they are 10-0:120:785e83425993f65b /
-    // 6-0:119:0c43dd4315fca6d2, the pins before it.
-    { attack: 'balanced' as const, expected: '12-4:146:14f92e624847723e' },
-    { attack: 'expansive' as const, expected: '0-6:139:cb2999499f127dfb' },
+    // 6-0:119:0c43dd4315fca6d2, the pins before it. With the last-tackle call (#650) on as well both move
+    // again (12-4:146:14f92e624847723e / 0-6:139:cb2999499f127dfb with the shapes alone,
+    // 10-0:143:c8e680f4a9f93b72 / 6-6:131:964b190f1b7b3aab with the last-tackle call alone).
+    { attack: 'balanced' as const, expected: '5-0:136:c6c2102e6b2845f8' },
+    { attack: 'expansive' as const, expected: '12-11:117:ec5f481cc165cc06' },
   ])('pins an even $attack / Slide match (seed 1)', async ({ attack, expected }) => {
     const sim = new LiveSim(sideSheet('H', { rating: 60, tactics: { attack } }), sideSheet('A', { rating: 60 }), 1);
     const parts: string[] = [];
@@ -330,9 +332,11 @@ describe('measuring and reporting', () => {
     // 12-6:152:590616020216c265 before it); both still launch a play and the AI coach still calls one.
     // The attack shapes (#649 step 2) re-pin both (6-7:137:d1d03788b03a1934 and
     // 7-6:160:ef629166efdf6fe6 before them, as they are at shapes.on 0); a launched play still
-    // overrides the shape, and both still launch one.
-    { name: 'plays-on', aiCoach: false, expected: '0-0:145:7384b0d2b13284e0' },
-    { name: 'plays-on-hard', aiCoach: true, expected: '0-4:153:795761cf8dcd6844' },
+    // overrides the shape, and both still launch one. With the last-tackle call (#650) on as well both move
+    // again (0-0:145:7384b0d2b13284e0 / 0-4:153:795761cf8dcd6844 with the shapes alone,
+    // 4-0:137:57361c8ca339e953 / 10-6:150:b55e8ecc71438834 with the last-tackle call alone).
+    { name: 'plays-on', aiCoach: false, expected: '4-7:126:8ed4b00c09535758' },
+    { name: 'plays-on-hard', aiCoach: true, expected: '0-8:153:2503f6138f85a553' },
   ])('pins $name: an even Balanced / Slide match with set plays (seed 1)', async ({ aiCoach, expected }) => {
     const home = { ...sideSheet('H', { rating: 60 }), plays: ['block-play' as const, 'cut-out-winger' as const, 'kick-pass' as const] };
     const sim = new LiveSim(home, sideSheet('A', { rating: 60 }), 1, aiCoach ? { aiCoach: ['home'] } : {});
