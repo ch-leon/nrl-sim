@@ -7,7 +7,7 @@ live gameplay change; work still open below has not shipped.
 
 ## Now
 
-- **Everyday movement — stage 2 candidate:** grounded jog/sprint, acceleration, braking, planted cuts and ball-facing defensive steps are implemented under [#698](https://github.com/ch-leon/nrl-sim/issues/698), on top of stage 1. Combined validation is in progress. The next bounded pass is contact choreography, starting with a complete one-defender tackle and recovery.
+- **Everyday movement — stage 2 candidate:** grounded jog/sprint, acceleration, braking, planted cuts and ball-facing defensive steps are implemented in [draft PR #699](https://github.com/ch-leon/nrl-sim/pull/699), on top of stage 1. All 4,336 tests, build and production browser checks passed; a sequential desktop passage stayed near 60 fps before and after. Release checks and phone performance remain open. The next bounded pass is contact choreography, starting with a complete one-defender tackle and recovery.
 
 - **Match art and animation improvement — stage 1 candidate:** player silhouettes, side views, editable torso/handling poses, quieter grass and softer crowd contrast are in [draft PR #697](https://github.com/ch-leon/nrl-sim/pull/697). Local typecheck/build, all 4,323 tests and production Chromium live-art/big-moment checks passed; release validation is in progress. Follow the [implementation plan](../plans/2026-11-match-art-and-animation.md): stage 2 covers everyday movement; tackles follow, then connected handling/intention and a full-match pass. The first major milestone remains one polished 20–30-second passage. Use the existing labs and reconcile tasks with watchability #626 below. This candidate has not shipped.
 

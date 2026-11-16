@@ -5,8 +5,9 @@ Status: stage 1 implemented in [draft PR #697](https://github.com/ch-leon/nrl-si
 tracking [#696](https://github.com/ch-leon/nrl-sim/issues/696). Local functional checks passed;
 release validation is in progress. Leon agreed to all five improvement areas.
 
-Stage 2 is implemented under [#698](https://github.com/ch-leon/nrl-sim/issues/698),
-on top of the stage-1 candidate; combined validation is in progress. One Sol agent
+Stage 2 is implemented in [draft PR #699](https://github.com/ch-leon/nrl-sim/pull/699),
+tracking [#698](https://github.com/ch-leon/nrl-sim/issues/698),
+on top of the stage-1 candidate; local validation passed. One Sol agent
 implemented movement, Luna runs the shared validation, and the main agent reviews
 the source, visual result and rendering cost.
 
@@ -152,8 +153,10 @@ career match, actual contact/handling/kick/try phases, pause/seek, ball ownershi
 and texture cleanup. The first 1,200 ticks of seed 1 produced identical events to
 the baseline. In that sample, frame-cache misses rose from 11.56% to 17.89%, its
 peak stayed at 768 entries, and texture count stayed at 68. This is cache telemetry,
-not a device frame-rate measurement. Separate-tool release review, CI/QA and a
-real-phone play-test remain release work.
+not a device frame-rate measurement. Stage-1 CI `check`, all WebKit shards and their aggregate, and Android
+build passed. Separate-tool release review, QA and a real-phone play-test remain
+release work. On-demand QA dispatch was unavailable in this session (GitHub API
+returned Forbidden).
 
 Stage 2 uses seven small movement poses in the existing painter: acceleration,
 braking, two planted cuts, two shuffles and backpedalling. Ordinary jogging and
@@ -168,3 +171,22 @@ existing engine state so ball-facing defence continues through flight and loose
 balls; legacy snapshots use available holder/ruck context. No match decisions,
 RNG, save schema or recovery-engine revision changed. Shared contact, ruck and
 kick painters keep their own choreography. Art Lab exposes a Footwork control.
+
+Stage-2 validation: typecheck/build and all 4,336 tests in 322 files passed.
+Production Chromium live-art and big-moment checks passed, including career
+playback, contact/handling, ball ownership, kicks, high catches and tries. Every
+new movement state repeated identical pixels while paused and after seeking away
+and back. Art Lab's seven Footwork choices and Side view passed at 844×390 without
+browser errors or horizontal overflow. Across seed 1's first 1,200 ticks, 20 events
+and 12 sampled full snapshots exactly matched stage 1, excluding the new
+`attacking` projection.
+
+The same 22-second seed-1 passage from tick 43 was measured sequentially in
+production Chromium at 844×390 and ×1, with no concurrent tests/builds: stage 1
+averaged 59.3 fps (p95 16.8 ms, longest 50 ms); stage 2 averaged 59.8 fps
+(p95 16.7 ms, longest 33.4 ms). Neither had a frame over 100 ms. These desktop
+samples show no obvious added stutter; they do not establish phone performance.
+In the separate 1,200-tick cache sample, misses rose from 17.89% to 34.49%; the
+cache stayed capped at 768 and textures at 68. No cache expansion was introduced.
+The previous whole-career performance-budget failures remain open. Stage-2 CI,
+QA, different-tool review and a real-phone play-test remain release checks.

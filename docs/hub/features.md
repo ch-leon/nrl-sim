@@ -64,7 +64,7 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
-- **Everyday match movement (candidate, not yet released):** players lean into starts, take braking steps and plant into turns. Nearby defenders watch the ball while shuffling or backpedalling, including during a pass. Short support/transfer cycles follow distance travelled; the Art Lab Footwork control previews each pose. This builds on the art foundation and preserves match decisions ([#698](https://github.com/ch-leon/nrl-sim/issues/698)).
+- **Everyday match movement (candidate, not yet released):** players lean into starts, take braking steps and plant into turns. Nearby defenders watch the ball while shuffling or backpedalling, including during a pass. Short support/transfer cycles follow distance travelled; the Art Lab Footwork control previews each pose. This builds on the art foundation and preserves match decisions ([PR #699](https://github.com/ch-leon/nrl-sim/pull/699)).
 
 - **Match art foundation (candidate, not yet released):** ordinary movement and handling use a new side profile alongside the front/back views. Editable torso and handling poses give players clearer shoulders, hands and exposed ball panels; the pitch has quieter grass texture and the crowd has softer shirt contrast. Art Lab has a Side view control. Contact, ruck and kick sequences keep their existing directional artwork, and match decisions and player identities are preserved ([PR #697](https://github.com/ch-leon/nrl-sim/pull/697)).
 
