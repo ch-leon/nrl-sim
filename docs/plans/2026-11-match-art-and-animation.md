@@ -11,6 +11,11 @@ on top of the stage-1 candidate; local validation passed. One Sol agent
 implemented movement, Luna runs the shared validation, and the main agent reviews
 the source, visual result and rendering cost.
 
+Stage 3 is in progress under [#700](https://github.com/ch-leon/nrl-sim/issues/700),
+building on stage 2. Leon's explicit review policy: leave every PR open and
+unmerged; Leon reviews before merging. This overrides the repository's automatic
+merge convention for this work. Keep the staged PRs as drafts.
+
 Make an ordinary passage of rugby league enjoyable to watch. Players should have
 weight, the ball should be easy to follow, and tackles should make sense without
 commentary. Keep the game's playful pixel-art character and make the improvement

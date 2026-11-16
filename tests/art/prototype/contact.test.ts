@@ -21,7 +21,7 @@ describe('contact situation artwork', () => {
     for (const { id } of CONTACT_CASES) for (const variant of [0, 1, 2]) for (let t = .6; t < caseDuration(id); t += .025) {
       const state = contactCaseAt(id, t, variant).state!;
       // Include compressed live rucks as well as the slower review choreography.
-      for (const releaseTicks of [undefined, 7, 14]) {
+      for (const releaseTicks of [undefined, 5, 7, 14]) {
         const timed = releaseTicks === undefined || state.resolvedTick === null ? state : {
           ...state, contact: { ...state.contact, releaseTick: state.resolvedTick + releaseTicks },
         };
@@ -84,6 +84,29 @@ describe('contact situation artwork', () => {
       const pixels = drawContact(state, p => ({ ...appearanceFor(p.who), head }), () => kit);
       expect(opaqueBounds(pixels)!.y1).toBeLessThan(pixels.h - 1);
     }
+  });
+  it('supports recovery on a free palm and knee, keeps the ball visible through a pile and separates releases (#700)', () => {
+    for (const id of ['wrap', 'low', 'dominant', 'two', 'three'] as const) {
+      const end = CONTACT_CASES.find(c => c.id === id)!.end / 20;
+      const support = contactPoseAt(contactCaseAt(id, end + .58).state!);
+      expect(support.carrier.arms).toHaveLength(1);
+      expect(Math.abs(support.carrier.arms[0]!.hand[1] - 78)).toBeLessThan(1);
+      expect(support.carrier.pose.farKnee[1]).toBeGreaterThan(75);
+      for (const build of ['lean', 'athletic', 'stocky'] as const) for (const t of [end, end + .3, end + .58, end + .85]) {
+        const state = contactCaseAt(id, t).state!;
+        const lookFor = (p: typeof state.contact.carrier) => ({ ...appearanceFor(p.who), build });
+        const pixels = drawContact(state, lookFor, p => p.side === 'home' ? kit : away);
+        const ball = standContact(contactPoseAt(state), lookFor).ball;
+        let white = 0;
+        for (let y = Math.round(ball[1]); y < Math.round(ball[1]) + 7; y++) for (let x = Math.round(ball[0]); x < Math.round(ball[0]) + 9; x++) {
+          if (pixels.get(x, y).color === 0xffffff) white++;
+        }
+        expect(white).toBeGreaterThanOrEqual(2);
+      }
+    }
+    const state = contactCaseAt('three', CONTACT_CASES.find(c => c.id === 'three')!.end / 20 + .62).state!;
+    const grips = contactPoseAt(state).defenders.map(d => d.grip);
+    expect(new Set(grips).size).toBeGreaterThan(1);
   });
   it('draws each man at his own height on his feet, with hands and ball riding the carrier (#643)', () => {
     for (const { id } of CONTACT_CASES) for (let t = 0; t <= caseDuration(id); t += .1) {
