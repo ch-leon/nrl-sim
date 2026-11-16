@@ -42,7 +42,10 @@ import { contractsEndingSoon } from '../../src/systems/contracts';
 // season draws. The final standing-marker/deep-cover corrections restore this historical
 // season fingerprint; UI-read and no-read seasons still agree.
 // #650: the last-tackle call at its default leaves this fingerprint as it was (its first cut, with
-// run and pass weights 1.67× the default, moved it to 3329112261).
+// run and pass weights 1.67x the default, moved it to 3329112261). #652: held up with any tackler at
+// the line moved it to 3769124340 on its own, but with the last-tackle call also on (both merged) the
+// season ends on 1788836146 again (checked on the merge of main into #652, 16 Nov 2026). UI-read and
+// no-read seasons still agree.
 const MAIN_SEED_AFTER_SEASON = 1788836146;
 
 describe('the rng stream (#369)', () => {

@@ -121,31 +121,38 @@ describe('no plays: the match it always was', () => {
 });
 
 describe('the launch and the script (plan §3.3)', () => {
-  it('a block play launches at tackle 2 in the attacking half (seed 3) and the second-row takes the pass', () => {
-    const sim = new PlaySim(flat(['block-play']), A, 3);
-    let launch: SimEvent | null = null;
-    // Seed 7 reached tackle 2 in their half and completed the pass after #625; since the weighted
-    // receiver (#649) its launch there (tick 16739) breaks down, and seed 3 is the first that completes.
-    while (!launch) {
-      const e = until(sim, (x) => x.kind === 'set-play');
-      expect(e).not.toBeNull();
-      if (sim.tackleCount === 1 && zoneOf(sim.toLineNow('home')) === 'attackingHalf') launch = e;
+  it('a block play launches at tackle 2 in the attacking half and the second-row takes the pass', () => {
+    // The first seed whose launch there completes. It was pinned (seed 7 after #625, then seed 3 after the
+    // weighted receiver, #649, at tick 1791 before the last-tackle call, #650); held up at the line (#652)
+    // on top left seed 3 without such a launch, so it is searched for, as on the attack-shapes branch.
+    let checked = false;
+    for (let seed = 1; seed <= 20 && !checked; seed++) {
+      const sim = new PlaySim(flat(['block-play']), A, seed);
+      let launch: SimEvent | null = null;
+      while (!launch) {
+        const e = until(sim, (x) => x.kind === 'set-play');
+        if (!e) break;
+        if (sim.tackleCount === 1 && zoneOf(sim.toLineNow('home')) === 'attackingHalf' && sim.script?.outcome === 'ok') launch = e;
+      }
+      if (!launch) continue;
+      expect(launch.detail).toBe('block-play');
+      expect(launch.player).toBe(sim.man('home', 5).name); // the halfback calls it
+      expect(launch.text).toMatch(/calls the block play/);
+      expect(sim.script?.men.map((i) => i % 9)).toEqual([5, 8]);
+      let took = -1;
+      while (sim.tick < launch.tick + 80 && took < 0) {
+        sim.step();
+        const h = sim.holderNow();
+        if (h && h.side === 'home' && h.slot === 8) took = sim.tick;
+      }
+      if (took < 0) continue;
+      expect(took).toBeGreaterThan(launch.tick);
+      expect(sim.playsRun.launched.home).toBeGreaterThan(1);
+      expect(sim.playsRun.launched.away).toBe(0);
+      checked = true;
     }
-    // No tick pinned: it moves whenever a default reshuffles the seed (1791 before the last-tackle call, #650).
-    expect(launch.detail).toBe('block-play');
-    expect(launch.player).toBe(sim.man('home', 5).name); // the halfback calls it
-    expect(launch.text).toMatch(/calls the block play/);
-    expect(sim.script?.men.map((i) => i % 9)).toEqual([5, 8]);
-    let took = -1;
-    while (sim.tick < launch.tick + 80 && took < 0) {
-      sim.step();
-      const h = sim.holderNow();
-      if (h && h.side === 'home' && h.slot === 8) took = sim.tick;
-    }
-    expect(took).toBeGreaterThan(launch.tick);
-    expect(sim.playsRun.launched.home).toBeGreaterThan(1);
-    expect(sim.playsRun.launched.away).toBe(0);
-  }, 60_000);
+    expect(checked).toBe(true);
+  }, 120_000);
 
   it('a decoy runs the play’s line while it is scripted, not the support or shape spot', () => {
     const sim = new PlaySim(flat(['block-play']), A, 1);

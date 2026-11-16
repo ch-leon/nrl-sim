@@ -274,15 +274,16 @@ export abstract class LiveRestarts extends LivePlay {
    * A restart in play: the side gets the ball at `spot` — a play-the-ball (after
    * touch) or a tap (a 20 m restart, a 40/20). A player walks the ball to the
    * spot, both sides set, then play goes on. A stoppage: the coach can freshen up.
+   * `tackles`: the count the set carries on from (held up over the line, #652); a fresh set otherwise.
    */
-  protected startSetPiece(side: Side, spot: Vec, how: 'ptb' | 'tap', prefer?: number): void {
+  protected startSetPiece(side: Side, spot: Vec, how: 'ptb' | 'tap', prefer?: number, tackles = 0): void {
     this.callSwaps();
     const free = this.side(side).filter((p) => p.subFor === null && p !== this.dummyHalf(side));
     const pick = (prefer !== undefined ? free.find((p) => p.slot === prefer) : undefined) ?? [...free].sort((a, b) => dist(a.body.pos, spot) - dist(b.body.pos, spot))[0] ?? this.fullback(side);
     this.ball = { kind: 'held', by: this.indexOf(pick) };
     this.attacking = side;
     this.dir = this.dirOf(side);
-    this.tackles = 0;
+    this.tackles = tackles;
     this.lastPlay = false;
     this.kickCall = this.fgCall = null;
     this.pendingKick = null;

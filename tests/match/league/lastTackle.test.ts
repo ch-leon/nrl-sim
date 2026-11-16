@@ -100,7 +100,9 @@ describe('last tackle: in the sim', () => {
     }
   });
   it('off (lastTackle.on 0) plays exactly as before it existed: same events, points and rolls (pinned from a65edf9)', () => {
-    const restore = applyTuning({ 'lastTackle.on': 0 });
+    // Held up at the line (#652) also rolls dice, so it is switched off too: with both off the match is
+    // a65edf9's, as pinned here.
+    const restore = applyTuning({ 'lastTackle.on': 0, 'heldUp.on': 0 });
     try {
       expect(play(1)).toEqual(OFF_1);
       expect(play(11)).toEqual(OFF_11);

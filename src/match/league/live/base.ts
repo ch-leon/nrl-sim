@@ -561,7 +561,7 @@ export abstract class LiveBase {
   protected abstract resolveOut(): void;
   protected abstract endKick(side: Side, at: Vec): void;
   protected abstract groundInGoal(p: Player, raced?: boolean): boolean;
-  protected abstract startSetPiece(side: Side, spot: Vec, how: 'ptb' | 'tap', prefer?: number): void;
+  protected abstract startSetPiece(side: Side, spot: Vec, how: 'ptb' | 'tap', prefer?: number, tackles?: number): void;
   protected abstract startDropOut(side: Side): void;
   protected abstract penalize(offender: Side, spot: Vec, why: string, culprit: Player, kind: string, trait?: string, bin?: boolean): void;
   protected abstract takePenalty(award: Side, mark: Vec, choice: PenaltyChoice): void;
@@ -581,6 +581,7 @@ export abstract class LiveBase {
   protected abstract contest(c: Player, t: Player, committed: readonly Player[]): void;
   protected abstract stepWrestle(ph: Extract<Phase, { kind: 'tackle' }>, w: WrestleState): boolean;
   protected abstract goForBonus(h: Player): boolean;
+  protected abstract heldUpAtLine(h: Player): boolean;
   protected abstract score(scorer: Player): void;
   protected abstract committed(h: Player, defenders: readonly Player[]): Player[];
   protected abstract candidates(passer: Player, plan?: AttackPlan): Candidate[];

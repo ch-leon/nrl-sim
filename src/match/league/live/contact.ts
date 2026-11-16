@@ -1,15 +1,17 @@
+import { SET_TACKLES } from '../../../config';
 import { TICK_S } from '../../core/engine';
 import { FIELD_LENGTH, FIELD_WIDTH, IN_GOAL, MID_Y, clampToGround, inGoal } from '../../core/field';
 import { PASS_SPEED, passFlight } from '../../core/ball';
 import type { ContactSnap, Side } from '../../core/snapshot';
 import { add, clamp, dist, dot, scale, sub, type Vec } from '../../core/vec';
+import { speedOf } from '../../core/body';
 import { BASE, RACE, compressedContact, edgeRace, interceptChance, resolveContest, type ContestMods } from '../contest';
 import { PLAYERS, ROLES } from '../roles';
 import { MAX_LAT_M, pickReceiver } from '../tactics';
 import { EDGE_COST, FINISHER_M, announce, contestTraits, interceptTraits } from '../traits';
 import { traitBoost } from '../../../data/traits';
 import { FATIGUE } from '../fatigue';
-import { WRESTLE, driveSpeed, fightOf, gripOf, holdOf, wrestleTick, type WrestleState } from '../wrestle';
+import { HELD_UP, WRESTLE, driveSpeed, fightOf, gripOf, heldUpChance, heldUpContest, holdOf, wrestleTick, type WrestleState } from '../wrestle';
 import { NINES } from '../rules';
 import { GOALS, inBonusZone, postsFor } from '../goals';
 import { PENALTY } from '../penalties';
@@ -292,7 +294,7 @@ export abstract class LiveContact extends LivePenalties {
     const wb = traitBoost(c.traits, 'wreckingBall');
     const wreck = wb > 0 && this.rng.next() < LIVE.wreckDriveChance * wb ? wb : 0;
     const fight = fightOf({ ...c.stats, stamina: c.stamina }, c.energy, this.rng.next()) * (1 + WRESTLE.wreckFight * wreck);
-    const wrestle: WrestleState = { men: [this.indexOf(t)], fight, fight0: fight, grip: gripOf(t.stats, t.energy, true), t0: this.tick, metres: 0 };
+    const wrestle: WrestleState = { men: [this.indexOf(t)], fight, fight0: fight, grip: gripOf(t.stats, t.energy, true), t0: this.tick, metres: 0, speedDiff: sit.speedDiff };
     this.visualContact = this.contactInfo(c, [t]);
     this.hold(c, 'tackled');
     this.hold(t, 'tackle');
@@ -407,7 +409,8 @@ export abstract class LiveContact extends LivePenalties {
     c.body.pos = clampToGround(add(c.body.pos, shift), 0.5);
     for (const d of men) d.body.pos = clampToGround(add(d.body.pos, shift), 0.5);
     if (inGoal(c.body.pos, this.dir)) {
-      // Driven over the line in the tackle.
+      // Driven over the line in the tackle: a try, unless they hold him up (#652).
+      if (HELD_UP.on === 1 && this.heldUpInWrestle(ph, w, c, men)) return false;
       for (const d of men) this.lock(d, 'down', LIVE.downTicks);
       this.score(c);
       return false;
@@ -438,6 +441,70 @@ export abstract class LiveContact extends LivePenalties {
     const after = w.metres >= 1 ? ` after ${w.metres.toFixed(1)} m` : '';
     this.emit('tackle', ph.wreck > 0 ? `${t.name} hangs on as ${c.name} drives through the tackle${after}` : `${t.name} wraps up ${c.name}${after}${help}`, t, ph.wreck > 0 ? announce(c.traits.find((x) => x.id === 'wreckingBall')) : undefined);
     this.tagContact(c, men, ph.t0);
+    return true;
+  }
+
+  /**
+   * Held up over the line (#652, BAK-208 §8.1). A carrier in contact as he
+   * reaches the line, driven over in the wrestle or met on it in open play,
+   * may be kept off the ground by any defender on him (a lone one only with
+   * little drive left in him while `heldUp.oneManFight` < 1). One roll, only then (`holdUp`): their numbers and hold
+   * (Strength and legs) against his, less the drive and momentum he brings,
+   * and the traits. Held: no try, and a play-the-ball 10 m out by him with the
+   * tackle counted (a handover there on the last), as the rules give.
+   */
+  protected heldUpInWrestle(ph: Extract<Phase, { kind: 'tackle' }>, w: WrestleState, c: Player, men: readonly Player[]): boolean {
+    return this.holdUp(c, men, w.fight0 > 0 ? w.fight / w.fight0 : 0, w.speedDiff ?? 0, ph.t0);
+  }
+
+  /**
+   * Met on the line in open play: the free defenders within `heldUp.reachM` as he
+   * carries it over are on him (three at most, nearest first); his drive is his
+   * speed over his top speed. False, with no roll, when nobody is.
+   */
+  protected heldUpAtLine(h: Player): boolean {
+    const men = this.side(other(h.side))
+      .filter((d) => !this.locked(d) && this.retreatLine(d) === null && this.tick >= d.cooldownUntil && dist(d.body.pos, h.body.pos) <= HELD_UP.reachM)
+      .sort((a, b) => dist(a.body.pos, h.body.pos) - dist(b.body.pos, h.body.pos))
+      .slice(0, WRESTLE.maxMen);
+    if (men.length === 0) return false;
+    const drive = h.body.maxSpeed > 0 ? speedOf(h.body) / h.body.maxSpeed : 0;
+    return this.holdUp(h, men, drive, speedOf(h.body) - speedOf(men[0]!.body), this.tick);
+  }
+
+  private holdUp(c: Player, men: readonly Player[], fightLeft: number, speedDiff: number, startedTick: number): boolean {
+    if (!heldUpContest(men.length, fightLeft)) return false;
+    const walls = men.map((d) => traitBoost(d.traits, 'brickWall'));
+    const wall = Math.max(...walls);
+    const chance = heldUpChance({
+      men: men.length,
+      hold: men.reduce((a, d) => a + holdOf(d.stats, d.energy), 0) / men.length,
+      carrierHold: holdOf(c.stats, c.energy),
+      fightLeft,
+      speedDiff,
+      wreckingBall: traitBoost(c.traits, 'wreckingBall'),
+      brickWall: wall,
+    });
+    if (this.rng.next() >= chance) return false;
+    const t = men[0]!;
+    const who = men.length > 1 ? `${men.slice(0, -1).map((d) => d.name).join(', ')} and ${men[men.length - 1]!.name}` : t.name;
+    const credit = men.length >= 2 && wall > 0 ? announce(men[walls.indexOf(wall)]!.traits.find((x) => x.id === 'brickWall')) : undefined;
+    this.emit('held-up', `Held up! ${who} ${men.length > 1 ? 'keep' : 'keeps'} ${c.name} off the ground`, t, credit);
+    this.tagContact(c, men, startedTick);
+    this.lock(c, 'down', LIVE.downTicks);
+    for (const d of men) this.lock(d, 'down', LIVE.downTicks);
+    if (this.siren) {
+      this.endHalf(); // the ball is dead
+      return true;
+    }
+    // Play-the-ball 10 m out, level with where he was held; the count goes on, and on the last it is a handover there.
+    const line = this.dir > 0 ? FIELD_LENGTH : 0;
+    const spot = { x: line - this.dir * HELD_UP.restartM, y: clamp(c.body.pos.y, TOUCH.restartInM, FIELD_WIDTH - TOUCH.restartInM) };
+    const count = this.tackles + 1;
+    if (count >= SET_TACKLES) {
+      this.emit('handover', `Held up on the last — handover to ${this.names[other(c.side)]}`, c);
+      this.startSetPiece(other(c.side), spot, 'ptb');
+    } else this.startSetPiece(c.side, spot, 'ptb', c.slot, count);
     return true;
   }
 

@@ -133,8 +133,9 @@ describe('injuries in the live sim', () => {
     const squad = Array.from({ length: 13 }, (_, i) => generatePlayer(rng, { position: i % 2 ? 'prop' : 'centre' }));
     const mine = teamSheetFromSquad(squad, 'me', 'Me', ['#111', '#eee']);
     const them = { ...sideSheet('them', { rating: 60 }), clubId: 'them' };
-    // The first seed from 9 on where one of ours is hurt (9 itself until the last-tackle call, #650, reshuffled it).
-    const seed = [9, 10, 11, 12, 13, 14].find((x) => runMatch(mine, them, { seed: x, weather: 'rain' }).injuries.some((i) => i.teamId === 'me')) ?? 9;
+    // The first seed from 9 on where one of ours is hurt (9 itself until held up at the line, #652, and the
+    // last-tackle call, #650, reshuffled it).
+    const seed = Array.from({ length: 8 }, (_, i) => 9 + i).find((x) => runMatch(mine, them, { seed: x, weather: 'rain' }).injuries.some((i) => i.teamId === 'me')) ?? 9;
     const a = runMatch(mine, them, { seed, weather: 'rain' });
     const b = runMatch(mine, them, { seed, weather: 'rain' });
     expect(a.weather).toBe('rain');
