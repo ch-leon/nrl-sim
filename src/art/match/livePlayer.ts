@@ -4,7 +4,7 @@ import type { Kit } from './kit';
 import type { PlayerAnim } from './players';
 import { drawPrototypePlayer, type Appearance, type Action, type ReactAction, type Facing, type Movement } from '../prototype/player';
 import { drawRuckPlayer } from './ruck';
-import { MOMENT_ACTIONS, drawMomentPlayer, type MomentAction } from './moments';
+import { MOMENT_ACTIONS, momentHandoff, drawMomentPlayer, type MomentAction } from './moments';
 import { lookUpFrame } from './lookUp';
 
 /** `ready`: a defender set for the play-the-ball (#665). The reactions (#667): standing or on the run. */
@@ -16,14 +16,17 @@ const BASIC: Partial<Record<LivePlayerAction, Action | ReactAction>> = {
   handsOnHead: 'headHands', handsOnHips: 'hips', armsFolded: 'fold',
 };
 
-export function drawLivePlayer(look: Appearance, kit: Kit, action: LivePlayerAction, frame: number, facing: Facing, possession: boolean, strideFrame?: number, tired = 0, lookUp = 0, movement?: Movement): PixelBuffer {
-  // The landing's last beat is the continuing carry, including its directional view.
-  if (action === 'airCatch' && frame === 5) return drawPrototypePlayer(look, kit, 'carry', 0, facing, possession, strideFrame, tired, movement);
+export function drawLivePlayer(look: Appearance, kit: Kit, action: LivePlayerAction, frame: number, facing: Facing, possession: boolean, strideFrame?: number, tired = 0, lookUp = 0, movement?: Movement, teeFlip = false): PixelBuffer {
+  // Direction, fatigue and distance-linked feet survive the landing/follow-through handoff.
+  const end = momentHandoff(action as MomentAction, frame, possession, strideFrame);
+  if (end && action === 'teeKick') return drawMomentPlayer(look, kit, 'teeKick', frame, facing, possession, strideFrame, tired, movement, teeFlip);
+  if (end) return drawPrototypePlayer(look, kit, end, 0, facing, possession, strideFrame, tired, movement);
+  if (action === 'airCatch' && frame === 4) return drawPrototypePlayer(look, kit, 'land', 0, facing, possession, strideFrame, tired, movement);
   // Pickup ends on the same two-hand carry that precedes a pass or dart.
   if (action === 'dummyHalf' && possession && frame === 5) return drawPrototypePlayer(look, kit, 'carry', 0, facing === 'side' ? 'front' : facing, true, -1);
   const sharedFacing = facing === 'side' ? 'front' : facing;
   if (action === 'ptb' || action === 'dummyHalf' || action === 'ready') return drawRuckPlayer(look, kit, action, frame, sharedFacing, possession);
-  if (MOMENT_ACTIONS.includes(action as MomentAction)) return drawMomentPlayer(look, kit, action as MomentAction, frame, sharedFacing, possession, strideFrame);
+  if (MOMENT_ACTIONS.includes(action as MomentAction)) return drawMomentPlayer(look, kit, action as MomentAction, frame, sharedFacing, possession, strideFrame, tired, movement, teeFlip);
   let basic = BASIC[action];
   if (possession && (basic === 'wrap' || basic === 'idle')) basic = 'carry';
   // Every pose maps to a painter; a fend keeps the run cycle's legs under the straight arm.

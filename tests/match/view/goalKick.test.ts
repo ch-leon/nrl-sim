@@ -35,7 +35,7 @@ describe('the goal kicker\'s routine (#669)', () => {
         if (!k) continue;
         const g = k.goalKick!;
         const pic = playerPicture(k, k, s.tick, s.ball.holder, 1);
-        if (pic.action === 'goalRoutine' || pic.action === 'teeKick') expect(pic.left).toBe(g.toward < 0);
+        if (pic.action === 'goalRoutine' || (pic.action === 'teeKick' && pic.frame < 5)) expect(pic.left).toBe(g.toward < 0);
         if (s.tick < g.strikeTick) {
           expect(s.ball.holder).toMatchObject({ side: k.side, slot: k.slot });
           expect(pic.action).toBe('goalRoutine');

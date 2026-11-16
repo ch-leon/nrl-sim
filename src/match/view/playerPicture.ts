@@ -4,7 +4,7 @@ import { PLAYER_ANIMS, type PlayerAnim } from '../../art/match/players';
 import { LIVE } from '../league/live/knobs';
 import type { LivePlayerAction, Reaction } from '../../art/match/livePlayer';
 import { hashString } from '../../art/match/kit';
-import { MOMENT_ACTIONS, momentLift, type MomentAction } from '../../art/match/moments';
+import { MOMENT_ACTIONS, TRAVEL_ENDINGS, momentLift, type MomentAction } from '../../art/match/moments';
 import { screenFacing, screenPlayerFacing } from './screenFacing';
 import { legsBand } from './legsLayer';
 import { FATIGUE } from '../league/fatigue';
@@ -14,6 +14,8 @@ import { receivingPass, type ReceivePicture } from './handling';
 import { playerMotion, movementStride, type MotionContext } from './playerMotion';
 
 export interface PlayerPicture {
+  /** Terminal tee-kick body can turn while the empty tee stays on its original posts side. */
+  teeFlip?: true;
   /** Bounded movement key pose; absent for ordinary travel and shared contact artwork. */
   movement?: Movement;
   /** -1 plants the feet; otherwise the continuing run cycle, independent of hand progress. */
@@ -194,14 +196,18 @@ export function playerPicture(p: PlayerSnap, previous: PlayerSnap, tick: number,
     // Stable personal reactions, only after the engine has awarded the try. chestBump stays out:
     // it needs a partner, and big moments invent no paired interaction (match-big-moments.md).
     action = (['fistPump', 'point', 'celebrate', 'kneeSlide'] as const)[hashString(`${p.who ?? p.slot}/${p.celebrationTick}`) % 4]!;
-    frame = Math.floor((tick - p.celebrationTick) / 3 + p.slot) % 6;
+    frame = tryAge >= 20 ? Math.floor((tryAge - 20) / 3) % 6 : Math.floor((tick - p.celebrationTick) / 3 + p.slot) % 6;
+    // A slide drops once and stays on its knees; looping would replay the standing entry.
+    if (action === 'kneeSlide') frame = Math.min(5, Math.floor((tick - p.celebrationTick - (tryAge >= 20 ? 20 : 0)) / 3));
   }
   // After a try (#668): the mates the view gathers round the scorer run in, cheer on their own, run back;
   // the side that conceded slumps, hands on hips, or trudges back head down.
+  const travelEnd = frame === 5 && !possession && !!p.kick && TRAVEL_ENDINGS.includes(action as MomentAction);
+  const landing = action === 'airCatch' && frame >= 4;
   let gait = stride;
   // Profiles belong to everyday movement/handling; shared contact, ruck and kicks
   // retain their authored front/back poses until their own art pass.
-  let facing: { facing: Facing; left: boolean } = (['idle', 'run', 'carry', 'catch', 'pass', 'receive', 'guard', 'fend'].includes(action) || (action === 'airCatch' && frame === 5))
+  let facing: { facing: Facing; left: boolean } = (['idle', 'run', 'carry', 'catch', 'pass', 'receive', 'guard', 'fend'].includes(action) || landing || travelEnd)
     ? screenPlayerFacing(p, previous, screenDir) : screenFacing(p, previous, screenDir);
   let slump = false;
   const scene = ctx.tryScene;
@@ -221,15 +227,20 @@ export function playerPicture(p: PlayerSnap, previous: PlayerSnap, tick: number,
   const off = ctx.walkOff?.get(`${p.side}/${p.slot}`);
   if (off?.action) { action = off.action; frame = off.frame; gait = off.gait; slump = off.slump; if (off.left !== undefined) facing = { ...facing, left: off.left }; }
   // A shot at goal (#669): the kicker's routine up to the strike, then the kick off the tee, facing the posts.
+  let teeFlip = false;
   const shot = goalKickPicture(p, action, frame, tick, possession, screenDir);
-  if (shot) { action = shot.action; frame = shot.frame; facing = { facing: shot.facing, left: shot.left }; }
+  if (shot) {
+    action = shot.action; frame = shot.frame;
+    if (shot.action === 'teeKick' && shot.frame === 5) teeFlip = facing.left !== shot.left;
+    else facing = { facing: shot.facing, left: shot.left };
+  }
   const lift = MOMENT_ACTIONS.includes(action as MomentAction) ? momentLift(action as MomentAction, frame) : 0;
-  let strideFrame = ['run', 'carry', 'catch', 'pass', 'receive', 'guard', 'airCatch', 'fend', 'handsOnHead', 'handsOnHips', 'armsFolded'].includes(action)
+  let strideFrame = travelEnd || ['run', 'carry', 'catch', 'pass', 'receive', 'guard', 'airCatch', 'fend', 'handsOnHead', 'handsOnHips', 'armsFolded'].includes(action)
     ? gait : undefined;
   // Only free movement uses these poses. Handling keeps its hand timing over the same legs;
   // a shared contact/ruck/kick, whistle or celebration never inherits a movement pose.
   let movement: Movement | undefined;
-  if (!scene && !off?.action && !shot && (['idle', 'run', 'carry', 'catch', 'pass', 'receive', 'guard', 'fend'].includes(action) || (action === 'airCatch' && frame === 5))) {
+  if (!scene && !off?.action && !shot && (['idle', 'run', 'carry', 'catch', 'pass', 'receive', 'guard', 'fend'].includes(action) || landing || travelEnd)) {
     const motion = playerMotion(p, previous, screenDir, ctx);
     movement = motion.movement;
     // A ball-holder and his handling follow-through always keep the ball-side silhouette.
@@ -240,6 +251,6 @@ export function playerPicture(p: PlayerSnap, previous: PlayerSnap, tick: number,
   }
   // Eyes on the bomb (#671): standing or running, ball elsewhere, one of the few under it.
   const lookUp = ctx.eyesUp?.who.has(`${p.side}/${p.slot}`) && (action === 'idle' || action === 'run') && !possession && !p.binned ? ctx.eyesUp.level : 0;
-  const tired = slump ? 2 : weary && (['run', 'carry', 'idle', 'receive', 'guard', 'catch', 'pass'].includes(action) || (action === 'airCatch' && frame === 5)) ? weary : 0;
-  return { who: p.who ?? `${p.side}/${p.slot}`, action, frame, lift, ...(strideFrame === undefined ? {} : { strideFrame }), ...(movement ? { movement } : {}), ...(tired ? { tired } : {}), ...(lookUp ? { lookUp } : {}), ...facing, possession };
+  const tired = slump ? 2 : weary && (['run', 'carry', 'idle', 'receive', 'guard', 'catch', 'pass'].includes(action) || landing || travelEnd) ? weary : 0;
+  return { who: p.who ?? `${p.side}/${p.slot}`, action, frame, lift, ...(strideFrame === undefined ? {} : { strideFrame }), ...(movement ? { movement } : {}), ...(teeFlip ? { teeFlip: true as const } : {}), ...(tired ? { tired } : {}), ...(lookUp ? { lookUp } : {}), ...facing, possession };
 }

@@ -25,6 +25,12 @@ requires the separate earlier commitment described below: dummy-half controls,
 set plays and dart/pass choices currently resolve at release. No guessed call
 or new gameplay decision is part of this visual change.
 
+Stage 5 starts with a bounded kicks, aerial takes and try finishes pass under
+[#704](https://github.com/ch-leon/nrl-sim/issues/704), on top of stage 4. It carries
+the same support, weight and continuous handoffs into the existing moment painters.
+Wider officials, crowd, reactions, weather and full-match consistency remain
+subsequent stage-5 work; this first pass does not complete the entire stage.
+
 Make an ordinary passage of rugby league enjoyable to watch. Players should have
 weight, the ball should be easy to follow, and tackles should make sense without
 commentary. Keep the game's playful pixel-art character and make the improvement
@@ -281,7 +287,7 @@ p95 frame time 16.8 ms and no frame over 100 ms; longest frames were 50.0 ms and
 2,625 hits / 1,540 misses before and 2,516 / 1,672 after; both remained capped at
 768 entries and 68 textures. This desktop sample shows no material added stutter;
 real-phone performance and the earlier whole-career budget concerns remain open.
-CI on the final PR head, QA, different-tool review, phone play-test and Leon's
-review remain release checks. On-demand QA dispatch remains unavailable through
+Stage-4 CI and Android builds passed. QA, different-tool review, phone play-test
+and Leon's review remain release checks. On-demand QA dispatch remains unavailable through
 this session's GitHub API (Forbidden). All four staged PRs remain open, draft
 and unmerged. The next visual pass is stage 5's kicks, aerial takes and try finishes.

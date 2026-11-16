@@ -40,7 +40,7 @@ describe('live match artwork', () => {
   it('retains shared contact, ruck and kick artwork for profile requests', () => {
     const look = appearanceFor('same-player');
     for (const action of ['ptb', 'dummyHalf', 'ready', 'tackle', 'tackled', 'down', 'kick', 'grubberKick', 'dropKick'] as const) {
-      for (let f = 0; f < 6; f++) expect(drawLivePlayer(look, kit, action, f, 'side', false).data)
+      for (let f = 0; f < (action === 'kick' || action === 'grubberKick' || action === 'dropKick' ? 5 : 6); f++) expect(drawLivePlayer(look, kit, action, f, 'side', false).data)
         .toEqual(drawLivePlayer(look, kit, action, f, 'front', false).data);
     }
   });
