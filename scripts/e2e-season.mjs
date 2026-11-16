@@ -32,6 +32,7 @@ import { spawn } from 'node:child_process';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium } from 'playwright-core';
+import { pollCoachCall } from './e2e-coach-call.mjs';
 
 // --size WxH (or E2E_SIZE): 844×390 is a landscape phone with touch (the default);
 // anything 1000px or wider is a desktop window driven by the mouse.
@@ -944,14 +945,14 @@ async function play() {
     // A call that lands names itself on the badge at once (MatchScene.makeCall), lights its tile
     // and shuts the tray a moment later (#608); one refused (the play moved on) rebuilds the rows,
     // and a tap inside 300ms of the rows changing makes no call: read it in the same task.
-    let call = null;
-    let empty = 0;
-    const refused = [];
-    // Only a set's own call names itself on the badge: a kick-off call, a penalty call and Fresh legs
-    // are made without it (MatchScene.makeCall), so they are passed over here. The match holds at ×1
-    // while the tray is open (#639), and a kick-off's restart can last 10 s of it: 30 s of tries.
-    for (let i = 0; i < 120 && !call; i++) {
-      const got = await page.evaluate(() => {
+    // A replay can end on the half-time boundary before its sheet appears.
+    // Re-check each attempt, not just once above: Continue the same real sheet
+    // and keep requiring a made, lit set call and the tray's normal dismissal.
+    const { call, empty, refused } = await pollCoachCall({
+      halfTimePending: async () => !halfTimeDone && (await halfTimeCard().count()) > 0,
+      playHalfTime: () => playHalfTime(rec),
+      wait,
+      attemptCall: () => page.evaluate(() => {
         const coach = document.querySelector('.nrl-mo-bar [data-coach]');
         if (coach?.getAttribute('aria-expanded') !== 'true') coach?.click();
         const b = [...document.querySelectorAll('.nrl-mo-calls:not([hidden]) [data-call]')]
@@ -960,15 +961,9 @@ async function play() {
         b.click();
         const badge = document.querySelector('.nrl-mo-coach-badge');
         return { call: b.getAttribute('data-call'), made: badge?.getAttribute('data-state') === 'made', badge: badge?.textContent?.trim() ?? '', lit: b.hasAttribute('data-called') };
-      });
-      if (got?.made) {
-        // The tray shuts TRAY_CALLED_MS after the tap.
-        call = { ...got, tray: !(await page.waitForSelector('.nrl-mo-calls[hidden]', { state: 'attached', timeout: 3000 }).then(() => true, () => false)) };
-        break;
-      }
-      if (got) refused.push(got.call); else empty++;
-      await wait(250);
-    }
+      }),
+    });
+    const trayClosed = call && await page.waitForSelector('.nrl-mo-calls[hidden]', { state: 'attached', timeout: 3000 }).then(() => true, () => false);
     // Leave the tray shut: open, it hides every speed but the one playing.
     await page.evaluate(() => {
       const coach = document.querySelector('.nrl-mo-bar [data-coach]');
@@ -976,14 +971,14 @@ async function play() {
     });
     if (!call) throw new Error(refused.length ? `no call landed (${refused.slice(-3).join(', ')} refused)` : 'the tray offered no set call for 30 s');
     if (!call.lit) throw new Error(`${call.call} was made but its tile was not lit`);
-    if (call.tray) throw new Error(`the tray stayed open after ${call.call} was made`);
+    if (!trayClosed) throw new Error(`the tray stayed open after ${call.call} was made`);
     rec.notes.push(`called ${call.call}; badge reads "${call.badge}"${refused.length ? ` (${refused.length} refused first)` : ''}${empty ? `; ${empty} looks at an empty tray` : ''}`);
     await press(page.locator('.nrl-mo-controls [data-speed="8"]'));
   });
   // N11: the half-time card comes up by itself and waits for Continue (#341); change the attack and play on.
   await step('half-time-plan', async (rec) => {
     if (!liveOn) return 'skipped';
-    if (halfTimeDone) return `played during try-replay (${halfTimeDone})`;
+    if (halfTimeDone) return `played earlier (${halfTimeDone})`;
     // A 9-minute half at ×8 is about 70 s, but about 105 s on a loaded machine: two runs beside
     // other work ran out of 120 s with the clock at 06:56 and 08:55 of the half. 300 s leaves room.
     await halfTimeCard().waitFor({ timeout: 300000 });
