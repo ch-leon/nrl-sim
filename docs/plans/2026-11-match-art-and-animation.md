@@ -1,8 +1,9 @@
 # Match art and animation improvement plan
 
 Date: 16 November 2026  
-Status: stage 1 implemented locally under [#696](https://github.com/ch-leon/nrl-sim/issues/696),
-with validation in progress. Leon agreed to all five improvement areas.
+Status: stage 1 implemented in [draft PR #697](https://github.com/ch-leon/nrl-sim/pull/697),
+tracking [#696](https://github.com/ch-leon/nrl-sim/issues/696). Local functional checks passed;
+release validation is in progress. Leon agreed to all five improvement areas.
 
 Make an ordinary passage of rugby league enjoyable to watch. Players should have
 weight, the ball should be easy to follow, and tackles should make sense without
@@ -139,3 +140,12 @@ agree; existing front/back artwork supplies the turning views. Shared contact,
 ruck and kick art keeps its existing views. Art Lab exposes Side view for ordinary
 poses and the head gallery. This establishes the authoring format using existing
 tools; an imported sheet is optional when a future clip benefits from one.
+
+Local validation: TypeScript and production build passed; 4,323 tests in 320 files
+passed; production Chromium live-art and big-moment checks passed, including a
+career match, actual contact/handling/kick/try phases, pause/seek, ball ownership
+and texture cleanup. The first 1,200 ticks of seed 1 produced identical events to
+the baseline. In that sample, frame-cache misses rose from 11.56% to 17.89%, its
+peak stayed at 768 entries, and texture count stayed at 68. This is cache telemetry,
+not a device frame-rate measurement. Separate-tool release review, CI/QA and a
+real-phone play-test remain release work.
