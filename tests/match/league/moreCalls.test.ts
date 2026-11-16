@@ -51,7 +51,9 @@ interface Played {
  * them again: of seeds 1–60, Take the two is on in 7, 50 and 59, Tap and go only
  * in 59 (both at tick 4856). Two seeds, so one more reshuffle need not lose both.
  */
-const PENALTY_SEEDS = [7, 59];
+// A home penalty in range on 6-minute halves is rare: 7 and 59 held one with held up at the line (#652) alone,
+// 20 and 30 with the last-tackle call (#650) alone; the union keeps the check robust with both mechanics on.
+const PENALTY_SEEDS = [7, 20, 30, 59];
 
 /** Play with the home coach making `call` whenever he may (as a player at the tray does: a tap, in on the next tick). */
 function play(seed: number, call: CoachCall | null, minutes = 6, side: 'home' | 'away' = 'home'): Played {
@@ -210,7 +212,8 @@ describe('five more calls (#396): each does what it says', () => {
     let kicks = 0;
     let inReach = 0;
     let found = 0;
-    for (let seed = 1; seed <= 40; seed++) {
+    // 40/20s are rare: 60 seeds hold one with the last-tackle call (#650) on and off (was 40).
+    for (let seed = 1; seed <= 60; seed++) {
       const calls: CallInput[] = [];
       const sim = new LiveSim(H, A, seed, { length: { halves: 1, halfMinutes: 6 }, calls });
       let aimed = false;

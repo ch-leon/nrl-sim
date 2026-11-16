@@ -99,7 +99,9 @@ describe('held up: in the sim', () => {
   };
 
   it('off (heldUp.on 0) plays exactly as before it existed: same events, points and rolls (pinned from a65edf9)', () => {
-    withTuning({ 'heldUp.on': 0 }, () => {
+    // The last-tackle call (#650) merged first and also rolls dice, so it is switched off too: with both
+    // off the match is a65edf9's, as pinned here.
+    withTuning({ 'heldUp.on': 0, 'lastTackle.on': 0 }, () => {
       expect(play(31)).toEqual({ events: 122, home: 0, away: 12, draws: 752, heldUp: 0 });
       expect(play(13)).toEqual({ events: 148, home: 19, away: 18, draws: 772, heldUp: 0 });
       // Its other knobs do nothing while it is off.

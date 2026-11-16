@@ -25,8 +25,8 @@ function surface() {
 /**
  * A match level at full time, with golden point on (the lab's `final=1`) and the historical seven-minute
  * halves (#678 cut them to 2:30), with the lab's default sides: the first such seed from 28 (seed 12 before
- * the weighted receiver, #649, then 28; held up at the line, #652, reshuffled 28, so the seed is searched
- * for rather than pinned).
+ * the weighted receiver, #649, then 28; held up at the line, #652, reshuffled 28, and the last-tackle call, #650,
+ * found 63; so the seed is searched for rather than pinned).
  */
 const GOLDEN_FROM = 28;
 
