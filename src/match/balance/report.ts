@@ -165,6 +165,9 @@ const WATCH_COLUMNS: readonly { head: string; digits: number; get: (w: WatchStat
   // Who took the dummy-half's ball (#649); a dash in results from before it.
   { head: '1st receiver same man %', digits: 0, get: (w) => w.receivers?.sameMan },
   { head: '1st receiver slots', digits: 1, get: (w) => w.receivers?.slots },
+  // Kicks on the second-last tackle and where a won ball's set starts (#650); a dash in results from before it.
+  { head: '2nd-last kicks', digits: 2, get: (w) => w.territory?.earlyKicks },
+  { head: 'Set start m to go', digits: 1, get: (w) => w.territory?.startM },
 ];
 
 /** The watchability table for one scenario's rows, or nothing when none of them has the measures (a run from before #648). */
