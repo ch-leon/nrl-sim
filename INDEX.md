@@ -341,3 +341,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261115-022131-standard | standard | bcb1265 | main | [report](runs/20261115-022131-standard/report.md) |
 | 2026-11-15-persona-playtesters-finance | persona playtesters finance 2026-11-15 | ed6b6430 | main | [report](runs/2026-11-15-persona-playtesters-finance/report.md) |
 | 20261116-122527-standard | standard | 2d37864 | main | [report](runs/20261116-122527-standard/report.md) |
+| 20261116-124528-standard | standard | 9278a09 | main | [report](runs/20261116-124528-standard/report.md) |
