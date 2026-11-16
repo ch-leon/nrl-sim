@@ -440,8 +440,9 @@ speed in open play); +15% a third man, −15% a lone one; −30% × his drive; �
 is quicker than the first man (±6% at most, his momentum); +0.4 × (the men's average hold
 − his own), which is Strength /120 less the legs each has lost (§8.1's `holdOf`); −10% a
 level multiplier for a Wrecking Ball carrier, +10% for a Brick Wall among two or three men
-(named on the pop-up); never above 80%. Two men on a carrier at full pace: about 47%; one
-man on a carrier at 90% of his top speed: about 33%.
+(named on the pop-up); never above 80%. Two average men on a carrier at full pace, as quick
+as the first man: 45% (47% if he is 1 m/s slower); one man on a carrier at 90% of his top
+speed: about 33%.
 
 *A lone tackler* (Leon's decision, 13 Nov 2026). The first rule let a lone tackler hold
 him up only when the carrier had little drive left (at most 0.35), with the chance
@@ -470,13 +471,21 @@ as before. Tuning §11.
 Measured (`balance/plans/held-up.json`, 60 matches a row, 200 for the preset rows, two
 2.5-minute halves; its variant "on, any lone tackler, base 0.75" is the default): 18–40%
 of matches have a held-up (0.2–0.5 a match), for 0.1–0.3 fewer tries a match; the first
-rule ("on" there) gave 3–8%. `standard.json` off against on at the default (same seeds): 20–40% of whole matches
-have a held-up (0.3–0.6 a match; 10% of the late-legs stretch); tries 2.0 → 1.8 a match
-averaged over its 13 rows (−0.1 to −0.3 a row, none beyond luck); completion inside its
-band in every row. The six preset rows, as points shares: Tight 49.3 → 49.8%, Kick-chase
-48.8 → 51.5%, All-out 51.0 → 52.0%, Rush 51.3 → 54.3%, Compressed 44.5 → 48.3% (under 45
-off, inside on); Expansive 48.0 → 42.5% at the row's 100 seeds both ways, but 49.5 → 48.2%
-at 400 seeds both ways (an extra run), so its drop at 100 is luck, not the default.
+rule ("on" there) gave 3–8%. Those figures, and the first `standard.json` run (tries 2.0 → 1.8),
+were taken before the last-tackle call (#650).
+
+Re-measured on top of #687 (16 Nov 2026; `standard.json` off against on at the default, same
+seeds, held up off playing exactly as main at 5b7d08c3): 20–30% of whole matches have a
+held-up (0.2–0.4 a match; 30% of the late-legs stretch), every row's rise starred; tries
+1.95 → 1.72 a match averaged over its 13 rows (0.0 to −0.5 a row; only Grind v Balanced's
+−0.3 starred); completion inside its band in every row but stamina 30 v 80 on (71.2 → 69.1%,
+not starred). The last-tackle shares do not move beyond luck in any row (even sides: kick /
+run / pass 63 / 23 / 14% off, 63 / 22 / 15% on). The six preset rows, as points shares at
+100 seeds both ways: Tight 56.5 → 57.0%, Expansive 41.8 → 42.0%, Kick-chase 46.2 → 45.0%,
+All-out 53.0 → 54.2%, Rush 49.8 → 51.5%, Compressed 50.5 → 52.8%. Tight and Expansive are
+outside 45–55% with held up off too (main as it is); at 400 seeds both ways the four attack
+rows are all inside, off → on: Tight 52.8 → 53.7%, Expansive 46.9 → 48.2%, Kick-chase
+47.0 → 48.8%, All-out 54.2 → 53.2% (no change starred).
 
 ### 8.2 Sprint, gas and getting legs back (Leon, 2026-10-18) — *implemented in F2*
 
