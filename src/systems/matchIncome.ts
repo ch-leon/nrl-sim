@@ -44,7 +44,10 @@ export function freezeMatchIncome(state: GameState, fixture: Fixture): GameState
     homeSponsor: level(state, fixture.homeId, 'sponsorBoard'), awaySponsor: level(state, fixture.awayId, 'sponsorBoard'),
     homeStand: level(state, fixture.homeId, 'grandstand'),
   };
-  return { ...state, matchIncome: [...state.matchIncome, record] };
+  // Keep the current and immediately preceding season for result/review recovery.
+  // Older fixtures are no longer in the sporting state; their totals remain in
+  // the season books. Retaining every full receipt would grow saves indefinitely.
+  return { ...state, matchIncome: [...state.matchIncome.filter(r => r.season >= state.season - 1), record] };
 }
 
 /** Reconcile only accepted results with a saved kickoff promise, without replaying sport. */

@@ -112,6 +112,22 @@ describe('receipt-backed ordinary match income', () => {
       expect(ledger.rows()[0]!.net).toBe(12_800);
     } finally { offLedger(); offBooks(); }
   });
+  it('bounds receipt history while preserving prior-season review and current recovery', () => {
+    const { s, f } = career();
+    let next = s;
+    for (let season = 1; season <= 6; season++) {
+      next = { ...next, season, league: { ...next.league, fixtures: [{ ...f }] } };
+      const before = next.money;
+      next = applyResult(next, f, { homeScore: 20, awayScore: 10 });
+      expect(next.money - before).toBe(12_800);
+      expect(next.matchIncome.map(r => r.season)).toEqual(season === 1 ? [1] : [season - 1, season]);
+      expect(next.finance).toHaveLength(season);
+      const reloaded = JSON.parse(JSON.stringify(next)) as GameState;
+      expect(validMatchIncome(reloaded.matchIncome, reloaded)).toBe(true);
+      expect(reconcileMatchIncome(reloaded)).toEqual(next);
+      expect(applyResult(reloaded, f, { homeScore: 20, awayScore: 10 })).toEqual(next);
+    }
+  });
   it('neutral cross-tier knockout uses lower tier, shared venue and saved tie winner', () => {
     const { s, f } = career();
     const def = { ...cupDefinition(), minEntrants: 2, maxEntrants: 2, slotCount: 1, stages: [{ id: 'final', name: 'Final', kind: 'knockout' as const, rounds: 1 }], rewards: [] };
