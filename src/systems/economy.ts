@@ -10,19 +10,19 @@
 // to push money negative — spendMoney's guard would block that, so we credit a
 // negative delta instead.
 
-import { emptyFinance, getState, setState, type FinanceLine, type Fixture, type GameState, type PlacedFacility, type Player } from '../core/state';
+import { emptyFinance, getState, setState, type FinanceLine, type Fixture, type GameState, type PlacedFacility } from '../core/state';
 import { bus } from '../core/events';
 import { earnMoney } from '../data/club';
-import { ECON, SEASON_ROUNDS, SQUAD_MIN, WEEKS_PER_SEASON, difficultyMultipliers, scaledMoney } from '../config';
-import { fmtMoney } from '../utils/money';
+import { ECON, SEASON_ROUNDS, WEEKS_PER_SEASON, difficultyMultipliers, scaledMoney } from '../config';
 import { sortLadder } from './fixtures';
 import { FACILITY_CATALOG, facilityUpkeep, levelMult } from '../data/facility';
 import { closedGatesFlag, EVENT_CARDS } from '../data/events';
 import { currentRound, inTrials } from '../core/season';
-import { registerTickHook, TICK_ORDER } from '../core/time';
+import { registerSeasonHook, registerTickHook, TICK_ORDER } from '../core/time';
 import { hasStructuralCalendar } from './competitionCalendar';
 import { staffWages } from './staff';
-import { BOARD_LOAN, BOARD_LOAN_REPAID, renewalWage, takeBoardLoan, warnForWeeks, notifyContractWarning } from './contracts';
+import { BOARD_LOAN, BOARD_LOAN_REPAID, warnForWeeks, notifyContractWarning } from './contracts';
+import { expireEndedDeals } from './cap';
 
 /**
  * Level of the built facility with `defId`, or 0 if none is built. Placement
@@ -211,130 +211,44 @@ export function gateReceipts(state: GameState): number {
 }
 
 /**
- * Decrement contractWeeks by 1 for all squad. On reaching 0 a player demands
- * renewal at contracts.renewalWage: the market wage for their overall today,
- * moved by morale and the club's standing (N6, #167; before that it was the old
- * wage ± a drift by overall). If affordable at that moment (money ≥ newWage × 4)
- * auto-renew (wage = newWage, contractWeeks = 52); else the player departs to
- * freeAgents (removed from squad), ui:notify info. Deterministic; squad-array
- * order (earlier renewals can consume funds, pushing later players to depart).
+ * Count a week off each contract. Salaries are not repriced and nobody leaves
+ * for money: a deal ends at season rollover (expireEndedDeals), not midweek.
+ * Weeks stop at zero so a counted contract cannot go negative.
  */
 export function tickContracts(state: GameState): GameState {
-  const money = getState().money;
-  const keep: Player[] = [];
-  const departed: Player[] = [];
-
-  // Sequential, squad-array order (deterministic). Renewal carries no immediate
-  // payout, so affordability is checked against the tick's settled balance.
-  for (const p of state.squad) {
-    const weeks = p.contractWeeks - 1;
-    if (weeks > 0) {
-      keep.push({ ...p, contractWeeks: weeks });
-      const warning = warnForWeeks(p.name, weeks);
+  let changed = false;
+  const squad = state.squad.map(player => {
+    if (player.contractWeeks <= 0) return player;
+    changed = true;
+    const weeks = player.contractWeeks - 1;
+    if (weeks > 0 && !player.deal?.renewal) {
+      const warning = warnForWeeks(player.name, weeks);
       if (warning) notifyContractWarning(warning);
-      continue;
     }
-
-    // Contract expired this tick — renew at the ask if affordable, on a board loan
-    // of the four weeks if not (N14.3), else depart.
-    const newWage = renewalWage(p, state);
-
-    if (money >= newWage * 4) {
-      keep.push({ ...p, wage: newWage, contractWeeks: 52 });
-    } else if (takeBoardLoan(newWage * 4)) {
-      keep.push({ ...p, wage: newWage, contractWeeks: 52 });
-      bus.emit('ui:notify', {
-        text: `${p.name} re-signed on a board loan of ${fmtMoney(newWage * 4)}, repaid at the season's end.`,
-        kind: 'info',
-      });
-    } else {
-      departed.push({ ...p, contractWeeks: 0, departed: true });
-      bus.emit('ui:notify', {
-        text: `${p.name} left the club as a free agent (contract expired).`,
-        kind: 'info',
-      });
-    }
-  }
-
-  const s = getState();
-  setState({ squad: keep, freeAgents: [...s.freeAgents, ...departed] });
+    return { ...player, contractWeeks: weeks };
+  });
+  if (changed) setState({ squad });
   return getState();
 }
 
 /**
- * Bankruptcy cascade. Emits a single warning + danger notify when money < 0.
- * While money < FORCED_SALE_FLOOR, release the highest-`wage` squad player who
- * can go (NO payout) to freeAgents and apply squad-wide morale
- * −FORCED_SALE_MORALE_HIT (clamped ≥1): one a week (N14.3), so a club sinks in
- * steps and the advance stops each week with a name. Never below SQUAD_MIN, and
- * fieldable means fit: a fit player is sold only while more than SQUAD_MIN are
- * fit, an injured one while the squad is over SQUAD_MIN, so a sale never takes the
- * fit count under the minimum (QA finding 19). The warning comes after the sale
- * and names it (`forcedSales`, N12.5); the toasts keep their order.
+ * Finance-driven failure is retired (#557). A negative balance does not sell
+ * a player, cut morale, or sack the coach. Cash still cannot be created by
+ * waiting, and salaries are not what puts a club in the red.
  */
 export function handleBankruptcy(_state: GameState): GameState {
-  // Gate on the settled live balance, not the entry snapshot — prior pipeline
-  // steps may have moved money after `state` was captured.
-  const balance = getState().money;
-  const warned = balance < ECON.BANKRUPTCY_WARN;
-  if (warned) {
-    bus.emit('ui:notify', {
-      text: `The club is in the red (${fmtMoney(balance)}). Balance the books!`,
-      kind: 'danger',
-    });
-  }
-
-  const forcedSales: string[] = [];
-  // One sale a week (N14.3); a fieldable team is kept.
-  const s = getState();
-  let victim: Player | undefined;
-  if (s.money < ECON.FORCED_SALE_FLOOR && s.squad.length > SQUAD_MIN) {
-    const spareFit = s.squad.filter((p) => p.injuredWeeks <= 0 && (p.suspendedWeeks ?? 0) <= 0).length > SQUAD_MIN;
-    // Highest-paid player who can go (stable: first max in array order).
-    // A ban counts as not fieldable, the same as an injury (#324).
-    for (const p of s.squad) {
-      if (!spareFit && p.injuredWeeks <= 0 && (p.suspendedWeeks ?? 0) <= 0) continue;
-      if (!victim || p.wage > victim.wage) victim = p;
-    }
-  }
-  if (victim) {
-    const remaining = s.squad.filter((p) => p.id !== victim.id);
-    const morale = remaining.map((p) => ({
-      ...p,
-      morale: Math.max(1, p.morale - ECON.FORCED_SALE_MORALE_HIT),
-    }));
-    // Sold player (no payout) joins the free-agent pool.
-    setState({ squad: morale, freeAgents: [...s.freeAgents, victim] });
-    forcedSales.push(victim.name);
-
-    bus.emit('ui:notify', {
-      text: `${victim.name} was force-sold to cover debts (no fee).`,
-      kind: 'danger',
-    });
-  }
-  if (warned) bus.emit('bankruptcy:warning', { balance, forcedSales });
   return getState();
 }
 
 /**
- * Tick hook order 30. Fixed order: wages (deduct, may go negative) → upkeep →
- * overhead → sponsor → grant → gate → contracts → bankruptcy. Emits
- * money:changed per net movement (via earnMoney; deductions credit a negative delta).
+ * Tick hook order 30. Time passing does not spend cash: wages, upkeep and
+ * overhead are retired. Sponsor, reputation grant and the home gate still
+ * credit cash until receipt-backed income replaces them (#559). Contracts
+ * count down without a salary bill.
  */
 export function applyEconomy(state: GameState): GameState {
   if (hasStructuralCalendar(state)) return state; // Annual finance is not enabled by the structural prototype.
-  // Compute wages from the entry snapshot; subsequent reads use getState() as the
-  // store is mutated between steps.
-  const wages = weeklyWages(state);
-  if (wages !== 0) earnMoney(-wages, 'wages');
-
-  const upkeep = weeklyUpkeep(state);
-  if (upkeep !== 0) earnMoney(-upkeep, 'upkeep');
-
-  const overhead = weeklyOverhead(state);
-  if (overhead !== 0) earnMoney(-overhead, 'overhead');
-
-  const sponsor = sponsorIncome(getState());
+  const sponsor = sponsorIncome(state);
   if (sponsor !== 0) earnMoney(sponsor, 'sponsor');
   const grant = reputationGrant(getState());
   if (grant !== 0) earnMoney(grant, 'grant');
@@ -343,7 +257,6 @@ export function applyEconomy(state: GameState): GameState {
   if (gate !== 0) earnMoney(gate, 'gate');
 
   if (!inTrials(state)) tickContracts(getState());
-  handleBankruptcy(getState());
   return getState();
 }
 
@@ -356,6 +269,24 @@ export function registerEconomySystem(): void {
   registerTickHook('economy', TICK_ORDER.economy, () => {
     applyEconomy(getState());
   }, { trials: true });
+  // Before ageing and the Academy intake, so a finished deal is unsigned first.
+  // The structural prototype does not run this career finance clock.
+  registerSeasonHook('cap-season', 4, () => {
+    const s = getState();
+    if (hasStructuralCalendar(s)) return;
+    const next = expireEndedDeals(s.squad, s.freeAgents, s.capAccount, s.season);
+    if (next.squad.length === s.squad.length && next.squad.every((player, index) => player === s.squad[index]) && next.capAccount === s.capAccount) return;
+    const left = s.squad.filter(player => !next.squad.some(kept => kept.id === player.id));
+    setState({ squad: next.squad, freeAgents: next.freeAgents, capAccount: next.capAccount });
+    if (left.length > 0) {
+      bus.emit('ui:notify', {
+        text: left.length === 1
+          ? `${left[0]!.name} is unsigned. The deal ended with last season.`
+          : `${left.length} players are unsigned. Their deals ended with last season.`,
+        kind: 'info',
+      });
+    }
+  });
 }
 
 // ── The club's books (N6, #172) ───────────────────────────────────────────────

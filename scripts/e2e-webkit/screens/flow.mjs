@@ -15,9 +15,12 @@ import { OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav } from '../common.m
 //   - N4: ×4 runs until one stops on a new card, which opens in place; once
 //     answered, Keep advancing (whole, with a toast up) carries on to the same end;
 //   - F1: Staff & Board from Office, objectives beside the staff;
-//   - F3: Renew leaves the rows where they were, "Renewed ✓" in place, and a
-//     second tap on the same spot renews nobody else; the table fits the sheet,
-//     with SELL armed ("Really sell?") too, and ◂ FINANCE stays clear of the title;
+//   - F3: Renew is only open in the last season of a deal, and only when next
+//     season's cap can hold it. One tap on an open Renew queues that player
+//     ("QUEUED") and leaves the other rows where they were; a second tap on the
+//     same spot queues nobody else. A Renew that is not due stays "RENEW".
+//     The table fits the sheet, with SELL armed ("Really sell?") too, and
+//     ◂ FINANCE stays clear of the title;
 //   - T2: after a reload, New game on the slot asks "Start over? This replaces …"
 //     and Cancel keeps it. The title is at Normal whatever the save says: the text
 //     size is a save's setting, put on the page once a slot is picked.
@@ -300,18 +303,27 @@ export async function runFlow(browser, { w: W, h: H, text }) {
       return { id: r.getAttribute('data-contract') ?? r.getAttribute('data-contract-gone'), top: Math.round(r.getBoundingClientRect().top), btn: b ? { x: b.left + b.width / 2, y: b.top + b.height / 2 } : null };
     }));
     const before = await rows();
-    const first = before.find((r) => r.btn);
-    if (!first) return ['no Renew on Contracts'];
+    const open = await page.evaluate(() => [...document.querySelectorAll('[data-contract-renew]')].filter((b) => !b.disabled).map((b) => {
+      const box = b.getBoundingClientRect();
+      return { id: b.closest('tr')?.getAttribute('data-contract') ?? '', x: box.left + box.width / 2, y: box.top + box.height / 2 };
+    }));
+    const first = open[0] ? { id: open[0].id, btn: { x: open[0].x, y: open[0].y } } : before.find((r) => r.btn);
+    if (!first?.btn) return ['no Renew on Contracts'];
     // The table fits the sheet at this text size: SELL whole, no sideways scroll (#350, #371).
     const out = await flowReach(page, [`[data-contract-renew="${first.id}"]`, '.nrl-contracts-table tbody tr:first-child .nrl-contract-actions .nrl-btn:last-child']);
     const wide = await page.evaluate(() => { const e = document.querySelector('.nrl-contracts-scroll'); return e.scrollWidth - e.clientWidth; });
     if (wide > 1) out.push(`the table is ${wide}px wider than the sheet`);
-    const renewed = () => page.locator('[data-contract-renew]:disabled').count();
+    // Only a last-season deal with cap room is open. Everyone else stays "RENEW".
+    const labelled = (word) => page.locator('[data-contract-renew]').evaluateAll((els, word) => els.filter((e) => (e.textContent ?? '').trim() === word).length, word);
+    const queuedBefore = await labelled('QUEUED');
+    const waitingBefore = await labelled('RENEW');
     await page.touchscreen.tap(first.btn.x, first.btn.y);
     await page.waitForTimeout(300);
-    if ((await renewed()) !== 1) return [...out, `${await renewed()} rows read Renewed after one tap (money short?)`];
+    const queuedAfter = await labelled('QUEUED');
+    if (queuedAfter !== queuedBefore + 1) return [...out, `${queuedAfter - queuedBefore} rows read QUEUED after one tap (not his last season, or over the cap?)`];
     const label = (await page.locator(`[data-contract-renew="${first.id}"]`).textContent()).trim();
-    if (!/^RENEWED ✓$/i.test(label)) out.push(`the renewed row reads "${label}"`);
+    if (label !== 'QUEUED') out.push(`the renewed row reads "${label}"`);
+    if ((await labelled('RENEW')) !== waitingBefore - 1) out.push('a Renew that was not due changed');
     const after = await rows();
     await shot('f3-at-check');
     if (after.map((r) => r.id).join() !== before.map((r) => r.id).join()) out.push('the rows changed order');
@@ -320,7 +332,7 @@ export async function runFlow(browser, { w: W, h: H, text }) {
     // The same spot again (a double tap): nobody else is renewed.
     await page.touchscreen.tap(first.btn.x, first.btn.y);
     await page.waitForTimeout(300);
-    if ((await renewed()) !== 1) out.push('a second tap on the same spot renewed another player');
+    if ((await labelled('QUEUED')) !== queuedAfter) out.push('a second tap on the same spot queued another player');
     // The header: ◂ FINANCE whole, and clear of CONTRACTS.
     out.push(...await page.evaluate(() => {
       const back = document.querySelector('.nrl-contracts .nrl-back');

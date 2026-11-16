@@ -7,7 +7,7 @@ export async function runTrials(browser) {
   const out = join(OUT_ROOT, 'webkit', 'trials');
   mkdirSync(out, { recursive: true });
   const results = [];
-  for (const [width, height] of [[667, 375], [844, 390], [390, 844]]) {
+  for (const [width, height] of [[667, 375], [844, 390]]) {
     const ctx = await browser.newContext({ viewport: { width, height }, hasTouch: true, serviceWorkers: 'block' });
     await ctx.addInitScript(closeWeekSummary);
     const page = await ctx.newPage();
@@ -21,11 +21,9 @@ export async function runTrials(browser) {
       await page.locator('[data-nrl-start]').tap();
       await page.locator('[data-expansion-work]').tap();
       await page.locator('.nrl-tutorial-skip').tap();
-      await openNav(page, 'club');
-      if (height > width) {
-        if (!(await page.locator('.nrl-club-home-week').textContent()).includes('Trial 1 of 2')) throw new Error('Club home did not label trial 1');
-        await shot('club-home');
-      }
+      const week = await page.locator('.nrl-dock-week').innerText();
+      if (!/TRIAL\s*1/.test(week) || !week.includes('/2')) throw new Error(`the dock did not label trial 1 (${week})`);
+      await shot('grounds');
       await openNav(page, 'fixtures');
       await page.locator('[data-next-row][data-round="-1"]').waitFor();
       await page.locator('[data-next-row]').scrollIntoViewIfNeeded();
@@ -47,11 +45,9 @@ export async function runTrials(browser) {
       await page.locator('[data-next-row][data-round="1"]').waitFor();
       await page.locator('[data-next-row]').scrollIntoViewIfNeeded();
       await shot('fixtures-round1');
-      if (height > width) await page.setViewportSize({ width: 844, height: 390 });
       await playPhoneWeek(page);
       state = await page.evaluate(() => window.__nrlState());
       if (state.week !== 2 || state.league.ladder.some(r => r.played !== 1)) throw new Error('Round 1 did not count exactly once');
-      if (height > width) await page.setViewportSize({ width, height });
       await openNav(page, 'club');
       await shot('club-after-round1');
       rec.played = state.league.fixtures.filter(f => f.result && (f.homeId === 'player' || f.awayId === 'player')).map(f => f.round);

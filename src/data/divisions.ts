@@ -7,6 +7,7 @@ import { difficultyMultipliers, type Difficulty } from '../config';
 import { generatePlayer, generatePlayerAround, POSITIONS } from './player';
 import { createCompetitionInstance, competitionFixtureId, type CompetitionDefinition, type CompetitionInstance } from './competition';
 import { generateRivalSquad, hashString, rivalSquadSeed, squadStrength } from '../systems/rivals';
+import { admitOpeningSquad, AI_OPENING_CASH, freshCapAccount, tierCap, tierForRank } from '../systems/cap';
 import { makeRng } from '../utils/rng';
 import type { DivisionMetadata } from './competitionDivisions';
 import type { CompetitionCalendarSlot } from './competitionCalendar';
@@ -152,10 +153,11 @@ function startingSquad(profile: RegionalCareerProfile, seed: number, difficulty:
     ...POSITIONS.map(position => ({ target: depth, position })),
   ];
   while (plan.length < starting.size) plan.push({ target: depth });
-  return rng.shuffle(plan).map(slot => ({
+  const generated = rng.shuffle(plan).map(slot => ({
     ...(slot.target === undefined ? generatePlayer(rng, { quality: 'star' }) : generatePlayerAround(rng, slot.target, slot.position ? { position: slot.position } : {})),
     career: { games: 0, tries: 0, tackles: 0, lineBreaks: 0 }, joinedSeason: 1,
   }));
+  return generated;
 }
 
 /** Construct only a new, dormant prototype world. The caller prepares/selects
@@ -171,13 +173,19 @@ export function createDivisionWorld(
   const problems = validateRegionalCareerProfile(profile, pack);
   if (problems.length || activePack() !== pack || !integer(seed, 0, 0xffffffff) || !present(player.name)
     || player.colors.length !== 2 || !player.colors.every(c => hex.test(c))) throw new Error(`Invalid regional career: ${problems.join(', ') || 'active pack, seed or player'}`);
-  const squad = startingSquad(profile, seed, player.difficulty ?? 'normal');
+  const startRank = profile.divisions.find(d => d.id === profile.startingDivisionId)!.rank;
+  const generatedSquad = startingSquad(profile, seed, player.difficulty ?? 'normal');
+  const squad = admitOpeningSquad(generatedSquad, tierCap(tierForRank(startRank)), 1);
+  if (!squad) throw new Error('Opening squad does not fit the salary cap');
   const targets = new Map(profile.divisions.flatMap(d => d.entrants.map(e => [e.clubId, e.strength] as const)));
+  const tierOf = new Map(profile.divisions.flatMap(d => d.entrants.map(e => [e.clubId, tierForRank(d.rank)] as const)));
   const clubs: RivalClub[] = [{ id: 'player', name: player.name, colors: [...player.colors], strength: squadStrength(squad) }];
   for (const identity of profile.clubs) {
     const target = targets.get(identity.id)!;
-    const players = generateRivalSquad({ id: identity.id, strength: target }, rivalSquadSeed(streamSeed(seed, profile.id, 'rivals'), identity.id));
-    clubs.push({ id: identity.id, name: identity.name, colors: [...identity.colors], ...(identity.home ? { home: { ...identity.home } } : {}), strength: squadStrength(players), squad: players });
+    const tier = tierOf.get(identity.id)!;
+    const players = admitOpeningSquad(generateRivalSquad({ id: identity.id, strength: target }, rivalSquadSeed(streamSeed(seed, profile.id, 'rivals'), identity.id)), tierCap(tier), 1);
+    if (!players) throw new Error(`Opening squad for ${identity.id} does not fit the ${tier} cap`);
+    clubs.push({ id: identity.id, name: identity.name, colors: [...identity.colors], ...(identity.home ? { home: { ...identity.home } } : {}), strength: squadStrength(players), squad: players, cash: AI_OPENING_CASH, capAccount: freshCapAccount(tier) });
   }
   const divisions: DivisionMetadata[] = [];
   const instances = [...profile.divisions].sort((a, b) => a.rank - b.rank).map(division => {

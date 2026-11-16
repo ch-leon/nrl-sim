@@ -37,7 +37,7 @@ of them drops only that field, never the rest.
 | **Reset all** (class `nrl-labs-off`) | Turns the experiments and overrides off. The hints already seen stay. It hides the page only when `VITE_DEV_SETTINGS` is off; while the switch is on, the entry stays in Settings with everything off. In a playtest career it first leaves the way Return does; any playtest keys left behind are cleared. | Mid-match in a playtest career it is refused and changes nothing |
 
 Every control is at least 44px tall and every section is labelled. The page scrolls
-inside its frame upright (390×844) and sideways (667×375 and 568×320).
+inside its frame at phone landscape (844×390, 667×375 and 568×320).
 
 ## The playtest career
 
@@ -130,4 +130,4 @@ inside its frame upright (390×844) and sideways (667×375 and 568×320).
   the preset, reload, Return byte for byte (including keys changed elsewhere),
   Reset all, the screen override and the marker.
 - `scripts/e2e-webkit/portrait/devSettings.mjs` (`--dev-settings-only`, portrait
-  shard): the real route on WebKit as an iPhone.
+  shard): the real route on WebKit as an iPhone, in landscape.

@@ -8,7 +8,7 @@ import {
   classifyReason, emptyTally, tallyNet, FINANCE_LINES, NEAR_RIVALS, nearestRivals, recordAgainst, advanceWeekAsTapped, registerAllSystems,
   styleTable, styleMixOf, levelWinRates, fieldedTable, offTheLevelMean, nineShape, shapeTable, attackVsDefence, type NineShape, type SeasonSample, type SoakResult, type StyleGame,
 } from '../../src/qa/soak';
-import { STARTING_MONEY } from '../../src/config';
+import { FINANCE_STARTING_CASH } from '../../src/data/financeRules';
 import { SEASON_ROUNDS, SQUAD_CAP } from '../../src/config';
 import { getState, setState, type Fixture, type GameState } from '../../src/core/state';
 import { initLeague, PLAYER_ID } from '../../src/systems/fixtures';
@@ -96,7 +96,7 @@ describe('soak', () => {
           if (mode === 'idle') expect(s.signings).toBe(0);
           else expect(s.signingFees).toBeGreaterThanOrEqual(0);
           // The season's P&L adds up to the balance, line by line (#161).
-          expect(s.finance.wages).toBeLessThan(0);
+          expect(s.finance.wages).toBe(0);
           expect(s.finance.grant).toBeGreaterThan(0);
           expect(s.finance.sponsor).toBe(0); // the soak manager never builds a Sponsor Board
           expect(s.finance.gate).toBeGreaterThan(0);
@@ -110,7 +110,7 @@ describe('soak', () => {
             expect(s.finance.upkeep).toBeLessThanOrEqual(0);
           }
         }
-        expect(tallyNet(r.seasons[0]!.finance)).toBeCloseTo(r.seasons[0]!.money - STARTING_MONEY, 0);
+        expect(tallyNet(r.seasons[0]!.finance)).toBeCloseTo(r.seasons[0]!.money - FINANCE_STARTING_CASH.normal, 0);
         expect(tallyNet(r.seasons[1]!.finance)).toBeCloseTo(r.seasons[1]!.money - r.seasons[0]!.money, 0);
         runs.push(r);
       }
@@ -119,16 +119,14 @@ describe('soak', () => {
       pairs.push({ seed, idle: runs[0]!.seasons[1]!.bestNine, managed: runs[1]!.seasons[1]!.bestNine });
       const summary = summariseSeasons(runs);
       expect(summary.map((s) => `${s.mode}:${s.season}`)).toEqual(['idle:1', 'idle:2', 'managed:1', 'managed:2']);
-      // Optional buildings must be affordable; any built still incurs its real upkeep (#164).
-      // The healthy-budget control below proves that affordable builds and hires actually occur.
+      // Buildings are still paid up front. Their old weekly upkeep is not a cash bill.
       const facilitySpend = runs[1]!.seasons[0]!.finance.facilities + runs[1]!.seasons[1]!.finance.facilities;
       expect(facilitySpend).toBeLessThanOrEqual(0);
-      if (facilitySpend < 0) expect(runs[1]!.seasons[1]!.finance.upkeep).toBeLessThan(0);
-      else expect(runs[1]!.seasons[1]!.finance.upkeep).toBe(0);
+      expect(runs[1]!.seasons[1]!.finance.upkeep).toBe(0);
       for (const row of summary) {
         expect(row.runs).toBe(1);
-        expect(row.finance.wages).toBeLessThan(0);
-        expect(tallyNet(row.finance)).toBeCloseTo(row.money - (row.season === 1 ? STARTING_MONEY : summary.find((x) => x.mode === row.mode && x.season === row.season - 1)!.money), -1);
+        expect(row.finance.wages).toBe(0);
+        expect(tallyNet(row.finance)).toBeCloseTo(row.money - (row.season === 1 ? FINANCE_STARTING_CASH.normal : summary.find((x) => x.mode === row.mode && x.season === row.season - 1)!.money), -1);
         expect(row.gap).toBeCloseTo(row.bestNine - row.rivalMean, 0);
         expect(row.finals).toBe(row.ladderPosition <= 8 ? 1 : 0);
         const run = runs.find((r) => r.mode === row.mode)!;

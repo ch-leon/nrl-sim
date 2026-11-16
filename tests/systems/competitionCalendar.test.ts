@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { bus, type LiveMatchData } from '../../src/core/events';
-import { createNewGame, getState, setState, SAVE_VERSION, type Fixture, type GameState } from '../../src/core/state';
+import { createNewGame, getState, setState, type Fixture, type GameState } from '../../src/core/state';
 import { clearHeldWeek, clearSeasonHooks, clearTickHooks, advanceWeek, advanceWeeks, registerSeasonHook, registerTickHook, resumeWeek, weekHeld, withFastForward } from '../../src/core/time';
 import { setCareerNamespace } from '../../src/core/storage/local';
 import { DEV_TEST_PREFIX, liveMatchKey, slotKey } from '../../src/core/storageKeys';
@@ -85,12 +85,12 @@ describe('structural calendar activation and boundaries', () => {
     setState(active); const before = JSON.stringify(getState()); advanceWeek(); expect(JSON.stringify(getState())).toBe(before);
   });
 
-  it('keeps supported v25 careers dormant and preserves their exact data', () => {
+  it('rejects a v25 career and leaves its data unchanged', () => {
     const state = prototype(); delete state.competitions; const source = { ...state, version: 25 };
-    const result = importSave(JSON.stringify(source));
-    expect(result).toMatchObject({ ok: true, state: { ...source, version: SAVE_VERSION } });
-    if (result.ok) expect(result.state.competitions).toBeUndefined();
-    expect(source.version).toBe(25);
+    const original = JSON.stringify(source);
+    const result = importSave(original);
+    expect(result).toMatchObject({ ok: false, message: expect.stringMatching(/start a new career/i) });
+    expect(JSON.stringify(source)).toBe(original);
   });
 
   it('does not activate the new clock merely because dormant instances exist', () => {

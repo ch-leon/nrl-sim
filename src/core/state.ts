@@ -9,7 +9,9 @@ import { packForCountry, selectPack } from '../content';
 import { makeRng } from '../utils/rng';
 import { generateFreeAgent, generatePlayer, generatePlayerAround, POSITIONS } from '../data/player';
 import type { FacilityDefId } from '../data/facility';
-import { BOARD, LEAGUE, STARTING_MONEY, DEFAULT_DIFFICULTY, difficultyMultipliers, type Difficulty } from '../config';
+import { BOARD, LEAGUE, DEFAULT_DIFFICULTY, difficultyMultipliers, type Difficulty } from '../config';
+import { FINANCE_STARTING_CASH } from '../data/financeRules';
+import { admitOpeningSquad, freshCapAccount, SINGLE_LEAGUE_TIER, tierCap, type CapAccount, type SignedDeal } from '../systems/cap';
 import { autoPick } from '../systems/lineup';
 
 /** The UI's text size (#371): Normal, Large (115%) and Larger (130%); see ui/textSize.ts. */
@@ -54,8 +56,10 @@ export interface Player {
   /** Weeks left of a ban (#324). 0 or absent = available. The lineup treats it like an injury; the medics do not shorten it. */
   suspendedWeeks?: number;
   traits: import('../data/traits').TraitInstance[];
-  wage: number; // per week
+  wage: number; // per week, legacy display. The signed commitment is `deal`.
   contractWeeks: number; // remaining
+  /** Annual salary for an inclusive run of seasons. Absent while unsigned. */
+  deal?: SignedDeal;
   junior?: boolean; // Academy prospect awaiting signing (default false) — #42
   departed?: boolean; // left the club (contract expired / released): survives free-agent re-rolls — #40
   career?: StatTally; // folded from match events — #46
@@ -94,6 +98,10 @@ export interface RivalClub {
   squad?: Player[];
   /** Fictional club home; absent in older saves. Derby status is derived, never saved. */
   home?: { town: string; country?: string; lat: number; lon: number };
+  /** Transfer wallet. The player's cash is GameState.money, not this copy. */
+  cash?: number;
+  /** The rival's salary-cap account. The player's account is GameState.capAccount. */
+  capAccount?: CapAccount;
 }
 
 export interface LeagueState {
@@ -108,10 +116,9 @@ export interface LeagueState {
 // TODO(WU-6): reconcile WeatherKind ownership with src/sim/weather.ts
 export type WeatherKind = 'clear' | 'rain' | 'wind';
 
-/** v25 adds optional competition metadata. v26 adds the developer-only calendar.
- *  v27 adds optional regional division metadata. Supported careers stay dormant.
- *  Pre-v24 player data still requires a new career. */
-export const SAVE_VERSION = 27;
+/** v28 separates club cash from the annual salary cap. Careers from v27 and
+ *  earlier are pre-finance: they are rejected, not converted. */
+export const SAVE_VERSION = 28;
 
 /** The hires the facilities don't cover (N14.5), and the attack coach who opens set plays to buy (#326). */
 export type StaffRole = 'assistantCoach' | 'analyst' | 'welfare' | 'attackCoach';
@@ -322,8 +329,10 @@ export interface GameState {
   recentPlans: TeamTactics[];
   /** What the squad trains hardest (N11): one stat, or Balanced (every stat as it always trained). */
   training: { focus: TrainingFocus };
-  /** What the club owes the board (N14.3): renewals it couldn't afford, advanced and repaid at the rollover. */
+  /** What the club owes the board (N14.3). New careers do not borrow. */
   boardLoan: { owed: number };
+  /** Annual salary cap. `money` is cash in the bank and is not this account. */
+  capAccount: CapAccount;
   /** The club's hires (N14.5): at most one of each role, none at the start. */
   staff: StaffMember[];
   /** The set plays bought (#326, systems/playbook.ts): kept when the attack coach who opened them leaves. */
@@ -396,13 +405,16 @@ export function createNewGame(
     ...POSITIONS.map((position) => ({ target: depth, position })),
   ];
   while (plan.length < 20) plan.push({ target: depth });
-  const squad: Player[] = rng.shuffle(plan.slice(0, 20)).map((slot) => ({
+  const generated: Player[] = rng.shuffle(plan.slice(0, 20)).map((slot) => ({
     ...(slot.target === undefined
       ? generatePlayer(rng, { quality: 'star' })
       : generatePlayerAround(rng, slot.target, slot.position ? { position: slot.position } : {})),
     career: { games: 0, tries: 0, tackles: 0, lineBreaks: 0 },
     joinedSeason: 1,
   }));
+  const capAccount = freshCapAccount(SINGLE_LEAGUE_TIER);
+  const squad = admitOpeningSquad(generated, tierCap(SINGLE_LEAGUE_TIER), 1);
+  if (!squad) throw new Error('Opening squad does not fit the salary cap');
 
   // The opening pool sits around the league (N12): a new club has nothing built
   // and the baseline reputation, so freeagency.poolTarget is MEAN − POOL_BELOW.
@@ -422,7 +434,7 @@ export function createNewGame(
     ...(options.coachName?.trim() ? { coachName: options.coachName } : {}),
     ...(options.home ? { home: { ...options.home } } : {}),
     ...(options.groundName ? { groundName: options.groundName } : {}),
-    money: Math.round(STARTING_MONEY * difficultyMultipliers(difficulty).startingMoney),
+    money: FINANCE_STARTING_CASH[difficulty],
     reputation: 30,
     week: 1,
     preseason: 1,
@@ -443,6 +455,7 @@ export function createNewGame(
     recentPlans: [],
     training: { focus: 'balanced' },
     boardLoan: { owed: 0 },
+    capAccount,
     staff: [],
     playbook: { owned: [] },
     rngSeed: rng.state(),

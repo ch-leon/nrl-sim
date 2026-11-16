@@ -6,9 +6,11 @@ import { bus } from '../../src/core/events';
 import { earnMoney } from '../../src/data/club';
 import { initLeague } from '../../src/systems/fixtures';
 import { preparePack, selectPack } from '../../src/content';
-import { TRAINING_FOCI } from '../../src/systems/training';
+import { TRAINING_FOCI, setSpendMode } from '../../src/systems/training';
+import { shownStats } from '../../src/data/player';
 import { PERSONAS, personaById } from '../../src/qa/personas';
-import { effectValue } from '../../src/qa/personas/policy';
+import { createPersonaManager, effectValue } from '../../src/qa/personas/policy';
+import { measuredMatch } from '../../src/qa/soak';
 import { careerRoundTrip, observeCareer, type CareerMatch } from '../../src/qa/personas/metrics';
 import { compareBaseline, makeBaseline, outliers, personaReport, summarisePersonas } from '../../src/qa/personas/report';
 import { runSoak, FINANCE_LINES, type SoakResult } from '../../src/qa/soak';
@@ -22,12 +24,15 @@ describe('AI personas (#534)', () => {
       expect(p.label.length).toBeGreaterThan(0);
       expect(p.goals.length).toBeGreaterThan(0);
       expect(p.difficulties).toEqual(['easy', 'normal', 'hard']);
-      for (const key of ['events', 'training', 'facilities', 'recruits', 'staff', 'tactics', 'attackCoach', 'setPlays']) expect(p).toHaveProperty(key);
+      for (const key of ['events', 'training', 'facilities', 'recruits', 'staff', 'tactics', 'attackCoach', 'setPlays', 'points', 'calling', 'releases']) expect(p).toHaveProperty(key);
       const [low, high] = ranges[p.id as keyof typeof ranges];
       expect(p.mistakeRate).toBeGreaterThanOrEqual(low!);
       expect(p.mistakeRate).toBeLessThanOrEqual(high!);
     }
-    expect(personaById('newcomer')).toMatchObject({ events: 'first', training: 'balanced', tactics: 'defaults', attackCoach: 'none', setPlays: 'none' });
+    expect(personaById('newcomer')).toMatchObject({ events: 'first', training: 'balanced', tactics: 'defaults', attackCoach: 'none', setPlays: 'none', points: { policy: 'partial' }, calling: 'none', releases: 'none' });
+    expect(personaById('min-maxer')).toMatchObject({ points: { policy: 'optimal', hold: 0 }, calling: 'ai', releases: 'none' });
+    expect(personaById('casual-weekly').points.policy).toBe('focus');
+    expect(personaById('careless')).toMatchObject({ points: { policy: 'random', hold: 0.5 }, calling: 'none', releases: 'depth' });
     expect(personaById('casual-weekly').staff.roles).not.toContain('analyst');
     expect(() => personaById('extra')).toThrow('Unknown persona');
   });
@@ -39,6 +44,9 @@ describe('AI personas (#534)', () => {
       expect(a.problems).toEqual([]);
       expect(stable(a)).toEqual(stable(b));
       expect(a.career?.weeks).toBe(4);
+      expect(a.career?.diary).toHaveLength(4);
+      expect(a.career?.diary[0]?.cash).toEqual(expect.any(Number));
+      expect(a.match?.totalMinutes).toBe(5);
       expect(a.career?.matches.filter(m => m.kind === 'regular')).toHaveLength(2);
       expect(a.career?.matches.filter(m => m.kind === 'trial')).toHaveLength(2);
       expect(a.career?.cash).toHaveLength(5);
@@ -175,10 +183,42 @@ describe('AI personas (#534)', () => {
     expect(summary.progression['90']).toMatchObject({ meanWeeks: null, reached: 0, censored: 1 });
     expect(Object.keys(summary.finance)).toEqual([...FINANCE_LINES]);
     const report = personaReport([r], compareBaseline([r], baseline));
-    for (const word of ['Baseline warnings', 'Progression', 'unrecoverable', 'thrown ticks', 'taken-play', 'Per career', 'unreached']) expect(report).toContain(word);
+    for (const word of ['Baseline warnings', 'Progression', 'unrecoverable', 'thrown ticks', 'taken-play', 'Per career', 'unreached', 'weeks in debt', 'Balance flags']) expect(report).toContain(word);
     const differentPack = { ...r, pack: 'uk' as const };
     expect(compareBaseline([differentPack], baseline).compared).toBe(0);
     const checked = JSON.parse(readFileSync('src/qa/personas/baseline.json', 'utf8'));
     expect(checked.schema).toBe(1);
   }, 15_000);
+
+  it('uses the real five-minute match and spends stat points in character', () => {
+    const match = measuredMatch();
+    expect(match.halves).toBe(2);
+    expect(match.halfMinutes).toBe(2.5);
+    expect(match.totalMinutes).toBe(5);
+    expect([100, 80, 60]).toContain(match.fieldLength);
+    createLegacyGame('Points', 3);
+    const room = (p: ReturnType<typeof getState>['squad'][number]) => shownStats(p.position).reduce((n, k) => n + Math.max(0, (p.ceilings[k] ?? p.stats[k]) - p.stats[k]), 0);
+    const host = getState().squad.find(p => room(p) >= 4);
+    expect(host).toBeTruthy();
+    const fresh = () => setState({ squad: getState().squad.map(p => p.id === host!.id ? { ...host!, unspentPoints: 4 } : { ...p, unspentPoints: 0 }) });
+    const ops = { buildFirstFree: () => false, weeklyNet: () => 0 };
+    setSpendMode('manual');
+    try {
+      fresh();
+      createPersonaManager(personaById('min-maxer'), 3, ops).spendPoints();
+      const spent = getState().squad.find(p => p.id === host!.id)!;
+      expect(spent.unspentPoints).toBe(0);
+      expect(shownStats(host!.position).reduce((n, k) => n + (spent.stats[k] - host!.stats[k]), 0)).toBe(4);
+      fresh();
+      createPersonaManager(personaById('newcomer'), 3, ops).spendPoints();
+      expect(getState().squad.find(p => p.id === host!.id)!.unspentPoints).toBe(2);
+      const once = (seed: number) => {
+        fresh();
+        createPersonaManager(personaById('careless'), seed, ops).spendPoints();
+        return getState().squad.find(p => p.id === host!.id)!.unspentPoints;
+      };
+      expect(once(9)).toBe(once(9));
+      expect([0, 4]).toContain(once(9));
+    } finally { setSpendMode('auto'); }
+  });
 });
