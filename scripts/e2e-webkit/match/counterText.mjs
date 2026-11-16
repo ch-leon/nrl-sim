@@ -2,16 +2,45 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { BASE, OUT_ROOT, IPHONE_UA, closeWeekSummary, openNav, log, skipFromPill } from '../common.mjs';
 
+/**
+ * The seeds this check may play, in order. It needs a match that shows a real Compressed
+ * counter line and then loses with Out-schemed in the report, and which seed does that
+ * moves whenever a sim change adds a dice roll (470 before the retreat fix, 475 after it,
+ * a 4–4 draw once attack shapes went in, #649). So it finds its own witness: the first
+ * seed here that gives all three, and fails only if none does.
+ */
+const SEEDS = Array.from({ length: 25 }, (_, i) => 475 + i);
+
 /** #468: the real loss report and its plan CTA at both landscape sizes and text
  * settings. Screenshots are CI artifacts, never checked into the repository. */
 export async function runCounterText(browser) {
   const out = join(OUT_ROOT, 'webkit', 'counter-text');
   mkdirSync(out, { recursive: true });
   const reports = [];
+  // The match is the same at every size and text setting, so the next one starts at the seed the last one used.
+  let witness = 0;
   for (const [width, height] of [[667, 375], [844, 390]]) for (const textSize of ['normal', 'large']) {
     const tag = `${width}x${height}-${textSize}`;
-    const rec = { tag, problems: [] };
     log(`starting counter text ${tag}`);
+    let rec;
+    for (let i = witness; i < SEEDS.length; i++) {
+      rec = await playCounterText(browser, out, width, height, textSize, SEEDS[i]);
+      if (!rec.notWitness) { witness = i; break; }
+      log(`counter text ${tag}: seed ${SEEDS[i]} is no witness (${rec.notWitness})`);
+    }
+    if (rec.notWitness) rec.problems.push(`no seed from ${SEEDS[witness]} to ${SEEDS.at(-1)} shows a counter line and loses with Out-schemed (the last: ${rec.notWitness})`);
+    reports.push(rec);
+    log(`${rec.problems.length ? 'FAIL' : 'ok'} counter text ${tag}: ${rec.problems.length ? rec.problems.join('; ') : `seed ${rec.seed}`}`);
+  }
+  writeFileSync(join(out, 'report.json'), JSON.stringify(reports, null, 2));
+  return reports.filter(r => r.problems.length).length;
+}
+
+/** One play of the fixture on `seed`. `notWitness` says why this seed does not show what the check is about; `problems` are real failures. */
+async function playCounterText(browser, out, width, height, textSize, seed) {
+  const tag = `${width}x${height}-${textSize}`;
+  const rec = { tag, seed, problems: [] };
+  {
     const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 2,
       hasTouch: true, isMobile: true, userAgent: IPHONE_UA });
     await context.addInitScript(closeWeekSummary);
@@ -27,14 +56,14 @@ export async function runCounterText(browser) {
       await page.locator('[data-nrl-start]').tap();
       await page.locator('[data-expansion-work]').tap();
       await page.locator('.nrl-tutorial-skip').tap();
-      await page.evaluate(size => {
+      await page.evaluate(([size, seed]) => {
         window.__restoreNow();
         const s = window.__nrlState();
         s.settings.textSize = size;
         s.settings.hints = false;
-        // Seed 475 naturally loses at both 7:00 and 2:30 halves, with a real
-        // Compressed counter line and Out-schemed in the final loss report.
-        s.rngSeed = 475;
+        // A seed that loses with a real Compressed counter line and Out-schemed
+        // in the final loss report (SEEDS, above).
+        s.rngSeed = seed;
         s.lineup.tactics = { attack: 'grind', defence: 'slide' };
         s.lineup.rotation = 'standard';
         // Normal reads recent habits (#469): this fixture needs Compressed v Tight.
@@ -65,7 +94,7 @@ export async function runCounterText(browser) {
             p.ceilings = Object.fromEntries(Object.keys(p.ceilings).map(stat => [stat, p.stats[stat]]));
           }
         }
-      }, textSize);
+      }, [textSize, seed]);
       // Applying settings through the normal screen sets the real text-size class.
       await openNav(page, 'settings');
       await page.locator(`.nrl-settings-seg [data-seg="${textSize}"]`).tap();
@@ -96,7 +125,11 @@ export async function runCounterText(browser) {
         observer.observe(strip, { childList: true, characterData: true, subtree: true });
       });
       await page.locator('.nrl-mo-controls [data-speed="8"]').tap();
-      await page.waitForFunction(() => window.__counterLine, null, { timeout: 30000 });
+      if (!(await page.waitForFunction(() => window.__counterLine, null, { timeout: 30000 }).then(() => true, () => false))) {
+        rec.notWitness = 'no counter line in 30 s';
+        await context.close();
+        return rec;
+      }
       rec.commentary = await page.locator('.nrl-mo-strip-text').textContent();
       rec.problems.push(...await page.locator('.nrl-mo-strip').evaluate(strip => {
         const r = strip.getBoundingClientRect();
@@ -117,17 +150,27 @@ export async function runCounterText(browser) {
         score: card.querySelector('.nrl-ft-pts')?.textContent,
       }));
       if (rec.result.kind !== 'loss') {
-        throw new Error(`Counter fixture must lose to show the loss report: ${JSON.stringify(rec.result)}`);
+        rec.notWitness = `a ${rec.result.kind}, ${rec.result.score}`;
+        await context.close();
+        return rec;
       }
       await page.locator('.nrl-mo-ft [data-report]').tap();
       await page.locator('[data-why-lost] summary').tap();
       const row = page.locator('.nrl-report-why-row').filter({ hasText: 'Out-schemed:' });
       rec.report = await page.locator('.nrl-report').textContent();
-      await row.waitFor({ timeout: 3000 });
+      if (!(await row.waitFor({ timeout: 3000 }).then(() => true, () => false))) {
+        rec.notWitness = 'no Out-schemed row in the loss report';
+        await context.close();
+        return rec;
+      }
       await row.scrollIntoViewIfNeeded();
       await page.waitForTimeout(250);
       rec.reason = await row.textContent();
-      if (!rec.reason.includes('Compressed') || !rec.reason.includes('Tight')) rec.problems.push('wrong counter reason');
+      if (!rec.reason.includes('Compressed') || !rec.reason.includes('Tight')) {
+        rec.notWitness = `Out-schemed by another counter: ${rec.reason.slice(0, 60)}`;
+        await context.close();
+        return rec;
+      }
       rec.problems.push(...await row.evaluate(row => {
         const problems = [];
         const text = row.querySelector('span'), button = row.querySelector('button');
@@ -148,10 +191,7 @@ export async function runCounterText(browser) {
       log(rec.report ?? 'report not reached');
       await page.screenshot({ path: join(out, `${tag}-failure.png`) }).catch(() => {});
     }
-    reports.push(rec);
-    log(`${rec.problems.length ? 'FAIL' : 'ok'} counter text ${tag}: ${rec.problems.join('; ')}`);
     await context.close();
+    return rec;
   }
-  writeFileSync(join(out, 'report.json'), JSON.stringify(reports, null, 2));
-  return reports.filter(r => r.problems.length).length;
 }

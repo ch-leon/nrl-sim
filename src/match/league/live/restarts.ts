@@ -5,7 +5,7 @@ import { bounceFlight, kickFlight, landed, rollFlight, type BallState } from '..
 import type { Side } from '../../core/snapshot';
 import { dist, type Vec } from '../../core/vec';
 import { FULLBACK } from '../roles';
-import { pickReceiver } from '../tactics';
+import { MAX_LAT_M, pickReceiver, pickReceiverWeighted } from '../tactics';
 import { NINES } from '../rules';
 import { conversionSpot, goalChance, goalStrikeTick, postsFor } from '../goals';
 import { PENALTY, offsideChance } from '../penalties';
@@ -89,7 +89,12 @@ export abstract class LiveRestarts extends LivePlay {
     }
     // The coach's Grubber or 40/20 (#396): the dummy-half finds the kicker rather than dart (no roll for it).
     const toKicker = this.lastPlay && receiver !== null && (this.callState[this.attacking].attack === 'grubber' || this.callState[this.attacking].attack === 'forty-twenty');
-    if (receiver === null) receiver = pickReceiver(h.body.pos, this.dir, this.candidates(h));
+    if (receiver === null) {
+      // The first receiver (#649): weighted like an open-play pass while it is on at the ruck, one roll before the dart's.
+      receiver = LIVE.receiverMargin > 0 && LIVE.receiverAtRuck > 0
+        ? pickReceiverWeighted(h.body.pos, this.dir, this.candidates(h), MAX_LAT_M, 0, LIVE.receiverMargin, LIVE.receiverSpread, this.rng.next())
+        : pickReceiver(h.body.pos, this.dir, this.candidates(h));
+    }
     if (receiver === null || (!toKicker && this.rng.next() < LIVE.dartChance)) {
       // Dummy-half dart.
       h.catchTick = this.tick;

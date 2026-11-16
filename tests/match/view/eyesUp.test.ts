@@ -136,7 +136,10 @@ describe('eyes on the bomb (#671)', () => {
     expect(bombs).toBeGreaterThan(50);
     expect(withUp.stats().peak).toBeLessThanOrEqual(withUp.capacity);
     expect(withUp.size).toBeLessThanOrEqual(withUp.capacity);
-    // A few heads, a few frames: nowhere near a second cache's worth.
-    expect(withUp.stats().misses - without.stats().misses).toBeLessThan(600);
+    // A few heads, a few frames: nowhere near a second cache's worth (about 25,000 misses).
+    // Bounded per tick under a bomb, not in total: the cap was 600 when this sample held 284 such
+    // ticks (328 extra misses, 1.2 a tick); the weighted receiver (#649) reshuffled it to 770
+    // (917 extra, 1.2 a tick). Two a tick is the old cap's own rate.
+    expect(withUp.stats().misses - without.stats().misses).toBeLessThan(2 * bombs);
   }, 120_000);
 });

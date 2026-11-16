@@ -159,6 +159,16 @@ is heeled at a ruck the backline comes up onto it (3 m ahead of their standing s
 less for the forwards close to the ruck) so the first receiver takes it at ~2.5 m/s,
 not standing. Carrying the ball costs 5% of top speed.
 
+**Who gets it** (#649 step 1, the weighted receiver — *awaiting lab sign-off*). The
+pass options are scored as before (flat and about 6 m wide beats deep, plus the role
+preference: halves off the ruck, forwards on the early hit-ups, the side with the
+overlap). The passer no longer always finds the single best: any option within
+`live.receiverMargin` (2) of the best may get it, weighted exp(−gap / `live.receiverSpread`
+(2)), so the best man is still the likeliest. That covers the dummy-half's pass to the
+first receiver and the engaged carrier's pass in open play, one roll each; the
+last-tackle pass to the kicker, the coach's pass input, offloads and set plays keep
+their man. Margin 0 is off: no roll, every seed as before. Tuning §5.
+
 ### 4.3 Catch (kicks) — *first slice implemented (lab feedback round 2)*
 A kick hangs for its flight time (2√(2·peak/g): a 12 m kick ≈ 3.1 s, a bomb ≈ 4 s), so
 chasers and catchers can get under it. **Whoever is nearest the landing point within
@@ -516,6 +526,7 @@ makes the break but can't finish it, the workhorse who is never quick and never 
 | F2 | Sprint and gas; legs as their ceiling — *shipped* (half-time shipped with BAK-207 2a, the bench with 2b) | §8.2 |
 | F2+ | Sprint follow-ups (kick chase, line speed on cruise, lab legs bar, stamina knobs) — *shipped* (N9.3) | §8.2, §11 |
 | N13.5 | A side's plan can change at half-time and after a try, by a rule the match opts into — *shipped* (off unless a side is named; N14 wires the rivals). Tuning §30 | §5 |
+| #649.1 | The weighted receiver: the pass goes to one of the near-best options by weight, not always the best — *awaiting lab sign-off*. Tuning §5 | §4.2 |
 
 Then BAK-207 Phase 2 (full match, scoring, halves) and Phase 3 (balance).
 
