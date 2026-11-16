@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Side, SimEvent } from '../../../src/match/core/snapshot';
 import { MATCH_MINUTES, measureCell, type CellResult } from '../../../src/match/balance/measure';
 import { reportMarkdown, sharesOf } from '../../../src/match/balance/report';
-import { FirstReceivers, PlayWatch, ScoreLine, type TickView } from '../../../src/match/balance/watch';
+import { FirstReceivers, PlayWatch, ScoreLine, Territory, type TickView } from '../../../src/match/balance/watch';
 
 const ev = (tick: number, kind: string, side?: Side, detail?: string): SimEvent => ({ tick, kind, text: '', ...(side ? { side } : {}), ...(detail ? { detail } : {}) });
 
@@ -253,12 +253,41 @@ describe('the report', () => {
   });
   it('adds the first-receiver columns last, with a dash for results from before them (#649)', () => {
     expect(reportMarkdown({ plan, meta, results: [old] })).toContain('| Last tackle pass % | 1st receiver same man % | 1st receiver slots |');
-    const { receivers: _, ...older } = fresh!;
+    // Results from before #649 lack the #650 columns after them too (#650: four dashes, was two).
+    const { receivers: _, territory: _t, ...older } = fresh!;
     const md = reportMarkdown({ plan, meta, results: [{ ...old, watch: older }] });
     // The baseline's second (watchability) row.
     const line = md.split('\n').filter((l) => l.startsWith('| baseline | ')).pop()!;
+    expect(line.trim().endsWith('| — | — | — | — |')).toBe(true);
+    expect(line.split('—').length).toBe(5);
+  });
+  it('adds the second-last kicks and set start columns last, with a dash for results from before them (#650)', () => {
+    expect(reportMarkdown({ plan, meta, results: [old] })).toContain('| 1st receiver slots | 2nd-last kicks | Set start m to go |');
+    const { territory: _, ...older } = fresh!;
+    const line = reportMarkdown({ plan, meta, results: [{ ...old, watch: older }] }).split('\n').filter((l) => l.startsWith('| baseline | ')).pop()!;
     expect(line.trim().endsWith('| — | — |')).toBe(true);
     expect(line.split('—').length).toBe(3);
+  });
+});
+
+describe('territory (#650)', () => {
+  it('counts kicks on the second-last tackle only, and where a set starts after the ball changes hands', () => {
+    const w = new Territory();
+    let toGo = 70;
+    const at = () => toGo;
+    // A kick hands the ball over as it is struck (the set reads 0 on its tick): the tick before says which tackle it was.
+    w.tick([], view({ attacking: 'home' }), 2, at);
+    w.tick([ev(1, 'kick', 'home', 'long')], view({ attacking: 'home' }), 0, at); // struck on tackle 3: not counted
+    w.tick([], view({ attacking: 'home', phase: 'ruck' }), 3, at); // same side's ruck: no set start
+    toGo = 64;
+    w.tick([ev(2, 'kick', 'home', 'grubber')], view({ attacking: 'away' }), 0, at); // struck on the second-last; the ball changes hands…
+    w.tick([], view({ attacking: 'away', phase: 'ruck' }), 1, at); // …its first play-the-ball
+    toGo = 30;
+    w.tick([], view({ attacking: 'away', phase: 'ruck' }), 2, at); // later rucks: not again
+    toGo = 80;
+    w.tick([], view({ attacking: 'home', phase: 'ruck' }), 0, at);
+    expect(w.result()).toEqual({ earlyKicks: 1, startM: 72 });
+    expect(new Territory().result()).toEqual({ earlyKicks: 0, startM: 0 });
   });
 });
 
