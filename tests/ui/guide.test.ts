@@ -12,7 +12,7 @@ import { BENCH } from '../../src/match/league/bench';
 import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL } from '../../src/match/league/presets';
 import { TACTIC_BLURB } from '../../src/ui/tacticsBlurbs';
 import { TRAINING_FOCUS } from '../../src/config';
-import { STAFF, STAFF_ROLES, WELFARE_RENEWAL_CUT } from '../../src/systems/staff';
+import { STAFF, STAFF_ROLES } from '../../src/systems/staff';
 import { BOARD, DIFFICULTY, ECON, ON_FIELD, PRIZE, SET_TACKLES, SQUAD_MIN } from '../../src/config';
 import { createNewGame, setState } from '../../src/core/state';
 import { IN_GOAL } from '../../src/match/core/field';
@@ -61,10 +61,14 @@ describe('the Money page stays true to the economy', () => {
   const text = money.sections.map((s) => `${s.text ?? ''} ${s.bullets?.join(' ') ?? ''}`).join(' ');
   const dollars = (n: number): string => `$${Math.round(n).toLocaleString('en-US')}`;
 
-  it('quotes the running costs a week on every difficulty (N12.3)', () => {
-    expect(text).toContain(`${dollars(ECON.OVERHEAD_WEEKLY * DIFFICULTY.normal.overhead)} on Normal`);
-    expect(text).toContain(`${dollars(ECON.OVERHEAD_WEEKLY * DIFFICULTY.easy.overhead)} on Easy`);
-    expect(text).toContain(`${dollars(ECON.OVERHEAD_WEEKLY * DIFFICULTY.hard.overhead)} on Hard`);
+  it('quotes the cash that leaves the bank, not a weekly wage bill', () => {
+    expect(text).toContain('A signing fee');
+    expect(text).toContain('Releasing a player');
+    expect(text).toContain('A renewal costs no cash');
+    expect(text).not.toContain('Wages every week');
+    expect(text).not.toContain('Running costs');
+    expect(text).not.toContain('turns amber');
+    expect(text).toContain('The balance at the left of the dock is the cash in the bank');
   });
 
   it('quotes the ticket price', () => {
@@ -78,8 +82,8 @@ describe('the Money page stays true to the economy', () => {
     expect(text).toContain(`The board pays ${dollars(BOARD.GRANT_PER_MET)} for every objective met`);
     expect(text).toContain(`Easy pays ${Math.round(DIFFICULTY.easy.prize * 100)}% of that and Hard ${Math.round(DIFFICULTY.hard.prize * 100)}%`);
     expect(text).toContain(`Easy ${Math.round(DIFFICULTY.easy.prize * 100)}%, Hard ${Math.round(DIFFICULTY.hard.prize * 100)}%`);
-    expect(text).toContain(`below -${dollars(-ECON.FORCED_SALE_FLOOR)} it sells your highest-paid player`);
-    expect(text).toContain(`the squad’s morale drops by ${ECON.FORCED_SALE_MORALE_HIT} each time`);
+    expect(text).toContain('a negative balance does not sell a player');
+    expect(text).toContain('Salaries sit on the cap');
     const all = CLUB_PAGES.flatMap((p) => p.sections.map((s) => `${s.text ?? ''} ${s.bullets?.join(' ') ?? ''}`)).join(' ');
     expect(all).toContain(`Each one met pays ${dollars(BOARD.GRANT_PER_MET)} and ${BOARD.REP_PER_MET} reputation.`);
     expect(all).toContain(`the week the balance passes the -${dollars(-ECON.FORCED_SALE_FLOOR)} floor`);
@@ -137,9 +141,8 @@ describe('the Money page says the real numbers (N12)', () => {
     expect(bullets('money')).not.toContain('$3,000');
   });
 
-  it('quotes the difficulty wage multipliers and the pool\'s level', () => {
-    expect(bullets('money')).toContain(`Easy pays ${Math.round(DIFFICULTY.easy.wages * 100)}%, Hard ${Math.round(DIFFICULTY.hard.wages * 100)}%`);
-    expect(bullets('money')).toContain('Easy pays 90%, Hard 115%');
+  it('quotes the signing fee and the pool\'s level', () => {
+    expect(bullets('money')).toContain('difficulty does not scale');
     expect(bullets('squad')).toContain('about 52 overall');
     expect(bullets('grounds')).toContain('Sponsor Board ($10,000, one only): $150 a week plus $10 a reputation point (up to $1,000)');
   });
@@ -162,8 +165,9 @@ describe('the Squad page stays true to the cascade (N14.3)', () => {
   const squad = CLUB_PAGES.find((p) => p.id === 'squad')!;
   const text = squad.sections.map((s) => `${s.text ?? ''} ${s.bullets?.join(' ') ?? ''}`).join(' ');
 
-  it('quotes the board loan\'s cap and the call-up', () => {
-    expect(text).toContain(`up to $${BOARD.LOAN_CAP.toLocaleString('en-US')} a season`);
+  it('says the board does not lend, and quotes the call-up', () => {
+    expect(text).toContain('The board does not lend');
+    expect(text).not.toContain('finished solvent');
     expect(text).toContain(`Short of ${SQUAD_MIN} fit before a match, the Academy calls up juniors`);
   });
 });
@@ -178,8 +182,8 @@ describe('the Squad page\'s Staff section stays true to the hires (N14.5)', () =
     }
   });
 
-  it('quotes the Welfare Manager\'s cut on renewal asks', () => {
-    expect(text).toContain(`takes ${Math.round(WELFARE_RENEWAL_CUT * 100)}% off renewal asks`);
+  it('quotes the Welfare Manager\'s cut on a new agreement', () => {
+    expect(text).toContain('takes 3% off a new agreement');
   });
 });
 

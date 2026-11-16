@@ -21,6 +21,7 @@ import { getCurrentFixture, PLAYER_ID } from './fixtures';
 import { overallRating, shownStats, withShownStats, generatePlayer, POSITIONS } from '../data/player';
 import type { Rng } from '../utils/rng';
 import { makeRng } from '../utils/rng';
+import { commitPlayer, protectAddedDeals } from './cap';
 
 export const JUNIOR_MIN_AGE = 17;
 export const JUNIOR_MAX_AGE = 19;
@@ -97,7 +98,7 @@ export function callUpJuniors(
     const intake = generateProspects(rng, level).sort((a, b) => overallRating(b) - overallRating(a));
     for (const p of intake.slice(0, need - out.length)) {
       const { junior: _junior, ...rest } = p;
-      out.push({ ...rest, contractWeeks: Math.max(1, weeksLeft), joinedSeason: season });
+      out.push(commitPlayer({ ...rest, contractWeeks: Math.max(1, weeksLeft), joinedSeason: season }, season, 1));
     }
   }
   return out;
@@ -113,7 +114,12 @@ export function registerYouthSystem(): void {
     const rng = makeRng(state.rngSeed);
     const called = callUpJuniors(rng, state.squad, academyLevel(state.facilities), season, WEEKS_PER_SEASON - week + 1);
     if (called.length === 0) return;
-    setState({ squad: [...state.squad, ...called], rngSeed: rng.state() });
+    const squad = [...state.squad, ...called];
+    setState({
+      squad,
+      rngSeed: rng.state(),
+      capAccount: protectAddedDeals(squad, state.capAccount, season, called.map(player => player.id)),
+    });
     bus.emit('ui:notify', {
       text: `Academy call-up: ${called.map((p) => p.name).join(', ')} ${called.length === 1 ? 'comes' : 'come'} up to make the side, on the junior wage to the season's end.`,
       kind: 'info',

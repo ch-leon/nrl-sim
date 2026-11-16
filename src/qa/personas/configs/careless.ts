@@ -7,4 +7,5 @@ export default {
   recruits: { policy: 'stars', floor: 13, reserve: 0, wageWeeks: 0, renewStars: false },
   staff: { roles: [], fromWeek: 1, reserve: 0 },
   tactics: 'mismatch', attackCoach: 'mismatch', setPlays: 'poor-fit',
+  points: { policy: 'random', hold: 0.5 }, calling: 'none', releases: 'depth',
 } satisfies PersonaConfig;

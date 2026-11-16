@@ -27,7 +27,9 @@ beforeEach(() => {
   clearSeasonHooks();
 });
 
-const club = (strength: number, id = 'rival-test'): RivalClub => ({ id, name: 'Test Rivals', colors: ['#000000', '#ffffff'], strength });
+const club = (strength: number, id = 'rival-test'): RivalClub => ({
+  id, name: 'Test Rivals', colors: ['#000000', '#ffffff'], strength, cash: 1_000_000,
+});
 const agent = (rng = makeRng(1), over: Partial<Player> = {}): Player => ({ ...generatePlayer(rng), ...over });
 /** Weak free agents nobody signs, so a test pool sits above RIVAL_POOL_FLOOR. */
 const filler = (n = RIVAL_POOL_FLOOR): Player[] => {
@@ -89,7 +91,8 @@ describe('signings', () => {
     // Find a seed whose first roll is a hit.
     const pool = [star, ...filler()];
     let r = rivalSigningTick([c], pool, makeRng(0));
-    for (let seed = 1; r.signed.length === 0; seed++) r = rivalSigningTick([c], pool, makeRng(seed));
+    for (let seed = 1; seed < 400 && r.signed.length === 0; seed++) r = rivalSigningTick([c], pool, makeRng(seed));
+    expect(r.signed.length).toBeGreaterThan(0);
     expect(r.freeAgents).toEqual(filler());
     expect(r.clubs[0]!.squad!.some((p) => p.id === star.id)).toBe(true);
     expect(r.clubs[0]!.strength).toBe(squadStrength(r.clubs[0]!.squad!));
@@ -106,7 +109,8 @@ describe('signings', () => {
     const star = rivalPlayer(rng, 'fa', 'fullback', 85);
     const pool = [star, ...filler()];
     let r = rivalSigningTick([c], pool, makeRng(0));
-    for (let seed = 1; r.signed.length === 0; seed++) r = rivalSigningTick([c], pool, makeRng(seed));
+    for (let seed = 1; seed < 400 && r.signed.length === 0; seed++) r = rivalSigningTick([c], pool, makeRng(seed));
+    expect(r.signed.length).toBeGreaterThan(0);
     expect(r.clubs[0]!.squad).toHaveLength(RIVAL_SQUAD_MAX);
     expect(r.freeAgents.map((p) => p.id)).toEqual([...filler().map((p) => p.id), worst.id]);
   });

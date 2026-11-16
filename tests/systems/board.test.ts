@@ -30,8 +30,8 @@ describe('generateObjectives', () => {
     const s = fresh();
     expect(generateObjectives(s)).toEqual(generateObjectives(s));
     const n = generateObjectives(s).length;
-    expect(n === 2 || n === 3).toBe(true);
-    expect(generateObjectives({ ...s, reputation: 10 })).toHaveLength(2);
+    expect(n === 1 || n === 2).toBe(true);
+    expect(generateObjectives({ ...s, reputation: 10 })).toHaveLength(1);
   });
 
   it('keeps the no-derby seed-7 objectives captured from main (eba6d46)', () => {
@@ -39,7 +39,6 @@ describe('generateObjectives', () => {
     const s = getState();
     const expected = [
       { id: 's1-finals', kind: 'finals', text: 'Finish in the top 9', target: 9, status: 'pending' },
-      { id: 's1-solvent', kind: 'solvent', target: 0, status: 'pending', text: 'Finish the season solvent' },
       { id: 's1-rival', kind: 'beatRival', target: 0, rivalId: 'rival-brumbies', status: 'pending', text: 'Finish above Ballarat Bushrangers' },
     ];
     expect(generateObjectives(s)).toEqual(expected);
@@ -121,8 +120,8 @@ describe('reviewObjectives', () => {
     const s0 = fresh();
     const s = { ...s0, objectives: s0.objectives.filter((o) => o.kind !== 'build' && o.kind !== 'beatRival') };
     const bad = reviewObjectives({ ...s, money: -5, boardPatience: 3 }, outcome({ ladderPosition: 12 }));
-    expect(bad.missed).toBe(2);
-    expect(bad.patience).toBe(1);
+    expect(bad.missed).toBe(1);
+    expect(bad.patience).toBe(2);
     const good = reviewObjectives({ ...s, money: 5, boardPatience: 3 }, outcome({ ladderPosition: 1 }));
     expect(good.missed).toBe(0);
     expect(good.patience).toBe(4);

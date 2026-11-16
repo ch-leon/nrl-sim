@@ -3,11 +3,11 @@ import { join } from 'node:path';
 import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, skipFromPill } from '../common.mjs';
 
 /**
- * Developer settings (#519), the real route on an iPhone, upright first:
+ * Developer settings (#519), the real route on an iPhone, in landscape:
  *   - Settings shows Developer settings with no `?labs=1` (the build switch is on). Nothing
  *     on the page is on, and opening it does not change the career. `?labs=1` still shows it.
  *     The page has its Screens, Playtest career, Experiments (Match controls, off) and
- *     Reset parts, 44px targets, and fits upright (390×844) and sideways (667×375, 568×320);
+ *     Reset parts, 44px targets, and fits at 844×390, 667×375 and 568×320;
  *   - the screen override opens Staff & Board on the dock's Office with a DEV tag and
  *     writes no career key; off locks it again;
  *   - Set up playtest career, with a change not saved yet, saves it with its meta into the backup
@@ -24,7 +24,7 @@ export async function runDevSettings(browser) {
   const started = Date.now();
   const OUT = join(OUT_ROOT, 'webkit', 'dev-settings');
   mkdirSync(OUT, { recursive: true });
-  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true, userAgent: IPHONE_UA });
+  const ctx = await browser.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true, userAgent: IPHONE_UA });
   await ctx.addInitScript(closeWeekSummary);
   const page = await ctx.newPage();
   page.setDefaultTimeout(15000);
@@ -100,7 +100,7 @@ export async function runDevSettings(browser) {
     if (!normal['nrl-sim-save-slot-1']) throw new Error('no normal save in slot 1');
     await openPanel();
     if (await page.locator('[data-experiment="match-controls"]').isChecked()) throw new Error('Match controls is on by default');
-    const problems = await panelProblems('390x844');
+    const problems = await panelProblems('844x390');
     await closePanel();
     for (const [w, h] of [[667, 375], [568, 320]]) {
       await page.setViewportSize({ width: w, height: h });
@@ -109,10 +109,10 @@ export async function runDevSettings(browser) {
       problems.push(...await panelProblems(`${w}x${h}`));
       await closePanel();
     }
-    await page.setViewportSize({ width: 390, height: 844 });
+    await page.setViewportSize({ width: 844, height: 390 });
     await page.waitForTimeout(300);
     if (problems.length) throw new Error(problems.join('; '));
-    step('?labs=1 shows it; fits 390x844, 667x375, 568x320 with 44px targets');
+    step('?labs=1 shows it; fits 844x390, 667x375, 568x320 with 44px targets');
 
     // 3. The screen override: Staff & Board opens on screen only.
     const staffLocked = () => page.evaluate(() => document.querySelector('.nrl-nav-sheet [data-screen="staff"]')?.classList.contains('nrl-office-locked'));
@@ -171,7 +171,7 @@ export async function runDevSettings(browser) {
     for (const [k, v] of Object.entries(normal)) if (!/^nrl-sim-save-(slot|meta)-1$/.test(k) && backedUp[k] !== v) throw new Error(`setup changed ${k}`);
     normal = backedUp; // the career as set up: from here every normal key must stay exactly this
     if (await page.locator('[data-nrl-title]').count()) throw new Error('the playtest career stopped on the title');
-    await page.screenshot({ path: join(OUT, 'playtest-club-390x844.png') });
+    await page.screenshot({ path: join(OUT, 'playtest-club-844x390.png') });
     step('playtest career set up from an unsaved change; the save and its meta in the backup, normal keys byte for byte');
 
     // 5. The real route: the first match at ×1, Block play called from the tray, ×2.
@@ -241,7 +241,7 @@ export async function runDevSettings(browser) {
     if (!same(await careerKeys(), normal)) throw new Error('playing the playtest match changed a normal career key');
 
     // 6. Return to my career.
-    await page.setViewportSize({ width: 390, height: 844 });
+    await page.setViewportSize({ width: 844, height: 390 });
     await page.waitForTimeout(300);
     await openPanel();
     await page.locator('[data-dev-action="return"]').tap();

@@ -13,7 +13,7 @@ export async function runDifficulty(browser) {
     easy: 'More money, cheaper wages, rivals a step slower.',
     hard: 'Less money, dearer wages, sharper rivals.',
   };
-  for (const [width, height] of [[667, 375], [844, 390], [390, 844]]) {
+  for (const [width, height] of [[667, 375], [844, 390]]) {
     const ctx = await browser.newContext({ viewport: { width, height }, hasTouch: true, isMobile: true, userAgent: IPHONE_UA });
     const page = await ctx.newPage();
     const record = { size: `${width}x${height}`, layouts: [], problems: [] };

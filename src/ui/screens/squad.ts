@@ -147,7 +147,7 @@ export function openSquadScreen(): void {
     for (const p of sortSquad(s.squad, sortKey)) {
       const no = numbers.get(p.id);
       const fit = fitnessPct(p);
-      const expiring = p.contractWeeks <= MORALE.EXPIRING_WEEKS;
+      const expiring = p.contractWeeks <= MORALE.EXPIRING_WEEKS && !p.deal?.renewal;
       const unhappy = p.morale < 50;
       list.appendChild(tableRow(p, [
         el('span', { class: 'nrl-num nrl-squad-no', text: no ? String(no) : '–', attrs: { title: no ? (no <= 9 ? 'Starting this week' : 'On the bench this week') : 'Not in the side this week' } }),
@@ -155,7 +155,7 @@ export function openSquadScreen(): void {
         el('span', { class: 'nrl-row-pos', text: posShort(p.position), attrs: { title: positionLabel(p.position) } }),
         el('span', { class: 'nrl-num nrl-row-ovr', text: ratingText(overallRating(p)), attrs: { title: 'Overall rating' } }),
         fitnessCell(fit, p.injuredWeeks > 0, p.injuredWeeks > 0 ? `Injured: out ${p.injuredWeeks} wk` : `Fitness ${fit}%: 100 less his injury risk (${p.injuryRisk})`),
-        el('span', { class: `nrl-num nrl-row-dim${expiring ? ' nrl-row-attn' : ''}`, text: `${p.contractWeeks} wk`, attrs: { title: expiring ? 'Contract running down' : 'Weeks left on his contract' } }),
+        el('span', { class: `nrl-num nrl-row-dim${expiring ? ' nrl-row-attn' : ''}`, text: `${p.contractWeeks} wk`, attrs: { title: p.deal?.renewal ? `Renewal queued from season ${p.deal.renewal.startSeason}` : expiring ? 'Contract running down' : 'Weeks left on his contract' } }),
         el('span', { class: 'nrl-num nrl-row-dim nrl-sq-wide', text: fmtMoney(p.wage), attrs: { title: 'Weekly wage' } }),
         el('span', { class: `nrl-sq-wide ${unhappy ? 'nrl-row-bad' : 'nrl-row-dim'}`, text: moraleWord(p.morale), attrs: { title: `Morale ${p.morale}` } }),
       ], () => openPlayerPage(p, { kind: 'squad' })));

@@ -8,7 +8,7 @@ export async function runCoachVoice(browser) {
   const out = join(OUT_ROOT, 'webkit', 'coach-voice');
   mkdirSync(out, { recursive: true });
   const results = [];
-  for (const [width, height] of [[667, 375], [844, 390], [390, 844]]) {
+  for (const [width, height] of [[667, 375], [844, 390]]) {
     const tag = `${width}x${height}`;
     const ctx = await browser.newContext({ viewport: { width, height }, hasTouch: true, isMobile: true, userAgent: IPHONE_UA });
     const page = await ctx.newPage();
@@ -31,21 +31,10 @@ export async function runCoachVoice(browser) {
       await page.screenshot({ path: join(out, `${tag}-${channel}.png`) });
     };
     const home = async () => {
-      // Club home's screen key is 'club'; it is already home, so leave it alone.
-      if (await page.locator('.nrl-screen-region:not([data-screen-key="club"])').count()) {
+      if (await page.locator('.nrl-screen-region').count()) {
         await page.locator('.nrl-nav [data-nav-home]').tap();
-        await page.waitForFunction(() => {
-          const screen = document.querySelector('.nrl-screen-region');
-          return !screen || screen.getAttribute('data-screen-key') === 'club';
-        });
+        await page.waitForFunction(() => !document.querySelector('.nrl-screen-region'));
       }
-    };
-    const viewport = async (w, h) => {
-      await page.setViewportSize({ width: w, height: h });
-      await page.waitForFunction(([w, h]) => innerWidth === w && innerHeight === h &&
-        matchMedia('(orientation: portrait)').matches === (h > w), [w, h]);
-      // Let the orientation handlers and the dock's resize observer finish before tapping.
-      await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     };
     const finishMatch = async () => {
       await page.waitForSelector('.nrl-mo-controls', { timeout: 60000 });
@@ -75,10 +64,6 @@ export async function runCoachVoice(browser) {
         if (kind === 'summary') break;
         await page.locator('[data-event-choice]').first().tap({ timeout: Math.max(1, deadline - Date.now()) });
       }
-      // Rotate only once the card exists. WebKit can deliver orientation changes
-      // after setViewportSize returns; rotating during the summary's opening races
-      // the Club home transition. This also checks the mounted card survives rotation.
-      if (height > width) await viewport(width, height);
       await page.locator('[data-week-summary]').waitFor({ state: 'visible' });
       await page.waitForTimeout(250); // the card's entrance (#606): its buttons are measured at full size
       const fit = await page.evaluate(() => {
@@ -94,7 +79,6 @@ export async function runCoachVoice(browser) {
       await shot(`summary-${week}`, '[data-week-summary]');
       await page.locator('[data-summary-close]').tap();
       await page.locator('[data-week-summary]').waitFor({ state: 'detached' });
-      if (height > width) await page.locator('[data-club-home]').waitFor({ state: 'visible' });
     };
     try {
       await page.goto(BASE);
@@ -102,8 +86,6 @@ export async function runCoachVoice(browser) {
       await page.locator('[data-expansion-work]').tap();
       await page.waitForSelector('[data-step="build"]');
       await shot('tutorial', '.nrl-tutorial-bubble');
-      // Club home works upright; placement and live matches use landscape, as today.
-      if (height > width) await viewport(844, 390);
       await page.locator('[data-screen-key="build"] [data-facility="trainingPaddock"]').tap();
       await page.waitForSelector('[data-step="place"]');
       await page.locator('.nrl-placebar [data-place-go]').tap();
@@ -129,7 +111,6 @@ export async function runCoachVoice(browser) {
       await shot('event', '.nrl-event-card');
       for (let i = 0; i < 8 && await page.locator('[data-event-choice]').count(); i++) await page.locator('[data-event-choice]').first().tap();
       await home();
-      if (height > width) await viewport(844, 390);
       await page.locator('.nrl-hud-actions > [data-hud="advance"]').tap();
       await finishMatch();
       await summary(2);

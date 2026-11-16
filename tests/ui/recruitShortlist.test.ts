@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createNewGame, getState, type GameState, type Player, type Position } from '../../src/core/state';
-import { difficultyMultipliers, SQUAD_CAP } from '../../src/config';
+import { SQUAD_CAP } from '../../src/config';
 import { signingFee } from '../../src/systems/freeagency';
 import { autoPick, LINEUP_SLOTS } from '../../src/systems/lineup';
 import { recruitAffordable, recruitShortlist } from '../../src/ui/recruitShortlist';
@@ -8,6 +8,7 @@ import { recruitAffordable, recruitShortlist } from '../../src/ui/recruitShortli
 function player(id: string, position: Position, rating = 60, wage = 100): Player {
   return { ...getState().squad[0]!, id, name: id, position, age: 25, wage, junior: false,
     injuredWeeks: 0, suspendedWeeks: 0, traits: [],
+    deal: { salary: 1_000, startSeason: 1, endSeason: 1 },
     stats: { speed: rating, strength: rating, stamina: rating, handling: rating, kicking: rating, footyIQ: rating } };
 }
 function state(agents: Player[]): GameState {
@@ -33,11 +34,11 @@ describe('recruitShortlist', () => {
     s.squad = s.squad.filter((p) => p.position !== 'winger');
     expect(recruitShortlist(s).ids[0]).toBe('w0');
   });
-  it.each(['easy', 'normal', 'hard'] as const)('uses the exact eight-week wage boundary on %s', (difficulty) => {
+  it.each(['easy', 'normal', 'hard'] as const)('uses the signing fee itself on %s, and difficulty does not change it', (difficulty) => {
     const s = state(Array.from({ length: 5 }, (_, i) => player(`a${i}`, 'hooker', 60, 1000)));
     s.settings = { ...s.settings, difficulty };
     const p = s.freeAgents[0]!;
-    s.money = signingFee(s, p) + 8 * p.wage * difficultyMultipliers(difficulty).wages;
+    s.money = signingFee(s, p);
     expect(recruitAffordable(s, p)).toBe(true);
     expect(recruitShortlist(s).pickId).not.toBeNull();
     s.money -= 1;

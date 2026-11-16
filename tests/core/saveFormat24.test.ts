@@ -96,15 +96,9 @@ it('backfills pre-progression v24 players deterministically without changing RNG
   });
   const first = importSave(raw); const second = importSave(raw);
   expect(first).toEqual(second);
-  expect(first.ok).toBe(true);
-  if (!first.ok) return;
-  expect(first.state.rngSeed).toBe(current.rngSeed);
-  const players = [...first.state.squad, ...first.state.freeAgents, ...first.state.league.clubs.flatMap(c => c.squad ?? [])];
-  for (const p of players) expect(p).toMatchObject({ xp: 0, level: 1, unspentPoints: 0 });
-  expect(first.state.squad.map(p => p.ceilings)).toEqual(current.squad.map(p => p.ceilings));
-  const progressed = { ...first.state, squad: first.state.squad.map(p => ({ ...p, xp: 45.5, level: 4, unspentPoints: 7 })) };
-  expect(importSave(exportSave(progressed))).toMatchObject({ ok: true, state: progressed });
+  expect(first).toMatchObject({ ok: false, message: expect.stringMatching(/start a new career/i) });
   expect(JSON.parse(raw).squad[0]).not.toHaveProperty('xp');
+  expect(JSON.parse(raw).version).toBe(24);
 });
 it.each([{ xp: -1 }, { xp: null }, { level: 0 }, { level: 1.5 }, { unspentPoints: -1 }, { unspentPoints: 0.5 }])('rejects malformed progression fields %j', fields => {
   const s = createNewGame('XP validation', 539);
