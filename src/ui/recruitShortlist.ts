@@ -1,8 +1,9 @@
 // UI-only recruitment advice: no pool changes, state writes or dice.
 import type { GameState, Player } from '../core/state';
-import { SQUAD_CAP, difficultyMultipliers } from '../config';
+import { SQUAD_CAP } from '../config';
 import { overallRating } from '../data/player';
 import { signingFee } from '../systems/freeagency';
+import { capRoomFor, salaryDemand } from '../systems/cap';
 import { LINEUP_SLOTS, isFieldable, positionFit, effectiveRating, resolveLineup } from '../systems/lineup';
 
 export interface RecruitShortlist {
@@ -11,10 +12,11 @@ export interface RecruitShortlist {
   reachId: string | null;
 }
 
-/** Fee plus eight weeks of this player's difficulty-scaled wage, with a squad place free. */
+/** Cash for the fee and room under this season's cap, with a squad place free. */
 export function recruitAffordable(state: GameState, p: Player): boolean {
   return state.squad.length < SQUAD_CAP
-    && signingFee(state, p) + 8 * p.wage * difficultyMultipliers(state.settings.difficulty).wages <= state.money;
+    && signingFee(state, p) <= state.money
+    && capRoomFor(state.squad, state.capAccount, state.season, salaryDemand(p));
 }
 
 /** Deterministic advice; small pools keep the full table's default overall order. */

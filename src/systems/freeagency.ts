@@ -8,11 +8,13 @@ import type { Rng } from '../utils/rng';
 import { makeRng } from '../utils/rng';
 import { bus } from '../core/events';
 import { spendMoney } from '../data/club';
+import { signingFeeQuote, type FinanceLevel } from '../data/financeRules';
 import { generateFreeAgent } from '../data/player';
 import { registerTickHook, TICK_ORDER, type TickContext } from '../core/time';
 import { SPECIAL_MAGNITUDE } from '../data/facility';
 import { LEAGUE, SQUAD_CAP, SQUAD_MIN, WEEKS_PER_SEASON } from '../config';
-import { transferFee } from './contracts';
+import { capRoomFor, commitment, publishedCap, releaseTerms, salaryDemand, signForRestOfSeason } from './cap';
+import { fmtMoney } from '../utils/money';
 import { REP_BASELINE } from './league';
 import { placeSigning, type SigningPlacement } from './lineup';
 import { hasStructuralCalendar } from './competitionCalendar';
@@ -32,6 +34,8 @@ export const NEW_CONTRACT_WEEKS = 52;
 export interface SignResult {
   ok: boolean;
   reason?: string;
+  /** Player-facing reason. Set on a failure. */
+  message?: string;
   /** Where the coach's signing went in the lineup (#416), when `opts.intoLineup` asked. */
   placed?: SigningPlacement;
 }
@@ -106,53 +110,71 @@ export function scoutFeeDiscount(state: Pick<GameState, 'facilities'>): number {
   return bestLevel(state as GameState, 'scoutOffice') * SCOUT_FEE_DISCOUNT_PER_LEVEL;
 }
 
+function scoutLevel(state: Pick<GameState, 'facilities'>): FinanceLevel {
+  return Math.min(3, Math.max(0, bestLevel(state, 'scoutOffice'))) as FinanceLevel;
+}
+
+/** Academy rate once, on the first signing. A player who has already left does not get it again. */
+function academyProspect(agent: Pick<Player, 'junior' | 'departed'>): boolean {
+  return agent.junior === true && agent.departed !== true;
+}
+
 /**
- * Upfront fee to sign a free agent (#146). An Academy prospect costs
- * SIGNING_FEE_WEEKS × their wage; everyone else a transfer-style fee that grows
- * with overall and falls with age (contracts.transferFee: overall² × 10 × age
- * factor, so an 80-overall in his prime is about $64k and a 55 about $30k), less
- * the Scout Office discount. Four weeks' wages made an 85-overall a $5k buy.
+ * Upfront fee to sign a free agent: one year's wage, or a quarter of that for
+ * an Academy prospect. A Scout Office takes 10% off the fee per level, and
+ * nothing off the salary. Difficulty does not scale it.
  */
 export function signingFee(state: Pick<GameState, 'facilities'>, agent: Player): number {
-  if (agent.junior) return SIGNING_FEE_WEEKS * agent.wage;
-  return Math.round(transferFee(agent) * (1 - scoutFeeDiscount(state)));
+  return signingFeeQuote(salaryDemand(agent), academyProspect(agent), scoutLevel(state));
 }
 
-/** How the fee was worked out, for the Recruit card: "4×wage, Academy prospect" or "by rating and age[, Scout Office −10%]". */
+/** How the fee was worked out, for the Recruit card. */
 export function signingFeeBasis(state: Pick<GameState, 'facilities'>, agent: Player): string {
-  if (agent.junior) return `${SIGNING_FEE_WEEKS}×wage, Academy prospect`;
-  const discount = scoutFeeDiscount(state);
-  return discount > 0 ? `by rating and age, Scout Office −${Math.round(discount * 100)}%` : 'by rating and age';
+  if (academyProspect(agent)) return "a quarter of one year's wage, Academy prospect";
+  const level = scoutLevel(state);
+  return level > 0 ? `one year's wage, Scout Office −${level * 10}%` : "one year's wage";
 }
 
 /**
- * Sign the free agent with `playerId` into the squad. Deducts the upfront
- * signingFee, sets contractWeeks = NEW_CONTRACT_WEEKS, and moves the player
- * from freeAgents to squad. Enforces SQUAD_CAP and funds. Nothing mutates on
+ * Sign the free agent with `playerId` into the squad. Needs the cash for the
+ * fee and room under this season's cap, and applies both or neither. The deal
+ * covers the rest of this season at the annual salary. Nothing mutates on
  * failure.
  *
- * Reasons: 'not-found' (id absent), 'squad-full' (squad at SQUAD_CAP),
- * 'insufficient-funds' (money < fee). On success emits 'player:signed' and a
- * 'ui:notify' success, unless `opts.toast` is false (the Recruit screen and the
- * player page show the Undo toast instead, #370). With `opts.intoLineup` (the
- * coach's own tap, #416) a man who out-rates a starter goes into the nine and
- * `placed` says where; without it (the soak, tests) the lineup is left alone.
+ * Reasons: 'not-found', 'squad-full', 'over-cap', 'insufficient-funds'.
+ * On success emits 'player:signed' and a 'ui:notify' success, unless
+ * `opts.toast` is false (the Recruit screen and the player page show the Undo
+ * toast instead, #370). With `opts.intoLineup` (the coach's own tap, #416) a
+ * man who out-rates a starter goes into the nine and `placed` says where;
+ * without it (the soak, tests) the lineup is left alone.
  */
 export function signPlayer(state: GameState, playerId: string, opts: { toast?: boolean; intoLineup?: boolean } = {}): SignResult {
   const s = state;
   const agent = s.freeAgents.find((p) => p.id === playerId);
-  if (!agent) return { ok: false, reason: 'not-found' };
-  if (s.squad.length >= SQUAD_CAP) return { ok: false, reason: 'squad-full' };
+  if (!agent) return { ok: false, reason: 'not-found', message: 'That player is no longer available.' };
+  if (s.squad.length >= SQUAD_CAP) return { ok: false, reason: 'squad-full', message: 'The squad is full.' };
 
   const fee = signingFee(s, agent);
-  if (s.money < fee) return { ok: false, reason: 'insufficient-funds' };
+  const salary = salaryDemand(agent);
+  if (!capRoomFor(s.squad, s.capAccount, s.season, salary)) {
+    const room = Math.max(0, publishedCap(s.capAccount) - commitment(s.squad, s.season));
+    return {
+      ok: false,
+      reason: 'over-cap',
+      message: `Not enough salary-cap room. He costs ${fmtMoney(salary)} a season and ${fmtMoney(room)} is free.`,
+    };
+  }
+  if (s.money < fee) {
+    return { ok: false, reason: 'insufficient-funds', message: `Not enough cash. The signing fee is ${fmtMoney(fee)}.` };
+  }
 
-  // Deduct the fee first (guaranteed to succeed given the funds check above),
-  // which emits money:changed. Then move the player between lists atomically.
-  spendMoney(fee, `sign:${playerId}`);
+  // Both checks passed. The debit and the move are the whole signing.
+  if (!spendMoney(fee, `sign:${playerId}`)) {
+    return { ok: false, reason: 'insufficient-funds', message: `Not enough cash. The signing fee is ${fmtMoney(fee)}.` };
+  }
 
   const { junior: _junior, departed: _departed, ...rest } = agent;
-  const signed: Player = { ...rest, contractWeeks: NEW_CONTRACT_WEEKS };
+  const signed: Player = signForRestOfSeason(rest, s.season, s.week);
   const after = getState();
   const squad = [...after.squad, signed];
   const placed = opts.intoLineup ? placeSigning(after.lineup, squad, signed) : undefined;
@@ -170,33 +192,48 @@ export function signPlayer(state: GameState, playerId: string, opts: { toast?: b
 // ── Release ─────────────────────────────────────────────────────────────────
 
 /**
- * Release a squad player: pays RELEASE_PAYOUT_WEEKS × wage upfront (allowed to go
- * negative — economy handles bankruptcy), removes them from squad and returns
- * them to freeAgents with contract cleared. Guarded by SQUAD_MIN so the club
- * cannot drop below the minimum matchday squad. UI must confirm before calling.
+ * Release a squad player. Pays a quarter of the salary still to run, and never
+ * more than one year's salary. Refuses when the cash is short or the squad
+ * would drop below the minimum, and then changes nothing. The signing fee is
+ * not refunded. He returns to the pool without the deal, and without the
+ * Academy rate.
  *
- * Reasons: 'not-found' (id absent from squad), 'squad-min' (squad at SQUAD_MIN).
- * On success emits money:changed and a 'ui:notify' info.
+ * Reasons: 'not-found', 'squad-min', 'insufficient-funds'.
  */
 export function releasePlayer(state: GameState, playerId: string): SignResult {
   const s = state;
   const player = s.squad.find((p) => p.id === playerId);
-  if (!player) return { ok: false, reason: 'not-found' };
-  if (s.squad.length <= SQUAD_MIN) return { ok: false, reason: 'squad-min' };
+  if (!player) return { ok: false, reason: 'not-found', message: 'Player not found.' };
+  if (s.squad.length <= SQUAD_MIN) {
+    return { ok: false, reason: 'squad-min', message: `The squad cannot drop below ${SQUAD_MIN}.` };
+  }
 
-  const payout = RELEASE_PAYOUT_WEEKS * player.wage;
-  // Apply the debit directly: spendMoney refuses when funds are short, but a
-  // release payout is allowed to take the balance negative (economy handles
-  // bankruptcy), so write money via the store and emit money:changed ourselves.
-  const balance = s.money - payout;
-  const released: Player = { ...player, contractWeeks: 0, departed: true };
+  const terms = releaseTerms(player, s.season, s.week);
+  if (s.money < terms.payout) {
+    return {
+      ok: false,
+      reason: 'insufficient-funds',
+      message: `Not enough cash. Releasing him costs ${fmtMoney(terms.payout)}.`,
+    };
+  }
+  if (terms.payout > 0 && !spendMoney(terms.payout, `release:${playerId}`)) {
+    return {
+      ok: false,
+      reason: 'insufficient-funds',
+      message: `Not enough cash. Releasing him costs ${fmtMoney(terms.payout)}.`,
+    };
+  }
+  const { deal: _deal, junior: _junior, ...withoutDeal } = player;
+  const released: Player = { ...withoutDeal, contractWeeks: 0, departed: true };
+  const after = getState();
   setState({
-    money: balance,
-    squad: s.squad.filter((p) => p.id !== playerId),
-    freeAgents: [...s.freeAgents, released],
+    squad: after.squad.filter((p) => p.id !== playerId),
+    freeAgents: [...after.freeAgents, released],
   });
-  bus.emit('money:changed', { delta: -payout, reason: `release:${playerId}`, balance });
-  bus.emit('ui:notify', { text: `Released ${released.name}`, kind: 'info' });
+  const freed = terms.nextCapFreed > 0
+    ? `, freeing ${fmtMoney(terms.capFreed)} of this season's cap and ${fmtMoney(terms.nextCapFreed)} next season`
+    : `, freeing ${fmtMoney(terms.capFreed)} of this season's cap`;
+  bus.emit('ui:notify', { text: `Released ${released.name} for ${fmtMoney(terms.payout)}${freed}`, kind: 'info' });
   return { ok: true };
 }
 

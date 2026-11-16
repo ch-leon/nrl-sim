@@ -14,7 +14,8 @@ import {
   weeklyWages, weeklyUpkeep, weeklyOverhead, weeklyIncome, sponsorIncome, groundCapacity, homeGate, nextStandGate, financeNet,
   classifyReason, stampMovement, type StandProjection,
 } from '../../systems/economy';
-import { ECON, SEASON_ROUNDS, WEEKS_PER_SEASON } from '../../config';
+import { capTotals } from '../../systems/cap';
+import { SEASON_ROUNDS, WEEKS_PER_SEASON } from '../../config';
 import { fmtMoney, fmtMoneyShort } from '../../utils/money';
 import { openHistoryScreen } from './history';
 import { openContractsScreen } from './contracts';
@@ -80,6 +81,12 @@ export interface FinanceSummary {
   nextStand: StandProjection | null;
   /** Squad players whose contracts end within EXPIRY_WINDOW_WEEKS, soonest first. */
   expiring: ExpiringContract[];
+  /** Published annual cap, and the signed totals for this season and the next. */
+  cap: number;
+  capCurrent: number;
+  capNext: number;
+  /** Contract-bound excess after relegation. It is not room to spend. */
+  protectedExcess: number;
 }
 
 /**
@@ -115,15 +122,14 @@ export function financeSummary(state: GameState): FinanceSummary {
   const nextStand = nextFixture ? nextStandGate({ ...state, week: nextFixture.round }, nextFixture) : null;
 
   const gateWeekly = averageGateWeekly(state, nextHome?.projectedGate ?? 0);
-  const burnWeekly = Math.max(0, wagesWeekly + upkeepWeekly + overheadWeekly - incomeWeekly - gateWeekly);
-  const runwayWeeks = burnWeekly > 0 ? Math.max(0, state.money) / burnWeekly : null;
-  // The economy sells when the balance is below the floor after a week's money.
-  const weeksToFloor = state.money < ECON.BANKRUPTCY_WARN && burnWeekly > 0
-    ? Math.max(0, Math.floor((state.money - ECON.FORCED_SALE_FLOOR) / burnWeekly) + 1)
-    : null;
+  // Salaries, upkeep and overhead no longer leave the bank. Cash net is income only.
+  const burnWeekly = 0;
+  const runwayWeeks = null;
+  const weeksToFloor = null;
+  const cap = capTotals(state.squad, state.capAccount, state.season);
 
   const expiring = state.squad
-    .filter((p) => p.contractWeeks <= EXPIRY_WINDOW_WEEKS)
+    .filter((p) => !p.deal?.renewal && p.contractWeeks <= EXPIRY_WINDOW_WEEKS)
     .map((p) => ({ id: p.id, name: p.name, contractWeeks: p.contractWeeks, wage: p.wage }))
     .sort((a, b) => a.contractWeeks - b.contractWeeks);
 
@@ -136,13 +142,17 @@ export function financeSummary(state: GameState): FinanceSummary {
     grantWeekly,
     incomeWeekly,
     gateWeekly,
-    netWeekly: incomeWeekly + gateWeekly - wagesWeekly - upkeepWeekly - overheadWeekly,
+    netWeekly: incomeWeekly + gateWeekly,
     burnWeekly,
     runwayWeeks,
     weeksToFloor,
     nextHome,
     nextStand,
     expiring,
+    cap: cap.cap,
+    capCurrent: cap.current,
+    capNext: cap.next,
+    protectedExcess: cap.protectedExcess,
   };
 }
 
@@ -459,12 +469,13 @@ function lineItem(label: string, value: number, opts: { signed?: boolean; cls?: 
  * THIS WEEK (3j): the bank, then every weekly line in and out, and the net at
  * the foot, which holds still while a short phone scrolls the lines above it.
  */
-function buildThisWeek(state: GameState, s: FinanceSummary): HTMLElement {
+function buildThisWeek(s: FinanceSummary): HTMLElement {
   const lines = el('div', { class: 'nrl-finance-lines' },
     lineItem('Bank balance', s.money, { signed: false }),
-    lineItem('Wage bill', -s.wagesWeekly),
-    lineItem('Facility upkeep', -s.upkeepWeekly),
-    lineItem(overheadLabel(state), -s.overheadWeekly),
+    lineItem('Salary cap used', s.capCurrent, { signed: false }),
+    lineItem('Salary cap', s.cap, { signed: false }),
+    lineItem('Next season', s.capNext, { signed: false }),
+    ...(s.protectedExcess > 0 ? [lineItem('Protected over cap', s.protectedExcess, { signed: false })] : []),
     lineItem('Sponsor', s.sponsorWeekly),
     lineItem('Grant', s.grantWeekly),
     lineItem('Home gates (avg/wk)', s.gateWeekly));
@@ -537,8 +548,10 @@ function buildLedger(ledgerRows: LedgerWeek[]): HTMLElement {
 
 /** The left column (3j): net weekly, the next home gate, and the way to Contracts. */
 function buildKeyTiles(state: GameState, s: FinanceSummary): HTMLElement {
-  const net = keyTile('Net weekly (avg)', fmtSigned(s.netWeekly), fmtNetNote(s), s.netWeekly < 0 ? 'nrl-finance-losing' : 'nrl-finance-making');
-  if (s.weeksToFloor !== null || s.runwayWeeks === 0) net.classList.add('nrl-finance-warn');
+  const capNote = s.protectedExcess > 0
+    ? `Next season ${fmtMoney(s.capNext)} · ${fmtMoney(s.protectedExcess)} protected`
+    : `Next season ${fmtMoney(s.capNext)}`;
+  const net = keyTile('Salary cap', `${fmtMoney(s.capCurrent)} / ${fmtMoney(s.cap)}`, capNote, s.capCurrent > s.cap ? 'nrl-finance-losing' : 'nrl-finance-making');
   const gate = s.nextHome
     ? keyTile(`Next home gate · ${s.nextHome.round <= 0 ? `trial ${s.nextHome.round + 2}` : s.nextHome.round > SEASON_ROUNDS ? 'final' : `R${s.nextHome.round}`}`, fmtMoney(s.nextHome.projectedGate), fmtCrowd(s.nextHome))
     : keyTile('Next home gate', 'None left', `${groundCapacity(state).toLocaleString('en-US')} seats`);
@@ -567,7 +580,7 @@ export function openFinanceScreen(): HTMLElement {
     const state = getState();
     const s = financeSummary(state);
     keys.replaceChildren(buildKeyTiles(state, s));
-    body.replaceChildren(financeView === 'week' ? buildThisWeek(state, s) : financeView === 'pnl' ? buildSeasonPnl(state) : buildLedger(financeLedger.rows()));
+    body.replaceChildren(financeView === 'week' ? buildThisWeek(s) : financeView === 'pnl' ? buildSeasonPnl(state) : buildLedger(financeLedger.rows()));
   };
   const seg = segmented<FinanceView>(
     [{ id: 'week', label: 'This week' }, { id: 'pnl', label: 'Season P&L' }, { id: 'ledger', label: 'Ledger' }],

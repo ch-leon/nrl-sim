@@ -74,8 +74,8 @@ describe('financeSummary — weekly P&L', () => {
     // upkeep: a Sponsor Board at L2 runs at 100 × 1.5 = 150 a week (#164); running costs 1500 (N12.3)
     expect(f.upkeepWeekly).toBe(150);
     expect(f.overheadWeekly).toBe(ECON.OVERHEAD_WEEKLY);
-    expect(f.netWeekly).toBe(1920 - 3500 - 150 - 1500);
-    expect(f.burnWeekly).toBe(3500 + 150 + 1500 - 1920);
+    expect(f.netWeekly).toBe(1920);
+    expect(f.burnWeekly).toBe(0);
   });
 
   it('the running costs count against the net and the burn, by difficulty (N12.3)', () => {
@@ -85,10 +85,10 @@ describe('financeSummary — weekly P&L', () => {
       const f = financeSummary(getState());
       expect(f.overheadWeekly, difficulty).toBe(cost);
       expect(f.overheadWeekly).toBe(weeklyOverhead(getState()));
-      // Nothing else in or out: an empty club still burns its running costs.
-      expect(f.netWeekly).toBe(-cost);
-      expect(f.burnWeekly).toBe(cost);
-      expect(f.runwayWeeks).toBeCloseTo(30_000 / cost, 5);
+      // Running costs are no longer a cash bill. An empty club does not burn.
+      expect(f.netWeekly).toBe(0);
+      expect(f.burnWeekly).toBe(0);
+      expect(f.runwayWeeks).toBeNull();
     }
   });
 
@@ -99,11 +99,11 @@ describe('financeSummary — weekly P&L', () => {
       league: { clubs: [], fixtures: [], ladder: [] },
     });
     const f = financeSummary(s);
-    // upkeep 1200 + 600 = 1800 ; wages 1000 ; running costs 1500 ; income 0 ; burn 4300 ; runway 60000/4300
+    // Upkeep is still quoted, and it no longer leaves the bank.
     expect(f.upkeepWeekly).toBe(1800);
-    expect(f.netWeekly).toBe(-4300);
-    expect(f.burnWeekly).toBe(4300);
-    expect(f.runwayWeeks).toBeCloseTo(60_000 / 4300, 5);
+    expect(f.netWeekly).toBe(0);
+    expect(f.burnWeekly).toBe(0);
+    expect(f.runwayWeeks).toBeNull();
   });
 
   it('sponsor part is 0 without a sponsor board; grant covers all income', () => {
@@ -119,10 +119,10 @@ describe('financeSummary — weekly P&L', () => {
       squad: [mkPlayer({ wage: 10_000 })],
     });
     const f = financeSummary(s);
-    // income 1200 ; wages 10000 ; running costs 1500 ; net −10300 ; burn 10300 ; runway 103000/10300 = 10
-    expect(f.netWeekly).toBe(-10_300);
-    expect(f.burnWeekly).toBe(10_300);
-    expect(f.runwayWeeks).toBe(10);
+    // Wages are a cap commitment, not a cash burn.
+    expect(f.netWeekly).toBe(1200);
+    expect(f.burnWeekly).toBe(0);
+    expect(f.runwayWeeks).toBeNull();
   });
 
   it('runway is null when income covers wages (no burn)', () => {
@@ -141,7 +141,7 @@ describe('financeSummary — weekly P&L', () => {
       money: -400, reputation: 0, facilities: [],
       squad: [mkPlayer({ wage: 2000 })],
     });
-    expect(financeSummary(s).runwayWeeks).toBe(0);
+    expect(financeSummary(s).runwayWeeks).toBeNull();
   });
 });
 
@@ -154,28 +154,11 @@ describe('financeSummary — weeks to the fire-sale floor', () => {
     league: { clubs: [], fixtures: [], ladder: [] },
   });
 
-  it('counts the weeks until the balance is below the floor: (money − floor) ÷ burn', () => {
-    // −$20,000: 80k above the floor, so −$100,000 after 8 weeks (not below) and the sale in week 9.
-    expect(financeSummary(burning(-20_000)).burnWeekly).toBe(10_000);
-    expect(financeSummary(burning(-20_000)).weeksToFloor).toBe(9);
-    // −$25,000: 75k above, 7.5 weeks: below the floor in week 8.
-    expect(financeSummary(burning(-25_000)).weeksToFloor).toBe(8);
-    expect(financeSummary(burning(FLOOR + 1)).weeksToFloor).toBe(1);
-    expect(financeSummary(burning(FLOOR)).weeksToFloor).toBe(1);
-  });
-
-  it('is 0 once the balance is below the floor', () => {
-    expect(financeSummary(burning(FLOOR - 1)).weeksToFloor).toBe(0);
-    expect(financeSummary(burning(FLOOR - 250_000)).weeksToFloor).toBe(0);
-  });
-
-  it('is null out of debt or with no burn', () => {
-    expect(financeSummary(burning(0)).weeksToFloor).toBeNull();
-    expect(financeSummary(burning(50_000)).weeksToFloor).toBeNull();
-    // In debt from the line the economy warns at, as the HUD and the advance rule read it.
-    expect(financeSummary(burning(ECON.BANKRUPTCY_WARN)).weeksToFloor).toBeNull();
-    expect(financeSummary(burning(ECON.BANKRUPTCY_WARN - 1)).weeksToFloor).not.toBeNull();
-    // In debt but earning: income 4,000 at reputation 100 covers a 1,000 wage bill and the running costs.
+  it('does not count down to a fire sale: salaries and running costs are not a cash burn', () => {
+    expect(financeSummary(burning(-20_000)).burnWeekly).toBe(0);
+    expect(financeSummary(burning(-20_000)).weeksToFloor).toBeNull();
+    expect(financeSummary(burning(FLOOR - 1)).weeksToFloor).toBeNull();
+    expect(financeSummary(burning(ECON.BANKRUPTCY_WARN - 1)).weeksToFloor).toBeNull();
     const earning = setup({ money: -30_000, reputation: 100, facilities: [], squad: [mkPlayer({ wage: 1000 })] });
     expect(financeSummary(earning).burnWeekly).toBe(0);
     expect(financeSummary(earning).weeksToFloor).toBeNull();
@@ -479,12 +462,11 @@ describe('initFinanceLedger', () => {
     offBooks();
 
     const grant = 30 * ECON.REP_GRANT_PER_POINT;
-    const run = -ECON.OVERHEAD_WEEKLY;
     expect(l.rows()).toEqual([
-      { season: 2, week: 1, wages: -1000, upkeep: 0, overhead: run, income: grant, gate: 0, other: 0, otherLines: {}, net: grant - 1000 + run },
+      { season: 2, week: 1, wages: 0, upkeep: 0, overhead: 0, income: grant, gate: 0, other: 0, otherLines: {}, net: grant },
       {
-        season: 1, week: WEEKS_PER_SEASON, wages: -1000, upkeep: 0, overhead: run, income: grant, gate: 0,
-        other: 35_000, otherLines: { prize: 25_000, boardGrant: 10_000 }, net: grant - 1000 + run + 35_000,
+        season: 1, week: WEEKS_PER_SEASON, wages: 0, upkeep: 0, overhead: 0, income: grant, gate: 0,
+        other: 35_000, otherLines: { prize: 25_000, boardGrant: 10_000 }, net: grant + 35_000,
       },
     ]);
     expect(getState().finance.map((e) => [e.season, e.prize, e.boardGrant])).toEqual([[1, 25_000, 10_000], [2, 0, 0]]);
@@ -521,21 +503,22 @@ describe('initFinanceLedger', () => {
     offRecord();
     offSpy();
 
-    expect(seen.map((e) => e.reason)).toEqual(['wages', 'upkeep', 'overhead', 'sponsor', 'grant', 'gate']);
+    expect(seen.map((e) => e.reason)).toEqual(['sponsor', 'grant', 'gate']);
     expect(l.rows()).toEqual([{
       season: 1,
       week: 3,
-      wages: -wages,
-      upkeep: -upkeep,
-      overhead: -overhead,
+      wages: 0,
+      upkeep: 0,
+      overhead: 0,
       income,
       gate,
       other: 0,
       otherLines: {},
-      net: -wages - upkeep - overhead + income + gate,
+      net: income + gate,
     }]);
     // The ledger's net equals the balance change the tick actually produced.
-    expect(getState().money).toBe(100_000 + (-wages - upkeep - overhead + income + gate));
+    expect(getState().money).toBe(100_000 + income + gate);
+    expect(wages + upkeep + overhead).toBeGreaterThan(0);
   });
 });
 
@@ -550,8 +533,8 @@ describe('financeSummary — average home gate in the run-rate (QA)', () => {
     const gate = gateReceipts({ ...s, week: 21 });
     // 2 home games left (R21, R23) over 4 weeks (R21–R24)
     expect(f.gateWeekly).toBe(Math.round((gate * 2) / 4));
-    expect(f.netWeekly).toBe(f.incomeWeekly + f.gateWeekly - f.wagesWeekly - f.overheadWeekly);
-    expect(f.burnWeekly).toBe(Math.max(0, f.wagesWeekly + f.overheadWeekly - f.incomeWeekly - f.gateWeekly));
+    expect(f.netWeekly).toBe(f.incomeWeekly + f.gateWeekly);
+    expect(f.burnWeekly).toBe(0);
   });
 
   it('a club whose gates cover the wages has no burn and no runway warning', () => {

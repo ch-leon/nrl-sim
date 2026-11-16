@@ -56,7 +56,8 @@ describe('the wages', () => {
     const off = registerFinanceSystem();
     applyEconomy(getState());
     off();
-    expect(getState().finance[0]!.overhead).toBe(-(ECON.OVERHEAD_WEEKLY + wages));
+    expect(getState().finance[0]!.overhead).toBe(0);
+    expect(weeklyOverhead(getState())).toBe(ECON.OVERHEAD_WEEKLY + wages);
   });
 });
 
@@ -79,7 +80,7 @@ describe('the Welfare Manager', () => {
     hireStaff('welfare');
     expect(renewalWeeklyCost(getState(), p)).toBeLessThan(shown);
     tickContracts(getState());
-    expect(Math.abs(getState().squad.find((x) => x.id === p.id)!.wage - plain * (1 - WELFARE_RENEWAL_CUT))).toBeLessThanOrEqual(1);
+    expect(getState().squad.find((x) => x.id === p.id)!.wage).toBe(p.wage);
     // A club without staff (a rival's pricing) asks the full amount.
     expect(renewalWage(p, { reputation: getState().reputation, season: getState().season })).toBe(plain);
   });
@@ -183,7 +184,7 @@ describe('the attack coach (plan §2.2)', () => {
     const off = registerFinanceSystem();
     applyEconomy(getState());
     off();
-    expect(getState().finance[0]!.overhead).toBe(-(overhead + m.wage));
+    expect(getState().finance[0]!.overhead).toBe(0);
   });
 
   it('the Razzle coach needs reputation 50; the other three never ask', () => {

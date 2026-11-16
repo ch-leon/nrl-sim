@@ -4,7 +4,7 @@ import {
   type GameState, emptyFinance,
 } from '../../src/core/state';
 import { bus } from '../../src/core/events';
-import { LEAGUE, ON_FIELD, STARTING_MONEY } from '../../src/config';
+import { LEAGUE, ON_FIELD } from '../../src/config';
 import { POSITIONS, overallRating } from '../../src/data/player';
 import { initLeague } from '../../src/systems/fixtures';
 import { bestNineMean, gapSample } from '../../src/qa/soak';
@@ -30,7 +30,7 @@ describe('createNewGame', () => {
     expect(s.clubName).toBe('Cavehole Crushers');
     expect(s.squad).toHaveLength(20);
     expect(s.freeAgents).toHaveLength(12);
-    expect(s.money).toBe(STARTING_MONEY);
+    expect(s.money).toBe(60_000);
     expect(s.reputation).toBe(30);
     expect(s.week).toBe(1);
     expect(s.season).toBe(1);

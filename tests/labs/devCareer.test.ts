@@ -21,7 +21,7 @@ import { uiScreenLockReason } from '../../src/labs/screenOverride';
 import { screenLockReason, screensDue } from '../../src/systems/screenUnlocks';
 import { initLeague } from '../../src/systems/fixtures';
 import { attackCoach } from '../../src/systems/staff';
-import { STARTING_MONEY } from '../../src/config';
+import { FINANCE_STARTING_CASH } from '../../src/data/financeRules';
 import { PLAYS_BY_ID } from '../../src/data/plays';
 import { devMarkerText } from '../../src/labs/marker';
 
@@ -130,7 +130,7 @@ describe('setting up the playtest career', () => {
     setState({ money: getState().money + 1234 });
     expect(enterTestCareer(deps()).ok).toBe(true);
     const backup = JSON.parse(storage.getItem(DEV_TEST_BACKUP_KEY)!) as Record<string, string>;
-    expect(JSON.parse(backup[slotKey(2)]!).money).toBe(STARTING_MONEY + 1234);
+    expect(JSON.parse(backup[slotKey(2)]!).money).toBe(FINANCE_STARTING_CASH.normal + 1234);
     expect(storage.getItem(slotKey(2))).toBe(backup[slotKey(2)]);
   });
 
@@ -158,7 +158,7 @@ describe('setting up the playtest career', () => {
     expect(enterTestCareer(deps()).ok).toBe(true);
     await new Promise((r) => setTimeout(r, 0));
     const after = storage.dump(isNormal);
-    expect(JSON.parse(after[slotKey(2)]!).money).toBe(STARTING_MONEY + 5);
+    expect(JSON.parse(after[slotKey(2)]!).money).toBe(FINANCE_STARTING_CASH.normal + 5);
     bootPlaytestPage();
     save(getState()); // the playtest's own save, its meta queued under the prefix
     const warn = vi.spyOn(console, 'warn');
@@ -229,7 +229,7 @@ describe('the playtest career', () => {
     expect(attackCoach(s)?.speciality).toBe('direct');
     expect(s.playbook.owned).toEqual(['block-play']);
     expect(s.lineup.plays).toEqual(['block-play']);
-    expect(s.money).toBe(STARTING_MONEY - PLAYS_BY_ID['block-play'].price);
+    expect(s.money).toBe(FINANCE_STARTING_CASH.normal - PLAYS_BY_ID['block-play'].price);
     expect(s.settings.tutorialDone).toBe(true);
     expect(s.settings.playbackSpeed).toBe(1);
     expect(s.version).toBe(SAVE_VERSION); // no save-format change

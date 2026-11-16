@@ -181,8 +181,8 @@ export interface NavMarks {
 
 /**
  * The marks for screen `key`, with Office's sheet up or not and a screen up or not.
- * A screen in Office marks OFFICE and its tile; with nothing over the grounds, CLUB,
- * and CLUB too for the Club home sheet (key HOME_ID), home on a phone held upright (#350).
+ * A screen in Office marks OFFICE and its tile; with nothing over the grounds, CLUB.
+ * A screen whose key is the club id marks CLUB the same way, and never with ▴.
  */
 export function navMarks(registry: ScreenRegistry, key: string | null, sheetUp: boolean, screenUp: boolean): NavMarks {
   const owner = registry.owner(key);
@@ -226,7 +226,7 @@ export function createNav(opts: NavOptions = {}): Nav {
   // A dot's read-out label by screen id (#369); absent means no dot.
   const dots = new Map<string, string>();
 
-  // CLUB: home, the grounds with nothing over them (upright, the Club home sheet, #350: already home, it stays).
+  // CLUB: home, the grounds with nothing over them. Tapping it closes whatever sheet is up.
   const club = tabButton('Club', () => {
     setSheet(false);
     if (screenKey() !== HOME_ID) closeScreen();

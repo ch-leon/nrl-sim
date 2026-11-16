@@ -155,7 +155,7 @@ describe('the marker (#344)', () => {
     expect(navMarks(r, 'kit', false, true)).toEqual({ current: [], open: [] });
   });
 
-  it('upright, the Club home sheet (#350) marks CLUB with no ▴, not while Office is up', () => {
+  it('a screen keyed club marks CLUB with no ▴, not while Office is up', () => {
     expect(navMarks(r, HOME_ID, false, true)).toEqual({ current: [HOME_ID], open: [] });
     expect(navMarks(r, HOME_ID, true, true)).toEqual({ current: [], open: [OFFICE_ID] });
   });
@@ -209,12 +209,11 @@ describe('the dock at every text size (#344)', () => {
     expect(narrow).toMatch(/\.nrl-nav-caret \{ display: none; \}/);
   });
 
-  it("holds ▴'s room on a closed tab at Normal, after the dot; not at Large or Larger, to 620px or upright, where ▴ takes room only when open (#607)", () => {
+  it("holds ▴'s room on a closed tab at Normal, after the dot; not at Large or Larger, or to 620px, where ▴ takes room only when open (#607)", () => {
     expect(rule('.nrl-nav-room')).toMatch(/order: 1; flex: 0 0 auto; margin-left: -6px; white-space: pre; visibility: hidden/);
     expect(rule('.nrl-dock-tabs > .nrl-btn')).toMatch(/gap: 6px/); // the gap the room's margin takes back
     expect(CSS).toMatch(/\.nrl-dock-tabs > \.nrl-btn:has\(\.nrl-nav-caret\) > \.nrl-nav-room, html\[data-text-size\] \.nrl-nav-room \{ display: none; \}/);
     expect(CSS.slice(CSS.indexOf('@media (max-width: 620px)'))).toMatch(/^@media \(max-width: 620px\) \{[^@]*\n  \.nrl-nav-room \{ display: none; \}/);
-    expect(PORTRAIT_CSS).toMatch(/html:root \.nrl-nav-caret, html:root \.nrl-nav-room \{ display: none; \}/);
   });
 
   it('gives tab padding back for it on a phone at Normal, under the Large and Larger rules (#607)', () => {
@@ -228,7 +227,6 @@ import { createNav } from '../../src/ui/nav';
 import { stubDocument, StubNode } from './stubDom';
 import { bus } from '../../src/core/events';
 import { el, openScreen, closeScreen } from '../../src/ui/dom';
-import { PORTRAIT_CSS } from '../../src/ui/portrait';
 
 // #607: the dock never moves. A closed tab holds ▴'s room; the open tab's label carries the ▴ itself.
 describe('the tabs stay put when one opens (#607)', () => {

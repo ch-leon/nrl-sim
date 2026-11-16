@@ -3,7 +3,7 @@ import { preparePack, selectPack } from '../../src/content';
 import { validatePack } from '../../src/content/pack';
 import { AU_PACK } from '../../src/content/au';
 import { createNewGame, getState, SAVE_VERSION, type GameState } from '../../src/core/state';
-import { __setStorage, __unlockSaves, exportRecoverySaves, exportSave, importSave, installImportedSave, loadSlot, migrateState, MIGRATIONS, save, setActiveSlot, writeSlot } from '../../src/core/save';
+import { __setStorage, __unlockSaves, exportOriginalSave, exportSave, importSave, installImportedSave, loadSlot, migrateState, MIGRATIONS, save, setActiveSlot } from '../../src/core/save';
 import { setCareerNamespace } from '../../src/core/storage/local';
 import { DEV_TEST_PREFIX, liveMatchKey, slotKey } from '../../src/core/storageKeys';
 import { initLeague } from '../../src/systems/fixtures';
@@ -272,28 +272,22 @@ describe('terminal sporting consistency', () => {
 });
 
 describe('v24 compatibility, import safety and namespace isolation', () => {
-  it.each(['au', 'uk'] as const)('upgrades %s v24 metadata-free saves without changing people, RNG or league format', pack => {
+  it.each(['au', 'uk'] as const)('rejects %s v24 careers and does not rewrite them', pack => {
     const source = { ...career(pack, false), version: 24 }; const original = JSON.stringify(source);
-    const step = MIGRATIONS.find(m => m.from === 24);
-    expect(step?.to).toBe(25); expect(step?.run(source)).toEqual(source);
     expect(MIGRATIONS.some(m => m.from === 23)).toBe(false);
     const result = importSave(original);
-    expect(result).toMatchObject({ ok: true, state: { ...source, version: SAVE_VERSION } });
-    if (!result.ok) throw new Error(result.message);
-    expect(result.state).not.toHaveProperty('competitions');
+    expect(result).toMatchObject({ ok: false, message: expect.stringMatching(/older version.*start a new career/i) });
     expect(JSON.stringify(source)).toBe(original);
-    expect(result.state.rngSeed).toBe(source.rngSeed); expect(result.state.league).toEqual(source.league);
   });
   for (const namespace of [null, DEV_TEST_PREFIX]) it.each(['au', 'uk'] as const)(`backs up original %s v24 bytes in ${namespace ?? 'normal'} without changing the other namespace`, pack => {
     const original = JSON.stringify({ ...career(pack, false), version: 24 });
     const prefix = namespace ?? ''; const other = namespace === null ? DEV_TEST_PREFIX : '';
     bytes.set(prefix + slotKey(1), original); bytes.set(other + slotKey(1), 'other career');
     bytes.set(other + liveMatchKey(1), 'other live match'); setCareerNamespace(namespace);
-    const result = loadSlot(); expect(result.status).toBe('ok');
-    if (result.status !== 'ok') throw new Error('Failed to load v24');
-    expect(writeSlot(1, result.state)).toBe(true);
-    expect(exportRecoverySaves(1)).toContain(original);
-    expect(JSON.parse(bytes.get(prefix + slotKey(1))!).version).toBe(SAVE_VERSION);
+    const result = loadSlot(); expect(result.status).toBe('corrupt');
+    expect(result).toMatchObject({ message: expect.stringMatching(/start a new career/i) });
+    expect(bytes.get(prefix + slotKey(1))).toBe(original);
+    expect(exportOriginalSave(1)).toBe(original);
     expect(bytes.get(other + slotKey(1))).toBe('other career');
     expect(bytes.get(other + liveMatchKey(1))).toBe('other live match');
   });
