@@ -1,6 +1,6 @@
 # Features
 
-Last updated: 2026-11-17
+Last updated: 2026-11-16
 
 What's in the game, with the PR that added each.
 
@@ -64,7 +64,7 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
-- **Connected handling (candidate, not yet released):** the selected receiver prepares his hands during a real incoming pass, with his running stride continuing underneath. Pickup finishes in the carry pose, the passer turns through release, and flight sprites meet the painted hand anchors. Nearby defenders can brace as they approach the current carrier. This uses actual flight and possession facts; pre-release calls remain separate gameplay work ([#702](https://github.com/ch-leon/nrl-sim/issues/702)).
+- **Connected handling (candidate, not yet released):** the actual receiver prepares his hands during an incoming pass, with his running stride continuing underneath. Pickup finishes in the carry pose, the passer turns through release, and flight sprites meet the painted hand anchors. Nearby defenders can brace as they approach the current carrier. This uses actual flight and possession facts; pre-release calls remain separate gameplay work ([PR #703](https://github.com/ch-leon/nrl-sim/pull/703)).
 
 - **Contact weight and recovery (candidate, not yet released):** tackle holds use planted support feet, falls land more sharply, and players recover through supported poses. Defenders clear the carrier in sequence and finish at their live positions before the shared tackle artwork hands back to ordinary movement. Existing contact outcomes and ball ownership are preserved ([PR #701](https://github.com/ch-leon/nrl-sim/pull/701)).
 

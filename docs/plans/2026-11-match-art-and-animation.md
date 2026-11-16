@@ -17,7 +17,8 @@ local functional validation passed. Leon's explicit review policy: leave every P
 unmerged; Leon reviews before merging. This overrides the repository's automatic
 merge convention for this work. Keep the staged PRs as drafts.
 
-Stage 4 handling work is in progress under [#702](https://github.com/ch-leon/nrl-sim/issues/702).
+Stage 4 handling presentation is implemented in [draft PR #703](https://github.com/ch-leon/nrl-sim/pull/703),
+tracking [#702](https://github.com/ch-leon/nrl-sim/issues/702), on top of stage 3.
 This presentation pass connects pickup, release and reception, and prepares the
 actual receiver once the engine has launched his pass. A pre-release call still
 requires the separate earlier commitment described below: dummy-half controls,
@@ -244,3 +245,43 @@ and 68 textures. This desktop sample shows no material added stutter; real-phone
 performance and the earlier whole-career budget concerns remain open. Stage-3
 CI and Android builds passed. QA, different-tool review, phone play-test and
 Leon's review remain pending.
+
+Stage 4 connects dummy-half pickup to carry, rotates the torso through release,
+and gives the actual incoming recipient two preparation poses over his continuing
+stride. A free defender approaching the current carrier can brace before contact.
+Catch, pass and aerial landing finish on their continuing carry/run poses, with
+fatigue retained. The painter and flight renderer share the same ball anchors;
+the flight correction follows the receiver's displayed, interpolated position.
+Only the ball sprite moves: field position, shadow, lift and kick paths retain
+their existing behavior.
+
+Optional snapshot flight metadata identifies the actual recipient, including an
+interceptor, and records the source's posture at launch. It survives expiration
+of the passer's pose without guessing a receiver or depending on playback history.
+Preparation is limited to the final eight ticks of an existing pass, with no
+duplicate ball; contact, dead phases, stale identities and expired flights cannot
+revive it. No match decisions, RNG calls, save format or simulation timing changed.
+Earlier receiver commitment and pre-release calls remain separate gameplay work
+under #672/#649. One Sol agent implemented the change; Luna ran shared validation;
+the main agent reviewed the source, pose sheets and production comparisons.
+
+Stage-4 typecheck/build and all 4,354 tests in 325 files passed. Focused regressions
+cover actual recipients and interceptions, launch metadata lifetime, planted and
+tired pose transitions, painted ball anchors, fractional interpolation and the
+real seed-1 passes at ticks 178–183 and 195–211. Production Chromium live-art and
+big-moment checks passed, including career playback, actual contact/handling,
+single-ball ownership, kicks, high takes, tries, reactions, phone layout, scene
+restart and bounded textures/cache. Ten pinned pickup/release/preparation/catch/
+carry frames repeated exactly after pause and seek, without browser errors.
+
+The same 22-second production Chromium passage (seed 1 from tick 43, 844×390,
+×1, other agents idle) averaged 58.2 fps before and 58.6 fps after. Both had
+p95 frame time 16.8 ms and no frame over 100 ms; longest frames were 50.0 ms and
+50.1 ms. The samples reached ticks 473 and 474 respectively. Cache counters were
+2,625 hits / 1,540 misses before and 2,516 / 1,672 after; both remained capped at
+768 entries and 68 textures. This desktop sample shows no material added stutter;
+real-phone performance and the earlier whole-career budget concerns remain open.
+CI on the final PR head, QA, different-tool review, phone play-test and Leon's
+review remain release checks. On-demand QA dispatch remains unavailable through
+this session's GitHub API (Forbidden). All four staged PRs remain open, draft
+and unmerged. The next visual pass is stage 5's kicks, aerial takes and try finishes.
