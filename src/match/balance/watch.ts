@@ -6,6 +6,7 @@
 // attribution rules are written up in balance/README.md ("Watchability").
 import type { Side, SimEvent } from '../core/snapshot';
 import { PLAYS } from '../league/plays';
+import { PLAYERS } from '../league/roles';
 
 /** Per match: lead changes (a count), whether it was close with a minute to play, whether the last minute decided it, and the winner's biggest deficit. */
 export const FLOW = ['leadChanges', 'closeLate', 'decidedLate', 'comeback'] as const;
@@ -18,6 +19,10 @@ export type OriginKey = (typeof ORIGINS)[number];
 /** What the play on a set's last tackle was. */
 export const LAST_TACKLES = ['kick', 'run', 'pass'] as const;
 export type LastTackleKey = (typeof LAST_TACKLES)[number];
+
+/** Who took the dummy-half's ball (#649): how often the same man took it on the same tackle of the set (%), and how many slots took it (a side's mean). */
+export const RECEIVERS = ['sameMan', 'slots'] as const;
+export type ReceiverKey = (typeof RECEIVERS)[number];
 
 /** A try this soon after its side's kick came from it (12 s, as `kickTries`). */
 const KICK_TRY_TICKS = 240;
@@ -207,3 +212,68 @@ export class PlayWatch {
     return 'other';
   }
 }
+
+/**
+ * The first receiver at each play-the-ball (#649): the first man of the
+ * attacking side, other than the one who had it at the ruck, to hold the ball
+ * in the play that follows. A dart, a tackle or a turnover before anyone else
+ * holds it counts nobody. Slots come off the holder's index (home 0..8, away
+ * after), so nothing here needs more of the sim than `TickView` gives.
+ */
+export class FirstReceivers {
+  /** Per side, per tackle count at the ruck: how many times each slot took it. */
+  private readonly seen: Record<Side, Map<number, Map<number, number>>> = { home: new Map(), away: new Map() };
+  private ruck: { side: Side; holder: number; tackle: number } | null = null;
+
+  /** One tick, after the step: the view, and the tackle count the set is on. */
+  tick(view: TickView, tackle: number): void {
+    if (view.phase === 'ruck') {
+      if (view.holder >= 0 && sideOf(view.holder) === view.attacking) this.ruck = { side: view.attacking, holder: view.holder, tackle };
+      return;
+    }
+    const r = this.ruck;
+    if (!r) return;
+    if (view.phase !== 'play') {
+      this.ruck = null;
+      return;
+    }
+    if (view.holder < 0 || view.holder === r.holder) return;
+    if (sideOf(view.holder) === r.side) {
+      const byTackle = this.seen[r.side];
+      const slots = byTackle.get(r.tackle) ?? new Map<number, number>();
+      const slot = view.holder % PLAYERS;
+      slots.set(slot, (slots.get(slot) ?? 0) + 1);
+      byTackle.set(r.tackle, slots);
+    }
+    this.ruck = null;
+  }
+
+  /**
+   * The match's numbers. `sameMan`: the chance that two first passes on the
+   * same tackle of a set (same side, this match) found the same slot, as a
+   * percentage: Σ n(n−1) over slots / Σ N(N−1) over tackles, which small
+   * samples do not inflate the way "the most-used man's share" would (0 with
+   * no pair to compare). `slots`: how many slots took one, a side's mean.
+   */
+  result(): Record<ReceiverKey, number> {
+    let same = 0;
+    let pairs = 0;
+    let slots = 0;
+    for (const side of ['home', 'away'] as const) {
+      const used = new Set<number>();
+      for (const bySlot of this.seen[side].values()) {
+        let all = 0;
+        for (const [slot, n] of bySlot) {
+          used.add(slot);
+          same += n * (n - 1);
+          all += n;
+        }
+        pairs += all * (all - 1);
+      }
+      slots += used.size;
+    }
+    return { sameMan: pairs > 0 ? (100 * same) / pairs : 0, slots: slots / 2 };
+  }
+}
+
+const sideOf = (holder: number): Side => (holder < PLAYERS ? 'home' : 'away');

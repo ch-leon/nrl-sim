@@ -22,8 +22,8 @@ function surface() {
   };
 }
 
-/** Seed 12 with golden point on (the lab's `final=1`) and the historical seven-minute halves (#678 cut them to 2:30) is level at full time with the lab's default sides. */
-const GOLDEN_SEED = 12;
+/** Seed 28 with golden point on (the lab's `final=1`) and the historical seven-minute halves (#678 cut them to 2:30) is level at full time with the lab's default sides (seed 12 before the weighted receiver, #649; 28 is the first of 1–60 since). */
+const GOLDEN_SEED = 28;
 
 function play(): Snapshot[] {
   const sim = new LiveSim(labSheet(DEFAULT_HOME), labSheet(DEFAULT_AWAY), GOLDEN_SEED, { goldenPoint: true, length: { halves: 2, halfMinutes: 7 } });
@@ -57,7 +57,8 @@ describe('the whistle (#675)', () => {
       const e = breakMan(early, p)!; const l = breakMan(later, p)!;
       if (p.side === winner) expect(['fistPump', 'celebrate', 'point']).toContain(e.action);
       else expect(['handsOnHips', 'handsOnHead']).toContain(e.action);
-      expect(e.dx).toBe(0); expect(e.alpha).toBe(1);
+      // Not moved yet (a man west of the tunnel stands at −0, which is still no step).
+      expect(Math.abs(e.dx)).toBe(0); expect(e.alpha).toBe(1);
       // Closer to the tunnel, never further from it, and fully gone by FT_GONE.
       const d0 = Math.hypot(TUNNEL.x - p.x, TUNNEL.y - p.y); const d1 = Math.hypot(TUNNEL.x - p.x - l.dx, TUNNEL.y - p.y - l.dy);
       expect(d1).toBeLessThan(d0);

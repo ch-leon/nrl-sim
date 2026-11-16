@@ -18,6 +18,11 @@ result. Keep it in step with the code: when a constant changes, change the row.
 > (`npm run balance -- --list` prints them all with their values). Write a plan with the
 > values to try and run it over many seeds — see `balance/README.md`. The Balance workflow
 > re-measures the standard suite whenever the match code changes on `main`.
+>
+> **Watch it on and off.** The lab takes the same names in its address:
+> `#lab?seed=11&knobs=live.receiverMargin:0` (several with commas) plays that match with
+> those values, shows them beside the styles line and keeps them across a restart. An
+> unknown name is reported and nothing is changed.
 
 ## 1. Clock and field
 
@@ -98,13 +103,38 @@ Tests: `tests/match/league/live.test.ts` (contest block).
 | Pass vs carry (`live.passBase`) | `live/play.ts` `stepPlay` | 30% + Skill/300 (+ Playmaker, + preset) | When engaged, once per possession. |
 | `rolePreference` | `live/positioning.ts` | halves +1.5 off the ruck (+0.5 else), forwards +1.2 on tackles 1–3, fullback −0.5 (+ preset) | Who the ball goes to. |
 | `live.overlapPrefer` / `live.shiftM` | `live/knobs.ts` | 0.8 / 20 m | Receivers on the side with the numbers. |
+| Weighted receiver margin (`live.receiverMargin`) | `live/knobs.ts`; `pickReceiverWeighted` in `tactics.ts` | 2 (score points; **0 = off**) | How far behind the best pass score an option may be and still get the ball (#649 step 1, BAK-208 §4.2). 0: always the best, and no roll is drawn, every seed as before #649. Higher: more men in the draw (most passes have 2–4 options, the second-best a median 0.9 behind). |
+| Weighted receiver spread (`live.receiverSpread`) | `live/knobs.ts` | 2 | Each option inside the margin is weighted exp(−gap / spread), so the best stays the likeliest. Lower: the best man nearly always; higher: closer to an even pick. |
+| Weighted at the ruck (`live.receiverAtRuck`) | `live/restarts.ts` `stepRuck` | 1 | 1: the dummy-half's pass to the first receiver is weighted too; 0: only the engaged carrier's pass in open play. The first receiver's variety comes almost entirely from this (harness run `weighted-receiver`, §5 note below). |
 | `live.runOnM` | `live/knobs.ts` | 3 m | Receiver runs through the catch point by this much. |
 | `live.ruckAdvanceM` | `live/knobs.ts` | 3 m (capped at `atk` − 3 per role) | Backline comes up as the ball is heeled. |
 | `leadPoint` | `live/contact.ts` | `runOn(v0, ACCEL, vMax, t)`, never ahead of the passer | Where the pass is thrown. |
 | `live.catchReach` | `live/knobs.ts` | 1.8 m | Receiver must be this close at landing. |
 | `live.pressureM` | `live/knobs.ts` | 2 m | A defender this close makes the catch pressured. |
 
-Tests: `tests/match/league/flow.test.ts` (catch speed, loose passes, carry speed).
+Tests: `tests/match/league/flow.test.ts` (catch speed, loose passes, carry speed),
+`tests/match/league/receiver.test.ts` (the weighted receiver: the pick, off equals the
+base commit, one roll per decision while on).
+
+**The weighted receiver (#649 step 1).** One roll per pass decision while
+`live.receiverMargin` > 0, drawn whether or not more than one man is inside the margin:
+the engaged carrier's open-play pass (before the cut-out roll) and, with
+`live.receiverAtRuck` 1, the dummy-half's pass (before the dart roll). The last-tackle
+pass to the kicker, the coach's pass-left/right input, an offload out of contact and a
+set play's scripted passes keep the deterministic best (or the scripted man). Chosen by
+`balance/plans/weighted-receiver.json` (margin 1, 2, 3, 5 at spread 2, 60 seeds even
+and 100 both ways for the six preset rows) and checked on `standard.json` on and off
+(13 November 2026, 2:30 halves). Margin 2 lowers "1st receiver same man %" on even
+sides from 32 to 26 and raises the slots that take a first pass from 4.7 to 5.4 a side:
+slots beyond luck in every standard scenario, same man in most. The six preset rows
+(points share, ±3.2) at margin 2 against off: Grind 49.3 (55.5), Expansive 48.0 (54.0),
+Kick-chase 48.8 (46.0), All-out 51.0 (56.8), Rush 51.2 (51.5), Compressed 44.5 (43.8,
+already under 45 off). Beyond luck in the §7 columns, only: completion in Expansive v
+Grind 78.6 → 74.2% (still in band), tries in Expansive v Balanced 2.1 → 1.6 a
+(5-minute) match, line breaks in Rush v Slide 4.6 → 5.3. Try origins and last-tackle
+plays, pooled over the standard plan, did not move (that is for the shapes, step 2).
+Margin 3 took Expansive v Balanced to 42% and margin 5 Grind and Compressed to 56–57%.
+Weighting only open play (`live.receiverAtRuck` 0) leaves the first receiver as it was.
 
 ## 6. Kicks and catches (§4.3–4.4)
 
