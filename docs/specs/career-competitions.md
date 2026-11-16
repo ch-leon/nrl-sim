@@ -1,6 +1,7 @@
 # Career competitions: execution contract
 
-Version 1, 11 November 2026. Implements the contract deliverable in
+Version 1 structural contract, 11 November 2026; product reconciliation added
+16 November 2026. Implements the contract deliverable in
 [#569](https://github.com/ch-leon/nrl-sim/issues/569), under
 [#323](https://github.com/ch-leon/nrl-sim/issues/323). Product intent and the open
 event catalogue live in the
@@ -11,6 +12,42 @@ does not report that a competition career has shipped or been balanced.
 The user authorised execution on 11 November. The numerical settings below are
 the initial prototype, not measured balance or a promise about the final game.
 Changing them requires updating their definition version and recording why.
+
+## 0. Product revision — 16 November 2026
+
+The approved [career opportunities design v0.2](career-opportunities.md) now
+governs player-facing behaviour. It replaces forced player-club promotion and
+relegation with title-earned league unlocks and a choice of eligible main league
+each season. It adds seasonal entry windows, overlapping player assignments,
+watched/coached individual challenges, playful small-sided events and connected
+rewards. Gear remains a later expansion. The [plan](../plans/2026-11-career-competitions.md)
+records the revised delivery sequence.
+
+This is a design amendment, not a change to saved definition versions or enabled
+runtime. The audited baseline and structural configuration below remain evidence
+of v1. Existing stable identities, snapshots, once-only results/rewards, persistent
+people, finite outcomes and calendar ownership remain required.
+
+Before extending the runtime:
+
+- Re-scope #574 to earned access, explicit selection and one rollover; settle AI
+  league-field allocation instead of applying forced one-up/one-down to the player.
+- Keep at most one main-team fixture per slot. Permit a simultaneous assignment
+  only through separate player reservations and a legal remaining main-team squad;
+  never disable the club collision guard indiscriminately.
+- Add typed assignment lifecycle, away/return phases, eligibility, stored coaching
+  choices, contest identities and recovery boundaries. Individual results are not
+  league fixtures or league statistics. Every activity shares one calendar clock.
+- Extend #576/#577 with explicit recipient/type/first-win reward policies while
+  retaining the finance/progression owners. Traits, sponsors and later gear need
+  their own supported effects, not arbitrary unvalidated reward payloads.
+- Expand #578/#582 for choice, assignments, special-event playback and longer-term
+  goals. New assignment/event slices need their own scoped tickets; this document
+  does not edit the existing GitHub issues or imply those features are implemented.
+
+The detailed design gates and acceptance criteria are in the v0.2 design §§10–11.
+Older finance/save observations below are dated audits; reconcile with current
+approved finance and progression policy before implementation.
 
 ## 1. Audited baseline
 
@@ -43,11 +80,11 @@ second career store, remote service dependency or generic application framework.
 | Owner | Responsibility | Prerequisites / limits |
 | --- | --- | --- |
 | #570 | Optional competition state, definition snapshots, stable IDs, boundary validation | #536 is merged. Metadata remains dormant until calendar/match integration can run it. |
-| #571 | Calendar, monotonic interval time, guarded fixture completion and recovery integration | #570; no new cash policy or promotion implementation. |
+| #571 | Calendar, monotonic interval time, guarded fixture completion and recovery integration | #570; no new cash policy or next-season league selection implementation. |
 | #573 | Regional division definitions and deterministic club/squad setup | #570; #537/#538 are merged. No annual budget guessed from legacy weekly wages. |
 | #575 | Open Cup draw, byes, ties and advancement | #571/#573. Emit sporting outcomes; finance settlement is #576. |
 | #572 | Real sale destination, ownership, market continuity | #570/#538 and finance #558. No imaginary buyer cash or free sale payout. |
-| #574 | Frozen season review, promotion/relegation, integrated rollover | #571/#572/#573 plus #557/#558/#545. No second ageing/board cycle. |
+| #574 | Frozen season review, league unlock/selection and integrated rollover (revised scope; issue body still needs reconciliation) | #571/#572/#573 plus #557/#558/#545. No second ageing/board cycle. |
 | #576/#577 | Reward ledger, earned-cap entitlement | #559 for fixture cash; #557/#560 for the shared annual cap. |
 | #578 | Competition/history views | Its recorded sporting/finance dependencies; follow existing UI conventions and supplied mockups. |
 | #579/#580/#581 | Shield, youth festival, later title series | Their recorded prerequisites; do not enable incomplete event rules. |
@@ -178,10 +215,12 @@ legacy `inTrials` filter to suppress all new-career interval work.
 
 Profile `career-3x8-v1`: three divisions within each regional pack, eight clubs per
 division, 14 home-and-away rounds. Every division has semi-finals 1 v 4 / 2 v 3
-and a grand final. Higher seed hosts a semi-final; grand finals are neutral. One
-champion promotes, one last-placed club relegates from the division above; bottom
-tier has no disappearance/relegation outside the world. Premier champions stay.
-Finishing first earns a distinct minor-premiership honour.
+and a grand final. Higher seed hosts a semi-final; grand finals are neutral.
+The original one-champion-up/one-last-place-down proposal is superseded for the
+player club: titles unlock harder leagues and the coach chooses an eligible league
+next season. Finishing first earns a distinct minor-premiership honour. The v1
+world remains a structural input; selectable fields and AI allocation must be
+designed before activating the revised rollover. No club disappears on a poor finish.
 
 | Slots | Role | Fixtures per participating club |
 | --- | --- | --- |
@@ -248,8 +287,9 @@ grant it again. Effect receipts and entitlement activation are replay-safe.
 
 Use the finance owner's annual cap and season-indexed commitments. Purchased and
 earned percentages are additive against the same division base only if D5
-adopts that proposal. The combined limit, currency, relegation/grace and AI rules
-are genuine pending inputs. No competition operation charges annual salary to
+adopts that proposal. Recheck the finance owner's current decisions on combined
+limits, currency, lower-budget league transitions and AI rules; the v1 audit is
+not their current approval status. No competition operation charges annual salary to
 cash, reprices an active contract or quietly releases a player to fit a limit.
 
 ## 7. Integrated rollover
@@ -260,9 +300,11 @@ player/free-agent ageing (5), youth intake (6), sporting/board and rival rollove
 This already has owners; adding another rollover pipeline is forbidden.
 
 #574 must freeze the completed season's sporting state before clearing it, settle
-due outcomes once, record honours/review, compute all movements from that frozen
-snapshot, activate next-season entitlements, age/retire/intake once, transition
-contracts and create the next schedule/goals. Refactor the existing hook order
+due outcomes once, record honours/review and earned league access, then pause for
+the coach's next-season choice. Validate the chosen field and cap commitments,
+activate next-season entitlements, age/retire/intake once, transition contracts
+and create the next schedule/goals. AI allocations must use the reconciled field
+policy, not an automatic forced move for the player. Refactor the existing hook order
 where necessary. Every later hook reads a documented completed-season or
 new-season view; do not rely on whichever state a previous hook happened to
 overwrite. The optional title series must finish or terminate before this runs.
@@ -279,10 +321,10 @@ visibility change, not deletion of people or regeneration of their potential.
 | --- | --- | --- |
 | Annual caps, start cash, fees, release, retained costs and old-career finance treatment | #556–#558 | Recorded D1/D2 decisions and validated accounting; no conversion from guessed wage multipliers. |
 | Base match payment M, neutral/byes/trials eligibility, facility mapping | #556/#559 | Published eligibility and income table, losing-club viability and once-only awards. |
-| Purchased + earned capacity and relegation commitments | #556/#560/#577 | Combined limits, season timing and player/AI rules; first/repeat-win cases. |
+| Purchased + earned capacity and lower-budget league commitments | #556/#560/#577 | Combined limits, season timing and player/AI rules; first/repeat-win cases. |
 | XP rates and seasonal development | #541/#547, then #582 | Current targets: +3–4 mid-career / +6–8 young high-potential overall under agreed setups, no ceiling breaches. |
 | Optional-fixture XP | #547/#582 | Compare no events versus full participation; ≤20% extra baseline match XP is a hypothesis, not an implemented cap or proven value. |
-| Shorter schedule and tier strength | #569/#573/#582 | Existing season/progression reports, phone duration and credible failure/recovery after a missed promotion. |
+| Shorter schedule and tier strength | #569/#573/#582 | Existing season/progression reports, phone duration and credible progress after a season without a new league unlock. |
 
 Use the existing soak, personas, QA/save corpus and progression reporting seams.
 No throwaway match-sim measurement harness and no retuning live match rules just
@@ -295,7 +337,7 @@ The minimum structural checks are template coverage/no club double-booking,
 complete home-and-away pairing, 23 decided cup ties, legitimate byes, stable
 IDs/snapshots, corrupt-import preservation, one-time finalisation and finite ties.
 The foundation release adds actual watch/skip/worker/recovery equivalence,
-promotion/rollover and multi-season finance/XP evidence for AU/UK on all supported
+league unlock/selection/rollover and multi-season finance/XP evidence for AU/UK on all supported
 difficulties. Test losing/average/recruitment-first/academy-first/cap-first clubs,
 with entrants and decliners. Add youth substitution and early-series termination
 checks when those formats are enabled.
@@ -303,14 +345,15 @@ checks when those formats are enabled.
 Run repository-required TypeScript/Vitest/build, PR CI/WebKit and QA gates. A
 reviewer using a different tool checks the issue's completion criteria and diff;
 a same-tool subagent inspection is useful but does not replace that requirement.
-Observe a losing season, cup run and promotion on a phone before enabling the
+Observe a losing season, cup run, league unlock and deliberate next-season choice on a phone before enabling the
 overlapping-competition prototype by default. Merge still follows AGENTS.md.
 
 ## 9. Extension rule
 
-Community Shield, derby aggregate trophy, salary challenge, homegrown cup,
-weekend festival, Giantkillers Cup, anniversary exhibition and international
-invitational remain design seeds in Notion. No five-event limit is imposed.
+The [v0.2 catalogue](career-opportunities.md#7-working-event-catalogue-and-connected-opportunities)
+adds individual challenges, player assignments, beach/fives and playful recurring
+opponents to the earlier Community Shield, derby trophy, salary challenge,
+homegrown cup and other design seeds. No five-event limit is imposed.
 Before enabling another event, define its decision, entrants, dates, eligibility,
 finite results, reward policy, seasonal XP/load cost and regression proof. Reuse
 the shared lifecycle; extra match rules or a wider international world require a
