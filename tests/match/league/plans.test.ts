@@ -52,7 +52,11 @@ describe('changing the plan at the breaks (N11)', () => {
   });
 
   it('after a try the change waits for the restart', () => {
-    const r = play(5, EXP_RUSH, (s) => s.phaseKind === 'try');
+    // The first seed from 5 with a try in it (seed 5 itself until the attack shapes, #649 step 2, and the
+    // last-tackle call, #650, together left its short match without one).
+    let seed = 5;
+    let r = play(seed, EXP_RUSH, (s) => s.phaseKind === 'try');
+    while (r.plans.length === 0 && seed < 20) r = play(++seed, EXP_RUSH, (s) => s.phaseKind === 'try');
     expect(r.plans).toHaveLength(1);
     const at = r.plans[0]!.tick;
     const plan = r.events.find((e) => e.kind === 'plan')!;

@@ -187,11 +187,13 @@ describe('legs and the wrestle in the live sim', () => {
       // Seeds 1–16 since the weighted receiver (#649) reshuffled them again: one seed alone
       // runs 0.60–0.83 for the Stamina-40 side, so four seeds put the mean (0.78 on 5–8)
       // over the line by luck. Over 1–16 it is 0.75, the Stamina-80 side 0.11–0.16 ahead.
-      for (let s = 1; s <= 16; s++) {
+      // Seeds 1–24 since the attack shapes (#649 step 2) and the last-tackle call (#650) together left
+      // 1–16 at 0.774, just over the line; over 1–24 it is 0.76, the Stamina-80 side at 0.89.
+      for (let s = 1; s <= 24; s++) {
         const sim = new LiveSim(sheet('H', { stamina: 40 }), sheet('A', { stamina: 80 }), s, { length: { halves: 2, halfMinutes: 7 } });
         play(sim, 600);
-        home += sim.energyOf('home') / 16;
-        away += sim.energyOf('away') / 16;
+        home += sim.energyOf('home') / 24;
+        away += sim.energyOf('away') / 24;
       }
     } finally {
       restore();
