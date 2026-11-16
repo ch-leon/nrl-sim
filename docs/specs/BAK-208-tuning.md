@@ -184,6 +184,27 @@ and a formed shape gives each tackle its own man as often as it changes him). Tr
 pooled off → on: drive inside 5 m 34.7 → 37.2%, break 20 m+ 8.1 → 7.9%, kick 10.3 → 10.1%,
 offload 4.2 → 4.4%: not more spread (with the spots as the table, 35.6 / 8.0 / 12.7%).
 
+Re-measured on top of #687 and #686 (16 Nov 2026; the receiver, the last-tackle call and
+held up all on; `standard.json` with `shapes.on` 0 as the baseline against 1, same seeds,
+run `standard-shapes-rebase`; `shapes.on` 0 plays exactly as main at 7559f53d). Shapes
+picked, averaged over the 13 rows: spread 27%, pod 34%, edge 18%, back door 22% (no row
+under 11%, edge in Tight v Balanced, or over 47%, pod there). Formed at ball-out 92–96% in
+every row, 94% averaged (pod 97, edge 84, back door 97; 0.3 m short). First receiver same
+man 26.8 → 26.6%, slots 5.5 → 5.4 (none beyond luck). Try origins off → on: drive inside
+5 m 32 → 39% (beyond luck only in Kick-chase v Balanced), other 45 → 39%, kick 10.8 → 10.5%,
+break 20 m+ 7.5 → 6.8%, offload 4.8 → 5.1%. Last tackle kick / run / pass 61 / 25 / 15 →
+59 / 26 / 15% (Kick-chase's kick share 66 → 61% and All-out's pass share 21 → 16% beyond
+luck). Held-ups 0.29 → 0.35 a match, in 26% of matches both ways. Beyond luck in the §7
+columns: tackles up 1.1–2.9 a match in five scenarios (52.3 → 53.2 averaged), errors and
+tries up 1.2 and 0.9 in 70 v 50 only; tries 1.72 → 1.88 averaged, Expansive v Grind +0.5 and
+Expansive v Balanced +0.3 (not starred); line breaks 5.3 → 5.5, completion 72.8 → 72.6%
+(on: even sides 69.4, All-out v Balanced 69.7 and the late-legs stretch 68.8% read under
+70, none starred; off: stamina 30 v 80 69.1%). The six preset rows (points share, 100 both
+ways) off → on: Tight 57.0 → 52.3, Expansive 42.0 → 48.3, Kick-chase 45.0 → 51.5, All-out
+54.3 → 53.5, Rush 51.5 → 51.3, Compressed 52.8 → 46.8, all inside 45–55% on (Tight and
+Expansive are outside off, as main is); at 400 both ways (`shapes-presets-400`) Tight
+53.7 → 51.4, Expansive 48.2 → 50.0, Kick-chase 48.8 → 49.1, All-out 53.2 → 53.1.
+
 ## 6. Kicks and catches (§4.3–4.4)
 
 | Knob | File | Value | Effect |

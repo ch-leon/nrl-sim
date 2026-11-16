@@ -48,7 +48,8 @@ interface Played {
  * receiver, #649) and every new roll moved them, so since the attack shapes
  * (#649 step 2) each call's seed is found: the first with that call on offer
  * (96 for Take the two and 111 for Tap and go when it was written; main had
- * pinned 7, 10, 19 and 20 for held up at the line, #652, and the last-tackle call, #650).
+ * pinned 7, 10, 19 and 20 for held up at the line, #652, and the last-tackle call, #650;
+ * with all three on, 52 and 89).
  */
 const penaltySeeds = new Map<CoachCall, number[]>();
 function PENALTY_SEEDS(call: 'take-two' | 'tap-go'): number[] {

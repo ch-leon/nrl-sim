@@ -113,6 +113,19 @@ describe('attack shapes: in the sim', () => {
       expect(names).toContain(k);
     }
   });
+  it('off (shapes.on 0) alone plays exactly as main before it (7559f53d: the receiver, the last-tackle call and held up on)', () => {
+    const restore = applyTuning({ 'shapes.on': 0 });
+    try {
+      for (const seed of [1, 11]) {
+        const off = play(seed);
+        expect(off.shapeDraws).toBe(0);
+        expect(off.picks).toBe(0);
+        expect({ events: off.events, home: off.home, away: off.away, draws: off.draws }).toEqual(OFF_MAIN[seed]);
+      }
+    } finally {
+      restore();
+    }
+  });
   it('off (shapes.on 0) draws no roll and shows no shape: the match as before it (seeds 1 and 11, pinned from a65edf9)', () => {
     // The last-tackle call (#650) and held up at the line (#652) merged first and also roll dice, so they are
     // switched off too: with all three off the match is a65edf9's, as pinned here.
@@ -210,4 +223,10 @@ describe('attack shapes: in the sim', () => {
 const OFF: Record<number, { events: number; home: number; away: number; draws: number }> = {
   1: { events: 131, home: 6, away: 4, draws: 795 },
   11: { events: 142, home: 8, away: 12, draws: 842 },
+};
+
+/** Seeds 1 and 11 as main plays them at 7559f53d (after #686), the base this branch was re-measured on (16 Nov 2026). */
+const OFF_MAIN: Record<number, { events: number; home: number; away: number; draws: number }> = {
+  1: { events: 138, home: 12, away: 10, draws: 828 },
+  11: { events: 146, home: 12, away: 12, draws: 753 },
 };

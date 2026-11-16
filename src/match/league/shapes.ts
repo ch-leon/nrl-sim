@@ -6,7 +6,8 @@
 // ball, or the plain spread of the base lanes. The shape only says where the
 // attackers stand, and so who the pass options are; the receiver (tactics.ts)
 // still picks among them. Pure data and sums here; the one roll is the live
-// sim's (live/play.ts), and the spots are steered to in live/positioning.ts.
+// sim's (`chooseShape` in live/positioning.ts, called from live/contact.ts as
+// the tackle is made), and the spots are steered to in live/positioning.ts.
 import { FIELD_WIDTH } from '../core/field';
 import { clamp, type Vec } from '../core/vec';
 import type { AttackPreset, Zone } from './presets';
@@ -29,6 +30,7 @@ export const SHAPE_LABEL: Readonly<Record<ShapeName, string>> = {
  */
 export type ShapeMan = 'fullback' | 'prop' | 'backrow' | 'nearHalf' | 'farHalf' | 'nearEdge' | 'farEdge' | 'nearWing' | 'farWing';
 
+// Slot 8 has two labels (`backrow`, and the edge man on its side: `nearEdge` played right, `farEdge` left) and the first key wins, so a shape must never list both.
 const SLOT_RIGHT: Readonly<Record<ShapeMan, number>> = { fullback: 0, prop: 7, backrow: 8, nearHalf: 5, farHalf: 4, nearEdge: 8, farEdge: 3, nearWing: 2, farWing: 1 };
 const SLOT_LEFT: Readonly<Record<ShapeMan, number>> = { fullback: 0, prop: 7, backrow: 8, nearHalf: 4, farHalf: 5, nearEdge: 3, farEdge: 8, nearWing: 1, farWing: 2 };
 

@@ -32,7 +32,8 @@ function surface() {
  * seed (12, then 28 after the weighted receiver, #649, and 63 after the last-tackle call, #650) until the attack shapes (#649 step 2), and
  * every new roll moved it. With the last-tackle call (#650) and the shapes both on, the search starts at 26:
  * seed 25 is the first to reach golden point but ends with a man still drawn after the walk-off (the same
- * view edge main steps round at seed 45 by pinning 63), so the first seed found is 45.
+ * view edge main steps round at seed 45 by pinning 63), so the first seed found was 45. With held up at the
+ * line (#652) on as well the first found from 26 is seed 33 (from 1 it would be seed 20, which passes too).
  */
 const GOLDEN_FROM = 26;
 function play(): Snapshot[] {

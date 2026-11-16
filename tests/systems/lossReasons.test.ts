@@ -227,10 +227,12 @@ describe('out-schemed (#468)', () => {
     const flatThem = { ...them, tactics: { attack: 'balanced', defence: 'slide' } as const };
     // The negative control is a real loss: the first seed that gives one (seed 1 until the last-tackle
     // call, #650, and the attack shapes, #649 step 2, turned it into a win).
-    let flatSeed = 1;
-    while (flatSeed < 20 && (() => { const r = runMatch(flatUs, flatThem, { seed: flatSeed, length: { halves: 2, halfMinutes: 7 } }); return r.awayScore <= r.homeScore; })()) flatSeed++;
-    const flat = runMatch(flatUs, flatThem, { seed: flatSeed, length: { halves: 2, halfMinutes: 7 } });
-    expect(flat.awayScore).toBeGreaterThan(flat.homeScore);
+    let flat: Awaited<ReturnType<typeof runMatch>> | undefined;
+    for (let seed = 1; seed <= 20 && !flat; seed++) {
+      const r = runMatch(flatUs, flatThem, { seed, length: { halves: 2, halfMinutes: 7 } });
+      if (r.awayScore > r.homeScore) flat = r;
+    }
+    if (!flat) throw new Error('no losing seed found in seeds 1–20 for the flat Balanced / Slide negative control');
     expect(hasReason(why(s, flat, flatUs, flatThem))).toBe(false);
   });
 });
