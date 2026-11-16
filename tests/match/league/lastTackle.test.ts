@@ -121,7 +121,9 @@ describe('last tackle: in the sim', () => {
     expect(LAST_TACKLE.on).toBeGreaterThan(0);
     const on = play(1);
     expect(on).not.toEqual(OFF_1);
-    const restore = applyTuning({ 'lastTackle.zones.midfield.pass': 9, 'lastTackle.zones.ownHalf.pass': 9 });
+    // Every zone's pass weight, not only midfield and own half: with held up (#652) and the attack shapes
+    // (#649 step 2) also on, seed 1's last tackles in those two zones alone came out the same.
+    const restore = applyTuning({ 'lastTackle.zones.midfield.pass': 9, 'lastTackle.zones.ownHalf.pass': 9, 'lastTackle.zones.attackingHalf.pass': 9, 'lastTackle.zones.redZone.pass': 9, 'lastTackle.zones.own20.pass': 9 });
     try {
       expect(play(1)).not.toEqual(on);
     } finally {

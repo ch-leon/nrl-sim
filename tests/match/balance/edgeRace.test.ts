@@ -59,8 +59,10 @@ describe('the #322 Speed levers', () => {
       },
     });
     // Twice the seeds since the attack shapes (#649 step 2): over 30 both ways the race's extra busts read 0.98 a match.
-    const off = measureCell(cell({ ...ON, 'race.on': 0 }), SEEDS * 2);
-    const on = measureCell(cell({ ...ON, 'race.on': 1, 'race.perPoint': 0.02, 'race.single': 0 }), SEEDS * 2);
+    // Four times since held up at the line (#652) and the last-tackle call (#650) joined them: over 60 both ways it
+    // read 0.68, over 120 1.13, so 60 was too few to measure the race, not a smaller race.
+    const off = measureCell(cell({ ...ON, 'race.on': 0 }), SEEDS * 4);
+    const on = measureCell(cell({ ...ON, 'race.on': 1, 'race.perPoint': 0.02, 'race.single': 0 }), SEEDS * 4);
     // The harness now reports counts per five-minute default; compare the established
     // fourteen-minute rate so shortening the clock does not dilute the physics threshold.
     const extraBustsPer14Minutes = (on.trackedCounts!.busts.mean - off.trackedCounts!.busts.mean) * 14 / MATCH_MINUTES;

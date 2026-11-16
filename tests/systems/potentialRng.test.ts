@@ -49,9 +49,10 @@ import { contractsEndingSoon } from '../../src/systems/contracts';
 // The attack shapes (#649 step 2) add a roll at each tackle and change match outcomes. Its
 // first cut moved this to 4195872732; picked at the tackle, within reach, the season ends on
 // the same stream as with shapes.on 0, the pin above.
-// With the shapes and the last-tackle call both on (merged together, 16 Nov 2026) the season ends on a new
-// stream; either alone leaves 1788836146.
-const MAIN_SEED_AFTER_SEASON = 2881251055;
+// With the shapes and the last-tackle call both on the season ended on 2881251055; with held up at the
+// line (#652) on as well (main after #686, merged into this branch 16 Nov 2026) it ends on 3329112261.
+// Main without the shapes ends on 1788836146.
+const MAIN_SEED_AFTER_SEASON = 3329112261;
 
 describe('the rng stream (#369)', () => {
   it.each([0, 1])('weekly potential and dot reads preserve the season stream with habit AI=%i', (ai) => {
