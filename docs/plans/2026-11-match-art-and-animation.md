@@ -11,8 +11,9 @@ on top of the stage-1 candidate; local validation passed. One Sol agent
 implemented movement, Luna runs the shared validation, and the main agent reviews
 the source, visual result and rendering cost.
 
-Stage 3 is in progress under [#700](https://github.com/ch-leon/nrl-sim/issues/700),
-building on stage 2. Leon's explicit review policy: leave every PR open and
+Stage 3 is implemented in [draft PR #701](https://github.com/ch-leon/nrl-sim/pull/701),
+tracking [#700](https://github.com/ch-leon/nrl-sim/issues/700), on top of stage 2;
+local functional validation passed. Leon's explicit review policy: leave every PR open and
 unmerged; Leon reviews before merging. This overrides the repository's automatic
 merge convention for this work. Keep the staged PRs as drafts.
 
@@ -193,5 +194,45 @@ averaged 59.3 fps (p95 16.8 ms, longest 50 ms); stage 2 averaged 59.8 fps
 samples show no obvious added stutter; they do not establish phone performance.
 In the separate 1,200-tick cache sample, misses rose from 17.89% to 34.49%; the
 cache stayed capped at 768 and textures at 68. No cache expansion was introduced.
-The previous whole-career performance-budget failures remain open. Stage-2 CI,
-QA, different-tool review and a real-phone play-test remain release checks.
+The previous whole-career performance-budget failures remain open. Stage-2 CI
+and Android builds passed. QA, different-tool review and a real-phone play-test
+remain release checks, followed by Leon’s review before any merge.
+
+Stage 3 keeps the shared contact painter and recorded lifecycle. Settled wrap
+soles stay planted while hips and shoulders absorb arrivals. An editable fall
+curve gives the landing a faster final descent and one settling beat; a free
+palm and knee support the recovery into play-the-ball. Defenders clear their
+hands and rise at different points within the existing release window. Torso,
+hand and sole shading makes the support points clearer, and gripping arms are
+painted before the carrier's ball panels. Existing impact/audio timing remains
+aligned with the recorded resolution event.
+
+The live layout retains a fixed ordinary-contact pivot instead of cancelling
+hip motion by translating the whole group. Escapes still cancel the authored
+run-out because their world travel already comes from the simulation. Recovery
+and positional release finish on `releaseTick - 1`, the last visible shared
+frame. This fixes the handoff to ordinary player sprites, including quick rucks.
+Before/after seed-1 samples cover one defender (ticks 776–809), two (140–157)
+and three (393–402). Their previous 9–24 px horizontal defender jumps at PTB
+became 0–1 px; the carrier stayed in place. No simulation decisions, positions,
+events, RNG, save format or release deadlines were changed.
+
+Stage-3 local checks: typecheck/build and all 4,341 tests in 323 files passed.
+Production Chromium live-art and big-moment checks passed, covering career
+playback, real contact participants/outcomes, ball ownership, handling, kicks,
+tries, phone layout, scene restart and bounded textures/cache. The final shared
+frames of all three sampled tackles repeated exact pixels after pause and seek.
+The new geometry tests cover support stability in world layout, bounded limbs,
+both directions, ball-panel visibility, staggered release, escape travel and
+terminal handoff in five-, seven- and fourteen-tick rucks. One Sol agent built
+the change; Luna ran the combined validation; the main agent reviewed the diff,
+pose sheets and live-match comparisons.
+
+Sequential production Chromium measurements of the unchanged reference passage
+(seed 1 from tick 43, 22 seconds, 844×390 at ×1, agents idle) averaged 59.6 fps
+before and 59.4 fps after. Both had p95 frame time 16.8 ms and no frame over
+100 ms; longest frames were 33.4 ms and 50 ms respectively. Both reached tick
+475 with identical cache counters (2,639 hits / 1,545 misses), peak 768 entries
+and 68 textures. This desktop sample shows no material added stutter; real-phone
+performance and the earlier whole-career budget concerns remain open. Stage-3
+CI/QA, different-tool review, phone play-test and Leon's review remain pending.

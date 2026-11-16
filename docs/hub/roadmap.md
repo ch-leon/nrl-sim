@@ -7,7 +7,7 @@ live gameplay change; work still open below has not shipped.
 
 ## Now
 
-- **Contact — stage 3 candidate:** planted tackle holds, decisive landings, supported recovery and smoother defender release are being built under [#700](https://github.com/ch-leon/nrl-sim/issues/700), on top of movement PR #699. Leon will review all staged PRs before merging; they remain open and draft.
+- **Contact — stage 3 candidate:** planted tackle holds, decisive landings, supported recovery and smoother defender release are implemented in [draft PR #701](https://github.com/ch-leon/nrl-sim/pull/701), on top of movement PR #699. All 4,341 tests, build and production browser checks passed; sampled defender jumps at the PTB handoff fell from 9–24 px to 0–1 px. Leon will review all staged PRs before merging; they remain open and draft. Connected handling and preparation are next.
 
 - **Everyday movement — stage 2 candidate:** grounded jog/sprint, acceleration, braking, planted cuts and ball-facing defensive steps are implemented in [draft PR #699](https://github.com/ch-leon/nrl-sim/pull/699), on top of stage 1. All 4,336 tests, build and production browser checks passed; a sequential desktop passage stayed near 60 fps before and after. Release checks and phone performance remain open. The next bounded pass is contact choreography, starting with a complete one-defender tackle and recovery.
 
