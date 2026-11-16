@@ -343,3 +343,5 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261116-122527-standard | standard | 2d37864 | main | [report](runs/20261116-122527-standard/report.md) |
 | 20261116-124528-standard | standard | 9278a09 | main | [report](runs/20261116-124528-standard/report.md) |
 | 20261116-130445-standard | standard | 5b7d08c | main | [report](runs/20261116-130445-standard/report.md) |
+| 20261116-125803-heldup-rebase-standard | heldup-rebase standard | e731dd11 | claude/652-held-up | [report](runs/20261116-125803-heldup-rebase-standard/report.md) |
+| 20261116-130129-heldup-rebase-attack-presets-400 | heldup-rebase attack presets 400 | e731dd11 | claude/652-held-up | [report](runs/20261116-130129-heldup-rebase-attack-presets-400/report.md) |

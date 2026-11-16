@@ -1,0 +1,78 @@
+{
+  "name": "heldup-rebase attack presets 400",
+  "description": "#652 rebased on #687: the four attack preset rows (against Balanced) at 400 seeds both ways, held up off (heldUp.on 0) against on, to tell a real shift in a preset share from luck at the standard size.",
+  "seeds": 400,
+  "base": {
+    "heldUp.on": 0
+  },
+  "scenarios": [
+    {
+      "name": "grind v balanced",
+      "seeds": 400,
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "expansive v balanced",
+      "seeds": 400,
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "kick-chase v balanced",
+      "seeds": 400,
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "all-out v balanced",
+      "seeds": 400,
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "on (default)",
+      "tuning": {
+        "heldUp.on": 1
+      }
+    }
+  ]
+}
