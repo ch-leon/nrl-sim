@@ -172,7 +172,7 @@ describe('generateFixtures', () => {
 
 function stateWithLadder(rows: LadderRow[]): GameState {
   createLegacyGame('Tester', 42);
-  setState({ league: { clubs: [], fixtures: [], ladder: rows } });
+  setState({ league: { clubs: [], fixtures: [{ round: 1, homeId: 'a', awayId: 'b' }], ladder: rows } });
   return getState();
 }
 

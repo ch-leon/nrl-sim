@@ -222,7 +222,7 @@ describe('a release previews the payout and refuses when the cash is short', () 
   });
 });
 
-describe('a rival later signing is checked against the cap, not the wallet', () => {
+describe('a rival later signing needs both cap room and cash', () => {
   it('refuses when the new salary does not fit the cap, and still signs when it does', () => {
     const s = getState();
     const club = s.league.clubs.find(c => c.id !== s.clubId && c.squad && c.squad.length > 0)!;
@@ -247,7 +247,11 @@ describe('a rival later signing is checked against the cap, not the wallet', () 
       if (signed.signed.length !== 1) continue;
       const player = signed.clubs[0]!.squad!.find(p => p.id === signed.signed[0]!.playerId)!;
       expect(player.deal!.salary).toBe(salaryDemand(pool[0]!));
-      expect(signed.clubs[0]!.cash).toBe(wallet);
+      expect(signed.clubs[0]!.cash).toBe(wallet - salaryDemand(pool[0]!));
+      const empty = rivalSigningTick([{ ...base, cash: 0 }], pool, makeRng(seed), { perClub: 1, season: 1 });
+      expect(empty.signed).toEqual([]);
+      expect(empty.clubs[0]!.cash).toBe(0);
+      expect(empty.clubs[0]!.squad).toEqual(squad);
       const stuffed = squad.map(p => ({ ...p, deal: { salary: 600_000, startSeason: 1, endSeason: 1 } }));
       const over = rivalSigningTick([{ ...base, squad: stuffed }], pool, makeRng(seed), { perClub: 1, season: 1 });
       expect(over.signed).toEqual([]);

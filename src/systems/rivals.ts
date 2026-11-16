@@ -20,8 +20,8 @@ import { bus } from '../core/events';
 import { registerTickHook } from '../core/time';
 import { LEAGUE, ON_FIELD, SEASON_ROUNDS, STAT_MAX, WEEKS_PER_SEASON } from '../config';
 import { generatePlayerAround, withShownStats, shownStats, marketWage, overallRating, POSITIONS, wageForOverall } from '../data/player';
-import { admitOpeningSquad, AI_OPENING_CASH, capRoomFor, commitPlayer, freshCapAccount, SINGLE_LEAGUE_TIER, tierCap } from './cap';
-import type { FinanceTier } from '../data/financeRules';
+import { admitOpeningSquad, AI_OPENING_CASH, capRoomFor, commitPlayer, freshCapAccount, SINGLE_LEAGUE_TIER, tierCap, salaryDemand, releaseTerms } from './cap';
+import { signingFeeQuote, type FinanceTier } from '../data/financeRules';
 import { makeRng, type Rng } from '../utils/rng';
 import { ageAndRetirePlayers } from './aging';
 import { STRENGTH_MAX, STRENGTH_MIN } from './league';
@@ -344,6 +344,7 @@ export interface SigningOptions {
   notable?: number;
   /** Season the new one-season deal starts in. */
   season?: number;
+  week?: number;
 }
 
 /**
@@ -356,7 +357,7 @@ export interface SigningOptions {
  * can take a player a later one wanted. Signings at `notable` or above make the news.
  */
 export function rivalSigningTick(clubs: readonly RivalClub[], freeAgents: readonly Player[], rng: Rng, opts: SigningOptions = {}): SigningResult {
-  const { playerId = 'player', perClub = RIVAL_SIGNINGS_PER_WEEK, start = 0, notable = notableOverall(freeAgents), season = 1 } = opts;
+  const { playerId = 'player', perClub = RIVAL_SIGNINGS_PER_WEEK, start = 0, notable = notableOverall(freeAgents), season = 1, week = 1 } = opts;
   let pool = [...freeAgents];
   const news: string[] = [];
   const signed: SigningResult['signed'] = [];
@@ -380,11 +381,11 @@ export function rivalSigningTick(clubs: readonly RivalClub[], freeAgents: readon
       const account = club.capAccount ?? freshCapAccount(SINGLE_LEAGUE_TIER);
       const signedPlayer = commitPlayer({ ...target, morale: 50, departed: false }, season);
       const salary = signedPlayer.deal?.salary ?? 0;
-      // The annual cap applies to a later signing. Rival cash is not debited
-      // here: a rival's wallet is the opening float and they have no match
-      // income until #559, so charging the annual fee would stop them replacing
-      // players. A funded move between clubs is #572.
-      if (!capRoomFor(room.squad, account, season, salary)) break;
+      const fee = signingFeeQuote(salaryDemand(target), false);
+      // A rival pays for any voluntary release as well as the replacement.
+      const payout = room.released ? releaseTerms(room.released, season, week).payout : 0;
+      const cash = club.cash ?? AI_OPENING_CASH;
+      if (!capRoomFor(room.squad, account, season, salary) || cash < fee + payout) break;
       if (room.released) {
         const { deal: _releasedDeal, ...bare } = room.released;
         pool.push({ ...bare, injuredWeeks: 0, contractWeeks: 0 });
@@ -393,7 +394,7 @@ export function rivalSigningTick(clubs: readonly RivalClub[], freeAgents: readon
       const ovr = overallRating(target);
       signed.push({ clubId: club.id, playerId: target.id, overall: ovr, reason: need?.kind ?? 'upgrade' });
       if (ovr >= notable) news.push(`${club.name} sign ${Math.round(ovr)}-rated ${target.position} ${target.name}.`);
-      club = withDerivedStrength({ ...club, capAccount: account, squad: [...room.squad, signedPlayer] });
+      club = withDerivedStrength({ ...club, cash: cash - fee - payout, capAccount: account, squad: [...room.squad, signedPlayer] });
     }
     out[i] = club;
   }
@@ -581,7 +582,7 @@ export function registerRivalsSystem(): void {
     }
     const perClub = s.week > SEASON_ROUNDS ? RIVAL_SIGNINGS_OFFSEASON : RIVAL_SIGNINGS_PER_WEEK;
     const r = rivalSigningTick(healed, s.freeAgents, makeRng(rivalWeekSeed(s)), {
-      perClub, start: s.week, season: s.season, notable: Math.round(poolTarget(s)) + RIVAL_NOTABLE_ABOVE_TARGET,
+      perClub, start: s.week, season: s.season, week: s.week, notable: Math.round(poolTarget(s)) + RIVAL_NOTABLE_ABOVE_TARGET,
     });
     const clubs = developRivalsWeek(r.clubs, makeRng(rivalDevelopSeed(s)));
     setState({ league: { ...s.league, clubs }, freeAgents: r.freeAgents });

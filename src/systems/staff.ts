@@ -1,24 +1,13 @@
-// src/systems/staff.ts — three hires the facilities don't cover (N14.5).
-//
-// The Welfare Manager halves the odds of the players' grievance cards, halves
-// the chance a risky choice goes wrong (#324, #325), and takes a tenth off
-// renewal asks. The Assistant Coach (the player's plan changed at the
-// break when a match is fast-forwarded, by the rivals' rule) and the Analyst (the
-// rival's plan and its switch on the next-match card) need the break rule (N13.5,
-// N14.1): they can be hired and are paid now, and act once it lands. Each is hired and released from the Staff panel under
-// the board's objectives (Finance), is paid a wage a week with the running costs
-// (economy.weeklyOverhead, the `overhead` line), and never leaves on his own.
-//
-// The Attack Coach (#326, plan §2.2) is the fourth role: one at a time, of one
-// of four specialities, each opening one family of set plays to buy
-// (systems/playbook.ts). His wage follows how advanced the family is; the
-// Razzle coach needs reputation (PLAYS.razzleRep). Plays bought stay when he goes.
+// Staff appointments are one-off cash investments; salaries never drain cash.
 import { bus } from '../core/events';
 import { getState, setState, type AttackCoachSpeciality, type GameState, type StaffMember, type StaffRole } from '../core/state';
 import { PLAYS } from '../match/league/plays';
 import { randomName } from '../data/names';
 import { makeRng } from '../utils/rng';
 import { difficultyMultipliers } from '../config';
+import { STAFF_APPOINTMENT_PRICES } from '../data/financeRules';
+import { weekHeld } from '../core/time';
+export { STAFF_APPOINTMENT_PRICES } from '../data/financeRules';
 
 export interface StaffDef {
   title: string;
@@ -41,7 +30,7 @@ export const STAFF: Record<HireRole, StaffDef> = {
   },
   welfare: {
     title: 'Welfare Manager', wage: 700,
-    blurb: 'Halves the odds of a player’s grievance card, halves the chance a risky night out or trip goes wrong, and takes a tenth off renewal asks.',
+    blurb: 'Halves the odds of a player’s grievance card, halves the chance a risky night out or trip goes wrong, and reduces new salary demands by up to 3%.',
   },
 };
 
@@ -113,28 +102,33 @@ export function staffWages(state: Pick<GameState, 'staff'>): number {
   return state.staff.reduce((t, m) => t + m.wage, 0);
 }
 
-/** Hire `role` (no fee; the wage starts with the next week). False if already on staff. */
+/** Hire `role` for its upfront fee. Refuses duplicate or unaffordable appointments. */
 export function hireStaff(role: HireRole): StaffMember | null {
   const s = getState();
-  if (hasStaff(s, role) || !(role in STAFF)) return null;
+  if (weekHeld() || hasStaff(s, role) || !(role in STAFF) || s.money < STAFF_APPOINTMENT_PRICES[role]) return null;
   const rng = makeRng(s.rngSeed);
   const member: StaffMember = { role, name: randomName(rng), wage: staffWage(s, role), hiredSeason: s.season };
-  setState({ staff: [...s.staff, member], rngSeed: rng.state() });
+  const fee = STAFF_APPOINTMENT_PRICES[role];
+  const balance = s.money - fee;
+  setState({ staff: [...s.staff, member], rngSeed: rng.state(), money: balance });
+  bus.emit('money:changed', { delta: -fee, reason: `staff:${role}`, balance });
   bus.emit('ui:notify', { text: `${member.name} joins as ${STAFF[role].title}.`, kind: 'success' });
   return member;
 }
 
 /**
- * Hire an attack coach of `speciality` (#326; no fee, the wage starts with the
- * next week): one at a time, and the Razzle coach only at reputation
+ * Hire an attack coach of `speciality` for its upfront appointment fee: one at a time, and the Razzle coach only at reputation
  * PLAYS.razzleRep. Null when refused (attackCoachRefusal says why).
  */
 export function hireAttackCoach(speciality: AttackCoachSpeciality): StaffMember | null {
   const s = getState();
-  if (!(speciality in ATTACK_COACHES) || attackCoachRefusal(s, speciality) !== null) return null;
+  if (weekHeld() || !(speciality in ATTACK_COACHES) || attackCoachRefusal(s, speciality) !== null || s.money < STAFF_APPOINTMENT_PRICES[speciality]) return null;
   const rng = makeRng(s.rngSeed);
   const member: StaffMember = { role: 'attackCoach', name: randomName(rng), wage: attackCoachWage(s, speciality), hiredSeason: s.season, speciality };
-  setState({ staff: [...s.staff, member], rngSeed: rng.state() });
+  const fee = STAFF_APPOINTMENT_PRICES[speciality];
+  const balance = s.money - fee;
+  setState({ staff: [...s.staff, member], rngSeed: rng.state(), money: balance });
+  bus.emit('money:changed', { delta: -fee, reason: `staff:${speciality}`, balance });
   bus.emit('ui:notify', { text: `${member.name} joins as ${ATTACK_COACHES[speciality].title}.`, kind: 'success' });
   return member;
 }
@@ -143,7 +137,7 @@ export function hireAttackCoach(speciality: AttackCoachSpeciality): StaffMember 
 export function releaseStaff(role: StaffRole): boolean {
   const s = getState();
   const member = s.staff.find((m) => m.role === role);
-  if (!member) return false;
+  if (weekHeld() || !member) return false;
   setState({ staff: s.staff.filter((m) => m !== member) });
   bus.emit('ui:notify', { text: `${member.name} has left the ${staffTitle(member)} job.`, kind: 'info' });
   return true;

@@ -18,9 +18,7 @@ import { inlineIqStat } from '../../content/pack';
 import { ATTACK_COACHES, ATTACK_SPECIALITIES, STAFF } from '../../systems/staff';
 import { playsOfFamily } from '../../data/plays';
 import { PLAYS } from '../../match/league/plays';
-import { LEVEL_MULT } from '../../data/facility';
 import { sponsorReturn } from '../../systems/economy';
-import { REP_BASELINE } from '../../systems/league';
 import { officeUnlockLine } from '../coachCallsText';
 
 const percent = (x: number): string => `${Math.round(x * 100)}%`;
@@ -42,14 +40,10 @@ function clubNow(): Pick<GameState, 'reputation' | 'facilities'> | null {
  * board pays at today's reputation (or what a new one would), the number the
  * weekly tick pays (economy.sponsorReturn). Worked out each time the page is shown.
  */
-export function sponsorBullet(club: Pick<GameState, 'reputation' | 'facilities'> | null = clubNow()): string {
-  const rep = club?.reputation ?? REP_BASELINE;
+export function sponsorBullet(club: (Pick<GameState, 'reputation' | 'facilities'> & Partial<Pick<GameState, 'capAccount'>>) | null = clubNow()): string {
   const level = (club?.facilities ?? []).reduce((m, f) => (f.defId === 'sponsorBoard' ? Math.max(m, f.level) : m), 0);
-  const rule = `A Sponsor Board pays ${fmtMoney(ECON.SPONSOR_BASE)} a week plus ${fmtMoney(ECON.SPONSOR_PER_REP)} a reputation point, up to ${fmtMoney(ECON.SPONSOR_CAP)}, and ${LEVEL_MULT[1]}× that at level 2, ${LEVEL_MULT[2]}× at level 3.`;
-  const now = level > 0
-    ? `Yours (level ${level}) pays ${fmtMoney(sponsorReturn(level, rep))} a week at your reputation of ${rep}.`
-    : `At your reputation of ${rep} a new one would pay ${fmtMoney(sponsorReturn(1, rep))} a week.`;
-  return `${rule} ${now}`;
+  const amount = fmtMoney(sponsorReturn(level || 1, 0, club?.capAccount?.tier ?? 'premier'));
+  return `A Sponsor Board pays 3% / 9% / 18% of match base at levels 1 / 2 / 3 on played non-trial matches. ${level ? `Yours (level ${level}) pays` : 'A new one would pay'} ${amount} per eligible match. No income while idle.`;
 }
 
 /**
@@ -140,8 +134,8 @@ export const CLUB_PAGES: readonly GuidePage[] = [
         // A getter, so the Sponsor Board line quotes the club's reputation each time the page is shown (N12).
         get bullets(): string[] {
           return [
-            `Home gates: the crowd is your reputation and form, lifted for a top-eight opponent or a final, and capped by the ground (2,000 on the hill; a Grandstand seats 3,500, 5,000 or 6,500). Tickets are ${fmtMoney(ECON.TICKET_PRICE)}. On Easy the gate pays ${percent(DIFFICULTY.easy.gate)} of that; Normal and Hard pay the full gate. A new club draws about 1,200.`,
-            'A weekly grant that grows with reputation ($40 a point).',
+            'Played matches pay a guaranteed base: Local $8,000, Championship $12,000, Premier $18,000. Home venue income adds half that base; a Grandstand adds 15% / 45% / 90% more at levels 1 / 2 / 3. Crowds remain a visual measure of reputation and form, not an extra ticket payment.',
+            'Wins add 10% of the base; draws add 5%. Trials pay a quarter-base only. Byes, unplayed fixtures and idle weeks earn nothing.',
             sponsorBullet(),
             `Finals prize money at the rollover: ${fmtMoney(PRIZE.PER_FINALS_WEEK)} for every finals week played, ${fmtMoney(PRIZE.GRAND_FINAL)} more for a grand final and ${fmtMoney(PRIZE.PREMIERSHIP)} for the premiership. Easy pays ${percent(DIFFICULTY.easy.prize)} of that and Hard ${percent(DIFFICULTY.hard.prize)}; Normal pays it as written.`,
             `The board pays ${fmtMoney(BOARD.GRANT_PER_MET)} for every objective met (Easy ${percent(DIFFICULTY.easy.prize)}, Hard ${percent(DIFFICULTY.hard.prize)}); some event cards pay too.`,

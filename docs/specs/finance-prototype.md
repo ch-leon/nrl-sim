@@ -18,8 +18,8 @@ new careers: salaries are season commitments, weekly wage/upkeep/overhead
 deductions are retired, and saves from before that format are rejected rather
 than converted. #558 now charges the signing fee, queues a fee-free
 renewal and pays the release payout, and refuses a signing that does not fit
-the cash and the cap. Receipt-backed match income, cap upgrades and the full
-finance presentation remain #559–#561. End-to-end balance is #562. A funded
+the cash and the cap. Receipt-backed match income and upfront investments now implement #559;
+cap upgrades and the full finance presentation remain #560–#561. End-to-end balance is #562. A funded
 sale between clubs is #572, so the old sell button refuses until that exists.
 
 ## 1. Decisions and units
@@ -196,10 +196,9 @@ bonuses. It may buy one level after a completed season when cap usage is at
 least 85% and cash covers its price plus a 2M reserve. Validate buyer funds and
 future commitments on every deal; cash-rich AI cannot exceed its published cap.
 
-#558 checks a rival's later free-agent signing against that published cap and
-refuses it when the salary does not fit. It does not debit the wallet. Rivals
-have no match receipts until #559, and the 60,000 opening float cannot fund an
-annual fee every week. #559 debits those wallets once the receipts exist.
+#559 credits rival wallets from the same fixture receipts as the player and
+charges ordinary free-agent signings plus any voluntary release payout. AI has
+no hidden facility income. Real funded inter-club moves remain #572.
 
 ### Relegation and minimum squads
 
@@ -325,3 +324,25 @@ finance migration is claimed here. #557 accounting → #558/#559/#560 operations
 → #561 presentation → #562 acceptance remains the implementation sequence.
 Competition transfers #572, promotion #574 and rewards #576/#577 reuse those
 owners instead of adding parallel cash/cap/season systems.
+
+## #559 delivery notes
+
+Save v29 adds saved kickoff promises and both clubs' ordinary receipt breakdowns.
+A v28 career keeps its cash and salary promises, starts with no match-income
+claims, and receives no retroactive payout for already accepted fixtures. Older
+pre-finance saves remain refused. A paid facility records its construction and
+upgrade spend; authored/free facilities and pre-v29 facilities without a payment
+record have a zero refund basis rather than inventing a past payment.
+
+Income settles in the result update with cash and season books. Observers receive
+already-booked notifications for weekly ledger and QA metrics, not a second
+payment. Missing settlement may be reconciled without replaying stats/XP. Trial
+exhibitions get quarter base; neutral ties use the lower tier; a saved knockout
+winner, not an altered score, owns the win bonus. A closed-crowd event still
+changes attendance and its published one-off cost, but does not replace the FIN
+v1 fixed venue quote with attendance-times-ticket income.
+
+Minimal existing previews show per-match sponsor/venue income and upfront staff
+prices; a complete cap/contract/receipt screen is still #561. This slice does not
+claim #562 multi-season balance sign-off, funded transfers, cap upgrades, or a
+new contract-length/release policy.

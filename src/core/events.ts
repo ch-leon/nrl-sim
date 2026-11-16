@@ -56,7 +56,7 @@ export interface Events {
   'state:changed': GameState;
   'week:advanced': { week: number; season: number };
   'season:ended': { season: number; ladderPosition: number; premiership: boolean };
-  'money:changed': { delta: number; reason: string; balance: number };
+  'money:changed': { delta: number; reason: string; balance: number; booked?: boolean; stamp?: { season: number; week: number } };
   'facility:placed': PlacedFacility;
   /** A facility taken off the grounds by an Undo (#370); `undo` is always true today. */
   'facility:removed': { facility: PlacedFacility; undo: boolean };

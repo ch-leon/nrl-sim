@@ -229,7 +229,7 @@ describe('the playtest career', () => {
     expect(attackCoach(s)?.speciality).toBe('direct');
     expect(s.playbook.owned).toEqual(['block-play']);
     expect(s.lineup.plays).toEqual(['block-play']);
-    expect(s.money).toBe(FINANCE_STARTING_CASH.normal - PLAYS_BY_ID['block-play'].price);
+    expect(s.money).toBe(FINANCE_STARTING_CASH.normal - 16_000 - PLAYS_BY_ID['block-play'].price);
     expect(s.settings.tutorialDone).toBe(true);
     expect(s.settings.playbackSpeed).toBe(1);
     expect(s.version).toBe(SAVE_VERSION); // no save-format change
