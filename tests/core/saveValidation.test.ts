@@ -253,7 +253,7 @@ it('does not install a repaired import when retaining its occupied destination f
 });
 
 describe('format-24 ceiling compatibility (#538)', () => {
-  it('backfills every pre-change v24 roster deterministically without mutation or RNG draws', () => {
+  it('rejects a pre-finance roster instead of backfilling it', () => {
     fresh(); initLeague(getState());
     const source = JSON.parse(JSON.stringify(getState()));
     source.version = 24;
@@ -261,22 +261,12 @@ describe('format-24 ceiling compatibility (#538)', () => {
     for (const roster of rosters) for (const p of roster) delete p.ceilings;
     source.squad[0].stats.speed = 99.75;
     const original = JSON.stringify(source);
-    const first = migrateState(source);
-    const second = importSave(original);
-    expect(first.ok).toBe(true); expect(second.ok).toBe(true);
-    if (!first.ok || !second.ok) return;
-    expect(first.state).toEqual(second.state);
-    expect(first.state.version).toBe(SAVE_VERSION);
-    expect(first.state.rngSeed).toBe(source.rngSeed);
-    expect(first.state.lineup).toEqual(source.lineup);
+    expect(migrateState(source)).toMatchObject({ ok: false, message: expect.stringMatching(/start a new career/i) });
+    expect(importSave(original)).toMatchObject({ ok: false, message: expect.stringMatching(/start a new career/i) });
     expect(JSON.stringify(source)).toBe(original);
-    const players = [...first.state.squad, ...first.state.freeAgents, ...first.state.league.clubs.flatMap(c => c.squad ?? [])];
-    for (const p of players) for (const key of shownStats(p.position)) expect(p.ceilings[key]).toBeGreaterThanOrEqual(p.stats[key]);
-    expect(migrateState(first.state)).toMatchObject({ ok: true, state: first.state });
     bytes.set(slotKey(1), original);
-    const loaded = loadSlot();
-    expect(loaded.status).toBe('ok');
-    if (loaded.status === 'ok') expect(loaded.state).toEqual(first.state);
+    expect(loadSlot()).toMatchObject({ status: 'corrupt', message: expect.stringMatching(/start a new career/i) });
+    expect(bytes.get(slotKey(1))).toBe(original);
   });
 
   it('preserves stored ceilings even when legacy training has passed them', () => {

@@ -158,8 +158,7 @@ export const SCREEN_SWAP_ATTR = 'data-swap';
 
 // The turn a sheet last came down in (#605). A sheet opened in that same turn takes its
 // place: nothing was drawn between the two. For a screen that closes before it opens the
-// next (History's ◂ back), and for Club home upright, which opens a tick after the sheet
-// over it closes.
+// next (History's ◂ back).
 let sheetLeftAt: number | null = null;
 
 /**

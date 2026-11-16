@@ -8,7 +8,7 @@ export async function runCoachName(browser) {
   const out = join(OUT_ROOT, 'webkit', 'coach-name');
   mkdirSync(out, { recursive: true });
   const results = [];
-  for (const [width, height] of [[667, 375], [844, 390], [390, 844]]) {
+  for (const [width, height] of [[667, 375], [844, 390]]) {
     for (const name of ['Sam Hale', '']) {
       const tag = `${width}x${height}-${name ? 'named' : 'unnamed'}`;
       const ctx = await browser.newContext({ viewport: { width, height }, hasTouch: true, isMobile: true, userAgent: IPHONE_UA });

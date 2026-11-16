@@ -69,6 +69,25 @@ export function isPlacedFacility(v: unknown): v is PlacedFacility {
 /** Finance gained its books in v10 and the overhead line in v17. Missing
  * historical overhead is defaulted by that migration; every other line must
  * already exist. Deltas are signed amounts, not nonnegative balances. */
+function isTerm(v: unknown, after?: number): boolean {
+  return record(v) && integer(v.salary) && Number.isSafeInteger(v.salary)
+    && integer(v.startSeason, after ?? 1) && integer(v.endSeason, v.startSeason as number)
+    && (v.endSeason as number) <= (v.startSeason as number) + 2;
+}
+function isDeal(v: unknown): boolean {
+  if (!isTerm(v)) return false;
+  if (!record(v) || v.renewal === undefined) return true;
+  return isTerm(v.renewal, (v.endSeason as number) + 1) && record(v.renewal) && v.renewal.startSeason === (v.endSeason as number) + 1;
+}
+function isCapAccount(v: unknown): boolean {
+  return record(v) && v.rulesVersion === 1 && oneOf(v.tier, ['local', 'championship', 'premier'])
+    && integer(v.purchasedLevel, 0, 3)
+    && (v.lastPurchaseSeason === null || integer(v.lastPurchaseSeason, 1))
+    && oneOf(v.earnedBasisPoints, [0, 500, 1000])
+    && strings(v.receipts) && unique(v.receipts)
+    && strings(v.protectedIds) && unique(v.protectedIds);
+}
+
 export function isSeasonFinance(v: unknown, version = SAVE_VERSION): v is SeasonFinance {
   // Totals consume every present line, including extra keys preserved by the UI.
   if (!record(v) || !integer(v.season, 1) || !Object.values(v).every(finite)) return false;
@@ -191,6 +210,15 @@ export function validateInput(v: Record<string, unknown>, version: number): stri
   if (version >= 16 && (!record(v.training) || !oneOf(v.training.focus, ['balanced', ...stats]))) return fail('training');
   if (version >= 18 && (!record(v.boardLoan) || !range(v.boardLoan.owed, 0))) return fail('boardLoan');
   if (version >= 19 && (!Array.isArray(v.staff) || !v.staff.every(s => record(s) && oneOf(s.role, ['assistantCoach', 'analyst', 'welfare', 'attackCoach']) && text(s.name) && range(s.wage, 0) && integer(s.hiredSeason, 1) && (s.speciality === undefined || oneOf(s.speciality, ['direct', 'width', 'kicking', 'razzle']))) || !unique(v.staff.map(s => s.role)))) return fail('staff');
+  if (version >= 28) {
+    if (!isCapAccount(v.capAccount)) return fail('cap');
+    const deals = (list: unknown, required: boolean): boolean => Array.isArray(list) && list.every(p => record(p) && (p.deal === undefined ? !required : isDeal(p.deal)));
+    if (!deals(v.squad, true) || !deals(v.freeAgents, false)) return fail('deals');
+    for (const c of v.league.clubs as Record<string, unknown>[]) {
+      if (c.id === 'player' || c.squad === undefined) continue;
+      if (!integer(c.cash) || !Number.isSafeInteger(c.cash) || !isCapAccount(c.capAccount) || !deals(c.squad, true)) return fail('rival account');
+    }
+  }
   return null;
 }
 

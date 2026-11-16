@@ -1,6 +1,6 @@
 # Roadmap
 
-Last updated: 2026-11-13
+Last updated: 2026-11-15
 
 Status checked against GitHub on 7 Nov 2026. Merged tooling is not the same as a
 live gameplay change; work still open below has not shipped.
@@ -23,10 +23,26 @@ live gameplay change; work still open below has not shipped.
   work. Annual-cap finance #555–#562 and progression tuning #547 remain open;
   paid rewards, transfers and release balance retain those prerequisites.
   The state/calendar foundation, isolated AU/UK regional setup and Open Cup are
-  merged through [PR #591](https://github.com/ch-leon/nrl-sim/pull/591). The finance
+  merged through [PR #591](https://github.com/ch-leon/nrl-sim/pull/591).   The finance
   model is approved for initial testing: [contract](../specs/finance-prototype.md),
-  executable quotes and opening inventory ([PR #595](https://github.com/ch-leon/nrl-sim/pull/595)). Normal
-  competition entry and promotion remain gated on their recorded dependencies.
+  executable quotes and opening inventory ([PR #595](https://github.com/ch-leon/nrl-sim/pull/595)).
+  New careers now keep cash and the annual cap apart ([#557](https://github.com/ch-leon/nrl-sim/issues/557)):
+  salaries are a season commitment and do not leave the bank. Signings, renewals
+  and releases now follow the cash and cap rules ([#558](https://github.com/ch-leon/nrl-sim/issues/558)):
+  a signing needs the fee and cap room, a renewal is free, only in the last
+  season of the current deal, and must fit the cap in the season it starts.
+  A release is refused when the cash is short. Choosing two or three seasons
+  at signing is not in this slice; it stays with the finance presentation
+  ([#561](https://github.com/ch-leon/nrl-sim/issues/561)). Rival later signings are
+  refused when they do not fit the cap. Charging their wallets waits until they
+  have match income ([#559](https://github.com/ch-leon/nrl-sim/issues/559)), because the opening float cannot fund an annual fee every
+  week. Match-income
+  receipts ([#559](https://github.com/ch-leon/nrl-sim/issues/559)), cap upgrades
+  ([#560](https://github.com/ch-leon/nrl-sim/issues/560)), the finance-screen
+  cleanup ([#561](https://github.com/ch-leon/nrl-sim/issues/561)) and funded
+  sales between clubs ([#572](https://github.com/ch-leon/nrl-sim/issues/572)) are still open.
+  The old weekly income is still paid, so cash can still climb between signings.
+  Normal competition entry and promotion remain gated on their recorded dependencies.
 - **Expansive attack still under par** ([issue #322](https://github.com/ch-leon/nrl-sim/issues/322), open).
   The Speed diagnostic and four Speed levers merged in
   [PR #514](https://github.com/ch-leon/nrl-sim/pull/514), with every lever **off**, so

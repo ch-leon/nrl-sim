@@ -11,24 +11,27 @@
 import { bus } from '../../core/events';
 import { getState, type Player } from '../../core/state';
 import { overallRating } from '../../data/player';
-import { RELEASE_PAYOUT_WEEKS, releasePlayer } from '../../systems/freeagency';
-import {
-  contractRows, renewalFee, renewalWeeklyCost, renewEarly, renewsOnLoan, sellPlayer, transferFee,
-} from '../../systems/contracts';
-import { SQUAD_MIN, difficultyMultipliers } from '../../config';
+import { releasePlayer } from '../../systems/freeagency';
+import { releaseTerms, renewalAsk } from '../../systems/cap';
+import { contractRows, renewEarly, renewalRefusal, sellPlayer } from '../../systems/contracts';
+import { hasStaff } from '../../systems/staff';
+import { SQUAD_MIN } from '../../config';
 import { fmtMoneyShort } from '../../utils/money';
 import { ARMED_CLASS, armGuard, armedTap, el, button, openScreen, screenHead, backButton } from '../dom';
 import { EXPIRY_WINDOW_WEEKS, ensureFinanceStyles, fmtMoney, openFinanceScreen } from './finance';
 
 const REASONS: Record<string, string> = {
-  'insufficient-funds': 'Not enough money.',
-  'already-fresh': 'Contract is already full length.',
+  'insufficient-funds': 'Not enough cash.',
+  'over-cap': 'Not enough salary-cap room.',
+  'already-renewed': 'A renewal is already queued.',
+  'not-final-season': 'A renewal waits until the last season of his deal.',
   'squad-min': `Squad can't go below ${SQUAD_MIN}.`,
   'not-found': 'Player not found.',
+  'no-buyer': 'No club has bought him. Nothing was changed.',
 };
 
-function act(result: { ok: boolean; reason?: string }): void {
-  if (!result.ok) bus.emit('ui:notify', { text: REASONS[result.reason ?? ''] ?? 'Not possible.', kind: 'info' });
+function act(result: { ok: boolean; reason?: string; message?: string }): void {
+  if (!result.ok) bus.emit('ui:notify', { text: result.message ?? REASONS[result.reason ?? ''] ?? 'Not possible.', kind: 'info' });
 }
 
 /** Short money for a button: $900, $12k, $12.5k, $2m (the labels are written in caps so the k stays small). */
@@ -86,10 +89,17 @@ export function heldRows(order: readonly string[], rows: readonly Player[], gone
 }
 
 /** "24 players · 3 end within 8 wks · wages $14,200/wk". */
-export function contractsSummary(players: readonly Pick<Player, 'contractWeeks' | 'wage'>[], wageMult = 1): string {
-  const soon = players.filter((p) => p.contractWeeks <= EXPIRY_WINDOW_WEEKS).length;
-  const wages = players.reduce((t, p) => t + Math.round(p.wage * wageMult), 0);
-  return `${players.length} players · ${soon} end within ${EXPIRY_WINDOW_WEEKS} wks · wages ${fmtMoney(wages)}/wk`;
+export function contractsSummary(players: readonly Pick<Player, 'contractWeeks' | 'deal'>[], season = 1): string {
+  const soon = players.filter((p) => !p.deal?.renewal && p.contractWeeks <= EXPIRY_WINDOW_WEEKS).length;
+  const cap = players.reduce((total, p) => {
+    const deal = p.deal;
+    if (!deal) return total;
+    if (season >= deal.startSeason && season <= deal.endSeason) return total + deal.salary;
+    const next = deal.renewal;
+    if (next && season >= next.startSeason && season <= next.endSeason) return total + next.salary;
+    return total;
+  }, 0);
+  return `${players.length} players · ${soon} end within ${EXPIRY_WINDOW_WEEKS} wks · cap ${fmtMoney(cap)} this season`;
 }
 
 /** This visit's order, renewals and departures; reset when the screen opens. */
@@ -99,8 +109,7 @@ const gone = new Map<string, GoneRow>();
 
 function render(sub: HTMLElement, tbody: HTMLElement): void {
   const s = getState();
-  const wageMult = difficultyMultipliers(s.settings.difficulty).wages;
-  sub.textContent = contractsSummary(s.squad, wageMult);
+  sub.textContent = contractsSummary(s.squad, s.season);
   const rows: HTMLElement[] = [];
   const rerender = (): void => render(sub, tbody);
   atRest = null;
@@ -116,34 +125,48 @@ function render(sub: HTMLElement, tbody: HTMLElement): void {
     }
     const p = row.player;
     const weeks = p.contractWeeks;
-    const onLoan = renewsOnLoan(s, p);
-    // Who he is, and what a renewal would pay him (the button says what it costs now). His
-    // position under his name too, for the narrowest sheet, which drops the Pos column (#350).
-    const meta = `age ${p.age} · morale ${p.morale} · renews at ${fmtMoney(renewalWeeklyCost(s, p))}/wk${onLoan ? ' on a board loan' : ''}`;
+    const ask = renewalAsk(p, hasStaff(s, 'welfare'));
+    const queued = p.deal?.renewal;
+    const start = queued?.startSeason ?? (p.deal && p.deal.endSeason >= s.season ? p.deal.endSeason + 1 : s.season);
+    const changed = p.deal && ask.salary !== p.deal.salary ? ` ${ask.why}.` : '';
+    const blocked = renewalRefusal(s, p);
+    const meta = queued
+      ? `age ${p.age} · renewal queued from season ${queued.startSeason} at ${fmtMoney(queued.salary)}/season`
+      : blocked
+        ? `age ${p.age} · ${blocked.message}`
+        : `age ${p.age} · morale ${p.morale} · renews from season ${start} at ${fmtMoney(ask.salary)}/season, no fee${changed}`;
     const who = el('td', { class: 'nrl-contract-info', attrs: { title: meta } }, el('div', { class: 'nrl-contract-who' },
       el('span', { class: 'nrl-contract-name', text: p.name }),
       el('span', { class: 'nrl-contract-meta', text: meta }),
       el('span', { class: 'nrl-contract-pos', text: p.position })));
 
     let renew: HTMLButtonElement;
-    if (renewed.has(p.id)) {
+    if (queued) {
+      renew = button('QUEUED', () => {});
+      renew.disabled = true;
+      renew.title = `A renewal is already queued from season ${queued.startSeason} at ${fmtMoney(queued.salary)} a season.`;
+    } else if (renewed.has(p.id)) {
       renew = button('RENEWED ✓', () => {});
       renew.disabled = true;
+      renew.title = 'Renewed this visit.';
+    } else if (blocked) {
+      renew = button('RENEW', () => { act(renewEarly(getState(), p.id)); });
+      renew.disabled = true;
+      renew.title = blocked.message;
     } else {
-      renew = button(`RENEW ${fmtMoney(renewalFee(s, p))}`, () => {
+      renew = button('RENEW', () => {
         arm(null);
         const res = renewEarly(getState(), p.id);
         if (res.ok) renewed.add(p.id);
         act(res);
         rerender();
       });
-      renew.title = `Renew: ${fmtMoney(renewalFee(s, p))} now${onLoan ? ' on a board loan' : ''}, then ${fmtMoney(renewalWeeklyCost(s, p))}/wk`;
+      renew.title = `No fee. From season ${start} at ${fmtMoney(ask.salary)} a season.${changed}`;
     }
     renew.setAttribute('data-contract-renew', p.id);
+    const terms = releaseTerms(p, s.season, s.week);
     const releaseArmed = armed === `release:${p.id}`;
-    const sellArmed = armed === `sell:${p.id}`;
-    const releaseLabel = `RELEASE ${fmtShort(RELEASE_PAYOUT_WEEKS * p.wage)}`;
-    const sellLabel = `SELL +${fmtShort(transferFee(p))}`;
+    const releaseLabel = `RELEASE ${fmtShort(terms.payout)}`;
     const release = button(releaseArmed ? 'REALLY RELEASE?' : releaseLabel, () => {
       const g = guardTap(armed, `release:${p.id}`);
       if (g.run && !armedTap(performance.now() - armedAt)) return; // the tap that armed it, twice
@@ -155,20 +178,18 @@ function render(sub: HTMLElement, tbody: HTMLElement): void {
       }
       rerender();
     }, { class: releaseArmed ? `nrl-btn-danger ${ARMED_CLASS}` : 'nrl-btn-danger' });
-    release.title = `Two taps: pays out ${fmtMoney(RELEASE_PAYOUT_WEEKS * p.wage)}`;
+    const nextFreed = terms.nextCapFreed > 0 ? ` and ${fmtMoney(terms.nextCapFreed)} next season` : '';
+    release.title = `Two taps: pays ${fmtMoney(terms.payout)} and frees ${fmtMoney(terms.capFreed)} of this season's cap${nextFreed}. The signing fee is not refunded.`;
+    const sellArmed = armed === `sell:${p.id}`;
+    const sellLabel = 'NO BUYER';
     const sell = button(sellArmed ? 'REALLY SELL?' : sellLabel, () => {
       const g = guardTap(armed, `sell:${p.id}`);
-      if (g.run && !armedTap(performance.now() - armedAt)) return; // the tap that armed it, twice
+      if (g.run && !armedTap(performance.now() - armedAt)) return;
       arm(g.armed);
-      if (g.run) {
-        const fee = transferFee(p);
-        const res = sellPlayer(getState(), p.id);
-        if (res.ok) gone.set(p.id, { text: `${p.name} · sold for ${fmtMoney(fee)}`, done: 'SOLD ✓' });
-        act(res);
-      }
+      if (g.run) act(sellPlayer(getState(), p.id));
       rerender();
     }, { class: sellArmed ? `nrl-btn-danger ${ARMED_CLASS}` : 'nrl-btn-danger' });
-    sell.title = `Two taps: a transfer fee of ${fmtMoney(transferFee(p))}`;
+    sell.title = 'Two taps. No club has bought him, so nothing is sold.';
     if (releaseArmed || sellArmed) {
       const [btn, label] = releaseArmed ? [release, releaseLabel] : [sell, sellLabel];
       atRest = () => { btn.classList.remove(ARMED_CLASS); btn.textContent = label; };
@@ -178,8 +199,8 @@ function render(sub: HTMLElement, tbody: HTMLElement): void {
       who,
       el('td', { text: p.position }),
       el('td', { class: 'nrl-num', text: String(Math.round(overallRating(p))) }),
-      el('td', { class: `nrl-num${weeks <= EXPIRY_WINDOW_WEEKS ? ' nrl-contract-soon' : ''}`, text: `${weeks} wk${weeks === 1 ? '' : 's'}` }),
-      el('td', { class: 'nrl-num', text: fmtMoney(Math.round(p.wage * wageMult)) }),
+      el('td', { class: `nrl-num${weeks <= EXPIRY_WINDOW_WEEKS && !queued ? ' nrl-contract-soon' : ''}`, text: `${weeks} wk${weeks === 1 ? '' : 's'}` }),
+      el('td', { class: 'nrl-num', text: fmtMoney(p.deal?.salary ?? 0), attrs: { title: 'Annual salary on the cap' } }),
       el('td', {}, el('div', { class: 'nrl-contract-actions' }, renew, release, sell)),
     ));
   }
@@ -200,7 +221,7 @@ export function openContractsScreen(): HTMLElement {
       el('col', { attrs: { style: 'width:64px' } }), el('col', { attrs: { style: 'width:76px' } }), el('col', { class: 'nrl-contracts-col-actions' })),
     el('thead', {}, el('tr', {},
       el('th', { text: 'Player' }), el('th', { text: 'Pos' }), el('th', { class: 'nrl-num', text: 'Ovr' }),
-      el('th', { class: 'nrl-num', text: 'Left' }), el('th', { class: 'nrl-num', text: 'Wage' }), el('th'))),
+      el('th', { class: 'nrl-num', text: 'Left' }), el('th', { class: 'nrl-num', text: 'Cap' }), el('th'))),
     tbody);
   render(sub, tbody);
   const sheet = el('div', { class: 'nrl-screen nrl-finance-sheet nrl-contracts' },

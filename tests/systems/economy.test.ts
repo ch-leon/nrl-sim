@@ -14,7 +14,7 @@ import {
   type Player, type PlacedFacility, type GameState, type Fixture,
 } from '../../src/core/state';
 import { bus } from '../../src/core/events';
-import { BOARD, CONTRACTS, DIFFICULTY, ECON, SQUAD_MIN, WEEKS_PER_SEASON } from '../../src/config';
+import { DIFFICULTY, ECON, SQUAD_MIN, WEEKS_PER_SEASON } from '../../src/config';
 import { clearTickHooks, advanceWeek, TICK_ORDER } from '../../src/core/time';
 
 // A player with fully controlled economic fields.
@@ -335,43 +335,20 @@ describe('tickContracts', () => {
     expect(s.squad.find((p) => p.id === 'b')!.contractWeeks).toBe(2);
   });
 
-  it('auto-renews an expiring affordable player at the renewal ask, 52 weeks (#167)', () => {
-    // overall 60, neutral morale, a new club at the baseline reputation → the market wage, $1,050.
+  it('does not reprice or release a player when the week count hits zero', () => {
     const p = mkPlayer({
       id: 'renew', wage: 4000, morale: 50, contractWeeks: 1,
-      stats: { speed: 60, strength: 60, stamina: 60, handling: 60, kicking: 60, footyIQ: 60 }, // overall 60
+      stats: { speed: 60, strength: 60, stamina: 60, handling: 60, kicking: 60, footyIQ: 60 },
     });
-    setup({ money: 1_000_000, reputation: 30, season: 1, squad: [p] });
+    setup({ money: 100, reputation: 30, season: 1, squad: [p] });
+    const cash = getState().money;
     tickContracts(getState());
     const out = getState().squad.find((x) => x.id === 'renew')!;
-    expect(out.contractWeeks).toBe(52);
-    expect(out.wage).toBe(1050);
-    expect(out.wage).toBe(renewalWage(p, { reputation: 30, season: 1 }));
+    expect(out.contractWeeks).toBe(0);
+    expect(out.wage).toBe(4000);
+    expect(getState().money).toBe(cash);
     expect(getState().freeAgents.some((x) => x.id === 'renew')).toBe(false);
-  });
-
-  it('the ask follows the wage curve and the club, not the old wage (#167)', () => {
-    // overall 100 → $5,650 on the curve; reputation 100 in season 3 → ×1.25 × (1 + 2 × the season inflation).
-    const elite = mkPlayer({
-      id: 'elite', wage: 10000, morale: 50, contractWeeks: 1,
-      stats: { speed: 100, strength: 100, stamina: 100, handling: 100, kicking: 100, footyIQ: 100 },
-    });
-    setup({ money: 10_000_000, reputation: 100, season: 3, squad: [elite] });
-    tickContracts(getState());
-    const out = getState().squad.find((x) => x.id === 'elite')!;
-    expect(out.wage).toBe(Math.round(5650 * 1.25 * (1 + 2 * CONTRACTS.RENEW_SEASON_INFLATION)));
-  });
-
-  it('unaffordable expiring player departs to freeAgents with a notify', () => {
-    let notified: { text: string; kind: string } | null = null;
-    bus.on('ui:notify', (n) => { if (n.kind === 'info') notified = n; });
-    const p = mkPlayer({ id: 'depart', name: 'Gone Guy', wage: 5000, contractWeeks: 1 });
-    // money too low: needs newWage×4 = 20000; give 100, and the board has no room (N14.3).
-    setup({ money: 100, squad: [p, mkPlayer({ id: 'other', contractWeeks: 30 })], boardLoan: { owed: BOARD.LOAN_CAP } });
-    tickContracts(getState());
-    expect(getState().squad.some((x) => x.id === 'depart')).toBe(false);
-    expect(getState().freeAgents.some((x) => x.id === 'depart')).toBe(true);
-    expect(notified).not.toBeNull();
+    expect(renewalWage(p, { reputation: 30, season: 1 })).toBe(1050);
   });
 
   it('empty squad is a no-op', () => {
@@ -382,136 +359,22 @@ describe('tickContracts', () => {
 });
 
 describe('handleBankruptcy', () => {
-  it('money < 0 emits bankruptcy:warning + danger notify', () => {
-    let warned: { balance: number } | null = null;
-    let danger = false;
-    bus.on('bankruptcy:warning', (w) => { warned = w; });
-    bus.on('ui:notify', (n) => { if (n.kind === 'danger') danger = true; });
-    setup({ money: -1000, squad: [mkPlayer()] });
-    handleBankruptcy(getState());
-    expect(warned).toEqual({ balance: -1000, forcedSales: [] });
-    expect(danger).toBe(true);
-  });
-
-  it('the warning names the forced sale, after it, and the toasts keep their order (N12.5)', () => {
-    const pricey = mkPlayer({ id: 'pricey', name: 'Big Wage', wage: 20000 });
-    const next = mkPlayer({ id: 'next', name: 'Next Wage', wage: 9000 });
-    const filler = Array.from({ length: SQUAD_MIN }, (_, i) => mkPlayer({ id: `f${i}`, wage: 500 }));
-    setup({ money: ECON.FORCED_SALE_FLOOR - 10_000, squad: [next, pricey, ...filler] });
-    const seen: string[] = [];
-    let squadAtWarning = -1;
-    bus.on('ui:notify', (n) => { seen.push(n.text); });
-    bus.on('bankruptcy:warning', (w) => {
-      seen.push(`warning: ${(w.forcedSales ?? []).join(', ')}`);
-      squadAtWarning = getState().squad.length;
-    });
-    handleBankruptcy(getState());
-    expect(seen).toEqual([
-      'The club is in the red (-$110,000). Balance the books!',
-      'Big Wage was force-sold to cover debts (no fee).',
-      'warning: Big Wage',
-    ]);
-    expect(squadAtWarning).toBe(SQUAD_MIN + 1);
-  });
-
-  it('the red is written the way the dock shows it: the sign before the dollar, en-US grouping (#417)', () => {
-    const seen: string[] = [];
-    bus.on('ui:notify', (n) => { seen.push(n.text); });
-    setup({ money: -8946, squad: [mkPlayer()] });
-    handleBankruptcy(getState());
-    expect(seen).toEqual(['The club is in the red (-$8,946). Balance the books!']);
-  });
-
-  it('no warning when money >= 0', () => {
+  it('does not warn, sell or cut morale when the bank is negative', () => {
+    const squad = Array.from({ length: SQUAD_MIN + 2 }, (_, i) => mkPlayer({ id: `s${i}`, wage: 1000 * (i + 1), morale: 50 }));
+    setup({ money: -5_000_000, squad });
     let warned = false;
     bus.on('bankruptcy:warning', () => { warned = true; });
-    setup({ money: 5000, squad: [mkPlayer()] });
     handleBankruptcy(getState());
     expect(warned).toBe(false);
+    expect(getState().squad.map(p => p.id)).toEqual(squad.map(p => p.id));
+    expect(getState().squad.every(p => p.morale === 50)).toBe(true);
+    expect(getState().money).toBe(-5_000_000);
   });
 
-  it('money < FORCED_SALE_FLOOR force-sells the highest-paid player (no payout)', () => {
-    const cheap = mkPlayer({ id: 'cheap', wage: 1000 });
-    const pricey = mkPlayer({ id: 'pricey', wage: 20000 });
-    // Squad above SQUAD_MIN so a sale is allowed.
-    const filler = Array.from({ length: SQUAD_MIN }, (_, i) => mkPlayer({ id: `f${i}`, wage: 500 }));
-    setup({ money: ECON.FORCED_SALE_FLOOR - 10_000, squad: [cheap, pricey, ...filler] });
-    const balanceBefore = getState().money;
-    handleBankruptcy(getState());
-    const s = getState();
-    // highest-paid removed, no payout (money unchanged by the sale itself)
-    expect(s.squad.some((p) => p.id === 'pricey')).toBe(false);
-    expect(s.freeAgents.some((p) => p.id === 'pricey')).toBe(true);
-    expect(s.money).toBe(balanceBefore); // no fee received
-  });
-
-  it('applies squad-wide morale −10 per forced sale, clamped ≥1', () => {
-    const pricey = mkPlayer({ id: 'pricey', wage: 30000, morale: 60 });
-    const lowMorale = mkPlayer({ id: 'low', wage: 100, morale: 5 });
-    const filler = Array.from({ length: SQUAD_MIN - 1 }, (_, i) => mkPlayer({ id: `f${i}`, wage: 100, morale: 50 }));
-    setup({ money: ECON.FORCED_SALE_FLOOR - 10_000, squad: [pricey, lowMorale, ...filler] });
-    handleBankruptcy(getState());
-    const s = getState();
-    expect(s.squad.length).toBe(SQUAD_MIN);
-    expect(s.squad.some((p) => p.id === 'pricey')).toBe(false); // highest-paid sold
-    // remaining players lost 10 morale (one sale); low(5-10) clamps to 1.
-    expect(s.squad.find((p) => p.id === 'low')!.morale).toBe(1);
-    expect(s.squad.find((p) => p.id === 'f0')!.morale).toBe(40);
-  });
-
-  it('sells one a week under the floor, the highest wage first, and never below SQUAD_MIN (N14.3)', () => {
-    // Huge debt: one sale a week until the squad is at the minimum, then none.
-    const squad = Array.from({ length: SQUAD_MIN + 2 }, (_, i) => mkPlayer({ id: `s${i}`, wage: 1000 * (i + 1) }));
-    setup({ money: -5_000_000, squad });
-    const sold: string[][] = [];
-    bus.on('bankruptcy:warning', (w) => sold.push(w.forcedSales ?? []));
-    for (let week = 0; week < 4; week++) handleBankruptcy(getState());
-    const s = getState();
-    expect(sold.map((names) => names.length)).toEqual([1, 1, 0, 0]);
-    expect(s.freeAgents.filter((p) => p.id.startsWith("s")).map((p) => p.id)).toEqual([`s${SQUAD_MIN + 1}`, `s${SQUAD_MIN}`]);
-    expect(s.squad.length).toBe(SQUAD_MIN);
-    expect(s.money).toBeLessThan(ECON.FORCED_SALE_FLOOR); // still in debt, but fieldable
-  });
-
-  /** The test's own players in the free-agent pool, in the order they were sold (a new game has its own pool). */
-  const sold = () => getState().freeAgents.map((p) => p.id).filter((id) => /^(fit|hurt)\d/.test(id));
-
-  it('keeps SQUAD_MIN fit: injured players go before a sale would leave too few fit (QA finding 19)', () => {
-    // As in a playthrough's week 27: the highest-paid fit players were sold down to a squad of
-    // SQUAD_MIN with two of them injured, 11 fit, and the finals match was forfeited.
-    const injured = [0, 1].map((i) => mkPlayer({ id: `hurt${i}`, wage: 100, injuredWeeks: 3 }));
-    const fit = Array.from({ length: SQUAD_MIN + 2 }, (_, i) => mkPlayer({ id: `fit${i}`, wage: 1000 * (i + 1) }));
-    setup({ money: -5_000_000, squad: [...injured, ...fit] });
-    for (let week = 0; week < 6; week++) handleBankruptcy(getState()); // one a week (N14.3)
-    const s = getState();
-    expect(s.squad.length).toBe(SQUAD_MIN);
-    expect(s.squad.filter((p) => p.injuredWeeks <= 0).length).toBe(SQUAD_MIN);
-    // The two best-paid fit players first, then the injured ones (cheaper, but the only ones left to go).
-    expect(sold()).toEqual(['fit14', 'fit13', 'hurt0', 'hurt1']);
-  });
-
-  it('never sells a fit player out of a squad already short of fit players', () => {
-    const injured = [0, 1, 2].map((i) => mkPlayer({ id: `hurt${i}`, wage: 100 + i, injuredWeeks: 2 }));
-    const fit = Array.from({ length: SQUAD_MIN - 1 }, (_, i) => mkPlayer({ id: `fit${i}`, wage: 50_000 }));
-    setup({ money: -5_000_000, squad: [...injured, ...fit] });
-    for (let week = 0; week < 4; week++) handleBankruptcy(getState()); // one a week (N14.3)
-    const s = getState();
-    // Squad SQUAD_MIN + 2: two injured go (highest-paid of them first), every fit player stays.
-    expect(sold()).toEqual(['hurt2', 'hurt1']);
-    expect(s.squad.filter((p) => p.injuredWeeks <= 0).length).toBe(SQUAD_MIN - 1);
-    expect(s.squad.length).toBe(SQUAD_MIN);
-  });
-
-  it('no forced sale when between floor and 0 (warning only)', () => {
-    const squad = Array.from({ length: SQUAD_MIN + 3 }, (_, i) => mkPlayer({ id: `s${i}`, wage: 1000 }));
-    setup({ money: -10_000, squad });
-    handleBankruptcy(getState());
-    expect(getState().squad.length).toBe(SQUAD_MIN + 3); // no sales above the floor
-  });
 });
 
 describe('applyEconomy — full weekly loop', () => {
-  it('deducts wages and credits sponsor + rep grant, emitting money:changed per path', () => {
+  it('credits sponsor and the rep grant without taking wages, upkeep or overhead', () => {
     const reasons: string[] = [];
     bus.on('money:changed', (m) => reasons.push(m.reason));
     setup({
@@ -521,12 +384,12 @@ describe('applyEconomy — full weekly loop', () => {
       league: { clubs: [], fixtures: [], ladder: [] },
     });
     applyEconomy(getState());
-    // wages -5000 ; upkeep -100 (Sponsor Board L1) ; running costs -1500 ; sponsor 150 + 10×30 = 450 + grant 40×30 = 1200 ; no gate (empty league)
-    expect(getState().money).toBe(100_000 - 5000 - 100 - ECON.OVERHEAD_WEEKLY + 450 + 30 * ECON.REP_GRANT_PER_POINT);
-    expect(reasons).toEqual(['wages', 'upkeep', 'overhead', 'sponsor', 'grant']);
+    expect(getState().money).toBe(100_000 + 450 + 30 * ECON.REP_GRANT_PER_POINT);
+    expect(reasons).toEqual(['sponsor', 'grant']);
+    expect(getState().squad).toHaveLength(1);
   });
 
-  it('pays upkeep after wages, at the facilities\' levels, and skips it with nothing built (#164)', () => {
+  it('does not charge facility upkeep or an idle club\'s running costs', () => {
     const seen: { delta: number; reason: string }[] = [];
     bus.on('money:changed', (m) => seen.push({ delta: m.delta, reason: m.reason }));
     setup({
@@ -535,78 +398,22 @@ describe('applyEconomy — full weekly loop', () => {
       league: { clubs: [], fixtures: [], ladder: [] },
     });
     applyEconomy(getState());
-    expect(seen).toEqual([{ delta: -(2400 + 120), reason: 'upkeep' }, { delta: -ECON.OVERHEAD_WEEKLY, reason: 'overhead' }]);
-    expect(getState().money).toBe(50_000 - 2520 - ECON.OVERHEAD_WEEKLY);
-
-    seen.length = 0;
-    setup({ money: 50_000, reputation: 0, squad: [], facilities: [], league: { clubs: [], fixtures: [], ladder: [] } });
-    applyEconomy(getState());
-    expect(seen).toEqual([{ delta: -ECON.OVERHEAD_WEEKLY, reason: 'overhead' }]);
+    expect(seen).toEqual([]);
+    expect(getState().money).toBe(50_000);
+    expect(weeklyUpkeep(getState())).toBe(2400 + 120);
   });
 
-  it('pays the running costs after upkeep and before any income, every week, built or not, on its own line (N12.3)', () => {
-    const seen: { delta: number; reason: string }[] = [];
-    bus.on('money:changed', (m) => seen.push({ delta: m.delta, reason: m.reason }));
-    for (const [difficulty, cost] of [['easy', 1200], ['normal', 1500], ['hard', 1800]] as const) {
-      seen.length = 0;
-      createNewGame('Overhead', 1, { difficulty });
-      loadState({
-        ...getState(), money: 10_000, reputation: 30, week: 2,
-        squad: [mkPlayer({ wage: 1000, contractWeeks: 30 })],
-        facilities: [pf('trainingPaddock', 1)],
-        league: { clubs: [], fixtures: [{ round: 2, homeId: 'player', awayId: 'r' }], ladder: [] },
-      });
-      applyEconomy(getState());
-      expect(seen.map((m) => m.reason), difficulty).toEqual(['wages', 'upkeep', 'overhead', 'grant', 'gate']);
-      expect(seen.find((m) => m.reason === 'overhead')!.delta, difficulty).toBe(-cost);
-      expect(classifyReason('overhead')).toBe('overhead');
-    }
-    // An idle club with no money still pays it: it is what pushes an idle club into the red.
-    seen.length = 0;
-    setup({ money: 1000, reputation: 0, squad: [], facilities: [], league: { clubs: [], fixtures: [], ladder: [] } });
-    applyEconomy(getState());
-    expect(getState().money).toBe(1000 - ECON.OVERHEAD_WEEKLY);
-  });
-
-  it('home gate is credited and can rescue the club before forced sales', () => {
-    // Start below the forced-sale floor; a big home gate lifts above it so no sale.
-    const squad = Array.from({ length: SQUAD_MIN + 2 }, (_, i) => mkPlayer({ id: `s${i}`, wage: 100, contractWeeks: 30 }));
+  it('a home gate is cash in, and a huge wage bill does not sell anyone', () => {
+    const squad = Array.from({ length: SQUAD_MIN + 1 }, (_, i) => mkPlayer({ id: `s${i}`, wage: 200_000, contractWeeks: 30 }));
     setup({
-      money: -55_000, reputation: 50, squad,
+      money: 0, reputation: 50, squad,
       facilities: [pf('grandstand', 3)],
       league: { clubs: [], fixtures: [{ round: 1, homeId: 'player', awayId: 'r' }], ladder: [] },
       week: 1,
     });
     applyEconomy(getState());
-    // gate = 1,800 × $20 = $36,000 (rep 50; the L3 stand is not needed), wages small, income = rep grant.
-    // Net well above the floor → no forced sales.
-    expect(getState().squad.length).toBe(SQUAD_MIN + 2);
-    expect(getState().money).toBeGreaterThan(ECON.FORCED_SALE_FLOOR);
-  });
-
-  it('wages push money negative (below zero allowed) and trigger a warning', () => {
-    let warned = false;
-    bus.on('bankruptcy:warning', () => { warned = true; });
-    setup({
-      money: 1000, reputation: 0,
-      squad: [mkPlayer({ wage: 5000, contractWeeks: 30 })],
-      facilities: [],
-      league: { clubs: [], fixtures: [], ladder: [] },
-    });
-    applyEconomy(getState());
-    expect(getState().money).toBe(1000 - 5000 - ECON.OVERHEAD_WEEKLY + 0); // -5500
-    expect(warned).toBe(true);
-  });
-
-  it('order is fixed: wages → upkeep → running costs → income → gate → contracts → bankruptcy (terminates)', () => {
-    const squad = Array.from({ length: SQUAD_MIN + 1 }, (_, i) => mkPlayer({ id: `s${i}`, wage: 200000, contractWeeks: 30 }));
-    setup({
-      money: 0, reputation: 0, squad, facilities: [],
-      league: { clubs: [], fixtures: [], ladder: [] },
-    });
-    // enormous wages drive deep below floor → one forced sale this week.
-    expect(() => applyEconomy(getState())).not.toThrow();
-    expect(getState().squad.length).toBe(SQUAD_MIN);
+    expect(getState().squad).toHaveLength(SQUAD_MIN + 1);
+    expect(getState().money).toBeGreaterThan(0);
   });
 });
 
@@ -696,9 +503,9 @@ describe('the club\'s books (N6, #172)', () => {
     const books = getState().finance[0]!;
     expect(books.season).toBe(1);
     for (const [line, delta] of Object.entries(seen)) expect(books[line as keyof typeof books], line).toBe(delta);
-    expect(books.wages).toBe(-1000);
-    expect(books.upkeep).toBe(-100);
-    expect(books.overhead).toBe(-ECON.OVERHEAD_WEEKLY);
+    expect(books.wages).toBe(0);
+    expect(books.upkeep).toBe(0);
+    expect(books.overhead).toBe(0);
     expect(books.sponsor).toBe(sponsorReturn(1, 30)); // $150 + $10 × 30 (N12)
     expect(books.grant).toBe(30 * ECON.REP_GRANT_PER_POINT);
     expect(books.gate).toBe(1200 * ECON.TICKET_PRICE);
@@ -738,8 +545,7 @@ describe('registerEconomySystem — hook installation', () => {
     registerEconomySystem();
     expect(TICK_ORDER.economy).toBe(30);
     advanceWeek();
-    // wages -3000 ; running costs -1500 ; income 40×20 = +800 → 96300
-    expect(getState().money).toBe(100_000 - 3000 - ECON.OVERHEAD_WEEKLY + 20 * ECON.REP_GRANT_PER_POINT);
+    expect(getState().money).toBe(100_000 + 20 * ECON.REP_GRANT_PER_POINT);
   });
 
   it('re-registering does not double-apply', () => {
@@ -751,7 +557,7 @@ describe('registerEconomySystem — hook installation', () => {
     registerEconomySystem();
     registerEconomySystem();
     advanceWeek();
-    expect(getState().money).toBe(100_000 - 3000 - ECON.OVERHEAD_WEEKLY + 20 * ECON.REP_GRANT_PER_POINT); // single application
+    expect(getState().money).toBe(100_000 + 20 * ECON.REP_GRANT_PER_POINT); // single application
   });
 });
 

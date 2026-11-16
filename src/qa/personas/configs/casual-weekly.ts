@@ -7,4 +7,5 @@ export default {
   recruits: { policy: 'short', floor: 16, reserve: 30_000, wageWeeks: 8, renewStars: true },
   staff: { roles: ['welfare'], fromWeek: 16, reserve: 60_000 },
   tactics: 'defaults', attackCoach: 'none', setPlays: 'none',
+  points: { policy: 'focus', hold: 0 }, calling: 'none', releases: 'none',
 } satisfies PersonaConfig;

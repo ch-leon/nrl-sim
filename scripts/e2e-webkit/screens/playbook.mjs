@@ -3,8 +3,8 @@ import { join } from 'node:path';
 import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav } from '../common.mjs';
 
 /**
- * Set plays on the club side (#326, phase 2), upright at 390×844 and sideways at
- * 844×390, as a veteran's new club (everything open, so Staff & Board is there):
+ * Set plays on the club side (#326, phase 2), at phone landscape (667×375 and
+ * 844×390), as a veteran's new club (everything open, so Staff & Board is there):
  *   - Office ▸ Playbook with no attack coach: the hire card, its Staff & Board link;
  *   - Staff & Board: the attack coach's row with four Hire buttons, Razzle locked
  *     at a new club's reputation; Hire Direct;
@@ -14,7 +14,7 @@ import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav }
  * At every step nothing is wider than the screen, the body scrolls (or fits), and
  * every button the step uses is a 44px tap. A few seconds a size.
  */
-export async function runPlaybook(browser, sizes = [[390, 844], [844, 390]]) {
+export async function runPlaybook(browser, sizes = [[667, 375], [844, 390]]) {
   const started = Date.now();
   const OUT = join(OUT_ROOT, 'webkit', 'playbook');
   mkdirSync(OUT, { recursive: true });

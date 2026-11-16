@@ -2,9 +2,10 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, reachProblems } from '../common.mjs';
 
-// #315: the page opened upright, not turned upright after boot. 390×844 is the
-// portrait pair of the 844×390 phone. Clicks go through element.click(): the
-// rotate card covers the title and the HUD, so a Playwright tap never lands.
+// A phone that opens already upright (390×844, the portrait pair of 844×390).
+// The rotate card covers the title, the menus, the grounds and the match, and
+// the loop sleeps until the phone is sideways. Clicks while the card is up go
+// through element.click(): a Playwright tap never lands on what the card covers.
 export async function runPortrait(browser) {
   const OUT = join(OUT_ROOT, 'webkit', '390x844-boot');
   rmSync(OUT, { recursive: true, force: true });
@@ -68,16 +69,6 @@ export async function runPortrait(browser) {
   }, null, { timeout: 15000 }).catch(async () => {
     throw new Error(`${label}: loop not asleep under the rotate card (${JSON.stringify(await state())})`);
   });
-  // #350: upright on a menu the loop sleeps with no rotate card: Club home, or a new game's tour,
-  // which opens on Build (#370).
-  const asleepOnMenu = (label, menu = '[data-club-home]') => page.waitForFunction((menu) => {
-    const loop = window.__nrlGame?.loop;
-    const card = document.querySelector('.nrl-rotate');
-    return !!loop?.started && loop.running === false && !!document.querySelector(menu)
-      && !!card && getComputedStyle(card).display === 'none';
-  }, menu, { timeout: 15000 }).catch(async () => {
-    throw new Error(`${label}: not on ${menu} with the loop asleep and no rotate card (${JSON.stringify(await state())})`);
-  });
   const awake = (label) => page.waitForFunction(() => {
     const g = window.__nrlGame;
     if (!g?.loop.running) return false;
@@ -102,13 +93,15 @@ export async function runPortrait(browser) {
     await page.waitForSelector('[data-nrl-start]');
     // press() is a DOM click, which a disabled Start ("Loading towns…", #613) ignores: wait for the town list.
     await page.waitForFunction(() => !document.querySelector('[data-nrl-start]')?.disabled);
+    const title = await state();
+    if (!title.coarse) throw new Error('WebKit did not report a coarse pointer, so this is not a phone');
+    if (!title.card) throw new Error('the rotate card is not over the title');
     await press('[data-nrl-start]');
-    await page.locator('[data-expansion-work]').tap();
+    await press('[data-expansion-work]');
     await page.waitForSelector('.nrl-dock');
-    await asleepOnMenu('opened upright', '[data-club-home], [data-screen-key="build"]');
+    await asleep('opened upright');
     const o = await state();
-    if (!o.coarse) throw new Error('WebKit did not report a coarse pointer, so this is not a phone');
-    rec.notes.push(`a menu (the tour's Build), no card, loop asleep, canvas ${o.canvas} in ${o.viewport}`);
+    rec.notes.push(`card over the title and the club, loop asleep, canvas ${o.canvas} in ${o.viewport}`);
   });
   await step('landscape-boot', async (rec) => {
     await turn(844, 390);
@@ -126,19 +119,44 @@ export async function runPortrait(browser) {
     await page.waitForSelector('.nrl-screen-region', { state: 'detached', timeout: 5000 }).catch(() => {});
     if (await page.locator('.nrl-screen-region').count()) throw new Error('Build stayed open after the tour was skipped');
   });
-  // Inspect the event UI in both orientations. Hide only the rotate prompt:
-  // portrait gameplay is still paused, but DOM choices must fit and accept taps.
+  await step('menu-portrait', async (rec) => {
+    await page.locator('.nrl-nav > .nrl-btn[data-screen="squad"]').tap();
+    await page.waitForSelector('[data-screen-key="squad"]');
+    await turn(390, 844);
+    await asleep('squad upright');
+    const covered = await page.evaluate(() => {
+      const card = document.querySelector('.nrl-rotate');
+      return !!document.querySelector('[data-screen-key="squad"]') && !!card && getComputedStyle(card).display !== 'none';
+    });
+    if (!covered) throw new Error('the rotate card is not over Squad');
+    rec.notes.push('card over Squad, loop asleep');
+  });
+  await step('menu-landscape', async () => {
+    await turn(844, 390);
+    await awake('squad sideways');
+    await page.keyboard.press('Escape');
+    await page.waitForSelector('.nrl-screen-region', { state: 'detached' });
+  });
+  await step('grounds-portrait', async (rec) => {
+    await turn(390, 844);
+    await asleep('grounds upright');
+    if (await page.locator('.nrl-screen-region').count()) throw new Error('a sheet is still up over the grounds');
+    rec.notes.push('card over the grounds, loop asleep');
+  });
+  await step('grounds-landscape', async () => {
+    await turn(844, 390);
+    await awake('grounds sideways');
+  });
+  // The event card, at phone landscape. Portrait is the rotate card, so the choices are not measured there.
   await step('bali-choices-fit', async (rec) => {
-    await page.addStyleTag({ content: '.nrl-rotate { display: none !important; }' });
     const problems = [];
-    for (const [w, h] of [[360, 640], [390, 844], [667, 375], [844, 390]]) {
+    for (const [w, h] of [[667, 375], [844, 390]]) {
       for (const choice of [0, 1]) {
         await turn(w, h);
         if (!(await page.evaluate(() => window.__nrlShowCard?.('baliTrip')))) throw new Error('Bali hook failed');
-        // 3a: the decisions chip on the grounds; its REVIEW opens the card in its own popup. Upright
-        // (#350) home is Club home, whose decisions row opens it. (The card's News row is checked
-        // sideways in runScreens' news-decision-banner.)
-        const review = w < h ? '.nrl-club-home-alert' : '[data-decisions-chip]:not([hidden]) .nrl-decisions-review';
+        // The decisions chip on the grounds; its REVIEW opens the card. (The card's News row is
+        // checked in runScreens' news-decision-banner.)
+        const review = '[data-decisions-chip]:not([hidden]) .nrl-decisions-review';
         await page.waitForSelector(review);
         await page.locator(review).tap();
         await page.waitForSelector('.nrl-decisions-modal .nrl-event-card');
@@ -171,12 +189,6 @@ export async function runPortrait(browser) {
       }
       rec.notes.push(`${w}×${h}: both choices tapped`);
     }
-    // Restore the real portrait prompt for the remaining orientation checks.
-    await page.evaluate(() => {
-      for (const style of document.querySelectorAll('style')) {
-        if (style.textContent === '.nrl-rotate { display: none !important; }') style.remove();
-      }
-    });
     await turn(844, 390);
     return problems;
   });
@@ -221,10 +233,11 @@ export async function runPortrait(browser) {
   });
   await step('parked-portrait', async (rec) => {
     await turn(390, 844);
-    await asleepOnMenu('parked at the club');
+    await asleep('parked at the club');
     const o = await state();
+    if (!o.card) throw new Error('the rotate card is not over the grounds');
     if (o.advance !== RESUME) throw new Error(`the parked match was dropped (${o.advance})`);
-    rec.notes.push(`Club home, still ${RESUME}, loop asleep`);
+    rec.notes.push(`rotate card over the grounds, still ${RESUME}, loop asleep`);
   });
   await step('parked-landscape', async (rec) => {
     await turn(844, 390);
@@ -345,10 +358,10 @@ export async function runPortrait(browser) {
       await sc();
     };
     const problems = [];
-    // The full log is a fixed 330px right panel (3m), drawn for a phone held sideways; upright the
-    // rotate card covers the match, so it is checked at the landscape sizes only. Beside the score
+    // The commentary is drawn for a phone held sideways. Upright, the rotate card covers the
+    // match, so both the line and the full log are checked at landscape sizes. Beside the score
     // bug where there is room (956×330), under it where there is not (667×375, 844×390).
-    const sizes = { line: [[360, 640], [390, 844], [667, 375], [844, 390]], full: [[667, 375], [844, 390], [956, 330]] };
+    const sizes = { line: [[667, 375], [844, 390]], full: [[667, 375], [844, 390], [956, 330]] };
     for (const mode of ['line', 'full']) {
       await setMode(mode);
       for (const [w, h] of sizes[mode]) {

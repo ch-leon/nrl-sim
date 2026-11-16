@@ -122,9 +122,9 @@ describe('each consumer reads BRAND', () => {
     expect(img.attrs.alt).toBe('NRL Sim');
   });
 
-  it("the rotate message (#350) names the match and the grounds, with the brand's name", () => {
-    expect(rotateText()).toBe('In NRL Sim, the match and the grounds play in landscape. Turn your phone sideways to carry on.');
-    expect(rotateText(withBrand({ name: 'Other Game' }))).toMatch(/^In Other Game, the match and the grounds play in landscape\./);
+  it("the rotate message names the game, with the brand's name", () => {
+    expect(rotateText()).toBe('In NRL Sim, the game plays in landscape. Turn your phone sideways to carry on.');
+    expect(rotateText(withBrand({ name: 'Other Game' }))).toMatch(/^In Other Game, the game plays in landscape\./);
   });
 
   it('the manifest (the config object vite-plugin-pwa is given) carries the brand', () => {
@@ -132,6 +132,7 @@ describe('each consumer reads BRAND', () => {
     expect(PWA_MANIFEST.short_name).toBe(BRAND.shortName);
     expect(PWA_MANIFEST.theme_color).toBe(BRAND.colors.app);
     expect(PWA_MANIFEST.background_color).toBe(BRAND.colors.app);
+    expect(PWA_MANIFEST.orientation).toBe('landscape');
     // Today's values, as main shipped them.
     expect([PWA_MANIFEST.name, PWA_MANIFEST.short_name, PWA_MANIFEST.theme_color]).toEqual(['NRL Sim', 'NRLSim', '#0e1630']);
   });
