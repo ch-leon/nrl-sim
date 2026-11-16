@@ -120,10 +120,12 @@ function bombEnds(es: readonly SimEvent[]): string[] {
 }
 
 describe('kick contests in the live sim (#99)', () => {
-  // A handful of whole Kick-chase matches: bombs and grubbers aplenty. Few named seeds, not a scan (CI's 10-minute check).
-  // Seeds 1–8 until the attack shapes (#649 step 2) left them without a spilled bomb (about one in fifteen
-  // matches has one, off or on; seed 18 now); it stops as soon as it has enough.
-  const { es, matches } = play(Array.from({ length: 20 }, (_, i) => i + 1), (all) => {
+  // Whole Kick-chase matches until every outcome has been seen: bombs and grubbers aplenty. Named seeds, not a
+  // wide scan (CI's 10-minute check). Seeds 1 to 24 hold the contests, in-goal balls and scrambles; with held up at
+  // the line (#652) and the last-tackle call (#650) both on, a bomb spilled back first turns up at seed 81 (55 with
+  // the last-tackle call alone, 6 with neither), so 81 and 114 follow. The
+  // attack shapes (#649 step 2) reshuffle them again; the scan stops as soon as it has enough.
+  const { es, matches } = play([...Array.from({ length: 24 }, (_, i) => i + 1), 81, 114], (all) => {
     const ends = bombEnds(all);
     return ends.includes('won-contest') && ends.includes('spilled') && ends.includes('caught') && all.filter((e) => e.kind === 'loose-ball' && e.detail === 'in-goal').length >= 6 && all.filter((e) => e.kind === 'set-start' && e.detail === 'scramble').length >= 3;
   });

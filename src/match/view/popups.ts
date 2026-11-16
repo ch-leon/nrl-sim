@@ -53,6 +53,8 @@ const WORDS: Readonly<Record<string, { word: string; tone: PopupTone; big?: bool
   gassed: { word: 'COOKED!', tone: 'bad' },
   // Sprint and gas (§8.2): caught from behind after a break.
   'run-down': { word: 'RUN DOWN!', tone: 'defence', big: true },
+  // Held up over the line (#652): over the first man in the tackle.
+  'held-up': { word: 'HELD UP!', tone: 'defence', big: true },
   // Interchanges (BAK-207 2b): over the man coming on.
   interchange: { word: 'ON!', tone: 'neutral' },
   // Goal kicking (2c): the result over the kicker; a charge-down over the man who blocked it.

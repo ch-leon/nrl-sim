@@ -147,7 +147,8 @@ describe('bonus-zone tries (Nines)', () => {
   it('a carrier clear over the line goes round under the posts: a five-point try, grounded in the zone', () => {
     let bonus = 0;
     let plain = 0;
-    // Up to 30 seeds (10 before the attack shapes, #649 step 2, left seeds 1–10 without a bonus try); it stops at two of each.
+    // Up to 30 seeds (10 before the attack shapes, #649 step 2, left seeds 1–10 without a bonus try; held up at the
+    // line, #652, and the last-tackle call, #650, had taken it to 20 on main); it stops at two of each.
     for (let seed = 1; seed <= 30 && (bonus < 2 || plain < 2); seed++) {
       const { events } = play(seed);
       for (const t of events.filter((x) => x.e.kind === 'try')) {

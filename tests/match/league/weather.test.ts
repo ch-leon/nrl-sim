@@ -133,7 +133,7 @@ describe('injuries in the live sim', () => {
     const squad = Array.from({ length: 13 }, (_, i) => generatePlayer(rng, { position: i % 2 ? 'prop' : 'centre' }));
     const mine = teamSheetFromSquad(squad, 'me', 'Me', ['#111', '#eee']);
     const them = { ...sideSheet('them', { rating: 60 }), clubId: 'them' };
-    // The first seed from 9 with one of ours hurt (seed 9 itself until the last-tackle call, #650, and the attack shapes, #649 step 2).
+    // The first seed from 9 with one of ours hurt (seed 9 itself until the last-tackle call, #650, held up, #652, and the attack shapes, #649 step 2).
     let seed = 9;
     while (seed < 30 && runMatch(mine, them, { seed, weather: 'rain' }).injuries.every((i) => i.teamId !== 'me')) seed++;
     const a = runMatch(mine, them, { seed, weather: 'rain' });

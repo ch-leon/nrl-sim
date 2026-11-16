@@ -124,7 +124,8 @@ describe('no plays: the match it always was', () => {
 describe('the launch and the script (plan §3.3)', () => {
   it('a block play launches at tackle 2 in the attacking half and the second-row takes the pass', () => {
     // The first seed whose launch there completes. It was pinned (seed 7, then seed 3 at tick 1791),
-    // and every mechanic that adds a roll moved it (#625, #649 step 1, the attack shapes in step 2).
+    // and every mechanic that adds a roll moved it (#625, #649 step 1, the last-tackle call #650, held up #652,
+    // the attack shapes in step 2).
     let checked = false;
     for (let seed = 1; seed <= 20 && !checked; seed++) {
       const sim = new PlaySim(flat(['block-play']), A, seed);

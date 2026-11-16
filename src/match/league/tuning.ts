@@ -26,7 +26,7 @@ import { CALLS } from './calls';
 import { KICKOFF } from './kickoff';
 import { KICK_CONTEST } from './kickContest';
 import { LAST_TACKLE } from './lastTackle';
-import { WRESTLE } from './wrestle';
+import { HELD_UP, WRESTLE } from './wrestle';
 import { BIN } from './sinbin';
 import { PLAYS } from './plays';
 import { SHAPES } from './shapes';
@@ -63,6 +63,7 @@ export const KNOBS = {
   fatigue: FATIGUE,
   gas: GAS,
   wrestle: WRESTLE,
+  heldUp: HELD_UP,
   traits: TRAIT_PTS,
   edge: EDGE_COST,
   presets: PRESET_TABLES,
