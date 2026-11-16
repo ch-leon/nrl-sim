@@ -1,0 +1,74 @@
+{
+  "name": "shapes-presets-400",
+  "description": "#649 step 2 on top of #684, #687 and #686: the four attack preset rows of standard.json at 400 seeds both ways, shapes.on 0 (baseline, main as it is) against shapes.on 1, to read Tight and Expansive's points shares past the standard size's ±3.2.",
+  "seeds": 400,
+  "base": {
+    "shapes.on": 0
+  },
+  "scenarios": [
+    {
+      "name": "grind v balanced",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "expansive v balanced",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "kick-chase v balanced",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "all-out v balanced",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "on",
+      "tuning": {
+        "shapes.on": 1
+      }
+    }
+  ]
+}
