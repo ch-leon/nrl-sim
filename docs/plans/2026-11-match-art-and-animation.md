@@ -5,6 +5,11 @@ Status: stage 1 implemented in [draft PR #697](https://github.com/ch-leon/nrl-si
 tracking [#696](https://github.com/ch-leon/nrl-sim/issues/696). Local functional checks passed;
 release validation is in progress. Leon agreed to all five improvement areas.
 
+Stage 2 is implemented under [#698](https://github.com/ch-leon/nrl-sim/issues/698),
+on top of the stage-1 candidate; combined validation is in progress. One Sol agent
+implemented movement, Luna runs the shared validation, and the main agent reviews
+the source, visual result and rendering cost.
+
 Make an ordinary passage of rugby league enjoyable to watch. Players should have
 weight, the ball should be easy to follow, and tackles should make sense without
 commentary. Keep the game's playful pixel-art character and make the improvement
@@ -149,3 +154,17 @@ the baseline. In that sample, frame-cache misses rose from 11.56% to 17.89%, its
 peak stayed at 768 entries, and texture count stayed at 68. This is cache telemetry,
 not a device frame-rate measurement. Separate-tool release review, CI/QA and a
 real-phone play-test remain release work.
+
+Stage 2 uses seven small movement poses in the existing painter: acceleration,
+braking, two planted cuts, two shuffles and backpedalling. Ordinary jogging and
+sprinting have revised leg/support frames. Starts, stops and defensive steps use
+four distance-linked support/transfer beats; cuts use two planted beats. Head and
+shoulder offsets leave the hips over the supporting foot. Nearby slow defenders
+face the real ball while travelling across or away from it.
+
+The view derives movement from the displayed snapshot pair, with no animation
+history to lose on pause or seek. An optional snapshot `attacking` field projects
+existing engine state so ball-facing defence continues through flight and loose
+balls; legacy snapshots use available holder/ruck context. No match decisions,
+RNG, save schema or recovery-engine revision changed. Shared contact, ruck and
+kick painters keep their own choreography. Art Lab exposes a Footwork control.

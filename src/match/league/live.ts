@@ -216,6 +216,7 @@ export class LiveSim extends LivePositioning implements MatchSim {
     const short = this.players.some((p) => !this.onField(p)) ? ` · ${this.side('home').length} v ${this.side('away').length}` : '';
     const snap: Snapshot = {
       tick: this.tick,
+      attacking: this.attacking,
       players,
       ball,
       label: `${this.names[this.attacking]} ball · ${state} · ${this.points.home}–${this.points.away} · ${clockText(this.half, this.clockTicks * TICK_S)}${this.siren && (kind === 'play' || kind === 'tackle' || kind === 'ruck') ? ' · siren' : ''} · ${legs}${short}`,

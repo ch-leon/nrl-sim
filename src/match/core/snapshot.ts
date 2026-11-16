@@ -95,6 +95,8 @@ export interface SimEvent {
 
 export interface Snapshot {
   tick: number;
+  /** Side currently attacking, including passes/kicks in flight and loose balls. View context only. */
+  attacking?: Side;
   players: PlayerSnap[];
   ball: BallSnap;
   /** Short state label for the lab readout (phase, set, tackle count...). */
