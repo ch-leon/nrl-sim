@@ -4,7 +4,7 @@ import type { Kit } from '../art/match/kit';
 import type { PlayerAnim } from '../art/match/players';
 import type { RingStyle } from '../art/match/kitClash';
 import { liveRingPixels, RING_SCALE } from '../match/view/ringTexture';
-import { appearanceFor, WIDTH, HEIGHT, CENTRE, FOOT, type Appearance } from '../art/prototype/player';
+import { appearanceFor, playerBallAnchor, WIDTH, HEIGHT, CENTRE, FOOT, type Appearance } from '../art/prototype/player';
 import { drawLivePlayer } from '../art/match/livePlayer';
 import { CONTACT_W, CONTACT_H, CONTACT_X, CONTACT_FOOT, drawContact } from '../art/prototype/contact';
 import type { MatchArtRegistry } from './matchArt';
@@ -47,6 +47,12 @@ export class PlayerFrameCache {
     this.frames.set(key, { pixels, used: ++this.clock });
     if (this.frames.size > this.counts.peak) this.counts.peak = this.frames.size;
     return pixels;
+  }
+  /** Same authored anchor as the cached frame; no pixel scan or second appearance catalogue. */
+  ballAnchor(p: PlayerPicture): { x: number; y: number } {
+    const action = p.action === 'catch' ? 'catch' : p.action === 'pass' ? 'pass' : 'carry';
+    const at = playerBallAnchor(this.look(p.who), action, p.frame, p.strideFrame, p.tired, p.movement);
+    return { x: p.left ? -at.x : at.x, y: at.y };
   }
   private evict(): void {
     let oldest = Infinity; let victim = '';
@@ -113,6 +119,7 @@ export class MatchActor {
   place(x: number, y: number, depth: number): void {
     this.sprite.setPosition(x, y - this.lift).setDepth(depth); this.shadow.setPosition(x, y); this.ring.setPosition(x, y);
   }
+  ballAnchor(picture: PlayerPicture): { x: number; y: number } { return this.cache.ballAnchor(picture); }
   wear(who: string): void { this.who = who; }
   paint(picture: PlayerPicture): void {
     this.who = picture.who;

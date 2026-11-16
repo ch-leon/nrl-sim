@@ -6,11 +6,13 @@
 import { toFieldPt } from '../core/field';
 import type { PlayerSnap, Snapshot, Side } from '../core/snapshot';
 import type { PlayerAnim } from '../../art/match/players';
-import { pictureContext, playerPicture, type PlayerPicture } from './playerPicture';
+import { pictureContext, playerPicture, strideFor, tiredLevel, type PlayerPicture } from './playerPicture';
 import { tryScene, type TryScene } from './tryMob';
 import { breakMan, breakScene } from './walkOff';
 import { screenFacing } from './screenFacing';
 import { advanceContactAnimation, type ContactAnimation } from './contactAnimation';
+import { flightPlayer, passSpriteOffset } from './handling';
+import { screenPlayerFacing } from './screenFacing';
 import { contactLayout, type ContactLayout, type ContactPoint } from './contactLayout';
 
 export interface ActorView {
@@ -19,6 +21,7 @@ export interface ActorView {
   /** Wear this player's look (an interchange put someone new in the slot). */
   wear?(who: string): void;
   paint?(picture: PlayerPicture): void;
+  ballAnchor?(picture: PlayerPicture): { x: number; y: number };
   /** Draw him this opaque (a substitute fades in), 1 once he has. */
   fade?(alpha: number): void;
   setSpriteVisible?(visible: boolean): void;
@@ -26,6 +29,9 @@ export interface ActorView {
 
 /** Where the ball is heading on screen, per tick (world px, the climb included), and the tick it is drawn at (fractional): the flying ball turns to its heading and spins by it. */
 export interface BallMotion {
+  /** Sprite centre correction for a launched pass; ground/shadow do not move. */
+  offsetX?: number;
+  offsetY?: number;
   dx: number;
   dy: number;
   t: number;
@@ -194,8 +200,30 @@ export class LiveView {
       const drawn = layout?.feet.find(p => p.player.side === cb.holder!.side && p.player.slot === cb.holder!.slot);
       this.s.focus?.carrier({ side: cb.holder.side, x: drawn?.x ?? bw.x, y: drawn?.y ?? bw.y });
     } else {
-      const hand = this.handAt(prev.tick) * (1 - a) + this.handAt(cur.tick) * a;
-      this.s.ball.place(bw.x + hand, bw.y, lift, bw.y + 2, motion);
+      const offset = passSpriteOffset(cur, motion.t, (ref, endpoint, flight) => {
+        const player = flightPlayer(cur, ref)!;
+        const actor = this.s.players[ref.side]?.[ref.slot];
+        if (!actor?.ballAnchor) return undefined;
+        if (endpoint === 'release') {
+          const heading = flight.source!;
+          const face = screenPlayerFacing(heading, heading, this.screenDir);
+          const launchPlayer: PlayerSnap = { ...ref, x: flight.from.x, y: flight.from.y, pose: 'run', headX: heading.headX, headY: heading.headY, speed: heading.speed, odometer: heading.odometer, legs: heading.legs, blown: heading.blown };
+          const tired = tiredLevel(launchPlayer);
+          return actor.ballAnchor({ who: ref.who, action: 'carry', frame: 0, strideFrame: strideFor(launchPlayer, launchPlayer, flight.startedTick), ...(tired ? { tired } : {}), possession: true, ...face });
+        }
+        const picture = playerPicture(player, this.before(prev, player), cur.tick, null, this.screenDir, ctx);
+        if (!['idle', 'run', 'receive'].includes(picture.action) || ctx.contactPlayers?.has(`${ref.side}/${ref.slot}/${ref.who}`)) return undefined;
+        const anchor = actor.ballAnchor({ ...picture, action: 'catch', frame: 0, possession: true });
+        const actual = points.find(p => p.player.side === ref.side && p.player.slot === ref.slot && p.player.who === ref.who);
+        if (!actual) return undefined;
+        const target = toFieldPt(flight.to), aimed = this.s.fieldToWorld(target.fx, target.fy);
+        return { x: anchor.x + actual.x - aimed.x, y: anchor.y + actual.y - aimed.y };
+      }, LIFT_PX_PER_M);
+      if (offset) this.s.ball.place(bw.x, bw.y, lift, bw.y + 2, { ...motion, offsetX: offset.x, offsetY: offset.y });
+      else {
+        const hand = this.handAt(prev.tick) * (1 - a) + this.handAt(cur.tick) * a;
+        this.s.ball.place(bw.x + hand, bw.y, lift, bw.y + 2, motion);
+      }
       this.s.focus?.carrier(null);
     }
     this.s.officials?.draw(prev, cur, a);

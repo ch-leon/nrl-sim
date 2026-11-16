@@ -1,11 +1,13 @@
 # Roadmap
 
-Last updated: 2026-11-16
+Last updated: 2026-11-17
 
 Status checked against GitHub on 7 Nov 2026. Merged tooling is not the same as a
 live gameplay change; work still open below has not shipped.
 
 ## Now
+
+- **Handling — stage 4 presentation candidate:** pickup/release/catch continuity, preparation by the actual in-flight target, and current-approach defensive bracing are being built under [#702](https://github.com/ch-leon/nrl-sim/issues/702), on top of contact PR #701. Earlier receiver commitment and pre-release calls remain the separate gameplay work associated with #672/#649. All staged PRs stay open and draft for Leon's review.
 
 - **Contact — stage 3 candidate:** planted tackle holds, decisive landings, supported recovery and smoother defender release are implemented in [draft PR #701](https://github.com/ch-leon/nrl-sim/pull/701), on top of movement PR #699. All 4,341 tests, build and production browser checks passed; sampled defender jumps at the PTB handoff fell from 9–24 px to 0–1 px. Leon will review all staged PRs before merging; they remain open and draft. Connected handling and preparation are next.
 

@@ -178,9 +178,9 @@ describe('live player presentation', () => {
     expect(playerPicture(still, still, 5, { side: 'home', slot: 0 }, 1).action).toBe('carry');
     expect(playerPicture({ ...still, binned: true }, still, 5, null, 1).action).toBe('armsFolded');
     expect(playerPicture({ ...still, legs: .3 }, still, 5, null, 1)).toMatchObject({ action: 'idle', tired: 1 });
-    // Other poses keep their frames: a tired man's pass or tackle is the same picture.
+    // Handling keeps the tired posture through release; shared contact still owns its poses.
     const passer = { ...tired, pose: 'pass', poseUntil: 60, caughtTick: 45 };
-    expect(playerPicture(passer, passer, 50, null, 1).tired).toBeUndefined();
+    expect(playerPicture(passer, passer, 50, null, 1).tired).toBe(1);
   });
   it('shows a short reaction after an error or a missed goal, and folds the binned man\'s arms (#667)', () => {
     const runner = { ...p, odometer: 3, reactTick: 200, react: 'error' as const };

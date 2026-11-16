@@ -206,7 +206,14 @@ export class LiveSim extends LivePositioning implements MatchSim {
       ball = { x: h.body.pos.x, y: h.body.pos.y, lift: lying ? 0.3 : CARRY_LIFT, holder: { side: h.side, slot: h.slot } };
     } else if (b.kind === 'flight') {
       const f = flightAt(b, this.tick);
-      ball = { x: f.pos.x, y: f.pos.y, lift: f.lift, holder: null };
+      const receiver = b.receiver === null ? undefined : this.players[b.receiver];
+      const launch = b.via === 'pass' && b.t0 <= this.tick && this.tick < b.t0 + b.ticks && this.visualPass?.tick === b.t0 ? this.visualPass : null;
+      const source = launch && this.players.find(p => p.side === launch.player.side && p.slot === launch.player.slot && p.key === launch.player.who);
+      ball = { x: f.pos.x, y: f.pos.y, lift: f.lift, holder: null, flight: {
+        via: b.via, from: { ...b.from }, to: { ...b.to }, startedTick: b.t0, arrivesTick: b.t0 + b.ticks, fromLift: b.fromLift,
+        ...(receiver ? { receiver: { side: receiver.side, slot: receiver.slot, who: receiver.key } } : {}),
+        ...(source && launch ? { source: { player: { ...launch.player }, headX: launch.headX, headY: launch.headY, speed: launch.speed, odometer: launch.odometer, legs: launch.legs, blown: launch.blown } } : {}),
+      } };
     } else {
       ball = { x: b.pos.x, y: b.pos.y, lift: 0, holder: null };
     }

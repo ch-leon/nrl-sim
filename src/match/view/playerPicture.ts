@@ -10,6 +10,7 @@ import { legsBand } from './legsLayer';
 import { FATIGUE } from '../league/fatigue';
 import { eyesUp, type EyesUp } from './eyesUp';
 import { goalKickPicture } from './goalKick';
+import { receivingPass, type ReceivePicture } from './handling';
 import { playerMotion, movementStride, type MotionContext } from './playerMotion';
 
 export interface PlayerPicture {
@@ -49,6 +50,8 @@ export function strideFor(p: PlayerSnap, previous: PlayerSnap, tick: number): nu
 
 /** What the whole tick says about one player's picture: read once per snapshot by `pictureContext`. */
 export interface PictureContext extends MotionContext {
+  incoming?: ReceivePicture;
+  contactPlayers?: ReadonlySet<string>;
   /** A play-the-ball in progress (#665): the side defending it, where the ball is, and whether it is coming out. */
   ruck?: { side: Side; x: number; y: number; rising: boolean };
   /** Who has the ball and where (a reaction gives way to it when the man with it is close, #667). */
@@ -105,6 +108,9 @@ export function pictureContext(s: Snapshot, prev?: Snapshot): PictureContext {
     ball: { x: s.ball.x, y: s.ball.y, previousX: prev?.ball.x ?? s.ball.x, previousY: prev?.ball.y ?? s.ball.y, side: s.ball.holder?.side ?? s.attacking ?? prev?.ball.holder?.side ?? r?.side ?? null },
     motionLive: !s.phase || ['play', 'ruck', 'tackle'].includes(s.phase.kind),
   };
+  const incoming = receivingPass(s);
+  if (incoming) ctx.incoming = incoming;
+  if (s.contact) ctx.contactPlayers = new Set([s.contact.carrier, ...s.contact.defenders].map(p => `${p.side}/${p.slot}/${p.who}`));
   const up = prev && eyesUp(prev, s);
   if (up) ctx.eyesUp = up;
   const h = s.ball.holder && s.players.find(p => p.side === s.ball.holder!.side && p.slot === s.ball.holder!.slot);
@@ -149,6 +155,16 @@ export function playerPicture(p: PlayerSnap, previous: PlayerSnap, tick: number,
     action = 'blowing';
     frame = Math.floor((tick + p.slot * 3) / BLOWING_TICKS) % 2;
   }
+  const free = ctx.motionLive !== false && !possession && !p.binned && !ctx.contactPlayers?.has(`${p.side}/${p.slot}/${p.who}`) && (p.pose === 'run' || p.pose === 'idle');
+  const incoming = ctx.incoming;
+  if (free && incoming?.tick === tick && incoming.player.side === p.side && incoming.player.slot === p.slot && incoming.player.who === p.who) {
+    action = 'receive'; frame = incoming.frame;
+  } else if (free && (action === 'run' || action === 'idle') && ctx.carrier && ctx.carrier.side !== p.side && p.speed > .6) {
+    const dx = ctx.carrier.x - p.x, dy = ctx.carrier.y - p.y, distance = Math.hypot(dx, dy);
+    if (distance > 1.2 && distance < 4.5 && (dx * p.headX + dy * (p.headY ?? 0)) / distance > .65) {
+      action = 'guard'; frame = distance < 3 ? 1 : 0;
+    }
+  }
   const clampFrame = (n: number) => Math.max(0, Math.min(5, Math.floor(n)));
   const catchAge = tick - (p.caughtTick ?? tick);
   if (action === 'catch') frame = clampFrame(catchAge * 5 / 3);
@@ -185,7 +201,7 @@ export function playerPicture(p: PlayerSnap, previous: PlayerSnap, tick: number,
   let gait = stride;
   // Profiles belong to everyday movement/handling; shared contact, ruck and kicks
   // retain their authored front/back poses until their own art pass.
-  let facing: { facing: Facing; left: boolean } = (['idle', 'run', 'carry', 'catch', 'pass', 'fend'].includes(action) || (action === 'airCatch' && frame === 5))
+  let facing: { facing: Facing; left: boolean } = (['idle', 'run', 'carry', 'catch', 'pass', 'receive', 'guard', 'fend'].includes(action) || (action === 'airCatch' && frame === 5))
     ? screenPlayerFacing(p, previous, screenDir) : screenFacing(p, previous, screenDir);
   let slump = false;
   const scene = ctx.tryScene;
@@ -208,12 +224,12 @@ export function playerPicture(p: PlayerSnap, previous: PlayerSnap, tick: number,
   const shot = goalKickPicture(p, action, frame, tick, possession, screenDir);
   if (shot) { action = shot.action; frame = shot.frame; facing = { facing: shot.facing, left: shot.left }; }
   const lift = MOMENT_ACTIONS.includes(action as MomentAction) ? momentLift(action as MomentAction, frame) : 0;
-  let strideFrame = ['run', 'carry', 'catch', 'pass', 'airCatch', 'fend', 'handsOnHead', 'handsOnHips', 'armsFolded'].includes(action)
+  let strideFrame = ['run', 'carry', 'catch', 'pass', 'receive', 'guard', 'airCatch', 'fend', 'handsOnHead', 'handsOnHips', 'armsFolded'].includes(action)
     ? gait : undefined;
   // Only free movement uses these poses. Handling keeps its hand timing over the same legs;
   // a shared contact/ruck/kick, whistle or celebration never inherits a movement pose.
   let movement: Movement | undefined;
-  if (!scene && !off?.action && !shot && (['idle', 'run', 'carry', 'catch', 'pass', 'fend'].includes(action) || (action === 'airCatch' && frame === 5))) {
+  if (!scene && !off?.action && !shot && (['idle', 'run', 'carry', 'catch', 'pass', 'receive', 'guard', 'fend'].includes(action) || (action === 'airCatch' && frame === 5))) {
     const motion = playerMotion(p, previous, screenDir, ctx);
     movement = motion.movement;
     // A ball-holder and his handling follow-through always keep the ball-side silhouette.
@@ -224,6 +240,6 @@ export function playerPicture(p: PlayerSnap, previous: PlayerSnap, tick: number,
   }
   // Eyes on the bomb (#671): standing or running, ball elsewhere, one of the few under it.
   const lookUp = ctx.eyesUp?.who.has(`${p.side}/${p.slot}`) && (action === 'idle' || action === 'run') && !possession && !p.binned ? ctx.eyesUp.level : 0;
-  const tired = slump ? 2 : weary && (action === 'run' || action === 'carry' || action === 'idle') ? weary : 0;
+  const tired = slump ? 2 : weary && (['run', 'carry', 'idle', 'receive', 'guard', 'catch', 'pass'].includes(action) || (action === 'airCatch' && frame === 5)) ? weary : 0;
   return { who: p.who ?? `${p.side}/${p.slot}`, action, frame, lift, ...(strideFrame === undefined ? {} : { strideFrame }), ...(movement ? { movement } : {}), ...(tired ? { tired } : {}), ...(lookUp ? { lookUp } : {}), ...facing, possession };
 }

@@ -17,6 +17,13 @@ local functional validation passed. Leon's explicit review policy: leave every P
 unmerged; Leon reviews before merging. This overrides the repository's automatic
 merge convention for this work. Keep the staged PRs as drafts.
 
+Stage 4 handling work is in progress under [#702](https://github.com/ch-leon/nrl-sim/issues/702).
+This presentation pass connects pickup, release and reception, and prepares the
+actual receiver once the engine has launched his pass. A pre-release call still
+requires the separate earlier commitment described below: dummy-half controls,
+set plays and dart/pass choices currently resolve at release. No guessed call
+or new gameplay decision is part of this visual change.
+
 Make an ordinary passage of rugby league enjoyable to watch. Players should have
 weight, the ball should be easy to follow, and tackles should make sense without
 commentary. Keep the game's playful pixel-art character and make the improvement
@@ -235,4 +242,5 @@ before and 59.4 fps after. Both had p95 frame time 16.8 ms and no frame over
 475 with identical cache counters (2,639 hits / 1,545 misses), peak 768 entries
 and 68 textures. This desktop sample shows no material added stutter; real-phone
 performance and the earlier whole-career budget concerns remain open. Stage-3
-CI/QA, different-tool review, phone play-test and Leon's review remain pending.
+CI and Android builds passed. QA, different-tool review, phone play-test and
+Leon's review remain pending.
