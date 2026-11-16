@@ -1,7 +1,11 @@
 # Match art and animation improvement plan
 
 Date: 16 November 2026  
-Status: stage 1 implemented in [draft PR #697](https://github.com/ch-leon/nrl-sim/pull/697),
+Status: stages 1–4 presentation and the first stage-5 pass are implemented in
+five linked draft PRs. All remain open and unmerged for Leon; wider stage-5
+consistency work and release validation remain.
+
+Stage 1 is implemented in [draft PR #697](https://github.com/ch-leon/nrl-sim/pull/697),
 tracking [#696](https://github.com/ch-leon/nrl-sim/issues/696). Local functional checks passed;
 release validation is in progress. Leon agreed to all five improvement areas.
 
@@ -25,7 +29,8 @@ requires the separate earlier commitment described below: dummy-half controls,
 set plays and dart/pass choices currently resolve at release. No guessed call
 or new gameplay decision is part of this visual change.
 
-Stage 5 starts with a bounded kicks, aerial takes and try finishes pass under
+Stage 5 starts with a bounded kicks, aerial takes and try finishes pass in
+[draft PR #705](https://github.com/ch-leon/nrl-sim/pull/705), tracking
 [#704](https://github.com/ch-leon/nrl-sim/issues/704), on top of stage 4. It carries
 the same support, weight and continuous handoffs into the existing moment painters.
 Wider officials, crowd, reactions, weather and full-match consistency remain
@@ -291,3 +296,53 @@ Stage-4 CI and Android builds passed. QA, different-tool review, phone play-test
 and Leon's review remain release checks. On-demand QA dispatch remains unavailable through
 this session's GitHub API (Forbidden). All four staged PRs remain open, draft
 and unmerged. The next visual pass is stage 5's kicks, aerial takes and try finishes.
+
+The first stage-5 candidate keeps the kicking support sole planted, brings the
+boot down through a recovery beat, and returns the final kick frame to the
+player's current direction, distance-linked stride and tired posture. A stopped
+kicker settles into idle, allowing the ordinary one-pixel breathing difference.
+The goal-kick tee remains on its posts side through the last kick pose, even if
+the player turns; a single terminal-only cache bit handles that local reflection.
+
+The aerial catch's penultimate frame loads the continuing carry by one pixel,
+then releases into that same silhouette with fatigue and foot phase retained.
+Try recovery uses explicit palm, knee and crouch poses instead of floating the
+whole body upright. The scorer enters his existing celebration at its settled
+first beat; knee slides drop once and hold. Teammates retain their individual
+loop phases. The real seed-8 dive-to-rise (2127→2128) and rise-to-celebration
+(2137→2138) seams now have identical cached pixels. Aerial take 120→carry 126,
+actual kick deadlines, interruptions, legacy snapshots, both directions and
+the empty tee's world position have focused regressions.
+
+One Sol agent built this pass; the main agent reviewed the source, transition
+tests and before/after pose sheets. Typecheck and 54 focused tests passed before
+the source freeze. Luna runs the shared full validation. No simulation code,
+event clocks, possession rules, RNG, save format or cache capacity changed.
+This is the first part of stage 5; wider presentation consistency remains open.
+
+Stage-5 first-pass local checks: all 4,363 tests in 326 files and the production
+build passed. Production Chromium live-art and big-moment checks passed, covering
+career playback, actual contact/handling, one ball, grounded shadows/rings, phone
+layout, scene restart and bounded textures/cache. Seed-8 baseline/candidate event
+identities and ticks matched: punt 43, aerial take 120, grubber 1299, try 2118,
+goal routine 2232 / strike 2262, and error reaction 4971.
+
+Additional paused/replayed traces used the actual previous/current snapshots and
+the last kick-pose tick, not the end of the ball flight: punt 47→48, grubber
+1303→1304 and tee kick 2269→2270. They preserved exact playback, ball ownership
+and the expected terminal pose. The aerial catch and both try seams also passed.
+Brief actual ×4 playback crossed each kick, high-take and try boundary without
+browser errors. Evidence and reusable capture helpers stay outside git under
+`/tmp/nrl-moments/`.
+
+Sequential production Chromium measurements of the reference passage (seed 1
+from tick 43, 22 seconds at 844×390 and ×1, other agents idle) averaged 59.1 fps
+before and 58.4 fps after. Both had p95 frame time 16.8 ms, longest frame 50 ms,
+and no frame over 100 ms. Both reached tick 473 with identical cache counters
+(2,509 hits / 1,671 misses), peak 768 entries and 68 textures. This short desktop
+sample showed no extra long frames; it does not settle phone performance or the
+earlier whole-career budget concerns. The Android build passed on the source
+commit; final-head CI, QA, different-tool review, phone play-test and Leon's
+review remain release checks. On-demand QA dispatch remains unavailable through
+this session's GitHub API (Forbidden). All five PRs remain open, draft and
+unmerged. The next pass is consistency across the rest of the match presentation.

@@ -64,7 +64,7 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
-- **Connected big moments (candidate, not yet released):** a focused pass on kick recovery, aerial landing and try recovery is in progress under [#704](https://github.com/ch-leon/nrl-sim/issues/704), building on the handling candidate. The existing event timing, possession and match outcomes remain authoritative.
+- **Connected big moments (candidate, not yet released):** kick follow-through lowers into the continuing run or settled stance; aerial landing loads into the same carry pose; try recovery uses palm and knee support before entering celebration. Knee slides settle once, and the empty goal-kick tee stays put as the kicker turns. Built on the handling candidate with existing event timing and possession ([PR #705](https://github.com/ch-leon/nrl-sim/pull/705)).
 
 - **Connected handling (candidate, not yet released):** the actual receiver prepares his hands during an incoming pass, with his running stride continuing underneath. Pickup finishes in the carry pose, the passer turns through release, and flight sprites meet the painted hand anchors. Nearby defenders can brace as they approach the current carrier. This uses actual flight and possession facts; pre-release calls remain separate gameplay work ([PR #703](https://github.com/ch-leon/nrl-sim/pull/703)).
 

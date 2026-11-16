@@ -7,7 +7,7 @@ live gameplay change; work still open below has not shipped.
 
 ## Now
 
-- **Big moments — first stage 5 candidate:** connect kick follow-through, aerial landing and try recovery under [#704](https://github.com/ch-leon/nrl-sim/issues/704), on top of handling PR #703. Wider officials/crowd/reaction/weather consistency and full-match polish remain later stage-5 work. All staged PRs stay open and draft for Leon's review.
+- **Big moments — first stage 5 candidate:** connected kick follow-through, aerial landing and supported try recovery are implemented in [draft PR #705](https://github.com/ch-leon/nrl-sim/pull/705), on top of handling PR #703. All 4,363 tests, build, production browser/replay and brief ×4 playback checks passed. The desktop reference passage averaged 59.1 fps before and 58.4 after, with identical cache/texture counts and no frame over 100 ms. Wider officials/crowd/reaction/weather consistency and full-match polish remain later stage-5 work. All staged PRs stay open and draft for Leon's review.
 
 - **Handling — stage 4 presentation candidate:** pickup/release/catch continuity, preparation by the actual in-flight target, and defensive bracing on approach are implemented in [draft PR #703](https://github.com/ch-leon/nrl-sim/pull/703), on top of contact PR #701. All 4,354 tests, build and production browser/replay checks passed; the desktop reference passage averaged 58.2 fps before and 58.6 after. Earlier receiver commitment and pre-release calls remain the separate gameplay work associated with #672/#649. All staged PRs stay open and draft for Leon's review. Stage 5's kicks, aerial takes and try finishes are next.
 
