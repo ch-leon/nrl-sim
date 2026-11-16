@@ -28,25 +28,25 @@ import { runExpansionIntro } from './e2e-webkit/screens/expansionIntro.mjs';
 // marked by its fill and a bar that reads in greyscale, and each tab's spoken name with
 // its alert.
 // Screenshots and report.json go to e2e-output/webkit/<WxH>/.
-// Then one portrait boot (390×844): the menus work upright (#350), so it opens on the
-// Club home sheet with no rotate card and the loop already asleep, and turning to
-// 844×390 must wake it with the canvas filling the screen. The same turn mid-match
-// freezes the clock under the rotate card and resumes it; a match parked at the club
-// is Club home upright (no card, the loop asleep, Resume match kept), and the live
-// match Continue reopens upright stays paused under the card until the phone is sideways.
+// Then one portrait boot (390×844): the rotate card covers the title, the menus,
+// the grounds and the match, and the loop is already asleep. Turning to 844×390
+// hides the card, wakes the loop and the canvas fills the screen. The same turn
+// mid-match freezes the clock under the card and resumes it; a match parked at
+// the club is the grounds under the card (Resume match kept), and Continue
+// reopened upright stays paused under the card until the phone is sideways.
 // With the match up, the coach tray is filled with the most it shows (#396: six
 // calls in five rows), which must not scroll, and the commentary checked: the line (log = line) clear of the bottom row and the
-// score bug at 360×640, 390×844, 667×375 and 844×390; the full log (log = full) clear
+// score bug at 667×375 and 844×390; the full log (log = full) clear
 // of them and of the open tray, and scrolling, at 667×375 and 844×390; and the LOG
 // switch keeps its fill under hover. The full tray is checked once more, alone, at 956×330.
 // Both Bali choices must fit, retain 44px targets and accept taps at these same
-// four sizes. Last, the ladder's form column after five rounds at every text size (#426,
+// landscape sizes. Last, the ladder's form column after five rounds at every text size (#426,
 // see runLadderForm). Then the Coach calls page, from Office and from the Coach's Office's
 // Build tile (see runCoachCalls; --coach-calls-only runs just that). Then set plays' club
-// screens upright and sideways (#326: Playbook, the attack coach on Staff & Board, the
+// screens at phone landscape (#326: Playbook, the attack coach on Staff & Board, the
 // Lineup's Plays sheet; see runPlaybook; --playbook-only runs just that). Then the match's
 // coach tray with and without plays at 844×390, 667×375 and 568×320 (#326 phase 3, see
-// runMatchPlays; --match-plays-only runs just that). Then Developer settings upright and sideways, its
+// runMatchPlays; --match-plays-only runs just that). Then Developer settings at phone landscape, its
 // playtest career through a real match and back (#519, see runDevSettings; --dev-settings-only runs
 // just that). Exits 1 on any failure.
 //
@@ -68,7 +68,6 @@ import { webkit, chromium } from 'playwright-core';
 import { argv, SIZES, log, startServer, stopServer } from './e2e-webkit/common.mjs';
 import { runSize } from './e2e-webkit/portrait/size.mjs';
 import { runPortrait } from './e2e-webkit/portrait/portrait.mjs';
-import { runPortraitMenus } from './e2e-webkit/portrait/portraitMenus.mjs';
 import { runPauseSettings } from './e2e-webkit/match/pauseSettings.mjs';
 import { runRecruit } from './e2e-webkit/screens/recruit.mjs';
 import { SCREEN_RUNS, runScreens } from './e2e-webkit/screens/screens.mjs';
@@ -120,11 +119,10 @@ const SECTIONS = [
   ['runCoachVoice', (b) => runCoachVoice(b)],
   ['runLargeTextTargets', (b) => runLargeTextTargets(b)],
   ['runLadderForm', (b) => runLadderForm(b)],
-  ['runPortraitMenus', (b) => runPortraitMenus(b)],
   ['runCoachCalls', (b) => runCoachCalls(b, [[844, 390]])],
   ['runLabsControls', (b) => runLabsControls(b)],
   ['runDevSettings', (b) => runDevSettings(b)],
-  ['runPlaybook', (b) => runPlaybook(b, [[390, 844], [844, 390]])],
+  ['runPlaybook', (b) => runPlaybook(b, [[667, 375], [844, 390]])],
   ['runMatchPlays', (b) => runMatchPlays(b, [[844, 390], [667, 375], [568, 320]])],
 ];
 /**
@@ -135,7 +133,7 @@ const GROUPS = {
   match: ['runPlaytest', 'runPauseSettings', 'runTutorialWalk', 'runCoachCalls', 'runLabsControls', 'runMatchPlays'],
   text: ['runCounterText', 'runLargeTextTargets', 'runLadderForm'],
   screens: ['runContentPacks', 'runTrials', 'runExpansionIntro', 'runDerby', 'runOfficeUnlocks', 'runUnlocks', 'runRecruit', 'runScreens', 'runTownSetup', 'runFlow', 'runCoachName', 'runDifficulty', 'runCoachVoice', 'runCoachSays', 'runPlaybook'],
-  portrait: ['runSize', 'runPortrait', 'runDockTextSize', 'runPortraitMenus', 'runDevSettings'],
+  portrait: ['runSize', 'runPortrait', 'runDockTextSize', 'runDevSettings'],
 };
 
 // Guard: a run* phase declared in this file or under e2e-webkit/ but missing from SECTIONS, or a section
@@ -176,7 +174,7 @@ if (GROUP && (SCREENS_ONLY || CONTROLS_ONLY || CALLS_ONLY || PLAYBOOK_ONLY || PL
 }
 /** [name, run] pairs this invocation plays, in the full run's order. */
 const plan = CALLS_ONLY
-  ? [['runCoachCalls', (b) => runCoachCalls(b, [[390, 844], [844, 390]])]]
+  ? [['runCoachCalls', (b) => runCoachCalls(b, [[667, 375], [844, 390]])]]
   : DEV_ONLY
     ? SECTIONS.filter(([n]) => n === 'runDevSettings')
   : PLAYBOOK_ONLY

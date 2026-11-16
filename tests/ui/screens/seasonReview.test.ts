@@ -175,7 +175,7 @@ describe('a season through the real hooks', () => {
     if (entry.ladderPosition <= 8) expect(r.finals).toEqual({ round: expect.any(Number), won: entry.premiership });
     else expect(r.finals).toBeUndefined();
     expect(r.money!.in).toBeGreaterThan(0);
-    expect(r.money!.out).toBeGreaterThan(0);
+    expect(r.money!.out).toBeGreaterThanOrEqual(0);
     expect(r.juniors).toBeGreaterThanOrEqual(3);
     // Reputation moves during a season too (events, results): `from` is the rollover's start.
     expect(r.reputation!.to).toBe(s.reputation);

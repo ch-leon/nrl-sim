@@ -68,6 +68,19 @@ export function injuryMult(player: Player): number {
 
 const clamp = (n: number): number => Math.max(STAT_FLOOR, Math.min(STAT_MAX, n));
 
+/**
+ * The career spends level points by focus as soon as they are earned.
+ * The persona harness sets `manual` so a playtester can spend those points
+ * itself; every real career leaves this unset and keeps the automatic spend.
+ */
+let spendMode: 'auto' | 'manual' = 'auto';
+export function setSpendMode(mode: 'auto' | 'manual'): void {
+  spendMode = mode;
+}
+function spendIfAuto(player: Player, focus: TrainingFocus): Player {
+  return spendMode === 'manual' ? player : spendByFocus(player, focus);
+}
+
 // ── The squad's training focus (N11) ─────────────────────────────────────────
 // What the coach sets on the Squad screen, its labels, and the managed manager's
 // pick (the squad's weakest stat). Focus controls point spending, never XP.
@@ -138,7 +151,7 @@ export function trainPlayer(player: Player, _facilities: PlacedFacility[] = [], 
 /** A small weekly XP trickle even without buildings; injury still slows training. */
 export function trainWeek(player: Player, facilities: PlacedFacility[], focus: TrainingFocus = 'balanced'): Player {
   const declined = { ...player, stats: trainPlayer(player) };
-  return spendByFocus(awardXp(declined, PROGRESSION.WEEKLY_XP * injuryMult(player), facilities), focus);
+  return spendIfAuto(awardXp(declined, PROGRESSION.WEEKLY_XP * injuryMult(player), facilities), focus);
 }
 
 /** Match XP uses the sheets and recorded moments, never the simulation RNG. */
@@ -154,7 +167,7 @@ export function applyMatchXp(squad: readonly Player[], own: TeamSheet, result: M
     const xp = (starters.has(p.id) ? PROGRESSION.STARTER_XP : PROGRESSION.BENCH_XP)
       + (tally?.tries ?? 0) * PROGRESSION.TRY_XP + (tally?.lineBreaks ?? 0) * PROGRESSION.LINE_BREAK_XP
       + (potm && potm.teamId === own.clubId && potm.name === p.name ? PROGRESSION.POTM_XP : 0);
-    return spendByFocus(awardXp(p, xp, facilities), focus);
+    return spendIfAuto(awardXp(p, xp, facilities), focus);
   });
 }
 

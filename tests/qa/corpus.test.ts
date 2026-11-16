@@ -40,7 +40,7 @@ describe('save corpus', () => {
         expect(raw.version).toBeLessThanOrEqual(SAVE_VERSION);
       });
 
-      if ((raw.version ?? 0) < 24) {
+      if ((raw.version ?? 0) < SAVE_VERSION) {
         it('requires a new career without changing the historical fixture', () => {
           const before = JSON.stringify(raw);
           expect(migrateState(raw)).toMatchObject({ ok: false, message: expect.stringMatching(/older version.*start a new career/i) });

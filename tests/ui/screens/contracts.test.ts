@@ -31,8 +31,9 @@ import { contractsSummary } from '../../../src/ui/screens/contracts';
 describe('contractsSummary', () => {
   it('counts the squad, the deals ending within the window and the wage bill as paid', () => {
     const squad = [{ contractWeeks: 3, wage: 1000 }, { contractWeeks: 8, wage: 1500 }, { contractWeeks: 30, wage: 2000 }];
-    expect(contractsSummary(squad)).toBe('3 players · 2 end within 8 wks · wages $4,500/wk');
-    expect(contractsSummary(squad, 1.5)).toBe('3 players · 2 end within 8 wks · wages $6,750/wk');
+    expect(contractsSummary(squad)).toBe('3 players · 2 end within 8 wks · cap $0 this season');
+    const dealt = squad.map((p, i) => ({ ...p, deal: { salary: (i + 1) * 1000, startSeason: 1, endSeason: 1 } }));
+    expect(contractsSummary(dealt, 1)).toBe('3 players · 2 end within 8 wks · cap $6,000 this season');
   });
 });
 
@@ -121,32 +122,19 @@ describe('Sell and Release disarm (#612)', () => {
   });
   afterEach(() => { slot.close?.(); slot.close = null; vi.useRealTimers(); vi.unstubAllGlobals(); });
 
-  it('the first tap arms (the label asks again, in the armed class); a second inside four seconds sells', () => {
+  it('the first tap arms a sale and the second does not remove the player', () => {
     const id = rows()[0]!.attrs['data-contract']!;
-    const rest = sell(0).textContent;
-    expect(rest).toMatch(/^SELL \+\$/);
+    const n = getState().squad.length;
+    const money = getState().money;
+    expect(sell(0).textContent).toBe('NO BUYER');
     sell(0).click();
     expect(sell(0).textContent).toBe('REALLY SELL?');
     expect(sell(0).classList.contains(ARMED_CLASS)).toBe(true);
+    vi.advanceTimersByTime(400);
+    sell(0).click();
     expect(getState().squad.some((p) => p.id === id)).toBe(true);
-    vi.advanceTimersByTime(ARMED_MS - 1);
-    expect(sell(0).classList.contains(ARMED_CLASS)).toBe(true);
-    sell(0).click();
-    expect(getState().squad.some((p) => p.id === id)).toBe(false);
-    expect(downs).toHaveLength(0);
-  });
-
-  it('a second tap at 150ms is the first one again and does not sell; at 400ms it does (#617)', () => {
-    const id = rows()[0]!.attrs['data-contract']!;
-    sell(0).click();
-    vi.advanceTimersByTime(150);
-    sell(0).click();
-    expect(sell(0).textContent).toBe('REALLY SELL?');
-    expect(sell(0).classList.contains(ARMED_CLASS)).toBe(true);
-    expect(getState().squad.some((p) => p.id === id)).toBe(true);
-    vi.advanceTimersByTime(250); // 400ms in, and the 4s wait is still the one that began at the first tap
-    sell(0).click();
-    expect(getState().squad.some((p) => p.id === id)).toBe(false);
+    expect(getState().squad).toHaveLength(n);
+    expect(getState().money).toBe(money);
   });
 
   it('the same for Release: 150ms is ignored, 300ms goes through (#617)', () => {
@@ -179,42 +167,42 @@ describe('Sell and Release disarm (#612)', () => {
     expect(getState().squad).toHaveLength(n);
   });
 
-  it('a finger down anywhere else disarms it in place; one on the armed button does not', () => {
+  it('a finger down anywhere else disarms a release in place; one on the armed button does not', () => {
     const n = getState().squad.length;
-    const rest = sell(0).textContent;
-    sell(0).click();
-    const btn = sell(0);
+    const rest = release(1).textContent;
+    release(1).click();
+    const btn = release(1);
     pointerdown(btn);
     expect(btn.classList.contains(ARMED_CLASS)).toBe(true);
     pointerdown(release(0)); // another button
-    expect(sell(0)).toBe(btn);
+    expect(release(1)).toBe(btn);
     expect(btn.textContent).toBe(rest);
     expect(btn.classList.contains(ARMED_CLASS)).toBe(false);
     expect(downs).toHaveLength(0);
-    sell(0).click();
+    release(1).click();
     pointerdown(null); // the sheet, a scroll
-    expect(sell(0).classList.contains(ARMED_CLASS)).toBe(false);
-    sell(0).click(); // armed again, not sold
+    expect(release(1).classList.contains(ARMED_CLASS)).toBe(false);
+    release(1).click(); // armed again, not released
     expect(getState().squad).toHaveLength(n);
   });
 
   it('survives a re-render while armed, and a wait that was called off never disarms the next one', () => {
-    sell(0).click();
+    release(0).click();
     vi.advanceTimersByTime(3000);
-    pointerdown(sell(2)); // the tap that arms another row's SELL: finger down, then the click
-    sell(2).click();
-    expect(sell(0).classList.contains(ARMED_CLASS)).toBe(false);
+    pointerdown(release(2)); // the tap that arms another row's release: finger down, then the click
+    release(2).click();
+    expect(release(0).classList.contains(ARMED_CLASS)).toBe(false);
     bus.emit('state:changed', undefined as never);
-    expect(sell(2).textContent).toBe('REALLY SELL?');
+    expect(release(2).textContent).toBe('REALLY RELEASE?');
     vi.advanceTimersByTime(ARMED_MS - 1); // the first wait's four seconds are long gone
-    expect(sell(2).classList.contains(ARMED_CLASS)).toBe(true);
+    expect(release(2).classList.contains(ARMED_CLASS)).toBe(true);
     vi.advanceTimersByTime(1);
-    expect(sell(2).classList.contains(ARMED_CLASS)).toBe(false);
-    expect(sell(2).textContent).toMatch(/^SELL \+\$/);
+    expect(release(2).classList.contains(ARMED_CLASS)).toBe(false);
+    expect(release(2).textContent).toMatch(/^RELEASE /);
   });
 
   it('closing the sheet calls the wait off', () => {
-    sell(0).click();
+    release(0).click();
     expect(downs).toHaveLength(1);
     slot.close!();
     slot.close = null;

@@ -7,7 +7,7 @@ export async function runExpansionIntro(browser) {
   const out = join(OUT_ROOT, 'webkit', 'expansion-intro');
   mkdirSync(out, { recursive: true });
   const results = [];
-  for (const [width, height] of [[667, 375], [844, 390], [390, 844]]) {
+  for (const [width, height] of [[667, 375], [844, 390]]) {
     const ctx = await browser.newContext({ viewport: { width, height }, hasTouch: true, isMobile: true, userAgent: IPHONE_UA, serviceWorkers: 'block' });
     const page = await ctx.newPage();
     const tag = `${width}x${height}`;
