@@ -1,6 +1,6 @@
 # Features
 
-Last updated: 2026-11-14
+Last updated: 2026-11-16
 
 What's in the game, with the PR that added each.
 
@@ -63,6 +63,8 @@ What's in the game, with the PR that added each.
 - Android test APK ([PR](https://github.com/ch-leon/nrl-sim/pull/394)); CI ([PR](https://github.com/ch-leon/nrl-sim/pull/442))
 
 ## Recently added
+
+- **Match art foundation (candidate, not yet released):** ordinary movement and handling use a new side profile alongside the front/back views. Editable torso and handling poses give players clearer shoulders, hands and exposed ball panels; the pitch has quieter grass texture and the crowd has softer shirt contrast. Art Lab has a Side view control. Contact, ruck and kick sequences keep their existing directional artwork, and match decisions and player identities are preserved ([#696](https://github.com/ch-leon/nrl-sim/issues/696)).
 
 - Signing a player takes the cash for one year's wage (a quarter for an Academy prospect, less a Scout Office discount on the fee only) and room under this season's salary cap. Both are checked before anything changes, so a signing that does not fit is refused and the books stay as they were. A renewal costs nothing, and only in the last season of the current deal: it is priced on his ability now, starts the season after that deal, and has to fit the cap in the season it starts. It does not move the weeks left or the salary already signed. A second renewal in the same season does nothing. Releasing him shows the cash payout and the cap it frees, and is refused when the cash is short. There is no buyer for a sale yet. A rival's later signing is refused when it does not fit the annual cap. Rival wallets are not charged the fee until they have match income ([#558](https://github.com/ch-leon/nrl-sim/issues/558)).
 

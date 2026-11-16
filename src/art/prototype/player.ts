@@ -144,6 +144,24 @@ const JOG_BOB = [0, 1, 0, 0, 1, 0];
 /** Arm swing, -2 (back) … 2 (forward), for the far arm; the near arm swings opposite. Arms oppose their own legs. */
 const ARM_SWING = [2, 1, -1, -2, -1, 1];
 
+/** Local layers for the turn/profile chest. Palette letters keep kit colours procedural.
+ * Rows are stretched across each build, with the waist tucked inside the shoulder caps.
+ * Edit these small grids to preview the same pose in the art lab and a live match.
+ */
+export const TORSO_LAYERS: Record<Facing, readonly string[]> = {
+  front: ['.LLLLLL.', 'LJJJJJJL', 'sJJJJJJJ', 'sJJJJJJJ', '.sJJJJJ.', '.sJJJJJ.', '.ssJJJs.'],
+  back: ['.LLLLLL.', 'LJJJJJsL', 'JJJJJJss', 'JJJJJJss', '.JJJJss.', '.JJJJss.', '.sJJJss.'],
+  side: ['..LLLL..', '.LJJJsL.', '.JJJJss.', '.JJJJss.', '.JJJss..', '.JJJss..', '.sJJss..'],
+};
+/** Hand/ball key poses, in pixels from the near shoulder. Timing remains in playerPicture.
+ * Catch/pass entries are the near-hand target; the far hand and ball lead it.
+ */
+export const HANDLING_POSES = {
+  carry: { ball: [1, 3], elbow: [-1, 7], hand: [5, 7] },
+  catch: [[7, 2], [6, 2], [4, 3], [4, 4], [4, 5], [5, 7]],
+  pass: [[5, 2], [7, 1], [6, 2], [4, 4], [2, 5], [1, 6]],
+} as const;
+
 /**
  * Frames are sampled on a six-step cycle; directions are painted, never skewed. Idle breathes over frames 0–1.
  * `tired` (#666): 1 on tired legs, 2 spent or blown. A tired man runs and stands lower and hunched,
@@ -247,10 +265,19 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action | Re
     line(left + 2, shoulderY + 1, left - 1, shoulderY + 6, skinDark);
   }
 
-  b.fillRect(left, shoulderY, bodyW, 7 + breath, kit.jersey);
-  b.fillRect(left, shoulderY, 2, 6, kit.jerseyShade);
-  b.fillRect(left + 2, shoulderY, bodyW - 3, 1, kit.jerseyLight);
-  b.fillRect(left + bodyW - 2, shoulderY + 1, 2, 6, kit.jerseyShade);
+  // Hand-authored chest clusters: broad shoulders, a lit breast and a tucked waist.
+  // The same head/limb anchors keep every turn on the existing short-legged figure.
+  const torso = TORSO_LAYERS[facing];
+  const torsoLeft = left - (facing === 'side' ? 0 : 1);
+  const torsoWidth = bodyW + (facing === 'side' ? 0 : 2);
+  const palette: Record<string, number> = { L: kit.jerseyLight, J: kit.jersey, s: kit.jerseyShade };
+  for (let y = 0; y < 7 + breath; y++) {
+    const row = torso[Math.min(y, 6)]!;
+    for (let x = 0; x < torsoWidth; x++) {
+      const color = palette[row[Math.floor(x * row.length / torsoWidth)]!];
+      if (color !== undefined) b.set(torsoLeft + x, shoulderY + y, color);
+    }
+  }
   if (kit.pattern === 'v') {
     b.line(left + 1, shoulderY + 2, left + bodyW / 2, shoulderY + 5, kit.trim);
     b.line(left + bodyW / 2, shoulderY + 5, left + bodyW - 2, shoulderY + 2, kit.trim);
@@ -303,13 +330,16 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action | Re
     line(shX + 1, shY - 1, shX + 1, shoulderY + 5, a.skin, 2);
     line(shX + 1, shoulderY + 5, handX, handY, a.skin, 2);
   } else if (action === 'carry' || action === 'brace' || (action === 'catch' && strideFrame !== undefined && f === 5)) {
-    handX = shX + 2; handY = shY + 4;
-    if (possession) heldBall(shX - 1, shY + 2);
-    line(shX, shY, shX - 1, shY + 6, a.skin);
-    line(shX - 1, shY + 6, handX + 2, handY + 1, a.skin, 2);
+    const pose = HANDLING_POSES.carry;
+    handX = shX + pose.hand[0]; handY = shY + pose.hand[1];
+    // A supporting far hand and a low near forearm leave the white ball panel exposed.
+    line(shX - 3, shY + 2, shX + 4, shY + 6, skinDark, 2);
+    if (possession) heldBall(shX + pose.ball[0], shY + pose.ball[1]);
+    line(shX, shY, shX + pose.elbow[0], shY + pose.elbow[1], a.skin);
+    line(shX + pose.elbow[0], shY + pose.elbow[1], handX, handY, a.skin, 2);
   } else if (strideFrame !== undefined && (action === 'catch' || (action === 'pass' && f < 5))) {
-    const reach = action === 'catch' ? [7, 6, 4, 3, 2, 2][f]! : [5, 7, 6, 4, 2, 1][f]!;
-    handX = shX + reach; handY = shY + (action === 'catch' ? [2, 2, 3, 4, 4, 4][f]! : [2, 1, 2, 4, 5, 6][f]!);
+    const pose = HANDLING_POSES[action][f]!;
+    handX = shX + pose[0]; handY = shY + pose[1];
     line(shX - 3, shY + 1, handX - 2, handY + 2, skinDark, 2);
     if (possession) heldBall(handX - 3, handY - 2);
     line(shX, shY, shX + 2, shY + 4, a.skin, 2);
@@ -351,6 +381,11 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action | Re
     if (Math.abs(dx) > Math.abs(dy)) b.fillRect(shX + Math.sign(dx) * 2 + 1, shY - 1, 2, 3, kit.trim);
     else b.fillRect(shX + Math.round(dx / Math.max(1, Math.abs(dy)) * 2), shY + 1, 3, 2, kit.trim);
     b.fillRect(shX, shY - 1, 3, 1, kit.trim);
+  }
+  // A small palm and lit knuckle distinguish hands from the forearm at phone size.
+  if (action !== 'headHands' && (swing === 0 || action === 'carry' || action === 'brace' || action === 'catch')) {
+    b.fillRect(handX, handY, 2, 2, a.skin);
+    b.set(handX + 1, handY, shade(a.skin, 1.12));
   }
   if (a.tape && action !== 'headHands') b.fillRect(handX, handY - 1, 2, 2, 0xf6edda);
   if (facing === 'back' && a.number !== undefined) {

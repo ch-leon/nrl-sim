@@ -5,7 +5,7 @@ import { LIVE } from '../league/live/knobs';
 import type { LivePlayerAction, Reaction } from '../../art/match/livePlayer';
 import { hashString } from '../../art/match/kit';
 import { MOMENT_ACTIONS, momentLift, type MomentAction } from '../../art/match/moments';
-import { screenFacing } from './screenFacing';
+import { screenFacing, screenPlayerFacing } from './screenFacing';
 import { legsBand } from './legsLayer';
 import { FATIGUE } from '../league/fatigue';
 import { eyesUp, type EyesUp } from './eyesUp';
@@ -177,7 +177,10 @@ export function playerPicture(p: PlayerSnap, previous: PlayerSnap, tick: number,
   // After a try (#668): the mates the view gathers round the scorer run in, cheer on their own, run back;
   // the side that conceded slumps, hands on hips, or trudges back head down.
   let gait = stride;
-  let facing = screenFacing(p, previous, screenDir);
+  // Profiles belong to everyday movement/handling; shared contact, ruck and kicks
+  // retain their authored front/back poses until their own art pass.
+  let facing: { facing: Facing; left: boolean } = (['idle', 'run', 'carry', 'catch', 'pass', 'fend'].includes(action) || (action === 'airCatch' && frame === 5))
+    ? screenPlayerFacing(p, previous, screenDir) : screenFacing(p, previous, screenDir);
   let slump = false;
   const scene = ctx.tryScene;
   const member = scene?.mob.get(`${p.side}/${p.slot}`);

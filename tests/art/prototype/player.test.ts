@@ -98,12 +98,32 @@ describe('prototype appearance compatibility', () => {
   });
   it('keeps all cosmetic/action/direction combinations inside their frames', () => {
     for (const build of ['lean', 'athletic', 'stocky'] as const) for (const head of HEAD_OPTIONS) for (const stature of [-2, 2]) {
-      for (const facing of ['front', 'back'] as const) for (const action of actions) for (let frame = 0; frame < 6; frame++) {
+      for (const facing of ['front', 'back', 'side'] as const) for (const action of actions) for (let frame = 0; frame < 6; frame++) {
         const pixels = drawPrototypePlayer({ ...base, build, head, stature, beard: true, tape: true }, kit, action, frame, facing, true);
         const bounds = opaqueBounds(pixels)!;
         expect(bounds.x0).toBeGreaterThan(0); expect(bounds.y0).toBeGreaterThan(0);
         expect(bounds.x1).toBeLessThan(pixels.w - 1); expect(bounds.y1).toBeLessThan(pixels.h - 1);
       }
+    }
+  });
+  it('turns the chest and head into a profile while preserving every hair style', () => {
+    for (const head of HEAD_OPTIONS) {
+      const look = { ...base, head, beard: true };
+      const headFront = drawHead(look, kit, 'front');
+      const headSide = drawHead(look, kit, 'side');
+      expect(headSide.data).not.toEqual(headFront.data);
+      // One visible eye, a nose ahead of the cheek, and the existing roots/crown.
+      expect(headSide.get(12, 10).color).toBe(headFront.get(11, 10).color);
+      expect(headSide.get(6, 10).color).not.toBe(headFront.get(6, 10).color);
+      for (let y = 0; y < 6; y++) for (let x = 0; x < headFront.w; x++) {
+        if (headFront.get(x, y).color === look.hair) expect(headSide.get(x, y)).toEqual(headFront.get(x, y));
+      }
+      const front = drawPrototypePlayer(look, kit, 'carry', 0, 'front', true, 0);
+      const side = drawPrototypePlayer(look, kit, 'carry', 0, 'side', true, 0);
+      expect(side.data).not.toEqual(front.data);
+      // Turning changes neither the ground anchor nor the painted height.
+      expect(opaqueBounds(side)!.y1).toBe(opaqueBounds(front)!.y1);
+      expect(opaqueBounds(side)!.y0).toBe(opaqueBounds(front)!.y0);
     }
   });
   it('renders separate front/back views and a protected carry', () => {

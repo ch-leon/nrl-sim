@@ -17,12 +17,16 @@ const BASIC: Partial<Record<LivePlayerAction, Action | ReactAction>> = {
 };
 
 export function drawLivePlayer(look: Appearance, kit: Kit, action: LivePlayerAction, frame: number, facing: Facing, possession: boolean, strideFrame?: number, tired = 0, lookUp = 0): PixelBuffer {
-  if (action === 'ptb' || action === 'dummyHalf' || action === 'ready') return drawRuckPlayer(look, kit, action, frame, facing, possession);
-  if (MOMENT_ACTIONS.includes(action as MomentAction)) return drawMomentPlayer(look, kit, action as MomentAction, frame, facing, possession, strideFrame);
+  // The landing's last beat is the continuing carry, including its directional view.
+  if (action === 'airCatch' && frame === 5) return drawPrototypePlayer(look, kit, 'carry', 0, facing, possession, strideFrame);
+  const sharedFacing = facing === 'side' ? 'front' : facing;
+  if (action === 'ptb' || action === 'dummyHalf' || action === 'ready') return drawRuckPlayer(look, kit, action, frame, sharedFacing, possession);
+  if (MOMENT_ACTIONS.includes(action as MomentAction)) return drawMomentPlayer(look, kit, action as MomentAction, frame, sharedFacing, possession, strideFrame);
   let basic = BASIC[action];
   if (possession && (basic === 'wrap' || basic === 'idle')) basic = 'carry';
   // Every pose maps to a painter; a fend keeps the run cycle's legs under the straight arm.
-  const drawn = drawPrototypePlayer(look, kit, basic ?? 'idle', frame, facing, possession, strideFrame, tired);
+  const bodyFacing = basic === 'ground' || basic === 'wrap' || basic === 'brace' || basic === 'ptb' ? sharedFacing : facing;
+  const drawn = drawPrototypePlayer(look, kit, basic ?? 'idle', frame, bodyFacing, possession, strideFrame, tired);
   // Eyes on a bomb (#671): a man standing or running, ball elsewhere, with his head tipped back.
   if (lookUp > 0 && !possession && (action === 'idle' || action === 'run')) return lookUpFrame(drawn, look, kit, facing, action, frame, strideFrame, tired, lookUp);
   return drawn;

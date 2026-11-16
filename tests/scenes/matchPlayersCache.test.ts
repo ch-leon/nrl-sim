@@ -40,6 +40,17 @@ describe('PlayerFrameCache', () => {
     expect(Array.from(warm.get('home', pic(4)).data)).toEqual(Array.from(cold.get('home', pic(4)).data));
   });
 
+  it('caches turn/profile frames separately and reproduces a side frame after eviction', () => {
+    const cache = new PlayerFrameCache(kits, undefined, 2);
+    const front = cache.get('home', pic(0));
+    const side = cache.get('home', pic(0, { facing: 'side' }));
+    expect(side.data).not.toEqual(front.data);
+    expect(cache.get('home', pic(0, { facing: 'side', left: true }))).toBe(side);
+    cache.get('home', pic(0, { facing: 'back' }));
+    cache.get('home', pic(1));
+    expect(cache.size).toBe(2);
+    expect(cache.get('home', pic(0, { facing: 'side' })).data).toEqual(side.data);
+  });
   it('keeps a default capacity that holds the busiest passage', () => {
     expect(new PlayerFrameCache(kits).capacity).toBe(FRAME_CACHE_SIZE);
     expect(FRAME_CACHE_SIZE).toBeGreaterThan(465);

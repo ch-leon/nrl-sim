@@ -3,7 +3,7 @@ import { JOG_SPEED, REACT_HOLD_TICKS, STRIDE_METRES, pictureContext, playerPictu
 import { FATIGUE } from '../../../src/match/league/fatigue';
 import type { PlayerSnap, Snapshot } from '../../../src/match/core/snapshot';
 import { LIVE } from '../../../src/match/league/live/knobs';
-import { FACING_BAND, screenFacing, screenHeading } from '../../../src/match/view/screenFacing';
+import { FACING_BAND, SIDE_BAND, screenFacing, screenPlayerFacing, screenHeading } from '../../../src/match/view/screenFacing';
 import { fieldToWorldPoint } from '../../../src/scenes/matchField';
 import { toFieldPt } from '../../../src/match/core/field';
 // Toward the home try line and the near touchline: up and to the right of the screen.
@@ -99,6 +99,29 @@ describe('live player presentation', () => {
     }
     // Straight along the boundary itself: the same view every tick.
     expect(new Set(views(Array.from({ length: 8 }, () => .01))).size).toBe(1);
+  });
+  it('uses profiles for agreed horizontal headings, preserving shared contact and replay facing', () => {
+    const headings = Array.from({ length: 3600 }, (_, i) => {
+      const h = { headX: Math.cos(i * Math.PI / 1800), headY: Math.sin(i * Math.PI / 1800) };
+      return { h, s: screenHeading(h.headX, h.headY) };
+    }).filter(v => v.s.x > .5);
+    const headingFor = (y: number) => headings.reduce((best, v) => Math.abs(v.s.y - y) < Math.abs(best.s.y - y) ? v : best).h;
+    const horizontal = headingFor(0), vertical = headingFor(.6);
+    const runner = { ...p, ...horizontal };
+    expect(screenPlayerFacing(horizontal, horizontal)).toEqual({ facing: 'side', left: false });
+    expect(screenPlayerFacing(horizontal, horizontal, -1)).toEqual({ facing: 'side', left: true });
+    expect(screenPlayerFacing(horizontal, vertical).facing).not.toBe('side');
+    // Either ordering of a one-tick wobble across the threshold selects the turn view.
+    const inside = headingFor(SIDE_BAND - .02), outside = headingFor(SIDE_BAND + .02);
+    expect(screenPlayerFacing(inside, outside).facing).toBe('front');
+    expect(screenPlayerFacing(outside, inside).facing).toBe('front');
+    const picture = playerPicture(runner, runner, 110, null, 1);
+    expect(picture.facing).toBe('side');
+    playerPicture({ ...runner, ...vertical }, runner, 111, null, 1);
+    expect(playerPicture(runner, runner, 110, null, 1)).toEqual(picture);
+    for (const pose of ['tackle', 'ptb', 'dummyHalf', 'kick'] as const) {
+      expect(playerPicture({ ...runner, pose }, runner, 110, null, 1).facing).toBe(screenFacing(runner, runner).facing);
+    }
   });
   it('advances the feet one full cycle per fixed distance at any pace', () => {
     const at = (speed: number, odometer: number, tick: number) => {
