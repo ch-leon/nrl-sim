@@ -34,7 +34,7 @@ live gameplay change; work still open below has not shipped.
   A release is refused when the cash is short. Choosing two or three seasons
   at signing is not in this slice; it stays with the finance presentation
   ([#561](https://github.com/ch-leon/nrl-sim/issues/561)). Rival signings now need both cap room and cash.
-  Played-match income and investment costs ([#559](https://github.com/ch-leon/nrl-sim/issues/559))
+  Played-match income and investment costs ([PR #695](https://github.com/ch-leon/nrl-sim/pull/695))
   replace passive weekly income with saved, once-only fixture receipts. Staff
   appointments cost cash upfront; construction records its paid cost for refunds.
   Cap upgrades ([#560](https://github.com/ch-leon/nrl-sim/issues/560)), the complete
