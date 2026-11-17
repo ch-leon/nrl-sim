@@ -1,0 +1,42 @@
+{
+  "name": "shapes win-rate check",
+  "description": "Does enabling ordinary attack shapes change Expansive's tracked win rate against Balanced at even ratings? Compare shapes off with on over 400 matches per orientation; an even 60v60 row is a neutral mechanics check.",
+  "seeds": 20,
+  "base": {
+    "shapes.on": 0
+  },
+  "scenarios": [
+    {
+      "name": "even 60 v 60",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "expansive v balanced",
+      "seeds": 400,
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "shapes on",
+      "tuning": {
+        "shapes.on": 1
+      }
+    }
+  ]
+}
