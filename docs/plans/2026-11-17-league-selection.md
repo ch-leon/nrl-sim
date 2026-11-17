@@ -12,6 +12,14 @@
 
 ## Scope, evidence and decisions
 
+**Paused checkpoint, 17 November:** Leon requested a usage pause. Foundation,
+annual owners and action clock have independent Claude approvals. Season close is
+implemented through `fdf0cfa3` and passed spec review, but Claude requested changes
+for non-final post-hook candidate validation before installation/autosave. Fix and
+re-review that first; annual confirmation and UI remain unimplemented. See the
+[resume notes and evidence](../status/2026-11-league-selection.md). PR #719 stays
+draft; do not start further work until Leon resumes.
+
 Baseline inspected: `03812a1618b80fbc1348bd6b0966b3df704e9b7a`, branch `codex/league-selection-unlocks`, save version 30. Read `AGENTS.md`, `CLAUDE.md`, `docs/hub/`, `docs/specs/career-opportunities.md`, `docs/specs/career-competitions.md` and `docs/plans/2026-11-career-competitions.md`. The opportunities specification supersedes historical forced promotion/relegation. Numerical tuning and optional events remain separate work.
 
 Done means the complete fresh AU and UK playable loop, including production new-game entry and reload, not merely progression helpers or a developer toggle. Initial content remains three eight-club regional leagues, 14 home-and-away rounds, top-four finals and the authored 25-slot year. Use saved definition bounds in logic and UI rather than hardcoding those numbers. AU and UK are regions, not difficulty ranks. Existing profile strength means 44/54/64 are generation targets, not guaranteed future opposition ratings.
