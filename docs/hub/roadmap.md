@@ -7,7 +7,7 @@ live gameplay change; work still open below has not shipped.
 
 ## Now
 
-- **Match presentation — whole-match consistency next:** finish stage 5 with officials, crowd reactions, fatigue/error reactions and walk-offs, then check complete career matches across contrasting kits, appearances, weather, interchanges and normal/fast playback. Keep the existing painters and event-driven animation. Follow the [implementation plan](../plans/2026-11-match-art-and-animation.md).
+- **Match presentation — whole-match consistency:** [PR #706](https://github.com/ch-leon/nrl-sim/pull/706), open for review, fixes the binned player and detached overlays at the whistle. Officials, benches and crowd already read consistently with the merged art in the clear/rain/wind audit. Complete-match, interchange and normal/fast-playback evidence is recorded in the PR; real-phone validation remains. Follow the [implementation plan](../plans/2026-11-match-art-and-animation.md).
 
 - **Merged animation foundation:** Leon reviewed the clip and approved the full stack, merged on 17 November 2026 through [PR #705](https://github.com/ch-leon/nrl-sim/pull/705) at `f9f1641`. It includes the art foundation (#697), movement (#699), contact (#701), handling (#703) and connected big moments. The plan records validation and remaining QA/phone performance work. Earlier receiver commitment and pre-release calls remain a separate gameplay change under #672/#649.
 

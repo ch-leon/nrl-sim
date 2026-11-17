@@ -41,7 +41,8 @@ weight, the ball should be easy to follow, and tackles should make sense without
 commentary. Keep the game's playful pixel-art character and make the improvement
 obvious at phone size.
 
-The next stage-5 pass addresses [#688](https://github.com/ch-leon/nrl-sim/issues/688):
+The next stage-5 pass, [PR #706](https://github.com/ch-leon/nrl-sim/pull/706),
+addresses [#688](https://github.com/ch-leon/nrl-sim/issues/688):
 the player in the sin bin must fade with his side at the whistle, from his existing
 seat, and return with the restart. Review also found detached bin/fatigue indicators
 after the players disappeared. Officials, benches and the crowd already use
