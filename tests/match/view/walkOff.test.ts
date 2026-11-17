@@ -15,6 +15,7 @@ import { binnedSpot } from '../../../src/match/view/officials';
 import { NINES } from '../../../src/match/league/rules';
 import type { PlayerPicture } from '../../../src/match/view/playerPicture';
 import type { Snapshot } from '../../../src/match/core/snapshot';
+import seed15Whistle from '../../fixtures/seed15-whistle.json';
 import { BreakClock, CAPTAIN_SLOT, FT_GONE, FT_FADE, RESTART_FADE, HT_FADE, TUNNEL, breakMan, breakScene } from '../../../src/match/view/walkOff';
 
 interface Drawn { x: number; y: number; alpha: number; visible: boolean }
@@ -243,26 +244,18 @@ describe('a binned man at the whistle (#688)', () => {
     view.draw(live, live, 1); expect(a.alpha).toBe(1);
   });
 
-  it('leaves no lone binned actor after the real seed45 final whistle', () => {
-    // Current main's real witness: #lab?seed=45&final=1, full time 9075,
-    // home7 Xavier Stampton still in the bin. The old #688 witness used seven-minute halves.
-    const sim = new LiveSim(labSheet(DEFAULT_HOME), labSheet(DEFAULT_AWAY), 45, { goldenPoint: true });
-    let prev = sim.snapshot();
-    let liveContact: [Snapshot, Snapshot] | null = null;
-    while (!sim.finished && sim.tick < 12_000) {
-      const before = sim.snapshot();
-      sim.step();
-      const current = sim.snapshot();
-      if (!liveContact && current.contact) liveContact = [before, current];
-      prev = before;
-    }
-    const snap = sim.snapshot(), binned = snap.players.filter(p => p.binned);
+  it('clears contact and player-attached marks across a recorded real full-time whistle, and restores them on seek', () => {
+    // Four real snapshots from seed 15 (Reapers v Wolves): contact ticks 140–141,
+    // then the 8357–8358 final whistle with away8 Dane Fonoti in the bin. Frozen
+    // presentation evidence keeps this view regression independent of later match RNG changes.
+    const fixture = seed15Whistle as unknown as { contactPair: [Snapshot, Snapshot]; finalPair: [Snapshot, Snapshot] };
+    const [contactPrev, contactCur] = fixture.contactPair;
+    const [prev, snap] = fixture.finalPair;
+    expect([prev.tick, snap.tick]).toEqual([8357, 8358]);
+    const binned = snap.players.filter(p => p.binned);
     expect(snap.phase?.kind).toBe('full-time');
-    expect([prev.tick, snap.tick]).toEqual([9074, 9075]);
-    expect(binned.map(p => [p.side, p.slot])).toEqual([['home', 7]]);
-    expect(liveContact).not.toBeNull();
+    expect(binned.map(p => [p.side, p.slot, p.who])).toEqual([['away', 8, 'Dane Fonoti']]);
     const { s, view, contacts, focus } = make();
-    const [contactPrev, contactCur] = liveContact!;
     view.draw(contactPrev, contactCur, 1);
     expect(contacts[contacts.length - 1]).not.toBeNull();
     const participants = [contactCur.contact!.carrier, ...contactCur.contact!.defenders];
