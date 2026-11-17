@@ -1,6 +1,78 @@
 # Career progression, competitions and rewards
 
-## Current specification and delivery
+## Current plan — revised 16 November 2026
+
+Leon approved a broader, playful career: **choose an eligible league each season,
+win to unlock harder leagues, and send players to optional cups, events and
+assignments around a shared calendar.** Main leagues stay believable; special
+events, opponents and rewards take a Kairosoft direction. Individual contests
+include watching and coaching. Gear is a later expansion.
+
+The [v0.2 product design](../specs/career-opportunities.md) specifies the agreed
+experience, working catalogue, operational rules, implementation gates and
+acceptance criteria. The existing
+[Notion specification](https://app.notion.com/p/4150870d4c44810c880ae3395086e9d0)
+remains the canonical product record. The
+[technical contract](../specs/career-competitions.md) records how this changes the
+earlier structural prototype; [delivery evidence](../status/2026-11-career.md)
+distinguishes that prototype from the player-facing work still required.
+
+### Changes that govern future implementation
+
+- Replace automatic player-club promotion/relegation with lasting earned league
+  access and deliberate annual entry. A title unlocks an option, not a compulsory move.
+- Show registration windows and commitments in game time. Events can clash;
+  missing one this year leaves a reason to return next year.
+- Allow real squad members to go away individually or in groups while a legal
+  remaining team plays league matches. Track each person's availability and return.
+- Add short animated individual contests with coaching choices, plus distinct
+  beach/five-a-side formats. Preserve ordinary Nines leagues and the Open Cup.
+- Expand rewards to bounded XP, traits, badges, sponsor opportunities, cap
+  entitlements, club displays and connected invitations. First/repeat awards differ.
+- Maintain near-term, seasonal, longer-term and personal goals, with recurring
+  eccentric opponents and factual histories. No real-world timers or compulsory event grind.
+- Reserve boots/headgear with boosts for a separately specified gear expansion.
+
+### Revised delivery sequence
+
+| Slice | Deliverable | Done when |
+| --- | --- | --- |
+| A | Selectable league career and Open Cup | Win, unlock, choose to stay or move, and finish/decline a cup with valid people, finances and next-season setup. |
+| B | Player assignments | Send a player away, cover an overlapping fixture, and receive the player and recorded outcome once. |
+| C | Watched/coached individual challenge | Coach animated rounds, earn a personal and supported club reward, and reveal a next opportunity. |
+| D | Distinct small-sided event and invitation chain | A beach or floodlit event changes play and squad decisions, with a saved route to a later challenge. |
+| E | Wider catalogue and endgame | Add Shield/youth/Champions Series and further events, each with its own decision and bounded rewards. |
+| Later | Gear | Specify and validate equipment acquisition, boosts, slots and visual presentation separately. |
+
+The foundation does not by itself complete this broader design. Preserve existing
+calendar/state/division/Open Cup work; change the remaining entry and progression
+requirements rather than rebuilding those foundations.
+
+### Existing issue map and design gates
+
+Continue under [#323](https://github.com/ch-leon/nrl-sim/issues/323). #570/#571/#573/#575
+remain reusable foundations. #574 needs its automatic movement scope reconciled
+to unlocks, league selection and rollover; #578 needs opportunity/assignment views;
+#582 needs the revised career proof. #576/#577 retain reward/cap ownership.
+#579–#581 remain relevant, with their order reconciled to the slices above.
+On 17 November the tracker and #574/#578/#582 were reconciled to v0.2. The new
+scoped delivery tickets are [#708 assignments](https://github.com/ch-leon/nrl-sim/issues/708),
+[#710 watched/coached individual challenge](https://github.com/ch-leon/nrl-sim/issues/710)
+and [#711 distinct small-sided event](https://github.com/ch-leon/nrl-sim/issues/711).
+All remain planned work, not shipped behaviour. The first implementation is the
+ready prerequisite [#572 player continuity](https://github.com/ch-leon/nrl-sim/issues/572),
+with a [concrete implementation plan](2026-11-17-player-continuity.md). It is stacked
+on the exact match-income candidate [#695](https://github.com/ch-leon/nrl-sim/pull/695)
+to sequence the shared save/finance files; the upstream PR's review/merge gates
+remain mandatory.
+
+Before dependent implementation, settle AI field allocation for freely chosen
+leagues, calendar phases and durations, lower-league cap commitments, assignment
+recall/transfer rules, event simulation rules and actual reward values. The full
+design's §10 identifies each gate. Use the existing finance/progression owners
+and current contracts; exact numbers are working inputs, not approved balance.
+
+## Historical specification and delivery context — 10–11 November
 
 This file preserves the original 10 November concept. It was developed into the
 canonical [Notion implementation specification](https://app.notion.com/p/4150870d4c44810c880ae3395086e9d0)
@@ -18,15 +90,17 @@ uses **annual cap commitments, with no salary cash deductions**. The approved
 [player progression direction](https://app.notion.com/p/4130870d4c4481b4887feaad70fe35d8)
 supports new careers and older-save restart/export handling. These supersede the
 weekly-salary examples and migration recommendation in the historical text below.
-Use the Notion spec and current repository contracts when executing; do not treat
-this concept snapshot as a second implementation contract.
+Use the v0.2 design above and current finance/progression contracts when executing;
+do not treat this concept snapshot as a second implementation contract. In
+particular, its forced promotion/relegation, Nines-only scope and delivery order
+are superseded by the 16 November revision.
 
 Execution started on 11 November. The versioned
 [technical contract](../specs/career-competitions.md) and
 [delivery status](../status/2026-11-career.md) record the current source audit,
 prototype and implementation boundaries.
 
-## Original concept
+## Original concept — historical, superseded where noted above
 
 Draft for discussion, 10 November 2026. This is a design proposal, not a shipped
 feature or a committed delivery schedule. Names and numbers below are starting
