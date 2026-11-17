@@ -164,7 +164,7 @@ export interface SeasonSample extends GapSample {
   // bestNine / rivalMean / rivalRange (GapSample), madeFinals and the near-rival
   // record are taken at the end of the regular season: the squad that produced
   // the record, before the rollover.
-  /** Free agents the managed manager signed this season (0 when idle). */
+  /** Players recruited from the unsigned market or rival offers this season (0 when idle). */
   signings: number;
   /** Total fees paid for those signings. */
   signingFees: number;
@@ -535,12 +535,11 @@ export function managedEventChoice(state: GameState, event: PendingEvent): numbe
         candidate = { ...candidate, squad: candidate.squad.map(p => p.id === event.subjectId ? { ...p, wage: Math.round(p.wage * (1 + effect.pct)) } : p) };
         wageRise += Math.max(0, weeklyWages(candidate) - before);
       } else if (effect.kind === 'signSubject') {
-        const signed = signRivalPlayer(candidate, event.rivalId, event.subjectId, event.fee ?? 0);
+        if (event.fee === undefined) return false;
+        const signed = signRivalPlayer(candidate, event.rivalId, event.subjectId, event.fee);
         if (typeof signed === 'string') return false;
-        const added = signed.squad.find(p => p.id === event.subjectId);
-        if (!added?.deal || !capRoomFor(candidate.squad, candidate.capAccount, candidate.season, added.deal.salary)) return false;
         signs = true;
-        candidate = { ...signed, money: signed.money - (event.fee ?? 0) };
+        candidate = signed; // Shared transfer projection already includes the one fee and every covered cap season.
       }
       // Other effects do not guarantee new financing costs in the current deck.
       // In particular, don't roll chances or count conditional/weekly future receipts.
@@ -613,10 +612,21 @@ function trySign(p: Player): number | null {
  * follows whatever the fee formula is.
  */
 function manage(): Signed {
+  const out: Signed = { count: 0, fees: 0, overall: 0 };
+  const record = (p: Player, fee: number): void => {
+    out.count++;
+    out.fees += fee;
+    out.overall += overallRating(p);
+  };
   const s = getState();
   for (const ev of s.eventDeck.pending) {
     const choice = managedEventChoice(getState(), ev);
-    if (choice !== undefined) chooseEvent(ev.id, choice);
+    if (choice !== undefined) {
+      const alreadyHere = getState().squad.some(p => p.id === ev.subjectId);
+      chooseEvent(ev.id, choice);
+      const signed = getState().squad.find(p => p.id === ev.subjectId);
+      if (!alreadyHere && signed) record(signed, ev.fee ?? 0);
+    }
   }
   // Training focus (N11): the squad's weakest stat.
   setTrainingFocus(weakestStat(getState().squad));
@@ -634,12 +644,6 @@ function manage(): Signed {
     if (st.money - STAFF_APPOINTMENT_PRICES[role] < MANAGED.STAFF_RESERVE) continue;
     hireStaff(role);
   }
-  const out: Signed = { count: 0, fees: 0, overall: 0 };
-  const record = (p: Player, fee: number): void => {
-    out.count++;
-    out.fees += fee;
-    out.overall += overallRating(p);
-  };
   let st = getState();
   while (st.squad.length < MANAGED.SQUAD_FLOOR) {
     const fits = discoveredFreeAgents(st)
