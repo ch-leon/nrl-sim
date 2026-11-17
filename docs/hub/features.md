@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- **Player continuity foundation** (draft, #572): v30 stores observed club histories and compact retirement records. Recruit refreshes discovery without replacing unsigned people or drawing match RNG. Annual intake helpers are implemented; lifecycle signing, expiry, retirement and funded sales integration remain in the next batch.
+
 - **Played-match income and upfront investments** ([PR #695](https://github.com/ch-leon/nrl-sim/pull/695)): base, venue and small result payments settle once with the fixture; byes and waiting pay nothing. Rival wallets pay for signings/releases. Staff appointment fees and Grandstand 30k/60k/90k purchases are upfront, with refunds based on recorded spend. v29 records kickoff promises and receipts; v28 loads without retroactive income.
 
 - Signing a player takes the cash for one year's wage (a quarter for an Academy prospect, less a Scout Office discount on the fee only) and room under this season's salary cap. Both are checked before anything changes, so a signing that does not fit is refused and the books stay as they were. A renewal costs nothing, and only in the last season of the current deal: it is priced on his ability now, starts the season after that deal, and has to fit the cap in the season it starts. It does not move the weeks left or the salary already signed. A second renewal in the same season does nothing. Releasing him shows the cash payout and the cap it frees, and is refused when the cash is short. There is no buyer for a sale yet. A rival's later signing is refused when it does not fit the annual cap. Rival wallets are not charged the fee until they have match income ([#558](https://github.com/ch-leon/nrl-sim/issues/558)).

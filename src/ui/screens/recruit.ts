@@ -1,3 +1,4 @@
+import { discoveredFreeAgents } from '../../systems/playerCareer';
 // src/ui/screens/recruit.ts — free-agency browser screen (BAK-179, WU-9).
 // Renders GameState.freeAgents as a table (3g, Broadcast Quiet) with SIGN
 // inline. Built on the DOM UI kit (src/ui/dom.ts). No Phaser imports. Also
@@ -433,12 +434,13 @@ export function openRecruitScreen(): void {
   const render = (): void => {
     list.replaceChildren();
     const s = getState();
+    const discovered = discoveredFreeAgents(s);
     const shortlist = recruitShortlist(s);
-    const fullView = showAll || s.freeAgents.length < 5;
+    const fullView = showAll || discovered.length < 5;
     sort.button.style.display = fullView ? '' : 'none';
     more.replaceChildren();
     if (!fullView) {
-      const all = button(`Show all ${s.freeAgents.length}`, () => { showAll = true; render(); });
+      const all = button(`Show all ${discovered.length}`, () => { showAll = true; render(); });
       all.setAttribute('data-show-all', '');
       more.append(all);
     }
@@ -449,12 +451,12 @@ export function openRecruitScreen(): void {
     const bank = fmtMoney(s.money);
     sub.textContent = `Free agents · new players ${when} · squad ${s.squad.length}/${SQUAD_CAP} · bank ${bank}`;
     sub.title = `A pool of ${FREE_AGENT_POOL_SIZE}; new players arrive ${when}. Squad ${s.squad.length} of ${SQUAD_CAP}. Bank ${bank}.`;
-    if (s.freeAgents.length === 0) {
+    if (discovered.length === 0) {
       list.appendChild(el('div', { class: 'nrl-screen-empty', text: 'No free agents available. New players arrive when the pool refreshes.' }));
       return;
     }
     const full = s.squad.length >= SQUAD_CAP;
-    const agents = s.freeAgents.map((p) => ({ p, fee: signingFee(s, p), ovr: overallRating(p) }));
+    const agents = discovered.map((p) => ({ p, fee: signingFee(s, p), ovr: overallRating(p) }));
     agents.sort((a, b) => (recruitSort === 'fee' ? a.fee - b.fee : recruitSort === 'age' ? a.p.age - b.p.age : b.ovr - a.ovr) || b.ovr - a.ovr);
     const visible = fullView ? agents : shortlist.ids.map((id) => agents.find(({ p }) => p.id === id)!);
     if (visible.length === 0) list.append(el('div', { class: 'nrl-screen-empty', text: full

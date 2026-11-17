@@ -1,3 +1,4 @@
+import { discoveredFreeAgents } from '../../systems/playerCareer';
 // src/ui/screens/player.ts — the player page (N7, GitHub #185).
 //
 // Tap a row on the Squad or Recruit screen, or of a rival's squad, and this
@@ -469,7 +470,7 @@ function kitFor(ctx: PlayerContext, state: GameState): Kit {
 function findPlayer(id: string, ctx: PlayerContext, state: GameState): Player | null {
   // A rival's club as the league has it now: a rename (#398) replaces the object the page opened with.
   const club = ctx.kind === 'rival' ? state.league.clubs.find((c) => c.id === ctx.club.id) ?? ctx.club : null;
-  const list = ctx.kind === 'squad' ? state.squad : ctx.kind === 'freeAgent' ? state.freeAgents : (club?.squad ?? []);
+  const list = ctx.kind === 'squad' ? state.squad : ctx.kind === 'freeAgent' ? discoveredFreeAgents(state) : (club?.squad ?? []);
   return list.find((p) => p.id === id) ?? null;
 }
 

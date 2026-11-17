@@ -152,7 +152,7 @@ describe('soak', () => {
       createNewGame('Budget', 101);
       initLeague(getState());
       const initial = getState();
-      const fromSave = { ...initial, money, freeAgents: [],
+      const fromSave = { ...initial, money, freeAgents: [], playerPopulation: { ...initial.playerPopulation, shortlistIds: [] },
         squad: initial.squad.map((player) => ({ ...player, wage })) };
       // Salaries consume cap only. Cash pays the appointment fees and preserves the reserve.
       const result = runSoak({ seed: 101, seasons: 1, weeks: 1, mode: 'managed', fromSave });

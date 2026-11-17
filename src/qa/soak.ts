@@ -1,3 +1,4 @@
+import { discoveredFreeAgents } from '../systems/playerCareer';
 // src/qa/soak.ts — headless multi-season soak of the club/league systems (QA pass).
 // Plays whole seasons through the real tick pipeline (every system main.ts
 // registers, with matches auto-simmed) and checks invariants every week: no NaN
@@ -641,7 +642,7 @@ function manage(): Signed {
   };
   let st = getState();
   while (st.squad.length < MANAGED.SQUAD_FLOOR) {
-    const fits = st.freeAgents
+    const fits = discoveredFreeAgents(st)
       .filter((p) => !p.junior && signingFee(st, p) < st.money
         && capRoomFor(st.squad, st.capAccount, st.season, salaryDemand(p)))
       .sort((a, b) => overallRating(b) - overallRating(a))[0];
@@ -653,7 +654,7 @@ function manage(): Signed {
   }
   if (st.squad.length < SQUAD_CAP) {
     const ninth = st.squad.map(overallRating).sort((a, b) => b - a)[Math.min(ON_FIELD, st.squad.length) - 1] ?? 0;
-    const star = st.freeAgents
+    const star = discoveredFreeAgents(st)
       .filter((p) => !p.junior && overallRating(p) >= ninth + MANAGED.STAR_MARGIN)
       .sort((a, b) => overallRating(b) - overallRating(a))[0];
     if (star) {

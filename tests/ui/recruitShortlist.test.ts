@@ -93,3 +93,12 @@ describe('recruitShortlist', () => {
     expect(first.ids).toHaveLength(4);
   });
 });
+
+it('advises only scouted people, while pinning the coach’s unsigned alumni and juniors', () => {
+  const s = getState();
+  const [scouted, junior, alumni] = s.freeAgents;
+  s.playerPopulation.shortlistIds = [scouted!.id];
+  s.freeAgents[1] = { ...junior!, junior: true };
+  s.freeAgents[2] = { ...alumni!, departed: true };
+  expect(new Set(recruitShortlist(s).ids)).toEqual(new Set([scouted!.id, junior!.id, alumni!.id]));
+});

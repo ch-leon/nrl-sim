@@ -96,3 +96,14 @@ describe('Recruit screen', () => {
     expect(rows()).toHaveLength(getState().freeAgents.length);
   });
 });
+
+it('Show all counts and displays all scouted people without exposing undiscovered unsigned players', () => {
+  const s = getState();
+  setState({ playerPopulation: { ...s.playerPopulation, shortlistIds: s.freeAgents.slice(0, 6).map(p => p.id) } });
+  openRecruitScreen();
+  const more = screen().querySelector('[data-show-all]')!;
+  expect(more.textContent).toBe('Show all 6');
+  more.click();
+  expect(new Set(rows().map(r => r.attrs['data-row-player']))).toEqual(new Set(s.freeAgents.slice(0, 6).map(p => p.id)));
+  expect(getState().freeAgents).toBe(s.freeAgents);
+});

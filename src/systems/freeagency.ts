@@ -1,7 +1,6 @@
-// src/systems/freeagency.ts — free-agent pool refresh + signing/release logic.
-// See BAK-179 (WU-9). Pure TypeScript, no Phaser. All randomness routes through
-// the seeded Rng (ARCHITECTURE §1.5); the registered tick hook builds an Rng from
-// state.rngSeed and writes the advanced state back (same pattern as data/club.ts).
+import { refreshMarketShortlist } from './playerCareer';
+// Free-agent discovery + signing/release logic. Refreshes never generate people
+// or advance the match RNG; annual intake is a separate lifecycle operation.
 
 import { getState, setState, type GameState, type Player } from '../core/state';
 import type { Rng } from '../utils/rng';
@@ -9,7 +8,6 @@ import { makeRng } from '../utils/rng';
 import { bus } from '../core/events';
 import { spendMoney } from '../data/club';
 import { signingFeeQuote, type FinanceLevel } from '../data/financeRules';
-import { generateFreeAgent } from '../data/player';
 import { registerTickHook, TICK_ORDER, type TickContext } from '../core/time';
 import { SPECIAL_MAGNITUDE } from '../data/facility';
 import { LEAGUE, SQUAD_CAP, SQUAD_MIN, WEEKS_PER_SEASON } from '../config';
@@ -86,20 +84,9 @@ export function poolTarget(state: ScoutingClub): number {
 
 // ── Pool refresh ────────────────────────────────────────────────────────────
 
-/**
- * Regenerate GameState.freeAgents to a fresh pool of FREE_AGENT_POOL_SIZE.
- * Every agent is generated around poolTarget (the league mean, lifted by the
- * Scout Office, the Academy and reputation). Consumes RNG in a fixed order (one
- * generateFreeAgent per agent) so a given seed + state yields the same pool.
- * Mutates the store (via setState) and returns the new state; also persists the
- * advanced rngSeed so subsequent draws continue the sequence.
- */
-export function refreshFreeAgents(state: GameState, rng: Rng): GameState {
-  const target = poolTarget(state);
-  // Academy prospects (#42) and players who just left the club (#40) survive re-rolls; the next season's intake clears them.
-  const pool: Player[] = state.freeAgents.filter((p) => p.junior || p.departed);
-  for (let i = 0; i < FREE_AGENT_POOL_SIZE; i++) pool.push(generateFreeAgent(rng, target));
-  setState({ freeAgents: pool, rngSeed: rng.state() });
+/** Refresh discovery only. The optional legacy RNG argument is deliberately untouched. */
+export function refreshFreeAgents(state: GameState, _rng?: Rng): GameState {
+  setState({ playerPopulation: refreshMarketShortlist(state).playerPopulation });
   return getState();
 }
 

@@ -1,3 +1,4 @@
+import { installPlayerHistory } from './playerCareer';
 import { freezeMatchIncome, reconcileMatchIncome, matchIncomePatch, commitMatchState } from './matchIncome';
 // src/systems/fixtures.ts — season fixtures, ladder, rival cheap-sim and finals
 // for the 16-club league (BAK-184, WU-7). Pure TypeScript, no Phaser.
@@ -585,7 +586,7 @@ export function initLeague(
     strength: 55, // baseline used only if the player is ever cheap-simmed
   };
   // Rivals get real squads (#74), seeded per club so the main RNG is untouched.
-  const clubs: RivalClub[] = withRivalSquads([playerClub, ...RIVAL_CLUBS.map((c) => ({ ...c }))], state.rngSeed, PLAYER_ID);
+  const clubs: RivalClub[] = withRivalSquads([playerClub, ...RIVAL_CLUBS.map((c) => ({ ...c }))], state.rngSeed, PLAYER_ID).map(c => c.squad ? { ...c, squad: c.squad.map(p => installPlayerHistory(p, c.id, state)) } : c);
   const clubIds = clubs.map((c) => c.id);
 
   const rng = makeRng(state.rngSeed);
