@@ -189,8 +189,10 @@ export function contractRows(state: GameState): Player[] {
 export const CONTRACT_DOT_WEEKS = 4;
 
 /** Squad players whose contracts end within `weeks` (juniors and departed players aside), soonest first. Pure. */
-export function contractsEndingSoon(state: Pick<GameState, 'squad'>, weeks = CONTRACT_DOT_WEEKS): Player[] {
-  return state.squad
+export function contractsEndingSoon(state: Pick<GameState, 'squad'> & Partial<Pick<GameState, 'season' | 'week' | 'competitions'>>, weeks = CONTRACT_DOT_WEEKS): Player[] {
+  const clock = state.season !== undefined && state.week !== undefined
+    ? careerActionClock({ season: state.season, week: state.week, ...(state.competitions ? { competitions: state.competitions } : {}) }) : undefined;
+  return state.squad.map(p => clock ? normaliseContractForAction(p, clock) : p)
     .filter((p) => !p.departed && !p.junior && !p.deal?.renewal && p.contractWeeks <= weeks)
     .sort((a, b) => a.contractWeeks - b.contractWeeks || a.name.localeCompare(b.name));
 }

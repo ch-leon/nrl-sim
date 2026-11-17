@@ -13,7 +13,7 @@ import { bus } from '../../core/events';
 import { getState, type Player } from '../../core/state';
 import { overallRating } from '../../data/player';
 import { releasePlayer } from '../../systems/freeagency';
-import { releaseTerms, renewalAsk } from '../../systems/cap';
+import { activeSalary, releaseTerms, renewalAsk } from '../../systems/cap';
 import { contractRows, renewEarly, renewalRefusal } from '../../systems/contracts';
 import { quotePlayerSale } from '../../systems/playerTransfers';
 import { saleConfirmation } from '../saleConfirmation';
@@ -209,7 +209,7 @@ function render(sub: HTMLElement, tbody: HTMLElement, saleHost: HTMLElement): vo
       el('td', { text: p.position }),
       el('td', { class: 'nrl-num', text: String(Math.round(overallRating(p))) }),
       el('td', { class: `nrl-num${weeks <= EXPIRY_WINDOW_WEEKS && !queued ? ' nrl-contract-soon' : ''}`, text: `${weeks} wk${weeks === 1 ? '' : 's'}` }),
-      el('td', { class: 'nrl-num', text: fmtMoney(p.deal?.salary ?? 0), attrs: { title: 'Annual salary on the cap' } }),
+      el('td', { class: 'nrl-num', text: fmtMoney(careerActionClock(s).structural ? activeSalary(p, careerActionClock(s).season) : p.deal?.salary ?? 0), attrs: { title: 'Annual salary on the cap' } }),
       el('td', {}, el('div', { class: 'nrl-contract-actions' }, renew, release, sell)),
     ));
   }
