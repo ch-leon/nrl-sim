@@ -349,3 +349,6 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261116-140108-standard-shapes-rebase | standard-shapes-rebase | aa585e81 | claude/649-attack-shapes | [report](runs/20261116-140108-standard-shapes-rebase/report.md) |
 | 20261116-140446-shapes-presets-400 | shapes-presets-400 | aa585e81 (uncommitted changes) | claude/649-attack-shapes | [report](runs/20261116-140446-shapes-presets-400/report.md) |
 | 20261117-034440-standard | standard | f9f1641 | main | [report](runs/20261117-034440-standard/report.md) |
+| 20261117-035008-standard | standard | f9f1641 | HEAD | [report](runs/20261117-035008-standard/report.md) |
+| 20261117-042425-standard | standard | 62d625b | feat/match-receiver-call | [report](runs/20261117-042425-standard/report.md) |
+| 20261117-042420-receiver-call-edge-check | receiver-call-edge-check | 62d625b | feat/match-receiver-call | [report](runs/20261117-042420-receiver-call-edge-check/report.md) |

@@ -1,0 +1,68 @@
+{
+  "name": "receiver-call-edge-check",
+  "description": "Does the optional #322 race bust effect retain its original fast-backs causal margin after early ordinary-DH commitment? Same scenario as the unit guard; lead0 versus4, each with race off/on, plus neutral.",
+  "seeds": 100,
+  "base": {
+    "counters.slide.expansiveSigned": 1,
+    "counters.compressed.expansiveRelative": 1,
+    "race.single": 0,
+    "race.perPoint": 0.02
+  },
+  "scenarios": [
+    {
+      "name": "even 60 v 60",
+      "seeds": 20,
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "fast-backs expansive v flat slide",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "positionStats": {
+          "backs": {
+            "speed": 85
+          }
+        },
+        "tactics": {
+          "attack": "expansive"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "defence": "slide"
+        }
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "lead4 race-on",
+      "tuning": {
+        "live.dhDecisionLeadTicks": 4,
+        "race.on": 1
+      }
+    },
+    {
+      "name": "lead0 race-off",
+      "tuning": {
+        "live.dhDecisionLeadTicks": 0,
+        "race.on": 0
+      }
+    },
+    {
+      "name": "lead0 race-on",
+      "tuning": {
+        "live.dhDecisionLeadTicks": 0,
+        "race.on": 1
+      }
+    }
+  ]
+}
