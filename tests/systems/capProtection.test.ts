@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { getState } from '../../src/core/state';
 import { careerFixture } from '../helpers/playerCareer';
-import { capTotals, commitmentProtection, expireEndedDeals, freshCapAccount, freezeSignedTerms, protectAddedDeals, reconcileProtection, relegateCap } from '../../src/systems/cap';
+import { capTotals, commitmentProtection, expireEndedDeals, freshCapAccount, freezeSignedTerms, protectAddedDeals, reconcileProtection, relegateCap, reconcileClubProtection } from '../../src/systems/cap';
 import { commitmentYears } from '../../src/systems/leagueSelection';
 import { migrateState } from '../../src/core/save';
 import { validateCurrent } from '../../src/core/saveValidation';
@@ -112,6 +113,23 @@ describe('exact signed-term protection', () => {
     const account = relegateCap(players, s.capAccount, 1, 'local');
     expect(account.protectedTerms).toHaveLength(2);
     expect(commitmentProtection(players, account, 3)).toMatchObject({protectedExcess: 1, unprotectedExcess: 0});
+  });
+
+  it('reconciles every club allowance without changing people, deals, cash or the store', () => {
+    const s = careerFixture(); const rival = s.league.clubs.find(c => c.squad)!;
+    s.capAccount = freezeSignedTerms(s.squad, s.capAccount, 1);
+    rival.capAccount = freezeSignedTerms(rival.squad!, rival.capAccount!, 1);
+    const input = {...s, season: 4}; const before = structuredClone(input); const stored = getState();
+    const next = reconcileClubProtection(input);
+    expect(next.capAccount).toEqual({...input.capAccount, protectedTerms: [], protectedIds: []});
+    expect(next.league.clubs.find(c => c.id === rival.id)!.capAccount).toEqual({...rival.capAccount, protectedTerms: [], protectedIds: []});
+    expect({...next, capAccount: input.capAccount, league: input.league}).toEqual(input);
+    for (const club of next.league.clubs) {
+      const prior = input.league.clubs.find(c => c.id === club.id)!;
+      expect({...club, capAccount: prior.capAccount}).toEqual({...prior, capAccount: prior.capAccount});
+    }
+    expect(input).toEqual(before); expect(getState()).toBe(stored);
+    const fresh = careerFixture(); expect(reconcileClubProtection(fresh)).toBe(fresh);
   });
 
 });
