@@ -127,7 +127,8 @@ export function intakeUnsignedMarket(state: GameState): GameState {
   if (state.playerPopulation.lastMarketIntakeSeason >= state.season) return state;
   const ids = new Set([...ownedPeople(state).map(({ player }) => player.id), ...state.playerPopulation.retired.map(p => p.id)]);
   let nextPlayerOrdinal = state.playerPopulation.nextPlayerOrdinal;
-  const deficit = Math.max(0, MARKET_SHORTLIST_SIZE - state.freeAgents.filter(p => !pinned(state, p)).length);
+  // Discovery pinning does not create a population deficit: alumni are ordinary unsigned people.
+  const deficit = Math.max(0, MARKET_SHORTLIST_SIZE - state.freeAgents.filter(p => !p.junior).length);
   const rng = makeRng(marketSeed({ ...state, week: 1 }) ^ 0x572a11);
   const births: Player[] = [];
   for (let i = 0; i < deficit; i++) {

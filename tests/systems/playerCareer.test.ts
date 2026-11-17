@@ -150,3 +150,21 @@ it('an identical archived record is idempotent after JSON key reordering', () =>
   archived.playerPopulation.retired[0] = Object.fromEntries(Object.entries(record).reverse()) as typeof record;
   expect(continuity.archiveRetirees(archived, [p], s)).toBe(archived);
 });
+
+it('counts twelve ordinary unsigned alumni toward intake even when their history pins them in Recruit', () => {
+  const s = careerFixture();
+  s.freeAgents = s.freeAgents.map(player => continuity.closeClubSpell(
+    continuity.openClubSpell(player, s.clubId, s, 'signing'), s, 'release',
+  ));
+  s.season = 2;
+  expect(continuity.validatePlayerPopulation(s)).toBeNull();
+  expect(continuity.discoveredFreeAgents({ ...s, playerPopulation: { ...s.playerPopulation, shortlistIds: [] } })).toHaveLength(12);
+  const before = structuredClone(s);
+  const next = continuity.intakeUnsignedMarket(s);
+  expect(next.freeAgents).toHaveLength(12);
+  expect(next.freeAgents).toBe(s.freeAgents);
+  expect(next.playerPopulation.nextPlayerOrdinal).toBe(s.playerPopulation.nextPlayerOrdinal);
+  expect(next.playerPopulation.lastMarketIntakeSeason).toBe(2);
+  expect(continuity.validatePlayerPopulation(next)).toBeNull();
+  expect(s).toEqual(before);
+});
