@@ -4,17 +4,17 @@ import { AU_CAREER_PROFILE as profile } from '../../src/content/career/au';
 import { buildDivisionSchedule, type LeagueFields } from '../../src/data/divisions';
 import { buildDivisionTrials } from '../../src/systems/divisionCareer';
 import { validateCompetitions } from '../../src/data/competition';
-import { makeRng } from '../../src/utils/rng';
+import { createNewGame, getState } from '../../src/core/state';
 
 const fields: LeagueFields = Object.fromEntries(profile.divisions.map(d => [d.id, d.entrants.map(e => e.clubId)]));
 describe('pure season-only regional scheduling', () => {
   it.each([1, 2, 3])('builds season %i without people or external RNG changes', season => {
     const original = JSON.stringify({ profile, fields, rules: AU_PACK.rules });
-    const rng = makeRng(987); const before = rng.state();
+    createNewGame('Purity witness', 987); const before = JSON.stringify(getState());
     const schedule = buildDivisionSchedule(profile, AU_PACK, season, fields, 573);
     const trials = buildDivisionTrials(schedule, profile, season, 573);
     expect(buildDivisionSchedule(profile, AU_PACK, season, fields, 573)).toEqual(schedule);
-    expect(rng.state()).toBe(before);
+    expect(JSON.stringify(getState())).toBe(before);
     expect(JSON.stringify({ profile, fields, rules: AU_PACK.rules })).toBe(original);
     expect(Object.keys(schedule).sort()).toEqual(['divisions', 'instances', 'profile']);
     const instances = [...schedule.instances, ...trials];

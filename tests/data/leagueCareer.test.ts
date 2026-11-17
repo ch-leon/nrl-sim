@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { validateCompetitions } from '../../src/data/competition';
 import { leagueCloseFacts, leagueEntryReceiptId, leagueTitleEvidence, validateLeagueCareer } from '../../src/data/leagueCareer';
+import { allocateLeagueFields } from '../../src/data/leagueAllocation';
+import { buildDivisionSchedule } from '../../src/data/divisions';
+import { AU_PACK } from '../../src/content/au';
 import { competitions, progress, clubIds, profile } from './leagueCareerFixtures';
 
 const context = { pack: 'au', season: 1, week: 5, clubIds, clubId: 'player' };
@@ -129,6 +132,61 @@ describe('strict League career progression metadata', () => {
     expect(validateCompetitions(c, {...context, week: 3})).toBe('league career phase');
     c.calendar!.elapsedIntervals = 2;
     expect(validateCompetitions(c, {...context, week: 3})).toBeNull();
+  });
+
+  it.each(['swapped definitions', 'swapped instance pointers', 'initial wrong field', 'false first-year movement'] as const)('rejects %s', fault => {
+    const c = competitions(1, false); c.leagueCareer = {...progress(), phase: 'active', accepted: closed().leagueCareer!.accepted!};
+    if (fault === 'swapped definitions') {
+      [c.instances[0]!.definition.id, c.instances[2]!.definition.id] = [c.instances[2]!.definition.id, c.instances[0]!.definition.id];
+    }
+    if (fault === 'swapped instance pointers') {
+      [c.world!.divisions[0]!.instanceId, c.world!.divisions[2]!.instanceId] = [c.world!.divisions[2]!.instanceId, c.world!.divisions[0]!.instanceId];
+    }
+    if (fault === 'initial wrong field') {
+      c.leagueCareer.phase = 'initial-choice'; delete c.leagueCareer.accepted;
+      [c.instances[0]!.entrantIds, c.instances[2]!.entrantIds] = [c.instances[2]!.entrantIds, c.instances[0]!.entrantIds];
+      for (const instance of c.instances) {instance.tieOrder = [...instance.entrantIds]; instance.fixtures = [];}
+    }
+    if (fault === 'false first-year movement') c.leagueCareer.accepted!.movements.push({clubId: 'player', fromLeagueId: profile.startingDivisionId, toLeagueId: profile.divisions[1]!.id});
+    expect(validateCompetitions(c, {...context, week: 1})).not.toBeNull();
+  });
+  it('rejects a relabelled Local source that claims a Championship title', () => {
+    const c = closed(); const local = c.instances[0]!; const harder = profile.divisions[1]!.id; const top = profile.divisions[2]!.id;
+    const fakeId = `${profile.id}:${harder}:s1:i99`; const final = local.fixtures[2]!;
+    const relabelled = {...local, id: fakeId, fixtures: local.fixtures.map(f => ({...f, id: f.id.replace(local.id, fakeId), competitionId: fakeId}))};
+    c.instances.push(relabelled);
+    c.leagueCareer!.access.push({leagueId: harder, earnedFrom: leagueTitleEvidence(local, profile.startingDivisionId, harder)!},
+      {leagueId: top, earnedFrom: leagueTitleEvidence(relabelled, harder, top)!});
+    expect(final.result!.winnerId).toBe('player');
+    expect(validateLeagueCareer(c.leagueCareer, c, context)).toBe('league career title source');
+  });
+  it('rejects a later-year false movement and fields that differ from the prior close allocation', () => {
+    const previous = competitions(); const c = competitions(2, false); c.instances = [...previous.instances, ...c.instances];
+    c.leagueCareer = {...progress(), phase: 'active', close: leagueCloseFacts(previous.world!, previous.instances, 1), accepted: {
+      season: 2, leagueId: profile.startingDivisionId, allocationPolicy: 'adjacent-vacancy-v1', movements: [],
+      receiptId: leagueEntryReceiptId(profile.id, 2, 'player', profile.startingDivisionId)}};
+    const cursor = {...context, season: 2, week: 1}; expect(validateCompetitions(c, cursor)).toBeNull();
+    c.leagueCareer.accepted!.movements.push({clubId: 'player', fromLeagueId: profile.startingDivisionId, toLeagueId: profile.divisions[1]!.id});
+    expect(validateCompetitions(c, cursor)).toBe('league career allocation');
+    c.leagueCareer.accepted!.movements = [];
+    const current = c.instances.filter(i => i.season === 2);
+    [current[1]!.entrantIds, current[2]!.entrantIds] = [current[2]!.entrantIds, current[1]!.entrantIds];
+    for (const instance of current) {instance.tieOrder = [...instance.entrantIds]; instance.fixtures = [];}
+    expect(validateCompetitions(c, cursor)).toBe('league career allocation');
+  });
+
+  it('accepts an earned next-year move with its exact replayed allocation', () => {
+    const previous = competitions(); const close = leagueCloseFacts(previous.world!, previous.instances, 1);
+    const target = profile.divisions[1]!.id;
+    const allocation = allocateLeagueFields(previous.world!, close, 'player', target, previous.instances);
+    const schedule = buildDivisionSchedule(profile, AU_PACK, 2, allocation.fields, 573);
+    const c = competitions(2, false); c.instances = [...previous.instances, ...schedule.instances];
+    c.world = {profile: schedule.profile, divisions: schedule.divisions};
+    c.leagueCareer = {...progress(), phase: 'active', close, access: [...progress().access,
+      {leagueId: target, earnedFrom: leagueTitleEvidence(previous.instances[0]!, profile.startingDivisionId, target)!}],
+      accepted: {season: 2, leagueId: target, allocationPolicy: allocation.policy, movements: allocation.movements,
+        receiptId: leagueEntryReceiptId(profile.id, 2, 'player', target)}};
+    expect(validateCompetitions(c, {...context, season: 2, week: 1})).toBeNull();
   });
 
 });

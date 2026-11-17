@@ -112,8 +112,6 @@ interface MigrationStep {
 }
 
 export const MIGRATIONS: readonly MigrationStep[] = [
-  // v31 adds optional progression; no historical titles or entry are inferred.
-  { from: 30, to: 31, run: old => ({ ...old }) },
   // v1 → v2: storage moved to save slots; the state shape itself is unchanged.
   { from: 1, to: 2, run: (old) => ({ ...old }) },
   // v2 → v3: settings.difficulty (GitHub #48). Existing saves play as Normal.
@@ -325,6 +323,8 @@ export const MIGRATIONS: readonly MigrationStep[] = [
   } },
   // v29 starts receipt-backed income without retroactive claims on v28 results.
   { from: 28, to: 29, run: old => ({ ...old, matchIncome: [] }) },
+  // v31 adds optional progression; no historical titles or entry are inferred.
+  { from: 30, to: 31, run: old => ({ ...old }) },
 ];
 
 /** Old string traits → instances; instances already in the new shape pass through. */

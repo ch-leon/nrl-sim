@@ -1,5 +1,7 @@
 // Durable selection facts only. This marker grants no runtime capability.
 import { completedCompetition, standingsOrder, type CompetitionCareerState, type CompetitionInstance, type CompetitionResult } from './competition';
+import { allocateLeagueFields } from './leagueAllocation';
+import type { LeagueFields } from './divisions';
 import type { CompetitionWorldMetadata } from './competitionDivisions';
 
 export interface LeagueTitleEvidence {
@@ -26,6 +28,8 @@ export interface LeagueEntryReceipt {
 export interface LeagueProgress {
   version: 1;
   scheduleSeed: number;
+  /** Frozen authored membership captured once by fresh-world construction. */
+  initialFields: LeagueFields;
   clubId: string;
   phase: 'initial-choice' | 'active' | 'next-season-choice';
   access: LeagueAccess[];
@@ -76,13 +80,28 @@ const equal = (a: unknown, b: unknown): boolean => JSON.stringify(canonical(a)) 
 export function validateLeagueCareer(v: unknown, competitions: CompetitionCareerState,
   context: { pack: string; season: number; week?: number; clubIds: readonly string[]; clubId?: string }): string | null {
   const { world, calendar, instances } = competitions;
-  if (!record(v) || !keys(v, ['version', 'scheduleSeed', 'clubId', 'phase', 'access', 'close', 'accepted']) || v.version !== 1
+  if (!record(v) || !keys(v, ['version', 'scheduleSeed', 'initialFields', 'clubId', 'phase', 'access', 'close', 'accepted']) || v.version !== 1
     || !integer(v.scheduleSeed, 0) || v.scheduleSeed > 0xffffffff
     || v.clubId !== (context.clubId ?? 'player') || !context.clubIds.includes(v.clubId as string)
     || !['initial-choice', 'active', 'next-season-choice'].includes(String(v.phase)) || !world || world.profile.pack !== context.pack
     || calendar?.mode !== 'structural' || calendar.season !== context.season) return 'league career identity';
   if (instances.some(i => i.season < context.season - 1)) return 'league career retained seasons';
   const divisions = [...world.divisions].sort((a, b) => a.rank - b.rank);
+  for (const division of divisions) {
+    const instance = instances.find(i => i.id === division.instanceId);
+    if (!instance || instance.season !== context.season || instance.definition.id !== `${world.profile.id}:${division.id}`)
+      return 'league career league identity';
+  }
+  const initial = v.initialFields;
+  if (!record(initial) || Object.keys(initial).length !== divisions.length || Object.keys(initial).some(id => !divisions.some(d => d.id === id))
+    || divisions.some(d => !Array.isArray(initial[d.id]) || (initial[d.id] as unknown[]).length !== instances.find(i => i.id === d.instanceId)!.entrantIds.length
+      || !(initial[d.id] as unknown[]).every(id => typeof id === 'string' && context.clubIds.includes(id)))) return 'league career initial fields';
+  const initialIds = Object.values(initial).flat();
+  if (initialIds.length !== context.clubIds.length || new Set(initialIds).size !== initialIds.length
+    || !(initial[world.profile.startingDivisionId] as string[]).includes(v.clubId as string)) return 'league career initial fields';
+  const fieldSets = (fields: LeagueFields): unknown => Object.fromEntries(divisions.map(d => [d.id, [...fields[d.id]!].sort()]));
+  const currentFields = Object.fromEntries(divisions.map(d => [d.id, instances.find(i => i.id === d.instanceId)!.entrantIds]));
+  if (context.season === 1 && !equal(fieldSets(initial as LeagueFields), fieldSets(currentFields))) return 'league career initial fields';
   if (!Array.isArray(v.access) || v.access.length === 0 || new Set(v.access.map(a => record(a) ? a.leagueId : undefined)).size !== v.access.length) return 'league career access';
   const accessible = new Set<string>();
   for (const a of v.access) {
@@ -111,7 +130,8 @@ export function validateLeagueCareer(v: unknown, competitions: CompetitionCareer
     const instance = instances.find(i => i.id === source.instanceId);
     // A missing source can be compacted only after its whole season ages out
     // of the required current/previous-year retention window.
-    if ((!instance && source.season >= Math.max(1, context.season - 1))
+    if ((instance && (instance.definition.id !== `${world.profile.id}:${previous.id}` || instance.season !== source.season))
+      || (!instance && source.season >= Math.max(1, context.season - 1))
       || (instance && !equal(source, leagueTitleEvidence(instance, previous.id, division.id)))) return 'league career title source';
   }
   if (!accessible.has(divisions[0]!.id) || divisions.some(d => accessible.has(d.id) && d.rank > 0 && !accessible.has(divisions[d.rank - 1]!.id))) return 'league career access chain';
@@ -136,6 +156,16 @@ export function validateLeagueCareer(v: unknown, competitions: CompetitionCareer
     || accepted.receiptId !== leagueEntryReceiptId(world.profile.id, context.season, v.clubId as string, accepted.leagueId)) return 'league career acceptance';
   const current = divisions.find(d => d.id === accepted.leagueId);
   if (!instances.find(i => i.id === current?.instanceId)?.entrantIds.includes(v.clubId as string)) return 'league career accepted field';
+  try {
+    if (context.season === 1) {
+      if (accepted.movements.length !== 0) return 'league career allocation';
+    } else {
+      const previousClose = leagueCloseFacts(world, instances, context.season - 1);
+      const allocation = allocateLeagueFields(world, previousClose, v.clubId as string, accepted.leagueId, instances);
+      if (!equal(allocation.movements, accepted.movements) || !equal(fieldSets(allocation.fields), fieldSets(currentFields)))
+        return 'league career allocation';
+    }
+  } catch { return 'league career allocation source'; }
   if (v.close !== undefined) {
     const close = v.close;
     if (!record(close) || !keys(close, ['id', 'season', 'leagues']) || !integer(close.season)

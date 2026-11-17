@@ -30,7 +30,7 @@ export function buildDivisionTrials(world: DivisionSchedule, profile: RegionalCa
   const trials: CompetitionInstance[] = [];
   for (const division of world.divisions) {
     const league = world.instances.find(i => i.id === division.instanceId)!;
-    const ids = makeRng((seed ^ hashString(`${division.id}:trials${season === 1 ? '' : `:s${season}`}`)) >>> 0).shuffle(league.entrantIds);
+    const ids = makeRng((seed ^ hashString(season === 1 ? `${division.id}:trials` : `${world.profile.id}:${division.id}:trials:s${season}`)) >>> 0).shuffle(league.entrantIds);
     const half = ids.length / 2;
     for (let round = 0; round < 2; round++) for (let i = 0; i < half; i++) {
       const homeId = round === 0 ? ids[i]! : ids[half + i]!;

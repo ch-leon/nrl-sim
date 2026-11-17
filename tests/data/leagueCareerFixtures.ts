@@ -26,5 +26,5 @@ export function competitions(season = 1, complete = true): CompetitionCareerStat
     calendar: { mode: 'structural', status: complete ? 'awaiting-next-season' : 'active', season, elapsedIntervals: complete ? 5 : 0, slots: profile.calendarSlots.map(s => ({...s})) } };
 }
 export function progress(): LeagueProgress {
-  return { version: 1, scheduleSeed: 573, clubId: 'player', phase: 'initial-choice', access: [{leagueId: profile.startingDivisionId}] };
+  return { version: 1, scheduleSeed: 573, initialFields: Object.fromEntries(Object.entries(fields).map(([id, ids]) => [id, [...ids]])), clubId: 'player', phase: 'initial-choice', access: [{leagueId: profile.startingDivisionId}] };
 }

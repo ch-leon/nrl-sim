@@ -1,8 +1,7 @@
 // Inactive, pure selection primitives. No store, notifications or career RNG.
 import type { CompetitionInstance } from '../data/competition';
 import type { CompetitionWorldMetadata } from '../data/competitionDivisions';
-import { completedLeagueFinal, leagueTitleEvidence, type LeagueAccess, type LeagueCloseFacts, type LeagueProgress, type LeagueMovement } from '../data/leagueCareer';
-import type { LeagueFields } from '../data/divisions';
+import { completedLeagueFinal, leagueTitleEvidence, type LeagueAccess, type LeagueCloseFacts, type LeagueProgress } from '../data/leagueCareer';
 import { commitment, publishedCap, tierCap, tierForRank, type CapAccount, type SignedDeal } from './cap';
 
 /** Union permanent access only when the close points at a real player-won final. */
@@ -21,45 +20,12 @@ export function leagueAccessFromClose(progress: LeagueProgress, close: LeagueClo
   }
   return access.sort((a,b) => world.divisions.find(d => d.id === a.leagueId)!.rank - world.divisions.find(d => d.id === b.leagueId)!.rank);
 }
-export type { LeagueMovement } from '../data/leagueCareer';
-export interface LeagueAllocation { policy: 'adjacent-vacancy-v1'; fields: LeagueFields; movements: LeagueMovement[] }
-
-/** Every participant is selected from the original completed fields. */
-export function allocateLeagueFields(world: CompetitionWorldMetadata, close: LeagueCloseFacts, playerId: string, targetLeagueId: string, instances: readonly CompetitionInstance[]): LeagueAllocation {
-  const divisions = [...world.divisions].sort((a,b) => a.rank - b.rank);
-  const facts = divisions.map(d => close.leagues.find(l => l.leagueId === d.id));
-  if (facts.some(f => !f) || close.leagues.length !== divisions.length || !divisions.some(d => d.id === targetLeagueId)) throw new Error('Invalid league allocation source');
-  const allIds = facts.flatMap(f => f!.standings.map(s => s.clubId));
-  if (new Set(allIds).size !== allIds.length || allIds.filter(id => id === playerId).length !== 1
-    || facts.some(f => !f!.standings.length || f!.standings.some(s => !s.clubId || !Number.isSafeInteger(s.position) || s.position < 1))) throw new Error('Invalid original league fields');
-  const from = facts.findIndex(f => f!.standings.some(s => s.clubId === playerId));
-  const to = divisions.findIndex(d => d.id === targetLeagueId);
-  const fields: Record<string, string[]> = Object.fromEntries(facts.map(f => {
-    const instance = instances.find(i => i.id === f!.instanceId && i.season === close.season);
-    if (!instance || instance.definition.id !== `${world.profile.id}:${f!.leagueId}` || instance.entrantIds.length !== f!.standings.length
-      || instance.entrantIds.some(id => !f!.standings.some(s => s.clubId === id))) throw new Error('Invalid original league instance');
-    return [f!.leagueId, [...instance.entrantIds]];
-  }));
-  const movements: LeagueMovement[] = [];
-  if (from === to) return {policy: 'adjacent-vacancy-v1', fields, movements};
-  const move = (clubId: string, source: number, destination: number): void => {
-    const sourceId = divisions[source]!.id; const destinationId = divisions[destination]!.id;
-    fields[sourceId] = fields[sourceId]!.filter(id => id !== clubId); fields[destinationId]!.push(clubId);
-    movements.push({clubId, fromLeagueId: sourceId, toLeagueId: destinationId});
-  };
-  move(playerId, from, to);
-  const used = new Set([playerId]); const step = to > from ? 1 : -1;
-  for (let rank = from + step; step > 0 ? rank <= to : rank >= to; rank += step) {
-    const ai = facts[rank]!.standings.filter(s => !used.has(s.clubId)).sort((a,b) =>
-      (step > 0 ? b.position - a.position : a.position - b.position) || a.clubId.localeCompare(b.clubId))[0];
-    if (!ai) throw new Error('No original AI available for vacancy');
-    used.add(ai.clubId); move(ai.clubId, rank, rank - step);
-  }
-  if (divisions.some((d,i) => fields[d.id]!.length !== facts[i]!.standings.length)
-    || new Set(Object.values(fields).flat()).size !== allIds.length) throw new Error('Invalid allocated league coverage');
-  return {policy: 'adjacent-vacancy-v1', fields, movements};
+export { allocateLeagueFields, type LeagueAllocation, type LeagueMovement } from '../data/leagueAllocation';
+export interface CommitmentYear {
+  season: number; committed: number; cap: number;
+  /** Stage 2 computes term-bound protection; these amounts are not entry eligibility. */
+  protectionBasis: 'deferred'; protectedAmount: number; unprotectedExcess: number;
 }
-export interface CommitmentYear { season: number; committed: number; cap: number; protectedAmount: number; unprotectedExcess: number }
 
 /** Amounts only: no decision about permitting excess or protecting a new term. */
 export function commitmentYears(players: readonly {deal?: SignedDeal}[], account: CapAccount, firstSeason: number): CommitmentYear[] {
@@ -77,7 +43,7 @@ export function commitmentYears(players: readonly {deal?: SignedDeal}[], account
   const cap = publishedCap(account);
   return Array.from({length: last - firstSeason + 1}, (_, i) => {
     const season = firstSeason + i; const committed = commitment(players, season);
-    return {season, committed, cap, protectedAmount: 0, unprotectedExcess: Math.max(0, committed - cap)};
+    return {season, committed, cap, protectionBasis: 'deferred', protectedAmount: 0, unprotectedExcess: Math.max(0, committed - cap)};
   });
 }
 export interface LeagueCommitmentPreview {
