@@ -138,6 +138,13 @@ Stage 1 checkpoint: Claude approved the inactive foundation at `6241a47b` after 
 
 ## Stage 2 — resumable two-phase lifecycle and shared annual owners
 
+Checkpoint: the extracted aging, expiry, youth and checked rival population owners,
+exact signed-term protection and v31-to-v32 migration passed spec review and Claude's
+`ANNUAL OWNERS REVIEW: APPROVE` at `05153331`. This is not completion of Tasks 4–5:
+the effective action clock and close/acceptance orchestration still need integration
+and review before the chooser can activate them. Foundation `6241a47b` separately
+passed all CI check and WebKit gates; final integrated QA remains required.
+
 **Boundary:** Still no normal-new-game activation. Replace Stage 1's blanket in-memory advancement refusal with the tested new phase gates only when the new lifecycle is ready. Normal load/import/install admission remains denied until Stage 3. Old structural saves remain isolated and follow their existing prototype path. New lifecycle tests may construct explicitly marked candidates without making those candidates accepted normal imports.
 
 ### Task 4. Close once and persist the choice gate

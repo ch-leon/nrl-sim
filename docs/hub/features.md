@@ -64,7 +64,7 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
-- **League-choice foundation — draft, unavailable in play** ([PR #719](https://github.com/ch-leon/nrl-sim/pull/719)): permanent title records, deterministic league fields and season-only scheduling are under review. Existing careers keep their format. The new-game chooser and annual rollover are still required before this becomes a playable feature.
+- **League choice — draft, unavailable in play** ([PR #719](https://github.com/ch-leon/nrl-sim/pull/719)): permanent title records, deterministic league fields, reusable schedules and shared annual player updates have passed independent checkpoint reviews. Contract protection now follows exact signed terms. The chooser and resumable season transition remain in development; existing careers keep their format.
 
 - **Real players and funded transfers** ([PR #716](https://github.com/ch-leon/nrl-sim/pull/716)): review the actual buyer, fee and unchanged deal before selling; the same player joins that club. Sale and event recruitment fees appear under Transfers in Finance. Market refreshes reveal existing unsigned players, club spells remain readable, and History includes retired people. Annual births are bounded. Emergency scholarships only replace unavoidable expiry/retirement vacancies below 13; injuries and bans no longer manufacture extra players. Save v30 retains supported v28/v29 careers.
 
