@@ -168,3 +168,39 @@ it('counts twelve ordinary unsigned alumni toward intake even when their history
   expect(continuity.validatePlayerPopulation(next)).toBeNull();
   expect(s).toEqual(before);
 });
+
+import { migrateState } from '../../src/core/save';
+
+it.each([
+  { ordinal: Number.MAX_SAFE_INTEGER - 1, ordinary: 11 },
+  { ordinal: Number.MAX_SAFE_INTEGER - 2, ordinary: 10 },
+])('leaves a valid population untouched when the entire intake cannot retain a valid counter ($ordinal, $ordinary unsigned)', ({ ordinal, ordinary }) => {
+  const s = careerFixture();
+  s.season = 2;
+  s.freeAgents = s.freeAgents.slice(0, ordinary);
+  s.playerPopulation = { ...s.playerPopulation, nextPlayerOrdinal: ordinal, shortlistIds: s.freeAgents.map(p => p.id) };
+  expect(continuity.validatePlayerPopulation(s)).toBeNull();
+  const loaded = migrateState(JSON.parse(JSON.stringify(s)));
+  expect(loaded.ok).toBe(true);
+  if (!loaded.ok) return;
+  const before = JSON.stringify(loaded.state);
+  const next = continuity.intakeUnsignedMarket(loaded.state);
+  expect(next).toBe(loaded.state);
+  expect(JSON.stringify(next)).toBe(before);
+  expect(continuity.validatePlayerPopulation(next)).toBeNull();
+  expect(migrateState(JSON.parse(JSON.stringify(next))).ok).toBe(true);
+});
+
+it('allows the final available ordinal when the resulting counter remains valid', () => {
+  const s = careerFixture();
+  s.season = 2;
+  s.freeAgents = s.freeAgents.slice(0, 11);
+  s.playerPopulation = { ...s.playerPopulation, nextPlayerOrdinal: Number.MAX_SAFE_INTEGER - 2, shortlistIds: s.freeAgents.map(p => p.id) };
+  expect(migrateState(s).ok).toBe(true);
+  const next = continuity.intakeUnsignedMarket(s);
+  expect(next.freeAgents).toHaveLength(12);
+  expect(next.freeAgents[11]!.id).toBe(`career-person:${Number.MAX_SAFE_INTEGER - 2}`);
+  expect(next.playerPopulation.nextPlayerOrdinal).toBe(Number.MAX_SAFE_INTEGER - 1);
+  expect(continuity.validatePlayerPopulation(next)).toBeNull();
+  expect(migrateState(JSON.parse(JSON.stringify(next))).ok).toBe(true);
+});

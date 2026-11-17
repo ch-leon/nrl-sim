@@ -6,6 +6,7 @@ import type { CareerDate, ClubArrival, ClubDeparture, PlayerCareerHistory, Playe
 import { makeRng } from '../utils/rng';
 
 export const MARKET_SHORTLIST_SIZE = 12;
+const MAX_PLAYER_ORDINAL = Number.MAX_SAFE_INTEGER - 1;
 
 /** Legacy evidence establishes today's owner only, never an invented earlier club. */
 export function observedHistory(player: Player, owner: string, date: CareerDate, arrival: ClubArrival = 'observed'): PlayerCareerHistory {
@@ -132,8 +133,10 @@ export function intakeUnsignedMarket(state: GameState): GameState {
   const rng = makeRng(marketSeed({ ...state, week: 1 }) ^ 0x572a11);
   const births: Player[] = [];
   for (let i = 0; i < deficit; i++) {
-    while (ids.has(`career-person:${nextPlayerOrdinal}`)) nextPlayerOrdinal++;
-    if (!Number.isSafeInteger(nextPlayerOrdinal + 1)) throw new Error('Player ordinal exhausted');
+    while (nextPlayerOrdinal < MAX_PLAYER_ORDINAL && ids.has(`career-person:${nextPlayerOrdinal}`)) nextPlayerOrdinal++;
+    // Keep the entire intake atomic at exhaustion, including its season marker.
+    // The next counter must remain valid; discard any locally prepared births.
+    if (nextPlayerOrdinal >= MAX_PLAYER_ORDINAL) return state;
     const id = `career-person:${nextPlayerOrdinal++}`;
     ids.add(id);
     births.push(installPlayerHistory({ ...generateFreeAgent(rng, poolTarget(state)), id }, 'unsigned', state));
@@ -188,7 +191,7 @@ export function validatePlayerPopulation(state: GameState): string | null {
   if (state.league.clubs.some(c => c.id === state.clubId && c.squad?.length)) return 'Player club has a second roster';
   const population = state.playerPopulation;
   if (!record(population) || population.schemaVersion !== 1 || !Array.isArray(population.shortlistIds) || !Array.isArray(population.retired)
-    || !integer(population.nextPlayerOrdinal, 1, Number.MAX_SAFE_INTEGER - 1)
+    || !integer(population.nextPlayerOrdinal, 1, MAX_PLAYER_ORDINAL)
     || !integer(population.lastMarketIntakeSeason, 1, state.season) || !integer(population.lastAcademyIntakeSeason, 1, state.season)) return 'Invalid player population metadata';
   const clubs = new Set([state.clubId, ...state.league.clubs.map(c => c.id)]);
   const ids = new Set<string>(); const unsigned = new Set<string>();
