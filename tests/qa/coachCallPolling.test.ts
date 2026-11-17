@@ -28,6 +28,18 @@ describe('QA coach-call polling across half-time', () => {
       playHalfTime: async () => { pending = false; continued++; }, attemptCall: async () => made, wait: async () => {} });
     expect(result.call).toEqual(made); expect(continued).toBe(1);
   });
+  it('stops without exhausting attempts when full time removes the coach tray mid-poll', async () => {
+    let attempts = 0; let fullTime = false; const waits: number[] = [];
+    const result = await pollCoachCall({
+      halfTimePending: async () => false,
+      playHalfTime: async () => { throw new Error('unexpected half-time'); },
+      attemptCall: async () => { attempts++; fullTime = attempts === 2; return null; },
+      finished: async () => fullTime,
+      wait: async ms => { waits.push(ms); }, attempts: 5,
+    });
+    expect(result).toEqual({ call: null, finished: true, empty: 2, refused: [] });
+    expect(attempts).toBe(2); expect(waits).toEqual([250]);
+  });
   it('does not turn a permanently empty tray into a passing call or extend the attempt bound', async () => {
     let attempts = 0; const waits: number[] = [];
     const result = await pollCoachCall({ halfTimePending: async () => false,

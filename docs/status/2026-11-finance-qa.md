@@ -55,3 +55,13 @@ full remote rerun.
 Local verification of the retention fix: TypeScript and production build passed;
 4,348 tests across 323 files passed; the full 3 seasons × 10 seeds × 3 modes
 soak passed all 30 runs with no problems or forfeits.
+
+## Main integration: full-time during coach polling
+
+Independent review of integration commit `e62d0a2a` found that the merge retained
+the half-time polling helper but dropped main's full-time exit. The helper now
+checks for the actual final overlay after an empty attempt and reports that the
+match ended before a set call. The existing full-time step still validates the
+saved result. A regression introduces full time midway through polling and
+requires an immediate exit; active-match exhaustion, refused calls and made-call
+checks retain their previous behavior.
