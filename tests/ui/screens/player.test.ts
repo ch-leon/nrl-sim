@@ -135,7 +135,7 @@ describe('playerPageModel', () => {
     expect(playerActions(p, { kind: 'squad' }, { ...s, money: 0 })[0]!.enabled).toBe(true);
     const thin = { ...s, squad: s.squad.slice(0, SQUAD_MIN), money: 1_000_000 };
     const acts = playerActions(thin.squad[0]!, { kind: 'squad' }, thin);
-    expect(acts[1]).toMatchObject({ enabled: false, why: `The squad cannot drop below ${SQUAD_MIN}.` });
+    expect(acts[1]).toMatchObject({ enabled: false, why: `The selling squad cannot drop below ${SQUAD_MIN}.` });
     expect(acts[2]).toMatchObject({ enabled: false, why: `Squad at the minimum (${SQUAD_MIN})` });
     const broke = playerActions(p, { kind: 'squad' }, { ...s, money: 0 })[2]!;
     if (terms.payout > 0) expect(broke.enabled).toBe(false);
