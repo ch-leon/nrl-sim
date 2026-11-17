@@ -81,6 +81,9 @@ function ensureSaleStyles(): void {
 .nrl-sale-details p { margin: 0 0 6px; line-height: 1.3; }
 .nrl-sale-actions { display: flex; gap: 8px; flex: 0 0 auto; }
 .nrl-sale-actions .nrl-btn { min-height: 44px; white-space: normal; }
+/* A sale is a decision: keep its fixed actions above ordinary toasts (60),
+   below dialogs (100). Covered notices stay queued and their timer pauses. */
+.nrl-screen-region:has(.nrl-sale-review) { z-index: 61; }
 .nrl-contracts-sale:empty { display: none; }
 .nrl-contracts-sale { display: flex; flex-direction: column; flex: 1 1 0; min-height: 0; overflow: hidden; }
 .nrl-contracts:has(.nrl-sale-review) > .nrl-screen-head, .nrl-contracts:has(.nrl-sale-review) > .nrl-hint, .nrl-contracts:has(.nrl-sale-review) .nrl-screen-sub { display: none; }

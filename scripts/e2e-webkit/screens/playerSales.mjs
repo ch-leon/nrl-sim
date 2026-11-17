@@ -96,6 +96,11 @@ export async function runPlayerSales(browser) {
       for (const stat of Object.keys(player.stats)) { player.stats[stat] = 85; player.ceilings[stat] = 95; }
       player.deal = { salary: 1000, startSeason: fixture.season, endSeason: fixture.season + 1, renewal: { salary: 2000, startSeason: fixture.season + 2, endSeason: fixture.season + 2 } };
       player.contractWeeks = 54;
+      const renewalPlayer = fixture.squad[1];
+      renewalPlayer.name = 'Cruz Mauafetu';
+      renewalPlayer.age = 31;
+      renewalPlayer.deal = { salary: 1000, startSeason: fixture.season, endSeason: fixture.season };
+      renewalPlayer.contractWeeks = 27;
       fixture.league.clubs.forEach((club, index) => {
         if (!club.squad) return;
         club.name = `Western District Wombats ${index + 1}`;
@@ -121,6 +126,12 @@ export async function runPlayerSales(browser) {
         };
         await openNav(page, screen === 'contracts' ? 'contracts' : 'squad');
         if (screen === 'player') await page.locator(`[data-player-open="${player.id}"] .nrl-row-name`).tap();
+        let renewalNotice;
+        if (screen === 'contracts') {
+          await page.locator(`[data-contract-renew="${renewalPlayer.id}"]`).tap();
+          renewalNotice = page.locator('.nrl-toast-text').filter({ hasText: `Renewal queued for ${renewalPlayer.name}` });
+          await renewalNotice.waitFor({ state: 'visible' });
+        }
         const before = await page.evaluate(() => window.__nrlState());
         await openReview();
         const geometry = await reviewGeometry(page);
@@ -134,11 +145,20 @@ export async function runPlayerSales(browser) {
         assert.ok(fee > 0);
         await page.locator('.nrl-sale-details').evaluate(element => { element.scrollTop = element.scrollHeight; });
         assert.deepEqual((await reviewGeometry(page)).problems, [], 'scrolling cap details preserves visible summary and buttons');
+        if (renewalNotice) assert.equal(await renewalNotice.count(), 1, 'notification is retained during review');
         await page.locator('[data-sale-cancel]').focus();
         await page.keyboard.press('Enter');
         assert.deepEqual(await page.evaluate(() => window.__nrlState()), before, 'Cancel makes no state change');
         assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('data-contract-sell') ?? document.activeElement?.getAttribute('data-player-action')), screen === 'contracts' ? player.id : 'sell', 'Cancel restores current sale control');
+        if (renewalNotice) {
+          assert.equal(await renewalNotice.count(), 1, 'Cancel preserves the queued notification');
+          assert.equal(await renewalNotice.evaluate(element => {
+            const rect = element.getBoundingClientRect();
+            return element.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2));
+          }), true, 'notification is readable again after Cancel');
+        }
         await openReview();
+        assert.deepEqual((await reviewGeometry(page)).problems, [], 'reopened review stays clear of notification');
         await focusConfirmByKeyboard(page);
         await page.keyboard.press('Space');
         await page.locator('[data-sale-review]').waitFor({ state: 'detached' });
