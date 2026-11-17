@@ -128,7 +128,8 @@ jumps. Participants and outcomes continue to come from the simulation.
 release, reception and contact are understandable at ×1 with commentary hidden.
 This is the first major playable milestone: the quality standard for the rest.
 
-The separate receiver-preparation candidate for #672 commits ordinary dummy-half
+The separate receiver-preparation candidate, [PR #707](https://github.com/ch-leon/nrl-sim/pull/707)
+for #672, commits ordinary dummy-half
 pass/dart decisions four ticks before the existing release, with no extra delay.
 The exact intended recipient raises one arm over the normal distance-linked gait.
 Manual/coach instructions and invalid identity, eligibility or possession cancel
