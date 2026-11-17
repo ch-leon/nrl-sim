@@ -1896,3 +1896,29 @@ advance uses the authored depth and retains its 3 m minimum. Lateral fitting
 preserves packet lane order near touch; a centre-field tie alternates by tackle
 and attack direction, independent of the weighted roll. Spread retains existing
 support priority. Snapshot/target reads never choose or consume dice.
+
+### Back-door packet and supporting runs (#649)
+
+The existing three weights above are unchanged. One additional kind uses the
+same ordinary shape draw, with no extra receiver, completion or contest roll.
+All three exact participants must pass the existing reach/availability gates;
+no packet is assembled by teleporting a player. The half/lead/fullback hold a
+lateral origin captured at choice time. Ordinary carrier, actual receiver,
+retreat and explicit coach/script priorities win. Revision 7 identifies this
+gameplay change for live-match recovery.
+
+| Knob | Default | Meaning |
+|---|---:|---|
+| `shapes.backDoor.on` | 1 | 0 restores the preceding spread/pod/edge simulation and RNG exactly. |
+| `shapes.weights.{grind,balanced,expansive,kick-chase,all-out}.back-door` | 1 / 1 / 2 / 0 / 1 | Additional relative weight when the compact packet is feasible; no old weight changes. |
+| `shapes.backDoor.callerDepth` / `.callerWidth` | 4 / 6 m | Half behind the setup anchor and toward his own side of it. |
+| `shapes.backDoor.leadDepth` / `.leadWidth` | 3 / 4 m | Forward inside the half's lane during setup. |
+| `shapes.backDoor.supportDepth` / `.supportWidth` | 6 / 0 m | Fullback behind the setup anchor, inside the lead. |
+| `shapes.backDoor.leadAheadM` | 2 m | Lead's finish ahead of the actual caller; fixed at second launch until catch. |
+| `shapes.backDoor.trailDepthM` | 3 m | Supporting fullback's run behind the actual caller, subject to ordinary passing eligibility. |
+| `shapes.backDoor.leadClearM` | 0.5 m | Real lead must be this far ahead of the backwards pass corridor before flight metadata calls it back-door. |
+
+The actual first DH recipient remains the existing commitment. A different
+recipient abandons this option, and the later pass remains an ordinary weighted
+choice with its usual handling/interception risk. Marker metadata records only
+actual geometry; it promises no catch or successful outcome.

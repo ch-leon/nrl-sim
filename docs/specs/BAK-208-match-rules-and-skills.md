@@ -344,8 +344,42 @@ renderers continue drawing the real positions.
 `shapes.on:0` draws nothing and retains the prior simulation exactly. Enabled
 choices change movement and RNG timing, so recovery engine revision is 6. All
 weights/distances are in tuning's **Ordinary attacking structures** section.
-Back-door balls, decoys and carrier-line contests remain separate work. This is
+Decoys that influence defenders and carrier-line contests remain separate work. This is
 an initial review default, subject to browser and standard-harness comparison.
+
+### Ordinary back-door support (#649, next shape slice)
+
+**UNFINISHED candidate, not a completed or current-main feature.** Controlled
+geometry/lifecycle fixtures pass, but the bounded default lab seeds 1–6 have not
+produced a genuine back-door passage. A slower lead can remain behind the run-on
+half when the ordinary pass is decided. Natural lead readiness before that run-on
+is the remaining blocker; pass odds, eligibility thresholds and outcomes have not
+been changed to manufacture a witness. This slice remains an open draft.
+
+`shapes.backDoor.on:1` adds one ordinary structure without changing the existing
+spread/pod/edge weights. A reachable free half, forward lead and fullback prepare
+during contact/PTB under the same 12/7 m reach limits. Their exact identities and
+lateral origin are chosen once; no player is moved into place. The fullback stays
+inside and behind the half, with the forward between their lanes. An actual DH
+pass to that half activates the supporting runs. Another committed recipient,
+manual/coach input or scripted play cancels the option without a redraw.
+
+The half keeps his ordinary carrier line and engagement decision. His support
+must really be behind him, available and in the usual passing window to be
+selected by the existing weighted receiver choice. Pass probability, intercept
+reads, catch/spill checks and contact odds are unchanged. A lead can still receive
+an ordinary pass when eligible: this adds no defender-deception or paid-play bonus.
+`ball.flight.backDoor.lead` identifies a genuine ball launched behind the exact
+lead runner, only when the actual flight goes to the support. An intercepted
+flight retains its real defender recipient and receives no back-door marker.
+
+The lead finishes his bounded run through the actual second catch, then the
+structure ends. Invalid identities, a locked/binned/interchanging participant,
+another pass choice, contact, kick, loose ball, turnover or dead phase also ends
+it. Actor/flight metadata is copied on snapshot reads; reads never recruit a
+recipient or consume dice. With `shapes.backDoor.on:0`, the prior three-structure
+simulation and RNG stream remain exact. This gameplay slice uses recovery engine
+revision 7; its weights and authored metres are listed in the tuning reference.
 
 ### 5.2 Defence presets
 

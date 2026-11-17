@@ -215,6 +215,8 @@ export class LiveSim extends LivePositioning implements MatchSim {
         via: b.via, from: { ...b.from }, to: { ...b.to }, startedTick: b.t0, arrivesTick: b.t0 + b.ticks, fromLift: b.fromLift,
         ...(receiver ? { receiver: { side: receiver.side, slot: receiver.slot, who: receiver.key } } : {}),
         ...(source && launch ? { source: { player: { ...launch.player }, headX: launch.headX, headY: launch.headY, speed: launch.speed, odometer: launch.odometer, legs: launch.legs, blown: launch.blown } } : {}),
+        ...(source && launch?.backDoor && this.players.some(p=>p.side===launch.backDoor!.lead.side && p.slot===launch.backDoor!.lead.slot && p.key===launch.backDoor!.lead.who)
+          ? {backDoor:{lead:{...launch.backDoor.lead}}} : {}),
       } };
     } else {
       ball = { x: b.pos.x, y: b.pos.y, lift: 0, holder: null };
@@ -240,7 +242,10 @@ export class LiveSim extends LivePositioning implements MatchSim {
       snap.passCall = { from: { ...d.from }, to: { ...d.to! }, startedTick: d.decidedAt, releasesTick: d.until };
     }
     const shape = this.currentAttackShape();
-    if (shape) snap.attackShape = { ...shape };
+    if (shape) {
+      const {secondPass:_,backDoor,...choice}=shape;
+      snap.attackShape = {...choice,...(backDoor?{backDoor:{originY:backDoor.originY,caller:{...backDoor.caller},lead:{...backDoor.lead},support:{...backDoor.support}}}:{})};
+    }
     const contact = this.visualContact;
     if (contact) {
       const c = this.players.find(p => p.key === contact.carrier.who && p.side === contact.carrier.side && p.slot === contact.carrier.slot);

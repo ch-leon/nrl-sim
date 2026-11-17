@@ -23,12 +23,13 @@ import { FIT, derivedRatings } from '../fit';
 import { COUNTERS, allOutRecoveryTicks, compressedCommitReach, rushBroken } from '../counters';
 import { BACKS, PACK } from '../presets';
 import { LIVE, runOn } from './knobs';
+import { backDoorTarget, behindLead } from '../attackingShapes';
 import { other, type Player, type Phase } from './types';
 import { LivePenalties } from './penalties';
 
 export abstract class LiveContact extends LivePenalties {
   /** Write-only launch history for sprite handoff; never consulted by match decisions. */
-  protected visualPass: (NonNullable<BallFlightSnap['source']> & { tick: number }) | null = null;
+  protected visualPass: (NonNullable<BallFlightSnap['source']> & { tick: number; backDoor?: BallFlightSnap['backDoor'] }) | null = null;
   /** Presentation history only; never consulted by match decisions. */
   protected visualContact: ContactSnap | null = null;
   /** Render metadata only: no rolls, movement or changes to the contest. */
@@ -83,7 +84,24 @@ export abstract class LiveContact extends LivePenalties {
     from.poseUntil = this.tick + LIVE.passPoseTicks;
     from.catchTick = this.tick;
     this.visualPass = { tick: this.tick, player: { side: from.side, slot: from.slot, who: from.key }, headX: from.body.heading.x, headY: from.body.heading.y, speed: Math.hypot(from.body.vel.x, from.body.vel.y), odometer: from.odometer, legs: from.energy, blown: from.gas.blown };
+    this.finishBackDoorPass(from,to);
   }
+
+  /** Keep the real lead's finish through the actual second catch; interceptions/cancellation win. */
+  protected finishBackDoorPass(from: Player, to: Player): void {
+    const ph=this.phase, shape=ph.kind==='play'?ph.shape:null, b=shape?.backDoor;
+    if (shape?.kind!=='back-door' || !b) return;
+    const lead=this.at(b.lead.side,b.lead.slot), flight=this.ball.kind==='flight'?this.ball:null;
+    if (from.side!==b.caller.side || from.key!==b.caller.who || from.slot!==b.caller.slot || to.side!==b.support.side || to.key!==b.support.who || to.slot!==b.support.slot
+      || lead.key!==b.lead.who || !flight || flight.via!=='pass' || flight.receiver!==this.indexOf(to)
+      || !behindLead(from.body.pos,flight.to,lead.body.pos,this.dir)) {
+      if (ph.kind==='play') ph.shape=null;
+      return;
+    }
+    shape.secondPass={startedTick:this.tick,leadTo:{...backDoorTarget(shape,lead.slot,from.body.pos)!}};
+    if (this.visualPass) this.visualPass.backDoor={lead:{...b.lead}};
+  }
+
 
   /**
    * A set play's botched pass picked off (#326): thrown toward `toward` and
