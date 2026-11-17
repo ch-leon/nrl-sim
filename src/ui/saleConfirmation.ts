@@ -39,6 +39,7 @@ export function saleConfirmation(playerId: string, actions: { onCancel(): void; 
         else {
           finished = false;
           render(`${result.message ?? 'The offer changed.'} Review the terms before confirming again.`);
+          panel.querySelector<HTMLButtonElement>('[data-sale-cancel]')?.focus();
         }
       }, { class: 'nrl-btn-danger' });
       confirm.setAttribute('data-sale-confirm', '');
@@ -68,7 +69,9 @@ function ensureSaleStyles(): void {
 .nrl-sale-actions { display: flex; flex-wrap: wrap; gap: 8px; flex: 0 0 auto; padding-top: 4px; }
 .nrl-sale-actions .nrl-btn { min-height: 44px; white-space: normal; }
 .nrl-contracts-sale:empty { display: none; }
-.nrl-contracts-sale { flex: 0 1 auto; min-height: 0; }
+.nrl-contracts-sale { display: flex; flex-direction: column; flex: 1 1 0; min-height: 0; overflow: hidden; }
+.nrl-contracts-sale > .nrl-sale-review { flex: 1 1 auto; max-height: 100%; }
+.nrl-contracts-sale:not(:empty) + .nrl-contracts-scroll { display: none; }
 .nrl-player-side > .nrl-sale-review { flex: 1 1 auto; }
 `;
   document.head.appendChild(style);

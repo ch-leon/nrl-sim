@@ -186,7 +186,10 @@ function render(sub: HTMLElement, tbody: HTMLElement, saleHost: HTMLElement): vo
     const sell = button(offer.ok ? `SELL +${fmtShort(offer.offer.fee)}` : 'NO BUYER', () => {
       arm(null);
       saleHost?.replaceChildren(saleConfirmation(p.id, {
-        onCancel: () => { saleHost?.replaceChildren(); sell.focus(); },
+        onCancel: () => {
+          saleHost.replaceChildren();
+          Array.from(tbody.querySelectorAll<HTMLButtonElement>('[data-contract-sell]')).find(b => b.getAttribute('data-contract-sell') === p.id)?.focus();
+        },
         onSold: (accepted) => {
           const buyer = getState().league.clubs.find(c => c.id === accepted.buyerId);
           gone.set(p.id, { text: `${p.name} · sold to ${buyer?.name ?? accepted.buyerId}`, done: 'SOLD ✓' });
