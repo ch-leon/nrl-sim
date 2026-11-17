@@ -61,6 +61,7 @@ describe('funded player transfers', () => {
   it('books and notifies once after the entire ownership change', () => {
     const { s, p, buyer } = fixture(); setState(s); registerFinanceSystem();
     const q = quotePlayerSale(s, p.id); if (!q.ok) throw Error(q.message);
+    const notices: string[] = []; bus.on('ui:notify', ({ text }) => notices.push(text));
     const snapshots: boolean[] = []; bus.on('state:changed', () => snapshots.push(migrateState(JSON.parse(JSON.stringify(getState()))).ok));
     const seen: string[] = []; bus.on('money:changed', () => seen.push(ownerOf(getState(), p.id)!));
     const oldBook = s.finance.find(f => f.season === s.season)?.transfers ?? 0;
@@ -68,6 +69,9 @@ describe('funded player transfers', () => {
     expect(confirmPlayerSale(q.offer).ok).toBe(false);
     expect(seen).toEqual([buyer.id]);
     expect(snapshots).toEqual([true]);
+    expect(notices).toHaveLength(1);
+    expect(notices[0]).toContain(buyer.name);
+    expect(notices[0]).toContain(p.name);
     expect(getState().finance.find(f => f.season === s.season)!.transfers).toBe(oldBook + q.offer.fee);
   });
   it('rejects future cap excess, insufficient funds and overflowing wallets at quote time', () => {

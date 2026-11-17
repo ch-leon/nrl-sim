@@ -9,6 +9,7 @@ import { commitment, publishedCap, reconcileProtection, salaryDemand, type CapAc
 import { bookPlayerMovement, closeClubSpell, openClubSpell, ownerOf } from './playerCareer';
 import { withDerivedStrength } from './rivals';
 import type { SignResult } from './freeagency';
+import { fmtMoney } from '../utils/money';
 
 export interface SaleOffer {
   playerId: string; sellerId: string; buyerId: string; fee: number;
@@ -108,5 +109,8 @@ export function confirmPlayerSale(offer: SaleOffer): SignResult {
   const result = applyPlayerSale(getState(), offer); if (!result.ok) return result;
   setState(result.state);
   bus.emit('money:changed', { delta: offer.fee, reason: `sell:${offer.playerId}`, balance: result.state.money, booked: true, stamp: { season: offer.season, week: offer.week } });
+  const buyer = result.state.league.clubs.find(c => c.id === offer.buyerId)!;
+  const player = buyer.squad!.find(p => p.id === offer.playerId)!;
+  bus.emit('ui:notify', { text: `Sold ${player.name} to ${buyer.name} for ${fmtMoney(offer.fee)}.`, kind: 'success' });
   return { ok: true };
 }
