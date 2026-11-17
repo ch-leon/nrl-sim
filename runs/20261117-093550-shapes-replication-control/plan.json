@@ -1,0 +1,56 @@
+{
+  "name": "shapes replication control",
+  "description": "Held-out seeds 401–800: replicate shapes off versus current on for Expansive against Balanced, then compare with on while both styles' packet geometry weights are flattened to spread only. The control retains shape choice and lifecycle but removes packet geometry.",
+  "seeds": 20,
+  "seedStart": 401,
+  "base": {
+    "shapes.on": 0
+  },
+  "scenarios": [
+    {
+      "name": "even 60 v 60",
+      "seeds": 20,
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "expansive v balanced",
+      "seeds": 400,
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "shapes on",
+      "tuning": {
+        "shapes.on": 1
+      }
+    },
+    {
+      "name": "spread-only control",
+      "tuning": {
+        "shapes.on": 1,
+        "shapes.weights.balanced.spread": 1,
+        "shapes.weights.balanced.pod": 0,
+        "shapes.weights.balanced.edge": 0,
+        "shapes.weights.expansive.spread": 1,
+        "shapes.weights.expansive.pod": 0,
+        "shapes.weights.expansive.edge": 0
+      }
+    }
+  ]
+}

@@ -359,3 +359,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261117-060048-shapes-win-rate-check | shapes win-rate check | 089ae13 | feat/match-attacking-shapes | [report](runs/20261117-060048-shapes-win-rate-check/report.md) |
 | 20261117-060952-shapes-expansive-width | shapes expansive width | 089ae13 | feat/match-attacking-shapes | [report](runs/20261117-060952-shapes-expansive-width/report.md) |
 | 20261117-072749-standard | standard | 03812a1 | main | [report](runs/20261117-072749-standard/report.md) |
+| 20261117-093550-shapes-replication-control | shapes replication control | ba5bc3d | feat/match-attacking-shapes | [report](runs/20261117-093550-shapes-replication-control/report.md) |
