@@ -352,3 +352,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261117-035008-standard | standard | f9f1641 | HEAD | [report](runs/20261117-035008-standard/report.md) |
 | 20261117-042425-standard | standard | 62d625b | feat/match-receiver-call | [report](runs/20261117-042425-standard/report.md) |
 | 20261117-042420-receiver-call-edge-check | receiver-call-edge-check | 62d625b | feat/match-receiver-call | [report](runs/20261117-042420-receiver-call-edge-check/report.md) |
+| 20261117-050733-standard | standard | b93515c | main | [report](runs/20261117-050733-standard/report.md) |
