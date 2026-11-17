@@ -8,7 +8,7 @@ import { ECON, SEASON_ROUNDS, WEEKS_PER_SEASON, difficultyMultipliers } from '..
 import { sortLadder } from './fixtures';
 import { FACILITY_CATALOG, facilityUpkeep } from '../data/facility';
 import { closedGatesFlag, EVENT_CARDS } from '../data/events';
-import { currentRound, inTrials } from '../core/season';
+import { careerActionClock, currentRound, inTrials } from '../core/season';
 import { registerSeasonHook, registerTickHook, TICK_ORDER } from '../core/time';
 import { hasStructuralCalendar } from './competitionCalendar';
 import { staffWages } from './staff';
@@ -325,7 +325,8 @@ const CLOSING_LINES: ReadonlySet<FinanceLine> = new Set(['prize', 'boardGrant'])
 export interface MovementStamp { line: FinanceLine; season: number; week: number }
 
 /**
- * Stamp a money movement made at `state`'s clock. Usually the clock itself, but
+ * Stamp a movement at its explicit owner date, or the canonical action clock.
+ * Legacy and unmarked DEV careers retain their existing closing rule:
  * the rollover pays the finals prize money and the board grant after the season
  * counter has moved to the next season, in week 1, so those two lines at week 1
  * close the season just played: they are stamped to its last week
@@ -333,8 +334,15 @@ export interface MovementStamp { line: FinanceLine; season: number; week: number
  * (registerFinanceSystem) and the Finance screen's weekly ledger both stamp with
  * this, so the two always agree on where the rollover's money belongs (N12).
  */
-export function stampMovement(state: Pick<GameState, 'season' | 'week' | 'finance' | 'preseason'>, reason: string): MovementStamp {
+export function stampMovement(state: Pick<GameState, 'season' | 'week' | 'finance' | 'preseason'> & Partial<Pick<GameState, 'competitions'>>,
+  reason: string, explicit?: Pick<MovementStamp, 'season' | 'week'>): MovementStamp {
   const line = classifyReason(reason);
+  // Explicit owner receipts take precedence in both the books and the ledger.
+  if (explicit) return { line, season: explicit.season, week: explicit.week };
+  const clock = careerActionClock(state);
+  // League planning belongs to the target year without moving the stored
+  // sporting cursor. Marked active years use their actual authored slot.
+  if (clock.structural) return { line, season: clock.season, week: clock.week };
   // A loan taken in week 1 is that season's; its repayment, like the grant, closes the one before.
   const closing = state.week === 1 && CLOSING_LINES.has(line) && reason !== BOARD_LOAN && state.finance.some((e) => e.season === state.season - 1);
   return closing
@@ -345,16 +353,17 @@ export function stampMovement(state: Pick<GameState, 'season' | 'week' | 'financ
 /**
  * Keep the club's books: every money:changed delta is added to its line in the
  * entry for the season stampMovement gives (opened on the first movement, so a
- * save written at any moment loads right): the current season, except the
- * rollover's prize money and board grant, which close the season just played.
+ * save written at any moment loads right). Explicit owner dates take priority;
+ * League planning uses its target year. Legacy rollover prize money and board
+ * grants retain their existing closing-season date.
  * Pure bookkeeping: nothing here depends on the order listeners fire in. Called
  * once from main.ts (and the soak); returns the unsubscribe.
  */
 export function registerFinanceSystem(): () => void {
-  return bus.on('money:changed', ({ delta, reason, booked }) => {
+  return bus.on('money:changed', ({ delta, reason, booked, stamp }) => {
     if (booked) return;
     const s = getState();
-    const { line, season } = stampMovement(s, reason);
+    const { line, season } = stampMovement(s, reason, stamp);
     const books = s.finance.some((e) => e.season === season)
       ? s.finance
       : [...s.finance, emptyFinance(season)].sort((a, b) => a.season - b.season);

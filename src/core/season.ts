@@ -23,7 +23,9 @@ export function elapsedInterval(s: Pick<GameState, 'season' | 'week'> & Partial<
 
 /** Read-only management date. Pending League choices retain the completed raw
  * cursor while every new promise belongs to the following authored year.
- * Call only on trusted state; save validation verifies progression first. */
+ * Requires trusted state with validated progression, calendar and raw season
+ * aligned. Acceptance must switch the candidate to its target active phase
+ * before deriving its clock after incrementing the raw season. */
 export function careerActionClock(s: Pick<GameState, 'season' | 'week'> & Partial<Pick<GameState, 'competitions'>>) {
   const progress = s.competitions?.leagueCareer;
   const calendar = progress && s.competitions?.calendar;

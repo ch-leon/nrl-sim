@@ -9,6 +9,7 @@ import { bus } from '../../../src/core/events';
 import { contractsEndingSoon } from '../../../src/systems/contracts';
 import { openSquadScreen } from '../../../src/ui/screens/squad';
 import { openContractsScreen } from '../../../src/ui/screens/contracts';
+import { saleConfirmation } from '../../../src/ui/saleConfirmation';
 import { closeScreen } from '../../../src/ui/dom';
 
 function fixture(planning: boolean): GameState {
@@ -85,5 +86,25 @@ describe('League Contracts annual cap cells', () => {
     expect(expiredRow.children[4]!.textContent).toBe('$0');
     expect(queuedRow.children[3]!.textContent).toBe('25 wks');
     expect(queuedRow.children[4]!.textContent).toBe('$2,000');
+  });
+});
+
+describe('League sale review terms', () => {
+  it('reviews the effective target-year agreement and explicit cap years before committing the same sale', () => {
+    const s=fixture(true);const p=s.squad[0]!;
+    p.stats={speed:85,strength:85,stamina:85,handling:85,kicking:85,footyIQ:85};
+    p.deal={salary:1000,startSeason:1,endSeason:1,renewal:{salary:2000,startSeason:2,endSeason:2}};
+    s.league.clubs.forEach(c=>{if(c.squad)c.cash=1_000_000;});
+    install(s);const sold=vi.fn();
+    const review=saleConfirmation(p.id,{onCancel:vi.fn(),onSold:sold}) as unknown as StubNode;
+    expect(review.querySelector('[data-sale-contract]')!.textContent).toBe('Deal unchanged: $2,000/season to S2.');
+    expect(review.words()).toContain('Your cap freed: $2,000 S2; $0 S3.');
+    expect(review.words()).not.toContain('renewal $2,000');
+    review.querySelector('[data-sale-confirm]')!.click();
+    expect(sold).toHaveBeenCalledOnce();
+    const moved=getState().league.clubs.flatMap(c=>c.squad??[]).find(x=>x.id===p.id)!;
+    expect(moved.deal).toEqual({salary:2000,startSeason:2,endSeason:2});
+    expect(moved.clubHistory!.spells.slice(-1)[0]!.start).toEqual({season:2,week:1});
+    expect(getState()).toMatchObject({season:1,week:25});
   });
 });

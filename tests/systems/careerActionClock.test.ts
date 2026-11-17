@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { WEEKS_PER_SEASON } from '../../src/config';
 import { makeRng } from '../../src/utils/rng';
 import { rivalSigningTick } from '../../src/systems/rivals';
 import { applyAnnualYouth } from '../../src/systems/youth';
@@ -7,7 +8,7 @@ import { careerActionClock } from '../../src/core/season';
 import { releaseTerms, normaliseContractForAction } from '../../src/systems/cap';
 import { signPlayer, releasePlayer } from '../../src/systems/freeagency';
 import { renewEarly, renewalRefusal } from '../../src/systems/contracts';
-import { getState, setState, type GameState } from '../../src/core/state';
+import { emptyFinance, getState, setState, type GameState } from '../../src/core/state';
 import { bus } from '../../src/core/events';
 import { transferBetweenClubs } from '../../src/systems/playerTransfers';
 import { validatePlayerPopulation } from '../../src/systems/playerCareer';
@@ -18,7 +19,9 @@ import { validateInput } from '../../src/core/saveValidation';
 import { leagueCloseFacts, leagueEntryReceiptId } from '../../src/data/leagueCareer';
 import { importSave, installImportedSave } from '../../src/core/save';
 import { recruitShortlist } from '../../src/ui/recruitShortlist';
-import { financeSummary, seasonPnl } from '../../src/ui/screens/finance';
+import { registerFinanceSystem, stampMovement } from '../../src/systems/economy';
+import { spendMoney, earnMoney } from '../../src/data/club';
+import { financeSummary, seasonPnl, FinanceLedger, initFinanceLedger } from '../../src/ui/screens/finance';
 import { playerPageModel, playerActions } from '../../src/ui/screens/player';
 import { competitions, progress, clubIds } from '../data/leagueCareerFixtures';
 
@@ -171,7 +174,9 @@ describe('verified pending history upper bound', () => {
     p.clubHistory!.spells.slice(-1)[0]!.arrival='emergency';
     source.clubHistory={academyDiscountUsed:true,spells:[{clubId:s.clubId,start:{season:1,week:1},end:{season:1,week:1},arrival:'observed',departure:'expiry'}]};
     expect(inputProblem(s)).toBeNull();setState(s);
+    const notices:string[]=[];bus.on('ui:notify',n=>notices.push(n.text));
     expect(releasePlayer(s,p.id).ok).toBe(true);
+    expect(notices).toContain(`${p.name}'s contract expired. No payout.`);
     expect(getState().freeAgents.find(x=>x.id===p.id)!.emergencyDealEndSeason).toBeUndefined();
     expect(inputProblem(getState())).toBeNull();
   });
@@ -193,5 +198,56 @@ describe('verified pending history upper bound', () => {
     expect(inputProblem(retired)).toContain('retired');
     const unmarked=structuredClone(after);delete unmarked.competitions!.leagueCareer;
     expect(inputProblem(unmarked)).not.toBeNull();
+  });
+});
+
+describe('generic management finance action date', () => {
+  it.each([true, false])('keeps completed books fixed and dates planning spending and ledger alike (books first: %s)', booksFirst => {
+    const s=verifiedPending();s.money=10_000;
+    s.finance=[{...emptyFinance(1),gate:300,facilities:-50}];
+    expect(inputProblem(s)).toBeNull();setState(s);
+    const ledger=new FinanceLedger();
+    const offs=booksFirst ? [registerFinanceSystem(),initFinanceLedger(ledger)] : [initFinanceLedger(ledger),registerFinanceSystem()];
+    expect(spendMoney(200,'build:canteen')).toBe(true);
+    expect(spendMoney(75,'staff:welfare')).toBe(true);
+    offs.forEach(off=>off());
+    expect(getState().finance.find(f=>f.season===1)).toEqual(s.finance[0]);
+    expect(getState().finance.find(f=>f.season===2)).toEqual({...emptyFinance(2),facilities:-200,other:-75});
+    expect(ledger.rows()).toEqual([{season:2,week:1,wages:0,upkeep:0,overhead:0,income:0,gate:0,other:-275,otherLines:{facilities:-200,other:-75},net:-275}]);
+    expect(getState()).toMatchObject({season:1,week:5,money:9725,rngSeed:s.rngSeed});
+    expect(inputProblem(getState())).toBeNull();
+  });
+  it('uses actual source slots for marked active movements without applying legacy closing heuristics', () => {
+    const s=verifiedPending();s.competitions!.leagueCareer!.phase='active';
+    delete s.competitions!.leagueCareer!.close;
+    s.competitions!.calendar!.status='active';s.competitions!.calendar!.elapsedIntervals=4;
+    expect(inputProblem(s)).toBeNull();setState(s);
+    expect(stampMovement(s,'gate')).toEqual({line:'gate',season:1,week:5});
+    const ledger=new FinanceLedger();const offBooks=registerFinanceSystem();const offLedger=initFinanceLedger(ledger);
+    earnMoney(50,'gate');offBooks();offLedger();
+    expect(getState().finance.find(f=>f.season===1)!.gate).toBe(50);
+    expect(ledger.rows()[0]).toMatchObject({season:1,week:5,gate:50});
+    expect(getState()).toMatchObject({season:1,week:5});
+  });
+  it('preserves legacy trial stamps and unmarked DEV closing grants', () => {
+    const legacy=structuredClone(careerFixture());legacy.week=1;legacy.preseason=1;
+    expect(stampMovement(legacy,'build:canteen')).toEqual({line:'facilities',season:1,week:-1});
+    const dev=verifiedPending();delete dev.competitions!.leagueCareer;
+    dev.season=2;dev.week=1;dev.finance=[emptyFinance(1)];
+    expect(inputProblem(dev)).toBeNull();setState(dev);
+    const ledger=new FinanceLedger();const offBooks=registerFinanceSystem();const offLedger=initFinanceLedger(ledger);
+    earnMoney(15,'board grant');offBooks();offLedger();
+    expect(getState().finance).toEqual([{...emptyFinance(1),boardGrant:15}]);
+    expect(ledger.rows()[0]).toMatchObject({season:1,week:WEEKS_PER_SEASON,otherLines:{boardGrant:15}});
+    expect(getState()).toMatchObject({season:2,week:1});
+  });
+  it('respects an explicit money-event date in both books and ledger', () => {
+    const s=structuredClone(careerFixture());s.season=2;s.week=7;s.preseason=0;
+    s.finance=[emptyFinance(1),emptyFinance(2)];setState(s);
+    const ledger=new FinanceLedger();const offBooks=registerFinanceSystem();const offLedger=initFinanceLedger(ledger);
+    bus.emit('money:changed',{delta:35,reason:'gate',balance:s.money,stamp:{season:1,week:5}});
+    offBooks();offLedger();
+    expect(getState().finance).toEqual([{...emptyFinance(1),gate:35},emptyFinance(2)]);
+    expect(ledger.rows()[0]).toMatchObject({season:1,week:5,gate:35});
   });
 });

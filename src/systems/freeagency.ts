@@ -202,7 +202,7 @@ export function releasePlayer(state: GameState, playerId: string): SignResult {
   }
   const expired = clock.structural && player.deal && player.deal.endSeason < clock.season
     && (!player.deal.renewal || player.deal.renewal.endSeason < clock.season);
-  const { deal: _deal, junior: _junior, ...withoutDeal } = closeClubSpell(installPlayerHistory(player, s.clubId, s), clock, expired ? 'expiry' : 'release');
+  const { deal: _deal, junior: _junior, ...withoutDeal } = closeClubSpell(installPlayerHistory(player, s.clubId, clock), clock, expired ? 'expiry' : 'release');
   const { emergencyDealEndSeason: _emergencyEnd, emergencyForPlayerId: _emergencySource, ...ordinary } = withoutDeal;
   const released: Player = { ...(clock.structural ? ordinary : withoutDeal), contractWeeks: 0, departed: true };
   const squad = s.squad.filter(p => p.id !== playerId);
@@ -212,7 +212,7 @@ export function releasePlayer(state: GameState, playerId: string): SignResult {
   const freed = terms.nextCapFreed > 0
     ? `, freeing ${fmtMoney(terms.capFreed)} of this season's cap and ${fmtMoney(terms.nextCapFreed)} next season`
     : `, freeing ${fmtMoney(terms.capFreed)} of this season's cap`;
-  bus.emit('ui:notify', { text: `Released ${released.name} for ${fmtMoney(terms.payout)}${freed}`, kind: 'info' });
+  bus.emit('ui:notify', { text: expired ? `${released.name}'s contract expired. No payout.` : `Released ${released.name} for ${fmtMoney(terms.payout)}${freed}`, kind: 'info' });
   return { ok: true };
 }
 

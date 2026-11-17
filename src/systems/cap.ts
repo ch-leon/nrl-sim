@@ -359,7 +359,9 @@ export function tierCap(tier: FinanceTier): number {
 }
 
 /** Promote only a consumed base agreement. An unconsumed signed renewal is
- * never replaced by a quote or another promise. No expiry/ownership side effects. */
+ * never replaced by a quote or another promise. Pure state-in/result-out: no
+ * ownership, annual expiry or time work runs here. Explicit management actions
+ * may persist this promoted term and removal of consumed emergency metadata. */
 export function normaliseContractForAction(player: Player, clock: CareerActionClock): Player {
   if (!clock.structural) return player;
   let deal = player.deal;
@@ -374,7 +376,9 @@ export function normaliseContractForAction(player: Player, clock: CareerActionCl
   }
   return { ...player, ...(deal ? { deal } : {}), contractWeeks };
 }
-/** Pure projection for displays and future acceptance/interval owners. */
+/** Projection for displays or explicit actions that persist their result.
+ * Requires the trusted, phase-aligned state documented by careerActionClock;
+ * acceptance/interval owners can instead supply an explicit clock above. */
 export function contractActionView(state: GameState, player: Player): Player {
   return normaliseContractForAction(player, careerActionClock(state));
 }

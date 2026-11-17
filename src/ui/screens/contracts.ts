@@ -176,7 +176,10 @@ function render(sub: HTMLElement, tbody: HTMLElement, saleHost: HTMLElement): vo
       arm(g.armed);
       if (g.run) {
         const res = releasePlayer(getState(), p.id);
-        if (res.ok) gone.set(p.id, { text: `${p.name} · released`, done: 'RELEASED ✓' });
+        if (res.ok) {
+          const expired = getState().freeAgents.find(x => x.id === p.id)?.clubHistory?.spells.slice(-1)[0]?.departure === 'expiry';
+          gone.set(p.id, { text: `${p.name} · ${expired ? 'contract expired' : 'released'}`, done: expired ? 'EXPIRED ✓' : 'RELEASED ✓' });
+        }
         act(res);
       }
       rerender();

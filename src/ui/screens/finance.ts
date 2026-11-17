@@ -259,7 +259,7 @@ const financeLedger = new FinanceLedger();
  */
 export function initFinanceLedger(ledger: FinanceLedger = financeLedger): () => void {
   return bus.on('money:changed', ({ delta, reason, stamp }) => {
-    const { season, week } = stamp ?? stampMovement(getState(), reason);
+    const { season, week } = stampMovement(getState(), reason, stamp);
     ledger.record({ delta, reason, season, week });
   });
 }
