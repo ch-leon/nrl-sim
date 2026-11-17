@@ -1,3 +1,4 @@
+import { reconcileMatchIncome } from '../systems/matchIncome';
 import { currentRound } from './season';
 import { careerNamespace } from './storage/local';
 import { DEV_TEST_PREFIX } from './storageKeys';
@@ -310,6 +311,8 @@ export const MIGRATIONS: readonly MigrationStep[] = [
   { from: 25, to: 26, run: (old) => ({ ...old }) },
   // v27 records optional regional world membership; existing careers retain it absent.
   { from: 26, to: 27, run: (old) => ({ ...old }) },
+  // v29 starts receipt-backed income without retroactive claims on v28 results.
+  { from: 28, to: 29, run: old => ({ ...old, matchIncome: [] }) },
 ];
 
 /** Old string traits → instances; instances already in the new shape pass through. */
@@ -579,7 +582,7 @@ export function loadSlot(slot = activeSlot): LoadResult {
       return { status: 'corrupt', outcome: 'unrecoverable', message: structuralPolicyProblem(res.state) ?? 'Competition prototypes require the isolated developer career.' };
     // An offered, qualified or entered competition can never finish on this calendar.
     // Close it here so a save that would freeze the week loads ready to advance.
-    const state = recoverUnfinishableCompetitions(res.state);
+    const state = reconcileMatchIncome(recoverUnfinishableCompetitions(res.state));
     // A repaired state must not reach trusted memory until its exact source is
     // retained and verified by #522's preservation path. Persisting comes later.
     if (res.repairs.length) {

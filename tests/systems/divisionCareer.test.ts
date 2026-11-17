@@ -91,7 +91,8 @@ describe('isolated fresh regional setup', () => {
     expect(getState().week).toBe(2); expect(weekHeld()).toBe(false);
     expect(getState().competitions!.instances.filter(i => i.definition.format.kind === 'exhibition' && i.status === 'completed')).toHaveLength(12);
     expect(getState().league.ladder.every(r => r.played === 0)).toBe(true);
-    expect(getState().money).toBe(money); expect(getState().squad.map(p => p.contractWeeks)).toEqual(contracts);
+    expect(getState().money).toBe(money + 2_000);
+    expect(received()).toBe(2_000); expect(getState().squad.map(p => p.contractWeeks)).toEqual(contracts);
   });
 
   it('starts the same fresh world and match stream whether or not unused legacy fixtures were initialised', () => {
@@ -131,7 +132,7 @@ describe('existing-hook league and finals staging', () => {
   });
 
   it.each([true, false])('completes all three sporting seasons with playerWins=%s and pauses without movement', wins => {
-    const s = setup(); const world = JSON.stringify(s.competitions!.world); const people = JSON.stringify(s.league.clubs); const squad = JSON.stringify(s.squad);
+    const s = setup(); const world = JSON.stringify(s.competitions!.world); const people = JSON.stringify(s.league.clubs.map(({ cash: _cash, ...club }) => club)); const squad = JSON.stringify(s.squad);
     fixtureHooks(wins); let ticks = 0; registerTickHook('count', 2, () => { ticks++; });
     advanceWeeks(23);
     expect(getState().week).toBe(24);
@@ -154,7 +155,9 @@ describe('existing-hook league and finals staging', () => {
     expect(getState().competitions!.instances.every(i => i.status === 'completed')).toBe(true);
     expect(getState().competitions!.instances.flatMap(i => i.fixtures).filter(f => f.stageId === 'finals')).toHaveLength(9);
     expect(JSON.stringify(getState().competitions!.world)).toBe(world);
-    expect(JSON.stringify(getState().league.clubs)).toBe(people); expect(JSON.stringify(getState().squad)).toBe(squad);
+    expect(JSON.stringify(getState().league.clubs.map(({ cash: _cash, ...club }) => club))).toBe(people);
+    for (const club of getState().league.clubs.filter(c => c.id !== s.clubId)) expect(club.cash).toBe(s.league.clubs.find(c => c.id === club.id)!.cash! + received(getState(), club.id));
+    expect(getState().money).toBe(s.money + received()); expect(JSON.stringify(getState().squad)).toBe(squad);
     expect(migrateState(JSON.parse(JSON.stringify(getState())))).toMatchObject({ ok: true, state: getState() });
     const stopped = JSON.stringify(getState()); advanceWeeks(3); expect(JSON.stringify(getState())).toBe(stopped);
   });
@@ -246,3 +249,8 @@ describe('tier anchors and dormant legacy market', () => {
     const rng = makeRng(7); expect(freeAgencyTick(getState(), rng)).toBe(getState()); expect(rng.state()).toBe(7);
   });
 });
+
+
+function received(state = getState(), clubId: string = state.clubId): number {
+  return state.matchIncome.reduce((sum, r) => sum + (r.fixture.homeId === clubId ? r.receipt?.home.total ?? 0 : r.fixture.awayId === clubId ? r.receipt?.away.total ?? 0 : 0), 0);
+}

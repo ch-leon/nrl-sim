@@ -80,7 +80,7 @@ export const FACILITY_CATALOG: Record<FacilityDefId, FacilityDef> = {
   grandstand: {
     id: 'grandstand',
     name: 'Grandstand',
-    cost: 120000,
+    cost: 30000,
     upkeep: 1200,
     footprint: { w: 3, h: 3 },
     special: 'gate',

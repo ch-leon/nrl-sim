@@ -45,16 +45,15 @@ live gameplay change; work still open below has not shipped.
   season of the current deal, and must fit the cap in the season it starts.
   A release is refused when the cash is short. Choosing two or three seasons
   at signing is not in this slice; it stays with the finance presentation
-  ([#561](https://github.com/ch-leon/nrl-sim/issues/561)). Rival later signings are
-  refused when they do not fit the cap. Charging their wallets waits until they
-  have match income ([#559](https://github.com/ch-leon/nrl-sim/issues/559)), because the opening float cannot fund an annual fee every
-  week. Match-income
-  receipts ([#559](https://github.com/ch-leon/nrl-sim/issues/559)), cap upgrades
-  ([#560](https://github.com/ch-leon/nrl-sim/issues/560)), the finance-screen
-  cleanup ([#561](https://github.com/ch-leon/nrl-sim/issues/561)) and funded
-  sales between clubs ([#572](https://github.com/ch-leon/nrl-sim/issues/572)) are still open.
-  The old weekly income is still paid, so cash can still climb between signings.
-  Normal competition entry and the revised unlock/selection rollover remain gated on
+  ([#561](https://github.com/ch-leon/nrl-sim/issues/561)). Rival signings now need both cap room and cash.
+  Played-match income and investment costs ([PR #695](https://github.com/ch-leon/nrl-sim/pull/695))
+  replace passive weekly income with saved, once-only fixture receipts. Staff
+  appointments cost cash upfront; construction records its paid cost for refunds.
+  Cap upgrades ([#560](https://github.com/ch-leon/nrl-sim/issues/560)), the complete
+  finance-screen cleanup ([#561](https://github.com/ch-leon/nrl-sim/issues/561)),
+  funded sales ([#572](https://github.com/ch-leon/nrl-sim/issues/572)) and integrated
+  multi-season balance acceptance (#562) remain open.
+  Normal competition entry and annual eligible-league choice remain gated on
   their dependencies and the new league-field design.
 - **Expansive attack still under par** ([issue #322](https://github.com/ch-leon/nrl-sim/issues/322), open).
   The Speed diagnostic and four Speed levers merged in

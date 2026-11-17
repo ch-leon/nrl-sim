@@ -106,7 +106,7 @@ describe('morale tick', () => {
 describe('facility effects', () => {
   it('every special facility blurb states a concrete effect', () => {
     expect(facilityBlurb(FACILITY_CATALOG.canteen)).toMatch(/morale/);
-    expect(facilityBlurb(FACILITY_CATALOG.sponsorBoard)).toMatch(/\+\$450\/week/); // L1 at reputation 30 (N12)
+    expect(facilityBlurb(FACILITY_CATALOG.sponsorBoard)).toMatch(/\+\$540 per played non-trial match/); // L1 at reputation 30 (N12)
     expect(facilityBlurb(FACILITY_CATALOG.grandstand)).toMatch(/[Ss]eats 3,500/); // #169: seats, not a % of attendance
     expect(facilityBlurb(FACILITY_CATALOG.academy)).toMatch(/free-agent/);
   });

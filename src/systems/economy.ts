@@ -1,28 +1,21 @@
-// src/systems/economy.ts — weekly income/expense loop. See BAK-188 (WU-10).
-// Pure TypeScript, no Phaser. Deterministic (no RNG). Runs as the economy tick
-// (ARCHITECTURE §5, order 30) after training/injuries, before the match — so a
-// home gate can rescue the club before forced sales trigger. Facility upkeep
-// (N6, #164) is the running cost of the grounds, paid after wages; the gate
-// (N6, #169) is min(seats, demand), so success on a bare hill has a roof.
-//
-// All money movement routes through club.earnMoney (credit; negative amount for a
-// deduction) so 'money:changed' fires for every net movement. Wages are allowed
-// to push money negative — spendMoney's guard would block that, so we credit a
-// negative delta instead.
+// FIN v1 economy: contract clock, presentation quotes and cash bookkeeping.
+// Ordinary income settles at the accepted-result boundary (matchIncome.ts).
+// Waiting neither earns income nor pays salaries, staff wages or upkeep.
 
 import { emptyFinance, getState, setState, type FinanceLine, type Fixture, type GameState, type PlacedFacility } from '../core/state';
 import { bus } from '../core/events';
-import { earnMoney } from '../data/club';
-import { ECON, SEASON_ROUNDS, WEEKS_PER_SEASON, difficultyMultipliers, scaledMoney } from '../config';
+import { ECON, SEASON_ROUNDS, WEEKS_PER_SEASON, difficultyMultipliers } from '../config';
 import { sortLadder } from './fixtures';
-import { FACILITY_CATALOG, facilityUpkeep, levelMult } from '../data/facility';
+import { FACILITY_CATALOG, facilityUpkeep } from '../data/facility';
 import { closedGatesFlag, EVENT_CARDS } from '../data/events';
 import { currentRound, inTrials } from '../core/season';
 import { registerSeasonHook, registerTickHook, TICK_ORDER } from '../core/time';
 import { hasStructuralCalendar } from './competitionCalendar';
 import { staffWages } from './staff';
 import { BOARD_LOAN, BOARD_LOAN_REPAID, warnForWeeks, notifyContractWarning } from './contracts';
+import { FINANCE_TIERS, matchCashQuote, type FinanceLevel, type FinanceTier } from '../data/financeRules';
 import { expireEndedDeals } from './cap';
+import { reconcileMatchIncome, commitMatchState } from './matchIncome';
 
 /**
  * Level of the built facility with `defId`, or 0 if none is built. Placement
@@ -60,32 +53,19 @@ export function weeklyOverhead(state: GameState): number {
   return Math.round(ECON.OVERHEAD_WEEKLY * difficultyMultipliers(state.settings.difficulty).overhead) + staffWages(state);
 }
 
-/**
- * What a Sponsor Board at `level` pays a week at `reputation` (N12): SPONSOR_BASE
- * + SPONSOR_PER_REP × reputation, at most SPONSOR_CAP, × the level step every
- * facility uses (LEVEL_MULT). 0 at level 0 (unbuilt). The Build menu, the
- * facility popup and the Guide quote it at the club's reputation.
- */
-export function sponsorReturn(level: number, reputation: number): number {
-  if (level < 1) return 0;
-  const perLevel = Math.min(ECON.SPONSOR_CAP, ECON.SPONSOR_BASE + ECON.SPONSOR_PER_REP * Math.max(0, reputation));
-  return Math.round(perLevel * levelMult(Math.min(3, level) as 1 | 2 | 3));
+/** Sponsor Board return per eligible played match. Reputation never changes this quote. */
+export function sponsorReturn(level: number, _reputation: number, tier: FinanceTier = 'premier'): number {
+  return matchCashQuote({ matchBase: FINANCE_TIERS[tier].matchBase, kind: 'played', venue: 'away', result: 'loss', sponsorLevel: Math.max(0, Math.min(3, level)) as FinanceLevel }).sponsor;
 }
 
-/** Sponsor Board income: sponsorReturn at its level and the club's reputation (0 if unbuilt). */
+/** Sponsor extra per eligible match at the club's own tier (not a weekly grant). */
 export function sponsorIncome(state: GameState): number {
-  return sponsorReturn(facilityLevel(state, 'sponsorBoard'), state.reputation);
+  return sponsorReturn(facilityLevel(state, 'sponsorBoard'), state.reputation, state.capAccount.tier);
 }
 
-/** The weekly reputation grant: REP_GRANT_PER_POINT × reputation. */
-export function reputationGrant(state: GameState): number {
-  return ECON.REP_GRANT_PER_POINT * state.reputation;
-}
-
-/** Passive weekly income: sponsorIncome + reputationGrant (booked as two lines, #172). */
-export function weeklyIncome(state: GameState): number {
-  return sponsorIncome(state) + reputationGrant(state);
-}
+/** Retired passive revenue: waiting never earns cash. */
+export function reputationGrant(_state: GameState): number { return 0; }
+export function weeklyIncome(_state: GameState): number { return 0; }
 
 /**
  * Find the current week's fixture for the player club, if any. Reads
@@ -143,7 +123,7 @@ export interface GateEstimate {
   /** min(capacity, demand). */
   attendance: number;
   receipts: number;
-  /** Demand exceeds the seats: a bigger stand would earn more. */
+  /** Demand exceeds the seats (presentation only, not a cash multiplier). */
   soldOut: boolean;
 }
 
@@ -151,7 +131,7 @@ export interface GateEstimate {
  * The crowd a home `fixture` would draw at `state`, and what it pays:
  *   demand     = (ATTEND_BASE + reputation × ATTEND_PER_REP) × form × occasion
  *   attendance = min(groundCapacity, demand)
- *   receipts   = attendance × TICKET_PRICE
+ * Venue receipts use the fixed FIN v1 base/stand quote, not attendance.
  * Form is 1 ± FORM_SWING × recentForm before the fixture's round; the occasion
  * is FINALS_MULT for a home final, BIG_MATCH_MULT for a top-eight opponent.
  * The Finance screen projects the next home gate with this same function.
@@ -165,9 +145,19 @@ export function homeGate(state: GameState, fixture: Fixture): GateEstimate {
   const capacity = groundCapacity(state);
   const closed = state.eventDeck.flags.includes(closedGatesFlag(state.season, fixture.round));
   const attendance = closed ? 0 : Math.min(capacity, demand);
-  // Easy pays a little less at the gate (DIFFICULTY.easy.gate). Normal and Hard
-  // are ×1, so the crowd, the form and the occasion still decide the receipt.
-  const receipts = Math.round(scaledMoney(attendance * ECON.TICKET_PRICE, difficultyMultipliers(state.settings.difficulty).gate) * (fixture.round <= 0 ? 0.25 : 1));
+  // Crowd presentation is independent of the fixed venue payment. Never multiply
+  // attendance by ticket prices or apply a hidden difficulty modifier to cash.
+  const context = state.competitions?.instances.find(i => i.id === fixture.competitionId);
+  const actual = context?.fixtures.find(f => f.id === fixture.id);
+  const homeAccount = fixture.homeId === state.clubId ? state.capAccount : state.league.clubs.find(c => c.id === fixture.homeId)?.capAccount;
+  const awayAccount = fixture.awayId === state.clubId ? state.capAccount : state.league.clubs.find(c => c.id === fixture.awayId)?.capAccount;
+  const hostBase = FINANCE_TIERS[homeAccount?.tier ?? 'premier'].matchBase;
+  const matchBase = actual?.neutral ? Math.min(hostBase, FINANCE_TIERS[awayAccount?.tier ?? 'premier'].matchBase) : hostBase;
+  const receipts = matchCashQuote({ matchBase,
+    kind: fixture.unplayed || actual?.status === 'cancelled' || actual?.result?.decider === 'forfeit' ? 'unplayed' : context?.definition.format.kind === 'exhibition' || (!context && fixture.round <= 0) ? 'trial' : 'played',
+    venue: actual?.neutral ? 'neutral' : fixture.homeId === state.clubId ? 'home' : 'away', result: 'loss',
+    grandstandLevel: facilityLevel(state, 'grandstand') as FinanceLevel,
+  }).home;
   return { capacity, demand, attendance, receipts, soldOut: !closed && demand > capacity };
 }
 
@@ -186,17 +176,18 @@ export interface StandProjection {
 
 /**
  * What the next Grandstand level would earn at `fixture` (N12): homeGate on the
- * same state with that stand built, so it is the gate the weekly tick would pay,
- * against the gate it pays today. Only when the fixture sells out (demand over
- * the seats: more seats would fill); null otherwise, and at the top level.
+ * same state with that stand built. The fixed venue-income increase applies
+ * even below capacity. Null for trials, neutral/away fixtures and at the top level.
  */
 export function nextStandGate(state: GameState, fixture: Fixture): StandProjection | null {
   const today = homeGate(state, fixture);
   const level = facilityLevel(state, 'grandstand') + 1;
-  if (!today.soldOut || ECON.CAPACITY[level] === undefined) return null;
+  if (ECON.CAPACITY[level] === undefined || fixture.round <= 0 || fixture.homeId !== state.clubId
+    || state.competitions?.instances.find(i => i.id === fixture.competitionId)?.fixtures.find(f => f.id === fixture.id)?.neutral) return null;
   // facilityLevel takes the best Grandstand, so one more at the next level stands in for the upgrade.
   const stand: PlacedFacility = { id: 'projected-stand', defId: 'grandstand', level: level as PlacedFacility['level'], x: 0, y: 0 };
   const bigger = homeGate({ ...state, facilities: [...state.facilities, stand] }, fixture);
+  if (bigger.receipts <= today.receipts) return null;
   return { level, capacity: bigger.capacity, attendance: bigger.attendance, receipts: bigger.receipts, gain: bigger.receipts - today.receipts };
 }
 
@@ -247,15 +238,8 @@ export function handleBankruptcy(_state: GameState): GameState {
  * count down without a salary bill.
  */
 export function applyEconomy(state: GameState): GameState {
-  if (hasStructuralCalendar(state)) return state; // Annual finance is not enabled by the structural prototype.
-  const sponsor = sponsorIncome(state);
-  if (sponsor !== 0) earnMoney(sponsor, 'sponsor');
-  const grant = reputationGrant(getState());
-  if (grant !== 0) earnMoney(grant, 'grant');
-
-  const gate = gateReceipts(getState());
-  if (gate !== 0) earnMoney(gate, 'gate');
-
+  commitMatchState(reconcileMatchIncome(state));
+  if (hasStructuralCalendar(state)) return getState();
   if (!inTrials(state)) tickContracts(getState());
   return getState();
 }
@@ -360,7 +344,8 @@ export function stampMovement(state: Pick<GameState, 'season' | 'week' | 'financ
  * once from main.ts (and the soak); returns the unsubscribe.
  */
 export function registerFinanceSystem(): () => void {
-  return bus.on('money:changed', ({ delta, reason }) => {
+  return bus.on('money:changed', ({ delta, reason, booked }) => {
+    if (booked) return;
     const s = getState();
     const { line, season } = stampMovement(s, reason);
     const books = s.finance.some((e) => e.season === season)

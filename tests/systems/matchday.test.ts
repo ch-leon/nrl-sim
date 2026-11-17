@@ -72,6 +72,24 @@ describe('player matchday result toast', () => {
     c.stop();
   });
 
+  it('reconciles accepted cash without applying sporting stats again on redelivery', () => {
+    const c = collect(); advanceWeek();
+    const { fixture, sim } = c.started[0]!;
+    const before = getState();
+    const accepted = { ...before.league, fixtures: before.league.fixtures.map(f => f.round === fixture.round && f.homeId === fixture.homeId && f.awayId === fixture.awayId
+      ? { ...f, result: { homeScore: sim.homeScore, awayScore: sim.awayScore } } : f) };
+    setState({ league: accepted });
+    const squad = JSON.stringify(getState().squad);
+    bus.emit('match:finished', { fixture, result: sim });
+    expect(JSON.stringify(getState().squad)).toBe(squad);
+    expect(getState().money).toBeGreaterThan(before.money);
+    expect(getState().matchIncome.filter(r => r.receipt)).toHaveLength(1);
+    const paid = getState().money;
+    bus.emit('match:finished', { fixture, result: sim });
+    expect(getState().money).toBe(paid);
+    c.stop();
+  });
+
   it('announces immediately when fast-forwarding (no playback)', () => {
     const c = collect();
     advanceWeeks(1);

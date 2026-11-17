@@ -16,11 +16,12 @@
 // across the boundary. GroundsScene.create() registers itself.
 
 import type Phaser from 'phaser';
+import { weekHeld } from '../core/time';
 import { GRID_W, GRID_H } from '../config';
 import { isFacilityOpen, unlockReason } from '../systems/unlocks';
 import { getState, setState, type GameState, type PlacedFacility } from '../core/state';
 import { bus } from '../core/events';
-import { spendMoney, addFacility, earnMoney } from '../data/club';
+import { addFacility } from '../data/club';
 import { FACILITY_CATALOG, upgradeCost, type FacilityDef, type FacilityDefId } from '../data/facility';
 import { GROUNDS } from '../config';
 import { fmtMoney } from '../utils/money';
@@ -35,9 +36,10 @@ export interface PlaceValidation {
 }
 
 // Machine reasons (exact strings per spec) mapped to human copy for ui:notify.
-export type PlaceReason = 'out-of-bounds' | 'overlap' | 'path' | 'duplicate' | 'insufficient-funds' | 'missing' | 'locked';
+export type PlaceReason = 'out-of-bounds' | 'overlap' | 'path' | 'duplicate' | 'insufficient-funds' | 'missing' | 'locked' | 'busy';
 
 const REASON_TEXT: Record<PlaceReason, string> = {
+  busy: 'Finish the current match first.',
   locked: 'This facility has not opened yet.',
   'out-of-bounds': "It won't fit there.",
   overlap: 'Something is already built there.',
@@ -226,8 +228,8 @@ export function facilitySpend(def: FacilityDef, level: 1 | 2 | 3): number {
 }
 
 /** Refund for demolishing: GROUNDS.DEMOLISH_REFUND_RATE of the build plus upgrades. */
-export function demolishRefund(def: FacilityDef, level: 1 | 2 | 3): number {
-  return Math.round(facilitySpend(def, level) * GROUNDS.DEMOLISH_REFUND_RATE);
+export function demolishRefund(def: FacilityDef, level: 1 | 2 | 3, constructionSpend = facilitySpend(def, level)): number {
+  return Math.round(constructionSpend * GROUNDS.DEMOLISH_REFUND_RATE);
 }
 
 /** Can `facility` move to (x, y)? Same rules as a build, minus itself, paying the move fee. */
@@ -246,27 +248,31 @@ export type MoveResult = PlaceValidation & { fee?: number };
 export function moveFacility(facilityId: string, x: number, y: number): MoveResult {
   const s = getState();
   const facility = s.facilities.find((f) => f.id === facilityId);
+  if (weekHeld()) return { ok: false, reason: 'busy' };
   if (!facility) return { ok: false, reason: 'missing' };
   if (facility.x === x && facility.y === y) return { ok: true, fee: 0 };
   const v = validateMove(s, facility, x, y);
   if (!v.ok) return v;
   const def = FACILITY_CATALOG[facility.defId];
   const fee = moveFee(def);
-  setState({ facilities: s.facilities.map((f) => (f.id === facilityId ? { ...f, x, y } : f)) });
-  if (fee > 0) spendMoney(fee, `move:${facility.defId}`);
+  const balance = s.money - fee;
+  setState({ facilities: s.facilities.map((f) => (f.id === facilityId ? { ...f, x, y } : f)), money: balance });
+  if (fee > 0) bus.emit('money:changed', { delta: -fee, reason: `move:${facility.defId}`, balance });
   return { ok: true, fee };
 }
 
-/** Upgrade the current facility, charging/bookkeeping through spendMoney once. Autosave owns persistence. */
+/** Upgrade the current facility, charging and recording actual spend atomically. Autosave owns persistence. */
 export function upgradeFacility(facilityId: string): boolean {
-  const facility = getState().facilities.find((f) => f.id === facilityId);
-  if (!facility || facility.level >= 3) return false;
+  const s = getState();
+  const facility = s.facilities.find((f) => f.id === facilityId);
+  if (weekHeld() || !facility || facility.level >= 3) return false;
   const def = FACILITY_CATALOG[facility.defId];
   const nextLevel = (facility.level + 1) as 2 | 3;
   const cost = upgradeCost(def, nextLevel);
-  if (!spendMoney(cost, `upgrade:${facility.defId}`)) return false;
-  const s = getState();
-  setState({ facilities: s.facilities.map((f) => f.id === facilityId ? { ...f, level: nextLevel } : f) });
+  if (s.money < cost) return false;
+  const balance = s.money - cost;
+  setState({ facilities: s.facilities.map((f) => f.id === facilityId ? { ...f, level: nextLevel, constructionSpend: (f.constructionSpend ?? 0) + cost } : f), money: balance });
+  bus.emit('money:changed', { delta: -cost, reason: `upgrade:${facility.defId}`, balance });
   bus.emit('ui:notify', { text: `${def.name} upgraded to L${nextLevel}!`, kind: 'success' });
   return true;
 }
@@ -278,11 +284,12 @@ export function upgradeFacility(facilityId: string): boolean {
 export function demolishFacility(facilityId: string): number | null {
   const s = getState();
   const facility = s.facilities.find((f) => f.id === facilityId);
-  if (!facility) return null;
+  if (weekHeld() || !facility) return null;
   const def = FACILITY_CATALOG[facility.defId];
-  const refund = demolishRefund(def, facility.level);
-  setState({ facilities: s.facilities.filter((f) => f.id !== facilityId) });
-  if (refund > 0) earnMoney(refund, `demolish:${facility.defId}`);
+  const refund = demolishRefund(def, facility.level, facility.constructionSpend ?? 0);
+  const balance = s.money + refund;
+  setState({ facilities: s.facilities.filter((f) => f.id !== facilityId), money: balance });
+  if (refund > 0) bus.emit('money:changed', { delta: refund, reason: `demolish:${facility.defId}`, balance });
   return refund;
 }
 
@@ -534,6 +541,7 @@ export class PlacementController {
    * and emits a neutral ui:notify (a refusal, not a problem: #339). Returns the validation result either way.
    */
   confirm(): PlaceValidation {
+    if (weekHeld()) return { ok: false, reason: 'busy' };
     if (this.defId === null) return { ok: false, reason: 'out-of-bounds' };
     const defId = this.defId;
     const def = FACILITY_CATALOG[defId];
@@ -552,11 +560,9 @@ export class PlacementController {
       return v;
     }
 
-    // Commit. Place first, pay only on success — addFacility re-checks bounds/
-    // overlap independently, so paying first could deduct with no facility.
-    const placed = addFacility(defId, this.gx, this.gy, 1); // emits facility:placed
+    // Commit the validated placement and its cash payment together.
+    const placed = addFacility(defId, this.gx, this.gy, 1, def.cost); // emits facility:placed
     if (placed) {
-      spendMoney(def.cost, `build:${defId}`);
       for (const t of footprintTiles(def, this.gx, this.gy)) {
         this.path.setBlocked(t.x, t.y, true);
       }

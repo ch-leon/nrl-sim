@@ -469,7 +469,7 @@ describe('wildcard polish', () => {
     expect(homeGate(open, fx).receipts).toBeGreaterThan(0);
     const refund = resolveEvent(base, 'polish', 1, 1)!;
     expect(refund.money.map((m) => m.amount)).toEqual([-4_000]);
-    // The card targets the same match even if answered a week later.
+    // The crowd closes for this match; FIN v1 fixed venue income is not another ticket-sale calculation.
     const late = resolveEvent({ ...base, week: 2 }, 'polish', 1, 2)!.state;
     const saved = new Map<string, string>();
     __setStorage({ getItem: (k) => saved.get(k) ?? null, setItem: (k, v) => { saved.set(k, v); }, removeItem: (k) => { saved.delete(k); } });
@@ -477,8 +477,8 @@ describe('wildcard polish', () => {
       save(refund.state);
       const loaded = load()!;
       for (const closed of [refund.state, late, loaded]) {
-        expect(homeGate(closed, fx)).toMatchObject({ attendance: 0, receipts: 0, soldOut: false });
-        expect(gateReceipts({ ...closed, week: 2 })).toBe(0);
+        expect(homeGate(closed, fx)).toMatchObject({ attendance: 0, receipts: homeGate(open, fx).receipts, soldOut: false });
+        expect(gateReceipts({ ...closed, week: 2 })).toBe(homeGate(open, fx).receipts);
         expect(gateReceipts({ ...closed, week: 3 })).toBeGreaterThan(0);
         expect(homeGate({ ...closed, season: 2 }, fx).receipts).toBeGreaterThan(0);
       }

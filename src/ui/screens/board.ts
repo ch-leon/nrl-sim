@@ -12,7 +12,7 @@ import { fmtMoney } from '../../utils/money';
 import { objectiveLine, objectiveRisk, sackedSummary } from '../../systems/board';
 import { financeSummary } from './finance';
 import { ladderPosition } from '../../systems/fixtures';
-import { ATTACK_COACHES, ATTACK_SPECIALITIES, STAFF, STAFF_ROLES, attackCoach, attackCoachRefusal, attackCoachWage, hireAttackCoach, hireStaff, releaseStaff, staffWage } from '../../systems/staff';
+import { ATTACK_COACHES, ATTACK_SPECIALITIES, STAFF, STAFF_ROLES, attackCoach, attackCoachRefusal, hireAttackCoach, hireStaff, releaseStaff, STAFF_APPOINTMENT_PRICES } from '../../systems/staff';
 import { el, button, openModal, openScreen, closeScreen, ensureStyles, guardDoubleTap } from '../dom';
 
 /** How an objective stands (3k): ON TRACK / AT RISK while the season runs, MET / FAILED once reviewed, PENDING before a ball is kicked. */
@@ -93,14 +93,18 @@ export function staffRows(state: GameState): HTMLElement[] {
     const def = STAFF[role];
     const member = state.staff.find((m) => m.role === role);
     const who = member
-      ? `${def.title}: ${member.name} · ${fmtMoney(member.wage)}/wk`
-      : `${def.title} · ${fmtMoney(staffWage(state, role))}/wk`;
+      ? `${def.title}: ${member.name} · appointed`
+      : `${def.title} · ${fmtMoney(STAFF_APPOINTMENT_PRICES[role])} once`;
     const row = el('div', { class: 'nrl-staff-row', attrs: { 'data-staff': role } },
       el('div', { class: 'nrl-staff-info' }, el('strong', { class: 'nrl-name-wrap', text: who }), el('span', { class: 'nrl-staff-blurb', text: def.blurb })),
       member
         ? button('Release', () => { releaseStaff(role); }, { class: 'nrl-btn-danger' })
         : button('Hire', () => { hireStaff(role); }, { class: 'nrl-btn-primary' }),
     );
+    if (!member && state.money < STAFF_APPOINTMENT_PRICES[role]) {
+      const hire = row.querySelector('button');
+      if (hire) { hire.disabled = true; hire.title = 'Not enough cash'; }
+    }
     rows.push(row);
   }
   rows.push(attackCoachRow(state));
@@ -121,18 +125,18 @@ export function attackCoachRow(state: GameState): HTMLElement {
     const def = ATTACK_COACHES[coach.speciality];
     return el('div', { class: 'nrl-staff-row', attrs: { 'data-staff': 'attackCoach', 'data-speciality': coach.speciality } },
       el('div', { class: 'nrl-staff-info' },
-        el('strong', { class: 'nrl-name-wrap', text: `${def.title}: ${coach.name} · ${fmtMoney(coach.wage)}/wk` }),
+        el('strong', { class: 'nrl-name-wrap', text: `${def.title}: ${coach.name} · appointed` }),
         el('span', { class: 'nrl-staff-blurb', text: `${def.blurb} Plays you buy stay if he goes.` })),
       button('Release', () => { releaseStaff('attackCoach'); }, { class: 'nrl-btn-danger' }));
   }
   const hires = el('div', { class: 'nrl-staff-hires' }, ...ATTACK_SPECIALITIES.map((sp) => {
     const def = ATTACK_COACHES[sp];
-    const why = attackCoachRefusal(state, sp);
+    const why = attackCoachRefusal(state, sp) ?? (state.money < STAFF_APPOINTMENT_PRICES[sp] ? 'Not enough cash' : null);
     const b = button('', () => { hireAttackCoach(sp); }, { class: 'nrl-btn-primary nrl-staff-hire' });
     b.append(el('span', { class: 'nrl-staff-hire-name', text: `Hire ${def.short}` }),
-      el('small', { text: why ?? `${fmtMoney(attackCoachWage(state, sp))}/wk` }));
+      el('small', { text: why ?? `${fmtMoney(STAFF_APPOINTMENT_PRICES[sp])} once` }));
     b.setAttribute('data-hire-attack', sp);
-    b.title = why ? `${def.title}: ${why.toLowerCase()} (you have ${state.reputation})` : `${def.title} · ${fmtMoney(attackCoachWage(state, sp))}/wk. ${def.blurb}`;
+    b.title = why ? `${def.title}: ${why.toLowerCase()} (you have ${state.reputation})` : `${def.title} · ${fmtMoney(STAFF_APPOINTMENT_PRICES[sp])} once. ${def.blurb}`;
     if (why) { b.disabled = true; b.setAttribute('data-locked', ''); }
     return b;
   }));

@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { bus, type Events } from '../../src/core/events';
 import { createNewGame, getState, setState, type GameState } from '../../src/core/state';
-import { addFacility, spendMoney } from '../../src/data/club';
+import { addFacility } from '../../src/data/club';
 import { FACILITY_CATALOG, type FacilityDefId } from '../../src/data/facility';
 import { GRID_H, GRID_W } from '../../src/config';
 import { validatePlacement } from '../../src/world/placement';
@@ -29,8 +29,7 @@ function freeSpot(s: GameState, defId: FacilityDefId, skip = 0): { x: number; y:
 
 /** Build the way the placement controller does (#370: then offer the Undo). */
 function build(defId: FacilityDefId, at = freeSpot(getState(), defId), now = 0): void {
-  const placed = addFacility(defId, at.x, at.y, 1)!;
-  spendMoney(FACILITY_CATALOG[defId].cost, `build:${defId}`);
+  const placed = addFacility(defId, at.x, at.y, 1, FACILITY_CATALOG[defId].cost)!;
   offerBuild(placed, FACILITY_CATALOG[defId].cost, now);
 }
 

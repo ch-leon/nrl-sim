@@ -1,3 +1,4 @@
+import { freezeMatchIncome, matchIncomePatch, commitMatchState, reconcileMatchIncome } from './matchIncome';
 // Orchestrator-owned: the PLAYER's match of the round (rival-vs-rival matches
 // are handled by fixtures.ts's own hook). The match is played on the live sim
 // (BAK-207): the week holds at kick-off, 'match:started' hands the Match scene
@@ -222,6 +223,10 @@ function applyPlayerResult(fixture: Fixture, home: TeamSheet, away: TeamSheet, s
   const ownSheet = fixture.homeId === PLAYER_ID ? home : away;
   const playedIds = (ownSheet.roster ?? []).flatMap((r) => (r.id ? [r.id] : []));
   const before = getState();
+  const accepted = fixture.competitionId
+    ? before.competitions?.instances.find(i => i.id === fixture.competitionId)?.fixtures.find(f => f.id === fixture.id)?.result
+    : before.league.fixtures.find(f => sameFixtureIdentity(f, fixture))?.result;
+  if (accepted) { commitMatchState(reconcileMatchIncome(before)); return () => {}; }
   const structural = hasStructuralCalendar(before);
   const knockout = structural ? calendarKnockout(before, fixture) : isFinalsRound(fixture.round);
   const context = structural ? calendarFixtureContext(before, fixture) : undefined;
@@ -230,9 +235,7 @@ function applyPlayerResult(fixture: Fixture, home: TeamSheet, away: TeamSheet, s
     awayScore: sim.awayScore,
   });
   if (applied === before) return () => {};
-  setState({
-    league: applied.league,
-    ...(applied.competitions ? { competitions: applied.competitions } : {}),
+  commitMatchState(applied, {
     ...((structural ? context?.instance.definition.stages.find(s => s.id === fixture.stageId)?.kind === 'league' : fixture.round > 0) ? { recentPlans: [{ ...(ownSheet.tactics ?? DEFAULT_TACTICS) }, ...getState().recentPlans].slice(0, 3) } : {}),
     squad: applyMatchXp(applyMatchStats(getState().squad, sim.events, PLAYER_ID, playedIds, getState().season),
       ownSheet, sim, fixture.homeId, fixture.awayId, getState().facilities, getState().training.focus),
@@ -286,8 +289,8 @@ export function registerPlayerMatchSystem(): void {
     const fit = fitSquadCount(state.squad);
     if (fit < SQUAD_MIN) {
       const result = forfeitResult(fixture);
-      const applied = hasStructuralCalendar(state) ? finaliseCalendarFixture(getState(), fixture, result, true) : applyResult(getState(), fixture, result);
-      setState({ league: applied.league, ...(applied.competitions ? { competitions: applied.competitions } : {}) });
+      const applied = hasStructuralCalendar(state) ? finaliseCalendarFixture(getState(), fixture, result, true) : applyResult(getState(), { ...fixture, unplayed: true }, result);
+      commitMatchState(applied);
       bus.emit('ui:notify', {
         text:
           fit === 0
@@ -305,12 +308,13 @@ export function registerPlayerMatchSystem(): void {
       if (fitSquadCount(rival.squad ?? []) < context.instance.definition.lineup.minSquad) {
         const score = forfeitResult(fixture, rivalId);
         const next = finaliseCalendarFixture(state, fixture, score, true);
-        setState({ competitions: next.competitions!, league: next.league });
+        commitMatchState(next);
         bus.emit('ui:notify', { text: `${rival.name} cannot field a legal squad. The fixture is a walkover; no match XP or income is awarded.`, kind: 'info' });
         return;
       }
     }
 
+    setState(matchIncomePatch(freezeMatchIncome(getState(), fixture)));
     const rng = makeRng(state.rngSeed);
     const seed = rng.int(1, 2 ** 31);
     setState({ rngSeed: rng.state() });

@@ -14,9 +14,9 @@
 //
 // Pure-ish around getState/setState; no DOM, no Phaser.
 
+import { weekHeld } from '../core/time';
 import { bus } from '../core/events';
 import { getState, setState, type GameState, type Lineup, type PlacedFacility, type Player } from '../core/state';
-import { earnMoney, spendMoney } from '../data/club';
 import { FACILITY_CATALOG } from '../data/facility';
 import { fmtMoney } from '../utils/money';
 import { demolishFacility, validatePlacement } from '../world/placement';
@@ -70,7 +70,7 @@ export function offerUndo(offer: UndoOffer, kind: 'info' | 'success' = 'success'
 export function undoNow(now = Date.now()): boolean {
   const o = currentOffer(now);
   open = null;
-  if (!o || !o.canRevert(getState())) return false;
+  if (weekHeld() || !o || !o.canRevert(getState())) return false;
   o.revert();
   return true;
 }
@@ -100,8 +100,10 @@ export function offerBuild(f: PlacedFacility, cost: number, now = Date.now()): v
     expiresAt: now + UNDO_MS,
     canRevert: (s) => s.facilities.some((x) => x.id === f.id && x.level === f.level && x.x === f.x && x.y === f.y),
     revert: () => {
-      setState({ facilities: getState().facilities.filter((x) => x.id !== f.id) });
-      earnMoney(cost, `undo:build:${f.defId}`);
+      const s = getState();
+      const balance = s.money + cost;
+      setState({ facilities: s.facilities.filter((x) => x.id !== f.id), money: balance });
+      bus.emit('money:changed', { delta: cost, reason: `undo:build:${f.defId}`, balance });
       bus.emit('facility:removed', { facility: f, undo: true });
     },
   });
@@ -128,8 +130,9 @@ export function offerSign(
       const pool = [...s.freeAgents];
       pool.splice(Math.min(poolIndex, pool.length), 0, asWas);
       const lineup = opts.lineup && s.lineup === opts.lineup.after ? { lineup: opts.lineup.before } : {};
-      setState({ squad: s.squad.filter((p) => p.id !== signed.id), freeAgents: pool, ...lineup });
-      earnMoney(fee, `undo:sign:${signed.id}`);
+      const balance = s.money + fee;
+      setState({ squad: s.squad.filter((p) => p.id !== signed.id), freeAgents: pool, money: balance, ...lineup });
+      bus.emit('money:changed', { delta: fee, reason: `undo:sign:${signed.id}`, balance });
       bus.emit('player:unsigned', { player: asWas });
     },
   });
@@ -148,10 +151,12 @@ export function offerDemolish(f: PlacedFacility, index: number, refund: number, 
     expiresAt: now + UNDO_MS,
     canRevert: (s) => !s.facilities.some((x) => x.id === f.id) && s.money >= refund && validatePlacement(s, f.defId, f.x, f.y, { cost: 0 }).ok,
     revert: () => {
-      const list = [...getState().facilities];
+      const s = getState();
+      const list = [...s.facilities];
       list.splice(Math.min(index, list.length), 0, f);
-      setState({ facilities: list });
-      if (refund > 0) spendMoney(refund, `undo:demolish:${f.defId}`);
+      const balance = s.money - refund;
+      setState({ facilities: list, money: balance });
+      if (refund > 0) bus.emit('money:changed', { delta: -refund, reason: `undo:demolish:${f.defId}`, balance });
       bus.emit('facility:placed', f); // the scene, sounds and badges as for a build
     },
   }, 'info');

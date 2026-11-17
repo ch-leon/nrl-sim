@@ -1,3 +1,4 @@
+import { validMatchIncome } from '../systems/matchIncome';
 // Save boundary only. Historical defaults belong to MIGRATIONS, never to ticks.
 import { FINANCE_LINES, SAVE_VERSION, type GameState, type Lineup, type Player, type PlayerStats, type PlacedFacility } from './state';
 import { createCeilings } from '../systems/potential';
@@ -62,6 +63,7 @@ export function isPlayer(v: unknown, version = SAVE_VERSION): v is Player {
 }
 export function isPlacedFacility(v: unknown): v is PlacedFacility {
   if (!record(v) || !text(v.id) || typeof v.defId !== 'string' || !Object.prototype.hasOwnProperty.call(FACILITY_CATALOG, v.defId) || !integer(v.level, 1, 3)) return false;
+  if (v.constructionSpend !== undefined && !integer(v.constructionSpend)) return false;
   const def = FACILITY_CATALOG[v.defId as keyof typeof FACILITY_CATALOG];
   return integer(v.x, 0, GRID_W - def.footprint.w) && integer(v.y, 0, GRID_H - def.footprint.h);
 }
@@ -191,6 +193,7 @@ export function validateInput(v: Record<string, unknown>, version: number): stri
   if ((!record(v.competitions) || v.competitions.calendar === undefined) && !integer(v.week, 1, v.pack === 'uk' ? 25 : 27)) return fail('career fields');
   for (const f of v.league.fixtures) {
     if (!record(f) || !integer(f.round, -1, v.pack === 'uk' ? 25 : 27) || !text(f.homeId) || !text(f.awayId) || !clubs.has(f.homeId) || !clubs.has(f.awayId) || f.homeId === f.awayId || (f.result !== undefined && (!record(f.result) || !integer(f.result.homeScore) || !integer(f.result.awayScore)))) return fail('fixture');
+    if (f.unplayed !== undefined && typeof f.unplayed !== 'boolean') return fail('unplayed fixture');
   }
   const ladderIds: unknown[] = [];
   for (const row of v.league.ladder) {
@@ -210,6 +213,7 @@ export function validateInput(v: Record<string, unknown>, version: number): stri
   if (version >= 16 && (!record(v.training) || !oneOf(v.training.focus, ['balanced', ...stats]))) return fail('training');
   if (version >= 18 && (!record(v.boardLoan) || !range(v.boardLoan.owed, 0))) return fail('boardLoan');
   if (version >= 19 && (!Array.isArray(v.staff) || !v.staff.every(s => record(s) && oneOf(s.role, ['assistantCoach', 'analyst', 'welfare', 'attackCoach']) && text(s.name) && range(s.wage, 0) && integer(s.hiredSeason, 1) && (s.speciality === undefined || oneOf(s.speciality, ['direct', 'width', 'kicking', 'razzle']))) || !unique(v.staff.map(s => s.role)))) return fail('staff');
+  if (version >= 29 && !validMatchIncome(v.matchIncome, { season: v.season as number, league: v.league as unknown as GameState['league'], competitions: v.competitions as GameState['competitions'] })) return fail('match income');
   if (version >= 28) {
     if (!isCapAccount(v.capAccount)) return fail('cap');
     const deals = (list: unknown, required: boolean): boolean => Array.isArray(list) && list.every(p => record(p) && (p.deal === undefined ? !required : isDeal(p.deal)));
