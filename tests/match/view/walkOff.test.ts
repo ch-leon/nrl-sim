@@ -9,8 +9,12 @@ import { LiveSim } from '../../../src/match/league/live';
 import { labSheet, DEFAULT_HOME, DEFAULT_AWAY } from '../../../src/match/lab/sheets';
 import { LiveView, type ActorView } from '../../../src/match/view/liveView';
 import { fieldOffsetX, fieldToWorldPoint } from '../../../src/scenes/matchField';
+import { toFieldPt } from '../../../src/match/core/field';
+import { binnedSpot } from '../../../src/match/view/officials';
+import { NINES } from '../../../src/match/league/rules';
+import type { PlayerPicture } from '../../../src/match/view/playerPicture';
 import type { Snapshot } from '../../../src/match/core/snapshot';
-import { BreakClock, CAPTAIN_SLOT, FT_GONE, TUNNEL, breakMan, breakScene } from '../../../src/match/view/walkOff';
+import { BreakClock, CAPTAIN_SLOT, FT_GONE, FT_FADE, RESTART_FADE, HT_FADE, TUNNEL, breakMan, breakScene } from '../../../src/match/view/walkOff';
 
 interface Drawn { x: number; y: number; alpha: number }
 function surface() {
@@ -152,6 +156,106 @@ describe('the whistle (#675)', () => {
     // A held picture that is sought forward restarts from nothing too.
     clock.advance(snaps[ht + 59]!, 500, 1, true);
     expect(clock.advance(snaps[ht + 100]!, 0, 1, true)).toBe(0);
+  });
+});
+
+describe('a binned man at the whistle (#688)', () => {
+  const fixture = (kind: string, age = 0, golden = false): Snapshot => ({
+    tick: 100 + age, phase: { kind, since: 100, ...(golden ? { golden: true } : {}) },
+    clock: { half: 2, seconds: 0, minute: 5, siren: false, finished: kind === 'full-time' },
+    score: { home: 10, away: 4 }, label: '', events: [],
+    ball: { x: 50, y: 34, lift: 0, holder: null },
+    players: [
+      { side: 'home', slot: 0, who: 'bin-home', x: 49.5, y: 1, pose: 'idle', speed: 0, headX: 1, binned: true },
+      { side: 'home', slot: 1, who: 'home', x: 35, y: 40, pose: 'idle', speed: 0, headX: 1 },
+      { side: 'away', slot: 0, who: 'bin-away', x: 49.5, y: 1, pose: 'idle', speed: 0, headX: -1, binned: true },
+      { side: 'away', slot: 1, who: 'away', x: 65, y: 30, pose: 'idle', speed: 0, headX: -1 },
+      { side: 'home', slot: 2, who: 'second-bin', x: 49.5, y: 1, pose: 'idle', speed: 0, headX: 1, binned: true },
+    ],
+  });
+  const make = () => {
+    const s = { ...surface(), officials: { spot: binnedSpot, draw() {} } };
+    const pictures = new Map<string, PlayerPicture>();
+    for (const side of ['home', 'away'] as const) s.players[side].forEach((a, slot) => { a.paint = p => { pictures.set(`${side}/${slot}`, p); }; });
+    return { s, view: new LiveView(s), pictures };
+  };
+  const seat = (s: ReturnType<typeof surface>, snap: Snapshot, slot = 0) => {
+    const at = binnedSpot(snap.players.find(p => p.side === 'home' && p.slot === slot)!, snap)!;
+    const f = toFieldPt(at), w = s.fieldToWorld(f.fx, f.fy);
+    return { x: Math.round(w.x), y: Math.round(w.y) };
+  };
+
+  it('fades both bins with their sides at half/full time and the golden-point huddle, without moving or celebrating', () => {
+    for (const [kind, golden, fade, gone] of [
+      ['half-time', false, NINES.halfTimeTicks - HT_FADE, NINES.halfTimeTicks],
+      ['full-time', false, FT_FADE, FT_GONE],
+      ['half-time', true, NINES.goldenPointBreakTicks - 10, NINES.goldenPointBreakTicks],
+    ] as const) {
+      const { s, view, pictures } = make(), snap = fixture(kind, 0, golden);
+      for (const age of [0, fade, (fade + gone) / 2, gone]) {
+        const scene = breakScene(snap, age, age)!;
+        const at = { ...snap, tick: snap.tick + age };
+        view.draw(at, at, 1);
+        for (const p of snap.players) {
+          const man = breakMan(scene, p)!, a = s.players[p.side][p.slot]!;
+          expect(a.alpha).toBe(man.alpha);
+          if (age === gone) expect(a.alpha).toBe(0);
+          if (!p.binned) continue;
+          const peer = breakMan(scene, { side: p.side, slot: 1 })!;
+          expect(man.alpha).toBe(peer.alpha);
+          expect(man).toMatchObject({ dx: 0, dy: 0, action: null, gait: -1 });
+          expect(pictures.get(`${p.side}/${p.slot}`)).toMatchObject({ action: 'armsFolded', possession: false });
+          const at = binnedSpot(p, snap)!, f = toFieldPt(at), w = s.fieldToWorld(f.fx, f.fy);
+          expect({ x: a.x, y: a.y }).toEqual({ x: Math.round(w.x), y: Math.round(w.y) });
+        }
+      }
+      expect(seat(s, snap, 2)).not.toEqual(seat(s, snap));
+    }
+  });
+
+  it('keeps live bins opaque, freezes on pause, seeks back exactly, and fades still-binned or returned men into the restart', () => {
+    const { s, view, pictures } = make(), live = fixture('play'), whistle = fixture('half-time');
+    const a = s.players.home[0]!, at = seat(s, live), clock = new BreakClock();
+    view.draw(live, live, 1); expect(a.alpha).toBe(1); expect({ x: a.x, y: a.y }).toEqual(at);
+    const held = clock.advance(whistle, (NINES.halfTimeTicks - HT_FADE / 2) * 50, 1, true);
+    view.draw(whistle, whistle, 1, 1, held);
+    const paused = { x: a.x, y: a.y, alpha: a.alpha, picture: pictures.get('home/0') };
+    expect(paused.alpha).toBe(.5);
+    for (let i = 0; i < 3; i++) view.draw(whistle, whistle, 1, 1, clock.advance(whistle, 1000, 1, false));
+    expect({ x: a.x, y: a.y, alpha: a.alpha, picture: pictures.get('home/0') }).toEqual(paused);
+    view.draw(whistle, whistle, 1, 1, NINES.halfTimeTicks); expect(a.alpha).toBe(0);
+    view.draw(live, live, 1); expect(a.alpha).toBe(1);
+    view.draw(whistle, whistle, 1, 1, held);
+    expect({ x: a.x, y: a.y, alpha: a.alpha, picture: pictures.get('home/0') }).toEqual(paused);
+    for (const golden of [false, true]) for (const returned of [false, true]) {
+      for (const age of [0, RESTART_FADE / 2, RESTART_FADE]) {
+        const restart = fixture('restart', age, golden);
+        if (returned) restart.players[0] = { ...restart.players[0]!, binned: false, x: 45, y: 30 };
+        view.draw(whistle, restart, 1);
+        expect(a.alpha).toBe(age / RESTART_FADE);
+        expect(pictures.get('home/0')!.action).toBe(returned ? 'idle' : 'armsFolded');
+        if (!returned) expect({ x: a.x, y: a.y }).toEqual(at);
+      }
+    }
+    view.draw(live, live, 1); expect(a.alpha).toBe(1);
+  });
+
+  it('leaves no lone binned actor after the real seed45 final whistle', () => {
+    // Current main's real witness: #lab?seed=45&final=1, full time 9075,
+    // home7 Xavier Stampton still in the bin. The old #688 witness used seven-minute halves.
+    const sim = new LiveSim(labSheet(DEFAULT_HOME), labSheet(DEFAULT_AWAY), 45, { goldenPoint: true });
+    while (!sim.finished && sim.tick < 12_000) sim.step();
+    const snap = sim.snapshot(), binned = snap.players.filter(p => p.binned);
+    expect(snap.phase?.kind).toBe('full-time');
+    expect(binned.map(p => [p.side, p.slot])).toEqual([['home', 7]]);
+    const { s, view } = make();
+    view.draw(snap, snap, 1);
+    const seats = binned.map(p => ({ x: s.players[p.side][p.slot]!.x, y: s.players[p.side][p.slot]!.y }));
+    view.draw(snap, snap, 1, 1, FT_GONE);
+    for (const p of snap.players) expect(s.players[p.side][p.slot]!.alpha).toBe(0);
+    binned.forEach((p, i) => expect({ x: s.players[p.side][p.slot]!.x, y: s.players[p.side][p.slot]!.y }).toEqual(seats[i]));
+    view.draw(snap, snap, 1);
+    for (const p of snap.players) expect(s.players[p.side][p.slot]!.alpha).toBe(1);
   });
 });
 

@@ -12,6 +12,7 @@ import { BENCH, REF, benchSeat, benchSeated, binSeat, binnedSpot, refCoversCarri
 import { refereeKit, REFEREE_STRIPS } from '../../../src/art/match/bench';
 import { kitContrast, resolveKits } from '../../../src/art/match/kitClash';
 import { kitFromColors } from '../../../src/art/match/kit';
+import { binCardSpot } from '../../../src/scenes/matchOfficials';
 
 const world = (p: { x: number; y: number }) => {
   const f = toFieldPt(p);
@@ -169,5 +170,18 @@ describe('the bench and the sin bin (#642)', () => {
       }
     }
     expect(saw).toEqual({ walking: true, seated: true });
+  });
+
+  it('hides the bin card through the whistle picture and restores it with live play', () => {
+    const binned = { side: 'away' as const, slot: 2, x: 50, y: 69, pose: 'idle', headX: 1, speed: 0, binned: true };
+    const live: Snapshot = { tick: 20, players: [binned], ball: { x: 50, y: 34, lift: 0, holder: null }, label: '', events: [] };
+    const whistle: Snapshot = { ...live, phase: { kind: 'full-time', since: 18 } };
+    const walkOn: Snapshot = { ...live, tick: 40, phase: { kind: 'restart', since: 38 }, clock: { half: 2, seconds: 0, minute: 40, siren: false, finished: false } };
+    const underway: Snapshot = { ...walkOn, tick: 41, clock: { ...walkOn.clock!, seconds: 1 } };
+    expect(binCardSpot(binned, live)).toEqual(binSeat('away'));
+    expect(binCardSpot(binned, whistle)).toBeNull();
+    expect(binCardSpot(binned, walkOn)).toBeNull();
+    expect(binCardSpot(binned, underway)).toEqual(binSeat('away'));
+    expect(binCardSpot(binned, live)).toEqual(binSeat('away'));
   });
 });
