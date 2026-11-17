@@ -3,7 +3,7 @@
 // Waiting neither earns income nor pays salaries, staff wages or upkeep.
 
 import { emptyFinance, getState, setState, type FinanceLine, type Fixture, type GameState, type PlacedFacility } from '../core/state';
-import { bus } from '../core/events';
+import { bus, type Events } from '../core/events';
 import { ECON, SEASON_ROUNDS, WEEKS_PER_SEASON, difficultyMultipliers } from '../config';
 import { sortLadder } from './fixtures';
 import { FACILITY_CATALOG, facilityUpkeep } from '../data/facility';
@@ -244,6 +244,17 @@ export function applyEconomy(state: GameState): GameState {
   return getState();
 }
 
+/** Candidate-only expiry owner. The legacy structural-calendar skip stays in the hook. */
+export function expirePlayerDeals(state: GameState, seasonWeeks = WEEKS_PER_SEASON): { state: GameState; notices: Events['ui:notify'][] } {
+  const next = expireEndedDeals(state.squad, state.freeAgents, state.capAccount, state.season, seasonWeeks);
+  if (next.squad.length === state.squad.length && next.squad.every((p, i) => p === state.squad[i]) && next.capAccount === state.capAccount) return { state, notices: [] };
+  const left = state.squad.filter(player => !next.squad.some(kept => kept.id === player.id));
+  return { state: { ...state, ...next }, notices: left.length ? [{
+    text: left.length === 1 ? `${left[0]!.name} is unsigned. The deal ended with last season.`
+      : `${left.length} players are unsigned. Their deals ended with last season.`, kind: 'info',
+  }] : [] };
+}
+
 /**
  * Install the economy tick hook (order 30). Called explicitly by the orchestrator
  * (main.ts) — importing this module has no side effects. The hook reads/writes
@@ -258,18 +269,10 @@ export function registerEconomySystem(): void {
   registerSeasonHook('cap-season', 4, () => {
     const s = getState();
     if (hasStructuralCalendar(s)) return;
-    const next = expireEndedDeals(s.squad, s.freeAgents, s.capAccount, s.season);
-    if (next.squad.length === s.squad.length && next.squad.every((player, index) => player === s.squad[index]) && next.capAccount === s.capAccount) return;
-    const left = s.squad.filter(player => !next.squad.some(kept => kept.id === player.id));
+    const { state: next, notices } = expirePlayerDeals(s);
+    if (next === s) return;
     setState({ squad: next.squad, freeAgents: next.freeAgents, capAccount: next.capAccount });
-    if (left.length > 0) {
-      bus.emit('ui:notify', {
-        text: left.length === 1
-          ? `${left[0]!.name} is unsigned. The deal ended with last season.`
-          : `${left.length} players are unsigned. Their deals ended with last season.`,
-        kind: 'info',
-      });
-    }
+    for (const notice of notices) bus.emit('ui:notify', notice);
   });
 }
 

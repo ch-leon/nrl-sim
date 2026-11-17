@@ -10,9 +10,9 @@
 // source-vacancy receipt; the current scholarship cannot be sold or released.
 import { admitGeneratedPeople } from './playerCareer';
 import { createCeilings } from './potential';
-import { bus } from '../core/events';
+import { bus, type Events } from '../core/events';
 import { getState, setState } from '../core/state';
-import type { Player } from '../core/state';
+import type { GameState, Player } from '../core/state';
 import { withTrait, withoutTrait } from '../data/traits';
 import { registerSeasonHook } from '../core/time';
 import { SQUAD_CAP, SQUAD_MIN, STAT_MAX, WEEKS_PER_SEASON } from '../config';
@@ -103,41 +103,52 @@ export function callUpJuniors(
   return out;
 }
 
+export type AnnualYouthResult = { ok: true; state: GameState; notices: Events['ui:notify'][] }
+  | { ok: false; state: GameState; notices: []; error: string };
+
+/** Complete annual candidate, including the durable intake receipt. Failed
+ * emergency admission rejects the ordinary batch too. No store or primary dice. */
+export function applyAnnualYouth(state: GameState, seasonWeeks = WEEKS_PER_SEASON): AnnualYouthResult {
+  const season = state.season;
+  if (state.playerPopulation.lastAcademyIntakeSeason >= season) return { ok: true, state, notices: [] };
+  const rng = makeRng((state.rngSeed ^ Math.imul(season, 0x9e3779b1)) >>> 0);
+  const admitted = admitGeneratedPeople(state, generateProspects(rng, academyLevel(state.facilities)));
+  if (!admitted) return { ok: false, state, notices: [], error: 'Academy birth admission failed' };
+  const prospects = admitted.players;
+  // Only genuine losses this rollover can fund minimum-roster scholarships.
+  const expired = state.freeAgents.filter(p => p.clubHistory?.spells.slice(-1)[0]?.clubId === state.clubId
+    && p.clubHistory.spells.slice(-1)[0]?.departure === 'expiry' && p.clubHistory.spells.slice(-1)[0]?.end?.season === season);
+  // Expiry runs before ageing. A player who then retires keeps his truthful
+  // expiry spell in the archive; that same loss still left a registration gap.
+  const retired = state.playerPopulation.retired.filter(p => {
+    const last = p.clubHistory.spells.slice(-1)[0];
+    return p.retiredAt.season === season && last?.clubId === state.clubId && last.end?.season === season
+      && (last.departure === 'retirement' || last.departure === 'expiry');
+  });
+  const used = new Set(state.squad.filter(p => p.emergencyDealEndSeason === season).map(p => p.emergencyForPlayerId));
+  const vacancies = [...new Map([...expired, ...retired].map(p => [p.id, p])).values()]
+    .filter(p => !used.has(p.id)).sort((a, b) => a.id.localeCompare(b.id));
+  let next = { ...state, freeAgents: [...state.freeAgents, ...prospects], playerPopulation: { ...admitted.playerPopulation, lastAcademyIntakeSeason: season } };
+  const generated = callUpJuniors(rng, state.squad, 0, season, seasonWeeks).slice(0, vacancies.length).map((p, i) => ({ ...p,
+    ceilings: Object.fromEntries(shownStats(p.position).map(k => [k, Math.max(p.stats[k], 45)])),
+    emergencyDealEndSeason: season, emergencyForPlayerId: vacancies[i]!.id }));
+  const emergency = admitGeneratedPeople(next, generated, state.clubId, 'emergency');
+  if (!emergency) return { ok: false, state, notices: [], error: 'Emergency scholarship admission failed' };
+  const squad = [...state.squad, ...emergency.players];
+  next = { ...next, squad, playerPopulation: emergency.playerPopulation, capAccount: protectAddedDeals(squad, state.capAccount, season, emergency.players.map(p => p.id)) };
+  return { ok: true, state: next, notices: [{
+    text: `Academy intake: ${prospects.length} prospects (aged ${JUNIOR_MIN_AGE}-${JUNIOR_MAX_AGE}) are in the free-agent pool.`,
+    kind: 'info', quiet: true,
+  }] };
+}
+
 export function registerYouthSystem(): void {
-  registerSeasonHook('youth', 6, ({ season }) => {
-    const state = getState();
-    if (state.playerPopulation.lastAcademyIntakeSeason >= season) return;
-    const rng = makeRng((state.rngSeed ^ Math.imul(season, 0x9e3779b1)) >>> 0);
-    const admitted = admitGeneratedPeople(state, generateProspects(rng, academyLevel(state.facilities)));
-    if (!admitted) return;
-    const prospects = admitted.players;
-    // Only genuine losses this rollover can fund minimum-roster scholarships.
-    const expired = state.freeAgents.filter(p => p.clubHistory?.spells.slice(-1)[0]?.clubId === state.clubId
-      && p.clubHistory.spells.slice(-1)[0]?.departure === 'expiry' && p.clubHistory.spells.slice(-1)[0]?.end?.season === season);
-    // Expiry runs before ageing. A player who then retires keeps his truthful
-    // expiry spell in the archive; that same loss still left a registration gap.
-    const retired = state.playerPopulation.retired.filter(p => {
-      const last = p.clubHistory.spells.slice(-1)[0];
-      return p.retiredAt.season === season && last?.clubId === state.clubId && last.end?.season === season
-        && (last.departure === 'retirement' || last.departure === 'expiry');
-    });
-    const used = new Set(state.squad.filter(p => p.emergencyDealEndSeason === season).map(p => p.emergencyForPlayerId));
-    const vacancies = [...new Map([...expired, ...retired].map(p => [p.id, p])).values()]
-      .filter(p => !used.has(p.id)).sort((a, b) => a.id.localeCompare(b.id));
-    let next = { ...state, freeAgents: [...state.freeAgents, ...prospects], playerPopulation: { ...admitted.playerPopulation, lastAcademyIntakeSeason: season } };
-    const generated = callUpJuniors(rng, state.squad, 0, season, WEEKS_PER_SEASON).slice(0, vacancies.length).map((p, i) => ({ ...p,
-      ceilings: Object.fromEntries(shownStats(p.position).map(k => [k, Math.max(p.stats[k], 45)])),
-      emergencyDealEndSeason: season, emergencyForPlayerId: vacancies[i]!.id }));
-    const emergency = admitGeneratedPeople(next, generated, state.clubId, 'emergency');
-    if (emergency) {
-      const squad = [...state.squad, ...emergency.players];
-      next = { ...next, squad, playerPopulation: emergency.playerPopulation, capAccount: protectAddedDeals(squad, state.capAccount, season, emergency.players.map(p => p.id)) };
-    }
+  registerSeasonHook('youth', 6, () => {
+    const before = getState();
+    const result = applyAnnualYouth(before);
+    if (!result.ok || result.state === before) return;
+    const next = result.state;
     setState({ freeAgents: next.freeAgents, squad: next.squad, playerPopulation: next.playerPopulation, capAccount: next.capAccount });
-    bus.emit('ui:notify', {
-      text: `Academy intake: ${prospects.length} prospects (aged ${JUNIOR_MIN_AGE}-${JUNIOR_MAX_AGE}) are in the free-agent pool.`,
-      kind: 'info',
-      quiet: true, // in the season review (N14)
-    });
+    for (const notice of result.notices) bus.emit('ui:notify', notice);
   });
 }

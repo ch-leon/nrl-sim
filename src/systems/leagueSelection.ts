@@ -2,7 +2,7 @@
 import type { CompetitionInstance } from '../data/competition';
 import type { CompetitionWorldMetadata } from '../data/competitionDivisions';
 import { completedLeagueFinal, leagueTitleEvidence, type LeagueAccess, type LeagueCloseFacts, type LeagueProgress } from '../data/leagueCareer';
-import { commitment, publishedCap, tierCap, tierForRank, type CapAccount, type SignedDeal } from './cap';
+import { commitmentProtection, publishedCap, tierCap, tierForRank, type CapAccount, type SignedDeal } from './cap';
 
 /** Union permanent access only when the close points at a real player-won final. */
 export function leagueAccessFromClose(progress: LeagueProgress, close: LeagueCloseFacts, world: CompetitionWorldMetadata,
@@ -23,12 +23,11 @@ export function leagueAccessFromClose(progress: LeagueProgress, close: LeagueClo
 export { allocateLeagueFields, type LeagueAllocation, type LeagueMovement } from '../data/leagueAllocation';
 export interface CommitmentYear {
   season: number; committed: number; cap: number;
-  /** Stage 2 computes term-bound protection; these amounts are not entry eligibility. */
-  protectionBasis: 'deferred'; protectedAmount: number; unprotectedExcess: number;
+  protectedAmount: number; protectedExcess: number; unprotectedExcess: number;
 }
 
 /** Amounts only: no decision about permitting excess or protecting a new term. */
-export function commitmentYears(players: readonly {deal?: SignedDeal}[], account: CapAccount, firstSeason: number): CommitmentYear[] {
+export function commitmentYears(players: readonly {id?: string; deal?: SignedDeal}[], account: CapAccount, firstSeason: number): CommitmentYear[] {
   if (!Number.isSafeInteger(firstSeason) || firstSeason < 1) throw new Error('Invalid commitment season');
   for (const {deal} of players) if (deal) {
     // Live base agreements start no later than the selected season. Queued
@@ -40,10 +39,8 @@ export function commitmentYears(players: readonly {deal?: SignedDeal}[], account
       || (deal.renewal && deal.renewal.startSeason !== deal.endSeason + 1)) throw new Error('Invalid signed commitment');
   }
   const last = Math.max(firstSeason, ...players.flatMap(p => p.deal ? [p.deal.endSeason, p.deal.renewal?.endSeason ?? 0] : []));
-  const cap = publishedCap(account);
   return Array.from({length: last - firstSeason + 1}, (_, i) => {
-    const season = firstSeason + i; const committed = commitment(players, season);
-    return {season, committed, cap, protectionBasis: 'deferred', protectedAmount: 0, unprotectedExcess: Math.max(0, committed - cap)};
+    return commitmentProtection(players, account, firstSeason + i);
   });
 }
 export interface LeagueCommitmentPreview {
@@ -52,7 +49,7 @@ export interface LeagueCommitmentPreview {
   baseCap: number; purchasedAddition: number; earnedAddition: number; cap: number;
   years: CommitmentYear[]; policyPendingReason?: string;
 }
-export function leagueCommitmentPreview(players: readonly {deal?: SignedDeal}[], account: CapAccount, firstSeason: number, targetRank: number): LeagueCommitmentPreview {
+export function leagueCommitmentPreview(players: readonly {id?: string; deal?: SignedDeal}[], account: CapAccount, firstSeason: number, targetRank: number): LeagueCommitmentPreview {
   const tier = tierForRank(targetRank); const target = {...account, tier}; const cap = publishedCap(target);
   const years = commitmentYears(players, target, firstSeason);
   const baseCap = tierCap(tier); const purchased = publishedCap({...target, earnedBasisPoints: 0});

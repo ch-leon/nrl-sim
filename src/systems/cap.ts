@@ -30,6 +30,10 @@ export interface SignedDeal extends SignedTerm {
   renewal?: SignedTerm;
 }
 
+export interface ProtectedTerm extends SignedTerm {
+  playerId: string;
+}
+
 export interface CapAccount {
   rulesVersion: typeof FINANCE_RULES_VERSION;
   tier: FinanceTier;
@@ -42,6 +46,8 @@ export interface CapAccount {
   receipts: string[];
   /** Deals that may sit above the published cap. New promises cannot use this list. */
   protectedIds: string[];
+  /** Exact agreements; the compatibility IDs never grant protection by themselves. */
+  protectedTerms?: ProtectedTerm[];
 }
 
 export function tierForRank(rank: number): FinanceTier {
@@ -177,47 +183,92 @@ export interface CapTotals {
   signingRoom: number;
 }
 
-export function capTotals(players: readonly Player[], account: CapAccount, season: number): CapTotals {
+type CommittedPlayer = { id?: string; deal?: SignedDeal };
+function signedTerms(player: CommittedPlayer): SignedTerm[] {
+  return player.deal ? [player.deal, ...(player.deal.renewal ? [player.deal.renewal] : [])] : [];
+}
+function sameTerm(a: SignedTerm, b: SignedTerm): boolean {
+  return a.salary === b.salary && a.startSeason === b.startSeason && a.endSeason === b.endSeason;
+}
+function termRecord(playerId: string, term: SignedTerm): ProtectedTerm {
+  return { playerId, salary: term.salary, startSeason: term.startSeason, endSeason: term.endSeason };
+}
+
+/** One year's actual promises. Allowances cover only their matching signed term,
+ * and only excess attributable to protected pay; ordinary pay must fit the cap. */
+export function commitmentProtection(players: readonly CommittedPlayer[], account: CapAccount, season: number) {
   const cap = publishedCap(account);
-  const current = commitment(players, season);
-  const next = commitment(players, season + 1);
-  const protectedPay = players.reduce((sum, player) => (
-    account.protectedIds.includes(player.id) ? sum + activeSalary(player, season) : sum
-  ), 0);
-  const protectedExcess = Math.max(0, protectedPay - cap);
-  return { cap, current, next, protectedExcess, signingRoom: Math.max(0, cap - current) };
+  const committed = commitment(players, season);
+  const protectedAmount = players.reduce((sum, player) => {
+    const term = signedTerms(player).find(t => t.startSeason <= season && t.endSeason >= season);
+    return term && account.protectedTerms?.some(p => p.playerId === player.id && sameTerm(p, term)) ? sum + term.salary : sum;
+  }, 0);
+  const unprotectedExcess = Math.max(0, committed - protectedAmount - cap);
+  const protectedExcess = Math.max(0, committed - cap) - unprotectedExcess;
+  return { season, cap, committed, protectedAmount, protectedExcess, unprotectedExcess };
 }
 
-/**
- * Relegation keeps every signed salary. The excess of those current deals over
- * the new published cap is protected on those player ids. A squad already
- * inside the new cap gets no allowance. Nothing is dropped or repriced.
- */
+export function capTotals(players: readonly Player[], account: CapAccount, season: number): CapTotals {
+  const { cap, committed: current, protectedExcess } = commitmentProtection(players, account, season);
+  return { cap, current, next: commitment(players, season + 1), protectedExcess, signingRoom: Math.max(0, cap - current) };
+}
+
+function withProtection(account: CapAccount, terms: ProtectedTerm[]): CapAccount {
+  const protectedIds = [...new Set(terms.map(t => t.playerId))];
+  // Preserve fresh/legacy empty account bytes when no allowance was created.
+  if (!terms.length && account.protectedTerms === undefined && !account.protectedIds.length) return account;
+  return { ...account, protectedIds, protectedTerms: terms };
+}
+
+/** Explicit involuntary-allocation primitive. Freeze only promises already signed,
+ * including queued terms. Later agreements can never inherit their allowance. */
+export function freezeSignedTerms(players: readonly Player[], account: CapAccount, season: number): CapAccount {
+  return withProtection(account, players.flatMap(p => signedTerms(p).filter(t => t.endSeason >= season).map(t => termRecord(p.id, t))));
+}
+
+/** Relegation never edits cash or salaries. Protect already signed promises only. */
 export function relegateCap(players: readonly Player[], account: CapAccount, season: number, tier: FinanceTier): CapAccount {
-  const next: CapAccount = { ...account, tier, protectedIds: [] };
+  const next = { ...account, tier };
+  // Each signed term spans at most three seasons. Empty gaps carry no bill;
+  // never allocate an array proportional to an absolute future season number.
+  const coveredSeasons = new Set(players.flatMap(p => signedTerms(p).flatMap(t =>
+    [t.startSeason, t.startSeason + 1, t.startSeason + 2].filter(year => year >= season && year <= t.endSeason))));
   const cap = publishedCap(next);
-  const active = players.filter(player => activeSalary(player, season) > 0);
-  const bill = active.reduce((sum, player) => sum + activeSalary(player, season), 0);
-  if (bill <= cap) return next;
-  return { ...next, protectedIds: active.map(player => player.id) };
+  if ([...coveredSeasons].some(year => commitment(players, year) > cap)) {
+    return freezeSignedTerms(players, next, season);
+  }
+  return reconcileProtection(players, next, season);
 }
 
-/** Drop protection once that deal no longer counts. Never adds a player or edits a salary. */
+/** Drop departed, expired or altered terms, retaining already signed future terms. */
 export function reconcileProtection(players: readonly Player[], account: CapAccount, season: number): CapAccount {
-  const protectedIds = account.protectedIds.filter(id => {
-    const player = players.find(candidate => candidate.id === id);
-    return !!player && activeSalary(player, season) > 0;
-  });
-  if (protectedIds.length === account.protectedIds.length && protectedIds.every((id, index) => id === account.protectedIds[index])) return account;
-  return { ...account, protectedIds };
+  const terms = (account.protectedTerms ?? []).filter(term => term.endSeason >= season && players.some(p => p.id === term.playerId && signedTerms(p).some(t => sameTerm(t, term))));
+  const ids = [...new Set(terms.map(t => t.playerId))];
+  if (terms.length === (account.protectedTerms?.length ?? 0) && ids.length === account.protectedIds.length && ids.every((id, i) => id === account.protectedIds[i])) return account;
+  return withProtection(account, terms);
 }
 
-/** Cover emergency call-ups that were required to reach a playable squad. */
+/** Cover the current scholarship agreement, never its later renewal. */
 export function protectAddedDeals(players: readonly Player[], account: CapAccount, season: number, addedIds: readonly string[]): CapAccount {
   if (commitment(players, season) <= publishedCap(account)) return account;
-  const protectedIds = [...account.protectedIds];
-  for (const id of addedIds) if (!protectedIds.includes(id)) protectedIds.push(id);
-  return reconcileProtection(players, { ...account, protectedIds }, season);
+  const reconciled = reconcileProtection(players, account, season);
+  const terms = [...(reconciled.protectedTerms ?? [])];
+  for (const player of players) if (addedIds.includes(player.id)) {
+    const term = signedTerms(player).find(t => t.startSeason <= season && t.endSeason >= season);
+    if (term && !terms.some(t => t.playerId === player.id && sameTerm(t, term))) terms.push(termRecord(player.id, term));
+  }
+  return withProtection(reconciled, terms);
+}
+
+/** v30 observed IDs had no provenance. Freeze only the term visible now; an
+ * already promoted renewal keeps that observed allowance through its own end. */
+export function migrateObservedProtection(players: readonly Player[], account: CapAccount, season: number): CapAccount {
+  if (!account.protectedIds.length) return account;
+  const terms = players.flatMap(player => {
+    const term = signedTerms(player).find(t => t.startSeason <= season && t.endSeason >= season);
+    return account.protectedIds.includes(player.id) && term ? [termRecord(player.id, term)] : [];
+  });
+  return withProtection(account, terms);
 }
 
 /** Unsigned players whose deals ended before `season`. Salaries are not paid out of cash. */
@@ -226,6 +277,7 @@ export function expireEndedDeals(
   freeAgents: readonly Player[],
   account: CapAccount,
   season: number,
+  seasonWeeks = WEEKS_PER_SEASON,
 ): { squad: Player[]; freeAgents: Player[]; capAccount: CapAccount } {
   const keep: Player[] = [];
   const gone: Player[] = [];
@@ -239,7 +291,7 @@ export function expireEndedDeals(
         keep.push({
           ...ordinary,
           deal: { salary: next.salary, startSeason: next.startSeason, endSeason: next.endSeason },
-          contractWeeks: Math.max(1, seasons * WEEKS_PER_SEASON),
+          contractWeeks: Math.max(1, seasons * seasonWeeks),
         });
       } else {
         const { deal: _deal, emergencyDealEndSeason: _end, emergencyForPlayerId: _vacancy, ...rest } = player;

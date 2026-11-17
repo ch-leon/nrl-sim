@@ -91,6 +91,27 @@ function isCapAccount(v: unknown): boolean {
     && strings(v.protectedIds) && unique(v.protectedIds);
 }
 
+/** Current allowances must identify an owned, unchanged agreement exactly. */
+function validProtection(account: Record<string, unknown>, players: unknown, season: number): boolean {
+  const terms = account.protectedTerms;
+  if (terms === undefined) return (account.protectedIds as string[]).length === 0;
+  if (!Array.isArray(terms) || !Array.isArray(players)) return false;
+  const seen = new Set<string>();
+  for (const term of terms) {
+    if (!record(term) || Object.keys(term).sort().join(',') !== 'endSeason,playerId,salary,startSeason'
+      || !text(term.playerId) || !isTerm(term) || (term.endSeason as number) < season) return false;
+    const key = JSON.stringify([term.playerId, term.salary, term.startSeason, term.endSeason]);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    const player = players.find(p => record(p) && p.id === term.playerId);
+    if (!record(player) || !record(player.deal)) return false;
+    const owned = [player.deal, player.deal.renewal].some(t => record(t) && t.salary === term.salary && t.startSeason === term.startSeason && t.endSeason === term.endSeason);
+    if (!owned) return false;
+  }
+  const ids = [...new Set(terms.map(t => (t as Record<string, unknown>).playerId))];
+  return ids.length === (account.protectedIds as string[]).length && ids.every(id => (account.protectedIds as string[]).includes(id as string));
+}
+
 export function isSeasonFinance(v: unknown, version = SAVE_VERSION): v is SeasonFinance {
   // Totals consume every present line, including extra keys preserved by the UI.
   if (!record(v) || !integer(v.season, 1) || !Object.values(v).every(finite)) return false;
@@ -226,9 +247,11 @@ export function validateInput(v: Record<string, unknown>, version: number): stri
     if (!isCapAccount(v.capAccount)) return fail('cap');
     const deals = (list: unknown, required: boolean): boolean => Array.isArray(list) && list.every(p => record(p) && (p.deal === undefined ? !required : isDeal(p.deal)));
     if (!deals(v.squad, true) || !deals(v.freeAgents, false)) return fail('deals');
+    if (version >= 31 && !validProtection(v.capAccount as Record<string, unknown>, v.squad, v.season as number)) return fail('cap protection');
     for (const c of v.league.clubs as Record<string, unknown>[]) {
       if (c.id === 'player' || c.squad === undefined) continue;
       if (!integer(c.cash) || !Number.isSafeInteger(c.cash) || !isCapAccount(c.capAccount) || !deals(c.squad, true)) return fail('rival account');
+      if (version >= 31 && !validProtection(c.capAccount as Record<string, unknown>, c.squad, v.season as number)) return fail('rival protection');
     }
   }
   return null;

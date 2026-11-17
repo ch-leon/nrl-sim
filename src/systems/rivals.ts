@@ -605,7 +605,16 @@ export function rolloverRivals(clubs: readonly RivalClub[], rng: Rng, playerId =
 }
 
 /** State owner assigns durable birth IDs and archives losses in the same commit. */
-export function rolloverRivalPopulation(state: GameState, rng: Rng): GameState {
+export type RivalPopulationResult = { ok: true; state: GameState; notices: []; rngSeed: number }
+  | { ok: false; state: GameState; notices: []; error: string };
+
+/** Candidate API clones the supplied dice. The legacy wrapper below retains its
+ * caller-owned RNG sequencing for fixture construction. */
+export function rolloverRivalPopulationChecked(state: GameState, rng: Rng = makeRng(state.rngSeed)): RivalPopulationResult {
+  return rolloverRivalPopulationCandidate(state, makeRng(rng.state()));
+}
+
+function rolloverRivalPopulationCandidate(state: GameState, rng: Rng, checked = true): RivalPopulationResult {
   const result = rolloverRivals(state.league.clubs, rng, state.clubId, state.season, state.freeAgents);
   let next = { ...state, league: { ...state.league, clubs: result.clubs }, freeAgents: result.freeAgents };
   const beforeIds = new Set(state.league.clubs.flatMap(c => c.squad ?? []).map(p => p.id));
@@ -613,12 +622,20 @@ export function rolloverRivalPopulation(state: GameState, rng: Rng): GameState {
     const births = club.squad?.filter(p => p.emergencyDealEndSeason === state.season && !beforeIds.has(p.id)) ?? [];
     if (!births.length) continue;
     const admitted = admitGeneratedPeople(next, births, club.id, 'emergency');
-    if (!admitted) return state;
+    if (!admitted) return { ok: false, state, notices: [], error: 'Rival emergency birth admission failed' };
     const replacements = new Map(births.map((p, i) => [p.id, admitted.players[i]!]));
     next = { ...next, playerPopulation: admitted.playerPopulation, league: { ...next.league, clubs: next.league.clubs.map(c => c.id !== club.id ? c : { ...c,
-      squad: c.squad!.map(p => replacements.get(p.id) ?? p), capAccount: { ...c.capAccount!, protectedIds: c.capAccount!.protectedIds.map(id => replacements.get(id)?.id ?? id) } }) } };
+      squad: c.squad!.map(p => replacements.get(p.id) ?? p), capAccount: { ...c.capAccount!, protectedIds: c.capAccount!.protectedIds.map(id => replacements.get(id)?.id ?? id),
+        ...(c.capAccount!.protectedTerms ? { protectedTerms: c.capAccount!.protectedTerms.map(t => ({ ...t, playerId: replacements.get(t.playerId)?.id ?? t.playerId })) } : {}) } }) } };
   }
-  return refreshMarketShortlist(intakeUnsignedMarket(archiveRetirees(reconcileShortlist(next), result.retiredPlayers, state)));
+  const market = intakeUnsignedMarket(archiveRetirees(reconcileShortlist(next), result.retiredPlayers, state));
+  if (checked && market.playerPopulation.lastMarketIntakeSeason < state.season) return { ok: false, state, notices: [], error: 'Unsigned market birth admission failed' };
+  return { ok: true, state: refreshMarketShortlist(market), notices: [], rngSeed: rng.state() };
+}
+
+export function rolloverRivalPopulation(state: GameState, rng: Rng): GameState {
+  const result = rolloverRivalPopulationCandidate(state, rng, false);
+  return result.ok ? result.state : state;
 }
 
 // ── Store glue ───────────────────────────────────────────────────────────────

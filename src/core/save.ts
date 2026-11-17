@@ -1,3 +1,4 @@
+import { migrateObservedProtection } from '../systems/cap';
 import { initialPlayerPopulation, installPlayerHistory } from '../systems/playerCareer';
 import { reconcileMatchIncome } from '../systems/matchIncome';
 import { currentRound } from './season';
@@ -323,8 +324,14 @@ export const MIGRATIONS: readonly MigrationStep[] = [
   } },
   // v29 starts receipt-backed income without retroactive claims on v28 results.
   { from: 28, to: 29, run: old => ({ ...old, matchIncome: [] }) },
-  // v31 adds optional progression; no historical titles or entry are inferred.
-  { from: 30, to: 31, run: old => ({ ...old }) },
+  // v31 adds optional progression and snapshots observed protected agreements.
+  // No historical titles, entry or earlier protection provenance are inferred.
+  { from: 30, to: 31, run: old => {
+    const state = old as unknown as GameState;
+    return { ...old, capAccount: migrateObservedProtection(state.squad, state.capAccount, state.season),
+      league: { ...state.league, clubs: state.league.clubs.map(c => c.squad && c.capAccount
+        ? { ...c, capAccount: migrateObservedProtection(c.squad, c.capAccount, state.season) } : c) } };
+  } },
 ];
 
 /** Old string traits → instances; instances already in the new shape pass through. */

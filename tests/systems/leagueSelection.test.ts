@@ -98,11 +98,11 @@ describe('all covered signed obligations', () => {
     const cap = publishedCap(account);
     const players = [{deal: {salary: cap, startSeason: 2, endSeason: 3, renewal: {salary: cap + 1, startSeason: 4, endSeason: 4}}}];
     expect(commitmentYears(players, account, 2)).toEqual([
-      {season: 2, committed: cap, cap, protectionBasis: 'deferred', protectedAmount: 0, unprotectedExcess: 0},
-      {season: 3, committed: cap, cap, protectionBasis: 'deferred', protectedAmount: 0, unprotectedExcess: 0},
-      {season: 4, committed: cap + 1, cap, protectionBasis: 'deferred', protectedAmount: 0, unprotectedExcess: 1},
+      {season: 2, committed: cap, cap, protectedExcess: 0, protectedAmount: 0, unprotectedExcess: 0},
+      {season: 3, committed: cap, cap, protectedExcess: 0, protectedAmount: 0, unprotectedExcess: 0},
+      {season: 4, committed: cap + 1, cap, protectedExcess: 0, protectedAmount: 0, unprotectedExcess: 1},
     ]);
-    expect(commitmentYears([], account, 5)).toEqual([{season: 5, committed: 0, cap, protectionBasis: 'deferred', protectedAmount: 0, unprotectedExcess: 0}]);
+    expect(commitmentYears([], account, 5)).toEqual([{season: 5, committed: 0, cap, protectedExcess: 0, protectedAmount: 0, unprotectedExcess: 0}]);
   });
   it('discloses lower-cap pending policy and preserves purchased/earned basis without granting protection', () => {
     const account = {...freshCapAccount('premier'), purchasedLevel: 2 as const, earnedBasisPoints: 1000 as const, protectedIds: ['p']};
