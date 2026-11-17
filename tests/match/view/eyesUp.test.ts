@@ -100,9 +100,9 @@ describe('eyes on the bomb (#671)', () => {
   it('is unchanged away from the head: same pixels below the chin', () => {
     const look = appearanceFor('p1');
     const kit = kitFromColors(['#1e3a8a', '#ffffff'], 'x');
-    for (const [action, frame, stride] of [['idle', 0, undefined], ['idle', 1, undefined], ['run', 2, 2], ['run', 4, 9]] as const) {
-      const base = drawLivePlayer(look, kit, action, frame, 'front', false, stride, 0, 0);
-      const up = drawLivePlayer(look, kit, action, frame, 'front', false, stride, 0, 2);
+    for (const facing of ['front', 'back', 'side'] as const) for (const [action, frame, stride] of [['idle', 0, undefined], ['idle', 1, undefined], ['run', 2, 2], ['run', 4, 9]] as const) {
+      const base = drawLivePlayer(look, kit, action, frame, facing, false, stride, 0, 0);
+      const up = drawLivePlayer(look, kit, action, frame, facing, false, stride, 0, 2);
       const at = headSpot(action, frame, stride, 0, look.stature);
       let moved = 0;
       for (let y = 0; y < base.h; y++) for (let x = 0; x < base.w; x++) {
@@ -136,7 +136,10 @@ describe('eyes on the bomb (#671)', () => {
     expect(bombs).toBeGreaterThan(50);
     expect(withUp.stats().peak).toBeLessThanOrEqual(withUp.capacity);
     expect(withUp.size).toBeLessThanOrEqual(withUp.capacity);
-    // A few heads, a few frames: nowhere near a second cache's worth.
-    expect(withUp.stats().misses - without.stats().misses).toBeLessThan(600);
+    // A few heads, a few frames: nowhere near a second cache's worth (about 25,000 misses).
+    // Bounded per tick under a bomb, not in total: the cap was 600 when this sample held 284 such
+    // ticks (328 extra misses, 1.2 a tick); the weighted receiver (#649) reshuffled it to 770
+    // (917 extra, 1.2 a tick). Two a tick is the old cap's own rate.
+    expect(withUp.stats().misses - without.stats().misses).toBeLessThan(2 * bombs);
   }, 120_000);
 });

@@ -8,11 +8,40 @@ import { FRAME_CACHE_SIZE, PlayerFrameCache } from '../../../src/scenes/matchPla
 const kit = buildKit(0xccbb22, 0x213344, 'v');
 describe('live match artwork', () => {
   it('supports every live-sim pose with the approved heads and bounded frames', () => {
-    for (const action of [...ANIM_ORDER, 'carry', 'ready'] as const) for (const facing of ['front', 'back'] as const) for (const build of ['lean', 'athletic', 'stocky'] as const) for (let frame = 0; frame < 6; frame++) {
+    for (const action of [...ANIM_ORDER, 'carry', 'ready'] as const) for (const facing of ['front', 'back', 'side'] as const) for (const build of ['lean', 'athletic', 'stocky'] as const) for (let frame = 0; frame < 6; frame++) {
       const p = drawLivePlayer({ ...appearanceFor('same-player'), build }, kit, action, frame, facing, true);
       const bounds = opaqueBounds(p)!;
       expect(bounds.x0).toBeGreaterThan(0); expect(bounds.y0).toBeGreaterThan(0);
       expect(bounds.x1).toBeLessThan(p.w - 1); expect(bounds.y1).toBeLessThan(p.h - 1);
+    }
+  });
+  it('keeps the held ball panel exposed and its anchor fixed through a turn in every kit pattern', () => {
+    const look = appearanceFor('same-player');
+    const panel = (p: ReturnType<typeof drawLivePlayer>) => {
+      const points: string[] = [];
+      for (let y = 0; y < p.h; y++) for (let x = 0; x < p.w; x++) {
+        if ([0xffffff, 0xe7dfc7].includes(p.get(x, y).color)) points.push(`${x}/${y}`);
+      }
+      return points;
+    };
+    for (const build of ['lean', 'athletic', 'stocky'] as const) for (const pattern of ['plain', 'v', 'hoops', 'stripes', 'sleeves'] as const) {
+      const strip = buildKit(0xb73e4e, 0x21394a, pattern);
+      const a = { ...look, build };
+      const front = panel(drawLivePlayer(a, strip, 'carry', 0, 'front', true, 0));
+      expect(front.length).toBeGreaterThanOrEqual(8);
+      for (const facing of ['side', 'back'] as const) expect(panel(drawLivePlayer(a, strip, 'carry', 0, facing, true, 0))).toEqual(front);
+    }
+  });
+  it('lands an aerial catch on the continuing profile carry', () => {
+    const look = appearanceFor('same-player');
+    for (const gait of [-1, 0, 2, 5, 8]) expect(drawLivePlayer(look, kit, 'airCatch', 5, 'side', true, gait).data)
+      .toEqual(drawLivePlayer(look, kit, 'carry', 0, 'side', true, gait).data);
+  });
+  it('retains shared contact, ruck and kick artwork for profile requests', () => {
+    const look = appearanceFor('same-player');
+    for (const action of ['ptb', 'dummyHalf', 'ready', 'tackle', 'tackled', 'down', 'kick', 'grubberKick', 'dropKick'] as const) {
+      for (let f = 0; f < (action === 'kick' || action === 'grubberKick' || action === 'dropKick' ? 5 : 6); f++) expect(drawLivePlayer(look, kit, action, f, 'side', false).data)
+        .toEqual(drawLivePlayer(look, kit, action, f, 'front', false).data);
     }
   });
   it('bounds the frame cache across replacements and frees it between fixtures', () => {
@@ -27,7 +56,7 @@ describe('live match artwork', () => {
   });
   it('ends the catch and pass on the continuing carry and running pixels', () => {
     const look = appearanceFor('same-player');
-    for (const facing of ['front', 'back'] as const) for (const build of ['lean', 'athletic', 'stocky'] as const) for (const gait of [-1, 0, 1, 2, 3, 4, 5]) {
+    for (const facing of ['front', 'back', 'side'] as const) for (const build of ['lean', 'athletic', 'stocky'] as const) for (const gait of [-1, 0, 1, 2, 3, 4, 5]) {
       const a = { ...look, build };
       expect(drawLivePlayer(a, kit, 'catch', 5, facing, true, gait).data)
         .toEqual(drawLivePlayer(a, kit, 'carry', 0, facing, true, gait).data);
@@ -44,7 +73,7 @@ describe('live match artwork', () => {
   it('draws six distinct running and jogging frames, in flight on two of them, and a breathing idle', () => {
     const look = appearanceFor('same-player');
     const soles = (p: ReturnType<typeof drawLivePlayer>) => opaqueBounds(p)!.y1;
-    for (const facing of ['front', 'back'] as const) for (const build of ['lean', 'athletic', 'stocky'] as const) for (const action of ['run', 'carry'] as const) {
+    for (const facing of ['front', 'back', 'side'] as const) for (const build of ['lean', 'athletic', 'stocky'] as const) for (const action of ['run', 'carry'] as const) {
       const a = { ...look, build };
       const ground = soles(drawLivePlayer(a, kit, 'idle', 0, facing, false));
       const run = [0, 1, 2, 3, 4, 5].map(g => drawLivePlayer(a, kit, action, g, facing, action === 'carry', g));
@@ -67,7 +96,7 @@ describe('live match artwork', () => {
   it('runs and stands lower and hunched when tired, and is untouched when fresh (#666)', () => {
     const look = appearanceFor('same-player');
     const top = (p: ReturnType<typeof drawLivePlayer>) => opaqueBounds(p)!.y0;
-    for (const facing of ['front', 'back'] as const) for (const build of ['lean', 'athletic', 'stocky'] as const) {
+    for (const facing of ['front', 'back', 'side'] as const) for (const build of ['lean', 'athletic', 'stocky'] as const) {
       const a = { ...look, build };
       for (const gait of [-1, 0, 1, 2, 3, 4, 5, 8]) {
         const action = gait < 0 ? 'idle' as const : 'run' as const;
@@ -86,7 +115,7 @@ describe('live match artwork', () => {
   it('paints the reactions over standing or running legs, inside the frame (#667)', () => {
     const look = appearanceFor('same-player');
     const legs = (p: ReturnType<typeof drawLivePlayer>) => Array.from(p.data.subarray(p.w * 4 * 36)).join();
-    for (const action of ['handsOnHead', 'handsOnHips', 'armsFolded'] as const) for (const head of HEAD_OPTIONS) for (const facing of ['front', 'back'] as const) for (const build of ['lean', 'athletic', 'stocky'] as const) {
+    for (const action of ['handsOnHead', 'handsOnHips', 'armsFolded'] as const) for (const head of HEAD_OPTIONS) for (const facing of ['front', 'back', 'side'] as const) for (const build of ['lean', 'athletic', 'stocky'] as const) {
       const a = { ...look, head, build };
       for (const stride of [-1, 0, 2, 5, 8]) for (const frame of [0, 1]) {
         const pic = drawLivePlayer(a, kit, action, frame, facing, false, stride);
@@ -101,7 +130,7 @@ describe('live match artwork', () => {
   });
   it('swings long hair a pixel against the stride and leaves the rest of the head alone (#670)', () => {
     const LONG = ['mullet', 'ponytail', 'braids', 'headband'];
-    for (const head of HEAD_OPTIONS) for (const facing of ['front', 'back'] as const) {
+    for (const head of HEAD_OPTIONS) for (const facing of ['front', 'back', 'side'] as const) {
       const a = { ...appearanceFor('same-player'), head };
       const still = drawHead(a, kit, facing).data;
       expect(drawHead(a, kit, facing, 0).data).toEqual(still);
@@ -146,7 +175,7 @@ describe('live match artwork', () => {
   it('fends on the run: the legs keep striding under the straight arm (#644)', () => {
     const look = appearanceFor('same-player');
     const legs = (p: ReturnType<typeof drawLivePlayer>) => Array.from(p.data.subarray(p.w * 4 * 30)).join();
-    for (const facing of ['front', 'back'] as const) for (const f of [2, 4]) {
+    for (const facing of ['front', 'back', 'side'] as const) for (const f of [2, 4]) {
       const strides = [0, 1, 2, 3, 4, 5].map(g => drawLivePlayer(look, kit, 'fend', f, facing, true, g));
       expect(new Set(strides.map(legs)).size).toBe(6);
       // The legs are the run cycle's; the arm is not the carry's tuck.
@@ -158,7 +187,7 @@ describe('live match artwork', () => {
   });
   it('gives the tackle and the beaten man a start, a middle and an end (#644)', () => {
     const look = appearanceFor('same-player');
-    for (const action of ['tackle', 'tackled'] as const) for (const facing of ['front', 'back'] as const) {
+    for (const action of ['tackle', 'tackled'] as const) for (const facing of ['front', 'back', 'side'] as const) {
       const beats = [0, 2, 4].map(f => Array.from(drawLivePlayer(look, kit, action, f, facing, false).data).join());
       expect(new Set(beats).size).toBe(3);
       expect(drawLivePlayer(look, kit, action, 0, facing, false).data).toEqual(drawLivePlayer(look, kit, action, 1, facing, false).data);

@@ -1,6 +1,6 @@
 # Features
 
-Last updated: 2026-11-16
+Last updated: 2026-11-17
 
 What's in the game, with the PR that added each.
 
@@ -68,6 +68,20 @@ What's in the game, with the PR that added each.
 
 - **Played-match income and upfront investments** ([PR #695](https://github.com/ch-leon/nrl-sim/pull/695)): base, venue and small result payments settle once with the fixture; byes and waiting pay nothing. Rival wallets pay for signings/releases. Staff appointment fees and Grandstand 30k/60k/90k purchases are upfront, with refunds based on recorded spend. v29 records kickoff promises and receipts; v28 loads without retroactive income.
 
+- **Whistle cleanup (candidate, not released):** a player still in the sin bin fades from his seat with his side at half-time and full time, and returns with the restart. The fade finishes completely; retained tackle artwork, carrier markers, bin cards and gas/fatigue bars clear for the break picture and restore on replay ([PR #706](https://github.com/ch-leon/nrl-sim/pull/706)).
+
+- **Connected big moments:** kick follow-through lowers into the continuing run or settled stance; aerial landing loads into the same carry pose; try recovery uses palm and knee support before entering celebration. Knee slides settle once, and the empty goal-kick tee stays put as the kicker turns. Uses the connected handling poses with existing event timing and possession ([PR #705](https://github.com/ch-leon/nrl-sim/pull/705)).
+
+- **Connected handling:** the actual receiver prepares his hands during an incoming pass, with his running stride continuing underneath. Pickup finishes in the carry pose, the passer turns through release, and flight sprites meet the painted hand anchors. Nearby defenders can brace as they approach the current carrier. This uses actual flight and possession facts; pre-release calls remain separate gameplay work ([PR #703](https://github.com/ch-leon/nrl-sim/pull/703)).
+
+- **Receiver preparation (candidate, not released):** an ordinary dummy-half commits to his pass four ticks before release. The intended receiver raises an arm while keeping his running stride; a changed instruction or invalid recipient cancels the call. Interceptions and spills still resolve normally ([PR #707](https://github.com/ch-leon/nrl-sim/pull/707)).
+
+- **Contact weight and recovery:** tackle holds use planted support feet, falls land more sharply, and players recover through supported poses. Defenders clear the carrier in sequence and finish at their live positions before the shared tackle artwork hands back to ordinary movement. Existing contact outcomes and ball ownership are preserved ([PR #701](https://github.com/ch-leon/nrl-sim/pull/701)).
+
+- **Everyday match movement:** players lean into starts, take braking steps and plant into turns. Nearby defenders watch the ball while shuffling or backpedalling, including during a pass. Short support/transfer cycles follow distance travelled; the Art Lab Footwork control previews each pose. This builds on the art foundation and preserves match decisions ([PR #699](https://github.com/ch-leon/nrl-sim/pull/699)).
+
+- **Match art foundation:** ordinary movement and handling use a new side profile alongside the front/back views. Editable torso and handling poses give players clearer shoulders, hands and exposed ball panels; the pitch has quieter grass texture and the crowd has softer shirt contrast. Art Lab has a Side view control. Contact, ruck and kick sequences keep their existing directional artwork, and match decisions and player identities are preserved ([PR #697](https://github.com/ch-leon/nrl-sim/pull/697)).
+
 - Signing a player takes the cash for one year's wage (a quarter for an Academy prospect, less a Scout Office discount on the fee only) and room under this season's salary cap. Both are checked before anything changes, so a signing that does not fit is refused and the books stay as they were. A renewal costs nothing, and only in the last season of the current deal: it is priced on his ability now, starts the season after that deal, and has to fit the cap in the season it starts. It does not move the weeks left or the salary already signed. A second renewal in the same season does nothing. Releasing him shows the cash payout and the cap it frees, and is refused when the cash is short. There is no buyer for a sale yet. A rival's later signing is refused when it does not fit the annual cap. Rival wallets are not charged the fee until they have match income ([#558](https://github.com/ch-leon/nrl-sim/issues/558)).
 
 - A new career keeps club cash and the salary cap apart. Player salaries are a season commitment against the cap and no longer come out of the bank each week, and the weekly running costs and facility upkeep do not either. Gates, sponsors and prize money still land as cash and do not change the cap. The Finance screen shows the cash balance, this season's cap and next season's commitments. Careers saved before this change are refused and kept, so they can be exported; they are not converted ([#557](https://github.com/ch-leon/nrl-sim/issues/557)).
@@ -75,6 +89,12 @@ What's in the game, with the PR that added each.
 - Portrait is blocked on a touch phone. The title, menus, grounds and live match all sit under “Turn your phone sideways” until the phone is landscape, and the Android app locks to landscape. The upright Club home sheet is gone. A desktop window is never blocked ([PR #690](https://github.com/ch-leon/nrl-sim/pull/690)).
 
 - The scripted persona playtesters record a weekly money and XP diary and spend stat points in character (optimal, spend-by-focus, random, or half). This is a measurement tool. A normal career still spends points by focus automatically ([PR #691](https://github.com/ch-leon/nrl-sim/pull/691)).
+
+- More options on the last tackle: the kicker weighs kicking, running it and shifting it wide by field position, his side's style, his boot, his outside backs' pace and, in the last minute, the score. Between even sides the last tackle is a kick 62% of the time (was 69%) and a pass 15% (was 8%). Awaiting lab sign-off ([PR](https://github.com/ch-leon/nrl-sim/pull/687), [issue](https://github.com/ch-leon/nrl-sim/issues/650)).
+
+- A carrier at the try line can be held up: any tackler on him there may stop the try, more surely with two or three men on him and less surely against a carrier at full pace. Play restarts with a play-the-ball 10 m out (a handover on the last). It shows as `HELD UP!` with a commentary line, in about one match in five between even sides (20 to 30% of matches across scenarios), for about 0.2 fewer tries a match, measured on top of the last-tackle options. Awaiting lab sign-off ([PR](https://github.com/ch-leon/nrl-sim/pull/686), [issue](https://github.com/ch-leon/nrl-sim/issues/652)).
+
+- The pass finds one of the near-best options by weight, not always the single best man, in open play and from dummy half, so a set's first receiver varies more (the chance two first passes on the same tackle find the same man falls from 32% to 26% between even sides). Step 1 of the attack-shapes work; awaiting lab sign-off ([PR](https://github.com/ch-leon/nrl-sim/pull/684), [issue](https://github.com/ch-leon/nrl-sim/issues/649)).
 
 - Developer settings is in Settings on every build (GitHub Pages, the Android test APK and local dev). Overrides and experiments stay off until you turn one on, so a normal career plays as before. Analytics stays on unless the address has `?labs=1` or a developer override, experiment or playtest career is actually on. Before launch, set `VITE_DEV_SETTINGS=0` or remove Developer settings ([PR #683](https://github.com/ch-leon/nrl-sim/pull/683)).
 
@@ -109,6 +129,7 @@ What's in the game, with the PR that added each.
   - At half-time and full time both sides walk off and fade behind the card, winners celebrating and losers head-down; before golden point each side huddles, then spreads.
   - The men under a bomb tip their heads back to watch it.
   - The referee no longer darts when the ball changes hands.
+  - Follow-ups ([PR](https://github.com/ch-leon/nrl-sim/pull/685), [issue](https://github.com/ch-leon/nrl-sim/issues/682)): the referee glides through the play-the-ball instead of stepping as the ball reaches the dummy half, and the walk-off at half-time stands still under a pause.
 
 - Defenders other than the markers must physically retreat 10m (or to their goal line) after each ruck before they can rejoin the defence, including after quick heels, handovers, sin bins and substitutions ([PR](https://github.com/ch-leon/nrl-sim/pull/677), [evidence](../specs/625-retreat-validation.md)).
 

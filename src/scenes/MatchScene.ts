@@ -224,7 +224,7 @@ export class MatchBall implements PlaybackBall {
     this.gx = x;
     this.gy = y;
     const sy = y - lift + 2;
-    this.sprite.setPosition(x, sy - this.half).setDepth(depth);
+    this.sprite.setPosition(x + (motion?.offsetX ?? 0), sy - this.half + (motion?.offsetY ?? 0)).setDepth(depth);
     this.turn(motion);
     this.vx = motion?.dx ?? 0;
     this.vy = motion?.dy ?? 0;
@@ -1589,7 +1589,7 @@ export class MatchScene extends Phaser.Scene {
     if (!(pb instanceof LivePlayback) || !side || this.planCard) return;
     this.sheet?.close();
     this.toggleTray(false);
-    pb.hold();
+    pb.hold(true);
     if (this.planBtn) this.planBtn.hidden = true;
     const other = side === 'home' ? 'away' : 'home';
     const s = pb.score;
@@ -1608,7 +1608,7 @@ export class MatchScene extends Phaser.Scene {
       onPick: (t) => pb.setTactics(side, t),
       onDone: () => {
         this.planCard = null;
-        pb.release();
+        pb.release(true);
       },
     });
   }

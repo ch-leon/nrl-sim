@@ -3,7 +3,9 @@ import { OUTLINE, type Kit } from '../match/kit';
 
 export const HEAD_OPTIONS = ['short', 'buzz', 'mullet', 'headgear', 'headband', 'curls', 'braids', 'mohawk', 'bald', 'ponytail', 'flatTop'] as const;
 export type Head = typeof HEAD_OPTIONS[number];
-export type Facing = 'front' | 'back';
+// Front/back are the familiar three-quarter turns; side is a right-facing profile.
+// The actor mirrors every view for leftward travel.
+export type Facing = 'front' | 'back' | 'side';
 export interface HeadLook { skin: number; hair: number; head: Head; beard: boolean }
 
 /**
@@ -19,12 +21,18 @@ export function drawHead(a: HeadLook, kit: Kit, facing: Facing, sway = 0): Pixel
   const hairLight = mix(a.hair, 0xf6dcc2, .3);
   const gear = mix(kit.trim, 0xb0cddd, .4);
   const polygon = (points: number[][], colour: number) => b.fillPoly(points.map(([x, y]) => ({ x: x!, y: y! })), colour);
-  const face = [[5, 3], [12, 3], [15, 6], [15, 12], [12, 16], [5, 16], [2, 12], [2, 7]];
+  const profile = facing === 'side';
+  const face = profile
+    ? [[7, 3], [12, 3], [14, 6], [14, 9], [16, 11], [14, 13], [14, 14], [11, 16], [7, 16], [4, 12], [4, 7]]
+    : [[5, 3], [12, 3], [15, 6], [15, 12], [12, 16], [5, 16], [2, 12], [2, 7]];
   polygon(face, skinShade);
   polygon([[6, 4], [12, 4], [14, 6], [14, 12], [11, 15], [6, 14], [4, 11], [4, 7]], a.skin);
   b.fillRect(6, 5, 6, 2, skinLight);
   b.fillRect(2, 9, 2, 3, a.skin); // Far ear.
-  b.fillRect(14, 9, 2, 3, skinLight); // Near ear.
+  if (profile) {
+    b.fillRect(6, 9, 2, 3, skinShade); // Ear behind the single visible eye.
+    b.fillRect(14, 10, 2, 2, skinLight); // Nose breaks the cheek silhouette.
+  } else b.fillRect(14, 9, 2, 3, skinLight); // Near ear.
 
   // Rear hair volume keeps the same outer silhouette; the far eye never leaks through.
   if (facing === 'back' && !['bald', 'buzz', 'mohawk'].includes(a.head)) {
@@ -90,7 +98,15 @@ export function drawHead(a: HeadLook, kit: Kit, facing: Facing, sway = 0): Pixel
     b.line(2, 8, 0, 11 + s, 0xf3e8d2); b.line(2, 8, 2 + Math.min(0, s), 13 + s, 0xf3e8d2);
   }
 
-  if (facing === 'front') {
+  if (profile) {
+    b.fillRect(12, 9, 2, 2, OUTLINE); b.set(12, 9, 0xfff4dc);
+    b.set(15, 11, skinLight);
+    if (a.beard) {
+      polygon([[8, 12], [11, 14], [14, 13], [14, 15], [11, 17], [7, 16], [6, 13]], a.hair);
+      b.fillRect(9, 16, 3, 1, hairShade);
+    }
+    b.fillRect(13, 14, 2, 1, mix(a.skin, 0x4a252b, .65));
+  } else if (facing === 'front') {
     b.fillRect(6, 9, 2, 3, OUTLINE); b.fillRect(11, 9, 2, 3, OUTLINE);
     b.set(6, 9, 0xfff4dc); b.set(11, 9, 0xfff4dc);
     b.set(10, 12, skinLight);

@@ -6,6 +6,7 @@
 // layer, like wrestleBar.ts.
 import type Phaser from 'phaser';
 import type { Side, Snapshot } from '../core/snapshot';
+import { breakKind } from './walkOff';
 
 /** Screen px. */
 export const LEGS_BAR_W = 12;
@@ -37,6 +38,7 @@ export const legsBand = (legs: number, b: LegsBands): LegsBand => (legs >= b.tir
 
 /** A bar for everyone on the field with legs reported (the sin-binned stand on the touchline: none). */
 export function legsMarks(s: Snapshot, b: LegsBands): LegsMark[] {
+  if (breakKind(s)) return [];
   const out: LegsMark[] = [];
   for (const p of s.players) {
     if (p.legs === undefined || p.binned) continue;

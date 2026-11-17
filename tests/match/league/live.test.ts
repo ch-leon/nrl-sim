@@ -246,7 +246,9 @@ describe('LiveSim', () => {
   });
 
   it('every carry ends in a tackle, a break, an error or a kick — and a tackle always plays the ball', () => {
-    const { kinds } = collect(factory(2), 180);
+    // Seeds 2 to 4 (seed 2 alone until the last-tackle call, #650: its first 180 s now hold no kick; 4 added
+    // when held up at the line, #652, on top left 2 and 3 without one).
+    const kinds = [2, 3, 4].flatMap((seed) => collect(factory(seed), 180).kinds);
     const tackles = kinds.filter((k) => k === 'tackle' || k === 'big-hit').length;
     expect(tackles).toBeGreaterThan(20);
     expect(kinds.filter((k) => k === 'break-tackle' || k === 'fend').length).toBeGreaterThan(0);
@@ -291,19 +293,30 @@ describe('LiveSim', () => {
     expect(kinds.filter((k) => k === 'kick' || k === 'handover').length).toBeGreaterThan(2);
   });
 
-  it('the ball is always held, in flight or loose-and-collected within a couple of seconds', () => {
+  it('accounts for every flight deadline and collects a live ground ball within five seconds', () => {
     let looseRun = 0;
     let maxLoose = 0;
+    let flights = 0;
+    let pickups = 0;
     run(factory(7), 180, (s) => {
-      if (s.ball.holder) looseRun = 0;
-      else {
-        looseRun++;
-        maxLoose = Math.max(maxLoose, looseRun);
+      const f = s.ball.flight;
+      if (f) {
+        flights++;
+        expect(s.ball.holder).toBeNull();
+        expect(s.tick).toBeGreaterThanOrEqual(f.startedTick);
+        expect(s.tick).toBeLessThan(f.arrivesTick);
       }
+      if (s.ball.holder && looseRun > 0) pickups++;
+      looseRun = !s.ball.holder && !f && s.phase?.kind === 'play' ? looseRun + 1 : 0;
+      maxLoose = Math.max(maxLoose, looseRun);
       expect(s.ball.lift).toBeGreaterThanOrEqual(0);
       expect(Number.isFinite(s.ball.x) && Number.isFinite(s.ball.y)).toBe(true);
     });
-    expect(maxLoose).toBeLessThan(5 / TICK_S); // a long kick nobody is under + the run to it
+    // #672's seed 7: kick 1298–1357, bounce 1358–1373, ground 1374–1418, pickup 1419.
+    // Its 121 no-holder ticks include two valid flights; only 45 ticks are ground collection.
+    expect(flights).toBeGreaterThan(0);
+    expect(pickups).toBeGreaterThan(0);
+    expect(maxLoose).toBeLessThan(5 / TICK_S);
   });
 
   it('pace is continuous (#85): while the ball is in play nobody stands still for more than a second', () => {

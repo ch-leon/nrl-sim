@@ -1,11 +1,15 @@
 # Roadmap
 
-Last updated: 2026-11-15
+Last updated: 2026-11-17
 
 Status checked against GitHub on 7 Nov 2026. Merged tooling is not the same as a
 live gameplay change; work still open below has not shipped.
 
 ## Now
+
+- **Match presentation — whole-match consistency:** [PR #706](https://github.com/ch-leon/nrl-sim/pull/706), open for review, fixes the binned player and detached overlays at the whistle. Officials, benches and crowd already read consistently with the merged art in the clear/rain/wind audit. Complete-match, interchange and normal/fast-playback evidence is recorded in the PR; real-phone validation remains. Follow the [implementation plan](../plans/2026-11-match-art-and-animation.md).
+
+- **Merged animation foundation:** Leon reviewed the clip and approved the full stack, merged on 17 November 2026 through [PR #705](https://github.com/ch-leon/nrl-sim/pull/705) at `f9f1641`. It includes the art foundation (#697), movement (#699), contact (#701), handling (#703) and connected big moments. The plan records validation and remaining QA/phone performance work. Earlier receiver commitment and pre-release calls remain a separate gameplay change under #672/#649.
 
 - **Match watchability** ([tracker #626](https://github.com/ch-leon/nrl-sim/issues/626)): a review of how the live match looks, moves, sounds and plays, filed as 49 issues. Waves 1 to 3 (phone view, pacing, facing, run cycle, impact, sound, harness telemetry; then commentary, player variety, ball and camera, coach-call payoff, match occasion, frame-time work; then referee and stadium life, a bigger crowd, body language and trait cues) merged in [PR #676](https://github.com/ch-leon/nrl-sim/pull/676); wave 4 (contact variety, the kicker's routine, walk-offs, eyes on the bomb) is in [PR #681](https://github.com/ch-leon/nrl-sim/pull/681). Still owed a phone play-test: frame rate at the new resolution and the new sounds have not been checked on a device. The gameplay issues (attack shapes, last-tackle options, score and clock, held-up) follow, each its own PR measured against the new harness telemetry; an open runner calling for the ball ([#672](https://github.com/ch-leon/nrl-sim/issues/672)) waits on attack shapes, since the sim picks its receiver only as the pass leaves.
 
@@ -52,6 +56,8 @@ live gameplay change; work still open below has not shipped.
   shuts out the wide game; it is not a Speed question.
 
 ## Next
+
+- **Receiver preparation candidate ([PR #707](https://github.com/ch-leon/nrl-sim/pull/707), open for review):** the ordinary dummy-half chooses his intended recipient during the existing hold, so that runner can call before release. This is separate from wider attack shapes (#649) and from the whistle cleanup. The candidate addresses #672 with explicit cancellation and unchanged interception/spill rules; its balance comparison and review must be assessed before merging.
 
 - **Launch plumbing (decided 2 Nov 2026):** hosting, push, analytics, pop-ups, flags, email and privacy. Tracking: [issue #456](https://github.com/ch-leon/nrl-sim/issues/456), which has Leon's setup checklist. Decisions are in [marketing.md](marketing.md#engagement-and-launch-plumbing) ([PR #457](https://github.com/ch-leon/nrl-sim/pull/457), merged 6 Nov). Implementation is still open.
   - **Before launch:** Developer settings is shown in Settings on every build, including GitHub Pages and the Android test APK. Set `VITE_DEV_SETTINGS=0`, or remove Developer settings, before launch. Seeing the page does not change a career.

@@ -948,9 +948,10 @@ async function play() {
     // A replay can end on the half-time boundary before its sheet appears.
     // Re-check each attempt, not just once above: Continue the same real sheet
     // and keep requiring a made, lit set call and the tray's normal dismissal.
-    const { call, empty, refused } = await pollCoachCall({
+    const { call, empty, refused, finished } = await pollCoachCall({
       halfTimePending: async () => !halfTimeDone && (await halfTimeCard().count()) > 0,
       playHalfTime: () => playHalfTime(rec),
+      finished: async () => (await page.locator('.nrl-mo-final').count()) > 0,
       wait,
       attemptCall: () => page.evaluate(() => {
         const coach = document.querySelector('.nrl-mo-bar [data-coach]');
@@ -963,6 +964,7 @@ async function play() {
         return { call: b.getAttribute('data-call'), made: badge?.getAttribute('data-state') === 'made', badge: badge?.textContent?.trim() ?? '', lit: b.hasAttribute('data-called') };
       }),
     });
+    if (finished) return 'no set call before full time';
     const trayClosed = call && await page.waitForSelector('.nrl-mo-calls[hidden]', { state: 'attached', timeout: 3000 }).then(() => true, () => false);
     // Leave the tray shut: open, it hides every speed but the one playing.
     await page.evaluate(() => {

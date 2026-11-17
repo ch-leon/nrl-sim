@@ -5,7 +5,6 @@
 // projected through the same mapping the pitch is drawn with.
 import { toFieldPt } from '../core/field';
 import type { PlayerSnap } from '../core/snapshot';
-import type { Facing } from '../../art/prototype/player';
 import { fieldToGrid } from '../../scenes/matchField';
 import { gridToScreen } from '../../world/iso';
 
@@ -47,8 +46,21 @@ function negative(cur: number, prev: number): boolean {
  * moving left. A pure function of this snapshot and the one before, so pause,
  * seek and replay show the same picture.
  */
-export function screenFacing(p: Pick<PlayerSnap, 'headX' | 'headY'>, previous: Pick<PlayerSnap, 'headX' | 'headY'>, screenDir = 1): { facing: Facing; left: boolean } {
+export function screenFacing(p: Pick<PlayerSnap, 'headX' | 'headY'>, previous: Pick<PlayerSnap, 'headX' | 'headY'>, screenDir = 1): { facing: 'front' | 'back'; left: boolean } {
   const cur = screenHeading(p.headX, p.headY ?? 0, screenDir);
   const prev = screenHeading(previous.headX, previous.headY ?? 0, screenDir);
   return { facing: negative(cur.y, prev.y) ? 'back' : 'front', left: negative(cur.x, prev.x) };
+}
+
+/** Side-on travel within about 17° of horizontal. Both snapshots must agree before
+ * entering a profile: a one-tick heading twitch cannot insert a new painted view.
+ * Front/back remain the turn views, and shared contact/ruck/kick art uses screenFacing.
+ */
+export const SIDE_BAND = 0.3;
+export function screenPlayerFacing(p: Pick<PlayerSnap, 'headX' | 'headY'>, previous: Pick<PlayerSnap, 'headX' | 'headY'>, screenDir = 1): { facing: 'front' | 'back' | 'side'; left: boolean } {
+  const view = screenFacing(p, previous, screenDir);
+  const cur = screenHeading(p.headX, p.headY ?? 0, screenDir);
+  const prev = screenHeading(previous.headX, previous.headY ?? 0, screenDir);
+  const profile = Math.abs(cur.x) > .5 && Math.abs(prev.x) > .5 && Math.max(Math.abs(cur.y), Math.abs(prev.y)) < SIDE_BAND;
+  return { ...view, facing: profile ? 'side' : view.facing };
 }

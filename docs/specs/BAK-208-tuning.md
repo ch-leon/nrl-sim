@@ -18,6 +18,11 @@ result. Keep it in step with the code: when a constant changes, change the row.
 > (`npm run balance -- --list` prints them all with their values). Write a plan with the
 > values to try and run it over many seeds — see `balance/README.md`. The Balance workflow
 > re-measures the standard suite whenever the match code changes on `main`.
+>
+> **Watch it on and off.** The lab takes the same names in its address:
+> `#lab?seed=11&knobs=live.receiverMargin:0` (several with commas) plays that match with
+> those values, shows them beside the styles line and keeps them across a restart. An
+> unknown name is reported and nothing is changed.
 
 ## 1. Clock and field
 
@@ -48,6 +53,7 @@ result. Keep it in step with the code: when a constant changes, change the row.
 | Knob | File | Value | Effect |
 |---|---|---|---|
 | `live.contactTicks` / `live.downTicks` / `live.ptbTicks` / `live.rollTicks` / `live.dhHoldTicks` | `live/knobs.ts` | 9 / 10 / 11 / 4 / 6 | Tackle → down → play-the-ball → heel → dummy-half pause. Sum ≈ 2 s per ruck. `live.contactTicks` / `live.downTicks` now apply to a big hit only; a held tackle is the wrestle and its length sets "down" (§11). |
+| `live.dhDecisionLeadTicks` | `live/restarts.ts` `stepRuck` | 4 ticks (200 ms) | Ordinary dummy-half receiver/dart choice is committed this many ticks before the existing release (clamped to the hold). Leaves the first two pickup ticks; adds no delay. 0 retains the legacy release-time choice and RNG order. Manual inputs and sheets with set plays retain their existing decision path; admitted later controls/calls or an invalid recipient cancel the commitment without a fresh receiver roll. Moves RNG timing and can change match results (#672); recovery engine revision 5. |
 | `live.onsideM` | `live/knobs.ts` | 10 | The defensive line stands 10 m off the ruck. |
 | `live.markerReleaseTicks` | `live/knobs.ts` | 14 | Markers hold at the ruck this long after the heel (× defence preset `markerHold`). Dropped marker tackles from ~50% to ~25%. |
 | `live.markerStandM` / `live.markerGapM` | `live/knobs.ts` | 1.8 / 1.8 m | First marker stands this far toward the defending goal line from the mark; second stands this much farther behind him. Both stay on the mark's lateral coordinate. Each default gap is one body diameter, avoiding separation pushing a settled ruck sideways. See BAK-208 §5.2 and `tests/match/league/markers.test.ts`. |
@@ -98,13 +104,38 @@ Tests: `tests/match/league/live.test.ts` (contest block).
 | Pass vs carry (`live.passBase`) | `live/play.ts` `stepPlay` | 30% + Skill/300 (+ Playmaker, + preset) | When engaged, once per possession. |
 | `rolePreference` | `live/positioning.ts` | halves +1.5 off the ruck (+0.5 else), forwards +1.2 on tackles 1–3, fullback −0.5 (+ preset) | Who the ball goes to. |
 | `live.overlapPrefer` / `live.shiftM` | `live/knobs.ts` | 0.8 / 20 m | Receivers on the side with the numbers. |
+| Weighted receiver margin (`live.receiverMargin`) | `live/knobs.ts`; `pickReceiverWeighted` in `tactics.ts` | 2 (score points; **0 = off**) | How far behind the best pass score an option may be and still get the ball (#649 step 1, BAK-208 §4.2). 0: always the best, and no roll is drawn, every seed as before #649. Higher: more men in the draw (most passes have 2–4 options, the second-best a median 0.9 behind). |
+| Weighted receiver spread (`live.receiverSpread`) | `live/knobs.ts` | 2 | Each option inside the margin is weighted exp(−gap / spread), so the best stays the likeliest. Lower: the best man nearly always; higher: closer to an even pick. |
+| Weighted at the ruck (`live.receiverAtRuck`) | `live/restarts.ts` `stepRuck` | 1 | 1: the dummy-half's pass to the first receiver is weighted too; 0: only the engaged carrier's pass in open play. The first receiver's variety comes almost entirely from this (harness run `weighted-receiver`, §5 note below). |
 | `live.runOnM` | `live/knobs.ts` | 3 m | Receiver runs through the catch point by this much. |
 | `live.ruckAdvanceM` | `live/knobs.ts` | 3 m (capped at `atk` − 3 per role) | Backline comes up as the ball is heeled. |
 | `leadPoint` | `live/contact.ts` | `runOn(v0, ACCEL, vMax, t)`, never ahead of the passer | Where the pass is thrown. |
 | `live.catchReach` | `live/knobs.ts` | 1.8 m | Receiver must be this close at landing. |
 | `live.pressureM` | `live/knobs.ts` | 2 m | A defender this close makes the catch pressured. |
 
-Tests: `tests/match/league/flow.test.ts` (catch speed, loose passes, carry speed).
+Tests: `tests/match/league/flow.test.ts` (catch speed, loose passes, carry speed),
+`tests/match/league/receiver.test.ts` (the weighted receiver: the pick, off equals the
+base commit, one roll per decision while on).
+
+**The weighted receiver (#649 step 1).** One roll per pass decision while
+`live.receiverMargin` > 0, drawn whether or not more than one man is inside the margin:
+the engaged carrier's open-play pass (before the cut-out roll) and, with
+`live.receiverAtRuck` 1, the dummy-half's pass (before the dart roll). The last-tackle
+pass to the kicker, the coach's pass-left/right input, an offload out of contact and a
+set play's scripted passes keep the deterministic best (or the scripted man). Chosen by
+`balance/plans/weighted-receiver.json` (margin 1, 2, 3, 5 at spread 2, 60 seeds even
+and 100 both ways for the six preset rows) and checked on `standard.json` on and off
+(13 November 2026, 2:30 halves). Margin 2 lowers "1st receiver same man %" on even
+sides from 32 to 26 and raises the slots that take a first pass from 4.7 to 5.4 a side:
+slots beyond luck in every standard scenario, same man in most. The six preset rows
+(points share, ±3.2) at margin 2 against off: Grind 49.3 (55.5), Expansive 48.0 (54.0),
+Kick-chase 48.8 (46.0), All-out 51.0 (56.8), Rush 51.2 (51.5), Compressed 44.5 (43.8,
+already under 45 off). Beyond luck in the §7 columns, only: completion in Expansive v
+Grind 78.6 → 74.2% (still in band), tries in Expansive v Balanced 2.1 → 1.6 a
+(5-minute) match, line breaks in Rush v Slide 4.6 → 5.3. Try origins and last-tackle
+plays, pooled over the standard plan, did not move (that is for the shapes, step 2).
+Margin 3 took Expansive v Balanced to 42% and margin 5 Grind and Compressed to 56–57%.
+Weighting only open play (`live.receiverAtRuck` 0) leaves the first receiver as it was.
 
 ## 6. Kicks and catches (§4.3–4.4)
 
@@ -112,9 +143,18 @@ Tests: `tests/match/league/flow.test.ts` (catch speed, loose passes, carry speed
 |---|---|---|---|
 | `KICK_SPEED` / `GRUBBER_SPEED` | `ball.ts` | 20 / 12 m/s | Flight speed; a kick is in the air for max(distance ÷ speed, `hangTime(peak)`). Grubber was 13; 12 gives the chase a step. |
 | `hangTime` | `ball.ts` | 2√(2·peak / 9.81) | Peaks: long 12 (3.1 s), bomb 20 (4 s), cross-field 13, chip 5, kick-off 18 (16 before #397; Short and Long kick-offs 20), grubber 0.9 (ground). |
-| `RUN_CLOSE_M` / `RUN_IT_ZONE_M` / `RUN_IT_CHANCE` / `ATTACK_KICK_M` | `tactics.ts` | 6 / 40 / 20% / 50 m | Run the last inside 6 m; 1 in 5 inside 40; territory beyond 50. |
+| `RUN_CLOSE_M` / `RUN_IT_ZONE_M` / `RUN_IT_CHANCE` / `ATTACK_KICK_M` | `tactics.ts` | 6 / 40 / 20% / 50 m | **Off value of the last-tackle call only** (`lastTackle.on` 0): run the last inside 6 m; 1 in 5 inside 40. With it on, the `lastTackle.*` table below owns the last and these three are not read. `ATTACK_KICK_M` (territory beyond 50) still shapes `kickWeights`, as does the 40 m line. |
+| Last-tackle call on (`lastTackle.on`) | `lastTackle.ts`; `callLastPlay` in `live/play.ts` | 1 (**0 = off**) | #650 part 1. On: the kicker's last-tackle call is one roll among kick / run it / shift it wide by the weights below, then for a kick `chooseKick`'s roll as before; the second-last's early kick is called at the play-the-ball (below). 0: the call as before #650, no new roll, every seed as a65edf9. |
+| Zone weights (`lastTackle.zones.<zone>.kick / run / pass`) | `lastTackle.ts` | own 20 1 / 0.025 / 0.025 · own half 1 / 0.05 / 0.06 · midfield 1 / 0.07 / 0.11 · attacking half 1 / 0.15 / 0.15 · red zone 1 / 0.18 / 0.18 | The share of each is its weight over the three. Raise a run or pass weight for more of it in that zone. The old "1 in 5 inside 40" is folded into the attacking-half and red-zone run weights (the kicker's own run is now about 1 in 8 there, with as many passes wide; darts and a kicker not there to take it add more runs). These are the first cut's run and pass weights × 0.6: at full strength All-out won 55.8% (400 seeds both ways). |
+| `lastTackle.closeM` | `lastTackle.ts` | 6 m | Inside this the kick weight is 0: run or pass only (was `RUN_CLOSE_M`, which ran every one). |
+| Style lean (`lastTackle.presets.<preset>.kick / pass`) | `lastTackle.ts` | Tight 1.15 / 0.8 · Balanced 1 / 1 · Expansive 0.8 / 1.6 · Kick-chase 1.8 / 0.6 · All-out 0.6 / 1.6 | × the zone's kick and pass weights (run ×1). Kick-chase kicks the last most, All-out least; the kick type is still the preset's `kickBias`. |
+| `lastTackle.lateS` / `lastTackle.trailRun` / `lastTackle.leadKick` | `lastTackle.ts` | 60 s / ×2 / ×2 | The score and the clock, read only here (#651 is the match-wide version): in the match's last 60 s (or golden point) a side behind doubles its run and pass weights, a side in front its kick weight. 1 / 1 turns the read off. |
+| `lastTackle.bootPerKicking` / `lastTackle.bigBoot` | `lastTackle.ts` | 0.02 a point over 60 / 0.3 a level | The kicker's boot: × (1 + 0.02·(kicking − 60) + 0.3·Big Boot) on the kick weight (Big Boot I 1, II 1.6, III 2.2). |
+| `lastTackle.pacePerSpeed` | `lastTackle.ts` | 0.03 a point | The edge's pace: × (1 + 0.03·(his centre and wingers' mean Speed − theirs)) on the run and pass weights. |
+| `lastTackle.minMult` | `lastTackle.ts` | 0.25 | No boot, pace or late lean goes below this. |
+| `lastTackle.earlyScale` / `lastTackle.earlyOwn20` / `lastTackle.earlyMax` | `lastTackle.ts`; `callEarlyKick` in `live/play.ts` | 1 / 0.05 / 0.9 | The early kick on the second-last, with the call on. Still the kicker's call when the ball finds him on the second-last (a half is the usual first receiver), with the same rolls in the same order; only the chance changes: the style's `earlyKick` (inside `live.earlyKickM`) or `earlyTerritory` (own 20 / own half) × `earlyScale`, + `earlyOwn20` for a territory kick from the own 20 (so a Balanced, Expansive or All-out side may go early from there too), × the boot lean (and, for territory, × `leadKick` in front late, ÷ `trailRun` behind late), at most `earlyMax`. A first cut that rolled it at the play-the-ball and had the dummy-half find the kicker for it was dropped: it changed who took the first pass on the second-last and Tight won about 58% (harness run `20261113-091649-lt-early`). |
 | `kickWeights(toLine)` | `tactics.ts` | table (§4.4) | Long / bomb / cross-field / grubber / chip weights by zone, × preset `kickBias`. |
-| `live.earlyKickM` + preset `earlyKick` | `live/knobs.ts` / `presets.ts` | 25 m, 35% Balanced | Early grubber / chip on the second-last tackle. |
+| `live.earlyKickM` + preset `earlyKick` | `live/knobs.ts` / `presets.ts` | 25 m, 35% Balanced | Early grubber / chip on the second-last tackle (× `lastTackle.earlyScale` with the call on). |
 | Targets | `tactics.ts` | grubber: inside 16 m, 3 m into the in-goal, else 8 m short; aimed on a winger's lane · chip 10–13 m · cross-field 2 m short, far winger · bomb 22–28 m · long 32 m (× Big Boot) | Where each kick lands. |
 | `live.kickCatchReach` | `live/knobs.ts` | 2.5 m | Whoever is nearest within this takes a kick (nominated man −0.3 m). |
 | `live.dropChance` / `live.dropPressured` | `live/knobs.ts` | 6% / 18% − (Skill − 50)/300 | Spill under a kick. |
@@ -128,7 +168,38 @@ Tests: `tests/match/league/flow.test.ts` (catch speed, loose passes, carry speed
 | `kickoff.short` (#397) | `kickoff.ts` | 12 m past halfway, peak 20 · regather 25% + 0.5%/pt (best of the 3 nearest chasers' Speed − the catcher's Skill), 15–40% | The Short kick-off call. One draw, only when called. A regather is the kicking side's ball near halfway; a miss is theirs about 12 m from halfway. Measured: 25% over 1,000 even kicks (`kickoff.test.ts`). |
 | `kickoff.long` (#397) | `kickoff.ts` | receivers' 5 m line at Skill ≤ 30 to the try line at ≥ 90, peak 20 · dead on the full 10% (3 m past the dead-ball line) · paid off inside 10 m | The Long kick-off call. One draw, only when called. Dead on the full is a penalty to the receivers at halfway (no sin bin). |
 
-Tests: `tests/match/league/kicks.test.ts`.
+Tests: `tests/match/league/kicks.test.ts`, `tests/match/league/lastTackle.test.ts` (the weights, the
+style order, the late read, off equals a65edf9 with its roll count).
+
+**More options on the last (#650 part 1).** One new roll per last-tackle call while
+`lastTackle.on` is 1, drawn by the kicker as he makes it (`callLastPlay`), before
+`chooseKick`'s roll, which follows only for a kick; it replaces the old run-it roll (drawn
+only inside 40 m), so a last tackle beyond 40 m now draws two rolls where it drew one. The
+second-last's early kick keeps its rolls; the own 20 adds one for styles with no
+`earlyTerritory`. Shift it wide is a pass to the widest man behind the kicker within
+`MAX_LAT_M` (+3 m for a wide style) once `live.passCooldown` has run, with no roll of its own
+(the pass's own interception and handling odds as usual); with nobody there he takes it on.
+Measured 13 November 2026, 2:30 halves. The first cut (run and pass weights 1.67× today's) was
+run in `balance/plans/last-tackle.json` (`20261113-094245-last-tackle`); at 100 seeds both ways
+it read Kick-chase 43.8% and All-out 55.0%. At 400 seeds both ways
+(`balance/plans/last-tackle-presets.json`, `20261113-111057-last-tackle-presets`) it was
+Kick-chase 46.1 (off 50.1) and All-out **55.8** (off 52.1), ±1.6. The same run swept the run and pass
+weights: halving them in the own 20, own half and midfield gave 46.2 / 54.1, taking them out
+there 46.5 / 54.9 (Kick-chase did not move: its loss is not the deep running), all of them ×
+0.6 46.9 / 54.4, which is the default. At the default
+(`balance/plans/last-tackle-presets-2.json`, `20261113-112709-last-tackle-presets-2`, 400
+seeds both ways, ±1.6), points share on (off): Tight 52.8 (51.9), Expansive 46.9 (49.6),
+Kick-chase 46.9 (50.1), All-out 54.3 (52.1); and from `standard.json` on
+(`20261113-112350-standard`, 100 seeds both ways, ±3.2) against off
+(`20261113-095318-standard-lt-off`): Rush 49.8 (51.3), Compressed 50.5 (44.5). All six inside
+45–55%. Even 60 v 60 over 200 matches (`last-tackle-presets`, the × 0.6 row): last tackle
+kick 69 → 62%, run 23 → 23%, pass 8 → 15% (kick and pass beyond luck), kicks 6.0 → 5.4 a
+match (beyond luck), completion 74.0 → 73.5%, errors 3.6 → 3.5, tries 1.8 → 1.9. Completion
+stays in its band in every standard scenario (70.4–75.2%). Kick-chase kicks the last most (66%
+with Balanced) and All-out least (56%, pass 19%). The run share hardly moves because most
+last-tackle runs were never the kicker's choice (a dart, or the kicker not there to take it);
+his own runs and the shift wide are new. A first cut that rolled the early kick at the
+play-the-ball (the dummy-half finding the kicker) put Tight near 58% and was dropped.
 
 ## 7. Traits (§3)
 
@@ -241,7 +312,7 @@ Tests: `tests/match/league/presets.test.ts` (direction of each preset, §7 bands
 | `REPLAY_BLOCK_MS` | `replay.ts` | 300 ms | The re-sim on the main thread, when no Worker is there, may block the page this long. The Worker path times only the hand-off. |
 | `POPUP_EDGE` / `POPUP_HALF_W` / `POPUP_LINE_H` / `POPUP_GAP` | `src/match/view/popups.ts` | 8 / 64 / 22 / 2 screen px | A pop-up is clamped inside the camera (N15.6, finding 4). The text hangs up from its anchor; at ×8 a 40 px lift over a man near the top used to leave the screen. Two shouts pulled onto the same edge drop apart by `POPUP_GAP`; a trait line stays on its shout. **Assumed (needs Leon)**: the inset. |
 | `CONTEST_MS` / `DRIVE_DUST_M` / `BREAK_SPAN_M` | `src/match/view/contestLayer.ts` | 800 ms / 1 m / 12 m | A big hit puffs dust a metre behind the carrier (the sim already drove him `LIVE.driveBack`, 2.5 m; the view does not move him again). A line break flashes across 12 m of the defensive line, on the point where it broke, not on the sprinter's feet as he runs off it. It fades over the last 280 ms. **Assumed (needs Leon)**: the look, and that the shove is the big hit rather than a new metre of wrestle. |
-| `REF.offM` / `REF.ballShare` / `REF.farRoomM` / `REF.swingM` | `src/match/view/officials.ts` | 6 m / 0.15 / 6 m / 10 m | The referee (#642), placed by a pure function of the snapshot (`refereeSpot`): 6 m off the play, which is 15% the ball and 85% the middle of all eighteen bodies (so a pass or a kick moves him at a man's pace). He stands on the far side of it (behind the ruck from the camera), and swings round to trail it along the field when play is within 6–16 m of the far touchline. Under 1.6 m a tick over seeds 1 to 24 (worst 1.39 m; it was 2.7 m with 10 of 24 seeds over 1.8 m before #680) except when the ball or the sides are put on a mark. **Assumed (needs Leon)**: where he stands. |
+| `REF.offM` / `REF.ballShare` / `REF.farRoomM` / `REF.swingM` | `src/match/view/officials.ts` | 6 m / 0.15 / 6 m / 10 m | The referee (#642), placed by a pure function of the snapshot (`refereeSpot`): 6 m off the play, which is 15% the ball and 85% the middle of all eighteen bodies (so a pass or a kick moves him at a man's pace). He stands on the far side of it (behind the ruck from the camera), and swings round to trail it along the field when play is within 6–16 m of the far touchline. Under 1.6 m a tick over seeds 1 to 84 (worst 1.37 m, a penalty restart; it was 1.71 m at the heel before #682 and 2.7 m before #680) except when the ball or the sides are put on a mark. Across a heel (#682) the ball he reads slides to the dummy half over the roll, the push off the rolling ball fades out and the push off the dummy half fades in over his hold (`LIVE.rollTicks`, `LIVE.dhHoldTicks`; read off the dummy half's `poseUntil` and `caughtTick`), so the ball's snap onto him does not step his spot. **Assumed (needs Leon)**: where he stands. |
 | `REF.clearM` / `REF.fadeM` | `officials.ts` | 2.5 m / 1.5 m | He is pushed off the carrier to 2.5 m (it was 3.5 m: the ball snaps 2 to 5 m onto a new holder in a tick and the push stepped by up to its peak, which was the dart of #680); the push fades out within 1.5 m of him, so a ball running straight through his spot swings him round it instead of jumping him across (inside 2.5 m on about 2% of carried ticks). Should he stand over the carrier on screen, he is drawn behind him (`refCoversCarrier`, about 4 to 5% of carried ticks). Signals: an arm up while a try is given (a scorer has `tryTick`), pointing during a penalty. His strip is the one of `REFEREE_STRIPS` (lime, pink, cyan, orange, black) furthest from both kits worn (`refereeKit`, `src/art/match/bench.ts`). |
 | `BENCH.seatM` / `BENCH.seats` / `BENCH.fromHalfwayM` / `BENCH.backM` | `officials.ts` | 2.4 m / 5 / 5 m / 2.2 m | The benches on the near touchline, 2.2 m back on the apron: home short of halfway, away past it. The reserves sit on them seen from behind, numbers on their backs; whoever is on the sheet and not on the field sits there, so an interchange changes who is sitting (`benchSeated`). |
 | `BENCH.binGapM` / `BENCH.arrivedM` | `officials.ts` | 3.2 m / 2.5 m | Each side's sin bin, 3.2 m past the outer end of its bench: a yellow box and stool. A binned man walks off as the sim has him; once within 2.5 m of a touchline he is drawn sitting in his side's bin, a yellow card over him (`binnedSpot`; the one line in `liveView.ts`). |
@@ -308,7 +379,26 @@ All in `src/match/league/wrestle.ts`; `live/contact.ts` `stepWrestle` runs it (a
 | `wrestle.quickS` / `wrestle.slowS` | 0.35 s / 1.2 s | … for a wrestle this short / long (linear between). QUICK PTB! / slow line at the ends. |
 | `wrestle.wrestleMaxS` | 3 s | Held at the latest. |
 
-Tests: `tests/match/league/fatigue.test.ts`.
+**Held up over the line** (#652 part 1, BAK-208 §8.1). Also in `wrestle.ts` (`HELD_UP`,
+`heldUpChance`); `live/contact.ts` `holdUp` draws the one roll, from `stepWrestle` (driven
+over in the wrestle) and from `stepPlay`'s try check (`heldUpAtLine`, carried over in open
+play). The roll is drawn only when he is in contact at the line and it is a contest.
+
+| Knob | Value | Effect |
+|---|---|---|
+| `heldUp.on` | 1 (**0 = off**) | 0: no roll, every carrier over the line scores, every seed exactly as before #652. |
+| `heldUp.reachM` | 2.5 m | Carried over in open play: free defenders (not down, not beaten, onside) this close are on him, three at most. Higher: more men on him at the line, more contests. |
+| `heldUp.oneManFight` | 1 | A lone tackler is a contest only when the carrier's drive is at most this (the share of his fight left in the wrestle, or of his top speed in open play). At 1 the threshold is always passed: any lone tackler contests and the odds alone fall with drive (Leon, 13 Nov 2026). 0.35 is the first rule (a lone tackler only on a carrier with little drive left; with `heldUp.base` 0.6, a held-up in 3–8% of matches, measured before #650). At the default, on top of #650 (16 Nov 2026): a held-up in 20–30% of whole matches, 0.2–0.4 a match, tries 1.95 → 1.72 a match across `standard.json`'s rows (BAK-208 §8.1). |
+| `heldUp.base` | 0.75 | Chance two average fresh men hold up an average fresh carrier with no drive left (0.6 under the first rule). |
+| `heldUp.perMan` | 0.15 | Added for a third man, taken off for a lone one. |
+| `heldUp.drive` | 0.3 | Taken off × his drive at the line (0–1). A carrier at full pace with two on him, as quick as the first man: 0.45 (0.47 if he is 1 m/s slower); one man on a carrier at 90% of his top speed: about 0.33. |
+| `heldUp.momentumPerMs` / `heldUp.momentumCap` | 0.02 / ±0.06 | Taken off per m/s he is quicker than the first man (added when slower), capped. |
+| `heldUp.strength` | 0.4 | × (the men's average `holdOf` − his own): Strength /120, each less the legs he has lost (`wrestle.holdLegs`). 20 Strength points ≈ 7%. |
+| `heldUp.wreckingBall` / `heldUp.brickWall` | 0.1 / 0.1 per level multiplier | A Wrecking Ball carrier is held up less; a Brick Wall among two or three men more (named on the pop-up). |
+| `heldUp.max` | 0.8 | Never surer. |
+| `heldUp.restartM` | 10 m | The restart: a play-the-ball this far out, level with where he was held (at least `touch.restartInM` in from touch), by the man held up, the tackle counted; on the last, a handover there (the other side's play-the-ball, a fresh set). |
+
+Tests: `tests/match/league/fatigue.test.ts`, `tests/match/league/heldUp.test.ts`.
 
 ## 12. Balance targets (§7) and how to measure
 

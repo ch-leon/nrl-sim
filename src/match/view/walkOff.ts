@@ -79,7 +79,7 @@ export function breakScene(s: Snapshot, age: number, simAge = age): BreakScene |
   const on = s.players.filter((p) => !p.binned);
   const full = s.phase!.kind === 'full-time';
   const score = s.score ?? { home: 0, away: 0 };
-  for (const p of on) {
+  for (const p of s.players) {
     const man: BreakMan = { side: p.side, slot: p.slot, dx: 0, dy: 0, alpha: 1, action: null, frame: 0, gait: -1, slump: false };
     if (kind === 'walk-off') {
       const won = full && score[p.side] > score[p.side === 'home' ? 'away' : 'home'];
@@ -88,6 +88,8 @@ export function breakScene(s: Snapshot, age: number, simAge = age): BreakScene |
       const fade = full ? FT_FADE : NINES.halfTimeTicks - HT_FADE;
       const gone = full ? FT_GONE : NINES.halfTimeTicks;
       man.alpha = 1 - smooth((t - fade) / (gone - fade));
+      // The bin's own seat/pose remains the officials' picture; he fades there with his side.
+      if (p.binned) { men.push(man); continue; }
       const goal = { x: TUNNEL.x + (p.side === 'home' ? -TUNNEL.sideM : TUNNEL.sideM), y: TUNNEL.y };
       const ux = goal.x - p.x; const uy = goal.y - p.y; const d = Math.hypot(ux, uy);
       const walked = Math.min(d, WALK_M * Math.max(0, t - start));
@@ -105,7 +107,7 @@ export function breakScene(s: Snapshot, age: number, simAge = age): BreakScene |
       const huddle = kind === 'huddle' || kind === 'spread';
       if (kind === 'huddle') man.alpha = 1 - smooth((simAge - (NINES.goldenPointBreakTicks - HUDDLE_FADE)) / HUDDLE_FADE);
       else man.alpha = smooth(t / RESTART_FADE);
-      if (huddle) {
+      if (huddle && !p.binned) {
         const w = kind === 'huddle' ? smooth(t / HUDDLE_IN) : 1 - smooth((t - SPREAD_FROM) / (SPREAD_END - SPREAD_FROM));
         const cap = on.find((q) => q.side === p.side && q.slot === CAPTAIN_SLOT);
         if (cap && cap !== p && w > 0) {
@@ -139,12 +141,16 @@ export class BreakClock {
 
   /**
    * Called once a frame with the snapshot on screen. `stalled`: the sim is not stepping (full time,
-   * or held for a card) though the picture should play on. Resets when the phase changes or the
-   * picture goes back (a seek).
+   * or held for a card) though the picture should play on; a sim held by the player's own pause
+   * is not stalled, so the picture stands still with it. Resets when the phase changes or the
+   * picture jumps (#682): back, or forward by more ticks than this frame's time can have played
+   * (a seek; the clock it carried belonged to the other end of the break).
    */
   advance(cur: Snapshot, deltaMs: number, speed: number, stalled: boolean): number {
     const since = cur.phase?.since ?? -1;
-    if (since !== this.since || cur.tick < this.tick) { this.since = since; this.held = 0; }
+    const played = Math.ceil(Math.max(0, deltaMs) * Math.max(0, speed) / TICK_MS) + 1;
+    const jumped = this.tick >= 0 && (cur.tick < this.tick || cur.tick - this.tick > played);
+    if (since !== this.since || jumped) { this.since = since; this.held = 0; }
     this.tick = cur.tick;
     if (stalled && (cur.phase?.kind === 'half-time' || cur.phase?.kind === 'full-time')) {
       // Enough to see every break picture through; no further, so it never grows without bound.

@@ -6,12 +6,13 @@ import { speedOf } from '../../core/body';
 import { add, dist, dot, norm, sub, type Vec } from '../../core/vec';
 import { angleFrom, stepChance, type Situation } from '../contest';
 import { PLAYERS, ROLES } from '../roles';
-import { MAX_LAT_M, RUN_CLOSE_M, RUN_IT_CHANCE, RUN_IT_ZONE_M, bombTarget, chipTarget, chooseKick, crossFieldTarget, grubberTarget, kickTarget, pickReceiver, type KickChoice } from '../tactics';
+import { MAX_LAT_M, RUN_CLOSE_M, RUN_IT_CHANCE, RUN_IT_ZONE_M, bombTarget, chipTarget, chooseKick, crossFieldTarget, grubberTarget, kickTarget, pickReceiver, pickReceiverWeighted, type KickChoice } from '../tactics';
 import { zoneOf, type AttackPlan } from '../presets';
+import { LAST_TACKLE, chooseLastPlay, earlyKickChance, lastTackleWeights, type LastTackleRead } from '../lastTackle';
 import { FINISHER_M, TRAIT_PTS, announce, bootMult, stepTraits } from '../traits';
 import { traitBoost } from '../../../data/traits';
 import { tiredness } from '../fatigue';
-import { WRESTLE, ruckTicks } from '../wrestle';
+import { HELD_UP, WRESTLE, ruckTicks } from '../wrestle';
 import { GOALS } from '../goals';
 import { PENALTY } from '../penalties';
 import { CALLS } from '../calls';
@@ -36,6 +37,8 @@ export abstract class LivePlay extends LiveKicks {
     // Try: over the line with the ball. With nobody near him he goes round
     // under the posts for the five-point bonus try first (Nines).
     if (inGoal(h.body.pos, this.dir) || (this.dir > 0 ? h.body.pos.x >= FIELD_LENGTH : h.body.pos.x <= 0)) {
+      // Carried over this tick with men on him: they may hold him up (#652).
+      if (HELD_UP.on === 1 && this.overLineAt < 0 && this.carriedOver(h) && this.heldUpAtLine(h)) return;
       if (!this.goForBonus(h)) {
         this.score(h);
         return;
@@ -93,9 +96,9 @@ export abstract class LivePlay extends LiveKicks {
     // A caller whose play broke down has tucked it: no kick or pass of his own either, till he is tackled.
     const own = script === 'fall' && this.tucked !== this.indexOf(h);
 
-    // Last tackle: the kicker makes one call for the play — run it when he's
-    // on the line (or fancies it inside 40), else a kick for the zone — then
-    // runs a few steps and puts boot to ball.
+    // Last tackle: the kicker makes one call for the play — a kick, run it or
+    // shift it wide (#650), weighed by the zone, the style, the score, the clock
+    // and who is on the field — then for a kick runs a few steps and puts boot to ball.
     const toLine = this.toLine(h);
     const plan = this.atkPlan(h);
     const dplan = this.defPlan();
@@ -124,9 +127,18 @@ export abstract class LivePlay extends LiveKicks {
         if (kickEarly) this.kickCall = toLine <= LIVE.earlyKickM ? (this.rng.next() < 0.6 ? 'grubber' : 'chip') : 'long';
         else if (this.lastPlay && called === 'run-it') this.kickCall = 'run';
         else if (this.lastPlay && called === 'bomb') this.kickCall = 'bomb';
-        else this.kickCall = this.lastPlay ? this.callLastPlay(toLine, plan) : this.callEarlyKick(toLine, plan);
+        else this.kickCall = this.lastPlay ? this.callLastPlay(toLine, plan, h) : this.callEarlyKick(toLine, plan, h);
       }
-      if (this.kickCall !== 'run' && (this.tick - h.catchTick >= LIVE.kickRunTicks || nearD < LIVE.engageM)) {
+      // Shift it wide (#650): to the widest man in reach once he can pass; from there it is played on.
+      if (this.kickCall === 'pass') {
+        const to = this.tick - h.catchTick >= LIVE.passCooldown ? this.shiftReceiver(h, plan) : null;
+        if (to) {
+          this.kickCall = 'run';
+          h.decided = true;
+          this.pass(h, to);
+          return;
+        }
+      } else if (this.kickCall !== 'run' && (this.tick - h.catchTick >= LIVE.kickRunTicks || nearD < LIVE.engageM)) {
         this.pendingKick = this.planKick(h, this.kickCall);
         this.lock(h, 'kick', LIVE.kickLockTicks);
         return;
@@ -141,7 +153,11 @@ export abstract class LivePlay extends LiveKicks {
       const maker = traitBoost(h.traits, 'playmaker');
       const reach = MAX_LAT_M + (maker > 0 ? LIVE.cutOutPerLevelM * maker : 0) + (plan.width > 0 ? 3 : 0);
       const cands = this.candidates(h, plan);
-      let receiver = pickReceiver(h.body.pos, this.dir, cands, reach, Math.min(0.6, LIVE.playmakerWidth * maker + plan.width));
+      const widthBias = Math.min(0.6, LIVE.playmakerWidth * maker + plan.width);
+      // The weighted receiver (#649): while it is on, one roll for who he looks for, before the cut-out's.
+      let receiver = LIVE.receiverMargin > 0
+        ? pickReceiverWeighted(h.body.pos, this.dir, cands, reach, widthBias, LIVE.receiverMargin, LIVE.receiverSpread, this.rng.next())
+        : pickReceiver(h.body.pos, this.dir, cands, reach, widthBias);
       // A Playmaker (or an expansive side) sees the overlap: now and then he skips the near man and throws to the widest one he can reach.
       const cutOut = LIVE.cutOutChance * maker + plan.cutOut;
       if (cutOut > 0 && this.rng.next() < cutOut) {
@@ -186,6 +202,12 @@ export abstract class LivePlay extends LiveKicks {
         return;
       }
     }
+  }
+
+  /** He ran it over the line this tick (a step back he was short of it), not caught or picked up already over it. */
+  private carriedOver(h: Player): boolean {
+    const was = h.body.pos.x - h.body.vel.x * TICK_S;
+    return this.dir > 0 ? was < FIELD_LENGTH : was > 0;
   }
 
   private steppedOn(h: Player): number {
@@ -260,22 +282,84 @@ export abstract class LivePlay extends LiveKicks {
   /**
    * With a tackle to spare: in the red zone the kicker sometimes goes early
    * (a grubber or a chip for the chasers); from deep a grinding or kick-chase
-   * side sometimes kicks early for territory.
+   * side sometimes kicks early for territory. The call is his when the ball
+   * finds him on the second-last (a half is the usual first receiver). With
+   * the last-tackle call on (#650) the chances lean on his boot and the late
+   * score (`earlyKickChance`) and any side may go early from its own 20; the
+   * rolls are the same ones, in the same order.
    */
-  private callEarlyKick(toLine: number, plan: AttackPlan): 'run' | KickChoice {
+  private callEarlyKick(toLine: number, plan: AttackPlan, h: Player): 'run' | KickChoice {
+    const on = LAST_TACKLE.on > 0;
     if (toLine <= LIVE.earlyKickM) {
-      if (this.rng.next() >= plan.earlyKick) return 'run';
+      const chance = on ? earlyKickChance(plan.earlyKick, this.lastTackleRead(h, toLine), true) : plan.earlyKick;
+      if (this.rng.next() >= chance) return 'run';
       return this.rng.next() < 0.6 ? 'grubber' : 'chip';
     }
-    if (plan.earlyTerritory <= 0 || this.rng.next() >= plan.earlyTerritory) return 'run';
+    const chance = on ? earlyKickChance(plan.earlyTerritory, this.lastTackleRead(h, toLine), false) : plan.earlyTerritory;
+    if (chance <= 0 || this.rng.next() >= chance) return 'run';
     return (plan.kickBias.bomb ?? 1) > 1 && this.rng.next() < 0.4 ? 'bomb' : 'long';
   }
 
-  /** The kicker's call on the last: run it close in or one time in five inside 40, else the kick for the zone in the side's style. */
-  private callLastPlay(toLine: number, plan: AttackPlan): 'run' | KickChoice {
+  /**
+   * The kicker's call on the last. With `lastTackle.on` (#650): one roll for
+   * kick, run it or shift it wide by `lastTackleWeights` (no kick inside
+   * `lastTackle.closeM`), then for a kick `chooseKick`'s roll as before. Off:
+   * run it close in or one time in five inside 40, else the kick for the zone
+   * in the side's style.
+   */
+  private callLastPlay(toLine: number, plan: AttackPlan, h: Player): 'run' | 'pass' | KickChoice {
+    if (LAST_TACKLE.on > 0) {
+      const play = chooseLastPlay(lastTackleWeights(this.lastTackleRead(h, toLine)), this.rng.next());
+      return play === 'kick' ? chooseKick(toLine, this.rng.next(), plan.kickBias) : play;
+    }
     if (toLine <= RUN_CLOSE_M) return 'run';
     if (toLine <= RUN_IT_ZONE_M && this.rng.next() < RUN_IT_CHANCE) return 'run';
     return chooseKick(toLine, this.rng.next(), plan.kickBias);
+  }
+
+  /** What the kicker reads for the last-tackle call (#650): the zone, the style, the score and the clock, his boot, the edge's pace. */
+  private lastTackleRead(h: Player, toLine: number): LastTackleRead {
+    const opp = other(h.side);
+    const left = this.length.halfMinutes * 60 - this.clockTicks * TICK_S;
+    return {
+      zone: zoneOf(toLine),
+      toLine,
+      preset: this.tactics[h.side].attack,
+      margin: this.points[h.side] - this.points[opp],
+      late: this.golden || (this.half >= this.length.halves && left <= LAST_TACKLE.lateS),
+      kicking: h.stats.kicking,
+      bigBoot: traitBoost(h.traits, 'bigBoot'),
+      paceEdge: this.edgePace(h.side) - this.edgePace(opp),
+    };
+  }
+
+  /** A side's centre and wingers on the field: their mean Speed (0 with none). */
+  private edgePace(side: Player['side']): number {
+    let sum = 0;
+    let n = 0;
+    for (const p of this.side(side)) {
+      const role = ROLES[p.slot]!.name;
+      if (role === 'centre' || role === 'winger') {
+        sum += p.stats.speed;
+        n++;
+      }
+    }
+    return n > 0 ? sum / n : 0;
+  }
+
+  /** Shifting it wide on the last (#650): the widest man behind him in reach, or nobody (no roll). */
+  private shiftReceiver(h: Player, plan: AttackPlan): Player | null {
+    const reach = MAX_LAT_M + (plan.width > 0 ? 3 : 0);
+    let best: Player | null = null;
+    let bestLat = 0;
+    for (const c of this.candidates(h, plan)) {
+      const depth = (h.body.pos.x - c.pos.x) * this.dir;
+      const lat = Math.abs(c.pos.y - h.body.pos.y);
+      if (c.busy || depth < 0.3 || depth > 8 || lat < 2 || lat > reach || lat <= bestLat) continue;
+      best = this.players[c.idx]!;
+      bestLat = lat;
+    }
+    return best;
   }
 
   /** Where the kick goes and who it is for, by type (BAK-208 §4.4). */

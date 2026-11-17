@@ -63,6 +63,8 @@ export const LIVE = {
   kickLockTicks: 8,
   kickContactTicks: 3,
   passPoseTicks: 5,
+  /** Ordinary DH commits this many ticks before his existing release. 0: legacy release-time decision. */
+  dhDecisionLeadTicks: 4,
 
   // Distances (metres)
   /** Who sprints (§8.2): the carrier with no defender this far ahead and this close to his lane; a defender closing the last stretch; support within reach of a break. */
@@ -128,6 +130,15 @@ export const LIVE = {
   dartChance: 0.08,
   /** Engaged carrier's base chance to pass (+ Handling/300, + Playmaker, + preset). */
   passBase: 0.3,
+  /**
+   * The weighted receiver (#649 step 1, BAK-208 §4.2): an option this close to the best pass
+   * score (pickReceiver's units) may get the ball too, weighted exp(−gap / receiverSpread);
+   * one roll per pass decision while on. 0 = off: always the best, no roll.
+   */
+  receiverMargin: 2,
+  receiverSpread: 2,
+  /** …at the play-the-ball too (1), the dummy-half's pass to the first receiver, or only in open play (0). */
+  receiverAtRuck: 1,
 };
 
 /**

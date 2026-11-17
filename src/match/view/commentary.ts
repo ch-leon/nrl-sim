@@ -132,6 +132,8 @@ export const LINES: Readonly<Record<string, readonly string[]>> = {
   // A Wrecking Ball drives on through it (§3); the tackler holds on.
   'tackle:drive': ['{player} hangs on as he drives through.', 'He drives on, but {player} holds him.', '{player} is carried back but holds on.'],
   'big-hit': ['{player} smashes him backwards!', 'Big hit from {player}!', '{player} drives him back in the tackle!', 'Huge shot from {player}!', '{player} flattens him!', 'Bone-rattling hit from {player}!'],
+  // Held up over the line (#652): {player} is the first man in the tackle, {team} the side that held out.
+  'held-up': ['Held up! {player} gets under the ball.', '{player} holds him up — no try!', 'Held up over the line! {team} survive.', "Held up! {player} won't let him ground it."],
   'run-down': ['{player} runs him down!', 'Caught from behind! {player} gets there.', '{player} chases him down from behind.'],
   intercept: ['{player} picks it off!', 'Intercept! {player} reads the pass.', '{player} jumps the pass!', 'Intercept! {player} steals it!', '{player} snatches the pass out of the air!', 'Pass picked off by {player}!'],
   gamble: ['{player} gambles and misses.', '{player} goes for the intercept, no luck.', '{player} jumps out of the line and misses.'],
@@ -224,7 +226,7 @@ const ENDS_KICK: ReadonlySet<string> = new Set([
 
 /** Lines that matter: a try, a sin bin, a clean break, a penalty, a kick that wins it, the whistles. The strip holds one a moment before any other line replaces it. */
 const IMPORTANT_KEYS: ReadonlySet<string> = new Set([
-  'try', 'try:bonus', 'line-break', '40-20', 'field-goal:good', 'penalty', 'penalty:offside', 'penalty:high',
+  'try', 'try:bonus', 'line-break', '40-20', 'field-goal:good', 'held-up', 'penalty', 'penalty:offside', 'penalty:high',
   'sin-bin', 'sin-bin:high', 'sin-bin:professional', 'sin-bin:repeat', 'sin-bin:offside',
   'golden-point', 'half-time:lead', 'half-time:level', 'full-time:win', 'full-time:draw', 'full-time:golden-point',
 ]);

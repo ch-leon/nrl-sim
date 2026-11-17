@@ -152,7 +152,9 @@ matches a row). No star means it may be noise: run more seeds before deciding.
 the average wrestle; **Legs end** each side's average energy at the last 3-minute
 mark. **sinBins** is men sent to the bin a match, **shortMin** the minutes of clock one
 side was alone a man short and **binSwing** the points the full side scored minus the
-short side's over them (so binSwing / shortMin × 5 is the swing per five-minute bin). Every other number (strips, intercepts, quick play-the-balls, wrestles held by
+short side's over them (so binSwing / shortMin × 5 is the swing per five-minute bin). **heldUp** is
+carriers held up over the line a match (#652) and **heldUpMatches** the share of matches (%) with at
+least one, a share like completion (not scaled for a stretch). Every other number (strips, intercepts, quick play-the-balls, wrestles held by
 1/2/3 men, legs at every mark, standard errors) is in `results*.jsonl`.
 
 ## Watchability (#648)
@@ -211,6 +213,23 @@ never as zero: the table is left out, or a dash shown for that row):
   ends; else a **pass** when more than one man holds the ball in the play (counting
   the dummy-half only if he runs it himself, so his heel to the first receiver is
   not a pass; an offload or cut-out is); else a **run**, including a dart.
+- **1st receiver same man % / 1st receiver slots** (#649): the first receiver is the
+  first man of the attacking side, other than the one who had the ball at the ruck, to
+  hold it in the play after a play-the-ball (a dart, a tackle or a turnover before
+  anyone else has it counts nobody; the pass to the kicker on the last tackle counts).
+  **Same man %** is the chance that two first passes on the same tackle of a set, by
+  the same side in the same match, found the same slot: Σ n(n−1) / Σ N(N−1) over
+  slots and tackles, which small samples do not inflate the way the most-used man's
+  share would (a match with no such pair reads 0). **Slots** is how many slots took a
+  first pass, a side's mean. Neither is scaled for a stretch. Results from before
+  #649 show a dash.
+- **2nd-last kicks / Set start m to go** (#650): kicks in play (a `kick` event) made
+  while the set is on its second-last tackle, a match (a count, scaled for a stretch);
+  and the metres to go, to the line the side with the ball attacks, at the first
+  play-the-ball after the ball changes hands (a kick caught, a handover, a turnover,
+  a kick-off taken by the other side), the match's mean (100 is a side's own line, so
+  lower is better field position for whoever won the ball). Results from before #650
+  show a dash.
 
 Origins and last-tackle plays are shares of the tries or last tackles in the row;
 the `*` marks use a standard error that treats each try (or last tackle) as an

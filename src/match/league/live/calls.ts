@@ -222,6 +222,7 @@ export abstract class LiveCalls extends LiveBase {
   call(side: Side, call: CoachCall, play?: PlayId): string | null {
     const why = this.callRefusal(side, call, play);
     if (why) return why;
+    if (side === this.attacking) this.cancelRuckDecision();
     if (call === 'set-play') {
       // Its own channel (#326): neither of the set's calls; it waits for the next play-the-ball or tap.
       this.callSetPlay(side, play!);
