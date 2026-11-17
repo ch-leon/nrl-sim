@@ -103,3 +103,48 @@ it('rollover does not manufacture a replacement for a preexisting voluntary shor
   const next = rolloverRivalPopulation({ ...s, season: 2, freeAgents: [], playerPopulation: { ...s.playerPopulation, shortlistIds: [] }, league: { ...s.league, clubs: s.league.clubs.map(c => c.id === club.id ? short : c) } }, makeRng(9));
   expect(next.league.clubs.find(c => c.id === club.id)!.squad).toHaveLength(12);
 });
+
+import { commitment, publishedCap, salaryDemand } from '../../src/systems/cap';
+import { rolloverRivals } from '../../src/systems/rivals';
+it('reserves every queued rival promise before making discretionary renewals', () => {
+  const s = getState(), club = s.league.clubs.find(c => c.squad)!;
+  const cap = publishedCap(club.capAccount!);
+  const queuedSalary = 100_000;
+  const currentTotal = cap - queuedSalary - 1_000;
+  const current = club.squad!.slice(0, 13).map((p, i) => ({ ...p, age: 25,
+    deal: { salary: Math.floor(currentTotal / 13) + (i === 0 ? currentTotal % 13 : 0), startSeason: 1, endSeason: 3 } }));
+  const higher = { ...club.squad![13]!, age: 25, stats: { speed: 70, strength: 70, stamina: 70, handling: 70, kicking: 70, footyIQ: 70 },
+    deal: { salary: 1_000, startSeason: 1, endSeason: 1 } };
+  const queued = { ...club.squad![14]!, age: 25, stats: { speed: 10, strength: 10, stamina: 10, handling: 10, kicking: 10, footyIQ: 10 },
+    deal: { salary: 1_000, startSeason: 1, endSeason: 1, renewal: { salary: queuedSalary, startSeason: 2, endSeason: 2 } } };
+  expect(salaryDemand(higher)).toBeGreaterThan(1_000);
+  for (const endings of [[higher, queued], [queued, higher]]) {
+    const result = rolloverRivals([{ ...club, cash: 0, squad: [...current, ...endings] }], makeRng(42), s.clubId, 2);
+    const next = result.clubs[0]!;
+    expect(commitment(next.squad!, 2)).toBe(cap - 1_000);
+    expect(next.squad!.find(p => p.id === queued.id)?.deal).toEqual(queued.deal.renewal);
+    expect(next.squad!.some(p => p.id === higher.id)).toBe(false);
+    expect(result.freeAgents.some(p => p.id === higher.id)).toBe(true);
+    expect(next.capAccount!.protectedIds).toEqual([]);
+  }
+});
+it('repairs one expiry vacancy even when that unsigned player retires in the same rollover', () => {
+  clearSeasonHooks(); clearTickHooks();
+  registerEconomySystem(); registerAgingSystem(); registerYouthSystem();
+  const s = getState(), lost = s.squad[0]!;
+  const squad = s.squad.slice(0, 13).map((p, i) => ({ ...p, age: i === 0 ? 37 : 25,
+    deal: { salary: 1_000, startSeason: 1, endSeason: i === 0 ? 1 : 3 } }));
+  loadState({ ...s, squad, preseason: 0, week: WEEKS_PER_SEASON });
+  advanceWeeks(1);
+  const after = getState();
+  const archived = after.playerPopulation.retired.find(p => p.id === lost.id)!;
+  expect(archived.age).toBe(38);
+  expect(archived.clubHistory.spells.slice(-1)[0]).toMatchObject({ departure: 'expiry', end: { season: 2, week: 1 } });
+  expect(after.squad).toHaveLength(13);
+  const scholarship = after.squad.filter(p => p.emergencyForPlayerId === lost.id);
+  expect(scholarship).toHaveLength(1);
+  expect(scholarship[0]!.emergencyDealEndSeason).toBe(2);
+  expect(validatePlayerPopulation(after)).toBeNull();
+  expect(importSave(JSON.stringify(after)).ok).toBe(true);
+  clearSeasonHooks(); clearTickHooks();
+});

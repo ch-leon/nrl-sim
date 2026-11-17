@@ -553,14 +553,18 @@ export function rolloverRivals(clubs: readonly RivalClub[], rng: Rng, playerId =
     retiredPlayers.push(...aged.retired.map(p => installPlayerHistory(p, club.id, { season, week: 1 })));
     const account = club.capAccount ?? freshCapAccount(SINGLE_LEAGUE_TIER);
     const survivors = aged.squad.map(p => ({ ...installPlayerHistory(p, club.id, { season, week: 1 }), injuredWeeks: 0 }));
-    // New ordinary renewals have to fit; existing signed promises remain exact.
-    let kept = survivors.filter(p => p.deal && p.deal.endSeason >= season);
-    const ended = survivors.filter(p => !p.deal || p.deal.endSeason < season).sort((a, b) => overallRating(b) - overallRating(a) || a.id.localeCompare(b.id));
+    // Reserve every signed promise before considering discretionary offers.
+    // Rating order must never let a fresh renewal spend a queued term's room.
+    const promised = survivors.filter(p => p.deal && p.deal.endSeason < season
+      && p.deal.renewal && p.deal.renewal.startSeason <= season && p.deal.renewal.endSeason >= season);
+    const promisedIds = new Set(promised.map(p => p.id));
+    const kept = [...survivors.filter(p => p.deal && p.deal.endSeason >= season),
+      ...expireEndedDeals(promised, [], account, season).squad];
+    const ended = survivors.filter(p => (!p.deal || p.deal.endSeason < season) && !promisedIds.has(p.id))
+      .sort((a, b) => overallRating(b) - overallRating(a) || a.id.localeCompare(b.id));
     const expired: Player[] = [];
     for (const p of ended) {
-      const renewed = p.deal?.renewal && p.deal.renewal.endSeason >= season
-        ? expireEndedDeals([p], [], account, season).squad[0]
-        : capRoomFor(kept, account, season, salaryDemand(p)) ? commitPlayer(p, season, 1) : undefined;
+      const renewed = capRoomFor(kept, account, season, salaryDemand(p)) ? commitPlayer(p, season, 1) : undefined;
       if (renewed) {
         const { emergencyDealEndSeason: _end, emergencyForPlayerId: _source, ...ordinary } = renewed;
         kept.push(ordinary);

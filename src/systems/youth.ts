@@ -114,8 +114,16 @@ export function registerYouthSystem(): void {
     // Only genuine losses this rollover can fund minimum-roster scholarships.
     const expired = state.freeAgents.filter(p => p.clubHistory?.spells.slice(-1)[0]?.clubId === state.clubId
       && p.clubHistory.spells.slice(-1)[0]?.departure === 'expiry' && p.clubHistory.spells.slice(-1)[0]?.end?.season === season);
-    const retired = state.playerPopulation.retired.filter(p => p.retiredAt.season === season && p.clubHistory.spells.slice(-1)[0]?.clubId === state.clubId && p.clubHistory.spells.slice(-1)[0]?.departure === 'retirement');
-    const vacancies = [...expired, ...retired].sort((a, b) => a.id.localeCompare(b.id));
+    // Expiry runs before ageing. A player who then retires keeps his truthful
+    // expiry spell in the archive; that same loss still left a registration gap.
+    const retired = state.playerPopulation.retired.filter(p => {
+      const last = p.clubHistory.spells.slice(-1)[0];
+      return p.retiredAt.season === season && last?.clubId === state.clubId && last.end?.season === season
+        && (last.departure === 'retirement' || last.departure === 'expiry');
+    });
+    const used = new Set(state.squad.filter(p => p.emergencyDealEndSeason === season).map(p => p.emergencyForPlayerId));
+    const vacancies = [...new Map([...expired, ...retired].map(p => [p.id, p])).values()]
+      .filter(p => !used.has(p.id)).sort((a, b) => a.id.localeCompare(b.id));
     let next = { ...state, freeAgents: [...state.freeAgents, ...prospects], playerPopulation: { ...admitted.playerPopulation, lastAcademyIntakeSeason: season } };
     const generated = callUpJuniors(rng, state.squad, 0, season, WEEKS_PER_SEASON).slice(0, vacancies.length).map((p, i) => ({ ...p,
       ceilings: Object.fromEntries(shownStats(p.position).map(k => [k, Math.max(p.stats[k], 45)])),
