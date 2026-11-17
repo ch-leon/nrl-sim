@@ -6,7 +6,7 @@ import { weekHeld } from '../core/time';
 import { activePack } from '../content';
 import { DEFAULT_PLAYER_COLORS } from '../config';
 import { autoPick } from './lineup';
-import { createDivisionWorld, type RegionalCareerProfile } from '../data/divisions';
+import { createDivisionWorld, type RegionalCareerProfile, type DivisionSchedule } from '../data/divisions';
 import { divisionForClub } from '../data/competitionDivisions';
 import { createCompetitionInstance, competitionFixtureId, validateCompetitions, type CompetitionFixture, type CompetitionInstance } from '../data/competition';
 import { activateStructuralCalendar, competitionLadder, hasStructuralCalendar, structuralRuntimeAllowed } from './competitionCalendar';
@@ -25,11 +25,12 @@ export function currentDivisionClubIds(state: GameState, clubId: string = state.
   return state.competitions?.world ? currentDivision(state, clubId)?.instance.entrantIds ?? [] : state.league.clubs.map(c => c.id);
 }
 
-function trialInstances(world: ReturnType<typeof createDivisionWorld>, profile: RegionalCareerProfile, seed: number): CompetitionInstance[] {
+export function buildDivisionTrials(world: DivisionSchedule, profile: RegionalCareerProfile, season: number, seed: number): CompetitionInstance[] {
+  if (!Number.isSafeInteger(season) || season < 1 || !Number.isSafeInteger(seed) || seed < 0 || seed > 0xffffffff || world.instances.some(i => i.season !== season)) throw new Error('Invalid trial season');
   const trials: CompetitionInstance[] = [];
   for (const division of world.divisions) {
     const league = world.instances.find(i => i.id === division.instanceId)!;
-    const ids = makeRng((seed ^ hashString(`${division.id}:trials`)) >>> 0).shuffle(league.entrantIds);
+    const ids = makeRng((seed ^ hashString(`${division.id}:trials${season === 1 ? '' : `:s${season}`}`)) >>> 0).shuffle(league.entrantIds);
     const half = ids.length / 2;
     for (let round = 0; round < 2; round++) for (let i = 0; i < half; i++) {
       const homeId = round === 0 ? ids[i]! : ids[half + i]!;
@@ -39,7 +40,7 @@ function trialInstances(world: ReturnType<typeof createDivisionWorld>, profile: 
         stages: [{ id: 'trial', name: 'Trial', kind: 'exhibition' as const, rounds: 1, slotIds: [profile.trialSlots[round]!] }],
         venues: { rounds: 'home-away' as const, final: 'same-as-rounds' as const } };
       delete definition.standings;
-      const instance = createCompetitionInstance(definition, 1, trials.length, [homeId, awayId]);
+      const instance = createCompetitionInstance(definition, season, trials.length, [homeId, awayId]);
       instance.status = 'scheduled'; instance.stageId = 'trial';
       instance.fixtures = [{ id: competitionFixtureId(instance.id, 0), competitionId: instance.id, stageId: 'trial', round: 1,
         slot: profile.trialSlots[round]!, homeId, awayId, neutral: false, status: 'scheduled' }];
@@ -62,7 +63,7 @@ export function setupStructuralDivisionCareer(profile: RegionalCareerProfile, se
   const leagues = world.instances.map(i => ({ ...i, status: 'scheduled' as const, stageId: 'regular',
     fixtures: i.fixtures.map(f => ({ ...f, status: 'scheduled' as const, slot: i.definition.stages[0]!.slotIds![f.round - 1]! })) }));
   const local = leagues.find(i => i.entrantIds.includes(state.clubId))!;
-  const instances = [...leagues, ...trialInstances(world, profile, seed)];
+  const instances = [...leagues, ...buildDivisionTrials(world, profile, 1, seed)];
   const cup = structuralOpenCup(profile, activePack(), seed, world.clubs.map(c => c.id), state.clubId, options.enterOpenCup);
   if (cup) instances.push(cup);
   const start = world.divisions.find(d => d.id === world.profile.startingDivisionId)!;

@@ -53,6 +53,7 @@ export function structuralPolicyProblem(state: GameState): string | null {
 }
 
 export function structuralAdvanceProblem(state: GameState): string | null {
+  if (state.competitions && 'leagueCareer' in state.competitions) return 'League careers are not enabled yet.';
   if (!hasStructuralCalendar(state)) return null;
   if (!structuralRuntimeAllowed()) return 'Competition prototypes require the isolated developer career.';
   if (state.competitions!.calendar!.status !== 'active') return 'The competition prototype is waiting for next-season setup.';

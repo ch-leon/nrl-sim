@@ -159,10 +159,8 @@ function sortedEntries<T extends { order: number; seq: number }>(m: Map<string, 
 export function advanceWeek(): void {
   if (getState().sacked) return; // game over (#47): the save stays, time stops
   if (held) return; // a held week finishes first (resumeWeek)
-  if (hasStructuralCalendar(getState())) {
-    // A paused setup or unsupported loaded policy cannot consume training or money.
-    if (structuralAdvanceProblem(getState())) return;
-  }
+  // Also refuse inactive or malformed League markers before any interval work.
+  if (structuralAdvanceProblem(getState())) return;
   if (demoStops()) return; // the demo's last week is played (#362; never with the commercial flag off)
   const { week, season } = getState();
   let holding = 0;
@@ -195,6 +193,7 @@ export function weekHeld(): boolean {
  * after the ones that held it, then the week's end, as advanceWeek would have.
  */
 export function resumeWeek(): void {
+  if (getState().competitions && 'leagueCareer' in getState().competitions!) return;
   const h = held;
   if (!h) return;
   if (--h.pending > 0) return;
@@ -292,7 +291,7 @@ function readSeasonOutcome(): { ladderPosition: number; premiership: boolean } {
  * The flag is restored in finally so a thrown hook never leaves it stuck.
  */
 export function advanceWeeks(n: number): void {
-  if (n <= 0) return;
+  if (n <= 0 || structuralAdvanceProblem(getState())) return;
   withFastForward(() => {
     for (let i = 0; i < n; i++) {
       if (demoStops()) return; // once, not once per week left (#362)

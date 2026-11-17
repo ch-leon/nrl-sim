@@ -112,6 +112,8 @@ interface MigrationStep {
 }
 
 export const MIGRATIONS: readonly MigrationStep[] = [
+  // v31 adds optional progression; no historical titles or entry are inferred.
+  { from: 30, to: 31, run: old => ({ ...old }) },
   // v1 → v2: storage moved to save slots; the state shape itself is unchanged.
   { from: 1, to: 2, run: (old) => ({ ...old }) },
   // v2 → v3: settings.difficulty (GitHub #48). Existing saves play as Normal.
@@ -392,6 +394,11 @@ function parseSave(text: string): MigrateResult {
     parsed = JSON.parse(text);
   } catch {
     return { ok: false, outcome: 'unrecoverable', reason: 'corrupt', message: 'File is not valid JSON.' };
+  }
+  if (parsed && typeof parsed === 'object' && 'competitions' in parsed) {
+    const competitions = (parsed as { competitions?: unknown }).competitions;
+    if (competitions && typeof competitions === 'object' && 'leagueCareer' in competitions)
+      return { ok: false, outcome: 'unsupported', reason: 'corrupt', message: 'League careers are not enabled yet. Your original save has been kept.' };
   }
   try { return migrateState(parsed); }
   catch { return { ok: false, outcome: 'unrecoverable', reason: 'corrupt', message: 'Save could not be migrated.' }; }

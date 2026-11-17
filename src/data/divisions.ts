@@ -188,15 +188,40 @@ export function createDivisionWorld(
     if (!players) throw new Error(`Opening squad for ${identity.id} does not fit the ${tier} cap`);
     clubs.push({ id: identity.id, name: identity.name, colors: [...identity.colors], ...(identity.home ? { home: { ...identity.home } } : {}), strength: squadStrength(players), squad: players.map(p => installPlayerHistory(p, identity.id, { season: 1, week: 1 })), cash: AI_OPENING_CASH, capAccount: freshCapAccount(tier) });
   }
+  const schedule = buildDivisionSchedule(profile, pack, 1,
+    Object.fromEntries(profile.divisions.map(d => [d.id, d.entrants.map(e => e.clubId)])), seed);
+  // Preserve the dormant fresh-world public contract: activation owns dates.
+  const instances = schedule.instances.map(i => ({ ...i, status: 'entered' as const, stageId: null,
+    fixtures: i.fixtures.map(({ slot: _slot, ...f }) => ({ ...f, status: 'pending' as const })) }));
+  return { ...schedule, clubs, squad, instances };
+}
+
+
+/** Complete canonical membership, keyed by stable league identity. */
+export type LeagueFields = Readonly<Record<string, readonly string[]>>;
+export type DivisionSchedule = Pick<DivisionWorld, 'profile' | 'divisions' | 'instances'>;
+
+/** Schedule existing identities only. Local seeded streams never consume the career RNG. */
+export function buildDivisionSchedule(profile: RegionalCareerProfile, pack: ContentPack, season: number,
+  fields: LeagueFields, seed: number): DivisionSchedule {
+  const clubIds = new Set(['player', ...profile.clubs.map(c => c.id)]);
+  const chosen = Object.values(fields).flat();
+  if (validateRegionalCareerProfile(profile, pack).length || !integer(season, 1) || !integer(seed, 0, 0xffffffff)
+    || Object.keys(fields).length !== profile.divisions.length || Object.keys(fields).some(id => !profile.divisions.some(d => d.id === id))
+    || profile.divisions.some(d => !Array.isArray(fields[d.id]) || fields[d.id]!.length !== d.entrants.length)
+    || chosen.length !== clubIds.size || new Set(chosen).size !== chosen.length || chosen.some(id => !clubIds.has(id)))
+    throw new Error('Invalid division fields or season');
   const divisions: DivisionMetadata[] = [];
   const instances = [...profile.divisions].sort((a, b) => a.rank - b.rank).map(division => {
-    const instance = createCompetitionInstance(divisionDefinition(profile, division, pack), 1, 0, division.entrants.map(e => e.clubId));
-    instance.tieOrder = makeRng(streamSeed(seed, profile.id, `${division.id}:standings`)).shuffle(instance.entrantIds);
-    instance.fixtures = divisionPairings(instance.entrantIds, division.regularRounds, streamSeed(seed, profile.id, `${division.id}:fixtures`)).map((f, index) => ({
-      ...f, id: competitionFixtureId(instance.id, index), competitionId: instance.id, stageId: 'regular', neutral: false, status: 'pending',
+    const instance = createCompetitionInstance(divisionDefinition(profile, division, pack), season, 0, fields[division.id]!);
+    instance.tieOrder = makeRng(streamSeed(seed, profile.id, `${division.id}:standings${season === 1 ? '' : `:s${season}`}`)).shuffle(instance.entrantIds);
+    instance.status = 'scheduled'; instance.stageId = 'regular';
+    instance.fixtures = divisionPairings(instance.entrantIds, division.regularRounds, streamSeed(seed, profile.id, `${division.id}:fixtures${season === 1 ? '' : `:s${season}`}`)).map((f, index) => ({
+      ...f, id: competitionFixtureId(instance.id, index), competitionId: instance.id, stageId: 'regular', neutral: false,
+      status: 'scheduled', slot: division.regularSlots[f.round - 1]!,
     }));
     divisions.push({ id: division.id, name: division.name, rank: division.rank, ratingMean: division.ratingMean, instanceId: instance.id });
     return instance;
   });
-  return { profile: { id: profile.id, version: profile.version, pack: profile.pack, startingDivisionId: profile.startingDivisionId }, clubs, squad, divisions, instances };
+  return { profile: { id: profile.id, version: profile.version, pack: profile.pack, startingDivisionId: profile.startingDivisionId }, divisions, instances };
 }

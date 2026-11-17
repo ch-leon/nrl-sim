@@ -193,8 +193,9 @@ export function validateInput(v: Record<string, unknown>, version: number): stri
   if (v.competitions !== undefined) {
     if (version < 25) return fail('competition metadata version');
     if (record(v.competitions) && v.competitions.calendar !== undefined && version < 26) return fail('competition calendar version');
+    if (record(v.competitions) && v.competitions.leagueCareer !== undefined && version < 31) return fail('league career version');
     if (record(v.competitions) && v.competitions.world !== undefined && version < 27) return fail('division world version');
-    const problem = validateCompetitions(v.competitions, { pack: v.pack === 'uk' ? 'uk' : 'au', season: v.season as number, week: v.week as number, clubIds: [...clubs] });
+    const problem = validateCompetitions(v.competitions, { pack: v.pack === 'uk' ? 'uk' : 'au', season: v.season as number, week: v.week as number, clubIds: [...clubs], clubId: v.clubId as string });
     if (problem) return fail(problem);
   }
   if ((!record(v.competitions) || v.competitions.calendar === undefined) && !integer(v.week, 1, v.pack === 'uk' ? 25 : 27)) return fail('career fields');
