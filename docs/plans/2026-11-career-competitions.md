@@ -55,8 +55,16 @@ remain reusable foundations. #574 needs its automatic movement scope reconciled
 to unlocks, league selection and rollover; #578 needs opportunity/assignment views;
 #582 needs the revised career proof. #576/#577 retain reward/cap ownership.
 #579–#581 remain relevant, with their order reconciled to the slices above.
-Assignments and bespoke contests need separately scoped issues. **This document
-does not change GitHub issue bodies, create tickets or claim those changes are done.**
+On 17 November the tracker and #574/#578/#582 were reconciled to v0.2. The new
+scoped delivery tickets are [#708 assignments](https://github.com/ch-leon/nrl-sim/issues/708),
+[#710 watched/coached individual challenge](https://github.com/ch-leon/nrl-sim/issues/710)
+and [#711 distinct small-sided event](https://github.com/ch-leon/nrl-sim/issues/711).
+All remain planned work, not shipped behaviour. The first implementation is the
+ready prerequisite [#572 player continuity](https://github.com/ch-leon/nrl-sim/issues/572),
+with a [concrete implementation plan](2026-11-17-player-continuity.md). It is stacked
+on the exact match-income candidate [#695](https://github.com/ch-leon/nrl-sim/pull/695)
+to sequence the shared save/finance files; the upstream PR's review/merge gates
+remain mandatory.
 
 Before dependent implementation, settle AI field allocation for freely chosen
 leagues, calendar phases and durations, lower-league cap commitments, assignment

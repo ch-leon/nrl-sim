@@ -2,6 +2,13 @@
 
 Product design v0.2 · 16 November 2026 (Australia/Brisbane).
 
+Execution update, 17 November: #323/#574/#578/#582 now reflect this design.
+Assignments are [#708](https://github.com/ch-leon/nrl-sim/issues/708), the individual
+challenge is [#710](https://github.com/ch-leon/nrl-sim/issues/710), and the distinct
+small-sided event is [#711](https://github.com/ch-leon/nrl-sim/issues/711).
+Implementation begins with prerequisite #572 player continuity; these tickets
+and the design do not establish runtime completion.
+
 **Status:** Leon approved the direction and requested this specification. This
 records that agreement; event names, numerical balance and the delivery slices
 below are working designs, not separately approved implementation details or
@@ -338,8 +345,9 @@ current approved contracts when implementing; older audit tables are not current
 ## 11. Delivery slices and acceptance
 
 Deliver as focused issues/PRs under #323, with the existing different-tool checker,
-CI/WebKit, QA and phone playtest process. This revision proposes the sequence; it
-does not create/rewrite GitHub issues, assign owners or claim a delivery date.
+CI/WebKit, QA and phone playtest process. The sequence below was proposed in this
+revision and mapped to the tickets in the 17 November execution update above.
+No delivery dates or owners are invented.
 
 | Slice | Scope | Done when |
 | --- | --- | --- |
@@ -354,8 +362,8 @@ Existing #570/#571/#573/#575 foundations are reusable, not grounds to restart th
 project. Re-scope #574 from forced movement to unlock/selection/rollover;
 extend #578 presentation and #582 validation. #576/#577 retain reward/finance
 ownership; #579–#581 remain relevant content with sequencing to be reconciled.
-Assignments and bespoke event engines require new scoped delivery work; do not
-silently absorb them into already-reviewed foundation tickets.
+Assignments and bespoke event engines have their own scoped delivery work in
+#708/#710/#711; do not silently absorb them into already-reviewed foundation tickets.
 
 For every slice, verify appropriate state transitions and measured player outcomes:
 
