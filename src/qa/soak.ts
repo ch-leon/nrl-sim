@@ -1,3 +1,4 @@
+import { discoveredFreeAgents } from '../systems/playerCareer';
 // src/qa/soak.ts — headless multi-season soak of the club/league systems (QA pass).
 // Plays whole seasons through the real tick pipeline (every system main.ts
 // registers, with matches auto-simmed) and checks invariants every week: no NaN
@@ -16,7 +17,8 @@ import { EVENTS, GRID_H, GRID_W, ON_FIELD, SEASON_ROUNDS, SQUAD_CAP, WEEKS_PER_S
 import { finalsSeeds, initLeague, isFinalsRound, registerFixturesSystem } from '../systems/fixtures';
 import { registerUnlockSystem, isFacilityOpen } from '../systems/unlocks';
 import { isTrainingFocus, registerTrainingSystem, setSpendMode, setTrainingFocus, weakestStat } from '../systems/training';
-import { hasStaff, hireStaff, staffWage, type HireRole } from '../systems/staff';
+import { hasStaff, hireStaff, type HireRole } from '../systems/staff';
+import { STAFF_APPOINTMENT_PRICES } from '../data/financeRules';
 import { classifyReason, homeGate, registerEconomySystem, registerFinanceSystem, weeklyIncome, weeklyOverhead, weeklyUpkeep, weeklyWages } from '../systems/economy';
 import { registerFreeAgencySystem, signPlayer, signingFee } from '../systems/freeagency';
 import { capRoomFor, salaryDemand } from '../systems/cap';
@@ -40,7 +42,8 @@ import { FORTY_TWENTY_ENABLED } from '../match/league/touch';
 import { overallRating } from '../data/player';
 import { cardById } from '../data/events';
 import { FACILITY_CATALOG, upgradeCost, type FacilityDefId } from '../data/facility';
-import { addFacility, spendMoney } from '../data/club';
+import { upgradeFacility } from '../world/placement';
+import { addFacility } from '../data/club';
 import { personaById, type PersonaConfig } from './personas';
 import { createPersonaManager } from './personas/policy';
 import { observeCareer, careerRoundTrip, emptyCareerMetrics, type CareerMetrics, type SaveHealth } from './personas/metrics';
@@ -161,7 +164,7 @@ export interface SeasonSample extends GapSample {
   // bestNine / rivalMean / rivalRange (GapSample), madeFinals and the near-rival
   // record are taken at the end of the regular season: the squad that produced
   // the record, before the rollover.
-  /** Free agents the managed manager signed this season (0 when idle). */
+  /** Players recruited from the unsigned market or rival offers this season (0 when idle). */
   signings: number;
   /** Total fees paid for those signings. */
   signingFees: number;
@@ -479,7 +482,7 @@ interface Signed { count: number; fees: number; overall: number }
 
 /** The managed manager's policy (#138). Assumed (needs Leon): a plain, sensible club. */
 export const MANAGED = {
-  /** Facilities it builds, in order, while the reserve and recurring costs remain affordable. */
+  /** Facilities it builds, in order, when their upfront cost leaves the cash reserve. */
   BUILDS: ['trainingPaddock', 'teamGym'] as readonly FacilityDefId[],
   BUILD_RESERVE: 40_000,
   /** Never let the squad fall below this many players. */
@@ -493,7 +496,7 @@ export const MANAGED = {
   BURN_ALLOWED: 3_000,
   /** Build or upgrade the Grandstand when the next home gate is sold out and this much is left after paying (#169). */
   STAND_RESERVE: 60_000,
-  /** Hire staff (N14.5) only with nonnegative projected weekly net and this much after a season of wages. */
+  /** Hire staff when their one-off appointment fee leaves this cash reserve. */
   STAFF_RESERVE: 40_000,
 } as const;
 
@@ -532,12 +535,11 @@ export function managedEventChoice(state: GameState, event: PendingEvent): numbe
         candidate = { ...candidate, squad: candidate.squad.map(p => p.id === event.subjectId ? { ...p, wage: Math.round(p.wage * (1 + effect.pct)) } : p) };
         wageRise += Math.max(0, weeklyWages(candidate) - before);
       } else if (effect.kind === 'signSubject') {
-        const signed = signRivalPlayer(candidate, event.rivalId, event.subjectId, event.fee ?? 0);
+        if (event.fee === undefined) return false;
+        const signed = signRivalPlayer(candidate, event.rivalId, event.subjectId, event.fee);
         if (typeof signed === 'string') return false;
-        const added = signed.squad.find(p => p.id === event.subjectId);
-        if (!added?.deal || !capRoomFor(candidate.squad, candidate.capAccount, candidate.season, added.deal.salary)) return false;
         signs = true;
-        candidate = { ...signed, money: signed.money - (event.fee ?? 0) };
+        candidate = signed; // Shared transfer projection already includes the one fee and every covered cap season.
       }
       // Other effects do not guarantee new financing costs in the current deck.
       // In particular, don't roll chances or count conditional/weekly future receipts.
@@ -550,15 +552,6 @@ export function managedEventChoice(state: GameState, event: PendingEvent): numbe
   return index === undefined || index < 0 ? undefined : index;
 }
 
-/** Check the candidate facility's real upkeep and projected gates before adding a recurring bill. */
-function canCarryFacility(s: GameState, defId: FacilityDefId, level: 1 | 2 | 3 = 1): boolean {
-  const existing = s.facilities.find((facility) => facility.defId === defId);
-  const facilities = existing
-    ? s.facilities.map((facility) => facility === existing ? { ...facility, level } : facility)
-    : [...s.facilities, { id: `managed-budget-${defId}`, defId, level, x: 0, y: 0 }];
-  return weeklyNet({ ...s, facilities }) >= 0;
-}
-
 /** Seats for a sold-out crowd (#169): a Grandstand, then its upgrades, while the money allows. */
 function seatTheCrowd(): void {
   const s = getState();
@@ -567,12 +560,12 @@ function seatTheCrowd(): void {
   const def = FACILITY_CATALOG.grandstand;
   const stand = s.facilities.find((f) => f.defId === 'grandstand');
   if (!stand) {
-    if (s.money - def.cost >= MANAGED.STAND_RESERVE && canCarryFacility(s, 'grandstand')) buildFirstFree('grandstand');
+    if (s.money - def.cost >= MANAGED.STAND_RESERVE) buildFirstFree('grandstand');
   } else if (stand.level < 3) {
     const level = (stand.level + 1) as 2 | 3;
     const cost = upgradeCost(def, level);
-    if (s.money - cost < MANAGED.STAND_RESERVE || !canCarryFacility(s, 'grandstand', level) || !spendMoney(cost, 'upgrade:grandstand')) return;
-    setState({ facilities: getState().facilities.map((f) => (f.id === stand.id ? { ...f, level } : f)) });
+    if (s.money - cost < MANAGED.STAND_RESERVE) return;
+    upgradeFacility(stand.id);
   }
 }
 
@@ -594,8 +587,7 @@ function buildFirstFree(defId: FacilityDefId): boolean {
     for (let x = 0; x + def.footprint.w <= GRID_W; x++) {
       if (!fits(x, y)) continue;
       // The same order as placement.ts: place, then pay.
-      if (!addFacility(defId, x, y, 1)) return false;
-      spendMoney(def.cost, `build:${defId}`);
+      if (!addFacility(defId, x, y, 1, def.cost)) return false;
       return true;
     }
   }
@@ -620,10 +612,21 @@ function trySign(p: Player): number | null {
  * follows whatever the fee formula is.
  */
 function manage(): Signed {
+  const out: Signed = { count: 0, fees: 0, overall: 0 };
+  const record = (p: Player, fee: number): void => {
+    out.count++;
+    out.fees += fee;
+    out.overall += overallRating(p);
+  };
   const s = getState();
   for (const ev of s.eventDeck.pending) {
     const choice = managedEventChoice(getState(), ev);
-    if (choice !== undefined) chooseEvent(ev.id, choice);
+    if (choice !== undefined) {
+      const alreadyHere = getState().squad.some(p => p.id === ev.subjectId);
+      chooseEvent(ev.id, choice);
+      const signed = getState().squad.find(p => p.id === ev.subjectId);
+      if (!alreadyHere && signed) record(signed, ev.fee ?? 0);
+    }
   }
   // Training focus (N11): the squad's weakest stat.
   setTrainingFocus(weakestStat(getState().squad));
@@ -631,27 +634,19 @@ function manage(): Signed {
     const st = getState();
     if (!isFacilityOpen(st, defId) || st.facilities.some((f) => f.defId === defId)) continue;
     if (st.money - FACILITY_CATALOG[defId].cost < MANAGED.BUILD_RESERVE) break;
-    if (!canCarryFacility(st, defId)) continue;
     buildFirstFree(defId);
   }
   seatTheCrowd();
-  // Staff: preserve a season of wages in cash and cover each new weekly bill from projected income.
+  // Staff: appointment fees are one-off cash investments, never weekly wage bills.
   for (const role of MANAGED_STAFF) {
     const st = getState();
     if (hasStaff(st, role)) continue;
-    if (st.money - staffWage(st, role) * WEEKS_PER_SEASON < MANAGED.STAFF_RESERVE) break;
-    if (weeklyNet(st) - staffWage(st, role) < 0) continue;
+    if (st.money - STAFF_APPOINTMENT_PRICES[role] < MANAGED.STAFF_RESERVE) continue;
     hireStaff(role);
   }
-  const out: Signed = { count: 0, fees: 0, overall: 0 };
-  const record = (p: Player, fee: number): void => {
-    out.count++;
-    out.fees += fee;
-    out.overall += overallRating(p);
-  };
   let st = getState();
   while (st.squad.length < MANAGED.SQUAD_FLOOR) {
-    const fits = st.freeAgents
+    const fits = discoveredFreeAgents(st)
       .filter((p) => !p.junior && signingFee(st, p) < st.money
         && capRoomFor(st.squad, st.capAccount, st.season, salaryDemand(p)))
       .sort((a, b) => overallRating(b) - overallRating(a))[0];
@@ -663,7 +658,7 @@ function manage(): Signed {
   }
   if (st.squad.length < SQUAD_CAP) {
     const ninth = st.squad.map(overallRating).sort((a, b) => b - a)[Math.min(ON_FIELD, st.squad.length) - 1] ?? 0;
-    const star = st.freeAgents
+    const star = discoveredFreeAgents(st)
       .filter((p) => !p.junior && overallRating(p) >= ninth + MANAGED.STAR_MARGIN)
       .sort((a, b) => overallRating(b) - overallRating(a))[0];
     if (star) {

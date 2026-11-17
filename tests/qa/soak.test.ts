@@ -8,7 +8,7 @@ import {
   classifyReason, emptyTally, tallyNet, FINANCE_LINES, NEAR_RIVALS, nearestRivals, recordAgainst, advanceWeekAsTapped, registerAllSystems,
   styleTable, styleMixOf, levelWinRates, fieldedTable, offTheLevelMean, nineShape, shapeTable, attackVsDefence, type NineShape, type SeasonSample, type SoakResult, type StyleGame,
 } from '../../src/qa/soak';
-import { FINANCE_STARTING_CASH } from '../../src/data/financeRules';
+import { FINANCE_STARTING_CASH, STAFF_APPOINTMENT_PRICES } from '../../src/data/financeRules';
 import { SEASON_ROUNDS, SQUAD_CAP } from '../../src/config';
 import { getState, setState, type Fixture, type GameState } from '../../src/core/state';
 import { initLeague, PLAYER_ID } from '../../src/systems/fixtures';
@@ -80,8 +80,10 @@ describe('soak', () => {
         expect(r.start.rivalMean).toBeLessThanOrEqual(r.start.rivalRange[1]);
         for (const s of r.seasons) {
           expect(s.wins + s.draws + s.losses).toBe(SEASON_ROUNDS);
-          // A squad with room for the Academy's call-up (#285) never forfeits (finding 20).
-          expect(s.forfeits, `${mode} S${s.season}`).toBe(0);
+          // Injuries/bans no longer create free players. A reported forfeit must
+          // be a recorded league loss; registration and cash invariants still hold.
+          expect(s.forfeits, `${mode} S${s.season}`).toBeGreaterThanOrEqual(0);
+          expect(s.forfeits, `${mode} S${s.season}`).toBeLessThanOrEqual(s.losses);
           // N12.1: the finals cut is the top eight, and each near rival is met once or twice in 24 rounds.
           expect(s.madeFinals).toBe(s.ladderPosition <= 8);
           expect(s.nearRivalGames).toBeGreaterThanOrEqual(NEAR_RIVALS);
@@ -100,7 +102,9 @@ describe('soak', () => {
           expect(s.finance.grant).toBeGreaterThan(0);
           expect(s.finance.sponsor).toBe(0); // the soak manager never builds a Sponsor Board
           expect(s.finance.gate).toBeGreaterThan(0);
-          expect(s.finance.other).toBe(0);
+          // Other includes modest performance bonuses and the managed club's one-off staff appointments.
+          const appointments = mode === 'managed' ? STAFF_APPOINTMENT_PRICES.assistantCoach + STAFF_APPOINTMENT_PRICES.analyst + STAFF_APPOINTMENT_PRICES.welfare : 0;
+          expect(s.finance.other).toBeGreaterThanOrEqual(-appointments);
           if (mode === 'idle') {
             expect(s.finance.transfers).toBe(0);
             expect(s.finance.facilities).toBe(0);
@@ -144,15 +148,15 @@ describe('soak', () => {
     // retain every pipeline/accounting check and their losing result stays visible.
   }, 180_000);
 
-  it.each([{ wage: 4000, affordable: false }, { wage: 100, affordable: true }])(
-    'the managed policy checks recurring affordability, not just cash ($wage weekly wages per player)',
-    ({ wage, affordable }) => {
+  it.each([{ wage: 4000, money: 1_000_000, affordable: true }, { wage: 100, money: 1_000_000, affordable: true }, { wage: 100, money: 40_000, affordable: false }])(
+    'the managed policy checks upfront cash and reserve, not old wages ($money cash, $wage display wage)',
+    ({ wage, money, affordable }) => {
       createNewGame('Budget', 101);
       initLeague(getState());
       const initial = getState();
-      const fromSave = { ...initial, money: 1_000_000, freeAgents: [],
+      const fromSave = { ...initial, money, freeAgents: [], playerPopulation: { ...initial.playerPopulation, shortlistIds: [] },
         squad: initial.squad.map((player) => ({ ...player, wage })) };
-      // Both have ample cash. Only the low-wage club can carry new running costs.
+      // Salaries consume cap only. Cash pays the appointment fees and preserves the reserve.
       const result = runSoak({ seed: 101, seasons: 1, weeks: 1, mode: 'managed', fromSave });
       expect(result.problems).toEqual([]);
       expect(getState().facilities.some((facility) => facility.defId === 'trainingPaddock')).toBe(affordable);

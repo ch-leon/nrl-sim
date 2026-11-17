@@ -1,3 +1,4 @@
+import { discoveredFreeAgents } from '../systems/playerCareer';
 // UI-only recruitment advice: no pool changes, state writes or dice.
 import type { GameState, Player } from '../core/state';
 import { SQUAD_CAP } from '../config';
@@ -23,7 +24,7 @@ export function recruitAffordable(state: GameState, p: Player): boolean {
 export function recruitShortlist(state: GameState): RecruitShortlist {
   const cmpId = (a: Player, b: Player): number => a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
   const best = (a: Player, b: Player): number => overallRating(b) - overallRating(a) || cmpId(a, b);
-  const pool = [...state.freeAgents].sort(best);
+  const pool = discoveredFreeAgents(state).sort(best);
   const affordable = pool.filter((p) => recruitAffordable(state, p));
   const small = pool.length < 5;
   // Natural, fieldable cover per starting slot: two wingers need twice the cover.

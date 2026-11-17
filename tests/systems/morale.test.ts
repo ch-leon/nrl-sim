@@ -14,8 +14,7 @@ import { clearTickHooks, advanceWeek } from '../../src/core/time';
 import { overallRating } from '../../src/data/player';
 import { facilityBlurb } from '../../src/ui/screens/build';
 import { FACILITY_CATALOG } from '../../src/data/facility';
-import { refreshFreeAgents } from '../../src/systems/freeagency';
-import { makeRng } from '../../src/utils/rng';
+import { intakeUnsignedMarket } from '../../src/systems/playerCareer';
 
 function mkPlayer(over: Partial<Player> = {}): Player {
   const stats = { speed: 60, strength: 60, stamina: 60, handling: 60, kicking: 60, footyIQ: 60 };
@@ -106,16 +105,16 @@ describe('morale tick', () => {
 describe('facility effects', () => {
   it('every special facility blurb states a concrete effect', () => {
     expect(facilityBlurb(FACILITY_CATALOG.canteen)).toMatch(/morale/);
-    expect(facilityBlurb(FACILITY_CATALOG.sponsorBoard)).toMatch(/\+\$450\/week/); // L1 at reputation 30 (N12)
+    expect(facilityBlurb(FACILITY_CATALOG.sponsorBoard)).toMatch(/\+\$540 per played non-trial match/); // L1 at reputation 30 (N12)
     expect(facilityBlurb(FACILITY_CATALOG.grandstand)).toMatch(/[Ss]eats 3,500/); // #169: seats, not a % of attendance
     expect(facilityBlurb(FACILITY_CATALOG.academy)).toMatch(/free-agent/);
   });
 
-  it('Academy raises free-agent quality', () => {
+  it('Academy raises annual newcomer quality without rerolling existing people', () => {
     const avg = (facilities: PlacedFacility[]): number => {
       createNewGame('Test Club', 7);
-      loadState({ ...getState(), facilities, reputation: 0 });
-      const pool = refreshFreeAgents(getState(), makeRng(99)).freeAgents;
+      loadState({ ...getState(), season: 2, freeAgents: [], facilities, reputation: 0 });
+      const pool = intakeUnsignedMarket(getState()).freeAgents;
       return pool.reduce((a, p) => a + overallRating(p), 0) / pool.length;
     };
     expect(avg([pf('academy', 3)])).toBeGreaterThan(avg([]));

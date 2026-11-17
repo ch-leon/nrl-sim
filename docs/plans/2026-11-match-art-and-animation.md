@@ -26,9 +26,15 @@ draws over 800 tracked games each. The report does not significance-test its
 tracked win column. One bounded
 [alternative mix](https://github.com/ch-leon/nrl-sim/blob/2176cd724a715c7d7b0869d739032dce375b4c84/runs/20261117-060952-shapes-expansive-width/report.md)
 (spread 5, pod 1, edge 2) measured 36.0% wins and was rejected; defaults remain
-spread 2, pod 1, edge 5. This is an open balance concern, not a completed rebalance.
-The candidate remains draft and unmerged for Leon; final validation is recorded
-in the PR. Back-door plays and decoys remain later work.
+spread 2, pod 1, edge 5. A
+[held-out replication](https://github.com/ch-leon/nrl-sim/blob/c238f24b44ada0750ed0d04cf0dbbbf8d050cf6f/runs/20261117-093550-shapes-replication-control/report.md)
+on seeds 401–800 reversed the initial drop: wins were 38.1% off and 40.6% on.
+Together, the two samples give 40.2% off versus 39.1% on over 1,600 games each.
+This does not prove balance parity; it does not justify retuning to the initial
+sample. Defaults remain unchanged. Leon approved merging #714/#715 on 17 November;
+the branches integrate the newer career work before their final checks. The PRs
+record the merge outcome. Back-door passing and support runs are next; their new
+PR stays open for review.
 
 Status: stages 1–4 presentation and the first stage-5 pass are implemented in
 five linked PRs. Leon reviewed the clip and approved merging on 17 November

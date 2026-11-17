@@ -128,16 +128,18 @@ export interface RolloverSnapshot {
   season: number;
   squad: { id: string; name: string; age: number }[];
   rivals: RivalClub[];
+  unsignedIds?: string[];
   reputation: number;
   /** How the club's finals ended; the fixtures are gone by the time the review is built. */
   finals?: SeasonReview['finals'];
 }
 
 /** `endedSeason`: the rollover has already moved the counter on when its hooks run, so the hook passes `season - 1`. */
-export function snapshotBeforeRollover(s: Pick<GameState, 'season' | 'squad' | 'league' | 'reputation' | 'clubId'>, endedSeason: number = s.season): RolloverSnapshot {
+export function snapshotBeforeRollover(s: Pick<GameState, 'season' | 'squad' | 'league' | 'reputation' | 'clubId'> & Partial<Pick<GameState, 'freeAgents'>>, endedSeason: number = s.season): RolloverSnapshot {
   const finals = finalsRun(s.league.fixtures, s.clubId);
   return {
     season: endedSeason,
+    unsignedIds: s.freeAgents?.map(p => p.id) ?? [],
     squad: s.squad.map((p) => ({ id: p.id, name: p.name, age: p.age })),
     rivals: s.league.clubs.map((c) => ({ id: c.id, name: c.name, colors: c.colors, strength: c.strength })),
     reputation: s.reputation,
@@ -215,11 +217,12 @@ export function buildSeasonReview(before: RolloverSnapshot, after: GameState): S
     review.money = { in: Math.round(moneyIn), out: Math.round(moneyOut) };
   }
 
-  const stillHere = new Set(after.squad.map((p) => p.id));
-  const retired = before.squad.filter((p) => !stillHere.has(p.id)).map((p) => ({ name: p.name, age: p.age + 1 }));
+  const retiredIds = new Set(after.playerPopulation.retired.filter(p => p.retiredAt.season === after.season).map(p => p.id));
+  const retired = before.squad.filter(p => retiredIds.has(p.id)).map(p => ({ name: p.name, age: p.age + 1 }));
   if (retired.length > 0) review.retired = retired;
 
-  const juniors = after.freeAgents.filter((p) => p.junior).length;
+  const priorUnsigned = new Set(before.unsignedIds ?? []);
+  const juniors = after.freeAgents.filter(p => p.junior && !priorUnsigned.has(p.id)).length;
   if (juniors > 0) review.juniors = juniors;
 
   const movers = strengthChanges(before.rivals, after.league.clubs)

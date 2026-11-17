@@ -5,6 +5,7 @@
 // Leaders beside it on a segmented control. Pure helpers are exported for node
 // tests; DOM open/init follow the fixtures.ts / hud.ts conventions (no Phaser).
 
+import { retiredPlayerRecords } from '../playerHistory';
 import { getState, type GameState, type SeasonRecord, type Player } from '../../core/state';
 import { el, button, openScreen, closeScreen, screenHead, segmented, backButton } from '../dom';
 import { initSeasonReview, openSeasonReview } from './seasonReview';
@@ -209,8 +210,8 @@ export function historyRowView(entry: SeasonHistoryEntry, state: Pick<GameState,
   };
 }
 
-/** SEASONS or RECORDS (3l); the choice holds while the game is open. */
-let historyView: 'seasons' | 'records' = 'seasons';
+/** Seasons, club records or retired players; the choice holds while the game is open. */
+let historyView: 'seasons' | 'records' | 'players' = 'seasons';
 
 /** The seasons table (3l): one row a season, newest first, with its review and books. */
 function buildSeasonsTable(state: GameState): HTMLElement {
@@ -267,9 +268,9 @@ export function openHistoryScreen(): HTMLElement {
   ensureHistoryStyles();
   const state = getState();
   const body = el('div', { class: 'nrl-history-body' });
-  const render = (): void => { body.replaceChildren(historyView === 'seasons' ? buildSeasonsTable(state) : buildRecords(state)); };
-  const seg = segmented<'seasons' | 'records'>(
-    [{ id: 'seasons', label: 'Seasons' }, { id: 'records', label: 'Records' }],
+  const render = (): void => { body.replaceChildren(historyView === 'seasons' ? buildSeasonsTable(state) : historyView === 'records' ? buildRecords(state) : retiredPlayerRecords(state)); };
+  const seg = segmented<'seasons' | 'records' | 'players'>(
+    [{ id: 'seasons', label: 'Seasons' }, { id: 'records', label: 'Records' }, { id: 'players', label: 'Retired players' }],
     historyView,
     (id) => { historyView = id; seg.set(id); render(); },
     { label: 'History view' },

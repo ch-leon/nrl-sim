@@ -18,9 +18,7 @@ import { inlineIqStat } from '../../content/pack';
 import { ATTACK_COACHES, ATTACK_SPECIALITIES, STAFF } from '../../systems/staff';
 import { playsOfFamily } from '../../data/plays';
 import { PLAYS } from '../../match/league/plays';
-import { LEVEL_MULT } from '../../data/facility';
 import { sponsorReturn } from '../../systems/economy';
-import { REP_BASELINE } from '../../systems/league';
 import { officeUnlockLine } from '../coachCallsText';
 
 const percent = (x: number): string => `${Math.round(x * 100)}%`;
@@ -42,14 +40,10 @@ function clubNow(): Pick<GameState, 'reputation' | 'facilities'> | null {
  * board pays at today's reputation (or what a new one would), the number the
  * weekly tick pays (economy.sponsorReturn). Worked out each time the page is shown.
  */
-export function sponsorBullet(club: Pick<GameState, 'reputation' | 'facilities'> | null = clubNow()): string {
-  const rep = club?.reputation ?? REP_BASELINE;
+export function sponsorBullet(club: (Pick<GameState, 'reputation' | 'facilities'> & Partial<Pick<GameState, 'capAccount'>>) | null = clubNow()): string {
   const level = (club?.facilities ?? []).reduce((m, f) => (f.defId === 'sponsorBoard' ? Math.max(m, f.level) : m), 0);
-  const rule = `A Sponsor Board pays ${fmtMoney(ECON.SPONSOR_BASE)} a week plus ${fmtMoney(ECON.SPONSOR_PER_REP)} a reputation point, up to ${fmtMoney(ECON.SPONSOR_CAP)}, and ${LEVEL_MULT[1]}× that at level 2, ${LEVEL_MULT[2]}× at level 3.`;
-  const now = level > 0
-    ? `Yours (level ${level}) pays ${fmtMoney(sponsorReturn(level, rep))} a week at your reputation of ${rep}.`
-    : `At your reputation of ${rep} a new one would pay ${fmtMoney(sponsorReturn(1, rep))} a week.`;
-  return `${rule} ${now}`;
+  const amount = fmtMoney(sponsorReturn(level || 1, 0, club?.capAccount?.tier ?? 'premier'));
+  return `A Sponsor Board pays 3% / 9% / 18% of match base at levels 1 / 2 / 3 on played non-trial matches. ${level ? `Yours (level ${level}) pays` : 'A new one would pay'} ${amount} per eligible match. No income while idle.`;
 }
 
 /**
@@ -117,7 +111,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
         heading: 'Advancing further',
         bullets: [
           'The ▾ beside Play Week runs ×4 weeks, to the finals or to the season’s end.',
-          `A long advance stops early when something needs you: fewer than 13 fit (the Academy would call up juniors to make the side), an injury, a contract about to run out, a decision card in News, or money: the week the balance goes into the red, and the week the balance passes the ${fmtMoney(ECON.FORCED_SALE_FLOOR)} floor (not every week in the red). A negative balance does not sell a player.`,
+          `A long advance stops early when something needs you: fewer than 13 fit (sign cover or risk a forfeit), an injury, a contract about to run out, a decision card in News, or money: the week the balance goes into the red, and the week the balance passes the ${fmtMoney(ECON.FORCED_SALE_FLOOR)} floor (not every week in the red). A negative balance does not sell a player.`,
         ],
       },
       {
@@ -140,8 +134,8 @@ export const CLUB_PAGES: readonly GuidePage[] = [
         // A getter, so the Sponsor Board line quotes the club's reputation each time the page is shown (N12).
         get bullets(): string[] {
           return [
-            `Home gates: the crowd is your reputation and form, lifted for a top-eight opponent or a final, and capped by the ground (2,000 on the hill; a Grandstand seats 3,500, 5,000 or 6,500). Tickets are ${fmtMoney(ECON.TICKET_PRICE)}. On Easy the gate pays ${percent(DIFFICULTY.easy.gate)} of that; Normal and Hard pay the full gate. A new club draws about 1,200.`,
-            'A weekly grant that grows with reputation ($40 a point).',
+            'Played matches pay a guaranteed base: Local $8,000, Championship $12,000, Premier $18,000. Home venue income adds half that base; a Grandstand adds 15% / 45% / 90% more at levels 1 / 2 / 3. Crowds remain a visual measure of reputation and form, not an extra ticket payment.',
+            'Wins add 10% of the base; draws add 5%. Trials pay a quarter-base only. Byes, unplayed fixtures and idle weeks earn nothing.',
             sponsorBullet(),
             `Finals prize money at the rollover: ${fmtMoney(PRIZE.PER_FINALS_WEEK)} for every finals week played, ${fmtMoney(PRIZE.GRAND_FINAL)} more for a grand final and ${fmtMoney(PRIZE.PREMIERSHIP)} for the premiership. Easy pays ${percent(DIFFICULTY.easy.prize)} of that and Hard ${percent(DIFFICULTY.hard.prize)}; Normal pays it as written.`,
             `The board pays ${fmtMoney(BOARD.GRANT_PER_MET)} for every objective met (Easy ${percent(DIFFICULTY.easy.prize)}, Hard ${percent(DIFFICULTY.hard.prize)}); some event cards pay too.`,
@@ -189,7 +183,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
         bullets: [
           'A new signing covers the rest of this season and needs both the cash for the fee and room under the salary cap. You are warned at 8, 4 and 1 weeks, unless a renewal is already queued. When the deal ends he is unsigned unless you have renewed. Renewing queues one new season after this deal, and a second renewal in the same season does nothing. The board does not lend.',
           'The renewal ask follows his ability now, with a small change for age and potential. It does not move because he is unhappy, and the club’s reputation does not inflate it. A signed salary stays fixed until that deal ends.',
-          'There is no buyer for a sale yet. Release costs the payout shown, and it is refused when the cash is short. The squad can never drop below 13.',
+          'Sell previews a real buying club, its fee and the existing contract before you confirm. The buyer must have cash, squad space and salary-cap room. With no eligible buyer, nothing moves. Release costs the payout shown and is refused when cash is short. Neither action can take the squad below 13.',
         ],
       },
       {
@@ -204,10 +198,10 @@ export const CLUB_PAGES: readonly GuidePage[] = [
       {
         heading: 'Recruiting',
         bullets: [
-          'The free-agent pool holds 12 and refreshes every 4 weeks; rivals sign from the same pool and cannot go over the salary cap, so a good one does not wait. A signing costs one year’s wage up front (a quarter for an Academy prospect). A Scout Office takes 10% off the fee per level.',
+          'Scouting discovers up to 12 unsigned players every 4 weeks; it does not replace the people already in the world. Earlier Academy prospects and your club’s released or expired players remain accessible. Rivals recruit from that same population and need cash and salary-cap room. A signing costs one year’s wage up front (a quarter for an Academy prospect’s first signing). A Scout Office takes 10% off the fee per level.',
           `The pool sits around the league: at a new club its players are about ${LEAGUE.MEAN - LEAGUE.POOL_BELOW} overall, with a star now and then. Reputation, a Scout Office and an Academy lift it.`,
           'Each pre-season the Academy brings 3 prospects aged 17–19 into the pool, 4 with an Academy built and 5 at level 3; from level 2 they arrive as Young Guns.',
-          `Short of ${SQUAD_MIN} fit before a match, the Academy calls up juniors to make the side, on the junior wage to the season’s end (better ones with an Academy built).`,
+          `At season rollover, expiry or retirement can leave fewer than ${SQUAD_MIN} registered players. Emergency scholarships fill only those vacancies up to the minimum; injuries and bans do not create replacements. A scholarship lasts one season and cannot be sold or released during that term.`,
         ],
       },
     ],

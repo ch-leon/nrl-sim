@@ -1,3 +1,4 @@
+import { discoveredFreeAgents } from '../../systems/playerCareer';
 // QA only. Decisions call the same system operations as the club screens and soak manager.
 import { getState, setState, type GameState, type Player, type PlayerStats } from '../../core/state';
 import { ON_FIELD, SQUAD_CAP, WEEKS_PER_SEASON } from '../../config';
@@ -197,7 +198,7 @@ export function createPersonaManager(config: PersonaConfig, seed: number, ops: S
         const short = s.squad.length < config.recruits.floor || s.squad.filter(isFieldable).length < 13;
         if (!short && !['improve', 'stars'].includes(config.recruits.policy)) break;
         const ninth = [...s.squad].sort(byRating)[ON_FIELD - 1];
-        const candidates = s.freeAgents.filter(p => !p.junior && isFieldable(p)
+        const candidates = discoveredFreeAgents(s).filter(p => !p.junior && isFieldable(p)
           && s.money - signingFee(s, p) >= config.recruits.reserve
           && capRoomFor(s.squad, s.capAccount, s.season, salaryDemand(p))
           && (short || config.recruits.policy === 'stars' || overallRating(p) > (ninth ? overallRating(ninth) : 0)))

@@ -1,10 +1,11 @@
+import { commitMatchState } from '../../src/systems/matchIncome';
 import { beforeEach, expect, it } from 'vitest';
 import { bus } from '../../src/core/events';
 import { createNewGame, getState, loadState, setState, SAVE_VERSION } from '../../src/core/state';
 import { advanceWeek, advanceWeeks, clearHeldWeek, clearSeasonHooks, clearTickHooks, registerTickHook, TICK_ORDER, weekHeld } from '../../src/core/time';
 import { currentRound } from '../../src/core/season';
 import { migrateState } from '../../src/core/save';
-import { getCurrentFixture, initLeague, registerFixturesSystem } from '../../src/systems/fixtures';
+import { getCurrentFixture, initLeague, registerFixturesSystem, applyResult } from '../../src/systems/fixtures';
 import { registerPlayerMatchSystem } from '../../src/systems/matchday';
 import { registerEconomySystem, gateReceipts, homeGate } from '../../src/systems/economy';
 import { registerUnlockSystem } from '../../src/systems/unlocks';
@@ -36,7 +37,7 @@ it('preserves optional phase on save/reload and leaves a v21 legacy season uncha
   expect(getState().league.fixtures.every((f) => f.round > 0)).toBe(true);
 });
 
-it('pays a small gate, leaves contracts and unlocks alone, then resumes normal contracts in round 1', () => {
+it('pays quarter-base trial income, leaves contracts and unlocks alone, then resumes normal contracts in round 1', () => {
   createNewGame('Trials', 42);
   initLeague(getState());
   const contracts = getState().squad.map((p) => p.contractWeeks);
@@ -48,13 +49,14 @@ it('pays a small gate, leaves contracts and unlocks alone, then resumes normal c
   registerTickHook('test-win', TICK_ORDER.match, () => {
     const s = getState();
     const f = getCurrentFixture(s, s.clubId)!;
-    setState({ league: { ...s.league, fixtures: s.league.fixtures.map((x) => x === f ? { ...x, result: { homeScore: 40, awayScore: 0 } } : x) } });
+    commitMatchState(applyResult(s, f, { homeScore: 40, awayScore: 0 }));
   }, { trials: true });
   for (let i = 0; i < 2; i++) {
     const s = getState();
-    const f = getCurrentFixture(s, s.clubId)!;
-    expect(gateReceipts(s)).toBe(f.homeId === s.clubId ? Math.round(homeGate(s, { ...f, round: 1 }).receipts * 0.25) : 0);
+    expect(gateReceipts(s)).toBe(0);
+    const cash = s.money;
     advanceWeeks(1);
+    expect(getState().money - cash).toBe(4_500);
     expect(getState().squad.map((p) => p.contractWeeks)).toEqual(contracts);
     expect(getState().unlocks).toEqual(unlocks);
   }
@@ -130,7 +132,7 @@ it('shows the seeded forecast and quarter home-gate projection during trials', a
 });
 
 
-it.each([1, 2] as const)('calls up emergency juniors before trial %s with contracts through the competitive season', async (preseason) => {
+it.each([1, 2] as const)('does not manufacture injury replacements before trial %s', async (preseason) => {
   const { registerYouthSystem } = await import('../../src/systems/youth');
   const { fitSquadCount } = await import('../../src/systems/matchday');
   createNewGame('Trials', 42);
@@ -143,8 +145,7 @@ it.each([1, 2] as const)('calls up emergency juniors before trial %s with contra
     fitAtMatch = fitSquadCount(getState().squad);
   }, { trials: true });
   advanceWeeks(1);
-  expect(fitAtMatch).toBe(13);
+  expect(fitAtMatch).toBe(9);
   const called = getState().squad.filter((p) => !before.some((old) => old.id === p.id));
-  expect(called).toHaveLength(4);
-  expect(called.every((p) => p.contractWeeks === 27)).toBe(true);
+  expect(called).toHaveLength(0);
 });

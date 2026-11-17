@@ -19,7 +19,7 @@ import { OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav } from '../common.m
 //     season's cap can hold it. One tap on an open Renew queues that player
 //     ("QUEUED") and leaves the other rows where they were; a second tap on the
 //     same spot queues nobody else. A Renew that is not due stays "RENEW".
-//     The table fits the sheet, with SELL armed ("Really sell?") too, and
+//     The table fits the sheet; Sell opens a review/refusal with a safe Cancel, and
 //     ◂ FINANCE stays clear of the title;
 //   - T2: after a reload, New game on the slot asks "Start over? This replaces …"
 //     and Cancel keeps it. The title is at Normal whatever the save says: the text
@@ -343,17 +343,22 @@ export async function runFlow(browser, { w: W, h: H, text }) {
       if (back.getBoundingClientRect().right > title.getBoundingClientRect().left + 1) out.push('◂ FINANCE runs into the title');
       return out;
     }));
-    // SELL armed on the next row: "Really sell?" whole, and still no sideways scroll.
+    // Sell opens the actual funded offer (or its refusal), never moves a player
+    // on the first tap, and Cancel returns to the same contract rows unchanged.
     const next = after.find((r) => r.btn && r.id !== first.id);
     if (next) {
-      const sell = `[data-contract="${next.id}"] .nrl-contract-actions .nrl-btn:last-child`;
+      const sell = `[data-contract-sell="${next.id}"]`;
+      const heldState = await page.evaluate(() => JSON.stringify(window.__nrlState()));
       await tap(sell);
-      await page.waitForTimeout(200);
-      if (!(await page.locator('.nrl-contracts .nrl-btn-armed').count())) out.push('SELL did not arm');
-      out.push(...await flowReach(page, ['.nrl-contracts .nrl-btn-armed']));
-      const armedWide = await page.evaluate(() => { const e = document.querySelector('.nrl-contracts-scroll'); return e.scrollWidth - e.clientWidth; });
-      if (armedWide > 1) out.push(`with SELL armed the table is ${armedWide}px wider than the sheet`);
-      await shot('f3-armed');
+      await page.waitForSelector('[data-sale-review]');
+      out.push(...await flowReach(page, ['[data-sale-cancel]']));
+      if (await page.locator('[data-sale-confirm]').count()) out.push(...await flowReach(page, ['[data-sale-confirm]']));
+      if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)) out.push('the sale review causes sideways scrolling');
+      await shot('f3-sale-review');
+      await tap('[data-sale-cancel]');
+      if (await page.locator('[data-sale-review]').count()) out.push('Cancel left the sale review open');
+      if (await page.evaluate(() => JSON.stringify(window.__nrlState())) !== heldState) out.push('reviewing/cancelling a sale changed career state');
+      if ((await rows()).map(r => r.id).join() !== after.map(r => r.id).join()) out.push('Cancel changed the contract rows');
     }
     await club();
     return out;

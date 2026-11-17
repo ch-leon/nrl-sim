@@ -2,6 +2,8 @@
 // module-singleton store. See ARCHITECTURE §4 and BAK-172. No Phaser, no class
 // instances in state (must JSON round-trip).
 
+import type { PlayerCareerHistory, PlayerPopulation } from '../data/playerCareer';
+import { initialPlayerPopulation, installPlayerHistory } from '../systems/playerCareer';
 import type { TeamTactics } from '../match/league/presets';
 import type { CompetitionCareerState } from '../data/competition';
 import { bus } from './events';
@@ -40,6 +42,7 @@ export interface StatTally { games: number; tries: number; tackles: number; line
 export type PlayerCeilings = Readonly<Partial<PlayerStats>>;
 
 export interface Player {
+  clubHistory?: PlayerCareerHistory; // required once installed in a canonical roster
   id: string; // seeded deterministic id (no crypto)
   name: string;
   age: number; // 17-36
@@ -60,6 +63,10 @@ export interface Player {
   contractWeeks: number; // remaining
   /** Annual salary for an inclusive run of seasons. Absent while unsigned. */
   deal?: SignedDeal;
+  /** Minimum-roster scholarship; cannot produce sale/release proceeds during this term. */
+  emergencyDealEndSeason?: number;
+  /** Actual expiry/retirement vacancy this scholarship filled. */
+  emergencyForPlayerId?: string;
   junior?: boolean; // Academy prospect awaiting signing (default false) — #42
   departed?: boolean; // left the club (contract expired / released): survives free-agent re-rolls — #40
   career?: StatTally; // folded from match events — #46
@@ -69,6 +76,7 @@ export interface Player {
 
 export interface PlacedFacility {
   id: string; // instance id
+  constructionSpend?: number;
   defId: FacilityDefId; // catalog key, e.g. 'weightsRoom'
   level: 1 | 2 | 3;
   x: number; y: number; // grid origin (top-left of footprint)
@@ -87,6 +95,7 @@ export interface Fixture {
   slot?: number;
   round: number; // 1..SEASON_ROUNDS (+ finals rounds)
   homeId: string; awayId: string;
+  unplayed?: boolean;
   result?: { homeScore: number; awayScore: number };
 }
 
@@ -116,9 +125,9 @@ export interface LeagueState {
 // TODO(WU-6): reconcile WeatherKind ownership with src/sim/weather.ts
 export type WeatherKind = 'clear' | 'rain' | 'wind';
 
-/** v28 separates club cash from the annual salary cap. Careers from v27 and
- *  earlier are pre-finance: they are rejected, not converted. */
-export const SAVE_VERSION = 28;
+/** v30 adds persistent player histories and discovery metadata. v28/v29 keep
+ * all finance state via migration; v27 and earlier require a new career. */
+export const SAVE_VERSION = 30;
 
 /** The hires the facilities don't cover (N14.5), and the attack coach who opens set plays to buy (#326). */
 export type StaffRole = 'assistantCoach' | 'analyst' | 'welfare' | 'attackCoach';
@@ -292,6 +301,7 @@ export interface GameState {
   /** Absent means everything is open: old saves and the veteran skip. */
   unlocks?: { facilities: FacilityDefId[]; screens?: string[] | undefined } | undefined;
   freeAgents: Player[];
+  playerPopulation: PlayerPopulation;
   league: LeagueState;
   /** Dormant, opt-in competition metadata (#570); absent keeps the legacy path. */
   competitions?: CompetitionCareerState;
@@ -322,6 +332,7 @@ export interface GameState {
    * money movement, and the rollover's prize money and board grant close the season
    * just played.
    */
+  matchIncome: import('../systems/matchIncome').MatchIncomeRecord[];
   finance: SeasonFinance[];
   /** The coach's nine, bench and rotation (#69); old saves get today's auto pick. */
   lineup: Lineup;
@@ -413,7 +424,7 @@ export function createNewGame(
     joinedSeason: 1,
   }));
   const capAccount = freshCapAccount(SINGLE_LEAGUE_TIER);
-  const squad = admitOpeningSquad(generated, tierCap(SINGLE_LEAGUE_TIER), 1);
+  const squad = admitOpeningSquad(generated.map(p => installPlayerHistory(p, 'player', { season: 1, week: 1 })), tierCap(SINGLE_LEAGUE_TIER), 1);
   if (!squad) throw new Error('Opening squad does not fit the salary cap');
 
   // The opening pool sits around the league (N12): a new club has nothing built
@@ -423,6 +434,8 @@ export function createNewGame(
     career: { games: 0, tries: 0, tackles: 0, lineBreaks: 0 },
     joinedSeason: 1,
   }));
+
+  for (let i = 0; i < freeAgents.length; i++) freeAgents[i] = installPlayerHistory(freeAgents[i]!, 'unsigned', { season: 1, week: 1 });
 
   const league: LeagueState = { clubs: [], fixtures: [], ladder: [] };
 
@@ -443,12 +456,14 @@ export function createNewGame(
     facilities: [],
     ...(options.openAll ? {} : { unlocks: { facilities: ['trainingPaddock', 'weightsRoom', 'canteen', 'sponsorBoard'] as FacilityDefId[], screens: [] } }),
     freeAgents,
+    playerPopulation: initialPlayerPopulation({ season: 1, squad, freeAgents, league }),
     league,
     settings: { muted: false, volume: 0.8, tutorialDone: false, difficulty },
     history: [],
     boardPatience: BOARD.START_PATIENCE,
     objectives: [],
     eventDeck: newEventDeck(seed),
+    matchIncome: [],
     finance: [emptyFinance(1)],
     // The opening side: today's best nine by slot and the next four (#69). No dice: the squad is unchanged.
     lineup: autoPick(squad),

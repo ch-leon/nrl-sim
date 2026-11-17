@@ -78,8 +78,9 @@ describe('Academy arrival potential (#545)', () => {
       const academy = level === 0 ? [] : [facility('academy', level as 1 | 2 | 3)];
       const baseline = rollover(academy);
       const rng = makeRng((545 ^ Math.imul(2, 0x9e3779b1)) >>> 0);
-      expect(baseline.players).toEqual(generateProspects(rng, level));
-      expect(baseline.seed).toBe(rng.state());
+      const stripped = baseline.players.map(({ id: _id, clubHistory: _history, ...p }) => p);
+      expect(stripped).toEqual(generateProspects(rng, level).map(({ id: _id, ...p }) => p));
+      expect(baseline.seed).toBe(545); // intake uses its own stream
       for (const other of others) for (const otherLevel of [1, 2, 3] as const) {
         const facilities = [facility(other.id, otherLevel), ...academy];
         expect(academyLevel(facilities)).toBe(level);
