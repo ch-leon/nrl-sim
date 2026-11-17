@@ -78,15 +78,15 @@ describe('tracked counter measurements', () => {
     expect(both.trackedCounts!.pointsFor).toEqual(both.opponentCounts!.pointsAgainst);
   });
   it('calculates wins plus half draws and its sample SE on a two-seed cell', () => {
-    // Seeds 7/8 give one loss and one draw since the weighted receiver (#649; a draw then a loss before it).
+    // Early DH choice (#672): seeds 5/6 give a draw and a loss (7/8 were a loss/draw before it).
     // Seed 3 supplies a neutral one-minute draw (seed 2 before #649).
     // This two-sample fixture checks aggregation mechanics, not match balance.
     const tiny = cell;
-    const first = measureCell(tiny, 1, 4, 7);
-    const second = measureCell(tiny, 1, 4, 8);
-    const both = measureCell(tiny, 2, 4, 7);
+    const first = measureCell(tiny, 1, 4, 5);
+    const second = measureCell(tiny, 1, 4, 6);
+    const both = measureCell(tiny, 2, 4, 5);
     const xs = [first, second].map((r) => r.trackedWin! + r.trackedDraw! / 2);
-    expect(xs).toEqual([0, 0.5]);
+    expect(xs).toEqual([0.5, 0]);
     expect(measureCell({ ...cell, scenario: even }, 1, 1, 3).pointsShare).toEqual({ mean: 0.5, se: 0 });
     expect(new Set(xs).size).toBe(2);
     const mean = (xs[0]! + xs[1]!) / 2;
