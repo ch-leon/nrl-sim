@@ -8,6 +8,7 @@ import type Phaser from 'phaser';
 import { LiveSim } from '../../../src/match/league/live';
 import { labSheet, DEFAULT_HOME, DEFAULT_AWAY } from '../../../src/match/lab/sheets';
 import { LiveView, type ActorView } from '../../../src/match/view/liveView';
+import type { ContactAnimation } from '../../../src/match/view/contactAnimation';
 import { fieldOffsetX, fieldToWorldPoint } from '../../../src/scenes/matchField';
 import { toFieldPt } from '../../../src/match/core/field';
 import { binnedSpot } from '../../../src/match/view/officials';
@@ -16,11 +17,11 @@ import type { PlayerPicture } from '../../../src/match/view/playerPicture';
 import type { Snapshot } from '../../../src/match/core/snapshot';
 import { BreakClock, CAPTAIN_SLOT, FT_GONE, FT_FADE, RESTART_FADE, HT_FADE, TUNNEL, breakMan, breakScene } from '../../../src/match/view/walkOff';
 
-interface Drawn { x: number; y: number; alpha: number }
+interface Drawn { x: number; y: number; alpha: number; visible: boolean }
 function surface() {
   const off = fieldOffsetX();
   const make = (): ActorView & Drawn => {
-    const a = { x: 0, y: 0, alpha: 1, place(x: number, y: number) { a.x = x; a.y = y; }, play() {}, fade(v: number) { a.alpha = v; } };
+    const a = { x: 0, y: 0, alpha: 1, visible: true, place(x: number, y: number) { a.x = x; a.y = y; }, play() {}, fade(v: number) { a.alpha = v; }, setSpriteVisible(v: boolean) { a.visible = v; } };
     return a;
   };
   return {
@@ -114,7 +115,7 @@ describe('the whistle (#675)', () => {
       const frame = (prev: Snapshot, cur: Snapshot, a: number, held: number) => {
         view.draw(prev, cur, a, 1, held);
         const now = new Map<string, Drawn>();
-        for (const side of ['home', 'away'] as const) s.players[side].forEach((p, slot) => now.set(`${side}/${slot}`, { x: p.x, y: p.y, alpha: p.alpha }));
+        for (const side of ['home', 'away'] as const) s.players[side].forEach((p, slot) => now.set(`${side}/${slot}`, { x: p.x, y: p.y, alpha: p.alpha, visible: p.visible }));
         if (last) for (const [k, d] of now) {
           const b = last.get(k)!;
           // A step only counts where he is to be seen on both frames.
@@ -174,10 +175,11 @@ describe('a binned man at the whistle (#688)', () => {
     ],
   });
   const make = () => {
-    const s = { ...surface(), officials: { spot: binnedSpot, draw() {} } };
+    const contacts: (ContactAnimation | null)[] = [];
+    const s = { ...surface(), contact: { paint(state: ContactAnimation | null) { contacts.push(state); } }, officials: { spot: binnedSpot, draw() {} } };
     const pictures = new Map<string, PlayerPicture>();
     for (const side of ['home', 'away'] as const) s.players[side].forEach((a, slot) => { a.paint = p => { pictures.set(`${side}/${slot}`, p); }; });
-    return { s, view: new LiveView(s), pictures };
+    return { s, view: new LiveView(s), pictures, contacts };
   };
   const seat = (s: ReturnType<typeof surface>, snap: Snapshot, slot = 0) => {
     const at = binnedSpot(snap.players.find(p => p.side === 'home' && p.slot === slot)!, snap)!;
@@ -245,19 +247,38 @@ describe('a binned man at the whistle (#688)', () => {
     // home7 Xavier Stampton still in the bin. The old #688 witness used seven-minute halves.
     const sim = new LiveSim(labSheet(DEFAULT_HOME), labSheet(DEFAULT_AWAY), 45, { goldenPoint: true });
     let prev = sim.snapshot();
-    while (!sim.finished && sim.tick < 12_000) { prev = sim.snapshot(); sim.step(); }
+    let liveContact: [Snapshot, Snapshot] | null = null;
+    while (!sim.finished && sim.tick < 12_000) {
+      const before = sim.snapshot();
+      sim.step();
+      const current = sim.snapshot();
+      if (!liveContact && current.contact) liveContact = [before, current];
+      prev = before;
+    }
     const snap = sim.snapshot(), binned = snap.players.filter(p => p.binned);
     expect(snap.phase?.kind).toBe('full-time');
     expect([prev.tick, snap.tick]).toEqual([9074, 9075]);
     expect(binned.map(p => [p.side, p.slot])).toEqual([['home', 7]]);
-    const { s, view } = make();
+    expect(liveContact).not.toBeNull();
+    const { s, view, contacts } = make();
+    const [contactPrev, contactCur] = liveContact!;
+    view.draw(contactPrev, contactCur, 1);
+    expect(contacts[contacts.length - 1]).not.toBeNull();
+    const participants = [contactCur.contact!.carrier, ...contactCur.contact!.defenders];
+    expect(participants.every(p => !s.players[p.side][p.slot]!.visible)).toBe(true);
     view.draw(prev, snap, 1);
+    expect(contacts[contacts.length - 1]).toBeNull();
+    expect(participants.every(p => s.players[p.side][p.slot]!.visible)).toBe(true);
     const seats = binned.map(p => ({ x: s.players[p.side][p.slot]!.x, y: s.players[p.side][p.slot]!.y }));
     for (const alpha of [0, 0.5, 0.999]) {
       view.draw(prev, snap, alpha, 1, FT_GONE);
       for (const p of snap.players) expect(s.players[p.side][p.slot]!.alpha, `${p.side}/${p.slot} at alpha ${alpha}`).toBe(0);
     }
     binned.forEach((p, i) => expect({ x: s.players[p.side][p.slot]!.x, y: s.players[p.side][p.slot]!.y }).toEqual(seats[i]));
+    // A seek back into that exact live contact reconstructs the shared picture.
+    view.draw(contactPrev, contactCur, 1);
+    expect(contacts[contacts.length - 1]).not.toBeNull();
+    expect(participants.every(p => !s.players[p.side][p.slot]!.visible)).toBe(true);
     view.draw(snap, snap, 1);
     for (const p of snap.players) expect(s.players[p.side][p.slot]!.alpha).toBe(1);
   });

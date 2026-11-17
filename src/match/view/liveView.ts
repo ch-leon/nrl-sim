@@ -156,7 +156,10 @@ export class LiveView {
     let layout: ContactLayout | null = null;
     let contactFacing: 'front' | 'back' = 'front';
     if (this.s.contact) {
-      this.contactState = advanceContactAnimation(this.contactState, cur);
+      // A retained tackle picture belongs to live play. Whistle scenes move
+      // the players independently, so clear the shared pile before laying
+      // them out for the break (and reconstruct it normally after a seek back).
+      this.contactState = brk ? null : advanceContactAnimation(this.contactState, cur);
       if (this.contactState) {
         const carrier = cur.players.find(p => p.side === this.contactState!.contact.carrier.side && p.slot === this.contactState!.contact.carrier.slot)!;
         const facing = screenFacing(carrier, this.before(prev, carrier), this.screenDir);
