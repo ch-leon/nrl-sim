@@ -37,19 +37,31 @@ function terms(state: GameState, buyerId: string, p: Player) {
   for (let season = state.season; season <= end; season++) rows.push({ season, used: commitment([...buyer.squad, p], season), cap });
   return rows;
 }
-function check(state: GameState, sellerId: string, buyerId: string, playerId: string, fee: number): Refusal | null {
-  const seller = club(state, sellerId); const buyer = club(state, buyerId);
-  if (!seller || !buyer || sellerId === buyerId) return refuse('not-found', 'The named clubs are no longer available.');
+/** Seller refusals apply to every candidate and must remain visible in quotes. */
+function checkSeller(state: GameState, sellerId: string, playerId: string, fee: number): Refusal | null {
+  const seller = club(state, sellerId);
+  if (!seller) return refuse('not-found', 'The selling club is no longer available.');
   const p = seller.squad.find(x => x.id === playerId);
   try { if (!p || ownerOf(state, playerId) !== sellerId) return refuse('not-found', 'That player is no longer at the selling club.'); }
   catch { return refuse('invalid-owner', 'That player has conflicting ownership records.'); }
   if (!p!.deal || p!.deal.endSeason < state.season || !p!.clubHistory) return refuse('no-contract', 'There is no current agreement to transfer.');
   if ((p!.emergencyDealEndSeason ?? 0) >= state.season) return refuse('scholarship', 'An emergency scholarship cannot generate transfer proceeds.');
   if (seller.squad.length <= SQUAD_MIN) return refuse('squad-min', `The selling squad cannot drop below ${SQUAD_MIN}.`);
+  // Receiving proceeds may reduce an existing negative balance. Only the buyer
+  // spends cash, and that side must still fund the entire fee without debt.
+  if (!validMoney(fee) || !Number.isSafeInteger(seller.cash) || !Number.isSafeInteger(seller.cash + fee)) return refuse('invalid-funds', 'The selling balance or transfer fee is invalid.');
+  return null;
+}
+function check(state: GameState, sellerId: string, buyerId: string, playerId: string, fee: number): Refusal | null {
+  const sellerRefusal = checkSeller(state, sellerId, playerId, fee);
+  if (sellerRefusal) return sellerRefusal;
+  const buyer = club(state, buyerId);
+  if (!buyer || sellerId === buyerId) return refuse('not-found', 'The named buying club is no longer available.');
   if (buyer.squad.length >= SQUAD_CAP) return refuse('squad-full', 'The buying squad is full.');
-  if (!validMoney(fee) || !validMoney(seller.cash) || !validMoney(buyer.cash) || !validMoney(seller.cash + fee)) return refuse('invalid-funds', 'The transfer requires valid club funds.');
+  if (!validMoney(buyer.cash)) return refuse('invalid-funds', 'The buying club requires valid available funds.');
   if (buyer.cash < fee) return refuse('insufficient-funds', 'The buying club cannot afford that fee.');
-  if (terms(state, buyerId, p!).some(row => row.used > row.cap)) return refuse('over-cap', 'The existing deal and queued renewal do not fit the buyer’s salary cap.');
+  const p = club(state, sellerId)!.squad.find(x => x.id === playerId)!;
+  if (terms(state, buyerId, p).some(row => row.used > row.cap)) return refuse('over-cap', 'The existing deal and queued renewal do not fit the buyer’s salary cap.');
   return null;
 }
 function offerFor(state: GameState, sellerId: string, buyerId: string, p: Player, fee: number): SaleOffer {
@@ -59,9 +71,9 @@ function offerFor(state: GameState, sellerId: string, buyerId: string, p: Player
 export function quotePlayerSale(state: GameState, playerId: string): SalePreview {
   const p = state.squad.find(x => x.id === playerId);
   if (!p) return refuse('not-found', 'Player not found.');
-  if (state.squad.length <= SQUAD_MIN) return refuse('squad-min', `The squad cannot drop below ${SQUAD_MIN}.`);
-  if ((p.emergencyDealEndSeason ?? 0) >= state.season) return refuse('scholarship', 'An emergency scholarship cannot generate transfer proceeds.');
   const fee = saleOfferQuote(salaryDemand(p));
+  const sellerRefusal = checkSeller(state, state.clubId, playerId, fee);
+  if (sellerRefusal) return sellerRefusal;
   const candidates = state.league.clubs.filter(c => c.id !== state.clubId && c.squad).map(c => {
     const position = c.squad!.filter(x => x.position === p.position);
     return { id: c.id, need: Math.max(0, 2 - position.length), improvement: overallRating(p) - Math.max(0, ...position.map(overallRating)) };

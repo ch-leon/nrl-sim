@@ -111,7 +111,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
         heading: 'Advancing further',
         bullets: [
           'The ▾ beside Play Week runs ×4 weeks, to the finals or to the season’s end.',
-          `A long advance stops early when something needs you: fewer than 13 fit (the Academy would call up juniors to make the side), an injury, a contract about to run out, a decision card in News, or money: the week the balance goes into the red, and the week the balance passes the ${fmtMoney(ECON.FORCED_SALE_FLOOR)} floor (not every week in the red). A negative balance does not sell a player.`,
+          `A long advance stops early when something needs you: fewer than 13 fit (sign cover or risk a forfeit), an injury, a contract about to run out, a decision card in News, or money: the week the balance goes into the red, and the week the balance passes the ${fmtMoney(ECON.FORCED_SALE_FLOOR)} floor (not every week in the red). A negative balance does not sell a player.`,
         ],
       },
       {
@@ -183,7 +183,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
         bullets: [
           'A new signing covers the rest of this season and needs both the cash for the fee and room under the salary cap. You are warned at 8, 4 and 1 weeks, unless a renewal is already queued. When the deal ends he is unsigned unless you have renewed. Renewing queues one new season after this deal, and a second renewal in the same season does nothing. The board does not lend.',
           'The renewal ask follows his ability now, with a small change for age and potential. It does not move because he is unhappy, and the club’s reputation does not inflate it. A signed salary stays fixed until that deal ends.',
-          'There is no buyer for a sale yet. Release costs the payout shown, and it is refused when the cash is short. The squad can never drop below 13.',
+          'Sell previews a real buying club, its fee and the existing contract before you confirm. The buyer must have cash, squad space and salary-cap room. With no eligible buyer, nothing moves. Release costs the payout shown and is refused when cash is short. Neither action can take the squad below 13.',
         ],
       },
       {
@@ -198,10 +198,10 @@ export const CLUB_PAGES: readonly GuidePage[] = [
       {
         heading: 'Recruiting',
         bullets: [
-          'The free-agent pool holds 12 and refreshes every 4 weeks; rivals sign from the same pool and cannot go over the salary cap, so a good one does not wait. A signing costs one year’s wage up front (a quarter for an Academy prospect). A Scout Office takes 10% off the fee per level.',
+          'Scouting discovers up to 12 unsigned players every 4 weeks; it does not replace the people already in the world. Earlier Academy prospects and your club’s released or expired players remain accessible. Rivals recruit from that same population and need cash and salary-cap room. A signing costs one year’s wage up front (a quarter for an Academy prospect’s first signing). A Scout Office takes 10% off the fee per level.',
           `The pool sits around the league: at a new club its players are about ${LEAGUE.MEAN - LEAGUE.POOL_BELOW} overall, with a star now and then. Reputation, a Scout Office and an Academy lift it.`,
           'Each pre-season the Academy brings 3 prospects aged 17–19 into the pool, 4 with an Academy built and 5 at level 3; from level 2 they arrive as Young Guns.',
-          `Short of ${SQUAD_MIN} fit before a match, the Academy calls up juniors to make the side, on the junior wage to the season’s end (better ones with an Academy built).`,
+          `At season rollover, expiry or retirement can leave fewer than ${SQUAD_MIN} registered players. Emergency scholarships fill only those vacancies up to the minimum; injuries and bans do not create replacements. A scholarship lasts one season and cannot be sold or released during that term.`,
         ],
       },
     ],

@@ -114,3 +114,65 @@ describe('funded player transfers', () => {
     expect(validatePlayerPopulation(r.state)).toBeNull();
   });
 });
+
+describe('sale proceeds and existing player debt', () => {
+  it.each(['partial', 'exact', 'positive'] as const)('credits a %s debt recovery from a funded buyer without creating debt or duplicate ownership', recovery => {
+    const { s, p, buyer } = fixture();
+    const fee = saleOfferQuote(salaryDemand(p));
+    s.money = recovery === 'partial' ? -2 * fee : recovery === 'exact' ? -fee : -fee + 500;
+    buyer.cash = fee;
+    const before = structuredClone(s);
+    const quote = quotePlayerSale(s, p.id);
+    expect(quote.ok).toBe(true); if (!quote.ok) throw Error(quote.message);
+    expect(s).toEqual(before);
+    const moved = applyPlayerSale(s, quote.offer);
+    expect(moved.ok).toBe(true); if (!moved.ok) throw Error(moved.message);
+    const afterBuyer = moved.state.league.clubs.find(c => c.id === buyer.id)!;
+    expect(moved.state.money).toBe(s.money + fee);
+    expect(afterBuyer.cash).toBe(0);
+    expect(moved.state.money + afterBuyer.cash!).toBe(s.money + buyer.cash!);
+    expect(ownerOf(moved.state, p.id)).toBe(buyer.id);
+    expect(moved.state.squad.some(x => x.id === p.id)).toBe(false);
+    expect(afterBuyer.squad!.filter(x => x.id === p.id)).toHaveLength(1);
+    expect(validatePlayerPopulation(moved.state)).toBeNull();
+    expect(migrateState(JSON.parse(JSON.stringify(moved.state))).ok).toBe(true);
+    setState(s); registerFinanceSystem();
+    expect(confirmPlayerSale(quote.offer).ok).toBe(true);
+    expect(getState().money).toBe(s.money + fee);
+    expect(getState().finance[0]!.transfers).toBe(s.finance[0]!.transfers + fee);
+    expect(confirmPlayerSale(quote.offer).ok).toBe(false);
+  });
+
+  it.each([Number.MAX_SAFE_INTEGER, Number.MIN_SAFE_INTEGER - 1, 1.5, NaN, Infinity])('reports invalid seller funds %s without masking them as no buyer', balance => {
+    const { s, p, buyer } = fixture(); s.money = balance;
+    const before = structuredClone(s);
+    expect(quotePlayerSale(s, p.id)).toMatchObject({ ok: false, reason: 'invalid-funds' });
+    expect(transferBetweenClubs(s, s.clubId, buyer.id, p.id, 1000)).toMatchObject({ ok: false, reason: 'invalid-funds' });
+    expect(s).toEqual(before);
+  });
+
+  it('reports missing contracts and conflicting owners before searching for buyers', () => {
+    const { s, p } = fixture(); delete p.deal;
+    expect(quotePlayerSale(s, p.id)).toMatchObject({ ok: false, reason: 'no-contract' });
+    const second = fixture(); second.buyer.squad!.push(structuredClone(second.p));
+    expect(quotePlayerSale(second.s, second.p.id)).toMatchObject({ ok: false, reason: 'invalid-owner' });
+    expect(quotePlayerSale(second.s, 'missing')).toMatchObject({ ok: false, reason: 'not-found' });
+  });
+
+  it.each([-1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])('still refuses invalid buyer cash %s, even for a seller in debt', cash => {
+    const { s, p, buyer } = fixture(); s.money = -1000; buyer.cash = cash;
+    const before = structuredClone(s);
+    expect(quotePlayerSale(s, p.id)).toMatchObject({ ok: false, reason: 'no-buyer' });
+    expect(transferBetweenClubs(s, s.clubId, buyer.id, p.id, 1000)).toMatchObject({ ok: false, reason: 'invalid-funds' });
+    expect(s).toEqual(before);
+  });
+
+  it('refuses an unaffordable buyer and a player trying to buy while in debt', () => {
+    const { s, p, buyer } = fixture();
+    const fee = saleOfferQuote(salaryDemand(p));
+    s.money = -1000; buyer.cash = fee - 1;
+    expect(quotePlayerSale(s, p.id)).toMatchObject({ ok: false, reason: 'no-buyer' });
+    expect(transferBetweenClubs(s, s.clubId, buyer.id, p.id, fee)).toMatchObject({ ok: false, reason: 'insufficient-funds' });
+    expect(transferBetweenClubs(s, buyer.id, s.clubId, buyer.squad![0]!.id, 1000)).toMatchObject({ ok: false, reason: 'invalid-funds' });
+  });
+});
