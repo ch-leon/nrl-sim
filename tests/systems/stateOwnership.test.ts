@@ -122,10 +122,10 @@ it('an upgrade charges one finance movement, publishes once after payment, toast
   const cost = upgradeCost(FACILITY_CATALOG.trainingPaddock, 2);
   expect(upgradeFacility(facility.id)).toBe(true);
   expect(getState()).toEqual({ ...before, money: before.money - cost,
-    finance: [{ ...before.finance[0]!, facilities: -cost }], facilities: [{ ...facility, level: 2 }] });
+    finance: [{ ...before.finance[0]!, facilities: -cost }], facilities: [{ ...facility, level: 2, constructionSpend: cost }] });
   expect(movement).toHaveBeenCalledTimes(1);
   expect(movement.mock.calls[0]![0]).toMatchObject({ delta: -cost, reason: 'upgrade:trainingPaddock' });
-  expect(changed).toHaveBeenCalledTimes(3); // money, one ledger booking, facilities
+  expect(changed).toHaveBeenCalledTimes(2); // atomic money/facility commit, one ledger booking
   expect(notify).toHaveBeenCalledTimes(1); expect(saveSpy).not.toHaveBeenCalled();
   expect(currentOffer()).toBe(offer); expect(offer!.canRevert(getState())).toBe(false);
   expect(undoNow()).toBe(false); // the original build cannot undo an upgraded building

@@ -45,7 +45,7 @@ describe('Staff & Board: the attack coach’s row', () => {
     const row = attackCoachRow(getState()) as unknown as StubNode;
     const hires = row.querySelectorAll('[data-hire-attack]');
     expect(hires.map((b) => b.attrs['data-hire-attack'])).toEqual(['direct', 'width', 'kicking', 'razzle']);
-    expect(hires.map((b) => b.textContent)).toEqual(['Hire Direct$800/wk', 'Hire Width$950/wk', 'Hire Kicking$900/wk', 'Hire RazzleNeeds reputation 50']);
+    expect(hires.map((b) => b.textContent)).toEqual(['Hire Direct$16,000 once', 'Hire Width$19,000 once', 'Hire Kicking$18,000 once', 'Hire RazzleNeeds reputation 50']);
     expect(hires.map((b) => b.disabled)).toEqual([false, false, false, true]);
     expect(row.words()).toContain('Plays you buy stay if he goes.');
 
@@ -53,7 +53,7 @@ describe('Staff & Board: the attack coach’s row', () => {
     tap(q('[data-hire-attack="direct"]'));
     const held = q('[data-staff="attackCoach"]')!;
     expect(held.attrs['data-speciality']).toBe('direct');
-    expect(held.textContent).toContain(`Attack Coach (direct play): ${getState().staff[0]!.name} · $800/wk`);
+    expect(held.textContent).toContain(`Attack Coach (direct play): ${getState().staff[0]!.name} · appointed`);
     expect(held.querySelectorAll('[data-hire-attack]')).toHaveLength(0);
     expect(body().words()).toContain('Staff · 1 of 4 hired');
     const release = held.all().find((n) => n.tagName === 'BUTTON' && n.textContent === 'Release')!;
@@ -111,7 +111,7 @@ describe('the Playbook (plan §4.1)', () => {
     expect(others.querySelector('[data-play="cut-out-winger"]')!.textContent).toContain('Hire the shift and width coach to buy');
 
     tap(block);
-    expect(getState().money).toBe(200_000 - 8000);
+    expect(getState().money).toBe(200_000 - 16_000 - 8000);
     expect(ownedPlays(getState())).toEqual(['block-play']);
     const owned = q('[data-playbook-owned]')!;
     expect(owned.querySelector('[data-play="block-play"]')).not.toBeNull();

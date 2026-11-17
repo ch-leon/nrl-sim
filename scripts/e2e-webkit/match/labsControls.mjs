@@ -1,6 +1,21 @@
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { reachLabsHintPossession } from '../../e2e-labs-hint.mjs';
 import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav } from '../common.mjs';
+
+// Read-only failure evidence as well as the eligibility input. A displayed hint
+// holds playback, so controlsAvailable becomes false once the real hint opens.
+function labsHintState() {
+  const match = window.__nrlGame?.scene.getScene('Match'), pb = match?.playback;
+  return {
+    mine: match?.live?.planSide ?? null, attacking: pb?.controlAttacking ?? null,
+    phase: pb?.controlPhase ?? null, holderSide: pb?.controlPicture.ball.holder?.side ?? null,
+    controlsAvailable: !!pb?.controlsAvailable, hintPresent: !!document.querySelector('.nrl-labs-hint'),
+    finished: !!pb?.finished || !!document.querySelector('.nrl-mo-final'),
+    halfTimePending: [...document.querySelectorAll('.nrl-mo-plan-head')].some(el => el.textContent === 'Half-time'),
+    tick: pb?.tick ?? null, clock: pb?.controlPicture.clock ?? null,
+  };
+}
 
 // Labs controls plus the tackle HUD: --controls-only runs this phase in isolation.
 // E2E_CHROMIUM_PATH provides an explicit local fallback; CI always uses WebKit.
@@ -33,7 +48,25 @@ export async function runLabsControls(browser) {
       if (await ask.count()) await ask.first().tap();
     }
     await page.locator('.nrl-labs-badge').waitFor();
-    await page.locator('.nrl-labs-hint').waitFor({ timeout: 25000 });
+    // The seeded kickoff can give them the first set. A 25s wall-time wait used
+    // to expire on their last-tackle kick, just before our eligible reception.
+    const possession = await reachLabsHintPossession({
+      readState: () => page.evaluate(labsHintState),
+      advanceOpponentSet: () => page.evaluate(() => {
+        const match = window.__nrlGame?.scene.getScene('Match'), pb = match?.playback;
+        if (!match?.live?.planSide || !pb?.controlsAvailable || pb.controlAttacking === match.live.planSide) return false;
+        pb.skipSet(); return true;
+      }),
+      continueHalfTime: async () => {
+        const card = page.locator('.nrl-mo-plan', { has: page.locator('.nrl-mo-plan-head', { hasText: /^Half-time$/ }) });
+        await card.locator('.nrl-mo-plan-go').tap();
+        await card.waitFor({ state: 'detached', timeout: 5000 });
+      },
+      wait: ms => page.waitForTimeout(ms), timeoutMs: 25000,
+    });
+    log(`  Labs hint eligible possession: ${JSON.stringify(possession)}`);
+    // Eligibility never stands in for the actual UI: a missing hint still fails.
+    await page.locator('.nrl-labs-hint').waitFor({ state: 'visible', timeout: 5000 });
     await page.screenshot({ path: join(OUT, 'hint.png') });
     await page.locator('.nrl-labs-hint').tap();
     // A seeded first carry can end as the hint closes. Wait and send in the
@@ -184,6 +217,9 @@ export async function runLabsControls(browser) {
     return 0;
   } catch (err) {
     log(`FAIL labs controls — ${err.message}`);
+    const state = await page.evaluate(labsHintState).catch(() => null);
+    log(`  Labs failure state: ${JSON.stringify(state)}`);
+    writeFileSync(join(OUT, 'failure-state.json'), JSON.stringify({ error: err.message, state }, null, 2));
     await page.screenshot({ path: join(OUT, 'failure.png') }).catch(() => {});
     return 1;
   } finally { await ctx.close(); }

@@ -77,7 +77,7 @@ describe('regional cup entry and existing calendar hooks', () => {
     const finished = cup(); expect(finished.status).toBe('completed'); expect(finished.fixtures).toHaveLength(23);
     expect(finished.fixtures[finished.fixtures.length - 1]).toMatchObject({ slot: 19, neutral: true, status: 'completed' });
     expect(getState().league.ladder.find(r => r.clubId === 'player')!.played).toBe(10);
-    expect(getState().money).toBe(cash); expect(getState().squad.map(p => p.contractWeeks)).toEqual(contracts);
+    expect(getState().money).toBe(cash + received()); expect(getState().squad.map(p => p.contractWeeks)).toEqual(contracts);
     const outcomes = openCupSportingOutcomes(finished); expect(outcomes).toHaveLength(24);
     expect(outcomes.filter(o => o.kind === 'title')).toMatchObject([{ clubId: finished.winnerId }]);
     expect(openCupSportingOutcomes(clone(finished))).toEqual(outcomes);
@@ -146,14 +146,15 @@ describe('regional cup entry and existing calendar hooks', () => {
     registerFixturesSystem(); registerPlayerMatchSystem(); let ticks = 0; registerTickHook('count', 2, () => { ticks++; });
     let started: { fixture: Fixture; home: TeamSheet; away: TeamSheet; live: LiveMatchData } | undefined;
     bus.on('match:started', value => { started = value; });
-    const ladder = JSON.stringify(getState().league.ladder); const money = getState().money;
+    const ladder = JSON.stringify(getState().league.ladder); const money = getState().money; const incomeBefore = received();
     advanceWeek(); expect(weekHeld()).toBe(true); expect(started!.fixture.competitionId).toBe(cup().id);
     advanceWeek(); expect(ticks).toBe(1);
     const played = started!; const result = runMatch(played.home, played.away, played.live);
     bus.emit('match:finished', { fixture: played.fixture, result });
     expect(weekHeld()).toBe(false); expect(getState().week).toBe(8);
     expect(cup().fixtures.filter(f => f.round === 2)).toHaveLength(8);
-    expect(JSON.stringify(getState().league.ladder)).toBe(ladder); expect(getState().money).toBe(money);
+    expect(JSON.stringify(getState().league.ladder)).toBe(ladder); expect(getState().money).toBe(money + received() - incomeBefore);
+    expect(received() - incomeBefore).toBeGreaterThan(0);
     const after = JSON.stringify(getState());
     bus.emit('match:finished', { fixture: played.fixture, result });
     expect(JSON.stringify(getState())).toBe(after); expect(ticks).toBe(1);
@@ -171,7 +172,7 @@ describe('early supported cup import policy', () => {
     if (fault === 'future clash') saved.definition.stages[0]!.slotIds![1] = 8;
     if (fault === 'undrawn') { saved.status = 'entered'; saved.stageId = null; saved.fixtures = []; }
     if (fault === 'missed round') saved.fixtures = saved.fixtures.filter(f => f.round === 1);
-    expect(importSave(JSON.stringify(bad)).ok).toBe(true); // Metadata is otherwise structurally valid.
+    expect(importSave(JSON.stringify(bad)).ok).toBe(fault !== 'missed round'); // Removing played fixtures also leaves invalid receipt references.
     expect(structuralPolicyProblem(bad)).not.toBeNull();
     save(getState()); bytes.set(DEV_TEST_PREFIX + liveMatchKey(1), 'existing sidecar'); const before = new Map(bytes);
     expect(installImportedSave(JSON.stringify(bad), 1).ok).toBe(false);
@@ -181,3 +182,8 @@ describe('early supported cup import policy', () => {
     setState(bad); const unchanged = JSON.stringify(getState()); advanceWeek(); expect(JSON.stringify(getState())).toBe(unchanged);
   });
 });
+
+
+function received(state = getState(), clubId: string = state.clubId): number {
+  return state.matchIncome.reduce((sum, r) => sum + (r.fixture.homeId === clubId ? r.receipt?.home.total ?? 0 : r.fixture.awayId === clubId ? r.receipt?.away.total ?? 0 : 0), 0);
+}

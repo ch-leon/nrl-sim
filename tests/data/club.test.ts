@@ -3,16 +3,14 @@ import {
   addPlayer, removePlayer, addFacility, spendMoney, earnMoney,
 } from '../../src/data/club';
 import { createNewGame, getState, setState, type Player } from '../../src/core/state';
-import { makeRng } from '../../src/utils/rng';
-import { generatePlayer } from '../../src/data/player';
 import { bus } from '../../src/core/events';
 import { SQUAD_CAP, SQUAD_MIN, GRID_W, GRID_H } from '../../src/config';
 
-const gen = (seed: number): Player => generatePlayer(makeRng(seed));
 
 beforeEach(() => {
   bus.clear();
   createNewGame('Test Club', 1);
+  setState({ money: 10_000_000 });
 });
 
 describe('addPlayer', () => {
@@ -20,19 +18,21 @@ describe('addPlayer', () => {
     let signed: Player | null = null;
     bus.on('player:signed', (p) => { signed = p; });
     const before = getState().squad.length;
-    const p = gen(500);
+    const p = getState().freeAgents[0]!;
     expect(addPlayer(p)).toBe(true);
     expect(getState().squad).toHaveLength(before + 1);
-    expect(signed).toEqual(p);
+    expect(signed).toMatchObject({ id: p.id });
+    expect(getState().freeAgents.some(x => x.id === p.id)).toBe(false);
   });
 
   it('rejects at SQUAD_CAP without mutating', () => {
     // Fill to cap.
-    while (getState().squad.length < SQUAD_CAP) addPlayer(gen(getState().squad.length + 1000));
+    const template = getState().squad[0]!;
+    setState({ squad: Array.from({ length: SQUAD_CAP }, (_, i) => ({ ...template, id: `full:${i}` })) });
     expect(getState().squad).toHaveLength(SQUAD_CAP);
     let emitted = false;
     bus.on('player:signed', () => { emitted = true; });
-    expect(addPlayer(gen(9999))).toBe(false);
+    expect(addPlayer(getState().freeAgents[0]!)).toBe(false);
     expect(getState().squad).toHaveLength(SQUAD_CAP);
     expect(emitted).toBe(false);
   });

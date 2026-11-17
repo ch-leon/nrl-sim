@@ -2,28 +2,22 @@
 // See BAK-172. Mutate via setState and emit the relevant bus event. No Phaser.
 // The club is embedded in GameState (§1.2) — there is no separate Club class.
 
+import { signPlayer, releasePlayer } from '../systems/freeagency';
 import { getState, setState, type Player, type PlacedFacility } from '../core/state';
+import { weekHeld } from '../core/time';
 import { bus } from '../core/events';
 import { makeRng } from '../utils/rng';
 import { FACILITY_CATALOG, type FacilityDefId } from './facility';
-import { SQUAD_CAP, SQUAD_MIN, GRID_W, GRID_H } from '../config';
+import { GRID_W, GRID_H } from '../config';
 
-/** Add a player to the squad. Returns false when at SQUAD_CAP. */
+/** Canonical recruitment only: callers cannot insert a copied/generated person. */
 export function addPlayer(p: Player): boolean {
-  const s = getState();
-  if (s.squad.length >= SQUAD_CAP) return false;
-  setState({ squad: [...s.squad, p] });
-  bus.emit('player:signed', p);
-  return true;
+  return signPlayer(getState(), p.id).ok;
 }
 
-/** Remove a player by id. Returns false at SQUAD_MIN or if the id is absent. */
+/** A removal is a real release with its payout, minimum and history rules. */
 export function removePlayer(playerId: string): boolean {
-  const s = getState();
-  if (s.squad.length <= SQUAD_MIN) return false;
-  if (!s.squad.some((p) => p.id === playerId)) return false;
-  setState({ squad: s.squad.filter((p) => p.id !== playerId) });
-  return true;
+  return releasePlayer(getState(), playerId).ok;
 }
 
 /**
@@ -37,11 +31,13 @@ export function addFacility(
   x: number,
   y: number,
   level: 1 | 2 | 3 = 1,
+  purchaseCost?: number,
 ): PlacedFacility | null {
   const s = getState();
   const def = FACILITY_CATALOG[defId];
   const { w, h } = def.footprint;
 
+  if (purchaseCost !== undefined && (weekHeld() || !Number.isSafeInteger(purchaseCost) || purchaseCost < 0 || s.money < purchaseCost)) return null;
   if (x < 0 || y < 0) return null;
   if (x + w > GRID_W || y + h > GRID_H) return null;
 
@@ -50,8 +46,9 @@ export function addFacility(
   const id = `f_${rng.state().toString(36)}_${rng.int(0, 1e6)}`;
   const rngSeed = rng.state();
 
-  const facility: PlacedFacility = { id, defId, level, x, y };
-  setState({ facilities: [...s.facilities, facility], rngSeed });
+  const facility: PlacedFacility = { id, defId, level, x, y, constructionSpend: purchaseCost ?? 0 };
+  setState({ facilities: [...s.facilities, facility], rngSeed, money: s.money - (purchaseCost ?? 0) });
+  if (purchaseCost !== undefined) bus.emit('money:changed', { delta: -purchaseCost, reason: `build:${defId}`, balance: s.money - purchaseCost });
   bus.emit('facility:placed', facility);
   return facility;
 }

@@ -139,7 +139,8 @@ describe('one interval and one canonical fixture finalisation', () => {
     finish(first); expect(weekHeld()).toBe(true); expect(getState().week).toBe(2);
     finish(cup); expect(JSON.stringify(getState().league.ladder)).toBe(league);
     advanceWeek(); finish();
-    expect(intervals).toBe(3); expect(getState().money).toBe(cash);
+    expect(intervals).toBe(3); expect(getState().money).toBe(cash + received());
+    expect(getState().matchIncome.filter(r => r.receipt)).toHaveLength(3);
     expect(getState().squad.map(p => p.contractWeeks)).toEqual(contracts);
     expect(getState().season).toBe(2); expect(getState().week).toBe(1);
     expect(getState().competitions!.calendar).toMatchObject({ status: 'awaiting-next-season', elapsedIntervals: 3 });
@@ -415,3 +416,8 @@ describe('structural calendar freeze recovery', () => {
     }
   });
 });
+
+
+function received(state = getState(), clubId: string = state.clubId): number {
+  return state.matchIncome.reduce((sum, r) => sum + (r.fixture.homeId === clubId ? r.receipt?.home.total ?? 0 : r.fixture.awayId === clubId ? r.receipt?.away.total ?? 0 : 0), 0);
+}

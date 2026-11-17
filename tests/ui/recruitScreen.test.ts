@@ -72,7 +72,7 @@ describe('Recruit screen', () => {
     setState({ money: Math.floor(fee / 1.2), freeAgents: pool }); openRecruitScreen();
     const reach = rows().find((r) => r.attrs['data-row-player'] === pool[0]!.id)!;
     expect(reach.children[4]!.style.color).toBe('var(--nrl-alert)');
-    expect(reach.textContent).toMatch(new RegExp(`Fee \\$${fee.toLocaleString('en-US')}: about \\d+ weeks away`));
+    expect(reach.textContent).toMatch(new RegExp(`Fee \\$${fee.toLocaleString('en-US')}: more cash needed`));
     expect(screen().querySelectorAll('[data-coach-pick]')).toHaveLength(1);
     expect(rows().filter((r) => r.children[4]!.style.color === 'var(--nrl-alert)')).toHaveLength(1);
   });
@@ -95,4 +95,37 @@ describe('Recruit screen', () => {
     action(rows().find((r) => !action(r).disabled)!).click();
     expect(rows()).toHaveLength(getState().freeAgents.length);
   });
+});
+
+it('Show all counts and displays all scouted people without exposing undiscovered unsigned players', () => {
+  const s = getState();
+  setState({ playerPopulation: { ...s.playerPopulation, shortlistIds: s.freeAgents.slice(0, 6).map(p => p.id) } });
+  openRecruitScreen();
+  const more = screen().querySelector('[data-show-all]')!;
+  expect(more.textContent).toBe('Show all 6');
+  more.click();
+  expect(new Set(rows().map(r => r.attrs['data-row-player']))).toEqual(new Set(s.freeAgents.slice(0, 6).map(p => p.id)));
+  expect(getState().freeAgents).toBe(s.freeAgents);
+});
+
+it('describes discovery timing and the actual scouted count when pinned prospects exceed twelve', () => {
+  const s = getState();
+  const prospect = { ...s.freeAgents[0]!, id: 'academy-extra', junior: true };
+  setState({ week: 4, freeAgents: [...s.freeAgents, prospect] });
+  openRecruitScreen();
+  const sub = screen().querySelector('.nrl-screen-sub')!;
+  expect(sub.textContent).toContain('13 scouted');
+  expect(sub.textContent).toContain('next discovery after this week');
+  expect((sub as unknown as { title: string }).title).toContain('13 scouted players');
+  expect(screen().textContent).not.toMatch(/new players|pool of 12/i);
+  expect((sub as unknown as { title: string }).title).not.toMatch(/new players|pool of 12/i);
+});
+
+it('an empty discovery list does not promise player births on refresh', () => {
+  const s = getState();
+  setState({ freeAgents: [], playerPopulation: { ...s.playerPopulation, shortlistIds: [] } });
+  openRecruitScreen();
+  expect(screen().querySelector('.nrl-screen-empty')!.textContent).toBe('No scouted free agents available. Discovery refreshes in 4 weeks.');
+  expect(screen().querySelector('.nrl-screen-sub')!.textContent).toContain('0 scouted · next discovery in 4 weeks');
+  expect(screen().textContent).not.toMatch(/new players|players arrive/i);
 });

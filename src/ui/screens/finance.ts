@@ -11,7 +11,7 @@ import { currentRound, inTrials } from '../../core/season';
 import { bus } from '../../core/events';
 import { getState, FINANCE_LINES, type FinanceLine, type GameState, type SeasonFinance } from '../../core/state';
 import {
-  weeklyWages, weeklyUpkeep, weeklyOverhead, weeklyIncome, sponsorIncome, groundCapacity, homeGate, nextStandGate, financeNet,
+  weeklyWages, weeklyUpkeep, weeklyOverhead, weeklyIncome, groundCapacity, homeGate, nextStandGate, financeNet,
   classifyReason, stampMovement, type StandProjection,
 } from '../../systems/economy';
 import { capTotals } from '../../systems/cap';
@@ -99,7 +99,7 @@ export function financeSummary(state: GameState): FinanceSummary {
   const upkeepWeekly = weeklyUpkeep(state);
   const overheadWeekly = weeklyOverhead(state);
   const incomeWeekly = weeklyIncome(state);
-  const sponsorWeekly = sponsorIncome(state);
+  const sponsorWeekly = 0; // Sponsor income belongs to played matches, never the weekly projection.
   const grantWeekly = incomeWeekly - sponsorWeekly;
 
   const nextFixture = state.league.fixtures
@@ -258,8 +258,8 @@ const financeLedger = new FinanceLedger();
  * unsubscribe.
  */
 export function initFinanceLedger(ledger: FinanceLedger = financeLedger): () => void {
-  return bus.on('money:changed', ({ delta, reason }) => {
-    const { season, week } = stampMovement(getState(), reason);
+  return bus.on('money:changed', ({ delta, reason, stamp }) => {
+    const { season, week } = stamp ?? stampMovement(getState(), reason);
     ledger.record({ delta, reason, season, week });
   });
 }

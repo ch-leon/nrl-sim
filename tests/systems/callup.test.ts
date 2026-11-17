@@ -4,12 +4,12 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { bus } from '../../src/core/events';
 import { getState, setState } from '../../src/core/state';
 import { advanceWeek, clearHeldWeek, clearSeasonHooks, clearTickHooks, registerTickHook, TICK_ORDER, withFastForward } from '../../src/core/time';
-import { getCurrentFixture, initLeague, PLAYER_ID, registerFixturesSystem } from '../../src/systems/fixtures';
+import { initLeague, registerFixturesSystem } from '../../src/systems/fixtures';
 import { callUpJuniors, generateProspects, registerYouthSystem } from '../../src/systems/youth';
 import { fitSquadCount } from '../../src/systems/matchday';
 import { overallRating } from '../../src/data/player';
 import { makeRng } from '../../src/utils/rng';
-import { SQUAD_CAP, SQUAD_MIN, WEEKS_PER_SEASON } from '../../src/config';
+import { SQUAD_CAP, SQUAD_MIN } from '../../src/config';
 
 afterEach(() => {
   bus.clear();
@@ -24,9 +24,9 @@ function squadWithFit(fit: number) {
 }
 
 describe('callUpJuniors', () => {
-  it('reaches the minimum fit, never over it, at the junior wage to the season\'s end', () => {
+  it('reaches the registration minimum, never over it, at the junior wage to the season\'s end', () => {
     for (const fit of [0, 5, SQUAD_MIN - 1]) {
-      const squad = squadWithFit(fit).slice(0, Math.max(fit, SQUAD_MIN));
+      const squad = squadWithFit(fit).slice(0, fit);
       const called = callUpJuniors(makeRng(1), squad, 0, 3, 10);
       expect(called).toHaveLength(SQUAD_MIN - fit);
       expect(fitSquadCount([...squad, ...called])).toBe(SQUAD_MIN);
@@ -47,7 +47,7 @@ describe('callUpJuniors', () => {
   it('never takes the squad past the cap', () => {
     const base = squadWithFit(0);
     const squad = [...base, ...base, ...base].slice(0, SQUAD_CAP - 2).map((p, i) => ({ ...p, id: `x${i}` }));
-    expect(callUpJuniors(makeRng(1), squad, 0, 1, 10)).toHaveLength(2);
+    expect(callUpJuniors(makeRng(1), squad, 0, 1, 10)).toEqual([]);
   });
 
   it('an Academy calls up better juniors than none (the same seeds)', () => {
@@ -78,21 +78,12 @@ describe('the call-up in the week', () => {
     registerYouthSystem();
   }
 
-  it('makes the side before the match, says who came up, and plays the round instead of forfeiting', () => {
+  it('does not manufacture players for injuries or bans during a week', () => {
     newGame();
     setState({ squad: getState().squad.map((p, i) => ({ ...p, injuredWeeks: i < 9 ? 0 : 5 })) });
-    const before = getState().squad.length;
-    let fitAtMatch = -1;
-    registerTickHook('probe-fit', TICK_ORDER.match - 0.5, () => { fitAtMatch = fitSquadCount(getState().squad); });
-    const toasts: string[] = [];
-    bus.on('ui:notify', (n) => toasts.push(n.text));
-    expect(getCurrentFixture(getState(), PLAYER_ID)).toBeDefined();
+    const before = getState().squad.map(p => p.id);
     withFastForward(() => advanceWeek());
-    expect(fitAtMatch).toBe(SQUAD_MIN);
-    expect(getState().squad.length).toBe(before + (SQUAD_MIN - 9));
-    const called = getState().squad.slice(before);
-    expect(called.every((p) => p.contractWeeks === WEEKS_PER_SEASON)).toBe(true); // week 1: the whole season
-    expect(toasts.some((t) => t.startsWith('Academy call-up: ') && called.every((p) => t.includes(p.name)))).toBe(true);
+    expect(getState().squad.map(p => p.id)).toEqual(before);
   });
 
   it('a club with enough fit men draws no dice for it: the week plays as before', () => {

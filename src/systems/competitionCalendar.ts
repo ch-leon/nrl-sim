@@ -1,3 +1,4 @@
+import { freezeMatchIncome, reconcileMatchIncome } from './matchIncome';
 // Structural calendar/result adapter. Production offers and finance remain gated.
 import type { Fixture, GameState, LadderRow } from '../core/state';
 import { careerNamespace } from '../core/storage/local';
@@ -146,6 +147,7 @@ export function finaliseCalendarFixture(state: GameState, bridge: Fixture, score
   const context = calendarFixtureContext(state, bridge);
   if (!context) return state;
   const { instance, fixture } = context;
+  state = freezeMatchIncome(state, bridge);
   const result = resolvedResult(instance, fixture, score, forfeit);
   const updated = progressInstance({ ...instance, stageId: fixture.stageId,
     fixtures: instance.fixtures.map(f => f.id === fixture.id ? { ...f, status: 'completed', result } : f) });
@@ -156,7 +158,7 @@ export function finaliseCalendarFixture(state: GameState, bridge: Fixture, score
   // A compatibility read model for the player's own league. Cup results never change it.
   const ladder = stage.kind === 'league' && instance.entrantIds.includes(state.clubId)
     ? competitionLadder(updated) : state.league.ladder;
-  return { ...state, competitions, league: ladder === state.league.ladder ? state.league : { ...state.league, ladder } };
+  return reconcileMatchIncome({ ...state, competitions, league: ladder === state.league.ladder ? state.league : { ...state.league, ladder } });
 }
 
 export function competitionLadder(instance: CompetitionInstance): LadderRow[] {

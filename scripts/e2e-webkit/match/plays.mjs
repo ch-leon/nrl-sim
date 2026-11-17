@@ -1,3 +1,4 @@
+import { pollMatchPlay } from '../../e2e-match-play.mjs';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log } from '../common.mjs';
@@ -87,7 +88,24 @@ export async function runMatchPlays(browser, sizes = [[844, 390], [667, 375], [5
         };
       });
       const settle = () => page.evaluate(() => Promise.all(document.querySelector('.nrl-mo-calls').getAnimations({ subtree: true }).map((a) => a.finished.catch(() => {}))));
+      let halfTimeContinuations = 0;
+      const halfTimeCard = () => page.locator('.nrl-mo-plan', { has: page.locator('.nrl-mo-plan-head', { hasText: /^Half-time$/ }) });
+      const halfTimePending = async () => (await halfTimeCard().count()) > 0;
+      const finished = () => page.evaluate(() => !!document.querySelector('.nrl-mo-final') || window.__nrlGame.scene.getScene('Match').finished);
+      const currentTactics = () => page.evaluate(() => { const sc = window.__nrlGame.scene.getScene('Match'); return sc.playback.planFor(sc.callSide); });
+      const continueHalfTime = async () => {
+        const before = await currentTactics();
+        await page.screenshot({ path: join(OUT, `halftime-${tag}-${w}x${h}.png`) });
+        // Press the normal Continue only: leave the selected attack and defence untouched.
+        await halfTimeCard().locator('.nrl-mo-plan-go').tap();
+        await halfTimeCard().waitFor({ state: 'detached', timeout: 5000 });
+        if (JSON.stringify(await currentTactics()) !== JSON.stringify(before)) throw new Error('Half-time continuation changed the selected tactics');
+        halfTimeContinuations++;
+        log(`    ${w}x${h} ${tag}: continued half-time with ${before.attack}/${before.defence}`);
+      };
       const openTray = async () => {
+        if (await finished()) throw new Error('Match finished before opening the coach tray');
+        if (await halfTimePending()) await continueHalfTime();
         if (await page.locator('.nrl-mo-calls[hidden]').count()) await page.locator('.nrl-mo-bar [data-coach]').tap();
         await page.waitForSelector('.nrl-mo-calls:not([hidden])', { timeout: 3000 });
         await settle();
@@ -102,7 +120,11 @@ export async function runMatchPlays(browser, sizes = [[844, 390], [667, 375], [5
        */
       const TRAY_OPEN_WAIT_MS = 240000;
       /** Wait for the tray's title to read `title` (his side's ball, or theirs) with it open. */
-      const waitTitle = (title) => page.waitForFunction((t) => document.querySelector('.nrl-mo-tray-title')?.textContent === t, title, { timeout: TRAY_OPEN_WAIT_MS });
+      const waitMatchState = (probe, arg, description, { timeoutMs = TRAY_OPEN_WAIT_MS, tray = true } = {}) => pollMatchPlay({
+        probe: () => page.evaluate(probe, arg), halfTimePending, continueHalfTime, finished,
+        ...(tray ? { reopenTray: openTray } : {}), wait: ms => page.waitForTimeout(ms), timeoutMs, description,
+      });
+      const waitTitle = (title) => waitMatchState((t) => document.querySelector('.nrl-mo-tray-title')?.textContent === t, title, title);
       const problems = [];
       try {
         await page.goto(BASE);
@@ -134,7 +156,7 @@ export async function runMatchPlays(browser, sizes = [[844, 390], [667, 375], [5
         let atk = null;
         for (let i = 0; i < 8; i++) {
           await waitTitle('Your ball');
-          if (withPlays) await page.waitForFunction(() => document.querySelectorAll('[data-tray-plays]:not([hidden]) [data-play]').length > 0, null, { timeout: TRAY_OPEN_WAIT_MS }).catch(() => {});
+          if (withPlays) await waitMatchState(() => document.querySelectorAll('[data-tray-plays]:not([hidden]) [data-play]').length > 0, null, 'visible play tiles');
           await settle();
           atk = await read();
           if (atk.title === 'Your ball' && (!withPlays || atk.shown)) break;
@@ -247,6 +269,14 @@ export async function runMatchPlays(browser, sizes = [[844, 390], [667, 375], [5
         if (def.tray.scrolls) problems.push('the tray scrolls while defending');
 
         if (withPlays) {
+          // The smallest phone always exercises the real break before calling a play (#717).
+          // Closing the tray restores the selected ×4; halftime still requires the normal button.
+          if (w === 568 && h === 320) {
+            await shutTray();
+            await waitMatchState(() => window.__nrlGame.scene.getScene('Match').playback.half >= 2, null,
+              'the second half after halftime confirmation', { tray: false });
+            if (halfTimeContinuations !== 1) problems.push(`expected one halftime continuation, got ${halfTimeContinuations}`);
+          }
           // Call one: the first tile that can be called. Its tag comes once it has been run.
           // A tap inside 300ms of the tiles changing makes no call (#608): tap until the tile lights.
           let called = null;
@@ -257,7 +287,7 @@ export async function runMatchPlays(browser, sizes = [[844, 390], [667, 375], [5
             // Called early in a set, so there are plays left to run it on: a play called on the fourth or the
             // last tackle lapses when the set ends ("not run"), and four of those in a row failed this check
             // (568x320 on 4c43c0f). Where the tackle chip is not showing, call as before.
-            const play = await page.waitForFunction(() => {
+            const play = await waitMatchState(() => {
               const b = document.querySelector('[data-tray-plays]:not([hidden]) [data-play]:not([disabled])');
               if (!b) return null;
               const chip = document.querySelector('.nrl-mo-tackle');
@@ -265,7 +295,7 @@ export async function runMatchPlays(browser, sizes = [[844, 390], [667, 375], [5
               if (shown && !/^TACKLE [123]\//.test(chip.textContent.trim())) return null;
               b.click();
               return b.hasAttribute('data-called') ? b.dataset.play : null;
-            }, null, { timeout: TRAY_OPEN_WAIT_MS }).then((hdl) => hdl.jsonValue());
+            }, null, 'a callable early-tackle set play');
             called = play;
             // The call is in at the tap: COACH is shut for a screen reader at once, the tray itself a moment later (TRAY_CALLED_MS).
             if ((await page.locator('.nrl-mo-bar [data-coach]').getAttribute('aria-expanded')) !== 'false') problems.push('COACH still reads open after the play was called');
@@ -275,10 +305,10 @@ export async function runMatchPlays(browser, sizes = [[844, 390], [667, 375], [5
             const queued = await page.evaluate(() => { const sc = window.__nrlGame.scene.getScene('Match'); return sc.playback.opts.calls.filter((c) => c.call === 'set-play').map((c) => c.play); });
             if (!queued.includes(play)) problems.push(`the call record has no ${play}`);
             // Its tag, once the play has been run (or lapsed, when the set ended first: try again).
-            const text = await page.waitForFunction((short) => {
+            const text = await waitMatchState((short) => {
               const el = document.querySelector('.nrl-mo-call-result');
               return el && el.textContent.startsWith(short) ? el.textContent : null;
-            }, SHORT[play], { timeout: 60000 }).then((hdl) => hdl.jsonValue());
+            }, SHORT[play], `${SHORT[play]} result`, { timeoutMs: 60000, tray: false });
             // Seen: shown, on screen, and not under the commentary line or COACH, measured once its slide-up
             // (nrl-sheet-up, 180ms) has settled. It has no pointer events, so measure rather than hit-test.
             const seen = await page.evaluate(async () => {

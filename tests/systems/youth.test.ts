@@ -84,9 +84,12 @@ describe('season hook', () => {
     expect(signPlayer(getState(), juniors[0]!.id).ok).toBe(true);
     expect(getState().squad.find((p) => p.id === juniors[0]!.id)!.junior).toBeUndefined();
   });
-  it('clears last intake before adding the next', () => {
+  it('retains earlier unsigned intakes while adding the next bounded batch', () => {
     rollover();
+    const previous = getState().freeAgents.filter(p => p.junior);
     rollover();
-    expect(getState().freeAgents.filter((p) => p.junior).length).toBeLessThanOrEqual(5);
+    const juniors = getState().freeAgents.filter(p => p.junior);
+    expect(juniors).toHaveLength(previous.length + 3);
+    for (const p of previous) expect(juniors.find(x => x.id === p.id)?.age).toBe(p.age + 1);
   });
 });

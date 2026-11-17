@@ -6,14 +6,16 @@
 //
 // No yellow on this screen: it is a list of 20-odd equal choices, and a yellow
 // RENEW on every row would be a column of primaries. RENEW is the plain
-// secondary button; RELEASE and SELL are the destructive red-on-navy, two taps.
+// secondary button; RELEASE uses two taps and SELL opens a separate offer review.
 
 import { bus } from '../../core/events';
 import { getState, type Player } from '../../core/state';
 import { overallRating } from '../../data/player';
 import { releasePlayer } from '../../systems/freeagency';
 import { releaseTerms, renewalAsk } from '../../systems/cap';
-import { contractRows, renewEarly, renewalRefusal, sellPlayer } from '../../systems/contracts';
+import { contractRows, renewEarly, renewalRefusal } from '../../systems/contracts';
+import { quotePlayerSale } from '../../systems/playerTransfers';
+import { saleConfirmation } from '../saleConfirmation';
 import { hasStaff } from '../../systems/staff';
 import { SQUAD_MIN } from '../../config';
 import { fmtMoneyShort } from '../../utils/money';
@@ -40,7 +42,7 @@ const fmtShort = (n: number): string => fmtMoneyShort(n, { places: 1 });
 /**
  * The action waiting for its second tap (N14, #263): the player page's two-tap
  * guard instead of a `window.confirm`, which a phone shows as a browser dialog.
- * `release:<id>` or `sell:<id>`; a tap anywhere else, or four seconds, clears it (#612).
+ * `release:<id>`; a tap anywhere else, or four seconds, clears it (#612).
  */
 let armed: string | null = null;
 /** Calls off the armed button's wait (dom.ts armGuard), and puts that button back as it was. */
@@ -107,11 +109,11 @@ let order: string[] = [];
 const renewed = new Set<string>();
 const gone = new Map<string, GoneRow>();
 
-function render(sub: HTMLElement, tbody: HTMLElement): void {
+function render(sub: HTMLElement, tbody: HTMLElement, saleHost: HTMLElement): void {
   const s = getState();
   sub.textContent = contractsSummary(s.squad, s.season);
   const rows: HTMLElement[] = [];
-  const rerender = (): void => render(sub, tbody);
+  const rerender = (): void => render(sub, tbody, saleHost);
   atRest = null;
   for (const row of heldRows(order, contractRows(s), gone)) {
     if (row.kind === 'gone') {
@@ -180,20 +182,26 @@ function render(sub: HTMLElement, tbody: HTMLElement): void {
     }, { class: releaseArmed ? `nrl-btn-danger ${ARMED_CLASS}` : 'nrl-btn-danger' });
     const nextFreed = terms.nextCapFreed > 0 ? ` and ${fmtMoney(terms.nextCapFreed)} next season` : '';
     release.title = `Two taps: pays ${fmtMoney(terms.payout)} and frees ${fmtMoney(terms.capFreed)} of this season's cap${nextFreed}. The signing fee is not refunded.`;
-    const sellArmed = armed === `sell:${p.id}`;
-    const sellLabel = 'NO BUYER';
-    const sell = button(sellArmed ? 'REALLY SELL?' : sellLabel, () => {
-      const g = guardTap(armed, `sell:${p.id}`);
-      if (g.run && !armedTap(performance.now() - armedAt)) return;
-      arm(g.armed);
-      if (g.run) act(sellPlayer(getState(), p.id));
-      rerender();
-    }, { class: sellArmed ? `nrl-btn-danger ${ARMED_CLASS}` : 'nrl-btn-danger' });
-    sell.title = 'Two taps. No club has bought him, so nothing is sold.';
-    if (releaseArmed || sellArmed) {
-      const [btn, label] = releaseArmed ? [release, releaseLabel] : [sell, sellLabel];
-      atRest = () => { btn.classList.remove(ARMED_CLASS); btn.textContent = label; };
-    }
+    const offer = quotePlayerSale(s, p.id);
+    const sell = button(offer.ok ? `SELL +${fmtShort(offer.offer.fee)}` : 'NO BUYER', () => {
+      arm(null);
+      saleHost?.replaceChildren(saleConfirmation(p.id, {
+        back: backButton('Finance', () => openFinanceScreen()),
+        onCancel: () => {
+          saleHost.replaceChildren();
+          Array.from(tbody.querySelectorAll<HTMLButtonElement>('[data-contract-sell]')).find(b => b.getAttribute('data-contract-sell') === p.id)?.focus();
+        },
+        onSold: (accepted) => {
+          const buyer = getState().league.clubs.find(c => c.id === accepted.buyerId);
+          gone.set(p.id, { text: `${p.name} · sold to ${buyer?.name ?? accepted.buyerId}`, done: 'SOLD ✓' });
+          saleHost?.replaceChildren(); rerender();
+        },
+      }));
+      saleHost?.querySelector<HTMLButtonElement>('[data-sale-cancel]')?.focus();
+    }, { class: 'nrl-btn-danger' });
+    sell.setAttribute('data-contract-sell', p.id);
+    sell.title = offer.ok ? 'Review the buying club, fee and existing contract before confirming.' : offer.message;
+    if (releaseArmed) atRest = () => { release.classList.remove(ARMED_CLASS); release.textContent = releaseLabel; };
 
     rows.push(el('tr', { attrs: { 'data-contract': p.id } },
       who,
@@ -214,6 +222,7 @@ export function openContractsScreen(): HTMLElement {
   order = contractRows(getState()).map((p) => p.id);
   renewed.clear();
   gone.clear();
+  const saleHost = el('div', { class: 'nrl-contracts-sale' });
   const sub = el('span', { class: 'nrl-screen-sub' });
   const tbody = el('tbody');
   const table = el('table', { class: 'nrl-table nrl-contracts-table' },
@@ -223,12 +232,13 @@ export function openContractsScreen(): HTMLElement {
       el('th', { text: 'Player' }), el('th', { text: 'Pos' }), el('th', { class: 'nrl-num', text: 'Ovr' }),
       el('th', { class: 'nrl-num', text: 'Left' }), el('th', { class: 'nrl-num', text: 'Cap' }), el('th'))),
     tbody);
-  render(sub, tbody);
+  render(sub, tbody, saleHost);
   const sheet = el('div', { class: 'nrl-screen nrl-finance-sheet nrl-contracts' },
     screenHead('Contracts', { lead: [backButton('Finance', () => openFinanceScreen())], sub }),
+    saleHost,
     el('div', { class: 'nrl-contracts-scroll' }, table));
   const off = bus.on('state:changed', () => {
-    if (sheet.isConnected) render(sub, tbody);
+    if (sheet.isConnected) render(sub, tbody, saleHost);
   });
   return openScreen(sheet, () => { off(); arm(null); }, 'contracts');
 }

@@ -13,6 +13,7 @@ import { fmtMoney } from '../utils/money';
 import { REP_BASELINE, REP_MAX } from './league';
 import type { SignResult } from './freeagency';
 import { hasStaff, WELFARE_RENEWAL_CUT } from './staff';
+import { confirmPlayerSale, type SaleOffer } from './playerTransfers';
 
 /** Warning text when `weeks` is a warning threshold, else null. */
 export function warnForWeeks(name: string, weeks: number): string | null {
@@ -164,14 +165,11 @@ export function renewEarly(state: GameState, playerId: string): SignResult {
   return { ok: true };
 }
 
-/**
- * A sale needs a buyer who pays and takes the player. That path is not in
- * yet, so this refuses and changes nothing. Reasons: 'not-found', 'no-buyer'.
- */
-export function sellPlayer(state: GameState, playerId: string): SignResult {
-  const p = state.squad.find((x) => x.id === playerId);
-  if (!p) return { ok: false, reason: 'not-found', message: 'Player not found.' };
-  return { ok: false, reason: 'no-buyer', message: 'No club has bought him. Nothing was changed.' };
+/** Selling requires the exact reviewed offer; old callers cannot bypass confirmation. */
+export function sellPlayer(state: GameState, playerId: string, offer?: SaleOffer): SignResult {
+  if (!state.squad.some(p => p.id === playerId)) return { ok: false, reason: 'not-found', message: 'Player not found.' };
+  if (!offer || offer.playerId !== playerId) return { ok: false, reason: 'no-buyer', message: 'Review and confirm a funded club offer first. Nothing was changed.' };
+  return confirmPlayerSale(offer);
 }
 
 /** Squad contracts sorted by weeks remaining (soonest first), then name. */

@@ -1,3 +1,4 @@
+import { discoveredFreeAgents } from '../../systems/playerCareer';
 // src/ui/screens/recruit.ts — free-agency browser screen (BAK-179, WU-9).
 // Renders GameState.freeAgents as a table (3g, Broadcast Quiet) with SIGN
 // inline. Built on the DOM UI kit (src/ui/dom.ts). No Phaser imports. Also
@@ -10,7 +11,7 @@ import { TRAITS, traitLabel } from '../../data/traits';
 import { bus } from '../../core/events';
 import { overallRating, ratingText } from '../../data/player';
 import {
-  signingFee, signingFeeBasis, weeksToPoolRefresh, FREE_AGENT_POOL_SIZE,
+  signingFee, signingFeeBasis, weeksToPoolRefresh,
 } from '../../systems/freeagency';
 import { capRoomFor, salaryDemand } from '../../systems/cap';
 import { signWithUndo } from '../../systems/undo';
@@ -433,28 +434,29 @@ export function openRecruitScreen(): void {
   const render = (): void => {
     list.replaceChildren();
     const s = getState();
+    const discovered = discoveredFreeAgents(s);
     const shortlist = recruitShortlist(s);
-    const fullView = showAll || s.freeAgents.length < 5;
+    const fullView = showAll || discovered.length < 5;
     sort.button.style.display = fullView ? '' : 'none';
     more.replaceChildren();
     if (!fullView) {
-      const all = button(`Show all ${s.freeAgents.length}`, () => { showAll = true; render(); });
+      const all = button(`Show all ${discovered.length}`, () => { showAll = true; render(); });
       all.setAttribute('data-show-all', '');
       more.append(all);
     }
-    // R2 (#349): when the pool changes, in Advance Weeks.
+    // Discovery cadence follows Advance Weeks; existing unsigned people stay in the world.
     const n = weeksToPoolRefresh(s.week);
     const when = n === 1 ? 'after this week' : `in ${n} weeks`;
     // The bank as the dock writes it (#600): in debt it is "-$84,448", the sign before the dollar.
     const bank = fmtMoney(s.money);
-    sub.textContent = `Free agents · new players ${when} · squad ${s.squad.length}/${SQUAD_CAP} · bank ${bank}`;
-    sub.title = `A pool of ${FREE_AGENT_POOL_SIZE}; new players arrive ${when}. Squad ${s.squad.length} of ${SQUAD_CAP}. Bank ${bank}.`;
-    if (s.freeAgents.length === 0) {
-      list.appendChild(el('div', { class: 'nrl-screen-empty', text: 'No free agents available. New players arrive when the pool refreshes.' }));
+    sub.textContent = `Free agents · ${discovered.length} scouted · next discovery ${when} · squad ${s.squad.length}/${SQUAD_CAP} · bank ${bank}`;
+    sub.title = `${discovered.length} scouted players; discovery refreshes ${when}. Squad ${s.squad.length} of ${SQUAD_CAP}. Bank ${bank}.`;
+    if (discovered.length === 0) {
+      list.appendChild(el('div', { class: 'nrl-screen-empty', text: `No scouted free agents available. Discovery refreshes ${when}.` }));
       return;
     }
     const full = s.squad.length >= SQUAD_CAP;
-    const agents = s.freeAgents.map((p) => ({ p, fee: signingFee(s, p), ovr: overallRating(p) }));
+    const agents = discovered.map((p) => ({ p, fee: signingFee(s, p), ovr: overallRating(p) }));
     agents.sort((a, b) => (recruitSort === 'fee' ? a.fee - b.fee : recruitSort === 'age' ? a.p.age - b.p.age : b.ovr - a.ovr) || b.ovr - a.ovr);
     const visible = fullView ? agents : shortlist.ids.map((id) => agents.find(({ p }) => p.id === id)!);
     if (visible.length === 0) list.append(el('div', { class: 'nrl-screen-empty', text: full

@@ -1,3 +1,4 @@
+import { installPlayerHistory } from '../systems/playerCareer';
 // Dormant regional world construction (#573). Calling this does not select a
 // pack, replace a career, activate a calendar or apply financial rules.
 import type { ContentPack } from '../content/pack';
@@ -175,7 +176,7 @@ export function createDivisionWorld(
     || player.colors.length !== 2 || !player.colors.every(c => hex.test(c))) throw new Error(`Invalid regional career: ${problems.join(', ') || 'active pack, seed or player'}`);
   const startRank = profile.divisions.find(d => d.id === profile.startingDivisionId)!.rank;
   const generatedSquad = startingSquad(profile, seed, player.difficulty ?? 'normal');
-  const squad = admitOpeningSquad(generatedSquad, tierCap(tierForRank(startRank)), 1);
+  const squad = admitOpeningSquad(generatedSquad.map(p => installPlayerHistory(p, 'player', { season: 1, week: 1 })), tierCap(tierForRank(startRank)), 1);
   if (!squad) throw new Error('Opening squad does not fit the salary cap');
   const targets = new Map(profile.divisions.flatMap(d => d.entrants.map(e => [e.clubId, e.strength] as const)));
   const tierOf = new Map(profile.divisions.flatMap(d => d.entrants.map(e => [e.clubId, tierForRank(d.rank)] as const)));
@@ -185,7 +186,7 @@ export function createDivisionWorld(
     const tier = tierOf.get(identity.id)!;
     const players = admitOpeningSquad(generateRivalSquad({ id: identity.id, strength: target }, rivalSquadSeed(streamSeed(seed, profile.id, 'rivals'), identity.id)), tierCap(tier), 1);
     if (!players) throw new Error(`Opening squad for ${identity.id} does not fit the ${tier} cap`);
-    clubs.push({ id: identity.id, name: identity.name, colors: [...identity.colors], ...(identity.home ? { home: { ...identity.home } } : {}), strength: squadStrength(players), squad: players, cash: AI_OPENING_CASH, capAccount: freshCapAccount(tier) });
+    clubs.push({ id: identity.id, name: identity.name, colors: [...identity.colors], ...(identity.home ? { home: { ...identity.home } } : {}), strength: squadStrength(players), squad: players.map(p => installPlayerHistory(p, identity.id, { season: 1, week: 1 })), cash: AI_OPENING_CASH, capAccount: freshCapAccount(tier) });
   }
   const divisions: DivisionMetadata[] = [];
   const instances = [...profile.divisions].sort((a, b) => a.rank - b.rank).map(division => {

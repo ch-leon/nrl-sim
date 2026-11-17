@@ -2,22 +2,20 @@
 // after aging/retirement (order 5). Generates 3-5 prospects aged 17-19 into the
 // free-agent pool (flagged `junior`), on cheap contracts. The Academy level lifts
 // their starting stats, their number and (level 2+) gives them the youngGun
-// training boost. Last season's unsigned prospects are cleared first.
+// training boost. Previous unsigned intakes remain real people.
 //
-// N14.3: the call-up. Before a round the club would forfeit (fewer than SQUAD_MIN
-// fit), the Academy calls up juniors to make the side: generated at the
-// Academy's level (no Academy: the lowest band) and signed at the junior wage for
-// the rest of the season. It adds dice only in a week it calls someone up, so
-// every other week plays as before.
+// Emergency scholarships only fill registration vacancies left by this year's
+// expiry/retirement, up to the minimum. Injuries and bans never create people.
+// Admissions use the lowest Academy band, capped potential, durable IDs and a
+// source-vacancy receipt; the current scholarship cannot be sold or released.
+import { admitGeneratedPeople } from './playerCareer';
 import { createCeilings } from './potential';
 import { bus } from '../core/events';
 import { getState, setState } from '../core/state';
 import type { Player } from '../core/state';
 import { withTrait, withoutTrait } from '../data/traits';
-import { registerSeasonHook, registerTickHook, TICK_ORDER } from '../core/time';
+import { registerSeasonHook } from '../core/time';
 import { SQUAD_CAP, SQUAD_MIN, STAT_MAX, WEEKS_PER_SEASON } from '../config';
-import { fitSquadCount } from './matchday';
-import { getCurrentFixture, PLAYER_ID } from './fixtures';
 import { overallRating, shownStats, withShownStats, generatePlayer, POSITIONS } from '../data/player';
 import type { Rng } from '../utils/rng';
 import { makeRng } from '../utils/rng';
@@ -81,9 +79,10 @@ export function generateProspects(rng: Rng, level: number): Player[] {
 }
 
 /**
- * The juniors the Academy calls up so the club can field SQUAD_MIN fit, the best
+ * Generated candidates to reach SQUAD_MIN registered people, the best
  * of each intake first; never past SQUAD_CAP. Signed at the junior wage until
- * the season's end (`weeksLeft`), no fee. Pure apart from the rng.
+ * the season's end (`weeksLeft`), no fee. The caller must prove an unavoidable
+ * vacancy before admitting them. Pure apart from the rng.
  */
 export function callUpJuniors(
   rng: Rng,
@@ -92,7 +91,7 @@ export function callUpJuniors(
   season: number,
   weeksLeft: number,
 ): Player[] {
-  const need = Math.min(SQUAD_MIN - fitSquadCount(squad), SQUAD_CAP - squad.length);
+  const need = Math.min(SQUAD_MIN - squad.length, SQUAD_CAP - squad.length);
   const out: Player[] = [];
   while (out.length < need) {
     const intake = generateProspects(rng, level).sort((a, b) => overallRating(b) - overallRating(a));
@@ -105,35 +104,36 @@ export function callUpJuniors(
 }
 
 export function registerYouthSystem(): void {
-  // After the economy (its forced sale) and the injuries, before the match.
-  registerTickHook('academy-callup', TICK_ORDER.match - 2, ({ week, season }) => {
-    const state = getState();
-    const fixture = getCurrentFixture(state, PLAYER_ID);
-    if (!fixture || fixture.result) return;
-    if (fitSquadCount(state.squad) >= SQUAD_MIN) return;
-    const rng = makeRng(state.rngSeed);
-    const called = callUpJuniors(rng, state.squad, academyLevel(state.facilities), season, WEEKS_PER_SEASON - week + 1);
-    if (called.length === 0) return;
-    const squad = [...state.squad, ...called];
-    setState({
-      squad,
-      rngSeed: rng.state(),
-      capAccount: protectAddedDeals(squad, state.capAccount, season, called.map(player => player.id)),
-    });
-    bus.emit('ui:notify', {
-      text: `Academy call-up: ${called.map((p) => p.name).join(', ')} ${called.length === 1 ? 'comes' : 'come'} up to make the side, on the junior wage to the season's end.`,
-      kind: 'info',
-    });
-  }, { trials: true });
-
   registerSeasonHook('youth', 6, ({ season }) => {
     const state = getState();
+    if (state.playerPopulation.lastAcademyIntakeSeason >= season) return;
     const rng = makeRng((state.rngSeed ^ Math.imul(season, 0x9e3779b1)) >>> 0);
-    const prospects = generateProspects(rng, academyLevel(state.facilities));
-    setState({
-      freeAgents: [...state.freeAgents.filter((p) => !p.junior), ...prospects],
-      rngSeed: rng.state(),
+    const admitted = admitGeneratedPeople(state, generateProspects(rng, academyLevel(state.facilities)));
+    if (!admitted) return;
+    const prospects = admitted.players;
+    // Only genuine losses this rollover can fund minimum-roster scholarships.
+    const expired = state.freeAgents.filter(p => p.clubHistory?.spells.slice(-1)[0]?.clubId === state.clubId
+      && p.clubHistory.spells.slice(-1)[0]?.departure === 'expiry' && p.clubHistory.spells.slice(-1)[0]?.end?.season === season);
+    // Expiry runs before ageing. A player who then retires keeps his truthful
+    // expiry spell in the archive; that same loss still left a registration gap.
+    const retired = state.playerPopulation.retired.filter(p => {
+      const last = p.clubHistory.spells.slice(-1)[0];
+      return p.retiredAt.season === season && last?.clubId === state.clubId && last.end?.season === season
+        && (last.departure === 'retirement' || last.departure === 'expiry');
     });
+    const used = new Set(state.squad.filter(p => p.emergencyDealEndSeason === season).map(p => p.emergencyForPlayerId));
+    const vacancies = [...new Map([...expired, ...retired].map(p => [p.id, p])).values()]
+      .filter(p => !used.has(p.id)).sort((a, b) => a.id.localeCompare(b.id));
+    let next = { ...state, freeAgents: [...state.freeAgents, ...prospects], playerPopulation: { ...admitted.playerPopulation, lastAcademyIntakeSeason: season } };
+    const generated = callUpJuniors(rng, state.squad, 0, season, WEEKS_PER_SEASON).slice(0, vacancies.length).map((p, i) => ({ ...p,
+      ceilings: Object.fromEntries(shownStats(p.position).map(k => [k, Math.max(p.stats[k], 45)])),
+      emergencyDealEndSeason: season, emergencyForPlayerId: vacancies[i]!.id }));
+    const emergency = admitGeneratedPeople(next, generated, state.clubId, 'emergency');
+    if (emergency) {
+      const squad = [...state.squad, ...emergency.players];
+      next = { ...next, squad, playerPopulation: emergency.playerPopulation, capAccount: protectAddedDeals(squad, state.capAccount, season, emergency.players.map(p => p.id)) };
+    }
+    setState({ freeAgents: next.freeAgents, squad: next.squad, playerPopulation: next.playerPopulation, capAccount: next.capAccount });
     bus.emit('ui:notify', {
       text: `Academy intake: ${prospects.length} prospects (aged ${JUNIOR_MIN_AGE}-${JUNIOR_MAX_AGE}) are in the free-agent pool.`,
       kind: 'info',

@@ -6,6 +6,7 @@ import { seasonBooks, fmtNetClosing } from '../../../src/ui/screens/finance';
 import { fmtBooksHeading } from '../../../src/ui/screens/history';
 import { emptyFinance, FINANCE_LINES, type GameState, type SeasonFinance } from '../../../src/core/state';
 import { financeNet } from '../../../src/systems/economy';
+import { FINANCE_STARTING_CASH } from '../../../src/data/financeRules';
 import { STARTING_MONEY, difficultyMultipliers } from '../../../src/config';
 
 const books = (season: number, lines: Partial<SeasonFinance>): SeasonFinance => ({ ...emptyFinance(season), ...lines, season });
@@ -62,7 +63,7 @@ describe('historical corpus ledger data: season books add up to the balance', ()
       const s = saves[file] as GameState;
       for (const h of s.history) expect(seasonBooks(s, h.season), `season ${h.season}`).not.toBeNull();
       // Every movement booked: the starting balance plus every season's net is today's balance.
-      const start = Math.round(STARTING_MONEY * difficultyMultipliers(s.settings.difficulty).startingMoney);
+      const start = s.version >= 28 ? FINANCE_STARTING_CASH[s.settings.difficulty] : Math.round(STARTING_MONEY * difficultyMultipliers(s.settings.difficulty).startingMoney);
       expect(Math.round(start + s.finance.reduce((sum, f) => sum + net(f), 0))).toBe(Math.round(s.money));
       // So the open season's books close on today's balance.
       const open = s.finance[s.finance.length - 1]!;
