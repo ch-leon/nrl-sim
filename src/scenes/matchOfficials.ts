@@ -30,6 +30,7 @@ import { BENCH, REF, benchSeat, benchSeated, binSeat, binnedSpot, refCoversCarri
 import type { MatchArtRegistry } from './matchArt';
 import { BOARD_TEX_H, BOARD_TEX_W, boardColor, drawScoreboard, flashWord, scoreboardOrigin, type BoardState } from '../art/match/scoreboard';
 import { reducedMotion } from '../match/view/impact';
+import { breakKind } from '../match/view/walkOff';
 
 /** Seconds a tick lasts (the sim's 20 Hz). */
 const TICK_S = 0.05;
@@ -44,6 +45,11 @@ const CARD_LIFT = 41;
 
 /** Phaser.BlendModes.ADD (the type-only import keeps Phaser out of this module's tests). */
 const BLEND_ADD = 1;
+
+/** A player-attached bin card belongs to the live picture, not the whistle's walk-off. */
+export function binCardSpot(p: PlayerSnap, s: Snapshot): { x: number; y: number } | null {
+  return breakKind(s) ? null : binnedSpot(p, s);
+}
 
 /** A canvas texture repainted in place: one per thing, never one per frame. */
 class Canvas {
@@ -271,7 +277,7 @@ export class MatchOfficials {
     }
     // The yellow card over a man who has reached the bin.
     const binned = cur.players.find((p) => p.side === side && binnedSpot(p, cur));
-    const at = binned && binnedSpot(binned, cur);
+    const at = binned && binCardSpot(binned, cur);
     if (at) {
       const w = this.world(at);
       b.card.setPosition(Math.round(w.x), Math.round(w.y) - CARD_LIFT).setDepth(w.y + 2).setVisible(true);

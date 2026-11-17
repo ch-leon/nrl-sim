@@ -3,7 +3,8 @@
 Date: 16 November 2026  
 Status: stages 1–4 presentation and the first stage-5 pass are implemented in
 five linked PRs. Leon reviewed the clip and approved merging on 17 November
-2026. Wider stage-5 consistency work and QA/phone validation remain.
+2026; the full stack merged through #705 at `f9f1641`. Wider stage-5 consistency
+work and QA/phone validation remain.
 
 Stage 1 is implemented in [PR #697](https://github.com/ch-leon/nrl-sim/pull/697),
 tracking [#696](https://github.com/ch-leon/nrl-sim/issues/696). Local functional checks passed;
@@ -39,6 +40,19 @@ Make an ordinary passage of rugby league enjoyable to watch. Players should have
 weight, the ball should be easy to follow, and tackles should make sense without
 commentary. Keep the game's playful pixel-art character and make the improvement
 obvious at phone size.
+
+The next stage-5 pass, [PR #706](https://github.com/ch-leon/nrl-sim/pull/706),
+addresses [#688](https://github.com/ch-leon/nrl-sim/issues/688):
+the player in the sin bin must fade with his side at the whistle, from his existing
+seat, and return with the restart. Review also found retained tackle artwork,
+carrier markers and bin/gas/fatigue indicators after the players disappeared,
+plus a fade that stopped one interpolation tick short. The candidate clears those
+layers for the break and restores live pictures when seeking back.
+Officials, benches and the crowd already use
+compatible proportions and kit colours; clear/rain/wind screenshots did not justify
+another asset change. Keep this pass focused on those demonstrated continuity
+problems and full-match verification. Earlier receiver commitment follows in its
+own gameplay PR under #672; it is not part of the whistle cleanup.
 
 ## Approach
 
