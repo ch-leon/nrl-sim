@@ -243,10 +243,10 @@ describe('a binned man at the whistle (#688)', () => {
     view.draw(live, live, 1); expect(a.alpha).toBe(1);
   });
 
-  it('leaves no lone binned actor after the real seed45 final whistle', () => {
-    // Current main's real witness: #lab?seed=45&final=1, full time 9075,
-    // home7 Xavier Stampton still in the bin. The old #688 witness used seven-minute halves.
-    const sim = new LiveSim(labSheet(DEFAULT_HOME), labSheet(DEFAULT_AWAY), 45, { goldenPoint: true });
+  it('leaves no lone binned actor after the real seed15 final whistle', () => {
+    // Real witness after #707's receiver-call timing change: #lab?seed=15&final=1,
+    // full time 8358 with away8 still in the bin. Seed45 now ends without a binned player.
+    const sim = new LiveSim(labSheet(DEFAULT_HOME), labSheet(DEFAULT_AWAY), 15, { goldenPoint: true });
     let prev = sim.snapshot();
     let liveContact: [Snapshot, Snapshot] | null = null;
     while (!sim.finished && sim.tick < 12_000) {
@@ -258,8 +258,8 @@ describe('a binned man at the whistle (#688)', () => {
     }
     const snap = sim.snapshot(), binned = snap.players.filter(p => p.binned);
     expect(snap.phase?.kind).toBe('full-time');
-    expect([prev.tick, snap.tick]).toEqual([9074, 9075]);
-    expect(binned.map(p => [p.side, p.slot])).toEqual([['home', 7]]);
+    expect([prev.tick, snap.tick]).toEqual([8357, 8358]);
+    expect(binned.map(p => [p.side, p.slot])).toEqual([['away', 8]]);
     expect(liveContact).not.toBeNull();
     const { s, view, contacts, focus } = make();
     const [contactPrev, contactCur] = liveContact!;
