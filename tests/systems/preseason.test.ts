@@ -132,7 +132,7 @@ it('shows the seeded forecast and quarter home-gate projection during trials', a
 });
 
 
-it.each([1, 2] as const)('calls up emergency juniors before trial %s with contracts through the competitive season', async (preseason) => {
+it.each([1, 2] as const)('does not manufacture injury replacements before trial %s', async (preseason) => {
   const { registerYouthSystem } = await import('../../src/systems/youth');
   const { fitSquadCount } = await import('../../src/systems/matchday');
   createNewGame('Trials', 42);
@@ -145,8 +145,7 @@ it.each([1, 2] as const)('calls up emergency juniors before trial %s with contra
     fitAtMatch = fitSquadCount(getState().squad);
   }, { trials: true });
   advanceWeeks(1);
-  expect(fitAtMatch).toBe(13);
+  expect(fitAtMatch).toBe(9);
   const called = getState().squad.filter((p) => !before.some((old) => old.id === p.id));
-  expect(called).toHaveLength(4);
-  expect(called.every((p) => p.contractWeeks === 27)).toBe(true);
+  expect(called).toHaveLength(0);
 });

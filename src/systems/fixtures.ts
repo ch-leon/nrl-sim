@@ -1,3 +1,4 @@
+import { installPlayerHistory } from './playerCareer';
 import { freezeMatchIncome, reconcileMatchIncome, matchIncomePatch, commitMatchState } from './matchIncome';
 // src/systems/fixtures.ts — season fixtures, ladder, rival cheap-sim and finals
 // for the 16-club league (BAK-184, WU-7). Pure TypeScript, no Phaser.
@@ -34,7 +35,7 @@ import { activePack, onPackChange } from '../content';
 import { RIVAL_CLUBS } from '../data/league';
 import { bus } from '../core/events';
 import { strengthChanges, applySeasonReputation } from './league';
-import { rolloverRivals, withRivalSquads } from './rivals';
+import { rolloverRivalPopulation, withRivalSquads } from './rivals';
 import { currentCalendarFixtures, finaliseCalendarFixture, fixtureBridge, hasStructuralCalendar, resolveCalendarForfeits, sameFixtureIdentity } from './competitionCalendar';
 import { prepareOpenCup } from './openCupCareer';
 import { prepareDivisionFinals } from './divisionCareer';
@@ -585,7 +586,7 @@ export function initLeague(
     strength: 55, // baseline used only if the player is ever cheap-simmed
   };
   // Rivals get real squads (#74), seeded per club so the main RNG is untouched.
-  const clubs: RivalClub[] = withRivalSquads([playerClub, ...RIVAL_CLUBS.map((c) => ({ ...c }))], state.rngSeed, PLAYER_ID);
+  const clubs: RivalClub[] = withRivalSquads([playerClub, ...RIVAL_CLUBS.map((c) => ({ ...c }))], state.rngSeed, PLAYER_ID).map(c => c.squad ? { ...c, squad: c.squad.map(p => installPlayerHistory(p, c.id, state)) } : c);
   const clubIds = clubs.map((c) => c.id);
 
   const rng = makeRng(state.rngSeed);
@@ -794,9 +795,11 @@ export function registerFixturesSystem(): void {
     const rng = makeRng(s2.rngSeed);
     const fixtures = generateFixtures(clubIds, rng);
     if (s2.preseason !== undefined) fixtures.unshift(...generateTrialFixtures(clubIds, s2.rngSeed));
-    const clubs = rolloverRivals(withRivalSquads(s2.league.clubs, s2.rngSeed, PLAYER_ID), rng, PLAYER_ID, s2.season).clubs;
+    const population = rolloverRivalPopulation(s2, rng);
+    const clubs = population.league.clubs;
     setState({
       league: { ...s2.league, clubs, fixtures, ladder: emptyLadder(clubIds) },
+      freeAgents: population.freeAgents, playerPopulation: population.playerPopulation,
       rngSeed: rng.state(),
     });
 

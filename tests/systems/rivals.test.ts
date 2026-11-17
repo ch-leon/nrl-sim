@@ -1,5 +1,6 @@
 import { createLegacyGame as createNewGame } from '../helpers/legacyGame';
 // tests/systems/rivals.test.ts — rival squads and rival free agency (GitHub #74).
+import { validatePlayerPopulation } from '../../src/systems/playerCareer';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   generateRivalSquad, squadStrength, withRivalSquads, pickSigning, rivalSigningTick, healRivals,
@@ -19,7 +20,7 @@ import { registerPlayerMatchSystem } from '../../src/systems/matchday';
 import { registerFreeAgencySystem, FREE_AGENT_POOL_SIZE, poolTarget } from '../../src/systems/freeagency';
 import { registerAgingSystem } from '../../src/systems/aging';
 import { advanceWeek, clearSeasonHooks, clearTickHooks, registerTickHook, withFastForward, TICK_ORDER } from '../../src/core/time';
-import { SEASON_ROUNDS, WEEKS_PER_SEASON } from '../../src/config';
+import { SEASON_ROUNDS, WEEKS_PER_SEASON, SQUAD_MIN } from '../../src/config';
 
 beforeEach(() => {
   bus.clear();
@@ -196,8 +197,10 @@ describe('need signings', () => {
     expect(squad).not.toBeNull();
     const need = { kind: 'thin', position: 'hooker' } as const;
     expect(rivalNeed(squad!)).toEqual(need);
-    expect(pickNeedSigning(squad!, [pricey, cheap], need)?.id).toBe(cheap.id);
-    expect(pickNeedSigning(squad!, [pricey], need)).toBeNull();
+    expect(pickNeedSigning(squad!, [pricey, cheap], need)?.id).toBe(pricey.id);
+    // Selection no longer uses the obsolete weekly-wage cap. The actual
+    // transaction checks annual commitment and cash (deals.test.ts).
+    expect(pickNeedSigning(squad!, [pricey], need)?.id).toBe(pricey.id);
     // Without the cap in the way, the better one.
     expect(pickNeedSigning(c0(), [pricey, cheap], need)?.id).toBe(pricey.id);
   });
@@ -302,7 +305,7 @@ describe('rolloverRivals', () => {
     const r = rolloverRivals([{ ...club(60), squad }], rng);
     const out = r.clubs[0]!.squad!;
     expect(r.retired).toBeGreaterThanOrEqual(4);
-    expect(out.length).toBeGreaterThanOrEqual(RIVAL_SQUAD_MIN);
+    expect(out.length).toBeGreaterThanOrEqual(SQUAD_MIN);
     expect(r.juniors).toBe(out.length - (squad.length - r.retired));
     const kept = out.filter((p) => squad.some((q) => q.id === p.id));
     for (const p of kept) expect(p.age).toBe(squad.find((q) => q.id === p.id)!.age + 1);
@@ -523,7 +526,7 @@ describe('the weekly hook (Wave 3 task 04)', () => {
 });
 
 describe('five-season headless league', () => {
-  it('keeps rival strength in the band and squads in their limits, crowns different champions, signs 1–3 a season, and the pool stays healthy', () => {
+  it('keeps rival strength in the band and squads in their limits, crowns different champions, makes funded signings within the persistent supply, and the pool stays healthy', () => {
     createNewGame('Five FC', 2026);
     initLeague(getState());
     registerFixturesSystem();
@@ -555,11 +558,12 @@ describe('five-season headless league', () => {
         if (rollover && !playing) rolloverMs = Math.max(rolloverMs, performance.now() - t0);
         const s = getState();
         expect(s.freeAgents.length).toBeGreaterThan(0);
+        expect(validatePlayerPopulation(s)).toBeNull();
         for (const c of s.league.clubs) {
           if (c.id === PLAYER_ID) continue;
           expect(c.strength).toBeGreaterThanOrEqual(STRENGTH_MIN);
           expect(c.strength).toBeLessThanOrEqual(STRENGTH_MAX);
-          expect(c.squad!.length).toBeGreaterThanOrEqual(RIVAL_SQUAD_MIN);
+          expect(c.squad!.length).toBeGreaterThanOrEqual(SQUAD_MIN);
           expect(c.squad!.length).toBeLessThanOrEqual(RIVAL_SQUAD_MAX);
         }
         // Wave 3 task 04: the pool stays healthy: never empty, never piling up.
@@ -576,7 +580,9 @@ describe('five-season headless league', () => {
     expect(champions).toHaveLength(5);
     expect(new Set(champions).size).toBeGreaterThan(1);
     const perRivalSeason = signings / (15 * 5);
-    expect(perRivalSeason).toBeGreaterThanOrEqual(1);
+    // Persistent supply replaces the old 12-new-people-every-four-weeks model.
+    // Initial five-year measurement is 0.4 weekly signings/rival/year.
+    expect(perRivalSeason).toBeGreaterThan(0);
     expect(perRivalSeason).toBeLessThanOrEqual(3);
     const meanPool = poolSizes.reduce((t, n) => t + n, 0) / poolSizes.length;
     expect(meanPool).toBeGreaterThanOrEqual(RIVAL_POOL_FLOOR);

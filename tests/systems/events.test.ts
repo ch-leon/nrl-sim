@@ -9,7 +9,7 @@ import { EVENT_CARDS, cardById, type EventCardDef, type EventEffect } from '../.
 import { initLeague, registerFixturesSystem, PLAYER_ID } from '../../src/systems/fixtures';
 import { getState, setState, type GameState, type PendingEvent } from '../../src/core/state';
 import { bus } from '../../src/core/events';
-import { advanceWeek, clearSeasonHooks, clearTickHooks, withFastForward } from '../../src/core/time';
+import { advanceWeek, clearSeasonHooks, clearTickHooks, clearHeldWeek, registerTickHook, weekHeld, withFastForward } from '../../src/core/time';
 import { makeRng } from '../../src/utils/rng';
 import { EVENTS, WEEKS_PER_SEASON } from '../../src/config';
 import { marketWage, overallRating } from '../../src/data/player';
@@ -17,6 +17,7 @@ import { signingFee } from '../../src/systems/freeagency';
 
 beforeEach(() => {
   bus.clear();
+  clearHeldWeek();
   clearTickHooks();
   clearSeasonHooks();
 });
@@ -377,9 +378,12 @@ describe('rival player cards (#74)', () => {
     const picked = s.league.clubs.find((c) => c.id === ev!.rivalId)!.squad!.find((p) => p.id === ev!.subjectId)!;
     const st = { ...s, eventDeck: { ...s.eventDeck, pending: [ev] } };
     const r = resolveEvent(st, ev.id, 0, 10)!;
-    expect(r.state.squad.some((p) => p.id === picked.id && p.contractWeeks === WEEKS_PER_SEASON - st.week + 1 && p.deal?.endSeason === st.season)).toBe(true);
+    expect(r.state.squad.find((p) => p.id === picked.id)?.deal).toEqual(picked.deal);
+    expect(r.state.squad.find((p) => p.id === picked.id)?.contractWeeks).toBe(picked.contractWeeks);
+    expect(r.state.money).toBe(st.money - ev.fee!);
+    expect(r.state.league.clubs.find(c => c.id === ev!.rivalId)!.cash).toBe(st.league.clubs.find(c => c.id === ev!.rivalId)!.cash! + ev.fee!);
     expect(r.state.league.clubs.find((c) => c.id === ev!.rivalId)!.squad!.some((p) => p.id === picked.id)).toBe(false);
-    expect(r.money).toEqual([{ amount: -ev.fee!, reason: 'event: Unsettled at a rival' }]);
+    expect(r.money).toEqual([{ amount: -ev.fee!, reason: `sign:${ev.subjectId}`, booked: true }]);
     expect(r.news[0]!.text).toContain(ev.vars!.rival!);
     void star; void rivalId;
   });
@@ -412,7 +416,31 @@ describe('rival player cards (#74)', () => {
     expect(ev.fee).toBe(signingFee(s, picked));
     expect(ev.vars!.fee).toBe(`$${signingFee(s, picked).toLocaleString('en-US')}`);
     const r = resolveEvent({ ...s, eventDeck: { ...s.eventDeck, pending: [ev] } }, ev.id, 0, 10)!;
-    expect(r.money).toEqual([{ amount: -signingFee(s, picked), reason: 'event: Unsettled at a rival' }]);
+    expect(r.money).toEqual([{ amount: -signingFee(s, picked), reason: `sign:${picked.id}`, booked: true }]);
+  });
+
+  it('keeps a funded offer pending with no writes while a match holds the week', () => {
+    const { s, star, rivalId } = setup();
+    const ev: PendingEvent = { id: 'held-sale', cardId: 'rivalUnsettled', season: 1, week: 1, expiresAt: 3, subjectId: star.id, rivalId, fee: 1234 };
+    setState(withPending(s, ev));
+    registerTickHook('test-hold', 40, ctx => ctx.hold?.());
+    advanceWeek();
+    expect(weekHeld()).toBe(true);
+    const before = structuredClone(getState());
+    expect(chooseEvent(ev.id, 0)).toBe(false);
+    expect(getState()).toEqual(before);
+    clearHeldWeek();
+  });
+
+  it('refuses a pending recruitment with no quoted fee rather than giving the player away', () => {
+    const { s, star, rivalId } = setup();
+    const ev: PendingEvent = { id: 'missing-fee', cardId: 'rivalUnsettled', season: 1, week: 1, expiresAt: 3, subjectId: star.id, rivalId };
+    const r = resolveEvent(withPending(s, ev), ev.id, 0, 1)!;
+    expect(r.failed).toMatch(/fee/i);
+    expect(r.state.squad).toEqual(s.squad);
+    expect(r.state.league).toEqual(s.league);
+    expect(r.state.money).toBe(s.money);
+    expect(r.money).toEqual([]);
   });
 
   it('falls through cleanly when the player has gone or the money has run out', () => {

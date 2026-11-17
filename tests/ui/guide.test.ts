@@ -168,7 +168,11 @@ describe('the Squad page stays true to the cascade (N14.3)', () => {
   it('says the board does not lend, and quotes the call-up', () => {
     expect(text).toContain('The board does not lend');
     expect(text).not.toContain('finished solvent');
-    expect(text).toContain(`Short of ${SQUAD_MIN} fit before a match, the Academy calls up juniors`);
+    expect(text).toContain(`expiry or retirement can leave fewer than ${SQUAD_MIN} registered players`);
+    expect(text).toContain('injuries and bans do not create replacements');
+    expect(text).toContain('Sell previews a real buying club');
+    expect(text).toContain('it does not replace the people already in the world');
+    expect(text).not.toContain('There is no buyer for a sale yet');
   });
 });
 

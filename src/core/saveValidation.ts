@@ -1,3 +1,4 @@
+import { validatePlayerPopulation } from '../systems/playerCareer';
 import { validMatchIncome } from '../systems/matchIncome';
 // Save boundary only. Historical defaults belong to MIGRATIONS, never to ticks.
 import { FINANCE_LINES, SAVE_VERSION, type GameState, type Lineup, type Player, type PlayerStats, type PlacedFacility } from './state';
@@ -158,6 +159,7 @@ export function validateInput(v: Record<string, unknown>, version: number): stri
   const ids = new Set<string>();
   const roster = (list: unknown): boolean => Array.isArray(list) && list.every(p => {
     if (!isPlayer(p, version) || ids.has(p.id)) return false;
+    if (version < 30 && 'clubHistory' in p) return false;
     ids.add(p.id); return true;
   });
   if (!roster(v.squad)) return fail('squad');
@@ -181,6 +183,11 @@ export function validateInput(v: Record<string, unknown>, version: number): stri
     // Pre-v8 catalogues had no rival squads. A missing current roster must not
     // be regenerated; an empty league is legitimate before initLeague.
     if ((c.squad !== undefined || (version >= 8 && c.id !== 'player')) && !roster(c.squad)) return fail('rival squad');
+  }
+  if (version < 30 && 'playerPopulation' in v) return fail('player population version');
+  if (version >= 30) {
+    const problem = validatePlayerPopulation(v as unknown as GameState);
+    if (problem) return fail(problem);
   }
   if (clubs.size && !clubs.has('player')) return fail('player club reference');
   if (v.competitions !== undefined) {

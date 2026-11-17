@@ -9,7 +9,7 @@
 // else is announced in the news with the outcome line.
 import { getState, setState, type ActiveModifier, type GameState, type PendingEvent, type Player, type RivalClub } from '../core/state';
 import { bus } from '../core/events';
-import { registerSeasonHook, registerTickHook, TICK_ORDER } from '../core/time';
+import { registerSeasonHook, registerTickHook, TICK_ORDER, weekHeld } from '../core/time';
 import { earnMoney } from '../data/club';
 import { overallRating } from '../data/player';
 import { TRAITS, traitLevel, withTrait, type TraitLevel } from '../data/traits';
@@ -17,8 +17,7 @@ import {
   cardById, closedGatesFlag, EVENT_CARDS, type EventCardDef, type EventEffect, type SubjectRule,
 } from '../data/events';
 import { BOARD, EVENTS, ON_FIELD, SQUAD_CAP, WEEKS_PER_SEASON, WILDCARDS } from '../config';
-import { marketWage, withDerivedStrength } from './rivals';
-import { capRoomFor, salaryDemand, signForRestOfSeason } from './cap';
+import { transferBetweenClubs } from './playerTransfers';
 import { signingFee } from './freeagency';
 import { hasStaff, WELFARE_CARDS } from './staff';
 import { isFieldable } from './lineup';
@@ -181,7 +180,7 @@ export function rivalStars(state: GameState): { club: RivalClub; player: Player;
       .sort((a, b) => overallRating(b) - overallRating(a) || a.id.localeCompare(b.id))[0];
     if (!best || overallRating(best) <= cut) continue;
     const fee = signingFee(state, best);
-    if (fee <= state.money && capRoomFor(state.squad, state.capAccount, state.season, salaryDemand(best))) {
+    if (transferBetweenClubs(state, club.id, state.clubId, best.id, fee).ok) {
       out.push({ club, player: best, fee });
     }
   }
@@ -277,11 +276,11 @@ export function drawEvent(state: GameState, now: number, rng: Rng): PendingEvent
 
 // ── Effects ──────────────────────────────────────────────────────────────────
 
-/** A state change plus the money it moves and the news it makes. Money is kept
- *  out of `state` so the caller can route it through earnMoney (the ledger). */
+/** Transfer cash is already booked atomically with ownership; ordinary event
+ * money is deferred for the caller's earnMoney ledger boundary. */
 export interface Applied {
   state: GameState;
-  money: { amount: number; reason: string }[];
+  money: { amount: number; reason: string; booked?: boolean }[];
   news: { text: string; kind: 'info' | 'success' | 'danger' }[];
   /** Why the choice couldn't go ahead (replaces its outcome line), e.g. a signing that fell through. */
   failed?: string;
@@ -345,11 +344,12 @@ export function applyEffects(state: GameState, effects: readonly EventEffect[], 
         }));
         break;
       case 'signSubject': {
-        const r = signRivalPlayer(s, ctx.rivalId, ctx.subjectId, ctx.fee ?? 0);
+        if (ctx.fee === undefined) { failed = 'the offer has no quoted transfer fee'; break; }
+        const r = signRivalPlayer(s, ctx.rivalId, ctx.subjectId, ctx.fee);
         if (typeof r === 'string') failed = r;
         else {
           s = r;
-          if (ctx.fee) money.push({ amount: -ctx.fee, reason: ctx.reason });
+          if (ctx.fee) money.push({ amount: -ctx.fee, reason: `sign:${ctx.subjectId}`, booked: true });
         }
         break;
       }
@@ -426,21 +426,12 @@ export function applyEffects(state: GameState, effects: readonly EventEffect[], 
  * club can't pay the fee.
  */
 export function signRivalPlayer(state: GameState, rivalId: string | undefined, playerId: string | undefined, fee: number): GameState | string {
-  const club = state.league.clubs.find((c) => c.id === rivalId);
-  const player = club?.squad?.find((p) => p.id === playerId);
-  if (!club || !player) return 'the player is no longer available';
-  if (state.squad.length >= SQUAD_CAP) return 'the squad is full';
-  if (state.money < fee) return "the club couldn't afford the fee";
-  const salary = salaryDemand(player);
-  if (!capRoomFor(state.squad, state.capAccount, state.season, salary)) {
-    return `not enough salary-cap room (${fmtMoney(salary)} a season)`;
-  }
-  const signed: Player = signForRestOfSeason({
-    ...player, wage: marketWage(player), morale: 70, joinedSeason: state.season,
-  }, state.season, state.week);
-  const clubs = state.league.clubs.map((c) =>
-    (c.id === club.id ? withDerivedStrength({ ...c, squad: c.squad!.filter((p) => p.id !== player.id) }) : c));
-  return { ...state, squad: [...state.squad, signed], league: { ...state.league, clubs } };
+  if (!rivalId || !playerId) return 'the player is no longer available';
+  const result = transferBetweenClubs(state, rivalId, state.clubId, playerId, fee);
+  if (result.ok) return result.state;
+  if (result.reason === 'not-found') return 'the player is no longer available';
+  if (result.reason === 'insufficient-funds') return "the club couldn't afford the fee";
+  return result.message;
 }
 
 /**
@@ -595,16 +586,20 @@ export function eventsTick(state: GameState): EventsTick {
 function commit(a: Applied): void {
   setState({
     squad: a.state.squad, reputation: a.state.reputation, boardPatience: a.state.boardPatience,
-    eventDeck: a.state.eventDeck, league: a.state.league,
+    eventDeck: a.state.eventDeck, league: a.state.league, money: a.state.money, finance: a.state.finance,
+    capAccount: a.state.capAccount, lineup: a.state.lineup,
   });
-  for (const m of a.money) earnMoney(m.amount, m.reason);
+  for (const m of a.money) {
+    if (m.booked) bus.emit('money:changed', { delta: m.amount, reason: m.reason, balance: getState().money, booked: true, stamp: { season: a.state.season, week: a.state.week } });
+    else earnMoney(m.amount, m.reason);
+  }
   for (const n of a.news) bus.emit('ui:notify', n);
 }
 
 /** The player picked choice `index` on a pending card. Returns false if it no longer exists. */
 export function chooseEvent(eventId: string, index: number): boolean {
   const s = getState();
-  if (hasStructuralCalendar(s)) return false;
+  if (hasStructuralCalendar(s) || weekHeld()) return false;
   const r = resolveEvent(s, eventId, index, elapsedInterval(s));
   if (!r) return false;
   commit(r);

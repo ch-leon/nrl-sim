@@ -1,3 +1,4 @@
+import { intakeUnsignedMarket } from '../../src/systems/playerCareer';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   FREE_AGENT_POOL_SIZE,
@@ -61,13 +62,11 @@ describe('refreshFreeAgents', () => {
     expect(getState().freeAgents).toHaveLength(FREE_AGENT_POOL_SIZE);
   });
 
-  it('fully replaces the previous pool (discards unsigned agents)', () => {
+  it('retains all previous unsigned agents', () => {
     const before = getState().freeAgents.map((p) => p.id);
     refreshFreeAgents(getState(), makeRng(7));
     const after = getState().freeAgents.map((p) => p.id);
-    expect(after).not.toEqual(before);
-    // No overlap in ids: it is a brand-new pool.
-    expect(after.some((id) => before.includes(id))).toBe(false);
+    expect(after).toEqual(before);
   });
 
   it('is deterministic for the same seed + state', () => {
@@ -81,13 +80,13 @@ describe('refreshFreeAgents', () => {
     expect(a).toEqual(b);
   });
 
-  it('advances rngSeed on the state', () => {
+  it('preserves rngSeed on the state', () => {
     const seedBefore = getState().rngSeed;
     refreshFreeAgents(getState(), makeRng(getState().rngSeed));
-    expect(getState().rngSeed).not.toBe(seedBefore);
+    expect(getState().rngSeed).toBe(seedBefore);
   });
 
-  it('higher scout level raises the mean overall over many seeded runs', () => {
+  it('higher scout level raises annual intake quality over many seasons', () => {
     const meanOverallWithScout = (scoutLevel: 0 | 1 | 2 | 3, runs: number): number => {
       let total = 0;
       let count = 0;
@@ -100,8 +99,9 @@ describe('refreshFreeAgents', () => {
             ],
           });
         }
-        refreshFreeAgents(getState(), makeRng(seed * 31 + 5));
-        for (const p of getState().freeAgents) {
+        setState({ season: seed + 1, freeAgents: [], playerPopulation: { ...getState().playerPopulation, shortlistIds: [] } });
+        const intake = intakeUnsignedMarket(getState());
+        for (const p of intake.freeAgents) {
           total += overallRating(p);
           count += 1;
         }
@@ -115,15 +115,16 @@ describe('refreshFreeAgents', () => {
     expect(highScout).toBeGreaterThan(noScout);
   });
 
-  it('higher reputation raises the mean overall over many seeded runs', () => {
+  it('higher reputation raises annual intake quality over many seasons', () => {
     const meanOverallWithRep = (rep: number, runs: number): number => {
       let total = 0;
       let count = 0;
       for (let seed = 1; seed <= runs; seed++) {
         createNewGame('Test Club', seed);
         setState({ reputation: rep });
-        refreshFreeAgents(getState(), makeRng(seed * 17 + 3));
-        for (const p of getState().freeAgents) {
+        setState({ season: seed + 1, freeAgents: [], playerPopulation: { ...getState().playerPopulation, shortlistIds: [] } });
+        const intake = intakeUnsignedMarket(getState());
+        for (const p of intake.freeAgents) {
           total += overallRating(p);
           count += 1;
         }
@@ -144,13 +145,13 @@ describe('the pool follows the league (N12)', () => {
     reputation,
     facilities: built.map((b) => ({ id: b.defId, defId: b.defId, level: b.level, x: 0, y: 0 })),
   });
-  /** Every overall from `runs` refreshes through the real refreshFreeAgents at this club. */
+  /** Quality belongs to annual intake; refreshing discovery never rerolls people. */
   const refreshed = (reputation: number, built: Built[] = [], runs = 40): number[] => {
     const out: number[] = [];
     for (let seed = 1; seed <= runs; seed++) {
       createNewGame('Test Club', seed);
-      setState({ ...club(reputation, built), freeAgents: [] });
-      out.push(...refreshFreeAgents(getState(), makeRng(seed * 31 + 5)).freeAgents.map(overallRating));
+      setState({ ...club(reputation, built), season: seed + 1, freeAgents: [], playerPopulation: { ...getState().playerPopulation, shortlistIds: [] } });
+      out.push(...intakeUnsignedMarket(getState()).freeAgents.map(overallRating));
     }
     return out;
   };
@@ -178,7 +179,7 @@ describe('the pool follows the league (N12)', () => {
     expect(Math.max(...all)).toBeLessThanOrEqual(52 + 2 * FREE_AGENT_SPREAD + 6);
   });
 
-  it('a refresh at reputation 30 lands within a point and a half of the target, and higher with a Scout Office or an Academy', () => {
+  it('annual intake at reputation 30 lands within a point and a half of the target, and higher with a Scout Office or an Academy', () => {
     const base = refreshed(30);
     expect(Math.abs(mean(base) - 52)).toBeLessThan(1.5);
     const scout = refreshed(30, [{ defId: 'scoutOffice', level: 3 }]);
@@ -205,8 +206,7 @@ describe('the pool follows the league (N12)', () => {
     setState({ ...club(100, [{ defId: 'scoutOffice', level: 3 }, { defId: 'academy', level: 3 }]), freeAgents: [junior, departed] });
     const pool = refreshFreeAgents(getState(), makeRng(9)).freeAgents;
     expect(pool.slice(0, 2)).toEqual([junior, departed]);
-    expect(pool).toHaveLength(2 + FREE_AGENT_POOL_SIZE);
-    expect(pool.slice(2).every((p) => !p.junior && !p.departed)).toBe(true);
+    expect(pool).toHaveLength(2);
   });
 });
 
@@ -227,10 +227,11 @@ describe('signingFee', () => {
   });
 
   it('Academy prospects pay a quarter, and not again after they have left', () => {
-    const junior = at(40, { junior: true, wage: 400 });
+    const junior = at(40, { junior: true, wage: 400, clubHistory: { spells: [], academyDiscountUsed: false } });
     expect(signingFee(getState(), junior)).toBe(signingFeeQuote(salaryDemand(junior), true, 0));
     expect(signingFee(getState(), { ...junior, departed: true })).toBe(signingFeeQuote(salaryDemand(junior), false, 0));
     expect(signingFeeBasis(getState(), junior)).toContain('Academy');
+    expect(signingFee(getState(), { ...junior, clubHistory: { spells: [], academyDiscountUsed: true } })).toBe(signingFeeQuote(salaryDemand(junior), false, 0));
   });
 
   it('a Scout Office takes 10% off the fee per level and nothing off the salary', () => {
@@ -432,16 +433,16 @@ describe('releasePlayer', () => {
 describe('freeAgencyTick / cadence', () => {
   it('no-ops when week is not divisible by 4', () => {
     setState({ week: 3 });
-    const before = getState().freeAgents.map((p) => p.id);
+    const before = getState().playerPopulation.shortlistIds;
     freeAgencyTick(getState(), makeRng(1));
-    expect(getState().freeAgents.map((p) => p.id)).toEqual(before);
+    expect(getState().playerPopulation.shortlistIds).toEqual(before);
   });
 
   it('refreshes when week is divisible by 4', () => {
     setState({ week: 4 });
-    const before = getState().freeAgents.map((p) => p.id);
+    const before = getState().playerPopulation.shortlistIds;
     freeAgencyTick(getState(), makeRng(1));
-    const after = getState().freeAgents.map((p) => p.id);
+    const after = getState().playerPopulation.shortlistIds;
     expect(after).not.toEqual(before);
     expect(after).toHaveLength(FREE_AGENT_POOL_SIZE);
   });
@@ -451,7 +452,7 @@ describe('registerFreeAgencySystem (tick hook)', () => {
   it('installs a hook at order 60 that refreshes on weeks 4, 8, ... only', () => {
     registerFreeAgencySystem();
 
-    const poolSnapshot = (): string[] => getState().freeAgents.map((p) => p.id).sort();
+    const poolSnapshot = (): string[] => [...getState().playerPopulation.shortlistIds];
 
     // Weeks 1,2,3 -> no refresh (advanceWeek runs the hook for the CURRENT week
     // before incrementing). Track when the pool changes.
@@ -473,9 +474,9 @@ describe('registerFreeAgencySystem (tick hook)', () => {
   it('advanceWeek fires the hook and refreshes the pool on week 4', () => {
     registerFreeAgencySystem();
     setState({ week: 4 });
-    const before = getState().freeAgents.map((p) => p.id);
+    const before = getState().playerPopulation.shortlistIds;
     advanceWeek(); // runs hooks for week 4, then bumps to week 5
-    const after = getState().freeAgents.map((p) => p.id);
+    const after = getState().playerPopulation.shortlistIds;
     expect(after).not.toEqual(before);
     expect(getState().week).toBe(5);
   });
@@ -483,9 +484,9 @@ describe('registerFreeAgencySystem (tick hook)', () => {
   it('advanceWeek on week 3 does not refresh', () => {
     registerFreeAgencySystem();
     setState({ week: 3 });
-    const before = getState().freeAgents.map((p) => p.id);
+    const before = getState().playerPopulation.shortlistIds;
     advanceWeek();
-    expect(getState().freeAgents.map((p) => p.id)).toEqual(before);
+    expect(getState().playerPopulation.shortlistIds).toEqual(before);
   });
 
   it('registers under the freeagents tick order (60)', () => {

@@ -27,11 +27,11 @@ describe('rival progression across seasons (#542)', () => {
     expect(run()).toEqual(run());
   });
 
-  it('preserves the main rollover draw order and ceilings for a fixed roster', () => {
+  it('repeats stable-club rollover draws and preserves surviving ceilings', () => {
     const clubs = withRivalSquads(RIVAL_CLUBS, 542);
     const rng = makeRng(542);
     const result = rolloverRivals(clubs, rng);
-    expect({ seed: rng.state(), retired: result.retired, juniors: result.juniors }).toEqual({ seed: 1000330794, retired: 16, juniors: 2 });
+    expect({ seed: rng.state(), retired: result.retired, juniors: result.juniors }).toEqual({ seed: 752142306, retired: 20, juniors: 0 });
     const before = new Map(clubs.flatMap(c => c.squad!).map(p => [p.id, p]));
     for (const p of result.clubs.flatMap(c => c.squad!)) {
       const previous = before.get(p.id);

@@ -22,6 +22,7 @@ describe('managed events use the same budgets as other optional commitments', ()
     };
     // Ample cash in both controls: only the recurring funding changes.
     const fromSave = { ...s, money: 1_000_000, freeAgents: [],
+      playerPopulation: { ...s.playerPopulation, shortlistIds: [] },
       squad: s.squad.map(p => ({ ...p, wage })),
       eventDeck: { ...s.eventDeck, pending: [event] } };
     const result = runSoak({ seed: 101, seasons: 1, weeks: 1, mode: 'managed', fromSave });
@@ -48,7 +49,8 @@ describe('managed events use the same budgets as other optional commitments', ()
     'an event signing takes the fee when cash and cap allow ($wage wages do not block it)', ({ wage }) => {
       const { state, subject } = play('rivalUnsettled', wage);
       expect(state.squad.some(p => p.id === subject.id)).toBe(true);
-      expect(state.finance.find(f => f.season === 1)!.events).toBe(-1000);
+      expect(state.finance.find(f => f.season === 1)!.transfers).toBe(-1000);
+      expect(state.finance.find(f => f.season === 1)!.events).toBe(0);
     },
   );
 
@@ -72,7 +74,7 @@ describe('managed events use the same budgets as other optional commitments', ()
     const healthy = { ...s, money: 1_000_000, squad: s.squad.map(p => ({ ...p, wage: 100 })) };
     const signed = signRivalPlayer(healthy, event.rivalId, event.subjectId, event.fee!);
     if (typeof signed === 'string') throw new Error(signed);
-    expect(signed.money).toBe(healthy.money); // The event ledger, not this pure helper, debits the fee.
+    expect(signed.money).toBe(healthy.money - event.fee!); // Pure projection includes the atomic funded transfer.
     const reserve = MANAGED.STAR_RESERVE + event.fee!;
     expect(managedEventChoice({ ...healthy, money: reserve }, event)).toBe(0);
     expect(managedEventChoice({ ...healthy, money: reserve - 1 }, event)).toBe(1);

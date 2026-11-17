@@ -21,7 +21,7 @@ The source audit for this plan is `origin/main` at `f4650217`. At that revision:
 - `events.signRivalPlayer` transfers a rival player on a new contract and needs reconciliation with the funded-transfer boundary.
 - Structural division careers remain developer-only and stop at next-season setup. They must remain gated after this work.
 
-**Stack on the exact #695 head first.** Its income changes overlap `state.ts`, save/version handling, economy, fixtures and rival wallets. The parent has created the implementation worktree at `.claude/worktrees/player-continuity` on #695 head `1dd…`, whose actual format is v29; six baseline suites passed 121 tests. Verify the full head with `git rev-parse HEAD` there before source edits. This allows draft implementation while independent different-tool review runs; it does not claim #695 is approved or merged. Choose the next actual save version on this integrated base; **this plan does not reserve v29**. If the #695 head changes during review, rebase and resolve its format before publishing. Preserve its receipts and never credit a sale through the match-income path.
+**Integrated base (updated 17 November).** The implementation began on #695 head `1dd…` (v29; six baseline suites passed 121 tests). #695 subsequently passed Claude review and full CI/QA at `c2202c12` and merged into main at `7e49e912`. The implementation worktree `.claude/worktrees/player-continuity`, published as [PR #716](https://github.com/ch-leon/nrl-sim/pull/716), integrates that final finance source and adds v30. Preserve its fixture receipts and never credit a sale through the match-income path. Resolve any later upstream format or wallet changes before final verification; the original draft baseline is historical.
 
 **Immediate builder assignment:** Tasks 1–3 form the first bounded implementation batch: installed ownership/history types, compact archive, additive migration, durable unsigned pool and visible shortlist IDs. Start there in `player-continuity`; do not concurrently edit sale/lifecycle/UI files. The later tasks are sequential continuation of the same #572 PR, not permission to expand into #574. A passed first batch is an intermediate foundation, not completion of #572.
 
@@ -103,7 +103,7 @@ Keep structural career market ticks and future season activation disabled. Pure 
 
 Only actual persistent rival clubs may buy. Choose among legal buyers deterministically by positional need first, then improvement at that position, then stable club ID. A buyer must need the position or improve its existing position depth; do not make every rich club buy every offered player. This is a bounded default AI policy, not dynamic negotiation.
 
-Use the existing `saleOfferQuote(salaryDemand(player))`. Preserve the exact current deal and queued renewal. Check annual commitment for every covered current/future season against the buyer's published cap; the seller's protected capacity does not travel with the person. Reconcile the seller's protection after departure. Require seller registration minimum, buyer squad maximum, nonnegative safe-integer wallets and current ownership. Block transfers during a held match/week and of a scholarship-restricted emergency player. There are no assignment records in this slice; do not add speculative assignment abstractions.
+Use the existing `saleOfferQuote(salaryDemand(player))`. Preserve the exact current deal and queued renewal. Check annual commitment for every covered current/future season against the buyer's published cap; the seller's protected capacity does not travel with the person. Reconcile the seller's protection after departure. Require seller registration minimum, buyer squad maximum, safe-integer wallets and current ownership. The buyer must remain nonnegative and fund the entire fee. A seller with an existing supported negative balance may receive proceeds (even partial recovery); reject overflow or noninteger balances. This permits recovery from existing debt and adds no borrowing. Block transfers during a held match/week and of a scholarship-restricted emergency player. There are no assignment records in this slice; do not add speculative assignment abstractions.
 
 ```ts
 export interface SaleOffer {
@@ -157,7 +157,7 @@ No match-engine or competition allocator edits are required. Different workers m
 
 **Files:** Create `tests/helpers/playerCareer.ts`; create `tests/systems/playerCareer.test.ts`; inspect integrated `src/core/state.ts`, `src/core/save.ts`, `src/systems/rivals.ts`, and #695 tests.
 
-- [ ] Confirm the implementation worktree is stacked on exact #695 head and record its full commit and actual save version at the top of the draft implementation PR. Read its money-event and wallet hooks. Formal checker approval may remain pending during this draft work. Check a clean worktree before edits; preserve all parent-authored docs.
+- [ ] Confirm the implementation includes the final approved #695 source and record its commit and actual save version in the implementation PR. Read its money-event and wallet hooks; the historical draft baseline is recorded above. Check a clean worktree before edits; preserve all parent-authored docs.
 - [ ] Add a repeatable fixture using the real constructors, with AU/UK pack preparation in test setup:
 
 ```ts
@@ -356,7 +356,7 @@ npm run build
 
 ## Risks and bounded exclusions
 
-- #695 review can change wallet APIs, event recording and save format. Draft work may proceed on its exact head; resolve upstream revisions before final verification and never parallelise competing state migrations.
+- The final #695 integration is recorded above. Later upstream changes can still alter wallet APIs, event recording and save format; resolve those revisions before final verification and never parallelise competing state migrations.
 - Existing event recruitment, Undo, generic add/remove helpers and QA managers can bypass a carefully written sale helper. Tasks 5/6/9 explicitly audit and cover them.
 - Per-player history reflects evidence available from its introduction. Migration cannot reconstruct unrecorded prior clubs or retirees.
 - A durable unsigned population changes market supply. Twelve-player discovery and bounded annual intake are measurable initial limits; validate a five-season sample rather than claiming the old churn balance still applies.

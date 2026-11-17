@@ -1,3 +1,4 @@
+import { withoutPopulationMetadata } from '../helpers/playerCareer';
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { createNewGame, getState, loadState, SAVE_VERSION, type GameState } from '../../src/core/state';
 import { earnMoney, spendMoney } from '../../src/data/club';
@@ -151,7 +152,7 @@ describe('rejected import', () => {
     expect(SAVE_VERSION).toBeGreaterThan(LAST_PRE_FINANCE_VERSION);
     const current = started();
     expect(importSave(JSON.stringify({ ...current, version: LAST_PRE_FINANCE_VERSION })).ok).toBe(false);
-    expect(importSave(JSON.stringify({ ...current, version: LAST_PRE_FINANCE_VERSION + 1 })).ok).toBe(true);
+    expect(importSave(JSON.stringify({ ...withoutPopulationMetadata(current), version: LAST_PRE_FINANCE_VERSION + 1 })).ok).toBe(true);
   });
 });
 

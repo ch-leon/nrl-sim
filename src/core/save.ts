@@ -1,3 +1,4 @@
+import { initialPlayerPopulation, installPlayerHistory } from '../systems/playerCareer';
 import { reconcileMatchIncome } from '../systems/matchIncome';
 import { currentRound } from './season';
 import { careerNamespace } from './storage/local';
@@ -311,6 +312,15 @@ export const MIGRATIONS: readonly MigrationStep[] = [
   { from: 25, to: 26, run: (old) => ({ ...old }) },
   // v27 records optional regional world membership; existing careers retain it absent.
   { from: 26, to: 27, run: (old) => ({ ...old }) },
+  // v30 preserves all people and observes current owners; no historical clubs are invented.
+  { from: 29, to: 30, run: old => {
+    const state = old as unknown as GameState;
+    const squad = state.squad.map(p => installPlayerHistory(p, state.clubId, state, 'observed'));
+    const freeAgents = state.freeAgents.map(p => installPlayerHistory(p, 'unsigned', state, 'observed'));
+    const league = { ...state.league, clubs: state.league.clubs.map(c => c.squad
+      ? { ...c, squad: c.squad.map(p => installPlayerHistory(p, c.id, state, 'observed')) } : c) };
+    return { ...old, squad, freeAgents, league, playerPopulation: initialPlayerPopulation({ ...state, squad, freeAgents, league }) };
+  } },
   // v29 starts receipt-backed income without retroactive claims on v28 results.
   { from: 28, to: 29, run: old => ({ ...old, matchIncome: [] }) },
 ];

@@ -1,3 +1,4 @@
+import { initialPlayerPopulation } from './playerCareer';
 // Isolated developer entry and sporting-stage preparation (#573). Finance,
 // promotion and a second-season setup remain owned by their later issues.
 import { getState, setState, type GameState } from '../core/state';
@@ -66,7 +67,7 @@ export function setupStructuralDivisionCareer(profile: RegionalCareerProfile, se
   if (cup) instances.push(cup);
   const start = world.divisions.find(d => d.id === world.profile.startingDivisionId)!;
   const next = activateStructuralCalendar({ ...state, rngSeed: (seed ^ hashString(`${profile.id}:calendar`)) >>> 0,
-    squad: world.squad, freeAgents: [], lineup: autoPick(world.squad), objectives: [],
+    squad: world.squad, freeAgents: [], playerPopulation: initialPlayerPopulation({ ...state, squad: world.squad, freeAgents: [], league: { ...state.league, clubs: world.clubs } }), lineup: autoPick(world.squad), objectives: [],
     capAccount: freshCapAccount(tierForRank(start.rank)),
     league: { clubs: world.clubs, fixtures: [], ladder: competitionLadder(local) },
     competitions: { schemaVersion: 1, instances, world: { profile: world.profile, divisions: world.divisions } } }, profile.calendarSlots);

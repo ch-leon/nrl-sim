@@ -29,3 +29,15 @@ TypeScript, the production build and all 3,771 tests across 277 files passed.
 The later documentation commits do not change those pricing functions. PR CI/
 WebKit, separate QA and review in a different tool remain gates. No merge or
 final numerical balance is claimed.
+
+## #572 integration — actual funded transfers
+
+[PR #716](https://github.com/ch-leon/nrl-sim/pull/716) builds on #695's reviewed
+`c2202c12` money-event contract. A sale commits both wallets, ownership, history,
+lineup and the player ledger atomically, then emits an already-booked `sell:<id>`
+event. Rival event recruitment preserves the exact contract, credits its real
+seller and uses already-booked `sign:<id>` on the transfers line. The QA manager
+projects and tallies that fee once. Current and queued commitments must fit
+every covered buyer season; seller protection never travels with the player.
+The continuity evidence is [recorded separately](2026-11-player-continuity.md);
+this does not close #562's wider balance acceptance.

@@ -21,6 +21,7 @@ import { FACILITY_CATALOG } from '../data/facility';
 import { fmtMoney } from '../utils/money';
 import { demolishFacility, validatePlacement } from '../world/placement';
 import { signPlayer, signingFee, type SignResult } from './freeagency';
+import { bookPlayerMovement } from './playerCareer';
 import { signingNote } from './lineup';
 
 /** How long the Undo stays on offer. */
@@ -118,21 +119,24 @@ export function offerBuild(f: PlacedFacility, cost: number, now = Date.now()): v
  */
 export function offerSign(
   signed: Player, asWas: Player, poolIndex: number, fee: number, now = Date.now(),
-  opts: { text?: string; lineup?: { before: Lineup; after: Lineup } } = {},
+  opts: { text?: string; shortlistIndex?: number; lineup?: { before: Lineup; after: Lineup } } = {},
 ): void {
   offerUndo({
     kind: 'sign',
     text: opts.text ?? `Signed ${signed.name}`,
     expiresAt: now + UNDO_MS,
-    canRevert: (s) => s.squad.some((p) => p.id === signed.id) && !s.freeAgents.some((p) => p.id === signed.id),
+    canRevert: (s) => s.squad.some((p) => p.id === signed.id && JSON.stringify(p) === JSON.stringify(signed)) && !s.freeAgents.some((p) => p.id === signed.id),
     revert: () => {
       const s = getState();
       const pool = [...s.freeAgents];
       pool.splice(Math.min(poolIndex, pool.length), 0, asWas);
       const lineup = opts.lineup && s.lineup === opts.lineup.after ? { lineup: opts.lineup.before } : {};
-      const balance = s.money + fee;
-      setState({ squad: s.squad.filter((p) => p.id !== signed.id), freeAgents: pool, money: balance, ...lineup });
-      bus.emit('money:changed', { delta: fee, reason: `undo:sign:${signed.id}`, balance });
+      const shortlistIds = [...s.playerPopulation.shortlistIds];
+      if (opts.shortlistIndex !== undefined && opts.shortlistIndex >= 0 && !shortlistIds.includes(asWas.id)) shortlistIds.splice(Math.min(opts.shortlistIndex, shortlistIds.length), 0, asWas.id);
+      const next = bookPlayerMovement({ ...s, squad: s.squad.filter(p => p.id !== signed.id), freeAgents: pool,
+        playerPopulation: { ...s.playerPopulation, shortlistIds }, ...lineup }, fee, 'transfers');
+      setState({ squad: next.squad, freeAgents: pool, money: next.money, finance: next.finance, playerPopulation: next.playerPopulation, ...lineup });
+      bus.emit('money:changed', { delta: fee, reason: `undo:sign:${signed.id}`, balance: next.money, booked: true, stamp: { season: s.season, week: s.week } });
       bus.emit('player:unsigned', { player: asWas });
     },
   });
@@ -173,7 +177,7 @@ export function signWithUndo(playerId: string): SignResult {
   const signed = after.squad.find((p) => p.id === playerId);
   // "Signed Deakin Cronky: goes straight into the nine at second-row" (#416).
   const text = res.placed && signed ? `Signed ${signed.name}: ${signingNote(res.placed)}` : undefined;
-  if (res.ok && asWas && signed) offerSign(signed, asWas, index, fee, Date.now(), { ...(text ? { text } : {}), lineup: { before: s.lineup, after: after.lineup } });
+  if (res.ok && asWas && signed) offerSign(signed, asWas, index, fee, Date.now(), { ...(text ? { text } : {}), shortlistIndex: s.playerPopulation.shortlistIds.indexOf(playerId), lineup: { before: s.lineup, after: after.lineup } });
   return res;
 }
 

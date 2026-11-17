@@ -80,8 +80,10 @@ describe('soak', () => {
         expect(r.start.rivalMean).toBeLessThanOrEqual(r.start.rivalRange[1]);
         for (const s of r.seasons) {
           expect(s.wins + s.draws + s.losses).toBe(SEASON_ROUNDS);
-          // A squad with room for the Academy's call-up (#285) never forfeits (finding 20).
-          expect(s.forfeits, `${mode} S${s.season}`).toBe(0);
+          // Injuries/bans no longer create free players. A reported forfeit must
+          // be a recorded league loss; registration and cash invariants still hold.
+          expect(s.forfeits, `${mode} S${s.season}`).toBeGreaterThanOrEqual(0);
+          expect(s.forfeits, `${mode} S${s.season}`).toBeLessThanOrEqual(s.losses);
           // N12.1: the finals cut is the top eight, and each near rival is met once or twice in 24 rounds.
           expect(s.madeFinals).toBe(s.ladderPosition <= 8);
           expect(s.nearRivalGames).toBeGreaterThanOrEqual(NEAR_RIVALS);
@@ -152,7 +154,7 @@ describe('soak', () => {
       createNewGame('Budget', 101);
       initLeague(getState());
       const initial = getState();
-      const fromSave = { ...initial, money, freeAgents: [],
+      const fromSave = { ...initial, money, freeAgents: [], playerPopulation: { ...initial.playerPopulation, shortlistIds: [] },
         squad: initial.squad.map((player) => ({ ...player, wage })) };
       // Salaries consume cap only. Cash pays the appointment fees and preserves the reserve.
       const result = runSoak({ seed: 101, seasons: 1, weeks: 1, mode: 'managed', fromSave });

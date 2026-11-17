@@ -32,8 +32,8 @@ live gameplay change; work still open below has not shipped.
   [technical contract](../specs/career-competitions.md) against current main;
   [delivery status](../status/2026-11-career.md) records evidence and dependencies.
   #536–#539 and #545 have merged, clearing structural state/calendar/division
-  work. Annual-cap finance #555–#562 and progression tuning #547 remain open;
-  paid rewards, transfers and release balance retain those prerequisites.
+  work. Remaining annual-cap finance tasks #560–#562 and progression tuning
+  #547 stay open; paid rewards and release balance retain those prerequisites.
   The state/calendar foundation, isolated AU/UK regional setup and Open Cup are
   merged through [PR #591](https://github.com/ch-leon/nrl-sim/pull/591).   The finance
   model is approved for initial testing: [contract](../specs/finance-prototype.md),
@@ -51,10 +51,14 @@ live gameplay change; work still open below has not shipped.
   appointments cost cash upfront; construction records its paid cost for refunds.
   Cap upgrades ([#560](https://github.com/ch-leon/nrl-sim/issues/560)), the complete
   finance-screen cleanup ([#561](https://github.com/ch-leon/nrl-sim/issues/561)),
-  funded sales ([#572](https://github.com/ch-leon/nrl-sim/issues/572)) and integrated
-  multi-season balance acceptance (#562) remain open.
-  Normal competition entry and annual eligible-league choice remain gated on
-  their dependencies and the new league-field design.
+  and integrated multi-season balance acceptance (#562) remain open.
+  Funded sales and durable player histories are implemented in the reviewed
+  candidate [PR #716](https://github.com/ch-leon/nrl-sim/pull/716), with final
+  independent-tool/CI/QA gates recorded in its
+  [evidence report](../status/2026-11-player-continuity.md).
+  Normal competition entry and annual eligible-league choice remain separate,
+  gated work; the approved product direction is recorded in
+  [PR #709](https://github.com/ch-leon/nrl-sim/pull/709).
 - **Expansive attack still under par** ([issue #322](https://github.com/ch-leon/nrl-sim/issues/322), open).
   The Speed diagnostic and four Speed levers merged in
   [PR #514](https://github.com/ch-leon/nrl-sim/pull/514), with every lever **off**, so

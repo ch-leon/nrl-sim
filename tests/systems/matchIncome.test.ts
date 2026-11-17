@@ -1,3 +1,4 @@
+import { withoutPopulationMetadata } from '../helpers/playerCareer';
 import { FinanceLedger, initFinanceLedger } from '../../src/ui/screens/finance';
 import { registerFinanceSystem } from '../../src/systems/economy';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -79,7 +80,7 @@ describe('receipt-backed ordinary match income', () => {
   });
   it('migrates v28 without retroactive receipts and rejects malformed receipt data', () => {
     const { s } = career();
-    const { matchIncome: _, ...old } = s;
+    const { matchIncome: _, ...old } = withoutPopulationMetadata(s);
     const migrated = migrateState({ ...old, version: 28 });
     expect(migrated.ok).toBe(true);
     if (migrated.ok) expect(migrated.state.matchIncome).toEqual([]);
