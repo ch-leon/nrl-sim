@@ -43,11 +43,14 @@ live gameplay change; work still open below has not shipped.
   appointments cost cash upfront; construction records its paid cost for refunds.
   Cap upgrades ([#560](https://github.com/ch-leon/nrl-sim/issues/560)), the complete
   finance-screen cleanup ([#561](https://github.com/ch-leon/nrl-sim/issues/561)),
-  funded sales ([#572](https://github.com/ch-leon/nrl-sim/issues/572)) and integrated
-  multi-season balance acceptance (#562) remain open. The #572 foundation now separates
-  durable unsigned people from Recruit discovery and adds v30 history metadata;
-  transaction, annual intake and retirement lifecycle integration remain open.
-  Normal competition entry and promotion remain gated on their recorded dependencies.
+  and integrated multi-season balance acceptance (#562) remain open.
+  Funded sales and durable player histories are implemented in the reviewed
+  candidate [PR #716](https://github.com/ch-leon/nrl-sim/pull/716), with final
+  independent-tool/CI/QA gates recorded in its
+  [evidence report](../status/2026-11-player-continuity.md).
+  Normal competition entry and annual eligible-league choice remain separate,
+  gated work; the approved product direction is recorded in
+  [PR #709](https://github.com/ch-leon/nrl-sim/pull/709).
 - **Expansive attack still under par** ([issue #322](https://github.com/ch-leon/nrl-sim/issues/322), open).
   The Speed diagnostic and four Speed levers merged in
   [PR #514](https://github.com/ch-leon/nrl-sim/pull/514), with every lever **off**, so

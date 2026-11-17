@@ -64,7 +64,7 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
-- **Player continuity foundation** (draft, #572): v30 stores observed club histories and compact retirement records. Recruit refreshes discovery without replacing unsigned people or drawing match RNG. Annual intake helpers are implemented; lifecycle signing, expiry, retirement and funded sales integration remain in the next batch.
+- **Real players and funded transfers** ([PR #716](https://github.com/ch-leon/nrl-sim/pull/716)): review the actual buyer, fee and unchanged deal before selling; the same player joins that club. Market refreshes reveal existing unsigned players, club spells remain readable, and History includes retired people. Annual births are bounded. Emergency scholarships only replace unavoidable expiry/retirement vacancies below 13; injuries and bans no longer manufacture extra players. Save v30 retains supported v28/v29 careers.
 
 - **Played-match income and upfront investments** ([PR #695](https://github.com/ch-leon/nrl-sim/pull/695)): base, venue and small result payments settle once with the fixture; byes and waiting pay nothing. Rival wallets pay for signings/releases. Staff appointment fees and Grandstand 30k/60k/90k purchases are upfront, with refunds based on recorded spend. v29 records kickoff promises and receipts; v28 loads without retroactive income.
 

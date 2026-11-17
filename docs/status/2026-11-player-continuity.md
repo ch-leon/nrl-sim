@@ -61,3 +61,37 @@ The deterministic career stream pins changed because persistent discovery,
 stable rival ordering, bounded births and isolated Academy intake change
 career outcomes/draws. UI-read versus no-read equality and unchanged surviving
 stats/ceilings remain required. No match-engine source was changed.
+
+## Full runtime integration and final review candidate
+
+[PR #716](https://github.com/ch-leon/nrl-sim/pull/716) integrates the independently
+reviewed income prerequisite `c2202c12`. The merge changed one deterministic
+career fingerprint from the provisional `1950957202` to `3782523015`; both
+UI-read/no-read parity checks remain intact and pass. No match rules were edited
+by the continuity changes.
+
+Actual registered hooks cover AU and UK sales, the sold ID in the opposing
+watched-match roster, unchanged agreements and progression attributes at transfer,
+100 refreshes without births, expiry/renewal/retirement and reload. Cross-division
+transfers retain the existing next-season waiting gate. Malformed imports leave
+an occupied career and its stored bytes untouched.
+
+A normal managed seed2026 run was dismissed after season4 for board objectives,
+with no state invariant failures. To exercise five complete years of continuity,
+a separate fixture clears the board objectives between annual full-runtime runs.
+That deliberate control is not normal-career balance evidence. Before the latest
+match-rule integration, its actual UTF-8 save measurements were:
+
+| Entering season | Live people | Retired records | Cumulative births | Save bytes |
+| --- | ---: | ---: | ---: | ---: |
+| 2 | 308 | 37 | 13 | 336,429 |
+| 3 | 303 | 63 | 34 | 440,929 |
+| 4 | 304 | 86 | 58 | 457,416 |
+| 5 | 307 | 99 | 74 | 470,352 |
+| 6 | 310 | 113 | 91 | 483,529 |
+
+Every previous ID remained live or archived after every year. The integration
+test logs fresh measurements on the final integrated code; these recorded
+numbers identify their source revision rather than claiming invariant balance
+values. Independent-tool review, final full checks, browser evidence and CI/QA
+are still required before merge.
