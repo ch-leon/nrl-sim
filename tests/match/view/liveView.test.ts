@@ -276,6 +276,8 @@ it('aligns current-pass sprite centres with painted moving/tired anchors and the
 });
 
 it('joins the pinned seed-1 short and long passes to the actual painted catch without an added ball hop', async () => {
+  // Main's receiver/last-tackle/held-up decisions (#649/#650/#652) move this real sequence:
+  // pickup 169, pass 175→181 (6 ticks), then moving pass 193→209 (16 ticks).
   const { LiveSim } = await import('../../../src/match/league/live');
   const { labSheet, DEFAULT_HOME, DEFAULT_AWAY } = await import('../../../src/match/lab/sheets');
   const { PlayerFrameCache } = await import('../../../src/scenes/matchPlayers');
@@ -292,15 +294,15 @@ it('joins the pinned seed-1 short and long passes to the actual painted catch wi
   s.ball.place = (x, y, lift, _depth, motion) => { centre = { x: x + (motion?.offsetX ?? 0), y: y - lift - 1.5 + (motion?.offsetY ?? 0) }; };
   const view = new LiveView(s), records = new Map<number, { centre: { x: number; y: number }; previous: { x: number; y: number } }>();
   let before = sim.snapshot(), previousCentre = centre, selected = 0;
-  for (let tick = 1; tick <= 212; tick++) {
+  for (let tick = 1; tick <= 210; tick++) {
     sim.step(); const cur = sim.snapshot(); view.draw(before, cur, 1);
-    if (tick === 178 || tick === 195) {
+    if (tick === 175 || tick === 193) {
       expect(cur.ball.flight?.startedTick).toBe(tick);
-      expect(cur.ball.flight?.arrivesTick).toBe(tick === 178 ? 183 : 211);
+      expect(cur.ball.flight?.arrivesTick).toBe(tick === 175 ? 181 : 209);
       expect(cur.ball.flight?.source).toBeDefined();
     }
-    if (tick === 182 || tick === 210) records.set(tick, { centre: { ...centre }, previous: { ...previousCentre } });
-    if (tick === 183 || tick === 211) {
+    if (tick === 180 || tick === 208) records.set(tick, { centre: { ...centre }, previous: { ...previousCentre } });
+    if (tick === 181 || tick === 209) {
       const holder = cur.ball.holder!;
       expect(holder).not.toBeNull();
       const picture = pictures.get(`${holder.side}/${holder.slot}`)!;

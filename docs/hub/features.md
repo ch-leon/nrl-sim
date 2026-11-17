@@ -1,6 +1,6 @@
 # Features
 
-Last updated: 2026-11-16
+Last updated: 2026-11-17
 
 What's in the game, with the PR that added each.
 
@@ -64,15 +64,15 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
-- **Connected big moments (candidate, not yet released):** kick follow-through lowers into the continuing run or settled stance; aerial landing loads into the same carry pose; try recovery uses palm and knee support before entering celebration. Knee slides settle once, and the empty goal-kick tee stays put as the kicker turns. Built on the handling candidate with existing event timing and possession ([PR #705](https://github.com/ch-leon/nrl-sim/pull/705)).
+- **Connected big moments:** kick follow-through lowers into the continuing run or settled stance; aerial landing loads into the same carry pose; try recovery uses palm and knee support before entering celebration. Knee slides settle once, and the empty goal-kick tee stays put as the kicker turns. Uses the connected handling poses with existing event timing and possession ([PR #705](https://github.com/ch-leon/nrl-sim/pull/705)).
 
-- **Connected handling (candidate, not yet released):** the actual receiver prepares his hands during an incoming pass, with his running stride continuing underneath. Pickup finishes in the carry pose, the passer turns through release, and flight sprites meet the painted hand anchors. Nearby defenders can brace as they approach the current carrier. This uses actual flight and possession facts; pre-release calls remain separate gameplay work ([PR #703](https://github.com/ch-leon/nrl-sim/pull/703)).
+- **Connected handling:** the actual receiver prepares his hands during an incoming pass, with his running stride continuing underneath. Pickup finishes in the carry pose, the passer turns through release, and flight sprites meet the painted hand anchors. Nearby defenders can brace as they approach the current carrier. This uses actual flight and possession facts; pre-release calls remain separate gameplay work ([PR #703](https://github.com/ch-leon/nrl-sim/pull/703)).
 
-- **Contact weight and recovery (candidate, not yet released):** tackle holds use planted support feet, falls land more sharply, and players recover through supported poses. Defenders clear the carrier in sequence and finish at their live positions before the shared tackle artwork hands back to ordinary movement. Existing contact outcomes and ball ownership are preserved ([PR #701](https://github.com/ch-leon/nrl-sim/pull/701)).
+- **Contact weight and recovery:** tackle holds use planted support feet, falls land more sharply, and players recover through supported poses. Defenders clear the carrier in sequence and finish at their live positions before the shared tackle artwork hands back to ordinary movement. Existing contact outcomes and ball ownership are preserved ([PR #701](https://github.com/ch-leon/nrl-sim/pull/701)).
 
-- **Everyday match movement (candidate, not yet released):** players lean into starts, take braking steps and plant into turns. Nearby defenders watch the ball while shuffling or backpedalling, including during a pass. Short support/transfer cycles follow distance travelled; the Art Lab Footwork control previews each pose. This builds on the art foundation and preserves match decisions ([PR #699](https://github.com/ch-leon/nrl-sim/pull/699)).
+- **Everyday match movement:** players lean into starts, take braking steps and plant into turns. Nearby defenders watch the ball while shuffling or backpedalling, including during a pass. Short support/transfer cycles follow distance travelled; the Art Lab Footwork control previews each pose. This builds on the art foundation and preserves match decisions ([PR #699](https://github.com/ch-leon/nrl-sim/pull/699)).
 
-- **Match art foundation (candidate, not yet released):** ordinary movement and handling use a new side profile alongside the front/back views. Editable torso and handling poses give players clearer shoulders, hands and exposed ball panels; the pitch has quieter grass texture and the crowd has softer shirt contrast. Art Lab has a Side view control. Contact, ruck and kick sequences keep their existing directional artwork, and match decisions and player identities are preserved ([PR #697](https://github.com/ch-leon/nrl-sim/pull/697)).
+- **Match art foundation:** ordinary movement and handling use a new side profile alongside the front/back views. Editable torso and handling poses give players clearer shoulders, hands and exposed ball panels; the pitch has quieter grass texture and the crowd has softer shirt contrast. Art Lab has a Side view control. Contact, ruck and kick sequences keep their existing directional artwork, and match decisions and player identities are preserved ([PR #697](https://github.com/ch-leon/nrl-sim/pull/697)).
 
 - Signing a player takes the cash for one year's wage (a quarter for an Academy prospect, less a Scout Office discount on the fee only) and room under this season's salary cap. Both are checked before anything changes, so a signing that does not fit is refused and the books stay as they were. A renewal costs nothing, and only in the last season of the current deal: it is priced on his ability now, starts the season after that deal, and has to fit the cap in the season it starts. It does not move the weeks left or the salary already signed. A second renewal in the same season does nothing. Releasing him shows the cash payout and the cap it frees, and is refused when the cash is short. There is no buyer for a sale yet. A rival's later signing is refused when it does not fit the annual cap. Rival wallets are not charged the fee until they have match income ([#558](https://github.com/ch-leon/nrl-sim/issues/558)).
 

@@ -2,26 +2,25 @@
 
 Date: 16 November 2026  
 Status: stages 1–4 presentation and the first stage-5 pass are implemented in
-five linked draft PRs. All remain open and unmerged for Leon; wider stage-5
-consistency work and release validation remain.
+five linked PRs. Leon reviewed the clip and approved merging on 17 November
+2026. Wider stage-5 consistency work and QA/phone validation remain.
 
-Stage 1 is implemented in [draft PR #697](https://github.com/ch-leon/nrl-sim/pull/697),
+Stage 1 is implemented in [PR #697](https://github.com/ch-leon/nrl-sim/pull/697),
 tracking [#696](https://github.com/ch-leon/nrl-sim/issues/696). Local functional checks passed;
 release validation is in progress. Leon agreed to all five improvement areas.
 
-Stage 2 is implemented in [draft PR #699](https://github.com/ch-leon/nrl-sim/pull/699),
+Stage 2 is implemented in [PR #699](https://github.com/ch-leon/nrl-sim/pull/699),
 tracking [#698](https://github.com/ch-leon/nrl-sim/issues/698),
 on top of the stage-1 candidate; local validation passed. One Sol agent
 implemented movement, Luna runs the shared validation, and the main agent reviews
 the source, visual result and rendering cost.
 
-Stage 3 is implemented in [draft PR #701](https://github.com/ch-leon/nrl-sim/pull/701),
+Stage 3 is implemented in [PR #701](https://github.com/ch-leon/nrl-sim/pull/701),
 tracking [#700](https://github.com/ch-leon/nrl-sim/issues/700), on top of stage 2;
-local functional validation passed. Leon's explicit review policy: leave every PR open and
-unmerged; Leon reviews before merging. This overrides the repository's automatic
-merge convention for this work. Keep the staged PRs as drafts.
+local functional validation passed. Leon's 17 November approval supersedes the
+earlier instruction to keep the reviewed stack open and unmerged.
 
-Stage 4 handling presentation is implemented in [draft PR #703](https://github.com/ch-leon/nrl-sim/pull/703),
+Stage 4 handling presentation is implemented in [PR #703](https://github.com/ch-leon/nrl-sim/pull/703),
 tracking [#702](https://github.com/ch-leon/nrl-sim/issues/702), on top of stage 3.
 This presentation pass connects pickup, release and reception, and prepares the
 actual receiver once the engine has launched his pass. A pre-release call still
@@ -30,7 +29,7 @@ set plays and dart/pass choices currently resolve at release. No guessed call
 or new gameplay decision is part of this visual change.
 
 Stage 5 starts with a bounded kicks, aerial takes and try finishes pass in
-[draft PR #705](https://github.com/ch-leon/nrl-sim/pull/705), tracking
+[PR #705](https://github.com/ch-leon/nrl-sim/pull/705), tracking
 [#704](https://github.com/ch-leon/nrl-sim/issues/704), on top of stage 4. It carries
 the same support, weight and continuous handoffs into the existing moment painters.
 Wider officials, crowd, reactions, weather and full-match consistency remain
@@ -346,3 +345,22 @@ commit; final-head CI, QA, different-tool review, phone play-test and Leon's
 review remain release checks. On-demand QA dispatch remains unavailable through
 this session's GitHub API (Forbidden). All five PRs remain open, draft and
 unmerged. The next pass is consistency across the rest of the match presentation.
+
+
+## Approved stack integration — 17 November 2026
+
+Leon watched the big-moment clip and approved merging the stack. The five original
+PR heads have green CI (including all WebKit shards/aggregate) and Android builds.
+The separate QA workflow and different-tool code review remain unverified; QA API
+access still returns Forbidden. Merge approval is recorded separately from those
+checks, and real-phone/whole-career performance work remains open.
+
+Main advanced to `7559f53` with weighted receivers, last-tackle options, held-up
+outcomes and contact/referee/pause fixes. Integrating those commits required no
+product source changes. Two regression fixtures now follow the current real
+sequences: seed-1 passes 175→181 and 193→209; seed-8 try 4856, with recovery seams
+4865→4866 and 4875→4876. The painted-ball and exact-pixel assertions remain intact.
+The 121 affected focused checks and typecheck passed. Full combined validation
+and the merge outcome are recorded in PR #705. The stack lands together through
+that PR so main receives the validated combination at once. Earlier open/draft notes above describe the prior
+review hold, which the recorded approval replaces.
