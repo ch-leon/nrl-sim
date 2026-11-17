@@ -27,7 +27,7 @@ import { withRivalSquads } from '../systems/rivals';
 import { autoPick } from '../systems/lineup';
 import { DEFAULT_TACTICS } from '../match/league/presets';
 import { bus } from './events';
-import { registerTickHook, TICK_ORDER, unregisterTickHook, weekHeld } from './time';
+import { registerTickHook, TICK_ORDER, unregisterTickHook, weekHeld, failedIntervalProblem } from './time';
 import { clearLiveMatch, LIVE_MATCH_EXPORT_FIELD, peelLiveMatchExport, readLiveMatch, writeLiveMatch } from '../systems/liveMatchRecord';
 import { CORRUPT_SAVE_KEY, LEGACY_SAVE_KEY, slotKey } from './storageKeys';
 import { BRAND } from '../brand';
@@ -566,6 +566,7 @@ export function __unlockSaves(): void {
  * a save was needed and did not land.
  */
 export function saveIfChanged(state: GameState): boolean {
+  if (failedIntervalProblem()) return false;
   const store = getStore();
   if (!store) return false;
   try {
@@ -586,7 +587,7 @@ export function saveIfChanged(state: GameState): boolean {
  * the active slot: the page is on its way to the title screen to load it.
  */
 export function save(state: GameState): void {
-  if (weekHeld() || slotImported || savesLocked) return;
+  if (weekHeld() || failedIntervalProblem() || slotImported || savesLocked) return;
   if (writeSlot(activeSlot, state)) lastSaved = state;
 }
 

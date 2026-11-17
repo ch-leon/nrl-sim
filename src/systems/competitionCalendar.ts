@@ -9,6 +9,7 @@ import { BENCH } from '../match/league/bench';
 import { standingsOrder, completedCompetition, validateCompetitions, type CompetitionFixture, type CompetitionInstance, type CompetitionResult, type CompetitionStatus } from '../data/competition';
 import type { CompetitionCalendarSlot } from '../data/competitionCalendar';
 import { isOpenCupInstance, openCupProblem } from './openCup';
+import { validateInput } from '../core/saveValidation';
 
 export const hasStructuralCalendar = (state: Pick<GameState, 'competitions'>): boolean => state.competitions?.calendar?.mode === 'structural';
 export const structuralRuntimeAllowed = (): boolean => careerNamespace() === DEV_TEST_PREFIX;
@@ -53,7 +54,11 @@ export function structuralPolicyProblem(state: GameState): string | null {
 }
 
 export function structuralAdvanceProblem(state: GameState): string | null {
-  if (state.competitions && 'leagueCareer' in state.competitions) return 'League careers are not enabled yet.';
+  if (state.competitions && 'leagueCareer' in state.competitions) {
+    if (!structuralRuntimeAllowed()) return 'League careers are not enabled yet outside the isolated developer career.';
+    if (!isPlayableLeagueCareer(state)) return 'The League career progression snapshot is invalid or unsupported.';
+    if (state.competitions.leagueCareer!.phase !== 'active') return 'A league choice is required before time can advance.';
+  }
   if (!hasStructuralCalendar(state)) return null;
   if (!structuralRuntimeAllowed()) return 'Competition prototypes require the isolated developer career.';
   if (state.competitions!.calendar!.status !== 'active') return 'The competition prototype is waiting for next-season setup.';
@@ -61,6 +66,12 @@ export function structuralAdvanceProblem(state: GameState): string | null {
   if (state.competitions!.instances.some(i => i.season === state.season && i.fixtures.some(f => f.slot === state.week && f.status === 'pending')))
     return 'The competition prototype is waiting for this stage or selection.';
   return null;
+}
+
+/** Validated lifecycle capability only; normal save admission remains separately refused. */
+export function isPlayableLeagueCareer(state: GameState): boolean {
+  return !!state.competitions?.leagueCareer && state.boardLoan?.owed === 0
+    && !validateInput(state as unknown as Record<string, unknown>, state.version);
 }
 
 /** Activation is an explicit local developer operation, never an imported flag. */

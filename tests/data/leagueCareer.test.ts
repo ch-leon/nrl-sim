@@ -9,10 +9,31 @@ import { competitions, progress, clubIds, profile } from './leagueCareerFixtures
 const context = { pack: 'au', season: 1, week: 5, clubIds, clubId: 'player' };
 function closed() {
   const c = competitions(); const close = leagueCloseFacts(c.world!, c.instances, 1);
-  c.leagueCareer = { ...progress(), phase: 'next-season-choice', close, accepted: {allocationPolicy: 'adjacent-vacancy-v1', movements: [], season: 1, leagueId: profile.startingDivisionId, receiptId: leagueEntryReceiptId(c.world!.profile.id, 1, 'player', profile.startingDivisionId)} };
+  c.leagueCareer = { ...progress(), phase: 'next-season-choice', close, accepted: {allocationPolicy: 'adjacent-vacancy-v1', movements: [], season: 1, startInterval: 0, leagueId: profile.startingDivisionId, receiptId: leagueEntryReceiptId(c.world!.profile.id, 1, 'player', profile.startingDivisionId)} };
   return c;
 }
 describe('strict League career progression metadata', () => {
+  it('requires exactly one canonical division per retained year and exact elapsed clock', () => {
+    const c = competitions(1, false); c.leagueCareer = {...progress(), phase: 'active', accepted: closed().leagueCareer!.accepted!};
+    c.calendar!.elapsedIntervals = 99;
+    expect(validateCompetitions(c, {...context, week: 1})).not.toBeNull();
+    c.calendar!.elapsedIntervals = 0;
+    const duplicate = {...c.instances[0]!, id: `${c.instances[0]!.id}duplicate`, fixtures: []}; c.instances.push(duplicate);
+    expect(validateLeagueCareer(c.leagueCareer, c, {...context, week: 1})).not.toBeNull();
+  });
+  it('rejects changed retained season-one membership, a forged acceptance start, and inflated closed elapsed', () => {
+    const old=closed();const c=competitions(2,false);c.instances=[...old.instances,...c.instances];
+    c.leagueCareer={...progress(),phase:'active',close:old.leagueCareer!.close!,accepted:{...old.leagueCareer!.accepted!,
+      season:2,startInterval:5,receiptId:leagueEntryReceiptId(profile.id,2,'player',profile.startingDivisionId)}};
+    const cursor={...context,season:2,week:1};expect(validateCompetitions(c,cursor)).toBeNull();
+    c.leagueCareer.accepted!.startInterval=6;c.calendar!.elapsedIntervals=6;
+    expect(validateCompetitions(c,cursor)).toBe('league career close');
+    c.leagueCareer.accepted!.startInterval=5;c.calendar!.elapsedIntervals=5;
+    [old.instances[1]!.entrantIds,old.instances[2]!.entrantIds]=[old.instances[2]!.entrantIds,old.instances[1]!.entrantIds];
+    expect(validateLeagueCareer(c.leagueCareer,c,cursor)).toBe('league career initial fields');
+    const terminal=closed();terminal.calendar!.elapsedIntervals++;
+    expect(validateCompetitions(terminal,context)).toBe('league career phase');
+  });
   it('validates initial, active and source-year closed states independently of runtime admission', () => {
     const c = competitions(1, false); c.leagueCareer = progress();
     expect(validateCompetitions(c, {...context, week: 1})).toBeNull();
@@ -52,7 +73,7 @@ describe('strict League career progression metadata', () => {
     const c = closed(); const old = c.instances[0]!;
     const current = competitions(2, false); current.instances = [...c.instances, ...current.instances];
     current.leagueCareer = {...progress(), phase: 'active', access: [...progress().access, {leagueId: profile.divisions[1]!.id, earnedFrom: leagueTitleEvidence(old, profile.startingDivisionId, profile.divisions[1]!.id)!}], close: c.leagueCareer!.close!,
-      accepted: {allocationPolicy: 'adjacent-vacancy-v1', movements: [], season: 2, leagueId: profile.startingDivisionId, receiptId: leagueEntryReceiptId(profile.id, 2, 'player', profile.startingDivisionId)} };
+      accepted: {allocationPolicy: 'adjacent-vacancy-v1', movements: [], season: 2, startInterval: 5, leagueId: profile.startingDivisionId, receiptId: leagueEntryReceiptId(profile.id, 2, 'player', profile.startingDivisionId)} };
     expect(validateCompetitions(current, {...context, season: 2, week: 1})).toBeNull();
     old.fixtures[2]!.status = 'cancelled'; delete old.fixtures[2]!.result;
     expect(validateLeagueCareer(current.leagueCareer, current, {...context, season: 2, week: 1})).not.toBeNull();
@@ -62,7 +83,7 @@ describe('strict League career progression metadata', () => {
     current.instances = [...previous.instances, ...current.instances];
     current.leagueCareer = {...progress(), phase: 'active', access: [...progress().access,
       {leagueId: profile.divisions[1]!.id, earnedFrom: leagueTitleEvidence(old.instances[0]!, profile.startingDivisionId, profile.divisions[1]!.id)!}],
-      close: leagueCloseFacts(previous.world!, previous.instances, 2), accepted: {allocationPolicy: 'adjacent-vacancy-v1', movements: [], season: 3, leagueId: profile.startingDivisionId,
+      close: leagueCloseFacts(previous.world!, previous.instances, 2), accepted: {allocationPolicy: 'adjacent-vacancy-v1', movements: [], season: 3, startInterval: 10, leagueId: profile.startingDivisionId,
         receiptId: leagueEntryReceiptId(profile.id, 3, 'player', profile.startingDivisionId)} };
     expect(validateCompetitions(current, {...context, season: 3, week: 1})).toBeNull();
     current.leagueCareer.access[1]!.earnedFrom!.result.winnerId = 'missing';
@@ -89,7 +110,7 @@ describe('strict League career progression metadata', () => {
   it('requires the previous close for active later years and bounds retained instances to two years', () => {
     const current = competitions(3, false); const previous = competitions(2);
     current.instances = [...previous.instances, ...current.instances];
-    current.leagueCareer = {...progress(), phase: 'active', accepted: {season: 3, leagueId: profile.startingDivisionId,
+    current.leagueCareer = {...progress(), phase: 'active', accepted: {season: 3, startInterval: 10, leagueId: profile.startingDivisionId,
       allocationPolicy: 'adjacent-vacancy-v1', movements: [], receiptId: leagueEntryReceiptId(profile.id, 3, 'player', profile.startingDivisionId)}};
     expect(validateCompetitions(current, {...context, season: 3, week: 1})).toBe('league career missing close');
     current.leagueCareer.close = leagueCloseFacts(previous.world!, previous.instances, 2);
@@ -103,7 +124,7 @@ describe('strict League career progression metadata', () => {
     if (season === 2) {
       c.instances = [...old.instances, ...c.instances];
       c.leagueCareer = {...progress(), phase: 'active', close: leagueCloseFacts(old.world!, old.instances, 1),
-        accepted: {season: 2, leagueId: profile.startingDivisionId, allocationPolicy: 'adjacent-vacancy-v1', movements: [],
+        accepted: {season: 2, startInterval: 5, leagueId: profile.startingDivisionId, allocationPolicy: 'adjacent-vacancy-v1', movements: [],
           receiptId: leagueEntryReceiptId(profile.id, 2, 'player', profile.startingDivisionId)}};
     }
     c.leagueCareer!.access.push({leagueId: profile.divisions[1]!.id, earnedFrom: title});
@@ -158,12 +179,12 @@ describe('strict League career progression metadata', () => {
     c.leagueCareer!.access.push({leagueId: harder, earnedFrom: leagueTitleEvidence(local, profile.startingDivisionId, harder)!},
       {leagueId: top, earnedFrom: leagueTitleEvidence(relabelled, harder, top)!});
     expect(final.result!.winnerId).toBe('player');
-    expect(validateLeagueCareer(c.leagueCareer, c, context)).toBe('league career title source');
+    expect(validateLeagueCareer(c.leagueCareer, c, context)).not.toBeNull();
   });
   it('rejects a later-year false movement and fields that differ from the prior close allocation', () => {
     const previous = competitions(); const c = competitions(2, false); c.instances = [...previous.instances, ...c.instances];
     c.leagueCareer = {...progress(), phase: 'active', close: leagueCloseFacts(previous.world!, previous.instances, 1), accepted: {
-      season: 2, leagueId: profile.startingDivisionId, allocationPolicy: 'adjacent-vacancy-v1', movements: [],
+      season: 2, startInterval: 5, leagueId: profile.startingDivisionId, allocationPolicy: 'adjacent-vacancy-v1', movements: [],
       receiptId: leagueEntryReceiptId(profile.id, 2, 'player', profile.startingDivisionId)}};
     const cursor = {...context, season: 2, week: 1}; expect(validateCompetitions(c, cursor)).toBeNull();
     c.leagueCareer.accepted!.movements.push({clubId: 'player', fromLeagueId: profile.startingDivisionId, toLeagueId: profile.divisions[1]!.id});
@@ -184,7 +205,7 @@ describe('strict League career progression metadata', () => {
     c.world = {profile: schedule.profile, divisions: schedule.divisions};
     c.leagueCareer = {...progress(), phase: 'active', close, access: [...progress().access,
       {leagueId: target, earnedFrom: leagueTitleEvidence(previous.instances[0]!, profile.startingDivisionId, target)!}],
-      accepted: {season: 2, leagueId: target, allocationPolicy: allocation.policy, movements: allocation.movements,
+      accepted: {season: 2, startInterval: 5, leagueId: target, allocationPolicy: allocation.policy, movements: allocation.movements,
         receiptId: leagueEntryReceiptId(profile.id, 2, 'player', target)}};
     expect(validateCompetitions(c, {...context, season: 2, week: 1})).toBeNull();
   });

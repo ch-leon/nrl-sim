@@ -51,9 +51,22 @@ export function finalsTarget(state: Pick<GameState, 'reputation' | 'settings'>):
  * a season is not failed because the bank moved.
  */
 export function generateObjectives(state: GameState): Objective[] {
+  return objectivesForField(state, finalsTarget(state));
+}
+
+/** League policy: scale the original 16-club target, never make last place a success.
+ * Regions share the policy. Only the accepted field participates in RNG or derbies.
+ * The lifecycle calls this at acceptance, never while closing the source year. */
+export function generateLeagueObjectives(state: GameState, fieldIds: readonly string[]): Objective[] {
+  const clubs = state.league.clubs.filter(c => fieldIds.includes(c.id));
+  if (clubs.length !== new Set(fieldIds).size || clubs.length < 2 || !clubs.some(c => c.id === state.clubId)) throw new Error('Invalid League objective field');
+  const top = Math.max(1, Math.min(clubs.length - 1, Math.round(finalsTarget(state) * clubs.length / 16)));
+  return objectivesForField({...state, league: {...state.league, clubs}}, top);
+}
+
+function objectivesForField(state: GameState, top: number): Objective[] {
   const rng = makeRng(state.season * 7919 + state.league.clubs.length * 31 + 17);
   const season = state.season;
-  const top = finalsTarget(state);
   const out: Objective[] = [
     { id: `s${season}-finals`, kind: 'finals', text: `Finish in the top ${top}`, target: top, status: 'pending' },
   ];

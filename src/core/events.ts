@@ -55,6 +55,7 @@ export interface LiveMatchData {
 export interface Events {
   'state:changed': GameState;
   'week:advanced': { week: number; season: number };
+  'week:blocked': { week: number; season: number; reason: string };
   'season:ended': { season: number; ladderPosition: number; premiership: boolean };
   'money:changed': { delta: number; reason: string; balance: number; booked?: boolean; stamp?: { season: number; week: number } };
   'facility:placed': PlacedFacility;

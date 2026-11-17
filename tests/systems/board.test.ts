@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
-  generateObjectives, evaluateObjective, reviewObjectives, finalsPrize, finalsTarget,
+  generateObjectives, generateLeagueObjectives, evaluateObjective, reviewObjectives, finalsPrize, finalsTarget,
   applyBoardReview, ensureObjectives, registerBoardSystem, sackedSummary, type SeasonOutcome,
 } from '../../src/systems/board';
 import { initLeague, PLAYER_ID } from '../../src/systems/fixtures';
@@ -26,6 +26,19 @@ const outcome = (over: Partial<SeasonOutcome> = {}): SeasonOutcome => ({
 });
 
 describe('generateObjectives', () => {
+  it('scales League targets from the original 16-club policy and restricts rival/derby/RNG to the actual field', () => {
+    const s = fresh(7, 30); const ids = s.league.clubs.slice(0, 8).map(c => c.id);
+    const expected = {easy: 5, normal: 5, hard: 4};
+    for (const difficulty of ['easy', 'normal', 'hard'] as const) {
+      const goals = generateLeagueObjectives({...s, settings: {...s.settings, difficulty}}, ids);
+      expect(goals[0]!.target).toBe(expected[difficulty]);
+      expect(goals.filter(o => o.rivalId).every(o => ids.includes(o.rivalId!))).toBe(true);
+    }
+    expect(generateLeagueObjectives({...s, reputation: 100}, ids)[0]!.target).toBe(2);
+    const subset = {...s, league: {...s.league, clubs: s.league.clubs.filter(c => ids.includes(c.id))}};
+    expect(generateLeagueObjectives(s, ids)).toEqual(generateLeagueObjectives(subset, ids));
+    expect(generateObjectives(s)[0]!.target).toBe(9);
+  });
   it('is deterministic and gives 2–3 objectives', () => {
     const s = fresh();
     expect(generateObjectives(s)).toEqual(generateObjectives(s));

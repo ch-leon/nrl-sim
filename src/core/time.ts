@@ -9,17 +9,20 @@
 // await, no setTimeout — so pipeline order is exact and no hook can observe a
 // later hook's mutation.
 
-import { getState, setState, resetForNewSeason } from './state';
+import { getState, setState, resetForNewSeason, stateInstallation } from './state';
 import { bus } from './events';
 import { WEEKS_PER_SEASON } from '../config';
 import { inTrials } from './season';
 import { demoStops } from '../commercial/demo';
 import { hasStructuralCalendar, settleStructuralCalendar, structuralAdvanceProblem, structuralSeasonResolved } from '../systems/competitionCalendar';
+import { closeLeagueSeason } from '../systems/leagueCareer';
+import { saveIfChanged } from './save';
 
 // ── Public hook contracts ──────────────────────────────────────────────────
 
 /** A weekly tick hook. Synchronous by contract — never block the tick. */
 export type TickHook = (ctx: TickContext) => void;
+export interface WeekRelease { (): void; current(): boolean }
 
 export interface TickContext {
   week: number;
@@ -34,7 +37,7 @@ export interface TickContext {
    * under fast-forward unless the caller allows it (the async advance, N10.3,
    * which plays the player's match in the Worker and waits for the week).
    */
-  hold?: () => void;
+  hold?: () => WeekRelease;
 }
 
 /** A season-rollover hook. Runs only at rollover, after counters are bumped. */
@@ -158,22 +161,39 @@ function sortedEntries<T extends { order: number; seq: number }>(m: Map<string, 
  */
 export function advanceWeek(): void {
   if (getState().sacked) return; // game over (#47): the save stays, time stops
-  if (held) return; // a held week finishes first (resumeWeek)
+  if (failedIntervalProblem()) return;
+  if (weekHeld()) return; // a held week finishes first (resumeWeek)
   // Also refuse inactive or malformed League markers before any interval work.
   if (structuralAdvanceProblem(getState())) return;
   if (demoStops()) return; // the demo's last week is played (#362; never with the commercial flag off)
   const { week, season } = getState();
-  let holding = 0;
+  const tokens = new Set<WeekRelease>();
+  const identity = {};
+  const installation = stateInstallation();
   const canHold = !fastForwardFlag || fastForwardHolds;
-  const ctx: TickContext = { week, season, fastForward: fastForwardFlag, ...(canHold ? { hold: () => void holding++ } : {}) };
+  const ctx: TickContext = { week, season, fastForward: fastForwardFlag, ...(canHold ? { hold: (): WeekRelease => {
+    const sameHold = (): boolean => held?.identity === identity && tokens.has(release) && stateInstallation() === installation
+      && getState().season === season && getState().week === week;
+    const release: WeekRelease = Object.assign(() => {
+      if (!sameHold()) return;
+      const problem = structuralAdvanceProblem(getState());
+      if (problem) {held = null; blockInterval(problem); return;}
+      tokens.delete(release);
+      if (tokens.size > 0) return;
+      const h = held!; held = null;
+      for (const entry of h.rest) entry.fn(h.ctx);
+      finishWeek(h.ctx.week);
+    }, {current: () => sameHold() && !structuralAdvanceProblem(getState())});
+    tokens.add(release); return release;
+  } } : {}) };
 
   const entries = sortedEntries(tickHooks).filter((entry) => !inTrials(getState()) || entry.trials);
   for (let i = 0; i < entries.length; i++) {
     entries[i]!.fn(ctx);
     // Held: finish this order's hooks (the player's match and the rival round
     // run side by side), then wait for every hold to be released.
-    if (holding > 0 && entries[i + 1]?.order !== entries[i]!.order) {
-      held = { ctx: { week, season, fastForward: fastForwardFlag }, rest: entries.slice(i + 1), pending: holding };
+    if (tokens.size > 0 && entries[i + 1]?.order !== entries[i]!.order) {
+      held = { ctx: { week, season, fastForward: fastForwardFlag }, rest: entries.slice(i + 1), tokens, identity, installation };
       return;
     }
   }
@@ -181,10 +201,22 @@ export function advanceWeek(): void {
 }
 
 /** A held week (coach calls #73; N9.2): the hooks still to run, and how many holds are still out. */
-let held: { ctx: TickContext; rest: TickEntry[]; pending: number } | null = null;
+let held: { ctx: TickContext; rest: TickEntry[]; tokens: Set<WeekRelease>; identity: object; installation: number } | null = null;
+let failedInterval: {installation: number; reason: string} | null = null;
+
+/** Unexpected post-hook failure is quarantined until a full career reload. */
+export function failedIntervalProblem(): string | null {
+  return failedInterval?.installation === stateInstallation() ? failedInterval.reason : null;
+}
+
+function blockInterval(reason: string): void {
+  failedInterval = {installation: stateInstallation(), reason};
+  const s = getState(); bus.emit('week:blocked', {week: s.week, season: s.season, reason});
+}
 
 /** True while a week is held, waiting for its live match to finish. */
 export function weekHeld(): boolean {
+  if (held && held.installation !== stateInstallation()) held = null;
   return held !== null;
 }
 
@@ -194,17 +226,14 @@ export function weekHeld(): boolean {
  */
 export function resumeWeek(): void {
   if (getState().competitions && 'leagueCareer' in getState().competitions!) return;
-  const h = held;
-  if (!h) return;
-  if (--h.pending > 0) return;
-  held = null;
-  for (const entry of h.rest) entry.fn(h.ctx);
-  finishWeek(h.ctx.week);
+  if (structuralAdvanceProblem(getState())) return;
+  held?.tokens.values().next().value?.();
 }
 
 /** Test helper: forget a held week. */
 export function clearHeldWeek(): void {
   held = null;
+  failedInterval = null;
 }
 
 function finishWeek(week: number): void {
@@ -216,6 +245,20 @@ function finishWeek(week: number): void {
     if (settled !== s) setState(settled);
     const now = getState();
     const calendar = now.competitions!.calendar!;
+    if (now.competitions!.leagueCareer) {
+      if (week >= calendar.slots.length) {
+        const closed = closeLeagueSeason(now);
+        if (closed === now) {blockInterval('The settled final interval could not be closed. Reload the saved interval to recover.'); return;}
+        // The live gate is installed first: a failed persistence attempt cannot replay this interval.
+        setState(closed);
+        saveIfChanged(getState());
+        if (!now.sacked && closed.sacked) bus.emit('board:sacked', closed.sacked);
+        const outcome = readSeasonOutcome();
+        bus.emit('season:ended', {season: now.season, ...outcome});
+      } else setState({week: week + 1, competitions: {...now.competitions!, calendar: {...calendar, elapsedIntervals: calendar.elapsedIntervals + 1}}});
+      const post = getState(); bus.emit('week:advanced', {week: post.week, season: post.season});
+      return;
+    }
     setState({ competitions: { ...now.competitions!, calendar: { ...calendar, elapsedIntervals: calendar.elapsedIntervals + 1 } } });
     if (week >= calendar.slots.length || structuralSeasonResolved(getState())) rollSeasonOver();
     else setState({ week: week + 1 });
@@ -294,6 +337,7 @@ export function advanceWeeks(n: number): void {
   if (n <= 0 || structuralAdvanceProblem(getState())) return;
   withFastForward(() => {
     for (let i = 0; i < n; i++) {
+      if (failedIntervalProblem() || structuralAdvanceProblem(getState()) || getState().sacked || weekHeld()) return;
       if (demoStops()) return; // once, not once per week left (#362)
       advanceWeek();
     }

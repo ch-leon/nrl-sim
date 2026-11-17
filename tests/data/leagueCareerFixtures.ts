@@ -23,7 +23,7 @@ export function competitions(season = 1, complete = true): CompetitionCareerStat
     league.status = 'completed'; league.winnerId = league.fixtures[2]!.result!.winnerId!;
   }
   return { schemaVersion: 1, instances: schedule.instances, world: { profile: schedule.profile, divisions: schedule.divisions },
-    calendar: { mode: 'structural', status: complete ? 'awaiting-next-season' : 'active', season, elapsedIntervals: complete ? 5 : 0, slots: profile.calendarSlots.map(s => ({...s})) } };
+    calendar: { mode: 'structural', status: complete ? 'awaiting-next-season' : 'active', season, elapsedIntervals: (season - 1) * 5 + (complete ? 5 : 0), slots: profile.calendarSlots.map(s => ({...s})) } };
 }
 export function progress(): LeagueProgress {
   return { version: 1, scheduleSeed: 573, initialFields: Object.fromEntries(Object.entries(fields).map(([id, ids]) => [id, [...ids]])), clubId: 'player', phase: 'initial-choice', access: [{leagueId: profile.startingDivisionId}] };

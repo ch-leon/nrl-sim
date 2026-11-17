@@ -1,3 +1,4 @@
+import { closeLeagueSeason } from '../../src/systems/leagueCareer';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { WEEKS_PER_SEASON } from '../../src/config';
 import { makeRng } from '../../src/utils/rng';
@@ -16,7 +17,7 @@ import { signWithUndo, undoNow, commitUndo } from '../../src/systems/undo';
 import { applyPlayerSale, quotePlayerSale } from '../../src/systems/playerTransfers';
 import { expireEndedDeals, freezeSignedTerms, publishedCap } from '../../src/systems/cap';
 import { validateInput } from '../../src/core/saveValidation';
-import { leagueCloseFacts, leagueEntryReceiptId } from '../../src/data/leagueCareer';
+import { leagueEntryReceiptId } from '../../src/data/leagueCareer';
 import { importSave, installImportedSave } from '../../src/core/save';
 import { recruitShortlist } from '../../src/ui/recruitShortlist';
 import { registerFinanceSystem, stampMovement } from '../../src/systems/economy';
@@ -155,15 +156,17 @@ describe('League management action clock', () => {
   });
 });
 
-function verifiedPending(): GameState {
+function verifiedPending(finance?: GameState['finance']): GameState {
   const s=structuredClone(careerFixture());
   s.week=5;s.preseason=0;s.league.fixtures=[];
   s.league.clubs=s.league.clubs.filter(c=>clubIds.includes(c.id));
   s.league.ladder=s.league.ladder.filter(c=>clubIds.includes(c.clubId));
   s.competitions=competitions();
   const world=s.competitions.world!;
-  s.competitions.leagueCareer={...progress(),phase:'next-season-choice',close:leagueCloseFacts(world,s.competitions.instances,1),accepted:{season:1,leagueId:world.profile.startingDivisionId,receiptId:leagueEntryReceiptId(world.profile.id,1,s.clubId,world.profile.startingDivisionId),allocationPolicy:'adjacent-vacancy-v1',movements:[]}};
-  return s;
+  s.competitions.leagueCareer={...progress(),phase:'active',accepted:{season:1, startInterval: 0,leagueId:world.profile.startingDivisionId,receiptId:leagueEntryReceiptId(world.profile.id,1,s.clubId,world.profile.startingDivisionId),allocationPolicy:'adjacent-vacancy-v1',movements:[]}};
+  s.competitions.calendar!.status='active';s.competitions.calendar!.elapsedIntervals=4;
+  if(finance) s.finance=finance;
+  return closeLeagueSeason(s);
 }
 const inputProblem = (s:GameState) => validateInput(s as unknown as Record<string,unknown>,s.version);
 describe('verified pending history upper bound', () => {
@@ -203,8 +206,7 @@ describe('verified pending history upper bound', () => {
 
 describe('generic management finance action date', () => {
   it.each([true, false])('keeps completed books fixed and dates planning spending and ledger alike (books first: %s)', booksFirst => {
-    const s=verifiedPending();s.money=10_000;
-    s.finance=[{...emptyFinance(1),gate:300,facilities:-50}];
+    const s=verifiedPending([{...emptyFinance(1),gate:300,facilities:-50}]);s.money=10_000;
     expect(inputProblem(s)).toBeNull();setState(s);
     const ledger=new FinanceLedger();
     const offs=booksFirst ? [registerFinanceSystem(),initFinanceLedger(ledger)] : [initFinanceLedger(ledger),registerFinanceSystem()];
@@ -220,6 +222,7 @@ describe('generic management finance action date', () => {
   it('uses actual source slots for marked active movements without applying legacy closing heuristics', () => {
     const s=verifiedPending();s.competitions!.leagueCareer!.phase='active';
     delete s.competitions!.leagueCareer!.close;
+    s.competitions!.leagueCareer!.access = progress().access; s.history = [];
     s.competitions!.calendar!.status='active';s.competitions!.calendar!.elapsedIntervals=4;
     expect(inputProblem(s)).toBeNull();setState(s);
     expect(stampMovement(s,'gate')).toEqual({line:'gate',season:1,week:5});

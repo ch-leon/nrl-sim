@@ -13,12 +13,13 @@
 // last (commercial flag on only); the demo's end has its own event, not the toast.
 
 import { bus } from './events';
-import { getState, type GameState } from './state';
-import { advanceWeek, weekHeld, withFastForward } from './time';
-import { structuralAdvanceProblem } from '../systems/competitionCalendar';
+import { getState, stateInstallation, type GameState } from './state';
+import { advanceWeek, failedIntervalProblem, weekHeld, withFastForward } from './time';
+import { isPlayableLeagueCareer, structuralAdvanceProblem } from '../systems/competitionCalendar';
 import { getCurrentFixture, PLAYER_ID } from '../systems/fixtures';
 import { fitSquadCount, playerMatchPending } from '../systems/matchday';
 import { overallRating } from '../data/player';
+import { contractActionView } from '../systems/cap';
 import { cardById } from '../data/events';
 import { DEMO_ENDED_TEXT, demoBlocked } from '../commercial/demo';
 import {
@@ -79,8 +80,8 @@ function newCards(before: GameState, after: GameState): string[] {
  * by default). A second call while one is running does nothing.
  */
 export async function advanceUntil(target: AdvanceTarget, frame: () => Promise<void> = nextFrame): Promise<AdvanceRun> {
-  const blocked = structuralAdvanceProblem(getState());
-  if (blocked) return { weeksPlayed: 0, stop: { kind: 'stopped', text: blocked } };
+  const blocked = failedIntervalProblem() ?? structuralAdvanceProblem(getState());
+  if (blocked) return { weeksPlayed: 0, stop: { kind: choiceRequired(getState()) ? 'choice-required' : 'stopped', text: blocked } };
   if (getState().sacked) return { weeksPlayed: 0, stop: { kind: 'target', text: 'The board has sacked you.' } };
   if (running) return { weeksPlayed: 0, stop: { kind: 'busy', text: 'An advance is already running.' } };
   // A week already held (Save & exit, or the rival round) must not be waited on here:
@@ -119,11 +120,16 @@ export async function advanceUntil(target: AdvanceTarget, frame: () => Promise<v
   return run;
 }
 
+function choiceRequired(state: GameState): boolean {
+  return isPlayableLeagueCareer(state) && state.competitions!.leagueCareer!.phase !== 'active';
+}
+
 async function runUntil(target: AdvanceTarget, frame: () => Promise<void>): Promise<AdvanceRun> {
   if (target.kind === 'weeks' && target.weeks <= 0) {
     return { weeksPlayed: 0, stop: { kind: 'target', text: `Advanced ${targetLabel(target)}.` } };
   }
   const startSeason = getState().season;
+  const installation = stateInstallation();
   let weeksPlayed = 0;
   let forcedSales: string[] = [];
 
@@ -141,8 +147,9 @@ async function runUntil(target: AdvanceTarget, frame: () => Promise<void>): Prom
         if (stopAsked) return { weeksPlayed, stop: { kind: 'stopped', text: STOPPED_BY_YOU } };
       }
       const before = getState();
-      const unavailable = structuralAdvanceProblem(before);
-      if (unavailable) return { weeksPlayed, stop: { kind: 'stopped', text: unavailable } };
+      if (installation !== stateInstallation()) return {weeksPlayed, stop: {kind: 'stopped', text: 'The career changed during advance.'}};
+      const unavailable = failedIntervalProblem() ?? structuralAdvanceProblem(before);
+      if (unavailable) return { weeksPlayed, stop: { kind: choiceRequired(before) ? 'choice-required' : 'stopped', text: unavailable } };
       // The demo ends here: stop before the week, not inside it (#362).
       if (demoBlocked(before)) return { weeksPlayed, stop: { kind: 'demo', text: DEMO_ENDED_TEXT } };
 
@@ -156,22 +163,33 @@ async function runUntil(target: AdvanceTarget, frame: () => Promise<void>): Prom
       forcedSales = [];
       // A held week (N10.3: the player's match in the Worker) finishes later: wait for its end.
       const weekDone = new Promise<void>((resolve) => {
-        const off = bus.on('week:advanced', () => { off(); resolve(); });
+        const finish = (): void => {off(); offBlocked(); offState(); resolve();};
+        const off = bus.on('week:advanced', finish);
+        const offBlocked = bus.on('week:blocked', finish);
+        const offState = bus.on('state:changed', () => {if (installation !== stateInstallation()) finish();});
         try {
-          if (!withFastForward(() => { advanceWeek(); return weekHeld(); }, { holds: true })) { off(); resolve(); }
+          if (!withFastForward(() => { advanceWeek(); return weekHeld(); }, { holds: true })) finish();
         } catch (err) {
-          off();
+          off(); offBlocked(); offState();
           throw err;
         }
       });
       await weekDone;
+      if (installation !== stateInstallation()) return {weeksPlayed, stop: {kind:'stopped',text:'The career changed during advance.'}};
+      const failure = failedIntervalProblem();
+      if (failure) return {weeksPlayed, stop: {kind:'stopped',text:failure}};
       weeksPlayed++;
 
       const after = getState();
       if (after.sacked) return { weeksPlayed, stop: { kind: 'target', text: 'The board has sacked you.' } };
+      if (choiceRequired(after)) {
+        if (targetReached(target, {weeksPlayed, week: after.week, startSeason, season: after.season, seasonClosed: true}))
+          return {weeksPlayed, stop: {kind: 'target', text: `Advanced ${targetLabel(target)}.`}};
+        return {weeksPlayed, stop: {kind: 'choice-required', text: 'Choose a league for next season before advancing.'}};
+      }
       const post = postWeekStop({
         injuredStarters: newlyInjuredStarters(before.squad, after.squad, overallRating, new Set(before.lineup.starters.filter((id): id is string => id !== null))),
-        contractAlerts: contractAlerts(before.squad, after.squad),
+        contractAlerts: contractAlerts(before.squad.map(p => contractActionView(before, p)), after.squad.map(p => contractActionView(after, p))),
         moneyBefore: before.money,
         moneyAfter: after.money,
         forcedSales,

@@ -221,6 +221,7 @@ export interface SeasonRecord {
   topScorer?: { name: string; tries: number };
   /** The season review (v12+, #190). */
   review?: SeasonReview;
+  league?: import('../data/leagueCareer').LeagueHistoryFacts;
 }
 
 /** Player-of-the-match awards to the club's players this season, by name (#190). */
@@ -356,6 +357,9 @@ export interface GameState {
 // ── Store (module-singleton around one GameState) ──────────────────────────
 
 let state: GameState | null = null;
+let installation = 0;
+/** In-memory installation identity; async work never crosses a career replacement. */
+export const stateInstallation = (): number => installation;
 
 /** Throws if the game has not been initialised (prevents silent undefined). */
 export function getState(): GameState {
@@ -380,6 +384,7 @@ export function setState(patch: Partial<GameState>): void {
 
 /** Replace the whole state (used by save.ts / tests). Emits 'state:changed'. */
 export function loadState(next: GameState): void {
+  installation++;
   selectPack(next.pack);
   state = next;
   bus.emit('state:changed', state);

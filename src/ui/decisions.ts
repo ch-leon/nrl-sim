@@ -265,7 +265,8 @@ export function advanceUntilAsked(target: AdvanceTarget, run: (t: AdvanceTarget)
     run(target).then((r) => {
       if (r.stop.kind !== 'decision') return;
       const s = getState();
-      const rest = remainingTarget(target, { weeksPlayed: r.weeksPlayed, week: s.week, startSeason, season: s.season });
+      const rest = remainingTarget(target, { weeksPlayed: r.weeksPlayed, week: s.week, startSeason, season: s.season,
+        seasonClosed: s.competitions?.leagueCareer?.phase === 'next-season-choice' });
       if (!rest || activeScreen() || dialogOpen()) return;
       openDecisions({ then: { label: keepAdvancingLabel(rest), run: () => advanceUntilAsked(rest, run, { confirmed: true }) } });
     }).catch((err: unknown) => {

@@ -46,12 +46,12 @@ describe('v31 additive progression save boundary', () => {
       expect(JSON.stringify(old)).toBe(original);
     }
   });
-  it('refuses any marked load/import and advancement even in DEV while the feature is inactive', () => {
+  it('refuses any marked load/import and advancement even in DEV for unsupported prototype markers', () => {
     setCareerNamespace(DEV_TEST_PREFIX); createNewGame('Inactive', 573);
     const state = setupStructuralDivisionCareer(AU_CAREER_PROFILE, 573);
     state.competitions!.leagueCareer = progress();
     setState(state); const before = JSON.stringify(getState());
-    expect(structuralAdvanceProblem(state)).toMatch(/not enabled/i);
+    expect(structuralAdvanceProblem(state)).toMatch(/invalid|unsupported/i);
     advanceWeek(); advanceWeeks(3); expect(JSON.stringify(getState())).toBe(before);
     const bytes = new Map([[DEV_TEST_PREFIX + slotKey(1), before]]);
     __setStorage({getItem: k => bytes.get(k) ?? null, setItem: (k,v) => {bytes.set(k,v);}, removeItem: k => {bytes.delete(k);}}); __unlockSaves();

@@ -9,7 +9,7 @@ import { DEFAULT_TACTICS } from '../match/league/presets';
 import type { RivalPlanContext } from '../match/league/ai';
 import { bus, type LiveMatchData } from '../core/events';
 import { getState, setState, type Fixture, type GameState, type RivalClub } from '../core/state';
-import { registerTickHook, resumeWeek, weekHeld, TICK_ORDER } from '../core/time';
+import { registerTickHook, weekHeld, TICK_ORDER, type WeekRelease } from '../core/time';
 import { clearLiveMatch, liveMatchSameRules, readLiveMatch, writeLiveMatch, type LiveMatchRecord } from './liveMatchRecord';
 import { matchEngineIdentity } from './matchEngineIdentity';
 import { NINES } from '../match/league/rules';
@@ -50,6 +50,7 @@ export function breakRuleSidesFor(
  * is already held; resuming re-emits match:started and does not hold again.
  */
 interface ParkedMatch {
+  release: WeekRelease;
   fixture: Fixture;
   home: TeamSheet;
   away: TeamSheet;
@@ -65,7 +66,7 @@ let parked: ParkedMatch | null = null;
  * and leave the held week with nothing that will release it.
  */
 export function playerMatchPending(): boolean {
-  return parked !== null && weekHeld();
+  return parked !== null && weekHeld() && parked.release.current();
 }
 
 /** Said once per incompatible fixture, through the existing match toast lane. */
@@ -82,7 +83,7 @@ function explainRestart(): void {
  * An incompatible record starts again at kick-off.
  */
 export function resumePlayerMatch(): boolean {
-  if (!parked || !weekHeld()) return false;
+  if (!parked || !weekHeld() || !parked.release.current()) return false;
   const rec = readLiveMatch();
   const live = parked.live;
   // Prefer the stored record (a kill, or a write newer than this page). A missing
@@ -355,16 +356,19 @@ export function registerPlayerMatchSystem(): void {
     // holds here; the result and the rest of the week come at full time, from
     // what the player watched (and called).
     if (!ctx.fastForward && ctx.hold) {
-      ctx.hold();
+      const release = ctx.hold();
       const record: LiveMatchRecord = { season: state.season, week: state.week, round: fixture.round, homeId: fixture.homeId, awayId: fixture.awayId, seed, calls: resumed ? [...resumed.calls] : [], ...(resumed?.controls?.length ? { controls: [...resumed.controls] } : {}), plans: resumed?.plans ? [...resumed.plans] : [], tick: resumed?.tick ?? 0, halfMinutes: NINES.halfMinutes, engineId: matchEngineIdentity() };
       if (fixture.id) { record.fixtureId = fixture.id; record.competitionId = fixture.competitionId!; record.slot = fixture.slot!; }
       const off = bus.on('match:finished', ({ fixture: done, result }) => {
-        if (!sameFixtureIdentity(done, fixture) || getState().season !== state.season || getState().week !== state.week) return;
+        if (!release.current()) {off(); return;}
+        // This is an in-process playback handoff: echo the actual kick-off
+        // object. Durable IDs can repeat after a fresh same-profile career.
+        if (done !== fixture || !sameFixtureIdentity(done, fixture) || getState().season !== state.season || getState().week !== state.week) return;
         off();
         parked = null;
         clearLiveMatch();
         applyPlayerResult(fixture, home, away, result, true)();
-        resumeWeek();
+        release();
       });
       const live: LiveMatchData = {
         seed,
@@ -385,6 +389,7 @@ export function registerPlayerMatchSystem(): void {
       // Keep the tick on the parked match too, so Resume still has it if the
       // stored record is later missing or unreadable.
       live.onProgress = (calls, tick, plans, controls = []) => {
+        if (!release.current()) return false;
         const progress = { ...record, calls: [...calls], plans: [...plans], tick };
         if (controls.length) {
           progress.controls = [...controls];
@@ -397,7 +402,7 @@ export function registerPlayerMatchSystem(): void {
         if (wrote && tick > 0) live.resumeAt = tick;
         return wrote;
       };
-      parked = { fixture, home, away, live, record, restartExplained: stale };
+      parked = { release, fixture, home, away, live, record, restartExplained: stale };
       writeLiveMatch(record);
       // Replacing the sidecar is safe only after construction and the hold above.
       if (stale) explainRestart();
@@ -407,11 +412,11 @@ export function registerPlayerMatchSystem(): void {
     // Fast-forward in a browser, inside the async advance (N10.3): the same match,
     // headless, in the Worker; the week waits for it, so the page keeps painting.
     if (ctx.fastForward && ctx.hold && canUseWorker()) {
-      ctx.hold();
+      const release = ctx.hold();
       void playMatchesInWorker([{ home, away, opts: matchOpts }], PLAYER_WORKER_TIMEOUT_MS)
-        .then(([result]) => applyPlayerResult(fixture, home, away, result ?? runMatch(home, away, matchOpts))())
+        .then(([result]) => { if (release.current()) applyPlayerResult(fixture, home, away, result ?? runMatch(home, away, matchOpts))(); })
         .catch((err: unknown) => console.error('the fast-forwarded match failed to land', err))
-        .finally(resumeWeek);
+        .finally(release);
       return;
     }
     // Fast-forward elsewhere (the soak, the tests, advanceWeeks): the same match, headless, here.

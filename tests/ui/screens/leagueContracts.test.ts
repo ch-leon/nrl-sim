@@ -1,8 +1,9 @@
+import { closeLeagueSeason } from '../../../src/systems/leagueCareer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { stubDocument, type StubNode } from '../stubDom';
 import { careerFixture } from '../../helpers/playerCareer';
 import { competitions, progress, clubIds } from '../../data/leagueCareerFixtures';
-import { leagueCloseFacts, leagueEntryReceiptId } from '../../../src/data/leagueCareer';
+import { leagueEntryReceiptId } from '../../../src/data/leagueCareer';
 import { getState, setState, type GameState } from '../../../src/core/state';
 import { validateInput } from '../../../src/core/saveValidation';
 import { bus } from '../../../src/core/events';
@@ -22,16 +23,15 @@ function fixture(planning: boolean): GameState {
   // finished, while the remaining authored quiet intervals still count.
   const c = s.competitions;
   c.calendar!.slots = Array.from({ length: 25 }, (_, i) => ({ id: i + 1, kind: i < 2 ? 'preseason' : 'competition' }));
-  c.calendar!.elapsedIntervals = planning ? 25 : 24;
-  c.calendar!.status = planning ? 'awaiting-next-season' : 'active';
+  c.calendar!.elapsedIntervals = 24;
+  c.calendar!.status = 'active';
   c.instances.forEach(instance => { instance.definition.slotCount = 25; });
-  c.leagueCareer = { ...progress(), phase: planning ? 'next-season-choice' : 'active',
-    ...(planning ? { close: leagueCloseFacts(c.world!, c.instances, 1) } : {}),
-    accepted: { season: 1, leagueId: c.world!.profile.startingDivisionId,
+  c.leagueCareer = { ...progress(), phase: 'active',
+    accepted: { season: 1, startInterval: 0, leagueId: c.world!.profile.startingDivisionId,
       receiptId: leagueEntryReceiptId(c.world!.profile.id, 1, s.clubId, c.world!.profile.startingDivisionId),
       allocationPolicy: 'adjacent-vacancy-v1', movements: [] } };
   s.squad.forEach(p => { p.deal = { salary: 1000, startSeason: 1, endSeason: 2 }; p.contractWeeks = 27; });
-  return s;
+  return planning ? closeLeagueSeason(s) : s;
 }
 function install(s: GameState): void {
   expect(validateInput(s as unknown as Record<string, unknown>, s.version)).toBeNull();
