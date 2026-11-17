@@ -299,8 +299,9 @@ describe('measuring and reporting', () => {
     // leaves Balanced as it was (no contest at the line) and re-pins Expansive (6-6:131:964b190f1b7b3aab
     // with the last-tackle call alone; 12-0:118:c104b852219f311c was Balanced with held up alone).
     // Early ordinary-DH commitment (#672) moves receiver/dart rolls four ticks earlier.
-    { attack: 'balanced' as const, expected: '6-0:137:a3aab7b7c35c2c99' },
-    { attack: 'expansive' as const, expected: '0-4:138:98e467c361b3a1f9' },
+    // Ordinary structures (#649) add a once-per-contact/PTB roll and real setup movement.
+    { attack: 'balanced' as const, expected: '0-8:138:a3c50b2b797e77b1' },
+    { attack: 'expansive' as const, expected: '6-6:141:efe82ee10feba754' },
   ])('pins an even $attack / Slide match (seed 1)', async ({ attack, expected }) => {
     const sim = new LiveSim(sideSheet('H', { rating: 60, tactics: { attack } }), sideSheet('A', { rating: 60 }), 1);
     const parts: string[] = [];
@@ -335,8 +336,9 @@ describe('measuring and reporting', () => {
     // re-pins plays-on-hard (10-6:150:b55e8ecc71438834 with the last-tackle call alone; held up alone gave
     // 6-12:146:855a4325e4eb4fc5 and 10-6:155:e32ad1bdf721a1a7).
     // #672 leaves scripted selection untouched; the opposing ordinary DH still commits earlier.
-    { name: 'plays-on', aiCoach: false, expected: '0-6:123:ab6b5638207cd447' },
-    { name: 'plays-on-hard', aiCoach: true, expected: '0-6:154:730643c394eba879' },
+    // Ordinary structures (#649) still leave scripted selection alone; the opponent prepares its packet.
+    { name: 'plays-on', aiCoach: false, expected: '0-4:134:d93f46a7e35ffb6c' },
+    { name: 'plays-on-hard', aiCoach: true, expected: '0-0:139:e3df2859485cf187' },
   ])('pins $name: an even Balanced / Slide match with set plays (seed 1)', async ({ aiCoach, expected }) => {
     const home = { ...sideSheet('H', { rating: 60 }), plays: ['block-play' as const, 'cut-out-winger' as const, 'kick-pass' as const] };
     const sim = new LiveSim(home, sideSheet('A', { rating: 60 }), 1, aiCoach ? { aiCoach: ['home'] } : {});

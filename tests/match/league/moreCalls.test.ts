@@ -41,13 +41,9 @@ interface Played {
   refusals: Set<string>;
 }
 
-/**
- * A home penalty in range is rare in a six-minute half. Early DH commitment
- * (#672) reshuffles the old seeds 7/10/19/20: seed 15 offers Take the two at 7438;
- * seed 41 offers both overrides at 2326 (25.04 m out). Keep actual penalties and
- * captain choices, without forcing the award or changing the call assertions.
- */
-const PENALTY_SEEDS = [15, 41];
+/** Current-default witness: seed 11 has a home penalty in range and offers both
+ * captain overrides in this six-minute match. */
+const PENALTY_SEEDS = [11];
 
 /** Play with the home coach making `call` whenever he may (as a player at the tray does: a tap, in on the next tick). */
 function play(seed: number, call: CoachCall | null, minutes = 6, side: 'home' | 'away' = 'home'): Played {

@@ -46,7 +46,10 @@ import { contractsEndingSoon } from '../../src/systems/contracts';
 // the line moved it to 3769124340 on its own, but with the last-tackle call also on (both merged) the
 // season ends on 1788836146 again (checked on the merge of main into #652, 16 Nov 2026). UI-read and
 // no-read seasons still agree.
-const MAIN_SEED_AFTER_SEASON = 1788836146;
+// #649 ordinary structures add phase-owned selection and preparation, changing match
+// outcomes and later season draws. UI-read and no-read seasons must still agree.
+// Previous pin: 1788836146.
+const MAIN_SEED_AFTER_SEASON = 3236754777;
 
 describe('the rng stream (#369)', () => {
   it.each([0, 1])('weekly potential and dot reads preserve the season stream with habit AI=%i', (ai) => {

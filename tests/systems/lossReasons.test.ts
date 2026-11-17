@@ -216,10 +216,21 @@ describe('out-schemed (#468)', () => {
     const them = sideSheet(rivalId(s), { rating: 60, tactics: { attack: 'balanced', defence: 'compressed' } });
     let losses = 0;
     for (const seed of [1, 2, 3, 4, 5, 6]) {
-      // Historical full-length trajectories supply real countered losses without choosing new seeds.
+      // The deterministic 1–6 cohort still has real countered losses. Seed 1 is
+      // also a loss, but its three higher-priority reasons fill the display cap.
       const r = runMatch(us, them, { seed, length: { halves: 2, halfMinutes: 7 } });
       const lost = r.awayScore > r.homeScore;
-      expect(hasReason(why(s, r, us, them))).toBe(lost);
+      const reasons = why(s, r, us, them);
+      if (seed === 1) {
+        expect(lost).toBe(true);
+        expect(reasons).toHaveLength(MAX_REASONS);
+        expect(reasons.map((reason) => reason.text)).toEqual([
+          'Your fullback Marley Ashgrove missed it injured (and 8 more)',
+          'You had 41% of the ball',
+          'You kicked 1 from 1 at goal, they kicked 4 from 4',
+        ]);
+        expect(hasReason(reasons)).toBe(false);
+      } else expect(hasReason(reasons)).toBe(lost);
       if (lost) losses++;
     }
     expect(losses).toBeGreaterThan(0);

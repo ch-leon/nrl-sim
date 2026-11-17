@@ -15,6 +15,21 @@ still generated seed 45 at its pre-receiver-change timing. [PR #714](https://git
 keeps its rendering assertions on four recorded real-match snapshots, independently
 of future gameplay changes. It is a separate test-only candidate.
 
+[PR #715](https://github.com/ch-leon/nrl-sim/pull/715) prepares the first ordinary
+forward pods and edge shifts during contact. Seed 1 supplies real settled edge
+and pod examples at ticks 173 and 6861; pods are uncommon in that match. The
+[standard comparison](https://github.com/ch-leon/nrl-sim/blob/376b01241d10c7945feb83f4ff89061fa64a5ba9/runs/20261117-055458-standard/report.md)
+records existing target gaps and changed gameplay metrics. A larger
+[off/on comparison](https://github.com/ch-leon/nrl-sim/blob/376b01241d10c7945feb83f4ff89061fa64a5ba9/runs/20261117-060048-shapes-win-rate-check/report.md)
+measured Expansive wins at 42.3% off versus 37.5% on, with 20.8% versus 18.9%
+draws over 800 tracked games each. The report does not significance-test its
+tracked win column. One bounded
+[alternative mix](https://github.com/ch-leon/nrl-sim/blob/2176cd724a715c7d7b0869d739032dce375b4c84/runs/20261117-060952-shapes-expansive-width/report.md)
+(spread 5, pod 1, edge 2) measured 36.0% wins and was rejected; defaults remain
+spread 2, pod 1, edge 5. This is an open balance concern, not a completed rebalance.
+The candidate remains draft and unmerged for Leon; final validation is recorded
+in the PR. Back-door plays and decoys remain later work.
+
 Status: stages 1–4 presentation and the first stage-5 pass are implemented in
 five linked PRs. Leon reviewed the clip and approved merging on 17 November
 2026; the full stack merged through #705 at `f9f1641`. Wider stage-5 consistency
