@@ -1,6 +1,20 @@
 # Match art and animation improvement plan
 
 Date: 16 November 2026  
+Update, 17 November: the approved presentation stack (#705), whistle cleanup
+(#706) and receiver preparation (#707) are merged. Both latest PRs passed every
+unit/browser CI shard and Android build; the combined main build deployed to
+GitHub Pages at `f465021`. Separate QA, physical-phone playtesting and whole-career
+performance work remain open. Leon authorized the next small build: forward pods
+and edge shifts under #649, alongside the existing spread, with balance evidence
+and normal-speed footage. Back-door options and decoys follow later. New PRs remain
+open for review. Earlier candidate notes below describe their implementation history.
+
+The combined-main check exposed one integration fixture: the whistle regression
+still generated seed 45 at its pre-receiver-change timing. [PR #714](https://github.com/ch-leon/nrl-sim/pull/714)
+keeps its rendering assertions on four recorded real-match snapshots, independently
+of future gameplay changes. It is a separate test-only candidate.
+
 Status: stages 1–4 presentation and the first stage-5 pass are implemented in
 five linked PRs. Leon reviewed the clip and approved merging on 17 November
 2026; the full stack merged through #705 at `f9f1641`. Wider stage-5 consistency

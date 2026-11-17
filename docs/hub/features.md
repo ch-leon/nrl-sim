@@ -64,13 +64,15 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
-- **Whistle cleanup (candidate, not released):** a player still in the sin bin fades from his seat with his side at half-time and full time, and returns with the restart. The fade finishes completely; retained tackle artwork, carrier markers, bin cards and gas/fatigue bars clear for the break picture and restore on replay ([PR #706](https://github.com/ch-leon/nrl-sim/pull/706)).
+- **Attacking shapes (candidate, not released):** free players prepare a compact forward pod or an edge shift during established tackle contact and carry that choice into the play-the-ball, alongside the existing spread. The selected players must be close enough to form it; the pod uses two forwards and a nearby free half. Real seed-1 play demonstrates both structures settled before release. This first slice of [#649](https://github.com/ch-leon/nrl-sim/issues/649) preserves explicit instructions, receiver commitment and unassigned support runners. Balance comparison and review remain part of the candidate; back-door plays and decoys follow separately.
+
+- **Whistle cleanup:** a player still in the sin bin fades from his seat with his side at half-time and full time, and returns with the restart. The fade finishes completely; retained tackle artwork, carrier markers, bin cards and gas/fatigue bars clear for the break picture and restore on replay ([PR #706](https://github.com/ch-leon/nrl-sim/pull/706), merged 17 November).
 
 - **Connected big moments:** kick follow-through lowers into the continuing run or settled stance; aerial landing loads into the same carry pose; try recovery uses palm and knee support before entering celebration. Knee slides settle once, and the empty goal-kick tee stays put as the kicker turns. Uses the connected handling poses with existing event timing and possession ([PR #705](https://github.com/ch-leon/nrl-sim/pull/705)).
 
 - **Connected handling:** the actual receiver prepares his hands during an incoming pass, with his running stride continuing underneath. Pickup finishes in the carry pose, the passer turns through release, and flight sprites meet the painted hand anchors. Nearby defenders can brace as they approach the current carrier. This uses actual flight and possession facts; pre-release calls remain separate gameplay work ([PR #703](https://github.com/ch-leon/nrl-sim/pull/703)).
 
-- **Receiver preparation (candidate, not released):** an ordinary dummy-half commits to his pass four ticks before release. The intended receiver raises an arm while keeping his running stride; a changed instruction or invalid recipient cancels the call. Interceptions and spills still resolve normally ([PR #707](https://github.com/ch-leon/nrl-sim/pull/707)).
+- **Receiver preparation:** an ordinary dummy-half commits to his pass four ticks before release. The intended receiver raises an arm while keeping his running stride; a changed instruction or invalid recipient cancels the call. Interceptions and spills still resolve normally ([PR #707](https://github.com/ch-leon/nrl-sim/pull/707), merged 17 November).
 
 - **Contact weight and recovery:** tackle holds use planted support feet, falls land more sharply, and players recover through supported poses. Defenders clear the carrier in sequence and finish at their live positions before the shared tackle artwork hands back to ordinary movement. Existing contact outcomes and ball ownership are preserved ([PR #701](https://github.com/ch-leon/nrl-sim/pull/701)).
 
