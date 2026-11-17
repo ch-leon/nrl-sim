@@ -176,10 +176,11 @@ describe('a binned man at the whistle (#688)', () => {
   });
   const make = () => {
     const contacts: (ContactAnimation | null)[] = [];
-    const s = { ...surface(), contact: { paint(state: ContactAnimation | null) { contacts.push(state); } }, officials: { spot: binnedSpot, draw() {} } };
+    const focus: ({ side: 'home' | 'away'; x: number; y: number } | null)[] = [];
+    const s = { ...surface(), contact: { paint(state: ContactAnimation | null) { contacts.push(state); } }, focus: { carrier(target: { side: 'home' | 'away'; x: number; y: number } | null) { focus.push(target); } }, officials: { spot: binnedSpot, draw() {} } };
     const pictures = new Map<string, PlayerPicture>();
     for (const side of ['home', 'away'] as const) s.players[side].forEach((a, slot) => { a.paint = p => { pictures.set(`${side}/${slot}`, p); }; });
-    return { s, view: new LiveView(s), pictures, contacts };
+    return { s, view: new LiveView(s), pictures, contacts, focus };
   };
   const seat = (s: ReturnType<typeof surface>, snap: Snapshot, slot = 0) => {
     const at = binnedSpot(snap.players.find(p => p.side === 'home' && p.slot === slot)!, snap)!;
@@ -260,7 +261,7 @@ describe('a binned man at the whistle (#688)', () => {
     expect([prev.tick, snap.tick]).toEqual([9074, 9075]);
     expect(binned.map(p => [p.side, p.slot])).toEqual([['home', 7]]);
     expect(liveContact).not.toBeNull();
-    const { s, view, contacts } = make();
+    const { s, view, contacts, focus } = make();
     const [contactPrev, contactCur] = liveContact!;
     view.draw(contactPrev, contactCur, 1);
     expect(contacts[contacts.length - 1]).not.toBeNull();
@@ -268,6 +269,7 @@ describe('a binned man at the whistle (#688)', () => {
     expect(participants.every(p => !s.players[p.side][p.slot]!.visible)).toBe(true);
     view.draw(prev, snap, 1);
     expect(contacts[contacts.length - 1]).toBeNull();
+    expect(focus[focus.length - 1]).toBeNull();
     expect(participants.every(p => s.players[p.side][p.slot]!.visible)).toBe(true);
     const seats = binned.map(p => ({ x: s.players[p.side][p.slot]!.x, y: s.players[p.side][p.slot]!.y }));
     for (const alpha of [0, 0.5, 0.999]) {
@@ -278,6 +280,7 @@ describe('a binned man at the whistle (#688)', () => {
     // A seek back into that exact live contact reconstructs the shared picture.
     view.draw(contactPrev, contactCur, 1);
     expect(contacts[contacts.length - 1]).not.toBeNull();
+    expect(focus[focus.length - 1]).not.toBeNull();
     expect(participants.every(p => !s.players[p.side][p.slot]!.visible)).toBe(true);
     view.draw(snap, snap, 1);
     for (const p of snap.players) expect(s.players[p.side][p.slot]!.alpha).toBe(1);

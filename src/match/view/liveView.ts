@@ -201,7 +201,7 @@ export class LiveView {
       const hand = h && screenFacing(h, this.before(prev, h), this.screenDir).left ? -4 : 4;
       this.s.ball.place(bw.x + hand, bw.y, lift, bw.y + 1.01 + cb.holder.slot * 0.001, motion);
       const drawn = layout?.feet.find(p => p.player.side === cb.holder!.side && p.player.slot === cb.holder!.slot);
-      this.s.focus?.carrier({ side: cb.holder.side, x: drawn?.x ?? bw.x, y: drawn?.y ?? bw.y });
+      this.s.focus?.carrier(brk ? null : { side: cb.holder.side, x: drawn?.x ?? bw.x, y: drawn?.y ?? bw.y });
     } else {
       const offset = passSpriteOffset(cur, motion.t, (ref, endpoint, flight) => {
         const player = flightPlayer(cur, ref)!;
