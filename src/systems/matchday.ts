@@ -360,7 +360,7 @@ export function registerPlayerMatchSystem(): void {
       const record: LiveMatchRecord = { season: state.season, week: state.week, round: fixture.round, homeId: fixture.homeId, awayId: fixture.awayId, seed, calls: resumed ? [...resumed.calls] : [], ...(resumed?.controls?.length ? { controls: [...resumed.controls] } : {}), plans: resumed?.plans ? [...resumed.plans] : [], tick: resumed?.tick ?? 0, halfMinutes: NINES.halfMinutes, engineId: matchEngineIdentity() };
       if (fixture.id) { record.fixtureId = fixture.id; record.competitionId = fixture.competitionId!; record.slot = fixture.slot!; }
       const off = bus.on('match:finished', ({ fixture: done, result }) => {
-        if (!release.current()) {off(); return;}
+        if (!release.current()) {off(); release(); return;}
         // This is an in-process playback handoff: echo the actual kick-off
         // object. Durable IDs can repeat after a fresh same-profile career.
         if (done !== fixture || !sameFixtureIdentity(done, fixture) || getState().season !== state.season || getState().week !== state.week) return;
