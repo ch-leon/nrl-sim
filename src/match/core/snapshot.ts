@@ -108,6 +108,8 @@ export interface SimEvent {
 }
 
 export interface Snapshot {
+  /** Actual structure prepared during contact (or a standalone PTB); renderers still use real positions. */
+  attackShape?: { kind: 'spread' | 'pod' | 'edge'; side: Side; dir: 1 | -1; edge: 1 | -1; startedTick: number; linkSlot?: 4 | 5 };
   /** The ordinary dummy-half's committed intended recipient, before release. Interceptions/spills can prevent the catch. */
   passCall?: { from: ContactPlayer; to: ContactPlayer; startedTick: number; releasesTick: number };
   tick: number;

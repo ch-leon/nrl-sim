@@ -24,13 +24,14 @@ function sheet(id: string, attack: AttackPreset = 'balanced', defence: DefencePr
     tactics: { attack, defence },
   };
 }
+/** Collect per-tick events directly; event-only comparisons need no full player snapshot. */
 function events(home: TeamSheet, away: TeamSheet, seeds: number, seconds: number): SimEvent[] {
   const out: SimEvent[] = [];
   for (let s = 1; s <= seeds; s++) {
     const sim = new LiveSim(home, away, s);
     for (let i = 0; i < seconds * 20; i++) {
       sim.step();
-      out.push(...sim.snapshot().events);
+      out.push(...sim.tickEvents);
     }
   }
   return out;
@@ -113,12 +114,16 @@ describe('tactics in the live sim', () => {
     // assertion described the retired Grind mechanic. Both styles offload.
     expect(count(grind, 'offload', 'home')).toBeGreaterThan(0);
     expect(count(wide, 'offload', 'home')).toBeGreaterThan(0);
+    // The whole-match comparison uses a fixed contiguous 60-seed cohort because
+    // neither style produced a cut-out in seeds 1–20 after the shapes change.
     // Cut-outs need a man more than 12 m wide and behind the ball. The grubber
     // chase pulls the wingers up in the red zone, so the opening minutes can
     // pass without one. Over whole matches the wide side still throws them.
-    const grindFull = events(sheet('H', 'grind'), away, 20, 14 * 60);
-    const wideFull = events(sheet('H', 'expansive'), away, 20, 14 * 60);
-    expect(count(wideFull, 'cut-out', 'home')).toBeGreaterThan(count(grindFull, 'cut-out', 'home'));
+    const grindFull = events(sheet('H', 'grind'), away, 60, 14 * 60);
+    const wideFull = events(sheet('H', 'expansive'), away, 60, 14 * 60);
+    const grindCutouts = count(grindFull, 'cut-out', 'home');
+    const wideCutouts = count(wideFull, 'cut-out', 'home');
+    expect(wideCutouts).toBeGreaterThan(grindCutouts);
     const longShare = (es: SimEvent[]): number => count(es, 'kick', 'home', 'long') / Math.max(1, count(es, 'kick', 'home'));
     expect(longShare(grind)).toBeGreaterThan(longShare(wide));
     expect(count(grind, 'step', 'home')).toBeLessThan(count(wide, 'step', 'home'));

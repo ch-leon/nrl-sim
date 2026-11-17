@@ -133,6 +133,7 @@ export class LiveSim extends LivePositioning implements MatchSim {
     }
     // Fresh legs (#367): one test a tick, and nothing more, until a coach calls it.
     if (this.freshLegs.home.pending || this.freshLegs.away.pending) this.landFreshLegs();
+    this.prepareAttackShape();
     if (this.tick % Math.max(1, Math.round(LIVE.decideEveryTicks)) === 0) this.assignTargets();
     this.move();
     this.restBench();
@@ -238,6 +239,8 @@ export class LiveSim extends LivePositioning implements MatchSim {
       const d = ph.decision;
       snap.passCall = { from: { ...d.from }, to: { ...d.to! }, startedTick: d.decidedAt, releasesTick: d.until };
     }
+    const shape = this.currentAttackShape();
+    if (shape) snap.attackShape = { ...shape };
     const contact = this.visualContact;
     if (contact) {
       const c = this.players.find(p => p.key === contact.carrier.who && p.side === contact.carrier.side && p.slot === contact.carrier.slot);

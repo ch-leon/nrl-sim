@@ -41,12 +41,11 @@ import { contractsEndingSoon } from '../../src/systems/contracts';
 // #625: completed retreats, including handovers, change match outcomes and later
 // season draws. The final standing-marker/deep-cover corrections restore this historical
 // season fingerprint; UI-read and no-read seasons still agree.
-// #650/#652 integrated last-tackle and held-up rules retained the previous
-// 1788836146 baseline before career persistence. #572 discovery, isolated
-// Academy intake and bounded births deliberately change career draws;
-// Integrating current match rules changes the provisional 1950957202 pin to
-// 3782523015; UI-read/no-read parity remains required in both AI modes.
-const MAIN_SEED_AFTER_SEASON = 3782523015;
+// #650/#652 retained the prior 1788836146 fingerprint. #649 ordinary attacking
+// structures moved the season seed to 3236754777. Career persistence and the
+// merged main career work move it again; compare UI-read/no-read in both AI modes.
+// Main's career-only pin: 3782523015. The combined pin below is measured on this merge.
+const MAIN_SEED_AFTER_SEASON = 119391389;
 
 describe('the rng stream (#369)', () => {
   it.each([0, 1])('weekly potential and dot reads preserve the season stream with habit AI=%i', (ai) => {

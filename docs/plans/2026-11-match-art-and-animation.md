@@ -1,6 +1,41 @@
 # Match art and animation improvement plan
 
 Date: 16 November 2026  
+Update, 17 November: the approved presentation stack (#705), whistle cleanup
+(#706) and receiver preparation (#707) are merged. Both latest PRs passed every
+unit/browser CI shard and Android build; the combined main build deployed to
+GitHub Pages at `f465021`. Separate QA, physical-phone playtesting and whole-career
+performance work remain open. Leon authorized the next small build: forward pods
+and edge shifts under #649, alongside the existing spread, with balance evidence
+and normal-speed footage. Back-door options and decoys follow later. New PRs remain
+open for review. Earlier candidate notes below describe their implementation history.
+
+The combined-main check exposed one integration fixture: the whistle regression
+still generated seed 45 at its pre-receiver-change timing. [PR #714](https://github.com/ch-leon/nrl-sim/pull/714)
+keeps its rendering assertions on four recorded real-match snapshots, independently
+of future gameplay changes. It is a separate test-only candidate.
+
+[PR #715](https://github.com/ch-leon/nrl-sim/pull/715) prepares the first ordinary
+forward pods and edge shifts during contact. Seed 1 supplies real settled edge
+and pod examples at ticks 173 and 6861; pods are uncommon in that match. The
+[standard comparison](https://github.com/ch-leon/nrl-sim/blob/376b01241d10c7945feb83f4ff89061fa64a5ba9/runs/20261117-055458-standard/report.md)
+records existing target gaps and changed gameplay metrics. A larger
+[off/on comparison](https://github.com/ch-leon/nrl-sim/blob/376b01241d10c7945feb83f4ff89061fa64a5ba9/runs/20261117-060048-shapes-win-rate-check/report.md)
+measured Expansive wins at 42.3% off versus 37.5% on, with 20.8% versus 18.9%
+draws over 800 tracked games each. The report does not significance-test its
+tracked win column. One bounded
+[alternative mix](https://github.com/ch-leon/nrl-sim/blob/2176cd724a715c7d7b0869d739032dce375b4c84/runs/20261117-060952-shapes-expansive-width/report.md)
+(spread 5, pod 1, edge 2) measured 36.0% wins and was rejected; defaults remain
+spread 2, pod 1, edge 5. A
+[held-out replication](https://github.com/ch-leon/nrl-sim/blob/c238f24b44ada0750ed0d04cf0dbbbf8d050cf6f/runs/20261117-093550-shapes-replication-control/report.md)
+on seeds 401–800 reversed the initial drop: wins were 38.1% off and 40.6% on.
+Together, the two samples give 40.2% off versus 39.1% on over 1,600 games each.
+This does not prove balance parity; it does not justify retuning to the initial
+sample. Defaults remain unchanged. Leon approved merging #714/#715 on 17 November;
+the branches integrate the newer career work before their final checks. The PRs
+record the merge outcome. Back-door passing and support runs are next; their new
+PR stays open for review.
+
 Status: stages 1–4 presentation and the first stage-5 pass are implemented in
 five linked PRs. Leon reviewed the clip and approved merging on 17 November
 2026; the full stack merged through #705 at `f9f1641`. Wider stage-5 consistency

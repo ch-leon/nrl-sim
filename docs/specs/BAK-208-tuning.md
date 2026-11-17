@@ -1855,3 +1855,44 @@ experiments and must declare their units. Previous 14-minute reports in this
 reference remain historical measurements. Live-match neutral 40-seed combined
 points were 10.15/12.825/17.675 at 100m/80m/60m; those live-sim measurements do not
 establish full-career economic or progression equivalence.
+
+## Ordinary attacking structures (#649, first slice)
+
+`src/match/league/attackingShapes.ts`, registered as `shapes.*`. Default on for
+review. One seeded choice during actual tackle contact, transferred without a
+redraw to its ordinary ruck and retained through the pass/carry; standalone PTBs
+choose at the ruck. All packet members must be on the field, free, not interchanging
+and within the setup reach. The nearest feasible half links the compact forward
+triangle; `busyUntil` remains a pass-only restriction and does not lock movement.
+Inputs/scripted sheets retain priority. No decoy,
+back-door pass or carrier-line contest is added. Off draws nothing and retains
+main f465021's simulation; enabled preparation changes movement/RNG timing, so
+match recovery engine revision is 6. Browser and standard-harness sign-off remain
+required; baseline target misses are not changes caused by this slice.
+
+| Knob | Default | Meaning |
+|---|---:|---|
+| `shapes.on` | 1 | 0 retains the previous simulation exactly; 1 enables ordinary structures. |
+| `shapes.weights.grind.{spread,pod,edge}` | 2 / 5 / 1 | Tight favours the short forward packet. |
+| `shapes.weights.balanced.{spread,pod,edge}` | 3 / 3 / 2 | Balanced mix before situation/availability weights. |
+| `shapes.weights.expansive.{spread,pod,edge}` | 2 / 1 / 5 | Expansive favours its same-edge half/link/wing. |
+| `shapes.weights.kick-chase.{spread,pod,edge}` | 4 / 3 / 1 | More fan/depth while preserving kick priorities. |
+| `shapes.weights.all-out.{spread,pod,edge}` | 2 / 3 / 4 | More edge and short-packet options. |
+| `shapes.earlyTackle` / `.earlyPod` | 2 / 1.8 | Through this upcoming tackle, multiply pod weight. |
+| `shapes.lateTackle` / `.lateEdge` | 3 / 1.5 | From this tackle, multiply edge weight. |
+| `shapes.deepM` / `.deepPod` | 60 / 1.4 | At least these metres to line, multiply pod weight. |
+| `shapes.redM` / `.redEdge` | 25 / 1.3 | Inside this distance, multiply edge weight. |
+| `shapes.marginM` / `.edgeRoomM` | 1.5 / 18 m | Touch margin; minimum near-edge room plus margin before an edge can be selected. |
+| `shapes.setupReachM` / `.contactReachM` | 7 / 12 m | Maximum actual packet-member travel at standalone PTB / earlier contact setup. |
+| `shapes.pod.propDepth` / `.propWidth` | 3.5 / −3 m | Prop behind the ball, on the opposite side of the pod's selected half. |
+| `shapes.pod.rowDepth` / `.rowWidth` | 4.5 / 4 m | Second-row behind and beside the ball. |
+| `shapes.pod.linkDepth` / `.linkWidth` | 7 / 2 m | Nearest feasible half deeper behind the two forwards; normal receiver eligibility still applies. |
+| `shapes.edge.halfDepth` / `.halfWidth` | 4 / 6 m | First half in the short ordered edge chain. |
+| `shapes.edge.linkDepth` / `.linkWidth` | 5.5 / 12 m | Same-edge centre (left) / second-row (right). |
+| `shapes.edge.wingDepth` / `.wingWidth` | 7 / 18 m | Same-edge winger, keeping the opposite winger's existing fan. |
+
+Depth is measured behind the real ball/receiver anchor. The existing DH run-on
+advance uses the authored depth and retains its 3 m minimum. Lateral fitting
+preserves packet lane order near touch; a centre-field tie alternates by tackle
+and attack direction, independent of the weighted roll. Spread retains existing
+support priority. Snapshot/target reads never choose or consume dice.

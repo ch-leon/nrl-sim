@@ -313,6 +313,40 @@ tries the step one-on-one rather than tucking it. *Width* softens the preference
 wingers). **Overlap** (all presets): when a side has more players than the defence within
 20 m on one side of the passer, receivers that way get +0.8 (×1 + width).
 
+### Ordinary attack structures (#649, first shape slice)
+
+With `shapes.on:1`, established tackle contact chooses **spread**, **forward pod** or
+**edge shift** once for the upcoming PTB, giving free attackers time to prepare.
+Standalone restart PTBs choose on entering their ruck. Spread keeps the existing fan. Pod brings the two forwards
+and a half into a short packet; edge uses the same-side half/link/wing (left
+4/3/1, right 5/8/2), preserving their order rather than crossing the far backs.
+Style weights the choice; early tackles/deep field favour pod and later/red-zone
+play favours edge. Edge requires room to the nearer touchline. All three packet
+members must be free to move: holder, dummy half, locked, binned or interchanging
+players are excluded. `busyUntil` still blocks passing eligibility, not steering. Packets beyond 12 m during contact, or 7 m
+at a standalone PTB, are excluded. Pod selects the nearest feasible half (slot 4/5) alongside the two forwards
+without a second roll; no actor is asked for a long cross-field shuttle during the PTB.
+
+One seeded draw uses the upcoming tackle count and current contact position;
+there is no predicted receiver or tackle outcome. The same choice is transferred
+to the actual ordinary ruck, retained through the heel, DH
+preparation, pass and subsequent carry. Carrier/actual receiver/DH, chasers,
+retreat and ordinary open-play supports retain priority. Shaped DH run-on uses
+its actual depth, keeping the existing minimum 3 m. A new contact, kick, loose
+ball, turnover or dead phase ends the structure. Breaks/offloads/strips abandon
+contact preparation. No old-side choice is made for a last-tackle handover.
+Admitted manual/attacking coach
+inputs cancel it without a fresh draw; scripted sheets retain their existing
+path. Handover waits for the actual attacking side. Bins/substitutions invalidate
+an affected packet. `Snapshot.attackShape` reports the engine's choice only;
+renderers continue drawing the real positions.
+
+`shapes.on:0` draws nothing and retains the prior simulation exactly. Enabled
+choices change movement and RNG timing, so recovery engine revision is 6. All
+weights/distances are in tuning's **Ordinary attacking structures** section.
+Back-door balls, decoys and carrier-line contests remain separate work. This is
+an initial review default, subject to browser and standard-harness comparison.
+
 ### 5.2 Defence presets
 
 The two ruck markers stand square with the play-the-ball, one behind the other

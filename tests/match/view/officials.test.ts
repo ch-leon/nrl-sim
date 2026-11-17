@@ -20,16 +20,19 @@ const world = (p: { x: number; y: number }) => {
 };
 
 /** Historical seven-minute halves provide the penalty/try presentation witnesses. */
-function playMatch(seed: number, halfMinutes = 7, maxTick = 30_000): Snapshot[] {
+function* matchSnapshots(seed: number, halfMinutes = 7, maxTick = 30_000): Generator<Snapshot> {
   const home = sideSheet('H', { rating: 62 });
   const away = sideSheet('A', { rating: 58 });
   const sim = new LiveSim(home, away, seed, { length: { halves: 2, halfMinutes } });
-  const snaps: Snapshot[] = [sim.snapshot()];
+  yield sim.snapshot();
   while (!sim.finished && sim.tick < maxTick) {
     sim.step();
-    snaps.push(sim.snapshot());
+    yield sim.snapshot();
   }
-  return snaps;
+}
+
+function playMatch(seed: number, halfMinutes = 7, maxTick = 30_000): Snapshot[] {
+  return Array.from(matchSnapshots(seed, halfMinutes, maxTick));
 }
 
 describe('the referee (#642)', () => {
@@ -75,8 +78,10 @@ describe('the referee (#642)', () => {
     let near = 0;
     let covers = 0;
     let held = 0;
-    for (const snaps of matches) {
-      for (const s of snaps) {
+    // A contiguous cohort includes the original seeds 3/11 without choosing favourable
+    // trajectories. Stream one match at a time; default structures change who crosses his path.
+    for (let seed = 1; seed <= 12; seed++) {
+      for (const s of matchSnapshots(seed)) {
         const h = s.ball.holder && s.players.find((p) => p.side === s.ball.holder!.side && p.slot === s.ball.holder!.slot);
         if (!h) continue;
         held++;
@@ -90,7 +95,8 @@ describe('the referee (#642)', () => {
         if (over) covers++;
       }
     }
-    // Inside the clear zone only while the ball runs right through his spot; standing far side of play, rarely over the carrier.
+    // Includes heel grace and dead phases, as before. Current seeds 1–12: near 4717/173704
+    // (2.72%), covers 9697/173704 (5.58%); the original 3%/7% bounds remain.
     expect(near / held).toBeLessThan(0.03);
     expect(covers / held).toBeLessThan(0.07); // a closer stand-off (#680) puts him over the carrier a little more often; the scene sorts him behind
   });

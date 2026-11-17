@@ -1,12 +1,12 @@
 // Actual engine moments, replay consistency and grounded shadows. No forced outcomes.
-// After #649/#650/#652, seed 8 has no grubber before full time. Seed 28 supplies all seven:
-// punt 43, high 120, grubber 2378, error 5194, try 5235, routine 5374, goal strike 5404 (<6,000 ticks).
+// Bounded contiguous default-Lab discovery (seeds 1–40) found seed 1 as the first
+// to supply all seven actual moments through tick 3111. Assertions below are unchanged.
 // E2E_URL=http://localhost:4176/ CHROMIUM_PATH=/usr/bin/chromium node scripts/e2e-moments.mjs
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium, webkit } from 'playwright-core';
 const out=process.env.E2E_OUT ?? 'e2e-output/moments'; await mkdir(out,{recursive:true});
-const seed=28;
+const seed=1;
 const browser=process.env.E2E_BROWSER==='webkit'?await webkit.launch():await chromium.launch({executablePath:process.env.CHROMIUM_PATH ?? '/opt/pw-browsers/chromium',args:['--no-sandbox']});
 try {
  const page=await browser.newPage({viewport:{width:1280,height:800}});const errors=[];page.on('pageerror',e=>errors.push(e.message));

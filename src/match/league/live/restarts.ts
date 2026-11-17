@@ -63,7 +63,11 @@ export abstract class LiveRestarts extends LivePlay {
     }
     // 'dh': wait for the heel to arrive, a beat, then move it.
     const h = this.holder();
-    if (!h || h !== this.dummyHalf(this.attacking)) { this.cancelRuckDecision(); return; }
+    if (!h || h !== this.dummyHalf(this.attacking)) {
+      const heel = this.ball.kind === 'flight' && this.ball.via === 'roll' && ph.heldAt === 0;
+      if (!heel) this.cancelRuckDecision();
+      return;
+    }
     if (ph.heldAt === 0) ph.heldAt = this.tick;
     if (ph.decision?.to && !this.ruckReceiver(ph)) ph.decision.cancelled = true;
     const release = ph.heldAt + LIVE.dhHoldTicks;
@@ -105,7 +109,7 @@ export abstract class LiveRestarts extends LivePlay {
       h.poseUntil = 0;
       this.emit('dart', `${h.name} darts from dummy-half`, h);
     } else this.pass(h, receiver);
-    this.phase = { kind: 'play' };
+    this.phase = { kind: 'play', ...(ph.shape ? { shape: ph.shape } : {}) };
   }
 
   private chooseRuck(h: Player, until: number): RuckDecision {
