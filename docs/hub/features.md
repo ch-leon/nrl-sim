@@ -82,6 +82,12 @@ What's in the game, with the PR that added each.
 
 - The scripted persona playtesters record a weekly money and XP diary and spend stat points in character (optimal, spend-by-focus, random, or half). This is a measurement tool. A normal career still spends points by focus automatically ([PR #691](https://github.com/ch-leon/nrl-sim/pull/691)).
 
+- More options on the last tackle: the kicker weighs kicking, running it and shifting it wide by field position, his side's style, his boot, his outside backs' pace and, in the last minute, the score. Between even sides the last tackle is a kick 62% of the time (was 69%) and a pass 15% (was 8%). Awaiting lab sign-off ([PR](https://github.com/ch-leon/nrl-sim/pull/687), [issue](https://github.com/ch-leon/nrl-sim/issues/650)).
+
+- A carrier at the try line can be held up: any tackler on him there may stop the try, more surely with two or three men on him and less surely against a carrier at full pace. Play restarts with a play-the-ball 10 m out (a handover on the last). It shows as `HELD UP!` with a commentary line, in about one match in five between even sides (20 to 30% of matches across scenarios), for about 0.2 fewer tries a match, measured on top of the last-tackle options. Awaiting lab sign-off ([PR](https://github.com/ch-leon/nrl-sim/pull/686), [issue](https://github.com/ch-leon/nrl-sim/issues/652)).
+
+- The pass finds one of the near-best options by weight, not always the single best man, in open play and from dummy half, so a set's first receiver varies more (the chance two first passes on the same tackle find the same man falls from 32% to 26% between even sides). Step 1 of the attack-shapes work; awaiting lab sign-off ([PR](https://github.com/ch-leon/nrl-sim/pull/684), [issue](https://github.com/ch-leon/nrl-sim/issues/649)).
+
 - Developer settings is in Settings on every build (GitHub Pages, the Android test APK and local dev). Overrides and experiments stay off until you turn one on, so a normal career plays as before. Analytics stays on unless the address has `?labs=1` or a developer override, experiment or playtest career is actually on. Before launch, set `VITE_DEV_SETTINGS=0` or remove Developer settings ([PR #683](https://github.com/ch-leon/nrl-sim/pull/683)).
 
 - Normal 2:30 clock halves on a 100m field; the existing Experiments panel offers browser-local 100m/80m/60m choices between matches ([PR #678](https://github.com/ch-leon/nrl-sim/pull/678)).
@@ -115,6 +121,7 @@ What's in the game, with the PR that added each.
   - At half-time and full time both sides walk off and fade behind the card, winners celebrating and losers head-down; before golden point each side huddles, then spreads.
   - The men under a bomb tip their heads back to watch it.
   - The referee no longer darts when the ball changes hands.
+  - Follow-ups ([PR](https://github.com/ch-leon/nrl-sim/pull/685), [issue](https://github.com/ch-leon/nrl-sim/issues/682)): the referee glides through the play-the-ball instead of stepping as the ball reaches the dummy half, and the walk-off at half-time stands still under a pause.
 
 - Defenders other than the markers must physically retreat 10m (or to their goal line) after each ruck before they can rejoin the defence, including after quick heels, handovers, sin bins and substitutions ([PR](https://github.com/ch-leon/nrl-sim/pull/677), [evidence](../specs/625-retreat-validation.md)).
 

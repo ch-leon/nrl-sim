@@ -4,8 +4,10 @@
 // Nothing here reads a random number or changes the sim: the harness only
 // looks (events, plus the ball's x and who holds it, read off the sim). The
 // attribution rules are written up in balance/README.md ("Watchability").
+import { SET_TACKLES } from '../../config';
 import type { Side, SimEvent } from '../core/snapshot';
 import { PLAYS } from '../league/plays';
+import { PLAYERS } from '../league/roles';
 
 /** Per match: lead changes (a count), whether it was close with a minute to play, whether the last minute decided it, and the winner's biggest deficit. */
 export const FLOW = ['leadChanges', 'closeLate', 'decidedLate', 'comeback'] as const;
@@ -19,6 +21,10 @@ export type OriginKey = (typeof ORIGINS)[number];
 export const LAST_TACKLES = ['kick', 'run', 'pass'] as const;
 export type LastTackleKey = (typeof LAST_TACKLES)[number];
 
+/** Who took the dummy-half's ball (#649): how often the same man took it on the same tackle of the set (%), and how many slots took it (a side's mean). */
+export const RECEIVERS = ['sameMan', 'slots'] as const;
+export type ReceiverKey = (typeof RECEIVERS)[number];
+
 /** A try this soon after its side's kick came from it (12 s, as `kickTries`). */
 const KICK_TRY_TICKS = 240;
 /** The line break must carry the scorer this far (metres) to count as a break try. */
@@ -27,8 +33,11 @@ export const BREAK_TRY_M = 20;
 export const DRIVE_M = 5;
 /** The kicks a try can come from (a long kick is territory, not a try's origin). */
 const ORIGIN_KICKS: ReadonlySet<string> = new Set(['bomb', 'grubber', 'chip', 'cross-field']);
-/** Events after which the play (set play, offload, break, play-the-ball spot) is over; a kick survives them unless they are the kicker's own loss. */
-const STOPPAGES: ReadonlySet<string> = new Set(['handover', 'intercept', 'strip', 'penalty', 'dead-ball', 'touch', 'on-full', 'drop-out', 'kickoff', 'half-time', 'full-time', 'conversion', 'field-goal', 'penalty-goal']);
+/**
+ * Events after which the play (set play, offload, break, play-the-ball spot) is over; a kick survives them unless they are the kicker's own loss.
+ * A held-up (#652) restarts with a play-the-ball 10 m out, so the play-the-ball before it no longer makes a try a drive.
+ */
+const STOPPAGES: ReadonlySet<string> = new Set(['handover', 'intercept', 'strip', 'penalty', 'dead-ball', 'touch', 'on-full', 'drop-out', 'kickoff', 'half-time', 'full-time', 'conversion', 'field-goal', 'penalty-goal', 'held-up']);
 /** Losing the ball: ends the kick link only when it is the kicking side that lost it. */
 const SPILLS: ReadonlySet<string> = new Set(['error', 'drop', 'loose']);
 
@@ -205,5 +214,109 @@ export class PlayWatch {
     if (this.broke && this.broke.side === side && (x - this.broke.x) * dir >= BREAK_TRY_M) return 'break';
     if (this.contact && this.contact.side === side && Math.abs(endX - this.contact.x) <= DRIVE_M) return 'drive';
     return 'other';
+  }
+}
+
+/**
+ * The first receiver at each play-the-ball (#649): the first man of the
+ * attacking side, other than the one who had it at the ruck, to hold the ball
+ * in the play that follows. A dart, a tackle or a turnover before anyone else
+ * holds it counts nobody. Slots come off the holder's index (home 0..8, away
+ * after), so nothing here needs more of the sim than `TickView` gives.
+ */
+export class FirstReceivers {
+  /** Per side, per tackle count at the ruck: how many times each slot took it. */
+  private readonly seen: Record<Side, Map<number, Map<number, number>>> = { home: new Map(), away: new Map() };
+  private ruck: { side: Side; holder: number; tackle: number } | null = null;
+
+  /** One tick, after the step: the view, and the tackle count the set is on. */
+  tick(view: TickView, tackle: number): void {
+    if (view.phase === 'ruck') {
+      if (view.holder >= 0 && sideOf(view.holder) === view.attacking) this.ruck = { side: view.attacking, holder: view.holder, tackle };
+      return;
+    }
+    const r = this.ruck;
+    if (!r) return;
+    if (view.phase !== 'play') {
+      this.ruck = null;
+      return;
+    }
+    if (view.holder < 0 || view.holder === r.holder) return;
+    if (sideOf(view.holder) === r.side) {
+      const byTackle = this.seen[r.side];
+      const slots = byTackle.get(r.tackle) ?? new Map<number, number>();
+      const slot = view.holder % PLAYERS;
+      slots.set(slot, (slots.get(slot) ?? 0) + 1);
+      byTackle.set(r.tackle, slots);
+    }
+    this.ruck = null;
+  }
+
+  /**
+   * The match's numbers. `sameMan`: the chance that two first passes on the
+   * same tackle of a set (same side, this match) found the same slot, as a
+   * percentage: Σ n(n−1) over slots / Σ N(N−1) over tackles, which small
+   * samples do not inflate the way "the most-used man's share" would (0 with
+   * no pair to compare). `slots`: how many slots took one, a side's mean.
+   */
+  result(): Record<ReceiverKey, number> {
+    let same = 0;
+    let pairs = 0;
+    let slots = 0;
+    for (const side of ['home', 'away'] as const) {
+      const used = new Set<number>();
+      for (const bySlot of this.seen[side].values()) {
+        let all = 0;
+        for (const [slot, n] of bySlot) {
+          used.add(slot);
+          same += n * (n - 1);
+          all += n;
+        }
+        pairs += all * (all - 1);
+      }
+      slots += used.size;
+    }
+    return { sameMan: pairs > 0 ? (100 * same) / pairs : 0, slots: slots / 2 };
+  }
+}
+
+const sideOf = (holder: number): Side => (holder < PLAYERS ? 'home' : 'away');
+
+/**
+ * Where the ball is kicked and where sets start (#650): `earlyKicks`, kicks in
+ * play on the second-last tackle of a set, a match (a count); `startM`, the
+ * metres to go at the first play-the-ball after the ball changes hands (100 is
+ * a side's own line), the match's mean, 0 with none.
+ */
+export const TERRITORY = ['earlyKicks', 'startM'] as const;
+export type TerritoryKey = (typeof TERRITORY)[number];
+
+export class Territory {
+  private kicks = 0;
+  private startSum = 0;
+  private starts = 0;
+  private holding: Side | null = null;
+  private pending = false;
+  private tackle = 0;
+
+  /**
+   * One tick, after the step: its events, the view, the tackle count the set is on and the metres to go
+   * for the side with the ball. A kick hands the ball over as it is struck, so its tackle is the one the
+   * tick before read.
+   */
+  tick(es: readonly SimEvent[], view: TickView, tackle: number, toGo: () => number): void {
+    for (const e of es) if (e.kind === 'kick' && this.tackle === SET_TACKLES - 2) this.kicks++;
+    this.tackle = tackle;
+    if (this.holding !== null && view.attacking !== this.holding) this.pending = true;
+    this.holding = view.attacking;
+    if (this.pending && view.phase === 'ruck') {
+      this.startSum += toGo();
+      this.starts++;
+      this.pending = false;
+    }
+  }
+
+  result(): Record<TerritoryKey, number> {
+    return { earlyKicks: this.kicks, startM: this.starts > 0 ? this.startSum / this.starts : 0 };
   }
 }

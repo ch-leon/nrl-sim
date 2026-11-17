@@ -246,7 +246,9 @@ describe('LiveSim', () => {
   });
 
   it('every carry ends in a tackle, a break, an error or a kick — and a tackle always plays the ball', () => {
-    const { kinds } = collect(factory(2), 180);
+    // Seeds 2 to 4 (seed 2 alone until the last-tackle call, #650: its first 180 s now hold no kick; 4 added
+    // when held up at the line, #652, on top left 2 and 3 without one).
+    const kinds = [2, 3, 4].flatMap((seed) => collect(factory(seed), 180).kinds);
     const tackles = kinds.filter((k) => k === 'tackle' || k === 'big-hit').length;
     expect(tackles).toBeGreaterThan(20);
     expect(kinds.filter((k) => k === 'break-tackle' || k === 'fend').length).toBeGreaterThan(0);

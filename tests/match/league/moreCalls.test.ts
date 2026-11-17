@@ -44,10 +44,17 @@ interface Played {
 /**
  * Seeds for the penalty pair: a home penalty in range is rare in a 6-minute half,
  * and one the captain doesn't tap himself (Tap and go's moment) rarer still.
- * The completed retreat (#625) reshuffled the previous fixtures: seed 6 has
- * both Take the two and Tap and go on at tick 4506.
+ * The completed retreat (#625) reshuffled the previous fixtures: seed 6 had
+ * both Take the two and Tap and go on at tick 4506. The weighted receiver
+ * (#649) reshuffled them again: of seeds 1–40 only seed 7 has both (Take the
+ * two at tick 884, Tap and go at 5064). The last-tackle call (#650) and held up
+ * at the line (#652) reshuffled them again. With both on, of seeds 1–80 both
+ * calls are on in 10, 19 and 20 (ticks 2700, 4008, 3631; the same with held up
+ * off, as on main after #650); 7, 30 and 59 no longer hold either. With both
+ * off, seed 7 still has both. Several seeds, so one more reshuffle need not
+ * lose them all.
  */
-const PENALTY_SEEDS = [6];
+const PENALTY_SEEDS = [7, 10, 19, 20];
 
 /** Play with the home coach making `call` whenever he may (as a player at the tray does: a tap, in on the next tick). */
 function play(seed: number, call: CoachCall | null, minutes = 6, side: 'home' | 'away' = 'home'): Played {
@@ -206,7 +213,8 @@ describe('five more calls (#396): each does what it says', () => {
     let kicks = 0;
     let inReach = 0;
     let found = 0;
-    for (let seed = 1; seed <= 40; seed++) {
+    // 40/20s are rare: 60 seeds hold one with the last-tackle call (#650) on and off (was 40).
+    for (let seed = 1; seed <= 60; seed++) {
       const calls: CallInput[] = [];
       const sim = new LiveSim(H, A, seed, { length: { halves: 1, halfMinutes: 6 }, calls });
       let aimed = false;

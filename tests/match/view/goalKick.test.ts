@@ -22,7 +22,8 @@ describe('the goal kicker\'s routine (#669)', () => {
   it('ends exactly on the sim\'s strike, off the tee, facing the posts, without changing the match', () => {
     const home = labSheet(DEFAULT_HOME); const away = labSheet(DEFAULT_AWAY);
     let shots = 0;
-    for (const seed of [1, 2]) {
+    // Seeds 1–3: since the weighted receiver (#649) seeds 1 and 2 alone have four goal kicks.
+    for (const seed of [1, 2, 3]) {
       const sim = new LiveSim(home, away, seed); const control = new LiveSim(home, away, seed);
       let beats: number[] = [];
       while (!sim.finished) {

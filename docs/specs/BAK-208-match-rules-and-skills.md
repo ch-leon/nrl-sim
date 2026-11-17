@@ -159,6 +159,16 @@ is heeled at a ruck the backline comes up onto it (3 m ahead of their standing s
 less for the forwards close to the ruck) so the first receiver takes it at ~2.5 m/s,
 not standing. Carrying the ball costs 5% of top speed.
 
+**Who gets it** (#649 step 1, the weighted receiver — *awaiting lab sign-off*). The
+pass options are scored as before (flat and about 6 m wide beats deep, plus the role
+preference: halves off the ruck, forwards on the early hit-ups, the side with the
+overlap). The passer no longer always finds the single best: any option within
+`live.receiverMargin` (2) of the best may get it, weighted exp(−gap / `live.receiverSpread`
+(2)), so the best man is still the likeliest. That covers the dummy-half's pass to the
+first receiver and the engaged carrier's pass in open play, one roll each; the
+last-tackle pass to the kicker, the coach's pass input, offloads and set plays keep
+their man. Margin 0 is off: no roll, every seed as before. Tuning §5.
+
 ### 4.3 Catch (kicks) — *first slice implemented (lab feedback round 2)*
 A kick hangs for its flight time (2√(2·peak/g): a 12 m kick ≈ 3.1 s, a bomb ≈ 4 s), so
 chasers and catchers can get under it. **Whoever is nearest the landing point within
@@ -182,9 +192,23 @@ counted in the match report. Between even sides about one bomb in five is contes
 back, 12% spilled). Tuning §31.
 
 ### 4.4 Kicks — *first slice implemented: long, bomb, grubber, chip, cross-field*
-The kicker makes **one call** for the last tackle: inside 6 m he runs it; inside 40 m he
-runs it one time in five; otherwise a kick by zone, each announced by type. On the
-second-last tackle inside 25 m he goes early 35% of the time (grubber 60 / chip 40):
+The kicker makes **one call** for the last tackle. **More options on the last (#650 part 1,
+`lastTackle.on`, awaiting lab sign-off):** one roll among **kick**, **run it** and **shift it
+wide** (to the widest man behind him in reach, who plays on), weighted by zone (own 20 kick
+1 / run 0.025 / pass 0.025, rising to red zone 1 / 0.18 / 0.18; no kick inside 6 m), × the side's
+style (Kick-chase kick ×1.8, Tight ×1.15, Expansive ×0.8, All-out ×0.6; Expansive and All-out
+pass ×1.6, Tight ×0.8, Kick-chase ×0.6), × who is on the field (the kicker's Skill over 60
+and his Big Boot lift the kick; the centre and wingers' Speed over the other side's lifts run
+and pass), and × the score and the clock in the match's last minute only (behind: run and
+pass ×2; in front: kick ×2). A kick then takes `chooseKick`'s roll as before. The coach's
+last-tackle calls (Run it, Bomb, Grubber, 40/20, Field goal) and a set play's script still
+come first. The early kick on the second-last stays his call when the ball finds him then,
+with its chance leaning on his boot and, for a territory kick, the late score; from the own 20
+any side may go early (+5%). Numbers and
+what they measured: tuning reference §6. Off (`lastTackle.on` 0), as before: inside 6 m he
+runs it; inside 40 m he runs it one time in five; otherwise a kick by zone, each announced by
+type. On the second-last tackle inside 25 m he goes early 35% of the time (grubber 60 / chip
+40), if the ball finds him:
 
 | Kick | When the AI chooses it | Resolution |
 |---|---|---|
@@ -390,7 +414,7 @@ for one / two / three men. The defenders have **grip**: the first man 1.3 s, eac
 - **Grip gone first → BROKE FREE!** A late bust: the tacklers go down and sit out, the
   carrier bursts away. Rare between fresh, even sides; it is where strength mismatches
   and tired tacklers show.
-- **Driven over the line** in the tackle → try.
+- **Driven over the line** in the tackle → try, unless he is held up (below).
 - **Metres after contact**: he drives forward at 1.5 m/s × fight left ÷ men on him.
 - **Ruck speed** from how long it lasted: 5 ticks down at ≤ 0.35 s to 18 at ≥ 1.2 s (the
   old fixed 10 sits at ~0.65 s, the average). **QUICK PTB!** at ≤ 0.35 s, a "slow
@@ -405,6 +429,63 @@ Stamina 30 v 80: ~10 late busts a match.
 
 Lab: **Legs** = fresh / last 10 min (38%, tired) / cooked (18%, spent),
 `#lab?legs=late`; the label reads `legs 74/71%` (home / away average).
+
+**Held up over the line** (#652 part 1 — *awaiting lab sign-off*). A carrier in contact
+as he reaches the try line can be held up: no try. In contact means driven over in the
+wrestle (the men in it), or carried over in open play with free defenders within
+`heldUp.reachM` (2.5 m) of him (three at most). **Any defender on him at the line can hold
+him up**: one roll, and only then. The chance starts at 75% for two average fresh men on a
+carrier with no **drive** left (the share of his fight left in the wrestle, or of his top
+speed in open play); +15% a third man, −15% a lone one; −30% × his drive; −2% per m/s he
+is quicker than the first man (±6% at most, his momentum); +0.4 × (the men's average hold
+− his own), which is Strength /120 less the legs each has lost (§8.1's `holdOf`); −10% a
+level multiplier for a Wrecking Ball carrier, +10% for a Brick Wall among two or three men
+(named on the pop-up); never above 80%. Two average men on a carrier at full pace, as quick
+as the first man: 45% (47% if he is 1 m/s slower); one man on a carrier at 90% of his top
+speed: about 33%.
+
+*A lone tackler* (Leon's decision, 13 Nov 2026). The first rule let a lone tackler hold
+him up only when the carrier had little drive left (at most 0.35), with the chance
+starting at 60%. Two men seldom reach a carrier at the line in this sim (most tries are
+scored with no defender or one within 2.5 m), so that rule gave a held-up in 3–8% of
+five-minute matches. Leon chose to let any lone tackler contest, at the higher odds, so a
+held-up is seen in a good share of five-minute matches. The first rule is still there by
+override: `heldUp.oneManFight` 0.35 and `heldUp.base` 0.6.
+
+*The restart.* The rules (NRL International Rules, held up in-goal): a play-the-ball 10 m
+from the goal line, level with where he was held up, by the player held up, and the
+tackle count goes on; held up on the last, a handover 10 m out there. The sim plays it
+that way, through the touch restart's set piece (§4.4): the held-up counts as a tackle,
+the other side retreats and he plays it 10 m out (at least 10 m in from touch); on the
+last tackle it is a HANDOVER and the defending side plays it there with a fresh set. The
+nearest existing cases were not used: a goal-line drop-out is the sim's restart for the
+*defending* carrier held in his own in-goal and for a ball dead off the defence, and a
+knock-on in the tackle is a turnover, the ball loose for the other side; neither is the rule for an
+attacker held up, and a drop-out would hand the attack a fresh set for being stopped.
+A held-up on the siren ends the half. Shown as **HELD UP!** over the first man (impact
+tier 2: the freeze, the shake and the dust), a commentary line naming him, and the sim's
+line naming every man in it; the crowd and the sound do not react (they read the
+contract's event kinds, which have no held-up). Off: `heldUp.on` 0, no roll, every seed
+as before. Tuning §11.
+
+Measured (`balance/plans/held-up.json`, 60 matches a row, 200 for the preset rows, two
+2.5-minute halves; its variant "on, any lone tackler, base 0.75" is the default): 18–40%
+of matches have a held-up (0.2–0.5 a match), for 0.1–0.3 fewer tries a match; the first
+rule ("on" there) gave 3–8%. Those figures, and the first `standard.json` run (tries 2.0 → 1.8),
+were taken before the last-tackle call (#650).
+
+Re-measured on top of #687 (16 Nov 2026; `standard.json` off against on at the default, same
+seeds, held up off playing exactly as main at 5b7d08c3): 20–30% of whole matches have a
+held-up (0.2–0.4 a match; 30% of the late-legs stretch), every row's rise starred; tries
+1.95 → 1.72 a match averaged over its 13 rows (0.0 to −0.5 a row; only Grind v Balanced's
+−0.3 starred); completion inside its band in every row but stamina 30 v 80 on (71.2 → 69.1%,
+not starred). The last-tackle shares do not move beyond luck in any row (even sides: kick /
+run / pass 63 / 23 / 14% off, 63 / 22 / 15% on). The six preset rows, as points shares at
+100 seeds both ways: Tight 56.5 → 57.0%, Expansive 41.8 → 42.0%, Kick-chase 46.2 → 45.0%,
+All-out 53.0 → 54.2%, Rush 49.8 → 51.5%, Compressed 50.5 → 52.8%. Tight and Expansive are
+outside 45–55% with held up off too (main as it is); at 400 seeds both ways the four attack
+rows are all inside, off → on: Tight 52.8 → 53.7%, Expansive 46.9 → 48.2%, Kick-chase
+47.0 → 48.8%, All-out 54.2 → 53.2% (no change starred).
 
 ### 8.2 Sprint, gas and getting legs back (Leon, 2026-10-18) — *implemented in F2*
 
@@ -516,6 +597,9 @@ makes the break but can't finish it, the workhorse who is never quick and never 
 | F2 | Sprint and gas; legs as their ceiling — *shipped* (half-time shipped with BAK-207 2a, the bench with 2b) | §8.2 |
 | F2+ | Sprint follow-ups (kick chase, line speed on cruise, lab legs bar, stamina knobs) — *shipped* (N9.3) | §8.2, §11 |
 | N13.5 | A side's plan can change at half-time and after a try, by a rule the match opts into — *shipped* (off unless a side is named; N14 wires the rivals). Tuning §30 | §5 |
+| #649.1 | The weighted receiver: the pass goes to one of the near-best options by weight, not always the best — *awaiting lab sign-off*. Tuning §5 | §4.2 |
+| #650.1 | More options on the last: kick, run it or shift it wide by zone, style, the late score and who is on the field; the second-last's early kick leans the same way — *awaiting lab sign-off*. Tuning §6 | §4.4 |
+| #652.1 | Held up over the line: any defender on a carrier in contact at the line can hold him up (a lone tackler too, Leon 13 Nov 2026); play-the-ball 10 m out, the tackle counted — *awaiting lab sign-off*. Tuning §11 | §8.1 |
 
 Then BAK-207 Phase 2 (full match, scoring, halves) and Phase 3 (balance).
 

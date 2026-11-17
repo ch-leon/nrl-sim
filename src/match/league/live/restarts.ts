@@ -5,7 +5,7 @@ import { bounceFlight, kickFlight, landed, rollFlight, type BallState } from '..
 import type { Side } from '../../core/snapshot';
 import { dist, type Vec } from '../../core/vec';
 import { FULLBACK } from '../roles';
-import { pickReceiver } from '../tactics';
+import { MAX_LAT_M, pickReceiver, pickReceiverWeighted } from '../tactics';
 import { NINES } from '../rules';
 import { conversionSpot, goalChance, goalStrikeTick, postsFor } from '../goals';
 import { PENALTY, offsideChance } from '../penalties';
@@ -89,7 +89,12 @@ export abstract class LiveRestarts extends LivePlay {
     }
     // The coach's Grubber or 40/20 (#396): the dummy-half finds the kicker rather than dart (no roll for it).
     const toKicker = this.lastPlay && receiver !== null && (this.callState[this.attacking].attack === 'grubber' || this.callState[this.attacking].attack === 'forty-twenty');
-    if (receiver === null) receiver = pickReceiver(h.body.pos, this.dir, this.candidates(h));
+    if (receiver === null) {
+      // The first receiver (#649): weighted like an open-play pass while it is on at the ruck, one roll before the dart's.
+      receiver = LIVE.receiverMargin > 0 && LIVE.receiverAtRuck > 0
+        ? pickReceiverWeighted(h.body.pos, this.dir, this.candidates(h), MAX_LAT_M, 0, LIVE.receiverMargin, LIVE.receiverSpread, this.rng.next())
+        : pickReceiver(h.body.pos, this.dir, this.candidates(h));
+    }
     if (receiver === null || (!toKicker && this.rng.next() < LIVE.dartChance)) {
       // Dummy-half dart.
       h.catchTick = this.tick;
@@ -269,15 +274,16 @@ export abstract class LiveRestarts extends LivePlay {
    * A restart in play: the side gets the ball at `spot` — a play-the-ball (after
    * touch) or a tap (a 20 m restart, a 40/20). A player walks the ball to the
    * spot, both sides set, then play goes on. A stoppage: the coach can freshen up.
+   * `tackles`: the count the set carries on from (held up over the line, #652); a fresh set otherwise.
    */
-  protected startSetPiece(side: Side, spot: Vec, how: 'ptb' | 'tap', prefer?: number): void {
+  protected startSetPiece(side: Side, spot: Vec, how: 'ptb' | 'tap', prefer?: number, tackles = 0): void {
     this.callSwaps();
     const free = this.side(side).filter((p) => p.subFor === null && p !== this.dummyHalf(side));
     const pick = (prefer !== undefined ? free.find((p) => p.slot === prefer) : undefined) ?? [...free].sort((a, b) => dist(a.body.pos, spot) - dist(b.body.pos, spot))[0] ?? this.fullback(side);
     this.ball = { kind: 'held', by: this.indexOf(pick) };
     this.attacking = side;
     this.dir = this.dirOf(side);
-    this.tackles = 0;
+    this.tackles = tackles;
     this.lastPlay = false;
     this.kickCall = this.fgCall = null;
     this.pendingKick = null;

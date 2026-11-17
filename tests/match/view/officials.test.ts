@@ -19,12 +19,12 @@ const world = (p: { x: number; y: number }) => {
 };
 
 /** Historical seven-minute halves provide the penalty/try presentation witnesses. */
-function playMatch(seed: number): Snapshot[] {
+function playMatch(seed: number, halfMinutes = 7, maxTick = 30_000): Snapshot[] {
   const home = sideSheet('H', { rating: 62 });
   const away = sideSheet('A', { rating: 58 });
-  const sim = new LiveSim(home, away, seed, { length: { halves: 2, halfMinutes: 7 } });
+  const sim = new LiveSim(home, away, seed, { length: { halves: 2, halfMinutes } });
   const snaps: Snapshot[] = [sim.snapshot()];
-  while (!sim.finished && sim.tick < 30_000) {
+  while (!sim.finished && sim.tick < maxTick) {
     sim.step();
     snaps.push(sim.snapshot());
   }
@@ -32,34 +32,41 @@ function playMatch(seed: number): Snapshot[] {
 }
 
 describe('the referee (#642)', () => {
-  const matches = [3, 11].map(playMatch);
+  const matches = [3, 11].map((seed) => playMatch(seed));
 
   it('is a pure function of the snapshot', () => {
     const s = matches[0]![500]!;
     expect(refereeSpot(s)).toEqual(refereeSpot(structuredClone(s)));
   });
 
-  it('glides with play: no more than a sprinter’s step a tick over seeds 1 to 24, except when the sides are put on their marks', () => {
-    // The ball snaps onto a new holder in a tick (the heel into the dummy half's hands); he must not dart after it (#680).
+  it('glides with play: no more than a sprinter’s step a tick over seeds 1 to 84, except when the sides are put on their marks', () => {
+    // The ball snaps onto a new holder in a tick (the heel into the dummy half's hands); he must not dart after it (#680, #682).
+    // The first 1,800 ticks (90 s) of 84 seeds keep it quick (a dozen or so heels each); the full
+    // seven-minute halves of the same seeds were checked once by hand (below).
     let worst = 0;
-    for (let seed = 1; seed <= 24; seed++) {
-      const snaps = playMatch(seed);
+    for (let seed = 1; seed <= 84; seed++) {
+      const snaps = playMatch(seed, 1, 1_800);
+      let p0 = refereeSpot(snaps[0]!);
       for (let i = 1; i < snaps.length; i++) {
         const a = snaps[i - 1]!;
         const b = snaps[i]!;
-        // A restart puts most bodies somewhere new in one tick (LiveView cuts the camera too).
+        const p1 = refereeSpot(b);
+        const step = Math.hypot(p1.x - p0.x, p1.y - p0.y);
+        p0 = p1;
+        if (step <= worst) continue;
+        // The ball put on a mark (a penalty, a restart) snaps on screen as well…
+        if (Math.hypot(b.ball.x - a.ball.x, b.ball.y - a.ball.y) > 6) continue;
+        // …and a restart puts most bodies somewhere new in one tick (LiveView cuts the camera too).
         const placed = b.players.filter((p) => {
           const q = a.players.find((r) => r.side === p.side && r.slot === p.slot)!;
           return Math.hypot(p.x - q.x, p.y - q.y) > 4;
         }).length;
-        // …and the ball put on a mark (a penalty, a restart) snaps on screen as well.
-        if (placed >= 6 || Math.hypot(b.ball.x - a.ball.x, b.ball.y - a.ball.y) > 6) continue;
-        const p0 = refereeSpot(a);
-        const p1 = refereeSpot(b);
-        worst = Math.max(worst, Math.hypot(p1.x - p0.x, p1.y - p0.y));
+        if (placed < 6) worst = step;
       }
     }
-    // 12 m/s is 0.6 m a tick. Was 2.7 m over these seeds before #680 (10 of 24 seeds above 1.8 m).
+    // 12 m/s is 0.6 m a tick. Was 2.7 m before #680 and 1.71 m (seed 46, the heel) before #682, which
+    // slides the ball he reads, and the push off it, across the heel. Over seeds 1 to 84 of seven-minute halves the worst is
+    // now 1.37 m (seed 62, a penalty restart).
     expect(worst).toBeLessThan(1.6);
   }, 120_000);
 

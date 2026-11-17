@@ -184,11 +184,16 @@ describe('legs and the wrestle in the live sim', () => {
       // Seeds 5–8 since the kick contests (#99) reshuffled every match: seeds 1–4 now leave the
       // Stamina-40 side at 0.83, 0.75, 0.84 and 0.79 (0.80; 0.76 before), seeds 5–8 at 0.75. On all
       // eight the Stamina-80 side is at least 0.11 ahead.
-      for (let s = 5; s <= 8; s++) {
+      // Seeds 1–16 since the weighted receiver (#649) reshuffled them again: one seed alone
+      // runs 0.60–0.83 for the Stamina-40 side, so four seeds put the mean (0.78 on 5–8)
+      // over the line by luck. Over 1–16 it is 0.75, the Stamina-80 side 0.11–0.16 ahead.
+      // Seeds 1–32 since held up at the line (#652, any tackler) reshuffled them: 1–16 read 0.78,
+      // 1–32 read 0.76 for the Stamina-40 side, the Stamina-80 side 0.13 ahead.
+      for (let s = 1; s <= 32; s++) {
         const sim = new LiveSim(sheet('H', { stamina: 40 }), sheet('A', { stamina: 80 }), s, { length: { halves: 2, halfMinutes: 7 } });
         play(sim, 600);
-        home += sim.energyOf('home') / 4;
-        away += sim.energyOf('away') / 4;
+        home += sim.energyOf('home') / 32;
+        away += sim.energyOf('away') / 32;
       }
     } finally {
       restore();
@@ -249,7 +254,8 @@ describe('legs and the wrestle in the live sim', () => {
   });
   it('a strong carrier against weak tacklers sometimes breaks free; quick and slow play-the-balls are announced', () => {
     const es: SimEvent[] = [];
-    for (let s = 1; s <= 6; s++) es.push(...play(new LiveSim(sheet('H', { strength: 90, stamina: 85 }), sheet('A', { strength: 35 }), s), 150));
+    // Seeds 1–10 (was 1–6): with the last-tackle call (#650) seeds 1–6 held no late break.
+    for (let s = 1; s <= 10; s++) es.push(...play(new LiveSim(sheet('H', { strength: 90, stamina: 85 }), sheet('A', { strength: 35 }), s), 150));
     const late = es.filter((e) => e.kind === 'break-tackle' && e.detail === 'wrestle');
     expect(late.length).toBeGreaterThan(0);
     expect(late.every((e) => e.side === 'home' || e.side === 'away')).toBe(true);

@@ -41,7 +41,7 @@ export function contestAlpha(ageMs: number): number {
 }
 
 /** The tier-2 contact moments (#631) that puff dust where the ball carrier was met. */
-const DUST_KINDS: ReadonlySet<string> = new Set(['big-hit', 'break-tackle', 'strip', 'intercept']);
+const DUST_KINDS: ReadonlySet<string> = new Set(['big-hit', 'break-tackle', 'strip', 'intercept', 'held-up']);
 
 /**
  * The mark an event draws, or null. A line break flashes on the man who broke

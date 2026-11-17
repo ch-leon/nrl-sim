@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { advanceContactAnimation, contactApproach, type ContactAnimation } from '../../../src/match/view/contactAnimation';
 import { CASE_DEFENDERS, CONTACT_CASES, caseDuration, caseSnapshot, contactCaseAt } from '../../../src/labs/art/contactCases';
+import { contactLayout } from '../../../src/match/view/contactLayout';
+import { LiveSim } from '../../../src/match/league/live';
+import { sideSheet } from '../../../src/match/balance/measure';
 import type { PlayerSnap } from '../../../src/match/core/snapshot';
 
 describe('contact animations follow the sim', () => {
@@ -74,4 +77,43 @@ describe('contact animations follow the sim', () => {
       }
     }
   });
+  it('keeps a contact\'s picture for as long as it is drawn, over whole matches (#682)', () => {
+    // The variant is read fresh each tick from the geometry, so it can move once the contact is not
+    // on screen (the play-the-ball draws nothing). Wherever `contactLayout` draws it, it must hold:
+    // the one change the code documents is a bust out of a held tackle, which becomes the bump-off.
+    let contacts = 0; let drawnTicks = 0; let busts = 0; const variantsSeen = new Set<string>();
+    const changes: string[] = [];
+    for (const seed of [4, 9, 23]) {
+      const sim = new LiveSim(sideSheet('H', { rating: 62 }), sideSheet('A', { rating: 58 }), seed, { length: { halves: 2, halfMinutes: 5 } });
+      let state: ContactAnimation | null = null;
+      const drawn = new Map<string, string[]>();
+      while (!sim.finished && sim.tick < 30_000) {
+        sim.step();
+        const snap = sim.snapshot();
+        state = advanceContactAnimation(state, snap);
+        if (!state) continue;
+        const points = snap.players.map(p => ({ player: { side: p.side, slot: p.slot, who: p.who ?? `${p.side}/${p.slot}` }, x: p.x, y: p.y }));
+        if (!contactLayout(state, points, false)) continue;
+        const key = `${seed}/${state.contact.startedTick}/${state.contact.carrier.side}${state.contact.carrier.slot}`;
+        const seen = drawn.get(key) ?? [];
+        if (seen[seen.length - 1] !== state.variant) seen.push(state.variant);
+        drawn.set(key, seen);
+        drawnTicks++;
+      }
+      for (const [key, seen] of drawn) {
+        contacts++;
+        seen.forEach(v => variantsSeen.add(v));
+        if (seen.length === 1) continue;
+        // The only allowed change: a held tackle's picture (one of the first variants) to the bump-off, once.
+        if (seen.length === 2 && seen[1] === 'bump' && seen[0] !== 'bump') { busts++; continue; }
+        changes.push(`${key}: ${seen.join(' > ')}`);
+      }
+    }
+    expect(changes).toEqual([]);
+    // The witnesses are there: many contacts drawn, a bust among them, and more than one picture in use.
+    expect(contacts).toBeGreaterThan(100);
+    expect(drawnTicks).toBeGreaterThan(contacts);
+    expect(busts).toBeGreaterThan(0);
+    expect(variantsSeen.size).toBeGreaterThan(2);
+  }, 120_000);
 });
