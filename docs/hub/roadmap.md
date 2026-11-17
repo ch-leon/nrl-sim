@@ -52,12 +52,15 @@ live gameplay change; work still open below has not shipped.
   Cap upgrades ([#560](https://github.com/ch-leon/nrl-sim/issues/560)), the complete
   finance-screen cleanup ([#561](https://github.com/ch-leon/nrl-sim/issues/561)),
   and integrated multi-season balance acceptance (#562) remain open.
-  Funded sales and durable player histories are implemented in the reviewed
-  candidate [PR #716](https://github.com/ch-leon/nrl-sim/pull/716), with final
+  Funded sales and durable player histories merged through
+  [PR #716](https://github.com/ch-leon/nrl-sim/pull/716), with final
   independent-tool/CI/QA gates recorded in its
   [evidence report](../status/2026-11-player-continuity.md).
-  Normal competition entry and annual eligible-league choice remain separate,
-  gated work; the approved product direction is recorded in
+  [Draft PR #719](https://github.com/ch-leon/nrl-sim/pull/719) starts league choice
+  and lasting title unlocks using the [implementation plan](../plans/2026-11-17-league-selection.md).
+  Its foundation remains inactive while the deliberate entry UI and resumable
+  annual lifecycle are built. Voluntary lower-cap treatment is a pending decision.
+  The approved product direction is recorded in
   [PR #709](https://github.com/ch-leon/nrl-sim/pull/709).
 - **Expansive attack still under par** ([issue #322](https://github.com/ch-leon/nrl-sim/issues/322), open).
   The Speed diagnostic and four Speed levers merged in
