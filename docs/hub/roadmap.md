@@ -20,6 +20,14 @@ live gameplay change; work still open below has not shipped.
 - **Match-art phone play-test** ([release PR and verification](https://github.com/ch-leon/nrl-sim/pull/584)): play a full match in landscape at ×1 and your usual speed; check player recognition, possession and tacklers releasing into play-the-ball. The PR records the deployed build and required review/CI/QA evidence.
 
 - **Career competitions: execution started** ([tracker #323](https://github.com/ch-leon/nrl-sim/issues/323)).
+  **Design expanded and approved 16 November:** [career opportunities v0.2](../specs/career-opportunities.md)
+  replaces forced player promotion with winning to unlock leagues and choosing
+  entry each season. Add seasonal windows, player assignments that can overlap
+  club fixtures, watched/coached individual challenges, playful beach/fives events,
+  recurring opponents and connected rewards. Gear is later. The
+  [updated plan](../plans/2026-11-career-competitions.md) separates the delivery
+  slices and issue-scope reconciliation; these additions are not shipped.
+  Earlier structural execution context follows:
   [#569](https://github.com/ch-leon/nrl-sim/issues/569) publishes the
   [technical contract](../specs/career-competitions.md) against current main;
   [delivery status](../status/2026-11-career.md) records evidence and dependencies.
@@ -45,7 +53,8 @@ live gameplay change; work still open below has not shipped.
   finance-screen cleanup ([#561](https://github.com/ch-leon/nrl-sim/issues/561)),
   funded sales ([#572](https://github.com/ch-leon/nrl-sim/issues/572)) and integrated
   multi-season balance acceptance (#562) remain open.
-  Normal competition entry and promotion remain gated on their recorded dependencies.
+  Normal competition entry and annual eligible-league choice remain gated on
+  their dependencies and the new league-field design.
 - **Expansive attack still under par** ([issue #322](https://github.com/ch-leon/nrl-sim/issues/322), open).
   The Speed diagnostic and four Speed levers merged in
   [PR #514](https://github.com/ch-leon/nrl-sim/pull/514), with every lever **off**, so
@@ -141,7 +150,7 @@ Open backlog checked on 7 Nov 2026; these are not newly scheduled:
 - Judiciary and a club lawyer ([issue #328](https://github.com/ch-leon/nrl-sim/issues/328))
 - Scrums ([issue #327](https://github.com/ch-leon/nrl-sim/issues/327))
 - Set plays, later phases: the live tray and pop-ups, rival plays and the balance pass ([issue #326](https://github.com/ch-leon/nrl-sim/issues/326); phases 1 and 2 merged)
-- League progression from a lower league ([issue #323](https://github.com/ch-leon/nrl-sim/issues/323))
+- League progression and seasonal competition choice ([issue #323](https://github.com/ch-leon/nrl-sim/issues/323); expanded approved design in Now)
 - Expansive still under par ([issue #322](https://github.com/ch-leon/nrl-sim/issues/322); in Now)
 - App store builds with Capacitor ([issue #89](https://github.com/ch-leon/nrl-sim/issues/89))
 - Open questions carried over from retired plan docs ([issue #446](https://github.com/ch-leon/nrl-sim/issues/446))
@@ -163,11 +172,20 @@ turning these into new work:
 - A full tray covering the key-moment banner.
 - The Coach calls page's short landscape scroll area.
 
-## Ideas being discussed (not decided)
+## Designs and ideas
 
-Source: Leon. These are design discussions, not scheduled work.
+Source: Leon. Approval and delivery status are stated per item; an approved
+direction does not mean its implementation has shipped.
 
-**Career progression, tournaments and prizes (11 Nov 2026). Execution started.**
+**Career opportunities (approved 16 Nov 2026; foundation execution started earlier).**
+The [v0.2 design](../specs/career-opportunities.md) and
+[revised plan](../plans/2026-11-career-competitions.md) govern the expanded scope:
+select eligible leagues, unlock harder choices through titles, send individuals
+and groups away, and choose between seasonal events. Keep main leagues believable
+and make special events/opponents/rewards playful. Personal XP/traits/badges,
+sponsors, bounded cap rewards and invitation chains provide goals; gear is later.
+Design direction is agreed; named events and numerical balance are working designs.
+The older implementation and filing context below is retained for traceability:
 The [Notion specification](https://app.notion.com/p/4150870d4c44810c880ae3395086e9d0)
 is filed in NRL Sim HQ → Specs & Decisions, linked to NRL Sim and **In review**.
 [Tracker #323](https://github.com/ch-leon/nrl-sim/issues/323) links 14 scoped issues;
