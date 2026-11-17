@@ -140,10 +140,15 @@ Stage 1 checkpoint: Claude approved the inactive foundation at `6241a47b` after 
 
 Checkpoint: the extracted aging, expiry, youth and checked rival population owners,
 exact signed-term protection and v31-to-v32 migration passed spec review and Claude's
-`ANNUAL OWNERS REVIEW: APPROVE` at `05153331`. This is not completion of Tasks 4–5:
-the effective action clock and close/acceptance orchestration still need integration
-and review before the chooser can activate them. Foundation `6241a47b` separately
-passed all CI check and WebKit gates; final integrated QA remains required.
+`ANNUAL OWNERS REVIEW: APPROVE` at `05153331`. The effective action clock passed
+independent spec review and Claude's `ACTION CLOCK REVIEW: APPROVE` at `29810f76`.
+Marked-career contracts, transfers, undo, management displays and generic finance
+events now share the calendar date; planning books into the upcoming year while
+the source-year cursor stays unchanged. All 4,663 tests and production build passed
+at that exact head. The reviewed Labs harness fix from main was merged at `d7151b69`.
+Season-close and acceptance orchestration remain unfinished, so Tasks 4–5 are not
+complete. Foundation and annual-owner checkpoints passed all CI check and WebKit
+gates; final integrated QA and production activation remain later steps.
 
 **Boundary:** Still no normal-new-game activation. Replace Stage 1's blanket in-memory advancement refusal with the tested new phase gates only when the new lifecycle is ready. Normal load/import/install admission remains denied until Stage 3. Old structural saves remain isolated and follow their existing prototype path. New lifecycle tests may construct explicitly marked candidates without making those candidates accepted normal imports.
 
