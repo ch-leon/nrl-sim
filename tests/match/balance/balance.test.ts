@@ -298,8 +298,9 @@ describe('measuring and reporting', () => {
     // they are 10-0:120:785e83425993f65b / 6-0:119:0c43dd4315fca6d2. Held up at the line (#652) on top
     // leaves Balanced as it was (no contest at the line) and re-pins Expansive (6-6:131:964b190f1b7b3aab
     // with the last-tackle call alone; 12-0:118:c104b852219f311c was Balanced with held up alone).
-    { attack: 'balanced' as const, expected: '10-0:143:c8e680f4a9f93b72' },
-    { attack: 'expansive' as const, expected: '0-0:138:6dd57d1400319b6f' },
+    // Early ordinary-DH commitment (#672) moves receiver/dart rolls four ticks earlier.
+    { attack: 'balanced' as const, expected: '6-0:137:a3aab7b7c35c2c99' },
+    { attack: 'expansive' as const, expected: '0-4:138:98e467c361b3a1f9' },
   ])('pins an even $attack / Slide match (seed 1)', async ({ attack, expected }) => {
     const sim = new LiveSim(sideSheet('H', { rating: 60, tactics: { attack } }), sideSheet('A', { rating: 60 }), 1);
     const parts: string[] = [];
@@ -333,8 +334,9 @@ describe('measuring and reporting', () => {
     // (7-6:160:ef629166efdf6fe6 before it). Held up at the line (#652) on top leaves plays-on as it was and
     // re-pins plays-on-hard (10-6:150:b55e8ecc71438834 with the last-tackle call alone; held up alone gave
     // 6-12:146:855a4325e4eb4fc5 and 10-6:155:e32ad1bdf721a1a7).
-    { name: 'plays-on', aiCoach: false, expected: '4-0:137:57361c8ca339e953' },
-    { name: 'plays-on-hard', aiCoach: true, expected: '4-12:158:039aad5cac56523e' },
+    // #672 leaves scripted selection untouched; the opposing ordinary DH still commits earlier.
+    { name: 'plays-on', aiCoach: false, expected: '0-6:123:ab6b5638207cd447' },
+    { name: 'plays-on-hard', aiCoach: true, expected: '0-6:154:730643c394eba879' },
   ])('pins $name: an even Balanced / Slide match with set plays (seed 1)', async ({ aiCoach, expected }) => {
     const home = { ...sideSheet('H', { rating: 60 }), plays: ['block-play' as const, 'cut-out-winger' as const, 'kick-pass' as const] };
     const sim = new LiveSim(home, sideSheet('A', { rating: 60 }), 1, aiCoach ? { aiCoach: ['home'] } : {});

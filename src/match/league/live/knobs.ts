@@ -63,6 +63,8 @@ export const LIVE = {
   kickLockTicks: 8,
   kickContactTicks: 3,
   passPoseTicks: 5,
+  /** Ordinary DH commits this many ticks before his existing release. 0: legacy release-time decision. */
+  dhDecisionLeadTicks: 4,
 
   // Distances (metres)
   /** Who sprints (§8.2): the carrier with no defender this far ahead and this close to his lane; a defender closing the last stretch; support within reach of a break. */

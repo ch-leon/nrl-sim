@@ -50,6 +50,10 @@ export abstract class LiveBase {
   protected readonly captain: Record<Side, CaptainRead>;
   protected ball!: BallState;
   protected phase!: Phase;
+  /** An admitted input can supersede the early DH choice, even if its attempted pass/play fails. */
+  protected cancelRuckDecision(): void {
+    if (this.phase.kind === 'ruck' && this.phase.decision) this.phase.decision.cancelled = true;
+  }
   protected attacking: Side = 'home';
   protected dir: 1 | -1 = 1;
   protected tackles = 0;

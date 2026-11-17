@@ -10,7 +10,7 @@ export { HEAD_OPTIONS, type Head, type Facing } from './head';
 
 export type Movement = 'drive' | 'brake' | 'cutBack' | 'cutForward' | 'shuffleBack' | 'shuffleForward' | 'backpedal';
 export type Build = 'lean' | 'athletic' | 'stocky';
-export type Action = 'idle' | 'run' | 'carry' | 'pass' | 'catch' | 'land' | 'receive' | 'guard' | 'brace' | 'wrap' | 'ground' | 'ptb' | 'fend';
+export type Action = 'idle' | 'run' | 'carry' | 'pass' | 'catch' | 'land' | 'call' | 'receive' | 'guard' | 'brace' | 'wrap' | 'ground' | 'ptb' | 'fend';
 /** Reactions (#667): the arms held still over standing or running legs. */
 export type ReactAction = 'headHands' | 'hips' | 'fold';
 export interface Appearance {
@@ -162,6 +162,7 @@ export const HANDLING_POSES = {
   catch: [[7, 2], [6, 2], [4, 3], [4, 4], [4, 5], [5, 7]],
   pass: [[7, 4], [8, 3], [6, 3], [4, 4], [2, 5], [1, 6]],
   receive: [[4, 4], [7, 2]],
+  call: [[5, -4], [5, -7]],
   guard: [[3, 5], [6, 4]],
 } as const;
 
@@ -199,15 +200,15 @@ export function prototypeUpperAt(build: Build, action: Action | ReactAction, fra
   const bodyW = build === 'stocky' ? 11 : build === 'athletic' ? 9 : 7;
   // Reactions (#667) hold the arms still over standing or running legs: hands on head, hands on hips, arms folded.
   const react = action === 'headHands' || action === 'hips' || action === 'fold';
-  const running = strideFrame !== -1 && (action === 'run' || action === 'carry' || action === 'land' || action === 'catch' || action === 'receive' || action === 'guard' || ((action === 'pass' || action === 'fend' || react) && strideFrame !== undefined));
+  const running = strideFrame !== -1 && (action === 'run' || action === 'carry' || action === 'land' || action === 'catch' || action === 'call' || action === 'receive' || action === 'guard' || ((action === 'pass' || action === 'fend' || react) && strideFrame !== undefined));
   const gait = strideFrame === undefined ? f : strideFrame < 0 ? 0 : strideFrame % 6;
   const jog = running && strideFrame !== undefined && strideFrame >= 6;
   const motion = movement ? MOVEMENT_POSES[movement] : undefined;
   const cut = movement === 'cutBack' || movement === 'cutForward';
   const shuffle = movement === 'shuffleBack' || movement === 'shuffleForward';
   // Arms pump with the legs except while the hands are busy catching, passing or fending.
-  const weary = ['run', 'carry', 'land', 'idle', 'catch', 'pass', 'receive', 'guard'].includes(action) ? Math.max(0, Math.min(2, tired)) : 0;
-  const swing = running && (action === 'run' || action === 'carry' || action === 'land' || (strideFrame !== undefined && f === 5 && action !== 'fend')) ? ARM_SWING[gait]! * (jog ? .5 : 1) * (weary > 1 ? .5 : 1) * (motion?.arms ?? 1) : 0;
+  const weary = ['run', 'carry', 'land', 'idle', 'catch', 'pass', 'call', 'receive', 'guard'].includes(action) ? Math.max(0, Math.min(2, tired)) : 0;
+  const swing = running && (action === 'run' || action === 'carry' || action === 'land' || action === 'call' || (strideFrame !== undefined && f === 5 && action !== 'fend')) ? ARM_SWING[gait]! * (jog ? .5 : 1) * (weary > 1 ? .5 : 1) * (motion?.arms ?? 1) : 0;
   // Away from the shared contact picture a tackle and a beaten (or tackled) man each have a start,
   // a middle and an end over the pose's last frames: reach, wrap, drive low; jolt, rock back, regather.
   const beat = f < 2 ? 0 : f < 4 ? 1 : 2;
@@ -392,6 +393,12 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action | Re
     if (possession) heldBall(at.x, at.y);
     line(shX, shY, shX + pose.elbow[0], shY + pose.elbow[1], a.skin);
     line(shX + pose.elbow[0], shY + pose.elbow[1], handX, handY, a.skin, 2);
+  } else if (action === 'call') {
+    const pose = HANDLING_POSES.call[Math.min(1, f)]!;
+    handX = shX + pose[0]; handY = shY + pose[1];
+    line(shX, shY, shX + 4, shY - 1, a.skin, 2);
+    line(shX + 4, shY - 1, handX, handY, a.skin, 2);
+    b.fillRect(handX, handY - 1, 2, 2, a.skin);
   } else if (action === 'receive' || action === 'guard') {
     const pose = HANDLING_POSES[action][Math.min(1, f)]!;
     handX = shX + pose[0]; handY = shY + pose[1];

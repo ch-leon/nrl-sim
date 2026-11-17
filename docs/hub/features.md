@@ -70,6 +70,8 @@ What's in the game, with the PR that added each.
 
 - **Connected handling:** the actual receiver prepares his hands during an incoming pass, with his running stride continuing underneath. Pickup finishes in the carry pose, the passer turns through release, and flight sprites meet the painted hand anchors. Nearby defenders can brace as they approach the current carrier. This uses actual flight and possession facts; pre-release calls remain separate gameplay work ([PR #703](https://github.com/ch-leon/nrl-sim/pull/703)).
 
+- **Receiver preparation (candidate, not released):** an ordinary dummy-half commits to his pass four ticks before release. The intended receiver raises an arm while keeping his running stride; a changed instruction or invalid recipient cancels the call. Interceptions and spills still resolve normally ([PR #707](https://github.com/ch-leon/nrl-sim/pull/707)).
+
 - **Contact weight and recovery:** tackle holds use planted support feet, falls land more sharply, and players recover through supported poses. Defenders clear the carrier in sequence and finish at their live positions before the shared tackle artwork hands back to ordinary movement. Existing contact outcomes and ball ownership are preserved ([PR #701](https://github.com/ch-leon/nrl-sim/pull/701)).
 
 - **Everyday match movement:** players lean into starts, take braking steps and plant into turns. Nearby defenders watch the ball while shuffling or backpedalling, including during a pass. Short support/transfer cycles follow distance travelled; the Art Lab Footwork control previews each pose. This builds on the art foundation and preserves match decisions ([PR #699](https://github.com/ch-leon/nrl-sim/pull/699)).

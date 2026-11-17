@@ -78,7 +78,8 @@ describe('weighted receiver: in the sim', () => {
   });
   it('off (margin 0) plays exactly as before it existed: same events, points and rolls (pinned from f02f4fa)', () => {
     // The last-tackle call (#650) came after f02f4fa: off too, for the match as it was then.
-    const restore = applyTuning({ 'live.receiverMargin': 0, 'lastTackle.on': 0 });
+    // Early DH commitment (#672) also moves rolls; disable it for this historical fingerprint.
+    const restore = applyTuning({ 'live.receiverMargin': 0, 'lastTackle.on': 0, 'live.dhDecisionLeadTicks': 0 });
     try {
       expect(play(1)).toEqual({ events: 133, home: 6, away: 11, draws: 634 });
       expect(play(11)).toEqual({ events: 136, home: 0, away: 6, draws: 667 });

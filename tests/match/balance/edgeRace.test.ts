@@ -13,7 +13,11 @@ import type { SideSpec } from '../../../src/match/balance/plan';
 
 /** Every #322 lever off (the shipped defaults), and every one on. */
 const OFF: Overrides = { 'race.on': 0, 'counters.slide.expansiveSigned': 0, 'counters.compressed.expansiveRelative': 0 };
-const SEEDS = 30;
+// #672's 30-seed sample gave +0.747 busts/14 min. The exact same default-lead scenario
+// at 100 seeds/orientation gives 2.85 (SE .138) → 3.35 (.152), +1.40/14 min (SE .575).
+// Keep the original margin and default DH path; use the larger sample to reduce seed noise.
+// Harness run: receiver-call-edge-check, 20261117-042420.
+const SEEDS = 100;
 /** Extra busts per fourteen minutes for the tracked side; keep the historical rate threshold. */
 const MARGIN = 1;
 const ON: Overrides = { 'race.on': 1, 'race.single': 0, 'counters.slide.expansiveSigned': 1, 'counters.compressed.expansiveRelative': 1 };

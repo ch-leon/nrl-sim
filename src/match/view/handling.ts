@@ -15,6 +15,15 @@ export function currentPass(s: Snapshot): BallFlightSnap | null {
   return f;
 }
 export interface ReceivePicture { player: ContactPlayer; frame: 0 | 1; tick: number }
+/** A committed intended recipient, not a prediction of which player will catch a future intercept/spill. */
+export function callingPass(s: Snapshot): ReceivePicture | undefined {
+  const c = s.passCall, holder = s.ball.holder;
+  if (!c || s.phase?.kind !== 'ruck' || !Number.isInteger(c.startedTick) || !Number.isInteger(c.releasesTick)
+    || c.startedTick > s.tick || c.releasesTick <= s.tick || c.startedTick < 0
+    || !holder || holder.side !== c.from.side || holder.slot !== c.from.slot || c.to.side !== c.from.side
+    || c.to.slot === c.from.slot || !flightPlayer(s, c.to) || flightPlayer(s, c.from)?.pose !== 'dummyHalf') return undefined;
+  return { player: c.to, frame: s.tick === c.startedTick ? 0 : 1, tick: s.tick };
+}
 export function receivingPass(s: Snapshot): ReceivePicture | undefined {
   const f = currentPass(s);
   if (!f || f.arrivesTick - s.tick > RECEIVE_TICKS || !flightPlayer(s, f.receiver)) return undefined;
