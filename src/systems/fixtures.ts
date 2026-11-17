@@ -1,3 +1,4 @@
+import { freezeMatchIncome, reconcileMatchIncome, matchIncomePatch, commitMatchState } from './matchIncome';
 // src/systems/fixtures.ts — season fixtures, ladder, rival cheap-sim and finals
 // for the 16-club league (BAK-184, WU-7). Pure TypeScript, no Phaser.
 //
@@ -202,13 +203,15 @@ export function stampFixtureResult(
   result: { homeScore: number; awayScore: number },
 ): GameState {
   if (hasStructuralCalendar(state)) return finaliseCalendarFixture(state, fixture, result);
-  if (state.league.fixtures.some(f => sameFixtureIdentity(f, fixture) && f.result)) return state;
+  if (state.league.fixtures.some(f => sameFixtureIdentity(f, fixture) && f.result)) return reconcileMatchIncome(state);
+  if (!state.league.fixtures.some(f => sameFixtureIdentity(f, fixture))) return state;
+  state = freezeMatchIncome(state, fixture);
   const fixtures = state.league.fixtures.map((f) =>
     f.round === fixture.round && f.homeId === fixture.homeId && f.awayId === fixture.awayId
-      ? { ...f, result }
+      ? { ...f, result, ...(fixture.unplayed ? { unplayed: true } : {}) }
       : f,
   );
-  return { ...state, league: { ...state.league, fixtures } };
+  return reconcileMatchIncome({ ...state, league: { ...state.league, fixtures } });
 }
 
 /**
@@ -226,7 +229,9 @@ export function applyResult(
   result: { homeScore: number; awayScore: number },
 ): GameState {
   if (hasStructuralCalendar(state)) return finaliseCalendarFixture(state, fixture, result);
-  if (state.league.fixtures.some(f => sameFixtureIdentity(f, fixture) && f.result)) return state;
+  if (state.league.fixtures.some(f => sameFixtureIdentity(f, fixture) && f.result)) return reconcileMatchIncome(state);
+  if (!state.league.fixtures.some(f => sameFixtureIdentity(f, fixture))) return state;
+  state = freezeMatchIncome(state, fixture);
   if (fixture.round <= 0 || isFinalsRound(fixture.round)) {
     return stampFixtureResult(state, fixture, result);
   }
@@ -267,12 +272,12 @@ export function applyResult(
   // Stamp the result onto the matching regular-season fixture (by round + teams).
   const fixtures = state.league.fixtures.map((f) =>
     f.round === fixture.round && f.homeId === fixture.homeId && f.awayId === fixture.awayId
-      ? { ...f, result }
+      ? { ...f, result, ...(fixture.unplayed ? { unplayed: true } : {}) }
       : f,
   );
 
   const league: LeagueState = { ...state.league, fixtures, ladder };
-  return { ...state, league };
+  return reconcileMatchIncome({ ...state, league });
 }
 
 /** 1-based ladder position of a club, or 0 if absent. */
@@ -538,11 +543,11 @@ export function recordPremiership(state: GameState): GameState {
  * and cheap-sim the remainder (including player ties) so tests and mid-season
  * saves still produce a correct history entry.
  */
-export function runFinals(state: GameState, rng: Rng): GameState {
+export function runFinals(state: GameState, rng: Rng, incomeSeason = state.season): GameState {
   const seeds = finalsSeeds(state);
   if (seeds.length < 8) return state;
 
-  let next = state;
+  let next = { ...state, season: incomeSeason };
 
   if (roundFixtures(next, QF_ROUND).length === 0) {
     next = appendFixtures(next, makeQuarterFinalFixtures(next));
@@ -559,7 +564,7 @@ export function runFinals(state: GameState, rng: Rng): GameState {
   }
   next = cheapSimRoundAll(next, GF_ROUND, rng);
 
-  return recordPremiership(next);
+  return recordPremiership({ ...next, season: state.season });
 }
 
 // ── League initialisation ─────────────────────────────────────────────────────
@@ -661,10 +666,13 @@ export function registerFixturesSystem(): void {
     let s = getState();
     if (hasStructuralCalendar(s)) {
       const legal = resolveCalendarForfeits(s);
-      if (legal !== s) { setState({ league: legal.league, competitions: legal.competitions! }); s = getState(); }
+      if (legal !== s) { commitMatchState(legal); s = getState(); }
     }
     if (!hasStructuralCalendar(s) && (currentRound(s) < -1 || ctx.week > WEEKS_PER_SEASON)) return;
     if (s.league.clubs.length === 0) return; // league not initialised yet
+    const incomeFixtures = hasStructuralCalendar(s) ? currentCalendarFixtures(s).map(fixtureBridge) : s.league.fixtures.filter(f => f.round === currentRound(s));
+    for (const fixture of incomeFixtures) s = freezeMatchIncome(s, fixture);
+    setState(matchIncomePatch(s));
     const rng = makeRng(s.rngSeed);
     if (s.settings.liveRivals === true && !ctx.fastForward) {
       const jobs = rivalJobs(s, rng, PLAYER_ID);
@@ -673,7 +681,7 @@ export function registerFixturesSystem(): void {
         // A result missing from the worker's answer is played here, so no fixture is left unplayed.
         const all = jobs.map((job, i) => results[i] ?? playRivalJob(job));
         const next = applyRivalResults(getState(), jobs, all, applyResult);
-        setState({ league: next.league, ...(next.competitions ? { competitions: next.competitions } : {}) });
+        commitMatchState(next);
       };
       if (ctx.hold && canUseWorker() && jobs.length > 0) {
         ctx.hold();
@@ -696,7 +704,7 @@ export function registerFixturesSystem(): void {
       return;
     }
     const next = simulateRivalRound(s, rng);
-    setState({ league: next.league, rngSeed: rng.state(), ...(next.competitions ? { competitions: next.competitions } : {}) });
+    commitMatchState(next, { rngSeed: rng.state() });
   }, { trials: true });
 
   // (c) Ladder refresh — defensive re-sort after the round's results land.
@@ -742,7 +750,7 @@ export function registerFixturesSystem(): void {
     // re-roll played ties; runFinals handles the unfinished / test path.
     const rngFinals = makeRng(s.rngSeed);
     const gfDone = roundFixtures(s, GF_ROUND).some((f) => !!f.result);
-    const afterFinals = gfDone ? recordPremiership(s) : runFinals(s, rngFinals);
+    const afterFinals = gfDone ? recordPremiership(s) : runFinals(s, rngFinals, Math.max(1, s.season - 1));
     // Reputation from the season's results (ladder finish, finals, decay). The
     // premiership bonus is already in afterFinals.reputation.
     const playerFinals = [QF_ROUND, SF_ROUND, GF_ROUND].flatMap((r) =>
@@ -759,7 +767,7 @@ export function registerFixturesSystem(): void {
       playedGrandFinal: !!grandFinal,
       premiership: !!lastEntry && lastEntry.premiership,
     });
-    setState({
+    commitMatchState(afterFinals, {
       history: afterFinals.history,
       reputation: rep.reputation,
       rngSeed: gfDone ? s.rngSeed : rngFinals.state(),

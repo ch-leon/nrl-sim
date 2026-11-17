@@ -7,7 +7,7 @@ import { preparePack } from '../../src/content';
 import { coachAddress } from '../../src/ui/coachName';
 import { SAVE_VERSION } from '../../src/core/state';
 import { WEEKS_PER_SEASON } from '../../src/config';
-import { migrateState } from '../../src/core/save';
+import { migrateState, LAST_PRE_FINANCE_VERSION } from '../../src/core/save';
 import { checkState, runSoak } from '../../src/qa/soak';
 
 // The tsconfig has no Node types, so the directory is read with Vite's glob
@@ -40,7 +40,7 @@ describe('save corpus', () => {
         expect(raw.version).toBeLessThanOrEqual(SAVE_VERSION);
       });
 
-      if ((raw.version ?? 0) < SAVE_VERSION) {
+      if ((raw.version ?? 0) <= LAST_PRE_FINANCE_VERSION) {
         it('requires a new career without changing the historical fixture', () => {
           const before = JSON.stringify(raw);
           expect(migrateState(raw)).toMatchObject({ ok: false, message: expect.stringMatching(/older version.*start a new career/i) });

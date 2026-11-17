@@ -71,9 +71,9 @@ describe('the Money page stays true to the economy', () => {
     expect(text).toContain('The balance at the left of the dock is the cash in the bank');
   });
 
-  it('quotes the ticket price', () => {
-    expect(text).toContain(`Tickets are ${dollars(ECON.TICKET_PRICE)}.`);
-    expect(text).toContain(`On Easy the gate pays ${Math.round(DIFFICULTY.easy.gate * 100)}% of that`);
+  it('quotes fixed match income rather than ticket multiplication', () => {
+    expect(text).toContain('Local $8,000');
+    expect(text).toContain('not an extra ticket payment');
   });
 
   it('quotes the finals prize money, the board\'s grant, the fire-sale floor and its morale hit (N12.7)', () => {
@@ -128,16 +128,16 @@ describe('the Money page says the real numbers (N12)', () => {
   const board = (level: 1 | 2 | 3) => [{ id: 'sb', defId: 'sponsorBoard' as const, level, x: 0, y: 0 }];
 
   it('the Sponsor Board line states the rule, then what one pays at the club\'s reputation', () => {
-    expect(sponsorBullet(null)).toBe('A Sponsor Board pays $150 a week plus $10 a reputation point, up to $1,000, and 1.6× that at level 2, 2.2× at level 3. At your reputation of 30 a new one would pay $450 a week.');
-    expect(sponsorBullet({ reputation: 60, facilities: [] })).toContain('At your reputation of 60 a new one would pay $750 a week.');
-    expect(sponsorBullet({ reputation: 80, facilities: board(3) })).toContain('Yours (level 3) pays $2,090 a week at your reputation of 80.');
+    expect(sponsorBullet(null)).toBe('A Sponsor Board pays 3% / 9% / 18% of match base at levels 1 / 2 / 3 on played non-trial matches. A new one would pay $540 per eligible match. No income while idle.');
+    expect(sponsorBullet({ reputation: 60, facilities: [] })).toContain('A new one would pay $540 per eligible match.');
+    expect(sponsorBullet({ reputation: 80, facilities: board(3) })).toContain('Yours (level 3) pays $3,240 per eligible match.');
   });
 
   it('is worked out each time the page is shown, for the club in play', () => {
     createNewGame('Guide FC', 4);
-    expect(bullets('money')).toContain('a new one would pay $450 a week');
+    expect(bullets('money')).toContain('A new one would pay $540 per eligible match');
     setState({ reputation: 100, facilities: board(1) });
-    expect(bullets('money')).toContain('Yours (level 1) pays $1,000 a week at your reputation of 100.');
+    expect(bullets('money')).toContain('Yours (level 1) pays $540 per eligible match.');
     expect(bullets('money')).not.toContain('$3,000');
   });
 

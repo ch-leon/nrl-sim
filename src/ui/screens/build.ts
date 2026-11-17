@@ -19,7 +19,7 @@ import {
   FACILITY_CATALOG,
   LEVEL_MULT,
   SPECIAL_MAGNITUDE,
-  facilityUpkeep,
+
   upgradeCost,
   type FacilityDefId,
   type FacilityDef,
@@ -65,6 +65,7 @@ export interface BlurbContext {
   level: 1 | 2 | 3;
   reputation: number;
   officeLevel?: number;
+  tier?: import('../../data/financeRules').FinanceTier;
 }
 
 /**
@@ -77,13 +78,11 @@ function officeCopy({ officeLevel = 0 }: BlurbContext): string {
 }
 
 /**
- * The Sponsor Board's line (N12): what it pays a week at `level` and the club's
- * reputation (economy.sponsorReturn, the number the weekly tick pays), then the rule.
+ * Sponsor Board's fixed per-match return at this tier and level.
  */
-function sponsorCopy({ level, reputation }: BlurbContext): string {
-  const now = fmtMoney(sponsorReturn(level, reputation));
-  const rule = `${fmtMoney(ECON.SPONSOR_BASE)} + ${fmtMoney(ECON.SPONSOR_PER_REP)} a reputation point, up to ${fmtMoney(ECON.SPONSOR_CAP)}; ×${LEVEL_MULT[1]} at L2, ×${LEVEL_MULT[2]} at L3`;
-  return `+${now}/week at L${level} and reputation ${reputation} (${rule}). One only`;
+function sponsorCopy({ level, reputation, tier = 'premier' }: BlurbContext): string {
+  const now = fmtMoney(sponsorReturn(level, reputation, tier));
+  return `+${now} per played non-trial match at L${level}. No income while idle. One only`;
 }
 
 /**
@@ -142,7 +141,7 @@ export function openBuildScreen(scene: GroundsSceneLike | null = activeGroundsSc
       .map((def) => {
         const blocked = buildBlocker(def, s);
         const built = def.unique === true && s.facilities.some((f) => f.defId === def.id);
-        const meta = `${fmtMoney(facilityUpkeep(def, 1))}/wk upkeep · ${def.footprint.w}×${def.footprint.h}`;
+        const meta = `One-off cost · ${def.footprint.w}×${def.footprint.h}`;
         const row = el(
           'div',
           {
@@ -155,7 +154,7 @@ export function openBuildScreen(scene: GroundsSceneLike | null = activeGroundsSc
             el('span', { class: 'nrl-build-title', text: def.name }),
             // A unique facility already built has no price to pay (3c: "—").
             el('span', { class: 'nrl-build-cost nrl-num', text: built ? '—' : fmtMoney(def.cost) })),
-          el('div', { class: 'nrl-build-blurb', text: facilityBlurb(def, { level: 1, reputation, officeLevel }) }),
+          el('div', { class: 'nrl-build-blurb', text: facilityBlurb(def, { level: 1, reputation, officeLevel, tier: s.capAccount.tier }) }),
           // Can't build: the meta line turns yellow and says why first.
           blocked
             ? el('div', { class: 'nrl-build-meta nrl-build-why', text: built || !isFacilityOpen(s, def.id) ? blocked : `${blocked} · ${meta}` })
@@ -244,17 +243,14 @@ function renderFacilityBody(facility: PlacedFacility, def: FacilityDef): HTMLEle
 
   const container = el('div', { class: 'nrl-facility-body' });
   // Running cost now, and what the next level would cost to run (N6).
-  const upkeepNow = fmtMoney(facilityUpkeep(def, facility.level));
-  const upkeepText = atMax
-    ? `Upkeep ${upkeepNow}/wk`
-    : `Upkeep ${upkeepNow}/wk · L${nextLevel} ${fmtMoney(facilityUpkeep(def, nextLevel))}/wk`;
+  const upkeepText = 'No recurring upkeep';
   const x = button('✕', () => closeModal(), { class: 'nrl-screen-x nrl-facility-close' });
   x.setAttribute('aria-label', 'Close');
   container.append(
     el('div', { class: 'nrl-facility-head' }, el('h2', { class: 'nrl-facility-name', text: def.name }), x),
     levelPips(facility.level),
     el('div', { class: 'nrl-facility-info' },
-      el('p', { class: 'nrl-facility-blurb', text: facilityBlurb(def, { level: facility.level, reputation: getState().reputation, officeLevel: coachsOfficeLevel(getState()) }) }),
+      el('p', { class: 'nrl-facility-blurb', text: facilityBlurb(def, { level: facility.level, tier: getState().capAccount.tier, reputation: getState().reputation, officeLevel: coachsOfficeLevel(getState()) }) }),
       el('div', { class: 'nrl-facility-upkeep', text: upkeepText }),
       ...(def.id === 'coachsOffice' ? [seeCallsButton()] : [])),
   );
@@ -287,7 +283,7 @@ function renderFacilityBody(facility: PlacedFacility, def: FacilityDef): HTMLEle
 
   // Move / Demolish (#78).
   const fee = moveFee(def);
-  const refund = demolishRefund(def, facility.level);
+  const refund = demolishRefund(def, facility.level, facility.constructionSpend ?? 0);
   const moveBtn = button(`Move · ${fmtMoney(fee)}`, () => {
     if (getState().money < fee) return;
     closeModal();

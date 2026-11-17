@@ -69,6 +69,7 @@ export interface Player {
 
 export interface PlacedFacility {
   id: string; // instance id
+  constructionSpend?: number;
   defId: FacilityDefId; // catalog key, e.g. 'weightsRoom'
   level: 1 | 2 | 3;
   x: number; y: number; // grid origin (top-left of footprint)
@@ -87,6 +88,7 @@ export interface Fixture {
   slot?: number;
   round: number; // 1..SEASON_ROUNDS (+ finals rounds)
   homeId: string; awayId: string;
+  unplayed?: boolean;
   result?: { homeScore: number; awayScore: number };
 }
 
@@ -116,9 +118,9 @@ export interface LeagueState {
 // TODO(WU-6): reconcile WeatherKind ownership with src/sim/weather.ts
 export type WeatherKind = 'clear' | 'rain' | 'wind';
 
-/** v28 separates club cash from the annual salary cap. Careers from v27 and
- *  earlier are pre-finance: they are rejected, not converted. */
-export const SAVE_VERSION = 28;
+/** v29 adds kickoff promises and match-income receipts. v28 keeps cash/cap via
+ * migration; v27 and earlier are pre-finance and rejected, not converted. */
+export const SAVE_VERSION = 29;
 
 /** The hires the facilities don't cover (N14.5), and the attack coach who opens set plays to buy (#326). */
 export type StaffRole = 'assistantCoach' | 'analyst' | 'welfare' | 'attackCoach';
@@ -322,6 +324,7 @@ export interface GameState {
    * money movement, and the rollover's prize money and board grant close the season
    * just played.
    */
+  matchIncome: import('../systems/matchIncome').MatchIncomeRecord[];
   finance: SeasonFinance[];
   /** The coach's nine, bench and rotation (#69); old saves get today's auto pick. */
   lineup: Lineup;
@@ -449,6 +452,7 @@ export function createNewGame(
     boardPatience: BOARD.START_PATIENCE,
     objectives: [],
     eventDeck: newEventDeck(seed),
+    matchIncome: [],
     finance: [emptyFinance(1)],
     // The opening side: today's best nine by slot and the next four (#69). No dice: the squad is unchanged.
     lineup: autoPick(squad),

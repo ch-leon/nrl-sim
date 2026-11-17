@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- **Played-match income and upfront investments** ([PR #695](https://github.com/ch-leon/nrl-sim/pull/695)): base, venue and small result payments settle once with the fixture; byes and waiting pay nothing. Rival wallets pay for signings/releases. Staff appointment fees and Grandstand 30k/60k/90k purchases are upfront, with refunds based on recorded spend. v29 records kickoff promises and receipts; v28 loads without retroactive income.
+
 - **Whistle cleanup (candidate, not released):** a player still in the sin bin fades from his seat with his side at half-time and full time, and returns with the restart. The fade finishes completely; retained tackle artwork, carrier markers, bin cards and gas/fatigue bars clear for the break picture and restore on replay ([PR #706](https://github.com/ch-leon/nrl-sim/pull/706)).
 
 - **Connected big moments:** kick follow-through lowers into the continuing run or settled stance; aerial landing loads into the same carry pose; try recovery uses palm and knee support before entering celebration. Knee slides settle once, and the empty goal-kick tee stays put as the kicker turns. Uses the connected handling poses with existing event timing and possession ([PR #705](https://github.com/ch-leon/nrl-sim/pull/705)).

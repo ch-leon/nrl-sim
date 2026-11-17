@@ -208,7 +208,7 @@ describe('moveFacility', () => {
 
 describe('demolishFacility', () => {
   it('removes it, frees its tiles and refunds 30% through the ledger', () => {
-    setState({ facilities: [placed({ id: 'a', defId: 'weightsRoom', level: 2, x: 2, y: 2 })], money: 0 });
+    setState({ facilities: [placed({ id: 'a', defId: 'weightsRoom', level: 2, x: 2, y: 2, constructionSpend: 45_000 })], money: 0 });
     const moves: { delta: number; reason: string }[] = [];
     bus.on('money:changed', ({ delta, reason }) => moves.push({ delta, reason }));
     expect(demolishFacility('a')).toBe(13_500); // 30% of 15k + 30k

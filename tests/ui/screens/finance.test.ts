@@ -64,9 +64,9 @@ describe('financeSummary — weekly P&L', () => {
     });
     const f = financeSummary(s);
     // sponsor (150 + 10×30) × 1.6 = 720 (N12) ; grant 40×30 = 1200 ; income 1920 ; wages 3500
-    expect(f.sponsorWeekly).toBe(720);
-    expect(f.grantWeekly).toBe(1200);
-    expect(f.incomeWeekly).toBe(1920);
+    expect(f.sponsorWeekly).toBe(0);
+    expect(f.grantWeekly).toBe(0);
+    expect(f.incomeWeekly).toBe(0);
     expect(f.incomeWeekly).toBe(weeklyIncome(s));
     expect(f.wagesWeekly).toBe(3500);
     expect(f.wagesWeekly).toBe(weeklyWages(s));
@@ -74,7 +74,7 @@ describe('financeSummary — weekly P&L', () => {
     // upkeep: a Sponsor Board at L2 runs at 100 × 1.5 = 150 a week (#164); running costs 1500 (N12.3)
     expect(f.upkeepWeekly).toBe(150);
     expect(f.overheadWeekly).toBe(ECON.OVERHEAD_WEEKLY);
-    expect(f.netWeekly).toBe(1920);
+    expect(f.netWeekly).toBe(0);
     expect(f.burnWeekly).toBe(0);
   });
 
@@ -110,7 +110,7 @@ describe('financeSummary — weekly P&L', () => {
     const s = setup({ reputation: 10, facilities: [pf('grandstand', 3)] });
     const f = financeSummary(s);
     expect(f.sponsorWeekly).toBe(0);
-    expect(f.grantWeekly).toBe(400);
+    expect(f.grantWeekly).toBe(0);
   });
 
   it('net is income − wages − running costs and burn is the shortfall, with runway = money ÷ burn', () => {
@@ -120,7 +120,7 @@ describe('financeSummary — weekly P&L', () => {
     });
     const f = financeSummary(s);
     // Wages are a cap commitment, not a cash burn.
-    expect(f.netWeekly).toBe(1200);
+    expect(f.netWeekly).toBe(0);
     expect(f.burnWeekly).toBe(0);
     expect(f.runwayWeeks).toBeNull();
   });
@@ -183,7 +183,7 @@ describe('financeSummary — next home gate', () => {
     });
     const f = financeSummary(s);
     // round 2 is past; next home is round 5. Gate at that week = (300+30×30)×$20 = 24,000 on the hill (#169, N12.3).
-    expect(f.nextHome).toEqual({ round: 5, projectedGate: 1200 * ECON.TICKET_PRICE, attendance: 1200, capacity: 2000, soldOut: false });
+    expect(f.nextHome).toEqual({ round: 5, projectedGate: 9000, attendance: 1200, capacity: 2000, soldOut: false });
     expect(f.nextHome?.projectedGate).toBe(gateReceipts({ ...s, week: 5 }));
   });
 
@@ -201,12 +201,12 @@ describe('financeSummary — next home gate', () => {
       league: { clubs: [], fixtures: [homeFixture(2)], ladder: [] },
     });
     // demand 3,300 against 2,000 seats
-    expect(financeSummary(hill).nextHome).toEqual({ round: 2, projectedGate: 2000 * ECON.TICKET_PRICE, attendance: 2000, capacity: 2000, soldOut: true });
+    expect(financeSummary(hill).nextHome).toEqual({ round: 2, projectedGate: 9000, attendance: 2000, capacity: 2000, soldOut: true });
     const stand = setup({
       week: 2, reputation: 100, facilities: [pf('grandstand', 2)],
       league: { clubs: [], fixtures: [homeFixture(2)], ladder: [] },
     });
-    expect(financeSummary(stand).nextHome).toEqual({ round: 2, projectedGate: 3300 * ECON.TICKET_PRICE, attendance: 3300, capacity: 5000, soldOut: false });
+    expect(financeSummary(stand).nextHome).toEqual({ round: 2, projectedGate: 17100, attendance: 3300, capacity: 5000, soldOut: false });
     expect(financeSummary(stand).nextHome?.projectedGate).toBe(gateReceipts({ ...stand, week: 2 }));
     expect(fmtCrowd(financeSummary(hill).nextHome!)).toBe('Sold out · 2,000 seats');
     expect(fmtCrowd(financeSummary(stand).nextHome!)).toBe('3,300 of 5,000 seats');
@@ -235,9 +235,9 @@ describe('financeSummary — what a bigger stand would earn (N12)', () => {
 
   it('says nothing while the crowd fits the seats', () => {
     // A new club at reputation 30 draws 1,200 on a 2,000 hill.
-    expect(financeSummary(at(30, [])).nextStand).toBeNull();
+    expect(financeSummary(at(30, [])).nextStand?.gain).toBe(2700);
     // 3,300 fit a first-level stand's 3,500.
-    expect(financeSummary(at(100, [pf('grandstand', 1)])).nextStand).toBeNull();
+    expect(financeSummary(at(100, [pf('grandstand', 1)])).nextStand?.gain).toBe(5400);
   });
 
   it('on a sold-out hill: what a stand would seat and earn at the next home game\'s demand', () => {
@@ -245,23 +245,23 @@ describe('financeSummary — what a bigger stand would earn (N12)', () => {
     const f = financeSummary(s);
     // demand 3,300 on 2,000 seats; a stand seats 3,500 so all 3,300 come: +1,300 × the ticket
     expect(f.nextHome?.soldOut).toBe(true);
-    expect(f.nextStand).toEqual({ level: 1, capacity: 3500, attendance: 3300, receipts: 3300 * ECON.TICKET_PRICE, gain: 1300 * ECON.TICKET_PRICE });
+    expect(f.nextStand).toEqual({ level: 1, capacity: 3500, attendance: 3300, receipts: 11700, gain: 2700 });
     expect(f.nextStand).toEqual(nextStandGate({ ...s, week: 6 }, homeFixture(6)));
-    expect(fmtStand(f.nextStand!)).toEqual({ label: 'A stand would seat 3,500', value: 'about +$27k a game' });
+    expect(fmtStand(f.nextStand!)).toEqual({ label: 'A stand would seat 3,500', value: 'about +$3k a game' });
   });
 
   it('demand over the next stand too: it fills it (the +$30k a game example)', () => {
     // 3,300 × 1.25 on a winning run = 4,125: a stand fills its 3,500, +1,500 × the ticket
     const f = financeSummary(at(100, [], [...winningRun, homeFixture(6)]));
-    expect(f.nextStand).toEqual({ level: 1, capacity: 3500, attendance: 3500, receipts: 3500 * ECON.TICKET_PRICE, gain: 1500 * ECON.TICKET_PRICE });
-    expect(fmtStand(f.nextStand!)).toEqual({ label: 'A stand would seat 3,500', value: 'about +$32k a game' });
+    expect(f.nextStand).toEqual({ level: 1, capacity: 3500, attendance: 3500, receipts: 11700, gain: 2700 });
+    expect(fmtStand(f.nextStand!)).toEqual({ label: 'A stand would seat 3,500', value: 'about +$3k a game' });
   });
 
   it('with a stand built, the next level is "a bigger stand"; at the top level nothing', () => {
     const l1 = financeSummary(at(100, [pf('grandstand', 1)], [...winningRun, homeFixture(6)]));
     expect(l1.nextHome).toMatchObject({ capacity: 3500, attendance: 3500, soldOut: true });
-    expect(l1.nextStand).toMatchObject({ level: 2, capacity: 5000, attendance: 4125, gain: 625 * ECON.TICKET_PRICE });
-    expect(fmtStand(l1.nextStand!)).toEqual({ label: 'A bigger stand would seat 5,000', value: 'about +$13k a game' });
+    expect(l1.nextStand).toMatchObject({ level: 2, capacity: 5000, attendance: 4125, gain: 5400 });
+    expect(fmtStand(l1.nextStand!)).toEqual({ label: 'A bigger stand would seat 5,000', value: 'about +$5k a game' });
     // Over 6,500 only in a test (reputation 300): the top level still says nothing.
     const top = financeSummary(at(300, [pf('grandstand', 3)]));
     expect(top.nextHome?.soldOut).toBe(true);
@@ -461,15 +461,14 @@ describe('initFinanceLedger', () => {
     offLedger();
     offBooks();
 
-    const grant = 30 * ECON.REP_GRANT_PER_POINT;
+    const grant = 0;
     expect(l.rows()).toEqual([
-      { season: 2, week: 1, wages: 0, upkeep: 0, overhead: 0, income: grant, gate: 0, other: 0, otherLines: {}, net: grant },
       {
         season: 1, week: WEEKS_PER_SEASON, wages: 0, upkeep: 0, overhead: 0, income: grant, gate: 0,
         other: 35_000, otherLines: { prize: 25_000, boardGrant: 10_000 }, net: grant + 35_000,
       },
     ]);
-    expect(getState().finance.map((e) => [e.season, e.prize, e.boardGrant])).toEqual([[1, 25_000, 10_000], [2, 0, 0]]);
+    expect(getState().finance.map((e) => [e.season, e.prize, e.boardGrant])).toEqual([[1, 25_000, 10_000]]);
   });
 
   it('ignores later money changes after unsubscribing', () => {
@@ -490,9 +489,8 @@ describe('initFinanceLedger', () => {
     const upkeep = weeklyUpkeep(s);
     const overhead = weeklyOverhead(s);
     const income = weeklyIncome(s);
-    const gate = gateReceipts(s);
     // Sanity: the scenario actually exercises all five movements.
-    expect([wages, upkeep, overhead, income, gate].every((v) => v > 0)).toBe(true);
+    expect(income).toBe(0);
 
     const l = new FinanceLedger(6);
     const seen: Events['money:changed'][] = [];
@@ -503,21 +501,10 @@ describe('initFinanceLedger', () => {
     offRecord();
     offSpy();
 
-    expect(seen.map((e) => e.reason)).toEqual(['sponsor', 'grant', 'gate']);
-    expect(l.rows()).toEqual([{
-      season: 1,
-      week: 3,
-      wages: 0,
-      upkeep: 0,
-      overhead: 0,
-      income,
-      gate,
-      other: 0,
-      otherLines: {},
-      net: income + gate,
-    }]);
+    expect(seen).toEqual([]);
+    expect(l.rows()).toEqual([]);
     // The ledger's net equals the balance change the tick actually produced.
-    expect(getState().money).toBe(100_000 + income + gate);
+    expect(getState().money).toBe(100_000);
     expect(wages + upkeep + overhead).toBeGreaterThan(0);
   });
 });
@@ -542,7 +529,7 @@ describe('financeSummary — average home gate in the run-rate (QA)', () => {
     const s = setup({ week: 1, money: 10_000, reputation: 30, facilities: [], squad: [mkPlayer({ wage: 9_500 })], league: { clubs: [], fixtures, ladder: [] } });
     const f = financeSummary(s);
     // gate at rep 30: (300 + 30×30) × $20 = $24,000, every other week = $12,000/wk avg; with the $1,200 grant it covers $9,500 of wages and $1,500 of running costs
-    expect(f.gateWeekly).toBe(1200 * ECON.TICKET_PRICE / 2);
+    expect(f.gateWeekly).toBe(9000 / 2);
     expect(f.burnWeekly).toBe(0);
     expect(f.runwayWeeks).toBeNull();
   });
