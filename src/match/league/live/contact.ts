@@ -2,7 +2,7 @@ import { SET_TACKLES } from '../../../config';
 import { TICK_S } from '../../core/engine';
 import { FIELD_LENGTH, FIELD_WIDTH, IN_GOAL, MID_Y, clampToGround, inGoal } from '../../core/field';
 import { PASS_SPEED, passFlight } from '../../core/ball';
-import type { ContactSnap, Side } from '../../core/snapshot';
+import type { BallFlightSnap, ContactSnap, Side } from '../../core/snapshot';
 import { add, clamp, dist, dot, scale, sub, type Vec } from '../../core/vec';
 import { speedOf } from '../../core/body';
 import { BASE, RACE, compressedContact, edgeRace, interceptChance, resolveContest, type ContestMods } from '../contest';
@@ -27,6 +27,8 @@ import { other, type Player, type Phase } from './types';
 import { LivePenalties } from './penalties';
 
 export abstract class LiveContact extends LivePenalties {
+  /** Write-only launch history for sprite handoff; never consulted by match decisions. */
+  protected visualPass: (NonNullable<BallFlightSnap['source']> & { tick: number }) | null = null;
   /** Presentation history only; never consulted by match decisions. */
   protected visualContact: ContactSnap | null = null;
   /** Render metadata only: no rolls, movement or changes to the contest. */
@@ -80,6 +82,7 @@ export abstract class LiveContact extends LivePenalties {
     from.pose = 'pass';
     from.poseUntil = this.tick + LIVE.passPoseTicks;
     from.catchTick = this.tick;
+    this.visualPass = { tick: this.tick, player: { side: from.side, slot: from.slot, who: from.key }, headX: from.body.heading.x, headY: from.body.heading.y, speed: Math.hypot(from.body.vel.x, from.body.vel.y), odometer: from.odometer, legs: from.energy, blown: from.gas.blown };
   }
 
   /**
@@ -98,6 +101,7 @@ export abstract class LiveContact extends LivePenalties {
     from.pose = 'pass';
     from.poseUntil = this.tick + LIVE.passPoseTicks;
     from.catchTick = this.tick;
+    this.visualPass = { tick: this.tick, player: { side: from.side, slot: from.slot, who: from.key }, headX: from.body.heading.x, headY: from.body.heading.y, speed: Math.hypot(from.body.vel.x, from.body.vel.y), odometer: from.odometer, legs: from.energy, blown: from.gas.blown };
     return true;
   }
 

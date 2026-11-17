@@ -100,9 +100,9 @@ describe('eyes on the bomb (#671)', () => {
   it('is unchanged away from the head: same pixels below the chin', () => {
     const look = appearanceFor('p1');
     const kit = kitFromColors(['#1e3a8a', '#ffffff'], 'x');
-    for (const [action, frame, stride] of [['idle', 0, undefined], ['idle', 1, undefined], ['run', 2, 2], ['run', 4, 9]] as const) {
-      const base = drawLivePlayer(look, kit, action, frame, 'front', false, stride, 0, 0);
-      const up = drawLivePlayer(look, kit, action, frame, 'front', false, stride, 0, 2);
+    for (const facing of ['front', 'back', 'side'] as const) for (const [action, frame, stride] of [['idle', 0, undefined], ['idle', 1, undefined], ['run', 2, 2], ['run', 4, 9]] as const) {
+      const base = drawLivePlayer(look, kit, action, frame, facing, false, stride, 0, 0);
+      const up = drawLivePlayer(look, kit, action, frame, facing, false, stride, 0, 2);
       const at = headSpot(action, frame, stride, 0, look.stature);
       let moved = 0;
       for (let y = 0; y < base.h; y++) for (let x = 0; x < base.w; x++) {

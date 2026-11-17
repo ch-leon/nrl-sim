@@ -224,7 +224,7 @@ export class MatchBall implements PlaybackBall {
     this.gx = x;
     this.gy = y;
     const sy = y - lift + 2;
-    this.sprite.setPosition(x, sy - this.half).setDepth(depth);
+    this.sprite.setPosition(x + (motion?.offsetX ?? 0), sy - this.half + (motion?.offsetY ?? 0)).setDepth(depth);
     this.turn(motion);
     this.vx = motion?.dx ?? 0;
     this.vy = motion?.dy ?? 0;

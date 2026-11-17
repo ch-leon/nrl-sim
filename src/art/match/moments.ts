@@ -1,8 +1,8 @@
 // The same short-limbed characters through kicks, high takes and scored tries.
 import { PixelBuffer } from '../pixel';
 import { OUTLINE, type Kit } from './kit';
-import { WIDTH, PAINT_H, FOOT, ballPixels, drawPrototypePlayer, stand as standFrame, type Appearance, type Facing } from '../prototype/player';
-import { add, body, blend, blendBody, contactPainter, type Body, type Point } from '../prototype/tackle';
+import { WIDTH, PAINT_H, FOOT, CENTRE, ballPixels, drawPrototypePlayer, stand as standFrame, type Appearance, type Facing, type Movement } from '../prototype/player';
+import { add, body, contactPainter, type Body, type Point } from '../prototype/tackle';
 import { tiltedHead } from '../prototype/contact';
 import { fitLegs, bentContactArm } from './limbs';
 
@@ -31,6 +31,36 @@ const ROUTINE: readonly { pose: Body; near: Point; far: Point; tilt: number }[] 
 /** Columns of the tee (and the ball standing on it) in the 44-px frame: just ahead of his front foot. */
 const TEE_X = 28;
 
+/** Existing six beats: plant/drop, strike at 3, then lower the boot before handing back to travel.
+ * Each foot is [x,y] in painter pixels. The far/support sole stays fixed throughout the kick.
+ */
+export const KICK_POSES = {
+  kick: { crouch: [0, 1, 1, 0, 1, 0], lean: [-1, 0, 0, -1, 0, 0],
+    foot: [[16, 35], [18, 33], [23, 32], [28, 26], [25, 31], [24, 35]],
+    knee: [[20, 31], [21, 30], [23, 29], [24, 25], [23, 29], [23, 31]],
+    ball: [[23, 24], [23, 26], [23, 28], [23, 28], [23, 28], [23, 24]] },
+  grubberKick: { crouch: [1, 2, 2, 1, 1, 0], lean: [0, 1, 2, 2, 1, 0],
+    foot: [[17, 35], [18, 35], [23, 34], [27, 33], [25, 34], [24, 35]],
+    knee: [[20, 32], [21, 32], [23, 32], [24, 31], [23, 32], [23, 31]],
+    ball: [[23, 24], [23, 27], [23, 29], [23, 29], [23, 29], [23, 24]] },
+  dropKick: { crouch: [0, 1, 1, 1, 1, 0], lean: [0, 0, 1, 0, 0, 0],
+    foot: [[16, 35], [18, 35], [22, 34], [27, 30], [25, 32], [24, 35]],
+    knee: [[20, 31], [21, 31], [22, 32], [24, 28], [23, 30], [23, 31]],
+    ball: [[23, 24], [24, 28], [24, 30], [24, 30], [24, 30], [23, 24]] },
+  teeKick: { crouch: [0, 0, 1, 0, 1, 0], lean: [0, 1, 2, -1, 0, 0],
+    foot: [[17, 35], [19, 34], [24, 33], [28, 31], [25, 33], [24, 35]],
+    knee: [[20, 31], [22, 31], [24, 30], [25, 28], [23, 31], [23, 31]],
+    ball: [[23, 24], [23, 24], [23, 24], [23, 24], [23, 24], [23, 24]] },
+} as const;
+export const TRAVEL_ENDINGS: readonly MomentAction[] = ['kick', 'grubberKick', 'dropKick', 'teeKick', 'airCatch'];
+/** Stopped players return to idle; no run pose or ball is invented at a kick's end. */
+export function momentHandoff(action: MomentAction, frame: number, possession: boolean, strideFrame?: number): 'idle' | 'run' | 'carry' | null {
+  if (frame !== 5 || !TRAVEL_ENDINGS.includes(action)) return null;
+  if (action === 'airCatch' && possession) return 'carry';
+  if (possession) return null;
+  return strideFrame === undefined || strideFrame === -1 ? 'idle' : 'run';
+}
+
 const landing = body([15, 32], [24, 30], [23, 16], [12, 33], [9, 35], [11, 32], [8, 33]);
 const diveKeys: readonly Body[] = [
   stand(1, 2),
@@ -38,6 +68,18 @@ const diveKeys: readonly Body[] = [
   body([15, 29], [23, 26], [21, 11], [11, 31], [8, 33], [11, 29], [8, 28]),
   landing, landing, landing,
 ];
+
+/** Palm on turf, supported knee, both boots under him, then the shared celebration entry.
+ * The ball remains protected in the other arm throughout the rise.
+ */
+export const TRY_RISE_POSES = [
+  { pose: landing, ball: [29, 30], near: [33, 33], far: [29, 32], tilt: 80 },
+  { pose: body([18, 32], [25, 29], [23, 14], [24, 34], [27, 35], [14, 35], [12, 35]), ball: [28, 29], near: [32, 32], far: [20, 35], tilt: 55 },
+  { pose: body([20, 32], [23, 26], [19, 10], [25, 34], [27, 35], [15, 35], [13, 35]), ball: [25, 27], near: [29, 30], far: [20, 34], tilt: 35 },
+  { pose: body([20, 30], [20, 23], [13, 6], [25, 33], [25, 35], [16, 33], [15, 35]), ball: [21, 26], near: [25, 29], far: [16, 32], tilt: 15 },
+  { pose: stand(1), ball: [16, 25], near: [25, 28], far: [18, 28], tilt: 0 },
+  { pose: stand(), ball: [13, 24], near: [25, 27], far: [15, 27], tilt: 0 },
+] as const;
 
 export function momentLift(action: MomentAction, frame: number): number {
   const f = Math.max(0, Math.min(5, Math.floor(frame)));
@@ -54,46 +96,57 @@ export function momentPoseAt(action: MomentAction, frame: number, possession = f
     return { pose: fitLegs(r.pose), ball: [TEE_X, 27], near: r.near, far: r.far, tilt: r.tilt, lift: 0 };
   }
   if (action === 'kick' || action === 'grubberKick' || action === 'dropKick' || action === 'teeKick') {
-    const low = action === 'grubberKick';
-    pose = stand(low ? [1, 2, 2, 1, 0, 0][f]! : 0, [-1, -1, 0, 1, 0, 0][f]!);
-    pose.foot = (low ? [[16, 35], [17, 34], [21, 33], [25, 33], [28, 32], [24, 35]] as const
-      : [[15, 34], [17, 32], [21, 31], [24, 30], [28, 23], [24, 35]] as const)[f]!;
-    pose.knee = [21, f === 4 && !low ? 24 : 30];
-    ball = action === 'dropKick' || action === 'teeKick' ? ([[23, 24], [20, 28], [17, 29], [17, 29], [17, 29], [23, 24]] as const)[f]!
-      : ([[23, 24], [20, 25], [17, 27], [17, 27], [17, 27], [23, 24]] as const)[f]!;
-    near = possession ? add(ball, 4, 2) : [27, f === 4 ? 18 : 23];
-    far = possession ? add(ball, 0, 2) : [11, 22];
+    const key = KICK_POSES[action];
+    pose = stand(key.crouch[f]!, key.lean[f]!);
+    pose.foot = key.foot[f]!; pose.knee = key.knee[f]!;
+    ball = key.ball[f]!;
+    near = possession ? add(ball, 4, 2) : ([[27, 25], [28, 22], [27, 20], [29, 18], [27, 23], [25, 27]] as const)[f]!;
+    far = possession ? add(ball, 0, 2) : ([[13, 27], [12, 25], [11, 23], [10, 22], [12, 25], [15, 27]] as const)[f]!;
   } else if (action === 'airCatch') {
-    pose = stand([0, 0, 1, 3, 2, 0][f]!);
-    ball = [23, [11, 11, 14, 18, 23, 24][f]!];
+    pose = stand([0, 0, 1, 3, 1, 0][f]!);
+    ball = [23, [11, 11, 16, 22, 26, 25][f]!];
     near = add(ball, 4, 2); far = add(ball, 0, 2);
   } else if (action === 'dive' || action === 'tryRise') {
-    const rise = action === 'tryRise' ? f / 5 : 0;
-    pose = action === 'dive' ? { ...diveKeys[f]! } : blendBody(landing, stand(), rise);
-    tilt = action === 'dive' ? [0, 25, 55, 80, 80, 80][f]! : 80 * (1 - rise);
-    ball = action === 'dive' ? ([[23, 25], [27, 27], [29, 29], [29, 30], [29, 30], [29, 30]] as const)[f]!
-      : blend([29, 30], [13, 24], rise);
-    near = action === 'tryRise' ? blend([33, 33], [25, 27], rise) : add(ball, 4, 3);
-    far = add(ball, 0, 2);
+    if (action === 'tryRise') {
+      const r = TRY_RISE_POSES[f]!;
+      pose = r.pose; ball = r.ball; near = r.near; far = action === 'tryRise' && f === 5 && !possession ? [12, 27] : r.far; tilt = r.tilt;
+    } else {
+      pose = { ...diveKeys[f]! };
+      tilt = [0, 25, 55, 80, 80, 80][f]!;
+      ball = ([[23, 25], [27, 27], [29, 29], [29, 30], [29, 30], [29, 30]] as const)[f]!;
+      near = add(ball, 4, 3); far = add(ball, 0, 2);
+    }
   } else if (action === 'blowing') {
     // Spent at a stoppage (#666): bent at the hips, hands on his knees, head hanging; the back heaves a pixel.
     const heave = f % 2;
     pose = body([17, 27], [22, 23 - heave], [21, 10 - heave], [25, 31], [24, 35], [16, 31], [15, 35]);
     near = [27, 30]; far = [19, 30];
   } else {
-    const crouch = action === 'kneeSlide' ? 4 : [0, 0, 1, 1, 0, 0][f]!;
+    const crouch = action === 'kneeSlide' ? [0, 1, 3, 5, 5, 5][f]! : [0, 0, 1, 1, 0, 0][f]!;
     pose = stand(crouch, [0, 1, 1, 0, -1, -1][f]!);
     ball = add(pose.shoulder, -6, 4);
-    if (action === 'fistPump') near = [27, [21, 16, 12, 13, 17, 21][f]!];
-    else if (action === 'point') near = [31, [19, 18, 17, 17, 18, 19][f]!];
-    else near = [27, [17, 14, 12, 12, 14, 17][f]!];
+    if (action === 'fistPump') near = ([[25, 27], [27, 20], [27, 15], [27, 12], [27, 17], [27, 23]] as const)[f]!;
+    else if (action === 'point') near = ([[25, 27], [28, 22], [31, 19], [31, 17], [31, 19], [28, 22]] as const)[f]!;
+    else near = ([[25, 27], [27, 19], [27, 14], [27, 12], [27, 14], [27, 20]] as const)[f]!;
+    if (action === 'kneeSlide' && f > 1) pose = { ...pose, knee: [24, 35], farKnee: [16, 35] };
     far = possession ? add(ball, 2, 3) : action === 'fistPump' || action === 'point' ? [12, 27] : [10, 13];
+  }
+  if (f === 0 && ['celebrate', 'fistPump', 'point', 'kneeSlide'].includes(action)) {
+    const entry = TRY_RISE_POSES[5]; pose = entry.pose; near = entry.near;
+    far = possession ? entry.far : [12, 27]; ball = entry.ball;
   }
   return { pose: fitLegs(pose), ball, near, far, tilt, lift: momentLift(action, f) };
 }
 
-export function drawMomentPlayer(look: Appearance, kit: Kit, action: MomentAction, frame: number, facing: Facing, possession: boolean, strideFrame?: number): PixelBuffer {
-  if (action === 'airCatch' && frame === 5) return drawPrototypePlayer(look, kit, 'carry', 0, facing, possession, strideFrame);
+export function drawMomentPlayer(look: Appearance, kit: Kit, action: MomentAction, frame: number, facing: Facing, possession: boolean, strideFrame?: number, tired = 0, movement?: Movement, teeFlip = false): PixelBuffer {
+  const end = momentHandoff(action, frame, possession, strideFrame);
+  if (end) {
+    const pixels = drawPrototypePlayer(look, kit, end, 0, facing, possession, strideFrame, tired, movement);
+    // The empty tee stays on the posts side through the last kick pose, even as his body turns.
+    if (action === 'teeKick') pixels.blit(TEE, teeFlip ? 2 * CENTRE - TEE_X - TEE.w : TEE_X, FOOT - 8);
+    return pixels;
+  }
+  if (action === 'airCatch' && frame === 4) return drawPrototypePlayer(look, kit, 'land', 0, facing, possession, strideFrame, tired, movement);
   const out = new PixelBuffer(WIDTH, PAINT_H); const brush = contactPainter(out);
   const { pose: p, ball, near, far, tilt } = momentPoseAt(action, frame, possession);
   const arm = (start: Point, target: Point, dark: boolean) => {

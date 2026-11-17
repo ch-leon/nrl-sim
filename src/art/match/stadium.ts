@@ -225,7 +225,8 @@ function inPostShadow(gx: number, gy: number): boolean {
 
 /** Base + three variants (lit clump, shaded clump, bright blade, dark blade). */
 function tones(base: number): [number, number, number, number, number] {
-  return [base, shade(base, 1.05), shade(base, 0.96), shade(base, 1.14), shade(base, 0.86)];
+  // Keep the broad mowing pattern, but avoid sharp pixel-to-pixel grass contrast.
+  return [base, shade(base, 1.035), shade(base, 0.975), shade(base, 1.1), shade(base, 0.9)];
 }
 
 interface GroundTex {
@@ -248,8 +249,9 @@ const T_INGOAL_B = tones(PAL.inGoalB);
 const T_APRON = tones(PAL.apron);
 
 function textured(t: readonly number[], clump: number, n: number): number {
-  if (n < 0.035) return t[3]!;
-  if (n > 0.972) return t[4]!;
+  // Preserve occasional blades without the dense bright/dark speckle at phone size.
+  if (n < 0.012) return t[3]!;
+  if (n > 0.992) return t[4]!;
   return clump > 0.66 ? t[1]! : clump < 0.3 ? t[2]! : t[0]!;
 }
 

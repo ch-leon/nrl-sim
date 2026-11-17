@@ -25,15 +25,19 @@ export function contactLayout(state: ContactAnimation, points: readonly ContactP
   const at = find(state.contact.carrier);
   if (!at || state.contact.defenders.some(p => !find(p))) return null;
   const pose = contactPoseAt(state); const sign = left ? -1 : 1;
-  const dx = CONTACT_X - pose.carrier.pose.hip[0];
+  // Ordinary contact is authored around a fixed pivot: cancelling hip sway here would
+  // move every planted sole. Escapes already travel in the sim, so cancel their authored run-out.
+  const dx = escape ? CONTACT_X - pose.carrier.pose.hip[0] : 0;
   const dy = CONTACT_FOOT - Math.max(pose.carrier.pose.foot[1], pose.carrier.pose.farFoot[1]);
   pose.carrier = move(pose.carrier, dx, dy); pose.ball = add(pose.ball, dx, dy);
   pose.defenders = pose.defenders.map((d, i) => {
     d = move(d, dx, dy);
     const actual = find(d.player)!;
     const join = clamp((state.tick - state.joined[i]!.tick) / 3);
+    const releaseTick = state.contact.releaseTick;
+    const window = Math.min(3 + i, Math.max(2, (releaseTick ?? 0) - (state.resolvedTick ?? 0)));
     const release = escape ? clamp((state.tick - state.resolvedTick!) / 4)
-      : state.contact.releaseTick !== undefined ? clamp((state.tick - state.contact.releaseTick + 3) / 3) : 0;
+      : releaseTick !== undefined ? clamp((state.tick - releaseTick + window) / (window - 1)) : 0;
     const blend = 1 - join * (1 - release);
     const shift: Point = [(CONTACT_X + (actual.x - at.x) * sign - d.pose.hip[0]) * blend,
       (CONTACT_FOOT + actual.y - at.y - Math.max(d.pose.foot[1], d.pose.farFoot[1])) * blend];

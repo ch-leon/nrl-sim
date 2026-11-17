@@ -4,7 +4,7 @@ import type { Kit } from '../art/match/kit';
 import type { PlayerAnim } from '../art/match/players';
 import type { RingStyle } from '../art/match/kitClash';
 import { liveRingPixels, RING_SCALE } from '../match/view/ringTexture';
-import { appearanceFor, WIDTH, HEIGHT, CENTRE, FOOT, type Appearance } from '../art/prototype/player';
+import { appearanceFor, playerBallAnchor, WIDTH, HEIGHT, CENTRE, FOOT, type Appearance } from '../art/prototype/player';
 import { drawLivePlayer } from '../art/match/livePlayer';
 import { CONTACT_W, CONTACT_H, CONTACT_X, CONTACT_FOOT, drawContact } from '../art/prototype/contact';
 import type { MatchArtRegistry } from './matchArt';
@@ -26,7 +26,7 @@ export interface FrameCacheStats { hits: number; misses: number; evictions: numb
 /** The fields of a picture that decide which frame is drawn. */
 function frameKey(side: Side, p: PlayerPicture): string {
   // A fresh man's key is as it was: tiredness (#666) only adds entries for the tired.
-  return `${side}/${p.who}/${p.action}/${p.frame}/${p.strideFrame ?? 'legacy'}/${p.facing}/${p.possession}${p.tired ? `/t${p.tired}` : ''}${p.lookUp ? `/u${p.lookUp}` : ''}`;
+  return `${side}/${p.who}/${p.action}/${p.frame}/${p.strideFrame ?? 'legacy'}/${p.facing}/${p.possession}${p.tired ? `/t${p.tired}` : ''}${p.lookUp ? `/u${p.lookUp}` : ''}${p.movement ? `/m${p.movement}` : ''}${p.teeFlip ? '/tee' : ''}`;
 }
 
 /** CPU frames only: bounded independently of match length and interchanges. */
@@ -42,11 +42,18 @@ export class PlayerFrameCache {
     // A hit is a stamp, not a delete-and-reinsert: the Map is not reshuffled 600 times a second.
     if (hit) { hit.used = ++this.clock; this.counts.hits++; return hit.pixels; }
     this.counts.misses++;
-    const pixels = drawLivePlayer(this.look(p.who), this.kits[side], p.action, p.frame, p.facing, p.possession, p.strideFrame, p.tired, p.lookUp);
+    const pixels = drawLivePlayer(this.look(p.who), this.kits[side], p.action, p.frame, p.facing, p.possession, p.strideFrame, p.tired, p.lookUp, p.movement, p.teeFlip);
     if (this.frames.size >= this.capacity) this.evict();
     this.frames.set(key, { pixels, used: ++this.clock });
     if (this.frames.size > this.counts.peak) this.counts.peak = this.frames.size;
     return pixels;
+  }
+  /** Same authored anchor as the cached frame; no pixel scan or second appearance catalogue. */
+  ballAnchor(p: PlayerPicture): { x: number; y: number } {
+    const action = p.action === 'airCatch' && p.frame === 4 ? 'land' : p.action === 'catch' ? 'catch' : p.action === 'pass' ? 'pass' : 'carry';
+    const frame = p.action === 'airCatch' && p.frame >= 4 ? 0 : p.frame;
+    const at = playerBallAnchor(this.look(p.who), action, frame, p.strideFrame, p.tired, p.movement);
+    return { x: p.left ? -at.x : at.x, y: at.y };
   }
   private evict(): void {
     let oldest = Infinity; let victim = '';
@@ -89,7 +96,7 @@ class PaintedTexture {
 
 /** The same frame to draw (position, lift and mirroring are not part of it). */
 function samePicture(a: PlayerPicture, b: PlayerPicture): boolean {
-  return a.who === b.who && a.action === b.action && a.frame === b.frame && a.strideFrame === b.strideFrame && a.facing === b.facing && a.possession === b.possession && a.tired === b.tired && a.lookUp === b.lookUp;
+  return a.who === b.who && a.action === b.action && a.frame === b.frame && a.strideFrame === b.strideFrame && a.facing === b.facing && a.possession === b.possession && a.tired === b.tired && a.lookUp === b.lookUp && a.movement === b.movement && a.teeFlip === b.teeFlip;
 }
 
 export class MatchActor {
@@ -113,6 +120,7 @@ export class MatchActor {
   place(x: number, y: number, depth: number): void {
     this.sprite.setPosition(x, y - this.lift).setDepth(depth); this.shadow.setPosition(x, y); this.ring.setPosition(x, y);
   }
+  ballAnchor(picture: PlayerPicture): { x: number; y: number } { return this.cache.ballAnchor(picture); }
   wear(who: string): void { this.who = who; }
   paint(picture: PlayerPicture): void {
     this.who = picture.who;

@@ -1,10 +1,11 @@
 import { PixelBuffer } from '../../art/pixel';
 import { buildKit } from '../../art/match/kit';
 import { drawPlayerFrame, LOOKS, lookForPlayer, PLAYER_ANIMS, type PlayerAnim } from '../../art/match/players';
-import { appearanceFor, ballPixels, CENTRE, FOOT, HEAD_OPTIONS, drawPrototypePlayer, type Action, type Appearance, type Build, type Facing, type Head } from '../../art/prototype/player';
+import { appearanceFor, ballPixels, CENTRE, FOOT, HEAD_OPTIONS, drawPrototypePlayer, type Action, type Appearance, MOVEMENT_POSES, type Movement, type Build, type Facing, type Head } from '../../art/prototype/player';
 import { BEATS, DURATION, momentAt, type ArtActor } from './sequence';
 import { ART_LAB_CSS } from './style';
 import { drawTacklePair, tacklePoseAt, PAIR_X, PAIR_FOOT } from '../../art/prototype/tackle';
+import { movementStride } from '../../match/view/playerMotion';
 import { BRAND } from '../../brand';
 import { RECOGNITION_CAST, recognitionAt } from './recognition';
 import { CONTACT_CASES, CASE_APPROACHES, CASE_CARRIER, CASE_DEFENDERS, caseDefinition, caseDuration, contactCaseAt, type ContactCaseId } from './contactCases';
@@ -14,7 +15,7 @@ import type { ContactPlayer } from '../../match/core/snapshot';
 
 const HOME = buildKit(0xe6b632, 0x21394a, 'v');
 const AWAY = buildKit(0x669ba4, 0xf3eee2, 'hoops');
-const OLD_ACTION: Record<Action, PlayerAnim> = { idle: 'idle', run: 'run', carry: 'run', pass: 'pass', catch: 'catch', brace: 'tackled', wrap: 'tackle', ground: 'down', ptb: 'ptb', fend: 'fend' };
+const OLD_ACTION: Record<Action, PlayerAnim> = { idle: 'idle', run: 'run', carry: 'run', pass: 'pass', catch: 'catch', land: 'catch', receive: 'catch', guard: 'tackle', brace: 'tackled', wrap: 'tackle', ground: 'down', ptb: 'ptb', fend: 'fend' };
 const LABELS: Record<Head, string> = { short: 'Short', buzz: 'Buzz cut', mullet: 'Mullet', headgear: 'Headgear', headband: 'Headband', curls: 'Curls', braids: 'Braids', mohawk: 'Mohawk', bald: 'Bald', ponytail: 'Ponytail', flatTop: 'Flat top' };
 
 function texture(buf: PixelBuffer): HTMLCanvasElement {
@@ -36,7 +37,7 @@ export function bootArtLab(): void {
     <div class="mode-switch"><button id="passage" aria-pressed="true">Passage of play</button><button id="contact-cases" aria-pressed="false">Tackle situations</button><button id="tackle-loop" aria-pressed="false">Original wrap</button><button id="recognise" aria-pressed="false">Nine-player test</button><button id="rearrange" hidden>Change positions</button></div>
     <p class="note" id="study-note">Compare the carry, catch and contact at playing size.</p>
     <div class="contact-controls" id="contact-controls" hidden><label>Situation<select id="contact-case">${CONTACT_CASES.map(c => `<option value="${c.id}">${c.label}</option>`).join('')}</select></label><button id="contact-variation">Approach: front</button><button id="case-contact">First contact</button><button id="case-outcome">Outcome</button><button id="case-finish">Follow-through</button></div>
-    <div class="topline"><div class="toggle"><button id="compare" aria-pressed="true">Compare</button><button id="new-only" aria-pressed="false">Prototype only</button></div><div class="toggle"><button id="zoom" aria-pressed="false">Close up</button><button id="turn" aria-pressed="false">Turn players</button></div></div>
+    <div class="topline"><div class="toggle"><button id="compare" aria-pressed="true">Compare</button><button id="new-only" aria-pressed="false">Prototype only</button></div><div class="toggle"><button id="zoom" aria-pressed="false">Close up</button><button id="turn" aria-pressed="false">Turn players</button><button id="profile" aria-pressed="false">Side view</button></div></div>
     <section class="stage" aria-label="Match artwork comparison">
       <figure class="panel old"><figcaption>CURRENT</figcaption><canvas class="pitch" id="old-pitch" role="img" aria-label="Current pixel artwork playing the same passage"></canvas></figure>
       <figure class="panel new"><figcaption>PROTOTYPE / 05</figcaption><canvas class="pitch" id="new-pitch" role="img" aria-label="Prototype artwork with varied bodies and directional poses"></canvas></figure>
@@ -45,10 +46,11 @@ export function bootArtLab(): void {
     <div class="beats" aria-label="Jump to action">${BEATS.map(b => `<button data-time="${b.at}">${b.label}</button>`).join('')}<button id="pass">Pass now →</button></div>
     <section class="workbench"><div><h2>Build your ball runner</h2><p class="note">Changes apply to the receiver in gold. Skin and hair colour stay tied to his original identity.</p><div class="fields">
       <label>Build<select id="build"><option value="lean">Lean back</option><option value="athletic">Athletic</option><option value="stocky">Stocky forward</option></select></label>
+      <label>Footwork<select id="footwork"><option value="">Passage timing</option>${Object.keys(MOVEMENT_POSES).map(m => `<option value="${m}">${({ drive: 'Start / accelerate', brake: 'Brake / stop', cutBack: 'Plant / turn away', cutForward: 'Plant / turn in', shuffleBack: 'Shuffle back', shuffleForward: 'Shuffle across', backpedal: 'Backpedal' } as Record<string, string>)[m]}</option>`).join('')}</select></label>
       <label>Hair / headwear<select id="head">${HEAD_OPTIONS.map(h => `<option value="${h}">${LABELS[h]}</option>`).join('')}</select></label>
       <label class="check"><input id="beard" type="checkbox"> Beard</label><label class="check"><input id="tape" type="checkbox"> Wrist tape</label>
     </div><p class="note">Tap Pass now during the carry. Use ↑ / ↓ to move the attacking lane, or scrub and pause to inspect contact.</p><button id="reset">Restore his original look</button></div>
-    <div><h2>The same player, more personality</h2><p class="note">All eleven head options on the selected build. Tap a player to choose his look.</p><canvas class="lineup" id="lineup" role="img" aria-label="Eleven head options on the same player; choose using the hair dropdown"></canvas><p class="note">Front and back views share the same face, colours and accessories. Close up enlarges pixels without smoothing.</p></div></section>
+    <div><h2>The same player, more personality</h2><p class="note">All eleven head options on the selected build. Tap a player to choose his look.</p><canvas class="lineup" id="lineup" role="img" aria-label="Eleven head options on the same player; choose using the hair dropdown"></canvas><p class="note">Turn and side views share the same identity, colours and accessories. Close up enlarges pixels without smoothing.</p></div></section>
     <footer>Character study · A passage of play and a nine-player recognition test. These preview choices are temporary; career saves are untouched.</footer>`;
   document.body.append(root);
   const back = root.querySelector<HTMLAnchorElement>('header a')!;
@@ -70,7 +72,7 @@ export function bootArtLab(): void {
   let time = 0; let playing = !matchMedia('(prefers-reduced-motion: reduce)').matches;
   let recognition = false; let arrangement = 0; let tackleLoop = false;
   let contactCases = false; let contactCase: ContactCaseId = 'two'; let variation = 0;
-  let speed = 1; let close = false; let turned = false; let lane = 0;
+  let speed = 1; let close = false; let turned = false; let profile = false; let footwork: Movement | '' = ''; let lane = 0;
   let last = performance.now(); let raf = 0; let stopped = false;
   const cache = new Map<string, HTMLCanvasElement>();
   const ball = texture(ballPixels());
@@ -82,14 +84,18 @@ export function bootArtLab(): void {
   function syncPlay(): void { play.textContent = playing ? 'Pause' : 'Play'; }
   function invalidate(): void { cache.clear(); draw(); }
   function getTexture(actor: ArtActor, modern: boolean): HTMLCanvasElement {
-    const facing: Facing = turned ? (actor.facing === 'front' ? 'back' : 'front') : actor.facing;
-    const key = `${recognition}/${modern}/${actor.id}/${actor.action}/${actor.frame}/${facing}/${actor.possession}`;
+    const facing: Facing = modern && profile && ['idle', 'run', 'carry', 'catch', 'pass', 'fend'].includes(actor.action)
+      ? 'side' : turned ? (actor.facing === 'front' ? 'back' : 'front') : actor.facing;
+    const movement = modern && !recognition && !contactCases && actor.id === 'p-art-4' && ['run', 'carry', 'catch', 'pass'].includes(actor.action)
+      ? footwork || (time >= 3.35 && time < 4 ? 'drive' : time >= 5.5 && time < 5.7 ? 'cutForward' : undefined) : undefined;
+    const gait = movement ? movementStride(actor.frame, movement) : undefined;
+    const key = `${recognition}/${modern}/${actor.id}/${actor.action}/${actor.frame}/${facing}/${actor.possession}/${movement ?? ''}/${gait ?? ''}`;
     const hit = cache.get(key); if (hit) return hit;
     const kit = actor.side === 'home' ? HOME : AWAY;
     let b: PixelBuffer;
     if (modern) {
       const look = recognition ? RECOGNITION_CAST.find(p => p.id === actor.id)!.look : actor.id === 'p-art-4' ? custom : appearanceFor(actor.id);
-      b = drawPrototypePlayer(look, kit, actor.action, actor.frame, facing, actor.possession);
+      b = drawPrototypePlayer(look, kit, actor.action, actor.frame, facing, actor.possession, gait, 0, movement);
     } else {
       const anim = OLD_ACTION[actor.action];
       const frames = PLAYER_ANIMS[anim].frames;
@@ -218,9 +224,9 @@ export function bootArtLab(): void {
     HEAD_OPTIONS.forEach((head, i) => {
       const cx = Math.round((i % cols + .5) * cell); const bottom = Math.floor(i / cols) * cellH + cellH - 20;
       if (head === custom.head) { ctx.fillStyle = '#30434b'; ctx.fillRect(Math.floor(i % cols * cell), Math.floor(i / cols * cellH), Math.ceil(cell), cellH); }
-      const key = `gallery/${head}/${turned}`;
+      const key = `gallery/${head}/${turned}/${profile}`;
       let img = cache.get(key);
-      if (!img) { img = texture(drawPrototypePlayer({ ...custom, head }, HOME, 'idle', 0, turned ? 'back' : 'front')); cache.set(key, img); }
+      if (!img) { img = texture(drawPrototypePlayer({ ...custom, head }, HOME, 'idle', 0, profile ? 'side' : turned ? 'back' : 'front')); cache.set(key, img); }
       ctx.drawImage(img, cx - CENTRE * scale, bottom - FOOT * scale, img.width * scale, img.height * scale);
       ctx.font = '10px "IBM Plex Sans",sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = head === custom.head ? '#ffda6c' : '#c3d0d1'; ctx.fillText(LABELS[head], cx, bottom + 14); ctx.textAlign = 'left';
     });
@@ -282,7 +288,9 @@ export function bootArtLab(): void {
   }
   el('rearrange').onclick = () => { arrangement = (arrangement + 1) % 9; draw(); };
   el('zoom').onclick = () => { close = !close; el('zoom').setAttribute('aria-pressed', String(close)); draw(); };
-  el('turn').onclick = () => { turned = !turned; el('turn').setAttribute('aria-pressed', String(turned)); invalidate(); };
+  el('turn').onclick = () => { turned = !turned; profile = false; el('profile').setAttribute('aria-pressed', 'false'); el('turn').setAttribute('aria-pressed', String(turned)); invalidate(); };
+  el('profile').onclick = () => { profile = !profile; turned = false; el('turn').setAttribute('aria-pressed', 'false'); el('profile').setAttribute('aria-pressed', String(profile)); invalidate(); };
+  el<HTMLSelectElement>('footwork').onchange = e => { footwork = (e.target as HTMLSelectElement).value as Movement | ''; invalidate(); };
   const change = () => { custom = { ...custom, build: buildSelect.value as Build, head: headSelect.value as Head, beard: beardCheck.checked, tape: tapeCheck.checked }; invalidate(); };
   buildSelect.onchange = headSelect.onchange = beardCheck.onchange = tapeCheck.onchange = change;
   el('reset').onclick = () => { custom = { ...original }; syncFields(); invalidate(); };

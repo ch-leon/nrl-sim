@@ -17,12 +17,12 @@ export const CONTACT_FOOT = 78;
 const clamp = (n: number) => Math.max(0, Math.min(1, n));
 const ease = (n: number) => { const t = clamp(n); return t * t * (3 - 2 * t); };
 const shift = (p: Body, x: number, y = 0): Body => Object.fromEntries(Object.entries(p).map(([k, v]) => [k, add(v, x, y)])) as unknown as Body;
-const stand = (x: number, y = 0): Body => body([x, 69 + y], [x, 61 + y], [x - 7, 44 + y], [x + 4, 73 + y], [x + 5, 78 + y], [x - 4, 73 + y], [x - 5, 78 + y]);
+const stand = (x: number, y = 0): Body => body([x, 70 + y], [x, 63 + y], [x - 7, 46 + y], [x + 4, 74 + y], [x + 5, 78 + y], [x - 4, 74 + y], [x - 5, 78 + y]);
 const CARRIER = stand(CONTACT_X);
-const BRACE = body([70, 70], [68, 62], [61, 45], [77, 73], [79, 78], [65, 73], [63, 78]);
+const BRACE = body([70, 71], [68, 63], [61, 46], [77, 73], [79, 78], [65, 73], [63, 78]);
 const BACK_DOWN = body([70, 74], [59, 72], [47, 57], [80, 76], [87, 78], [73, 78], [79, 79]);
 const FORWARD_DOWN = body([69, 73], [81, 72], [82, 56], [61, 76], [54, 78], [64, 77], [59, 79]);
-const HIGH = body([96, 69], [88, 62], [81, 45], [89, 73], [86, 78], [104, 73], [109, 78]);
+const HIGH = body([96, 71], [88, 63], [81, 46], [89, 73], [86, 78], [104, 73], [109, 78]);
 const LOW = body([108, 72], [93, 71], [86, 54], [112, 76], [119, 79], [105, 77], [110, 80]);
 const FAR = body([46, 67], [54, 59], [47, 42], [42, 71], [40, 75], [51, 71], [53, 75]);
 const HIGH_DOWN = body([96, 74], [81, 70], [74, 53], [96, 78], [104, 79], [108, 77], [116, 79]);
@@ -44,6 +44,36 @@ const STOP_DOWN = body([84, 74], [72, 71], [74, 58], [90, 77], [96, 79], [88, 77
 const ROCKED = body([101, 69], [101, 61], [95, 44], [104, 73], [106, 78], [98, 73], [96, 78]);
 const BUMPED = body([104, 75], [114, 73], [112, 58], [98, 77], [92, 79], [100, 78], [94, 79]);
 
+/** Editable contact beats, fitted to the recorded release deadline below. */
+export const CONTACT_BEATS = {
+  joinTicks: 3, struggleTicks: 14,
+  fall: [{ at: 0, weight: 0 }, { at: .4, weight: .12 }, { at: .85, weight: .93 }, { at: 1, weight: 1 }],
+  supportAt: .46, supportEnd: .64, kneeEnd: .82, readyAt: 1,
+  releaseAt: .43, upperDelay: .1, releaseStagger: .035, releaseSpan: .4,
+} as const;
+const BACK_SUPPORT = body([70, 75], [61, 70], [53, 54], [77, 77], [82, 78], [68, 78], [65, 78]);
+const FORWARD_SUPPORT = body([70, 75], [77, 70], [72, 54], [65, 77], [60, 78], [72, 78], [75, 78]);
+const KNEEL = body([70, 75], [70, 68], [63, 51], [76, 77], [79, 78], [66, 78], [63, 78]);
+function fallWeight(t: number): number {
+  const f = clamp(t), beats = CONTACT_BEATS.fall;
+  const next = beats.findIndex(b => b.at >= f), b = beats[Math.max(0, next)]!, a = beats[Math.max(0, next - 1)]!;
+  return a.weight + (b.weight - a.weight) * (b.at === a.at ? 0 : (f - a.at) / (b.at - a.at));
+}
+/** Leave room to bend under an arrival. Reaching the full leg limit would move a sole
+ * every time the hips absorb a pixel; the ordinary short-limb fitter still bounds every segment.
+ */
+function plantStance(p: Body): Body {
+  const fitted = fitLegs(p);
+  return fitLegs({ ...fitted,
+    foot: [p.hip[0] + 2 + (fitted.foot[0] - p.hip[0] - 2) * .8, fitted.foot[1]],
+    farFoot: [p.hip[0] - 2 + (fitted.farFoot[0] - p.hip[0] + 2) * .8, fitted.farFoot[1]],
+  });
+}
+const holdAnchor = (c: Body, role: ContactRole, lowDrop: number, square: boolean): Point => role === 'low' ? blend(c.shoulder, c.hip, lowDrop)
+  : role === 'ankle' ? add(c.farFoot, 0, -3) : role === 'drag' ? add(c.hip, -4, 1) : square ? blend(c.shoulder, c.hip, .6) : c.shoulder;
+const dockAt = (anchor: Point, role: ContactRole, square: boolean): Point => role === 'far' ? add(anchor, -5, -2) : role === 'low' ? add(anchor, 5, 3)
+  : role === 'ankle' ? add(anchor, -4, 1) : role === 'drag' ? add(anchor, -1, 0) : square ? add(anchor, 6, 1) : add(anchor, 6, 1);
+
 export type ContactRole = 'carrier' | 'upper' | 'low' | 'far' | 'ankle' | 'drag';
 export interface ContactBody {
   player: ContactPlayer; pose: Body; tilt: number; left: boolean;
@@ -57,15 +87,16 @@ export function contactPoseAt(state: ContactAnimation): ContactPose {
   const age = Math.max(0, (state.tick - state.contact.startedTick) / 20);
   let after = state.resolvedTick === null ? -1 : Math.max(0, (state.tick - state.resolvedTick) / 20);
   if (state.contact.releaseTick !== undefined && state.resolvedTick !== null && state.kind !== 'break' && state.kind !== 'steal') {
-    // Fit the approved fall/release to this ruck's actual duration, including quick rucks.
-    after = Math.max(0, (state.tick - state.resolvedTick) / Math.max(1, state.contact.releaseTick - state.resolvedTick)) * 1.05;
+    // Fit the fall/release to the actual displayed ruck, including quick rucks.
+    // The last shared tick is releaseTick - 1: PTB uses the individual actor from releaseTick.
+    after = Math.max(0, (state.tick - state.resolvedTick) / Math.max(1, state.contact.releaseTick - state.resolvedTick - 1)) * 1.05;
   }
   const completed = after >= 0 && !['break', 'steal'].includes(state.kind);
   const variant = state.variant;
   const stop = variant === 'stop';
   const fallTime = state.kind === 'dominant' ? .24 : state.kind === 'low' ? .25 : .32;
   // The stop folds him over the shoulder before he goes down.
-  const fall = completed ? ease((after - (stop ? .08 : 0)) / fallTime) : 0;
+  const fall = completed ? fallWeight((after - (stop ? .08 : 0)) / fallTime) : 0;
   const low = state.kind === 'low';
   const escaped = state.kind === 'break'; const stolen = state.kind === 'steal';
   // Held from behind (or hung on from the side), his legs go and he pitches forward,
@@ -73,11 +104,11 @@ export function contactPoseAt(state: ContactAnimation): ContactPose {
   const fromBehind = variant === 'ankle' || variant === 'drag';
   const forward = low || (fromBehind && state.joined.length === 1);
   const ptb = state.phase === 'ptb';
-  const drive = state.resolvedTick === null ? Math.sin(age * 18) * .75 : 0;
+  const drive = state.resolvedTick === null ? Math.sin(age * 20 * Math.PI * 2 / CONTACT_BEATS.struggleTicks) * .65 : 0;
   const recoil = state.kind === 'dominant' && !stop ? -10 * ease(after / .14) : 0;
-  const hit = Math.max(...state.joined.map(j => Math.max(0, 1 - (state.tick - j.tick) / 3)));
-  const lead = variant === 'ankle' ? STUMBLE : variant === 'drag' ? DRIVE : stop ? JACK : BRACE;
-  let c = blendBody(CARRIER, lead, ease(age / (stop ? .08 : .12)));
+  const hit = Math.max(...state.joined.map(j => Math.max(0, 1 - (state.tick - j.tick) / CONTACT_BEATS.joinTicks)));
+  const lead = plantStance(variant === 'ankle' ? STUMBLE : variant === 'drag' ? DRIVE : stop ? JACK : BRACE);
+  let c = blendBody(plantStance(CARRIER), lead, ease(age / (stop ? .08 : .12)));
   if (variant === 'drag') {
     // Legs still pumping: a stride or two with the tackler hanging off him, dying away as he goes down.
     const step = age * Math.PI * 3; const pump = 1 - fall;
@@ -88,7 +119,7 @@ export function contactPoseAt(state: ContactAnimation): ContactPose {
   c = shift(blendBody(c, forward ? FORWARD_DOWN : BACK_DOWN, fall), recoil);
   // Absorb each actual arrival through the trunk and knees; feet stay planted.
   const squash = (1 - fall) * hit;
-  c = { ...c, hip: add(c.hip, 0, squash), shoulder: add(c.shoulder, -2 * squash + drive, squash), head: add(c.head, -2 * squash + drive, squash), knee: add(c.knee, 0, squash) };
+  c = { ...c, hip: add(c.hip, drive * .35, squash), shoulder: add(c.shoulder, -2 * squash + drive, squash), head: add(c.head, -2 * squash + drive, squash), knee: add(c.knee, 0, squash) };
   const run = escaped && after >= .15;
   if (escaped) {
     c = shift(blendBody(BRACE, CARRIER, ease(after / .2)), 34 * ease((after - .1) / .8));
@@ -97,14 +128,26 @@ export function contactPoseAt(state: ContactAnimation): ContactPose {
     c = { ...c, shoulder: add(c.shoulder, 3 * bump, 2 * bump), head: add(c.head, 3 * bump, 2 * bump) };
   }
   if (stolen) c = shift(BRACE, -4 * ease(after / .18));
-  const recovery = completed ? ease((after - .55) / .45) : 0;
+  const beats = CONTACT_BEATS;
+  const support = completed ? ease((after - beats.supportAt) / (beats.supportEnd - beats.supportAt)) : 0;
+  const kneel = completed ? ease((after - beats.supportEnd) / (beats.kneeEnd - beats.supportEnd)) : 0;
+  const recovery = completed ? ease((after - beats.kneeEnd) / (beats.readyAt - beats.kneeEnd)) : 0;
+  // The last fast part of the fall lands, compresses once, then rests before the palm/knee rise.
+  const landingAge = after - fallTime - (stop ? .08 : 0);
+  const settle = completed && landingAge > 0 && landingAge < .12 ? Math.sin(landingAge / .12 * Math.PI) : 0;
+  c = { ...c, hip: add(c.hip, 0, settle), shoulder: add(c.shoulder, 0, settle), head: add(c.head, 0, settle) };
   const ready = ruckPoseAt('ptb', 0);
   const recoveryTarget = shift(ready.pose, CONTACT_X - CENTRE, CONTACT_FOOT - PAINT_FOOT);
+  c = blendBody(c, forward ? FORWARD_SUPPORT : BACK_SUPPORT, support);
+  c = blendBody(c, KNEEL, kneel);
   c = blendBody(c, recoveryTarget, recovery);
   if (ptb) c = recoveryTarget;
   c = fitLegs(c);
-  const carrier: ContactBody = { player: state.contact.carrier, pose: c, tilt: (forward ? 65 : -75) * fall * (1 - recovery), left: false,
-    arms: [], grip: 0, role: 'carrier', running: run };
+  const palm = add(c.shoulder, -3, Math.min(8, CONTACT_FOOT - c.shoulder[1]));
+  const freeHand = completed && after > beats.supportAt && !ptb
+    ? bentContactArm(add(c.shoulder, -2, 1), blend(palm, add(c.shoulder, -4, 7), kneel)) : undefined;
+  const carrier: ContactBody = { player: state.contact.carrier, pose: c, tilt: (forward ? 65 : -75) * fall * (1 - Math.max(support * .55, kneel)), left: false,
+    arms: freeHand ? [freeHand] : [], grip: 0, role: 'carrier', running: run };
   const defenders = state.joined.map(({ player, tick }, index): ContactBody => {
     // The man from behind takes the legs or the hips; anyone after him comes in front.
     const role: ContactRole = fromBehind ? index === 0 ? variant : index === 1 ? 'upper' : 'low'
@@ -116,12 +159,16 @@ export function contactPoseAt(state: ContactAnimation): ContactPose {
     const lowDrop = low && index === 0 && role === 'low' ? ease(after / .1) : 1;
     const target = role === 'far' ? FAR : role === 'low' ? blendBody(HIGH, LOW, lowDrop) : role === 'ankle' ? ANKLE : role === 'drag' ? DRAG : square ? STOP : HIGH;
     const down = role === 'far' ? FAR_DOWN : role === 'low' ? LOW_DOWN : role === 'ankle' ? ANKLE_DOWN : role === 'drag' ? DRAG_DOWN : square ? STOP_DOWN : HIGH_DOWN;
-    const join = ease((state.tick - tick) / 3);
-    const release = ptb ? 1 : completed ? ease((after - .45 - (role === 'upper' ? .12 : 0)) / .35) : 0;
+    const join = ease((state.tick - tick) / beats.joinTicks);
+    const releaseAt = beats.releaseAt + (role === 'upper' ? beats.upperDelay : 0) + (state.joined.length - 1 - index) * beats.releaseStagger;
+    const release = ptb ? 1 : completed ? ease((after - releaseAt) / beats.releaseSpan) : 0;
     let p = blendBody(shift(stand(target.hip[0]), role === 'far' ? -7 : behind ? -8 : 9, -3), target, join);
     p = shift(blendBody(p, down, fall), recoil);
-    p = blendBody(p, behind ? stand(36, -4) : stand(role === 'far' ? 30 : role === 'low' ? 132 : 112, role === 'far' ? -5 : role === 'low' ? 5 : -4), release);
-    let grip = join * (1 - release);
+    const clear = behind ? stand(36, -4) : stand(role === 'far' ? 30 : role === 'low' ? 132 : 112, role === 'far' ? -5 : role === 'low' ? 5 : -4);
+    const kneeRise = blendBody(down, { ...clear, hip: add(clear.hip, 0, 5), shoulder: add(clear.shoulder, 0, 7), head: add(clear.head, 0, 7) }, .55);
+    p = release < .45 ? blendBody(p, kneeRise, ease(release / .45)) : blendBody(kneeRise, clear, ease((release - .45) / .55));
+    // Hands clear before the defender stands, allowing a supporting palm during his rise.
+    let grip = join * (1 - ease(release / .35));
     let running = false;
     let turned = false;
     if (escaped) {
@@ -139,13 +186,16 @@ export function contactPoseAt(state: ContactAnimation): ContactPose {
       p = shift(blendBody(HIGH, stand(96), ease(after / .2)), 28 * ease((after - .15) / .7));
       running = after >= .25;
     }
-    const anchor = role === 'low' ? blend(c.shoulder, c.hip, lowDrop) : role === 'ankle' ? add(c.farFoot, 0, -3)
-      : role === 'drag' ? add(c.hip, -4, 1) : square ? blend(c.shoulder, c.hip, .6) : c.shoulder;
-    // Shoulder/jersey contact drives the pose. Arms wrap the body at short range;
-    // they no longer bridge the gap between two separated bodies.
-    const dock = role === 'far' ? add(anchor, -5, -2) : role === 'low' ? add(anchor, 5, 3) : role === 'ankle' ? add(anchor, -4, 1)
-      : role === 'drag' ? add(anchor, -1, 0) : square ? add(anchor, 7, 1) : add(anchor, 6, 1);
+    const anchor = holdAnchor(c, role, lowDrop, square);
+    const dock = dockAt(anchor, role, square);
     p = shift(p, (dock[0] - p.shoulder[0]) * grip, (dock[1] - p.shoulder[1]) * grip);
+    if (!completed && !escaped && !stolen && join >= 1 && !behind) {
+      // Dock the trunk, not the soles: settled feet belong to this man's full wrap stance.
+      const restDock = dockAt(holdAnchor(lead, role, lowDrop, square), role, square);
+      const planted = plantStance(shift(target, restDock[0] - target.shoulder[0], restDock[1] - target.shoulder[1]));
+      p = { ...p, hip: add(planted.hip, drive * .2, squash * .5), knee: planted.knee, farKnee: planted.farKnee,
+        foot: planted.foot, farFoot: planted.farFoot };
+    }
     // Heads sit outside the runner's silhouette so close torsos remain readable.
     const tuckedHead = role === 'far' ? add(p.shoulder, -16, -17) : role === 'low' ? add(p.shoulder, 2, -14) : role === 'ankle' ? add(p.shoulder, -6, -13)
       : role === 'drag' ? add(p.shoulder, -9, -16) : add(p.shoulder, 0, -17);
@@ -156,7 +206,9 @@ export function contactPoseAt(state: ContactAnimation): ContactPose {
     const holds: readonly Point[] = role === 'ankle' ? [add(anchor, -2, 1), add(anchor, 1, -1)]
       : role === 'drag' ? [add(anchor, 2, -2), add(anchor, 5, 1)] : [add(anchor, -side, 3), add(anchor, 2 * side, 5)];
     // A bumped man's arms fly up and out; free hands otherwise hang with him.
-    const free: readonly Point[] = escaped && index === 0 ? [add(p.shoulder, -7, -4), add(p.shoulder, 7, -5)] : [add(p.shoulder, -3 * side, 7), add(p.shoulder, 3 * side, 8)];
+    const supportHand = completed && release > 0 && release < .7 ? Math.sin(Math.PI * release / .7) : 0;
+    const free: readonly Point[] = escaped && index === 0 ? [add(p.shoulder, -7, -4), add(p.shoulder, 7, -5)]
+      : [blend(add(p.shoulder, -3 * side, 7), [p.shoulder[0] - 2 * side, Math.max(p.foot[1], p.farFoot[1]) - 1], supportHand), add(p.shoulder, 3 * side, 8)];
     const targets = [blend(free[0]!, holds[0]!, grip), blend(free[1]!, holds[1]!, grip)];
     const arms = [bentContactArm(p.shoulder, targets[0]!, -1), bentContactArm(add(p.shoulder, 2 * side, 2), targets[1]!)];
     const lean = role === 'far' ? 20 : role === 'low' ? -12 : role === 'ankle' ? 40 : role === 'drag' ? 25 : -32;
@@ -225,7 +277,9 @@ export function drawContact(state: ContactAnimation, lookFor: (p: ContactPlayer)
   if (far) drawBody(far);
   for (const d of pose.defenders.filter(d => d.role !== 'far')) drawBody(d);
   for (const d of pose.defenders) if (!d.running) arm(d.arms[0]!, lookFor(d.player), true);
+  if (pose.carrier.arms[0]) arm(pose.carrier.arms[0], lookFor(pose.carrier.player), true);
   drawBody(pose.carrier);
+  for (const d of pose.defenders) if (!d.running && state.kind !== 'steal') arm(d.arms[1]!, lookFor(d.player));
   if (state.kind === 'steal') {
     const shoulder = pose.carrier.pose.shoulder;
     const reach = 1 - ease((state.tick - state.resolvedTick!) / 6);
@@ -235,9 +289,6 @@ export function drawContact(state: ContactAnimation, lookFor: (p: ContactPlayer)
     out.blit(ballPixels(), Math.round(pose.ball[0]), Math.round(pose.ball[1]));
     const owner = state.kind === 'steal' ? pose.defenders[0]! : pose.carrier;
     arm(bentContactArm(add(owner.pose.shoulder, 4, 2), add(pose.ball, 4, 4)), lookFor(owner.player));
-  }
-  for (const d of pose.defenders) if (!d.running && state.kind !== 'steal') {
-    arm(d.arms[1]!, lookFor(d.player));
   }
   if (pose.impact > 0) {
     const x = pose.carrier.pose.shoulder[0] + 11; const y = pose.carrier.pose.shoulder[1] - 4;
