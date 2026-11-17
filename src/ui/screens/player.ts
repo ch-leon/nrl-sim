@@ -539,6 +539,11 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
     const state = getState();
     const p = findPlayer(player.id, ctx, state);
     if (!p) { finish(); return; }
+    content.classList.toggle('nrl-player-sale', saleReview !== null);
+    if (saleReview) {
+      content.replaceChildren(saleReview);
+      return;
+    }
     const m = playerPageModel(p, ctx, state);
     const kit = kitFor(ctx, state);
 
@@ -657,6 +662,7 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
           if (a.id === 'sell') {
             arm(null);
             saleReview = saleConfirmation(p.id, {
+              back,
               onCancel: () => { saleReview = null; render(); content.querySelector<HTMLButtonElement>('[data-player-action="sell"]')?.focus(); },
               onSold: () => finish(),
             });

@@ -32,9 +32,16 @@ describe('reviewed sale confirmation', () => {
   it('shows buyer, fee, unchanged deal, queued renewal and cap checks; cancel changes nothing', () => {
     const { p, buyer } = fixture(); const before = structuredClone(getState()); const cancel = vi.fn();
     const view = node(saleConfirmation(p.id, { onCancel: cancel, onSold: vi.fn() }));
-    expect(view.words()).toContain(buyer.name);
+    const summary = view.querySelector('[data-sale-summary]');
+    expect(summary).not.toBeNull();
+    expect(summary!.words()).toContain(buyer.name);
+    expect(summary!.words()).toContain(p.name);
+    expect(summary!.words()).toContain('Club receives');
+    expect(summary!.words()).toContain('Deal unchanged');
+    expect(summary!.words()).toContain('$1,000');
+    expect(summary!.words()).toContain('$2,000');
     expect(view.words()).toContain('$1,000'); expect(view.words()).toContain('$2,000');
-    expect(view.words()).toContain('Contract stays unchanged');
+    expect(view.words()).toContain('Deal unchanged');
     expect(view.words()).toContain('cap freed'); expect(view.words()).toContain('Buyer cap');
     view.querySelector('[data-sale-cancel]')!.click();
     expect(cancel).toHaveBeenCalledOnce(); expect(getState()).toEqual(before);

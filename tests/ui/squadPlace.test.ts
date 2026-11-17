@@ -97,7 +97,9 @@ describe('the player page’s columns (#614)', () => {
     expect(q('[data-player-action="sell"]').textContent).toMatch(/^Sell \+/);
     const beforeSale = structuredClone(getState());
     q('[data-player-action="sell"]').click();
-    expect(page.words()).toContain('Contract stays unchanged');
+    expect(page.words()).toContain('Deal unchanged');
+    expect(page.classList.contains('nrl-player-sale')).toBe(true);
+    expect(page.querySelector('.nrl-player-side')).toBeNull();
     q('[data-sale-cancel]').click();
     expect(getState()).toEqual(beforeSale);
     expect(page.querySelector('[data-player-rename]')).not.toBeNull();

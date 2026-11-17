@@ -150,7 +150,7 @@ describe('Sell and Release disarm (#612)', () => {
     openContractsScreen();
     const screen = slot.screen as StubNode; const before = structuredClone(getState());
     screen.querySelector(`[data-contract-sell="${p.id}"]`)!.click();
-    expect(screen.words()).toContain('Contract stays unchanged');
+    expect(screen.words()).toContain('Deal unchanged');
     screen.querySelector('[data-sale-cancel]')!.click(); expect(getState()).toEqual(before);
     screen.querySelector(`[data-contract-sell="${p.id}"]`)!.click();
     screen.querySelector('[data-sale-confirm]')!.click();

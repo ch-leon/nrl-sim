@@ -1,5 +1,6 @@
 import { runCounterText } from './e2e-webkit/match/counterText.mjs';
 import { runTrials } from './e2e-webkit/screens/trials.mjs';
+import { runPlayerSales } from './e2e-webkit/screens/playerSales.mjs';
 import { runExpansionIntro } from './e2e-webkit/screens/expansionIntro.mjs';
 // scripts/e2e-webkit.mjs — Safari-shaped checks: long DOM panels (#206, #203) and
 // a phone that opens already upright (#315).
@@ -99,6 +100,7 @@ const SECTIONS = [
   ['runCounterText', (b) => runCounterText(b)],
   ['runTrials', (b) => runTrials(b)],
   ['runExpansionIntro', (b) => runExpansionIntro(b)],
+  ['runPlayerSales', (b) => runPlayerSales(b)],
   ['runDerby', (b) => runDerby(b)],
   ['runUnlocks', (b) => runUnlocks(b)],
   ['runSize', async (b) => { let f = 0; for (const [W, H] of SIZES) f += await runSize(b, W, H); return f; }],
@@ -132,7 +134,7 @@ const SECTIONS = [
 const GROUPS = {
   match: ['runPlaytest', 'runPauseSettings', 'runTutorialWalk', 'runCoachCalls', 'runLabsControls', 'runMatchPlays'],
   text: ['runCounterText', 'runLargeTextTargets', 'runLadderForm'],
-  screens: ['runContentPacks', 'runTrials', 'runExpansionIntro', 'runDerby', 'runOfficeUnlocks', 'runUnlocks', 'runRecruit', 'runScreens', 'runTownSetup', 'runFlow', 'runCoachName', 'runDifficulty', 'runCoachVoice', 'runCoachSays', 'runPlaybook'],
+  screens: ['runPlayerSales', 'runContentPacks', 'runTrials', 'runExpansionIntro', 'runDerby', 'runOfficeUnlocks', 'runUnlocks', 'runRecruit', 'runScreens', 'runTownSetup', 'runFlow', 'runCoachName', 'runDifficulty', 'runCoachVoice', 'runCoachSays', 'runPlaybook'],
   portrait: ['runSize', 'runPortrait', 'runDockTextSize', 'runDevSettings'],
 };
 
@@ -157,6 +159,7 @@ const GROUPS = {
   }
 }
 
+const SALES_ONLY = argv.includes('--player-sales-only');
 const SCREENS_ONLY = argv.includes('--screens-only');
 const CONTROLS_ONLY = argv.includes('--controls-only');
 const CALLS_ONLY = argv.includes('--coach-calls-only');
@@ -168,12 +171,14 @@ if (argv.includes('--group') && !GROUPS[GROUP]) {
   console.error(`bad --group "${GROUP ?? ''}": want one of ${Object.keys(GROUPS).join(', ')}`);
   process.exit(2);
 }
-if (GROUP && (SCREENS_ONLY || CONTROLS_ONLY || CALLS_ONLY || PLAYBOOK_ONLY || PLAYS_ONLY || DEV_ONLY)) {
+if (GROUP && (SALES_ONLY || SCREENS_ONLY || CONTROLS_ONLY || CALLS_ONLY || PLAYBOOK_ONLY || PLAYS_ONLY || DEV_ONLY)) {
   console.error('--group does not combine with --screens-only, --controls-only, --coach-calls-only, --playbook-only or --match-plays-only');
   process.exit(2);
 }
 /** [name, run] pairs this invocation plays, in the full run's order. */
-const plan = CALLS_ONLY
+const plan = SALES_ONLY
+  ? SECTIONS.filter(([n]) => n === 'runPlayerSales')
+  : CALLS_ONLY
   ? [['runCoachCalls', (b) => runCoachCalls(b, [[667, 375], [844, 390]])]]
   : DEV_ONLY
     ? SECTIONS.filter(([n]) => n === 'runDevSettings')

@@ -186,6 +186,7 @@ function render(sub: HTMLElement, tbody: HTMLElement, saleHost: HTMLElement): vo
     const sell = button(offer.ok ? `SELL +${fmtShort(offer.offer.fee)}` : 'NO BUYER', () => {
       arm(null);
       saleHost?.replaceChildren(saleConfirmation(p.id, {
+        back: backButton('Finance', () => openFinanceScreen()),
         onCancel: () => {
           saleHost.replaceChildren();
           Array.from(tbody.querySelectorAll<HTMLButtonElement>('[data-contract-sell]')).find(b => b.getAttribute('data-contract-sell') === p.id)?.focus();
