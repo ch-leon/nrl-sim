@@ -324,9 +324,11 @@ export const MIGRATIONS: readonly MigrationStep[] = [
   } },
   // v29 starts receipt-backed income without retroactive claims on v28 results.
   { from: 28, to: 29, run: old => ({ ...old, matchIncome: [] }) },
-  // v31 adds optional progression and snapshots observed protected agreements.
-  // No historical titles, entry or earlier protection provenance are inferred.
-  { from: 30, to: 31, run: old => {
+  // v31 adds optional progression; no historical titles or entry are inferred.
+  { from: 30, to: 31, run: old => ({ ...old }) },
+  // v32 snapshots the agreement observed under v31 ID-only protection.
+  // Already recorded exact terms keep their provenance, including queued terms.
+  { from: 31, to: 32, run: old => {
     const state = old as unknown as GameState;
     return { ...old, capAccount: migrateObservedProtection(state.squad, state.capAccount, state.season),
       league: { ...state.league, clubs: state.league.clubs.map(c => c.squad && c.capAccount

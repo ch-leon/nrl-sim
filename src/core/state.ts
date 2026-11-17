@@ -125,9 +125,9 @@ export interface LeagueState {
 // TODO(WU-6): reconcile WeatherKind ownership with src/sim/weather.ts
 export type WeatherKind = 'clear' | 'rain' | 'wind';
 
-/** v30 adds persistent player histories and discovery metadata. v28/v29 keep
- * all finance state via migration; v27 and earlier require a new career. */
-export const SAVE_VERSION = 31;
+/** v30 adds player histories, v31 optional league progression, and v32 exact
+ * protected agreements. Finance state migrates from v28; v27 requires a new career. */
+export const SAVE_VERSION = 32;
 
 /** The hires the facilities don't cover (N14.5), and the attack coach who opens set plays to buy (#326). */
 export type StaffRole = 'assistantCoach' | 'analyst' | 'welfare' | 'attackCoach';

@@ -247,11 +247,11 @@ export function validateInput(v: Record<string, unknown>, version: number): stri
     if (!isCapAccount(v.capAccount)) return fail('cap');
     const deals = (list: unknown, required: boolean): boolean => Array.isArray(list) && list.every(p => record(p) && (p.deal === undefined ? !required : isDeal(p.deal)));
     if (!deals(v.squad, true) || !deals(v.freeAgents, false)) return fail('deals');
-    if (version >= 31 && !validProtection(v.capAccount as Record<string, unknown>, v.squad, v.season as number)) return fail('cap protection');
+    if (version >= 32 && !validProtection(v.capAccount as Record<string, unknown>, v.squad, v.season as number)) return fail('cap protection');
     for (const c of v.league.clubs as Record<string, unknown>[]) {
       if (c.id === 'player' || c.squad === undefined) continue;
       if (!integer(c.cash) || !Number.isSafeInteger(c.cash) || !isCapAccount(c.capAccount) || !deals(c.squad, true)) return fail('rival account');
-      if (version >= 31 && !validProtection(c.capAccount as Record<string, unknown>, c.squad, v.season as number)) return fail('rival protection');
+      if (version >= 32 && !validProtection(c.capAccount as Record<string, unknown>, c.squad, v.season as number)) return fail('rival protection');
     }
   }
   return null;

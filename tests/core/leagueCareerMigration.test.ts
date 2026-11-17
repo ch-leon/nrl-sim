@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { createNewGame, getState, setState, SAVE_VERSION } from '../../src/core/state';
-import { migrateState, LAST_PRE_FINANCE_VERSION, __setStorage, __unlockSaves, installImportedSave, loadSlot, exportOriginalSave } from '../../src/core/save';
+import { migrateState, MIGRATIONS, LAST_PRE_FINANCE_VERSION, __setStorage, __unlockSaves, installImportedSave, loadSlot, exportOriginalSave } from '../../src/core/save';
 import { setCareerNamespace } from '../../src/core/storage/local';
 import { DEV_TEST_PREFIX, slotKey } from '../../src/core/storageKeys';
 import { advanceWeek, advanceWeeks, clearHeldWeek, clearTickHooks, registerTickHook, resumeWeek, weekHeld } from '../../src/core/time';
@@ -12,10 +12,13 @@ import { competitions, progress } from '../data/leagueCareerFixtures';
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 afterEach(() => {__setStorage(null); setCareerNamespace(null); clearHeldWeek(); clearTickHooks();});
 describe('v31 additive progression save boundary', () => {
-  it('reserves v31 without moving the pre-finance cutoff', () => { expect(SAVE_VERSION).toBe(31); expect(LAST_PRE_FINANCE_VERSION).toBe(27); });
+  it('introduces progression at v31 without moving the pre-finance cutoff', () => {
+    expect(MIGRATIONS.find(m => m.from === 30)?.to).toBe(31);
+    expect(SAVE_VERSION).toBeGreaterThanOrEqual(31); expect(LAST_PRE_FINANCE_VERSION).toBe(27);
+  });
   it('migrates normal v30 bytes without constructing or inferring progression', () => {
     createNewGame('Existing', 30); const old = {...clone(getState()), version: 30}; const original = JSON.stringify(old);
-    const result = migrateState(old); expect(result).toMatchObject({ok: true, repairs: [], state: {...old, version: 31}});
+    const result = migrateState(old); expect(result).toMatchObject({ok: true, repairs: [], state: {...old, version: SAVE_VERSION}});
     expect(JSON.stringify(old)).toBe(original);
     if (!result.ok) throw new Error(result.message);
     expect(result.state.competitions).toBeUndefined();
@@ -38,7 +41,7 @@ describe('v31 additive progression save boundary', () => {
       const old = {...clone(dev), version: 30};
       if (dormant) { delete old.competitions!.calendar; delete old.competitions!.world; }
       const original = JSON.stringify(old); const result = migrateState(old);
-      expect(result).toMatchObject({ok: true, state: {...old, version: 31}, repairs: []});
+      expect(result).toMatchObject({ok: true, state: {...old, version: SAVE_VERSION}, repairs: []});
       expect(result.ok && result.state.competitions).not.toHaveProperty('leagueCareer');
       expect(JSON.stringify(old)).toBe(original);
     }

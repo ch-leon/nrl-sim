@@ -124,7 +124,8 @@ describe('relegation', () => {
     expect(totals.current).toBe(bill);
     expect(totals.signingRoom).toBe(0);
     const gone = players[0]!.id;
-    const shrunk = capTotals(players.slice(1), { ...account, protectedIds: account.protectedIds.filter(id => id !== gone) }, 1);
+    const shrunk = capTotals(players.slice(1), { ...account, protectedIds: account.protectedIds.filter(id => id !== gone),
+      protectedTerms: account.protectedTerms!.filter(term => term.playerId !== gone) }, 1);
     expect(shrunk.protectedExcess).toBe(totals.protectedExcess - 40_000);
     const inside = relegateCap(players.slice(0, 8), state.capAccount, 1, 'local');
     expect(inside.protectedIds).toEqual([]);

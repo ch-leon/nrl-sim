@@ -14,7 +14,7 @@ import { hasStructuralCalendar } from './competitionCalendar';
 import { staffWages } from './staff';
 import { BOARD_LOAN, BOARD_LOAN_REPAID, warnForWeeks, notifyContractWarning } from './contracts';
 import { FINANCE_TIERS, matchCashQuote, type FinanceLevel, type FinanceTier } from '../data/financeRules';
-import { expireEndedDeals } from './cap';
+import { expireEndedDeals, reconcileClubProtection } from './cap';
 import { reconcileMatchIncome, commitMatchState } from './matchIncome';
 
 /**
@@ -268,7 +268,11 @@ export function registerEconomySystem(): void {
   // The structural prototype does not run this career finance clock.
   registerSeasonHook('cap-season', 4, () => {
     const s = getState();
-    if (hasStructuralCalendar(s)) return;
+    if (hasStructuralCalendar(s)) {
+      const next = reconcileClubProtection(s);
+      if (next !== s) setState({ capAccount: next.capAccount, league: next.league });
+      return;
+    }
     const { state: next, notices } = expirePlayerDeals(s);
     if (next === s) return;
     setState({ squad: next.squad, freeAgents: next.freeAgents, capAccount: next.capAccount });

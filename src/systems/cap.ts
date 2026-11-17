@@ -2,7 +2,7 @@
 // annual commitment for an inclusive run of seasons. Ordinary cash movements
 // never read or write this module's numbers.
 import { closeClubSpell } from './playerCareer';
-import type { Player } from '../core/state';
+import type { GameState, Player } from '../core/state';
 import { WEEKS_PER_SEASON } from '../config';
 import { overallRating, shownStats } from '../data/player';
 import {
@@ -248,6 +248,20 @@ export function reconcileProtection(players: readonly Player[], account: CapAcco
   return withProtection(account, terms);
 }
 
+/** Protection housekeeping only. Old structural DEV rollover does not advance
+ * rival careers, but expired/departed allowances must still leave both owners. */
+export function reconcileClubProtection(state: GameState): GameState {
+  const capAccount = reconcileProtection(state.squad, state.capAccount, state.season);
+  const clubs = state.league.clubs.map(club => {
+    if (!club.squad || !club.capAccount) return club;
+    const account = reconcileProtection(club.squad, club.capAccount, state.season);
+    return account === club.capAccount ? club : { ...club, capAccount: account };
+  });
+  const sameClubs = clubs.every((club, i) => club === state.league.clubs[i]);
+  if (capAccount === state.capAccount && sameClubs) return state;
+  return { ...state, capAccount, league: sameClubs ? state.league : { ...state.league, clubs } };
+}
+
 /** Cover the current scholarship agreement, never its later renewal. */
 export function protectAddedDeals(players: readonly Player[], account: CapAccount, season: number, addedIds: readonly string[]): CapAccount {
   if (commitment(players, season) <= publishedCap(account)) return account;
@@ -260,10 +274,10 @@ export function protectAddedDeals(players: readonly Player[], account: CapAccoun
   return withProtection(reconciled, terms);
 }
 
-/** v30 observed IDs had no provenance. Freeze only the term visible now; an
+/** Pre-v32 observed IDs had no provenance. Freeze only the term visible now; an
  * already promoted renewal keeps that observed allowance through its own end. */
 export function migrateObservedProtection(players: readonly Player[], account: CapAccount, season: number): CapAccount {
-  if (!account.protectedIds.length) return account;
+  if (account.protectedTerms !== undefined || !account.protectedIds.length) return account;
   const terms = players.flatMap(player => {
     const term = signedTerms(player).find(t => t.startSeason <= season && t.endSeason >= season);
     return account.protectedIds.includes(player.id) && term ? [termRecord(player.id, term)] : [];
