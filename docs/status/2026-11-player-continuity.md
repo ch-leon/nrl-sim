@@ -18,7 +18,8 @@ no sale/release during their one-season term. Injuries and bans create no people
 
 ## Five-season measurement
 
-The existing `tests/systems/rivals.test.ts` five-season cohort, seed 2026, ran
+At lifecycle commit `0092aac7`, the existing
+`tests/systems/rivals.test.ts` five-season cohort, seed 2026, ran
 with its existing fixtures, match, discovery, ageing and rival hooks. It does
 not include all runtime hooks (notably player economy/Academy), so these are
 rival-supply measurements, not a complete career balance result.
@@ -79,19 +80,42 @@ an occupied career and its stored bytes untouched.
 A normal managed seed2026 run was dismissed after season4 for board objectives,
 with no state invariant failures. To exercise five complete years of continuity,
 a separate fixture clears the board objectives between annual full-runtime runs.
-That deliberate control is not normal-career balance evidence. Before the latest
-match-rule integration, its actual UTF-8 save measurements were:
+That deliberate control is not normal-career balance evidence. On the integrated source at `838c0861`, its actual UTF-8 save measurements were:
 
 | Entering season | Live people | Retired records | Cumulative births | Save bytes |
 | --- | ---: | ---: | ---: | ---: |
-| 2 | 308 | 37 | 13 | 336,429 |
-| 3 | 303 | 63 | 34 | 440,929 |
-| 4 | 304 | 86 | 58 | 457,416 |
-| 5 | 307 | 99 | 74 | 470,352 |
-| 6 | 310 | 113 | 91 | 483,529 |
+| 2 | 307 | 36 | 11 | 335,505 |
+| 3 | 298 | 66 | 32 | 439,373 |
+| 4 | 304 | 87 | 59 | 457,736 |
+| 5 | 307 | 100 | 75 | 471,488 |
+| 6 | 310 | 114 | 92 | 484,895 |
 
 Every previous ID remained live or archived after every year. The integration
 test logs fresh measurements on the final integrated code; these recorded
 numbers identify their source revision rather than claiming invariant balance
-values. Independent-tool review, final full checks, browser evidence and CI/QA
-are still required before merge.
+values. TypeScript, production build and all **4,527 tests across 341 files** passed
+on the integrated source. The later small-screen sale-panel and focus fixes
+receive their own affected-suite/browser checks. Independent-tool review and
+exact-head CI/QA remain required before merge.
+
+
+## Final review follow-up
+
+Claude Code's backend review of `838c0861` found one blocking issue: the
+sale preflight rejected a seller whose existing cash balance was negative.
+Supported saves and current optional event costs can already produce that state.
+The correction permits safe-integer sale receipts to reduce an existing debt,
+even when the proceeds do not clear it. It adds no borrowing: the buyer still
+needs a nonnegative safe-integer wallet and the full fee. Invalid ownership,
+agreements and seller balances now report their actual refusal before searching
+for a buyer. Regression cases cover partial/full recovery, conserved cash,
+reload, once-only booking, invalid buyers and overflow.
+
+The final sale review uses the screen width for the player, buyer, fee and
+unchanged contract; cap details scroll above fixed 44px actions. The production
+WebKit `player-sales` regression passes five size/text combinations, including
+568×320 Larger, using saved careers and native keyboard confirmation. It checks
+Cancel as a no-op, the actual buyer's single payment, unchanged contracts,
+unique ownership and reload persistence. Screenshots and the report are CI
+artifacts, not committed files. This is targeted browser evidence, not a claim
+that the later full PR gates have passed.
