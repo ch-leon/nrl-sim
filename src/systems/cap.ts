@@ -1,6 +1,7 @@
 // Season salary cap (#557). Cash stays on GameState.money. A signed deal is an
 // annual commitment for an inclusive run of seasons. Ordinary cash movements
 // never read or write this module's numbers.
+import { closeClubSpell } from './playerCareer';
 import type { Player } from '../core/state';
 import { WEEKS_PER_SEASON } from '../config';
 import { overallRating, shownStats } from '../data/player';
@@ -234,14 +235,15 @@ export function expireEndedDeals(
       const next = deal.renewal;
       if (next && next.startSeason <= season && next.endSeason >= season) {
         const seasons = next.endSeason - season + 1;
+        const { emergencyDealEndSeason: _end, emergencyForPlayerId: _vacancy, ...ordinary } = player;
         keep.push({
-          ...player,
+          ...ordinary,
           deal: { salary: next.salary, startSeason: next.startSeason, endSeason: next.endSeason },
           contractWeeks: Math.max(1, seasons * WEEKS_PER_SEASON),
         });
       } else {
-        const { deal: _deal, ...rest } = player;
-        gone.push({ ...rest, contractWeeks: 0, departed: true });
+        const { deal: _deal, emergencyDealEndSeason: _end, emergencyForPlayerId: _vacancy, ...rest } = player;
+        gone.push({ ...(rest.clubHistory ? closeClubSpell(rest, { season, week: 1 }, 'expiry') : rest), contractWeeks: 0, departed: true });
       }
     } else keep.push(player);
   }

@@ -63,6 +63,10 @@ export interface Player {
   contractWeeks: number; // remaining
   /** Annual salary for an inclusive run of seasons. Absent while unsigned. */
   deal?: SignedDeal;
+  /** Minimum-roster scholarship; cannot produce sale/release proceeds during this term. */
+  emergencyDealEndSeason?: number;
+  /** Actual expiry/retirement vacancy this scholarship filled. */
+  emergencyForPlayerId?: string;
   junior?: boolean; // Academy prospect awaiting signing (default false) — #42
   departed?: boolean; // left the club (contract expired / released): survives free-agent re-rolls — #40
   career?: StatTally; // folded from match events — #46

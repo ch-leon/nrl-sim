@@ -3,6 +3,7 @@ import { EXPANSION_COPY } from '../../../src/ui/expansionCopy';
 // tests/ui/screens/seasonReview.test.ts — the season review (N7, #190): the pure
 // builders, and a headless season through the real hooks to see the record
 // stamped. The modal itself is not rendered (the vitest env is 'node').
+import { archiveRetirees } from '../../../src/systems/playerCareer';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   addPotm, buildSeasonReview, finalsRun, fmtMoneyInOut, fmtMovers, fmtPotmTotal, fmtRecord, initSeasonReview, moneyLineBad,
@@ -65,7 +66,8 @@ describe('buildSeasonReview', () => {
       finance: [{ ...s.finance[0]!, gate: 300_000, grant: 40_000, wages: -420_000, upkeep: -5_000 }],
       potmTally: { season: 1, counts: { [gone1!.name]: 4, [kept[0]!.name]: 2 } },
     };
-    const r = buildSeasonReview(before, after);
+    const archived = archiveRetirees(after, [gone1!, gone2!].map(p => ({ ...p, age: p.age + 1 })), after);
+    const r = buildSeasonReview(before, archived);
     expect(r.potm).toEqual({ total: 6, best: { name: gone1!.name, count: 4 } });
     expect(r.board).toEqual({
       met: 1, missed: 1, patience: 4, sacked: false,

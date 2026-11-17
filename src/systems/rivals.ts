@@ -15,12 +15,13 @@
 //   - Season rollover: players age and retire through aging.ts and juniors top
 //     the squad back up (rolloverRivals). This replaces the old strength drift.
 // Pure functions plus one tick hook. No Phaser.
+import { admitGeneratedPeople, archiveRetirees, closeClubSpell, installPlayerHistory, openClubSpell, reconcileShortlist, intakeUnsignedMarket, refreshMarketShortlist } from './playerCareer';
 import { getState, setState, type GameState, type Player, type Position, type RivalClub } from '../core/state';
 import { bus } from '../core/events';
 import { registerTickHook } from '../core/time';
-import { LEAGUE, ON_FIELD, SEASON_ROUNDS, STAT_MAX, WEEKS_PER_SEASON } from '../config';
+import { LEAGUE, ON_FIELD, SQUAD_MIN, SEASON_ROUNDS, STAT_MAX, WEEKS_PER_SEASON } from '../config';
 import { generatePlayerAround, withShownStats, shownStats, marketWage, overallRating, POSITIONS, wageForOverall } from '../data/player';
-import { admitOpeningSquad, AI_OPENING_CASH, capRoomFor, commitPlayer, freshCapAccount, SINGLE_LEAGUE_TIER, tierCap, salaryDemand, releaseTerms } from './cap';
+import { admitOpeningSquad, AI_OPENING_CASH, capRoomFor, commitPlayer, freshCapAccount, SINGLE_LEAGUE_TIER, tierCap, salaryDemand, releaseTerms, expireEndedDeals, reconcileProtection, protectAddedDeals } from './cap';
 import { signingFeeQuote, type FinanceTier } from '../data/financeRules';
 import { makeRng, type Rng } from '../utils/rng';
 import { ageAndRetirePlayers } from './aging';
@@ -32,7 +33,7 @@ import { hasStructuralCalendar } from './competitionCalendar';
 
 /** Players in a freshly generated rival squad: two per position plus two spare. */
 export const RIVAL_SQUAD_SIZE = 20;
-/** Juniors are added at rollover until the squad is back to this size. */
+/** Preferred depth filled with funded recruits; emergency births only reach SQUAD_MIN. */
 export const RIVAL_SQUAD_MIN = 18;
 /** A rival at this size releases its weakest player to make room for a signing. */
 export const RIVAL_SQUAD_MAX = 24;
@@ -280,9 +281,9 @@ export function rivalNeed(squad: readonly Player[]): RivalNeed | null {
   return null;
 }
 
-/** Can `squad` take `target` under the squad limit and the salary cap? */
-function fits(squad: readonly Player[], target: Player): boolean {
-  return squad.length < RIVAL_SQUAD_MAX && squadWages(squad) + marketWage(target) <= RIVAL_WAGE_CAP;
+/** Roster space only. Actual signings check the saved annual cap and cash. */
+function fits(squad: readonly Player[], _target: Player): boolean {
+  return squad.length < RIVAL_SQUAD_MAX;
 }
 
 /**
@@ -300,7 +301,7 @@ function makeRoom(squad: readonly Player[], target: Player): { squad: Player[]; 
     return after >= Math.min(RIVAL_POSITION_MIN, now);
   };
   const worst = squad
-    .filter(spare)
+    .filter(p => spare(p) && p.emergencyDealEndSeason === undefined)
     .sort((a, b) => overallRating(a) - overallRating(b) || a.id.localeCompare(b.id))[0];
   if (!worst) return null;
   const without = squad.filter((p) => p.id !== worst.id);
@@ -372,29 +373,34 @@ export function rivalSigningTick(clubs: readonly RivalClub[], freeAgents: readon
       const squad: Player[] = club.squad!;
       const need = rivalNeed(squad);
       if (rng.next() >= (need ? RIVAL_NEED_CHANCE : RIVAL_SIGN_CHANCE)) break;
-      const target = need ? pickNeedSigning(squad, pool, need) : pickSigning(squad, pool);
+      const account = club.capAccount ?? freshCapAccount(SINGLE_LEAGUE_TIER);
+      const cash = club.cash ?? AI_OPENING_CASH;
+      const affordable = pool.filter(p => {
+        const room = makeRoom(squad, p);
+        return room && capRoomFor(room.squad, account, season, salaryDemand(p))
+          && cash >= signingFeeQuote(salaryDemand(p), false) + (room.released ? releaseTerms(room.released, season, week).payout : 0);
+      });
+      const target = need ? pickNeedSigning(squad, affordable, need) : pickSigning(squad, affordable);
       if (!target) break;
       // Make room under the squad limit and the salary cap by releasing the weakest
-      // player (one at most); if that still doesn't fit, there's no deal.
+      // player (one at most); annual commitment and cash were checked above.
       const room = makeRoom(squad, target);
       if (!room) break;
-      const account = club.capAccount ?? freshCapAccount(SINGLE_LEAGUE_TIER);
-      const signedPlayer = commitPlayer({ ...target, morale: 50, departed: false }, season);
+      const signedPlayer = openClubSpell(commitPlayer({ ...installPlayerHistory(target, 'unsigned', { season, week }), morale: 50, departed: false, joinedSeason: season }, season, 1), club.id, { season, week }, 'signing');
       const salary = signedPlayer.deal?.salary ?? 0;
       const fee = signingFeeQuote(salaryDemand(target), false);
       // A rival pays for any voluntary release as well as the replacement.
       const payout = room.released ? releaseTerms(room.released, season, week).payout : 0;
-      const cash = club.cash ?? AI_OPENING_CASH;
       if (!capRoomFor(room.squad, account, season, salary) || cash < fee + payout) break;
       if (room.released) {
-        const { deal: _releasedDeal, ...bare } = room.released;
+        const { deal: _releasedDeal, ...bare } = closeClubSpell(installPlayerHistory(room.released, club.id, { season, week }), { season, week }, 'release');
         pool.push({ ...bare, injuredWeeks: 0, contractWeeks: 0 });
       }
       pool = pool.filter((p) => p.id !== target.id);
       const ovr = overallRating(target);
       signed.push({ clubId: club.id, playerId: target.id, overall: ovr, reason: need?.kind ?? 'upgrade' });
       if (ovr >= notable) news.push(`${club.name} sign ${Math.round(ovr)}-rated ${target.position} ${target.name}.`);
-      club = withDerivedStrength({ ...club, cash: cash - fee - payout, capAccount: account, squad: [...room.squad, signedPlayer] });
+      club = withDerivedStrength({ ...club, cash: cash - fee - payout, capAccount: reconcileProtection(room.squad, account, season), squad: [...room.squad, signedPlayer] });
     }
     out[i] = club;
   }
@@ -529,31 +535,86 @@ export interface RolloverResult {
   clubs: RivalClub[];
   retired: number;
   juniors: number;
+  retiredPlayers: Player[];
+  freeAgents: Player[];
 }
 
-/**
- * Season rollover for every rival (pure): age and retire through aging.ts,
- * heal everyone, then top the squad up to RIVAL_SQUAD_MIN with juniors at the
- * club's weakest positions, and re-derive strength. Development happens during
- * the season (developRivalsWeek, #143), not here.
- */
-export function rolloverRivals(clubs: readonly RivalClub[], rng: Rng, playerId = 'player', season = 1): RolloverResult {
-  let retired = 0;
+/** Age actual people, honour surviving promises, renew within the annual cap,
+ * then recruit real unsigned people. Only unavoidable minimum-roster vacancies
+ * may receive a restricted, low-potential emergency scholarship. */
+export function rolloverRivals(clubs: readonly RivalClub[], rng: Rng, playerId = 'player', season = 1, freeAgents: readonly Player[] = []): RolloverResult {
+  const retiredPlayers: Player[] = [];
   let juniors = 0;
-  const out = clubs.map((club) => {
-    if (club.id === playerId || !club.squad) return club;
+  let pool = [...freeAgents];
+  const prepared = new Map<string, { club: RivalClub; vacancies: string[] }>();
+  for (const club of [...clubs].sort((a, b) => a.id.localeCompare(b.id))) {
+    if (club.id === playerId || !club.squad) continue;
     const aged = ageAndRetirePlayers(club.squad, [], rng);
-    retired += aged.retired.length;
-    const squad = aged.squad.map((p) => (p.injuredWeeks > 0 ? { ...p, injuredWeeks: 0 } : p));
+    retiredPlayers.push(...aged.retired.map(p => installPlayerHistory(p, club.id, { season, week: 1 })));
     const account = club.capAccount ?? freshCapAccount(SINGLE_LEAGUE_TIER);
-    while (squad.length < RIVAL_SQUAD_MIN) {
-      const anchor = (club.strength + RIVAL_LEAGUE_MEAN) / 2;
-      squad.push(commitPlayer(rivalPlayer(rng, club.id, weakestPosition(squad), anchor - RIVAL_JUNIOR_GAP, rng.int(17, 19)), season, 1));
-      juniors++;
+    const survivors = aged.squad.map(p => ({ ...installPlayerHistory(p, club.id, { season, week: 1 }), injuredWeeks: 0 }));
+    // New ordinary renewals have to fit; existing signed promises remain exact.
+    let kept = survivors.filter(p => p.deal && p.deal.endSeason >= season);
+    const ended = survivors.filter(p => !p.deal || p.deal.endSeason < season).sort((a, b) => overallRating(b) - overallRating(a) || a.id.localeCompare(b.id));
+    const expired: Player[] = [];
+    for (const p of ended) {
+      const renewed = p.deal?.renewal && p.deal.renewal.endSeason >= season
+        ? expireEndedDeals([p], [], account, season).squad[0]
+        : capRoomFor(kept, account, season, salaryDemand(p)) ? commitPlayer(p, season, 1) : undefined;
+      if (renewed) {
+        const { emergencyDealEndSeason: _end, emergencyForPlayerId: _source, ...ordinary } = renewed;
+        kept.push(ordinary);
+      } else {
+        const { deal: _deal, emergencyDealEndSeason: _end, emergencyForPlayerId: _source, ...unsigned } = closeClubSpell(p, { season, week: 1 }, 'expiry');
+        expired.push({ ...unsigned, contractWeeks: 0 });
+      }
     }
-    return withDerivedStrength({ ...club, squad, capAccount: account });
-  });
-  return { clubs: out, retired, juniors };
+    pool.push(...expired);
+    prepared.set(club.id, { club: { ...club, squad: kept, capAccount: reconcileProtection(kept, account, season) }, vacancies: [...aged.retired, ...expired].map(p => p.id) });
+  }
+  for (const [id, entry] of prepared) {
+    let club = entry.club;
+    let squad = [...club.squad!];
+    let cash = club.cash ?? AI_OPENING_CASH;
+    while (squad.length < RIVAL_SQUAD_MIN) {
+      const position = weakestPosition(squad);
+      const target = pool.filter(p => !p.junior && cash >= signingFeeQuote(salaryDemand(p), false)
+        && capRoomFor(squad, club.capAccount!, season, salaryDemand(p)))
+        .sort((a, b) => Number(b.position === position) - Number(a.position === position) || overallRating(b) - overallRating(a) || a.id.localeCompare(b.id))[0];
+      if (!target) break;
+      squad.push(openClubSpell(commitPlayer({ ...installPlayerHistory(target, 'unsigned', { season, week: 1 }), joinedSeason: season }, season, 1), id, { season, week: 1 }, 'signing'));
+      cash -= signingFeeQuote(salaryDemand(target), false);
+      pool = pool.filter(p => p.id !== target.id);
+    }
+    const count = Math.min(Math.max(0, SQUAD_MIN - squad.length), entry.vacancies.length);
+    const emergencyIds: string[] = [];
+    for (let i = 0; i < count; i++) {
+      const p = rivalPlayer(rng, id, weakestPosition(squad), 34, rng.int(17, 19));
+      const emergency = installPlayerHistory(commitPlayer({ ...p, ceilings: Object.fromEntries(shownStats(p.position).map(k => [k, Math.max(p.stats[k], 45)])),
+        emergencyDealEndSeason: season, emergencyForPlayerId: entry.vacancies[i]!, joinedSeason: season }, season, 1), id, { season, week: 1 }, 'emergency');
+      squad.push(emergency); emergencyIds.push(emergency.id); juniors++;
+    }
+    club = withDerivedStrength({ ...club, squad, cash, capAccount: protectAddedDeals(squad, club.capAccount!, season, emergencyIds) });
+    prepared.set(id, { ...entry, club });
+  }
+  return { clubs: clubs.map(c => prepared.get(c.id)?.club ?? c), retired: retiredPlayers.length, juniors, retiredPlayers, freeAgents: pool };
+}
+
+/** State owner assigns durable birth IDs and archives losses in the same commit. */
+export function rolloverRivalPopulation(state: GameState, rng: Rng): GameState {
+  const result = rolloverRivals(state.league.clubs, rng, state.clubId, state.season, state.freeAgents);
+  let next = { ...state, league: { ...state.league, clubs: result.clubs }, freeAgents: result.freeAgents };
+  const beforeIds = new Set(state.league.clubs.flatMap(c => c.squad ?? []).map(p => p.id));
+  for (const club of [...result.clubs].sort((a, b) => a.id.localeCompare(b.id))) {
+    const births = club.squad?.filter(p => p.emergencyDealEndSeason === state.season && !beforeIds.has(p.id)) ?? [];
+    if (!births.length) continue;
+    const admitted = admitGeneratedPeople(next, births, club.id, 'emergency');
+    if (!admitted) return state;
+    const replacements = new Map(births.map((p, i) => [p.id, admitted.players[i]!]));
+    next = { ...next, playerPopulation: admitted.playerPopulation, league: { ...next.league, clubs: next.league.clubs.map(c => c.id !== club.id ? c : { ...c,
+      squad: c.squad!.map(p => replacements.get(p.id) ?? p), capAccount: { ...c.capAccount!, protectedIds: c.capAccount!.protectedIds.map(id => replacements.get(id)?.id ?? id) } }) } };
+  }
+  return refreshMarketShortlist(intakeUnsignedMarket(archiveRetirees(reconcileShortlist(next), result.retiredPlayers, state)));
 }
 
 // ── Store glue ───────────────────────────────────────────────────────────────
@@ -585,7 +646,8 @@ export function registerRivalsSystem(): void {
       perClub, start: s.week, season: s.season, week: s.week, notable: Math.round(poolTarget(s)) + RIVAL_NOTABLE_ABOVE_TARGET,
     });
     const clubs = developRivalsWeek(r.clubs, makeRng(rivalDevelopSeed(s)));
-    setState({ league: { ...s.league, clubs }, freeAgents: r.freeAgents });
+    const next = reconcileShortlist({ ...s, league: { ...s.league, clubs }, freeAgents: r.freeAgents });
+    setState({ league: next.league, freeAgents: next.freeAgents, playerPopulation: next.playerPopulation });
     for (const text of r.news) bus.emit('ui:notify', { text, kind: 'info' });
   });
 }

@@ -4,6 +4,7 @@
 //
 // GitHub #5: soft-curve age retirement from RETIRE_SOFT_AGE, hard cut at
 // RETIRE_HARD_AGE. Retired players leave squad and free-agent pool entirely.
+import { archiveRetirees, reconcileShortlist, installPlayerHistory } from './playerCareer';
 import { bus } from '../core/events';
 import { getState, setState } from '../core/state';
 import type { Player } from '../core/state';
@@ -91,11 +92,9 @@ export function registerAgingSystem(): void {
     const state = getState();
     const rng = makeRng(state.rngSeed);
     const result = ageAndRetirePlayers(state.squad, state.freeAgents, rng);
-    setState({
-      squad: result.squad,
-      freeAgents: result.freeAgents,
-      rngSeed: result.rngSeed,
-    });
+    const next = archiveRetirees(reconcileShortlist({ ...state, squad: result.squad, freeAgents: result.freeAgents, rngSeed: result.rngSeed }),
+      result.retired.map(p => installPlayerHistory(p, state.squad.some(x => x.id === p.id) ? state.clubId : 'unsigned', state)), state);
+    setState({ squad: next.squad, freeAgents: next.freeAgents, rngSeed: next.rngSeed, playerPopulation: next.playerPopulation });
     // Only the player's own retirees are announced — free-agent pool exits are
     // silent (a toast per stranger at every rollover is noise).
     const squadIds = new Set(state.squad.map((p) => p.id));

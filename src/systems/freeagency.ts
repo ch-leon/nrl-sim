@@ -1,4 +1,4 @@
-import { refreshMarketShortlist } from './playerCareer';
+import { bookPlayerMovement, closeClubSpell, installPlayerHistory, openClubSpell, reconcileShortlist, refreshMarketShortlist } from './playerCareer';
 // Free-agent discovery + signing/release logic. Refreshes never generate people
 // or advance the match RNG; annual intake is a separate lifecycle operation.
 
@@ -6,12 +6,11 @@ import { getState, setState, type GameState, type Player } from '../core/state';
 import type { Rng } from '../utils/rng';
 import { makeRng } from '../utils/rng';
 import { bus } from '../core/events';
-import { spendMoney } from '../data/club';
 import { signingFeeQuote, type FinanceLevel } from '../data/financeRules';
 import { registerTickHook, TICK_ORDER, type TickContext } from '../core/time';
 import { SPECIAL_MAGNITUDE } from '../data/facility';
 import { LEAGUE, SQUAD_CAP, SQUAD_MIN, WEEKS_PER_SEASON } from '../config';
-import { capRoomFor, commitment, publishedCap, releaseTerms, salaryDemand, signForRestOfSeason } from './cap';
+import { capRoomFor, commitment, publishedCap, releaseTerms, salaryDemand, signForRestOfSeason, reconcileProtection } from './cap';
 import { fmtMoney } from '../utils/money';
 import { REP_BASELINE } from './league';
 import { placeSigning, type SigningPlacement } from './lineup';
@@ -102,8 +101,8 @@ function scoutLevel(state: Pick<GameState, 'facilities'>): FinanceLevel {
 }
 
 /** Academy rate once, on the first signing. A player who has already left does not get it again. */
-function academyProspect(agent: Pick<Player, 'junior' | 'departed'>): boolean {
-  return agent.junior === true && agent.departed !== true;
+function academyProspect(agent: Pick<Player, 'junior' | 'departed' | 'clubHistory'>): boolean {
+  return agent.junior === true && agent.departed !== true && agent.clubHistory?.academyDiscountUsed !== true;
 }
 
 /**
@@ -155,21 +154,15 @@ export function signPlayer(state: GameState, playerId: string, opts: { toast?: b
     return { ok: false, reason: 'insufficient-funds', message: `Not enough cash. The signing fee is ${fmtMoney(fee)}.` };
   }
 
-  // Both checks passed. The debit and the move are the whole signing.
-  if (!spendMoney(fee, `sign:${playerId}`)) {
-    return { ok: false, reason: 'insufficient-funds', message: `Not enough cash. The signing fee is ${fmtMoney(fee)}.` };
-  }
-
   const { junior: _junior, departed: _departed, ...rest } = agent;
-  const signed: Player = signForRestOfSeason(rest, s.season, s.week);
-  const after = getState();
-  const squad = [...after.squad, signed];
-  const placed = opts.intoLineup ? placeSigning(after.lineup, squad, signed) : undefined;
-  setState({
-    freeAgents: after.freeAgents.filter((p) => p.id !== playerId),
-    squad,
-    ...(placed ? { lineup: placed.lineup } : {}),
-  });
+  const signed = openClubSpell(signForRestOfSeason({ ...installPlayerHistory(rest, 'unsigned', s), joinedSeason: s.season }, s.season, s.week), s.clubId, s, 'signing', fee);
+  const squad = [...s.squad, signed];
+  const placed = opts.intoLineup ? placeSigning(s.lineup, squad, signed) : undefined;
+  const next = reconcileShortlist(bookPlayerMovement({ ...s, freeAgents: s.freeAgents.filter(p => p.id !== playerId), squad,
+    ...(placed ? { lineup: placed.lineup } : {}) }, -fee, 'transfers'));
+  setState({ freeAgents: next.freeAgents, squad, money: next.money, finance: next.finance, playerPopulation: next.playerPopulation,
+    ...(placed ? { lineup: placed.lineup } : {}) });
+  bus.emit('money:changed', { delta: -fee, reason: `sign:${playerId}`, balance: next.money, booked: true, stamp: { season: s.season, week: s.week } });
 
   bus.emit('player:signed', signed);
   if (opts.toast !== false) bus.emit('ui:notify', { text: `Signed ${signed.name}`, kind: 'success' });
@@ -195,6 +188,7 @@ export function releasePlayer(state: GameState, playerId: string): SignResult {
     return { ok: false, reason: 'squad-min', message: `The squad cannot drop below ${SQUAD_MIN}.` };
   }
 
+  if (player.emergencyDealEndSeason !== undefined && player.emergencyDealEndSeason >= s.season) return { ok: false, reason: 'scholarship', message: 'This emergency scholarship must finish before he can be released.' };
   const terms = releaseTerms(player, s.season, s.week);
   if (s.money < terms.payout) {
     return {
@@ -203,20 +197,12 @@ export function releasePlayer(state: GameState, playerId: string): SignResult {
       message: `Not enough cash. Releasing him costs ${fmtMoney(terms.payout)}.`,
     };
   }
-  if (terms.payout > 0 && !spendMoney(terms.payout, `release:${playerId}`)) {
-    return {
-      ok: false,
-      reason: 'insufficient-funds',
-      message: `Not enough cash. Releasing him costs ${fmtMoney(terms.payout)}.`,
-    };
-  }
-  const { deal: _deal, junior: _junior, ...withoutDeal } = player;
+  const { deal: _deal, junior: _junior, ...withoutDeal } = closeClubSpell(installPlayerHistory(player, s.clubId, s), s, 'release');
   const released: Player = { ...withoutDeal, contractWeeks: 0, departed: true };
-  const after = getState();
-  setState({
-    squad: after.squad.filter((p) => p.id !== playerId),
-    freeAgents: [...after.freeAgents, released],
-  });
+  const squad = s.squad.filter(p => p.id !== playerId);
+  const next = bookPlayerMovement({ ...s, squad, freeAgents: [...s.freeAgents, released], capAccount: reconcileProtection(squad, s.capAccount, s.season) }, -terms.payout, 'contracts');
+  setState({ squad, freeAgents: next.freeAgents, money: next.money, finance: next.finance, capAccount: next.capAccount });
+  if (terms.payout) bus.emit('money:changed', { delta: -terms.payout, reason: `release:${playerId}`, balance: next.money, booked: true, stamp: { season: s.season, week: s.week } });
   const freed = terms.nextCapFreed > 0
     ? `, freeing ${fmtMoney(terms.capFreed)} of this season's cap and ${fmtMoney(terms.nextCapFreed)} next season`
     : `, freeing ${fmtMoney(terms.capFreed)} of this season's cap`;
@@ -251,7 +237,7 @@ export function weeksToPoolRefresh(week: number): number {
 /**
  * Install the free-agency week-tick hook (TICK_ORDER.freeagents === 60). The hook
  * reads the store, builds an Rng from state.rngSeed, and runs freeAgencyTick;
- * refreshFreeAgents persists the advanced rngSeed. Registration is side-effect
+ * refreshFreeAgents only updates discovery IDs. Registration is side-effect
  * free at import — call this explicitly from the orchestrator (main.ts).
  */
 export function registerFreeAgencySystem(): void {

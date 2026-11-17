@@ -2,29 +2,22 @@
 // See BAK-172. Mutate via setState and emit the relevant bus event. No Phaser.
 // The club is embedded in GameState (§1.2) — there is no separate Club class.
 
+import { signPlayer, releasePlayer } from '../systems/freeagency';
 import { getState, setState, type Player, type PlacedFacility } from '../core/state';
 import { weekHeld } from '../core/time';
 import { bus } from '../core/events';
 import { makeRng } from '../utils/rng';
 import { FACILITY_CATALOG, type FacilityDefId } from './facility';
-import { SQUAD_CAP, SQUAD_MIN, GRID_W, GRID_H } from '../config';
+import { GRID_W, GRID_H } from '../config';
 
-/** Add a player to the squad. Returns false when at SQUAD_CAP. */
+/** Canonical recruitment only: callers cannot insert a copied/generated person. */
 export function addPlayer(p: Player): boolean {
-  const s = getState();
-  if (s.squad.length >= SQUAD_CAP) return false;
-  setState({ squad: [...s.squad, p] });
-  bus.emit('player:signed', p);
-  return true;
+  return signPlayer(getState(), p.id).ok;
 }
 
-/** Remove a player by id. Returns false at SQUAD_MIN or if the id is absent. */
+/** A removal is a real release with its payout, minimum and history rules. */
 export function removePlayer(playerId: string): boolean {
-  const s = getState();
-  if (s.squad.length <= SQUAD_MIN) return false;
-  if (!s.squad.some((p) => p.id === playerId)) return false;
-  setState({ squad: s.squad.filter((p) => p.id !== playerId) });
-  return true;
+  return releasePlayer(getState(), playerId).ok;
 }
 
 /**

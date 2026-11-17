@@ -227,10 +227,11 @@ describe('signingFee', () => {
   });
 
   it('Academy prospects pay a quarter, and not again after they have left', () => {
-    const junior = at(40, { junior: true, wage: 400 });
+    const junior = at(40, { junior: true, wage: 400, clubHistory: { spells: [], academyDiscountUsed: false } });
     expect(signingFee(getState(), junior)).toBe(signingFeeQuote(salaryDemand(junior), true, 0));
     expect(signingFee(getState(), { ...junior, departed: true })).toBe(signingFeeQuote(salaryDemand(junior), false, 0));
     expect(signingFeeBasis(getState(), junior)).toContain('Academy');
+    expect(signingFee(getState(), { ...junior, clubHistory: { spells: [], academyDiscountUsed: true } })).toBe(signingFeeQuote(salaryDemand(junior), false, 0));
   });
 
   it('a Scout Office takes 10% off the fee per level and nothing off the salary', () => {

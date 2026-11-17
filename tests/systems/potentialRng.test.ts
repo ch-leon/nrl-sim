@@ -41,7 +41,9 @@ import { contractsEndingSoon } from '../../src/systems/contracts';
 // #625: completed retreats, including handovers, change match outcomes and later
 // season draws. The final standing-marker/deep-cover corrections restore this historical
 // season fingerprint; UI-read and no-read seasons still agree.
-const MAIN_SEED_AFTER_SEASON = 1788836146;
+// #572: persistent discovery, isolated Academy intake and bounded rival births
+// deliberately change career draws. UI-read/no-read parity remains required.
+const MAIN_SEED_AFTER_SEASON = 1950957202;
 
 describe('the rng stream (#369)', () => {
   it.each([0, 1])('weekly potential and dot reads preserve the season stream with habit AI=%i', (ai) => {

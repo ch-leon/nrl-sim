@@ -35,7 +35,7 @@ import { activePack, onPackChange } from '../content';
 import { RIVAL_CLUBS } from '../data/league';
 import { bus } from '../core/events';
 import { strengthChanges, applySeasonReputation } from './league';
-import { rolloverRivals, withRivalSquads } from './rivals';
+import { rolloverRivalPopulation, withRivalSquads } from './rivals';
 import { currentCalendarFixtures, finaliseCalendarFixture, fixtureBridge, hasStructuralCalendar, resolveCalendarForfeits, sameFixtureIdentity } from './competitionCalendar';
 import { prepareOpenCup } from './openCupCareer';
 import { prepareDivisionFinals } from './divisionCareer';
@@ -795,9 +795,11 @@ export function registerFixturesSystem(): void {
     const rng = makeRng(s2.rngSeed);
     const fixtures = generateFixtures(clubIds, rng);
     if (s2.preseason !== undefined) fixtures.unshift(...generateTrialFixtures(clubIds, s2.rngSeed));
-    const clubs = rolloverRivals(withRivalSquads(s2.league.clubs, s2.rngSeed, PLAYER_ID), rng, PLAYER_ID, s2.season).clubs;
+    const population = rolloverRivalPopulation(s2, rng);
+    const clubs = population.league.clubs;
     setState({
       league: { ...s2.league, clubs, fixtures, ladder: emptyLadder(clubIds) },
+      freeAgents: population.freeAgents, playerPopulation: population.playerPopulation,
       rngSeed: rng.state(),
     });
 

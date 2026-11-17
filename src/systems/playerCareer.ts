@@ -1,7 +1,7 @@
 import { generateFreeAgent, POSITIONS, shownStats } from '../data/player';
 import { TRAIT_IDS } from '../data/traits';
 import { poolTarget } from './freeagency';
-import type { GameState, Player } from '../core/state';
+import { emptyFinance, type GameState, type Player, type FinanceLine } from '../core/state';
 import type { CareerDate, ClubArrival, ClubDeparture, PlayerCareerHistory, PlayerPopulation, RetiredPlayerRecord } from '../data/playerCareer';
 import { makeRng } from '../utils/rng';
 
@@ -200,6 +200,7 @@ export function validatePlayerPopulation(state: GameState): string | null {
     ids.add(player.id);
     if (owner === 'unsigned') unsigned.add(player.id);
     if (!validHistory(player.clubHistory, clubs, state, owner)) return 'Invalid player club history or current owner';
+    if ((player.emergencyDealEndSeason !== undefined || player.emergencyForPlayerId !== undefined) && (!integer(player.emergencyDealEndSeason, state.season) || !player.deal || player.deal.endSeason !== player.emergencyDealEndSeason || player.deal.startSeason !== player.deal.endSeason || typeof player.emergencyForPlayerId !== 'string' || !player.emergencyForPlayerId || owner === 'unsigned' || player.clubHistory?.spells.slice(-1)[0]?.arrival !== 'emergency')) return 'Invalid emergency scholarship';
     if (!player.clubHistory.academyDiscountUsed && (owner !== 'unsigned' || !player.junior || player.departed)) return 'Invalid unused Academy discount';
   }
   if (new Set(population.shortlistIds).size !== population.shortlistIds.length || population.shortlistIds.some(id => typeof id !== 'string' || !unsigned.has(id))) return 'Invalid unsigned shortlist';
@@ -209,5 +210,42 @@ export function validatePlayerPopulation(state: GameState): string | null {
     if (ids.has(player.id)) return 'Live/archive player collision';
     ids.add(player.id);
   }
+  const scholarshipReceipts = new Set<string>();
+  const known = [...ownedPeople(state).map(x => x.player), ...population.retired];
+  for (const { player, owner } of ownedPeople(state)) {
+    if (player.emergencyDealEndSeason === undefined) continue;
+    const receipt = `${owner}:${player.emergencyDealEndSeason}:${player.emergencyForPlayerId}`;
+    const source = known.find(p => p.id === player.emergencyForPlayerId);
+    const loss = source?.clubHistory?.spells.some(spell => spell.clubId === owner && spell.end?.season === player.emergencyDealEndSeason
+      && (spell.departure === 'expiry' || spell.departure === 'retirement'));
+    if (!loss || scholarshipReceipts.has(receipt)) return 'Invalid emergency vacancy receipt';
+    scholarshipReceipts.add(receipt);
+  }
   return null;
+}
+
+/** Book a player transaction in the same state as its ownership change. */
+export function bookPlayerMovement(state: GameState, delta: number, line: FinanceLine): GameState {
+  const finance = state.finance.some(f => f.season === state.season) ? state.finance : [...state.finance, emptyFinance(state.season)];
+  return { ...state, money: state.money + delta, finance: finance.map(f => f.season === state.season ? { ...f, [line]: f[line] + delta } : f) };
+}
+
+/** Remove IDs that changed owner without changing anyone else's discovery. */
+export function reconcileShortlist(state: GameState): GameState {
+  const unsigned = new Set(state.freeAgents.map(p => p.id));
+  return { ...state, playerPopulation: { ...state.playerPopulation, shortlistIds: state.playerPopulation.shortlistIds.filter(id => unsigned.has(id)) } };
+}
+
+/** Assign durable IDs to a complete generated batch, or admit nobody on exhaustion. */
+export function admitGeneratedPeople(state: GameState, generated: readonly Player[], owner: string = 'unsigned', arrival: ClubArrival = 'opening'): { players: Player[]; playerPopulation: PlayerPopulation } | null {
+  const ids = new Set([...ownedPeople(state).map(x => x.player.id), ...state.playerPopulation.retired.map(p => p.id)]);
+  let nextPlayerOrdinal = state.playerPopulation.nextPlayerOrdinal;
+  const players: Player[] = [];
+  for (const player of generated) {
+    while (nextPlayerOrdinal < MAX_PLAYER_ORDINAL && ids.has(`career-person:${nextPlayerOrdinal}`)) nextPlayerOrdinal++;
+    if (nextPlayerOrdinal >= MAX_PLAYER_ORDINAL) return null;
+    const id = `career-person:${nextPlayerOrdinal++}`; ids.add(id);
+    players.push(installPlayerHistory({ ...player, id }, owner, state, arrival));
+  }
+  return { players, playerPopulation: { ...state.playerPopulation, nextPlayerOrdinal } };
 }
