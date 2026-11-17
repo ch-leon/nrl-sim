@@ -84,7 +84,7 @@ second career store, remote service dependency or generic application framework.
 | #573 | Regional division definitions and deterministic club/squad setup | #570; #537/#538 are merged. No annual budget guessed from legacy weekly wages. |
 | #575 | Open Cup draw, byes, ties and advancement | #571/#573. Emit sporting outcomes; finance settlement is #576. |
 | #572 | Real sale destination, ownership, market continuity | #570/#538 and finance #558. No imaginary buyer cash or free sale payout. |
-| #574 | Frozen season review, league unlock/selection and integrated rollover (revised scope; issue body still needs reconciliation) | #571/#572/#573 plus #557/#558/#545. No second ageing/board cycle. |
+| #574 | Frozen season review, league unlock/selection and integrated rollover (issue scope reconciled 17 November) | #571/#572/#573 plus #557/#558/#545. No second ageing/board cycle. |
 | #576/#577 | Reward ledger, earned-cap entitlement | #559 for fixture cash; #557/#560 for the shared annual cap. |
 | #578 | Competition/history views | Its recorded sporting/finance dependencies; follow existing UI conventions and supplied mockups. |
 | #579/#580/#581 | Shield, youth festival, later title series | Their recorded prerequisites; do not enable incomplete event rules. |

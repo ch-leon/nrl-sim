@@ -279,8 +279,9 @@ item before that feature exists; use an implemented reward or hold that offer ba
 
 Extend the existing club and competition screens with an opportunities catalogue,
 integrated calendar, assignment details and personal/club histories. Avoid a second
-unrelated navigation system. The design must work on portrait phones and with
-the existing text-size settings; statuses use words as well as colour.
+unrelated navigation system. Follow the current supported phone orientation
+(landscape since #690), with the existing text-size settings; statuses use words
+as well as colour. Career work does not reintroduce portrait gameplay.
 
 Show four useful horizons without presenting four mandatory chores:
 
