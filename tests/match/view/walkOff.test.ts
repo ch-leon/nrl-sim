@@ -244,15 +244,19 @@ describe('a binned man at the whistle (#688)', () => {
     // Current main's real witness: #lab?seed=45&final=1, full time 9075,
     // home7 Xavier Stampton still in the bin. The old #688 witness used seven-minute halves.
     const sim = new LiveSim(labSheet(DEFAULT_HOME), labSheet(DEFAULT_AWAY), 45, { goldenPoint: true });
-    while (!sim.finished && sim.tick < 12_000) sim.step();
+    let prev = sim.snapshot();
+    while (!sim.finished && sim.tick < 12_000) { prev = sim.snapshot(); sim.step(); }
     const snap = sim.snapshot(), binned = snap.players.filter(p => p.binned);
     expect(snap.phase?.kind).toBe('full-time');
+    expect([prev.tick, snap.tick]).toEqual([9074, 9075]);
     expect(binned.map(p => [p.side, p.slot])).toEqual([['home', 7]]);
     const { s, view } = make();
-    view.draw(snap, snap, 1);
+    view.draw(prev, snap, 1);
     const seats = binned.map(p => ({ x: s.players[p.side][p.slot]!.x, y: s.players[p.side][p.slot]!.y }));
-    view.draw(snap, snap, 1, 1, FT_GONE);
-    for (const p of snap.players) expect(s.players[p.side][p.slot]!.alpha).toBe(0);
+    for (const alpha of [0, 0.5, 0.999]) {
+      view.draw(prev, snap, alpha, 1, FT_GONE);
+      for (const p of snap.players) expect(s.players[p.side][p.slot]!.alpha, `${p.side}/${p.slot} at alpha ${alpha}`).toBe(0);
+    }
     binned.forEach((p, i) => expect({ x: s.players[p.side][p.slot]!.x, y: s.players[p.side][p.slot]!.y }).toEqual(seats[i]));
     view.draw(snap, snap, 1);
     for (const p of snap.players) expect(s.players[p.side][p.slot]!.alpha).toBe(1);

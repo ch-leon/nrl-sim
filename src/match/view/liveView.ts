@@ -108,7 +108,7 @@ export class LiveView {
     }
     // The whistle (#675): the walk-off, the huddle before golden point and the kick-off after a break.
     const drawn = prev.tick + (cur.tick - prev.tick) * a;
-    const phaseAge = drawn - (cur.phase?.since ?? drawn);
+    const phaseAge = Math.max(0, drawn - (cur.phase?.since ?? drawn));
     const brk = breakScene(cur, phaseAge + heldTicks, phaseAge);
     if (brk) ctx.walkOff = new Map();
     for (let i = 0; i < cur.players.length; i++) {
