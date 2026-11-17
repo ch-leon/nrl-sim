@@ -108,6 +108,8 @@ export interface SimEvent {
 }
 
 export interface Snapshot {
+  /** The ordinary dummy-half's committed intended recipient, before release. Interceptions/spills can prevent the catch. */
+  passCall?: { from: ContactPlayer; to: ContactPlayer; startedTick: number; releasesTick: number };
   tick: number;
   /** Side currently attacking, including passes/kicks in flight and loose balls. View context only. */
   attacking?: Side;

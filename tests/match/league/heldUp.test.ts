@@ -101,7 +101,8 @@ describe('held up: in the sim', () => {
   it('off (heldUp.on 0) plays exactly as before it existed: same events, points and rolls (pinned from main at 5b7d08c3)', () => {
     // Re-pinned against main at 5b7d08c3 (the last-tackle call, #650, on), which this branch carries; before #650 the
     // pins were a65edf9's, and with the last-tackle call off too the match is still a65edf9's (below).
-    withTuning({ 'heldUp.on': 0 }, () => {
+    // Early DH commitment (#672) is off for the historical event/roll fingerprints.
+    withTuning({ 'heldUp.on': 0, 'live.dhDecisionLeadTicks': 0 }, () => {
       expect(play(31)).toEqual({ events: 122, home: 4, away: 10, draws: 813, heldUp: 0 });
       expect(play(13)).toEqual({ events: 147, home: 10, away: 10, draws: 725, heldUp: 0 });
       // Its other knobs do nothing while it is off.
@@ -109,7 +110,7 @@ describe('held up: in the sim', () => {
         expect(play(13)).toEqual({ events: 147, home: 10, away: 10, draws: 725, heldUp: 0 });
       });
     });
-    withTuning({ 'heldUp.on': 0, 'lastTackle.on': 0 }, () => {
+    withTuning({ 'heldUp.on': 0, 'lastTackle.on': 0, 'live.dhDecisionLeadTicks': 0 }, () => {
       expect(play(31)).toEqual({ events: 122, home: 0, away: 12, draws: 752, heldUp: 0 });
       expect(play(13)).toEqual({ events: 148, home: 19, away: 18, draws: 772, heldUp: 0 });
     });
@@ -122,7 +123,8 @@ describe('held up: in the sim', () => {
     const count = (over: Record<string, number>): { same: number; moved: number } => {
       let same = 0;
       let moved = 0;
-      for (const seed of [1, 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31]) {
+      // Early DH choice (#672): seed 41 supplies the rare first-rule witness instead of old seed 31.
+      for (const seed of [1, 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 41]) {
         const off = withTuning({ 'heldUp.on': 0 }, () => play(seed));
         const on = withTuning(over, () => play(seed));
         if (on.draws === off.draws && on.events === off.events && on.home === off.home && on.away === off.away) same++;

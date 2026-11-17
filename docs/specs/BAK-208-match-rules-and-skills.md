@@ -169,6 +169,29 @@ first receiver and the engaged carrier's pass in open play, one roll each; the
 last-tackle pass to the kicker, the coach's pass input, offloads and set plays keep
 their man. Margin 0 is off: no roll, every seed as before. Tuning §5.
 
+**The intended recipient calls early** (#672, ordinary dummy-half pass only). After
+the first two ticks of the existing six-tick hold, the dummy half commits his
+ordinary weighted receiver/dart choice. The selected runner raises one arm over
+his continuing gait/fatigue for four ticks (200 ms); a committed dart has no caller.
+Release remains on the same tick. Exact source/target identity is projected in
+`Snapshot.passCall`; reads are pure and replay needs no animation history.
+Manual inputs, admitted attacking coach calls (including a queued set play),
+possession/identity loss or recipient ineligibility cancel the call. A cancelled
+ordinary choice becomes a carry without another receiver draw; an overriding
+manual/scripted action retains priority, as does the existing deterministic
+last-tackle DH-to-kicker handoff for a later Grubber/40–20 call. Sheets with set plays keep their existing
+release-time selection and show no speculative ordinary call. Open-play passes
+and scripted selection are unchanged.
+
+The caller is the **intended** recipient, not a guarantee of a catch: the existing
+lane interception and handling/spill decisions remain at release/reception. Once
+the ball is in flight, readiness follows its actual receiver, including an
+interceptor. This deliberately scopes #672's broader "no ball elsewhere" wording;
+the issue is referenced rather than closed as fully satisfied. Early commitment
+moves RNG timing, so it can change match results; `live.dhDecisionLeadTicks:0`
+keeps legacy decisions and recovery engine revision is 5. Harness comparison with
+main is required; this is not a presentation-only change.
+
 ### 4.3 Catch (kicks) — *first slice implemented (lab feedback round 2)*
 A kick hangs for its flight time (2√(2·peak/g): a 12 m kick ≈ 3.1 s, a bomb ≈ 4 s), so
 chasers and catchers can get under it. **Whoever is nearest the landing point within

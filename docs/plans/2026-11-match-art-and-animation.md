@@ -128,6 +128,17 @@ jumps. Participants and outcomes continue to come from the simulation.
 release, reception and contact are understandable at ×1 with commentary hidden.
 This is the first major playable milestone: the quality standard for the rest.
 
+The separate receiver-preparation candidate for #672 commits ordinary dummy-half
+pass/dart decisions four ticks before the existing release, with no extra delay.
+The exact intended recipient raises one arm over the normal distance-linked gait.
+Manual/coach instructions and invalid identity, eligibility or possession cancel
+the commitment; scripted distribution keeps its existing release-time path.
+The call describes intention, so an interception or spill can still prevent the
+catch. This deliberately supersedes the issue's literal promise of always naming
+the eventual catcher. Zero preparation lead retains the old decision timing for
+comparison, and the recovery-engine revision changes because seeded outcomes can
+change. Balance results and browser evidence belong in the candidate PR.
+
 ## 5. Carry that quality across the match
 
 - Apply the improved directions, proportions and timing to kicks, aerial catches,

@@ -75,6 +75,7 @@ export class LiveSim extends LivePositioning implements MatchSim {
       const c = this.controlList[this.controlRead++]!;
       if (c.tick === this.tick && c.side === this.attacking && (c.kind !== 'kick' || this.tackles === SET_TACKLES - 1)) {
         this.pendingControl[c.side] = c;
+        this.cancelRuckDecision();
         // A manual decision can arrive during the AI's wind-up, including its
         // launch tick. Keep the animation lock, but let the input decide the action.
         if (this.phase.kind === 'play' && this.holder()?.side === c.side) this.pendingKick = null;
@@ -233,6 +234,10 @@ export class LiveSim extends LivePositioning implements MatchSim {
       phase: { kind: ph.kind, since: this.phaseSince, ...(this.golden ? { golden: true } : {}) },
     };
     const w = ph.kind === 'tackle' ? ph.wrestle : null;
+    if (ph.kind === 'ruck' && ph.decision && this.tick < ph.decision.until && this.ruckReceiver(ph)) {
+      const d = ph.decision;
+      snap.passCall = { from: { ...d.from }, to: { ...d.to! }, startedTick: d.decidedAt, releasesTick: d.until };
+    }
     const contact = this.visualContact;
     if (contact) {
       const c = this.players.find(p => p.key === contact.carrier.who && p.side === contact.carrier.side && p.slot === contact.carrier.slot);

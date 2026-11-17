@@ -56,6 +56,8 @@ live gameplay change; work still open below has not shipped.
 
 ## Next
 
+- **Receiver preparation candidate:** the ordinary dummy-half chooses his intended recipient during the existing hold, so that runner can call before release. This is separate from wider attack shapes (#649) and from the whistle cleanup. The candidate addresses #672 with explicit cancellation and unchanged interception/spill rules; its balance comparison and review must be assessed before merging.
+
 - **Launch plumbing (decided 2 Nov 2026):** hosting, push, analytics, pop-ups, flags, email and privacy. Tracking: [issue #456](https://github.com/ch-leon/nrl-sim/issues/456), which has Leon's setup checklist. Decisions are in [marketing.md](marketing.md#engagement-and-launch-plumbing) ([PR #457](https://github.com/ch-leon/nrl-sim/pull/457), merged 6 Nov). Implementation is still open.
   - **Before launch:** Developer settings is shown in Settings on every build, including GitHub Pages and the Android test APK. Set `VITE_DEV_SETTINGS=0`, or remove Developer settings, before launch. Seeing the page does not change a career.
   - Buildable now: the pop-up itself, with a test message ([issue #451](https://github.com/ch-leon/nrl-sim/issues/451)).
