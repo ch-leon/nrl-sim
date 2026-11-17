@@ -78,7 +78,7 @@ describe('AUTO PICK’s toast (#614)', () => {
 });
 
 describe('the player page’s columns (#614)', () => {
-  it('keep their scroll through CAPTAIN and Rename; Sell stays closed', () => {
+  it('keep their scroll through CAPTAIN and Rename; a sale preview cancels without changing the player', () => {
     const id = getState().lineup.starters[3]!;
     openPlayerPage(getState().squad.find((p) => p.id === id)!, { kind: 'squad' });
     const page = q('[data-player-page]');
@@ -94,9 +94,34 @@ describe('the player page’s columns (#614)', () => {
       expect(cols().map((c) => c.scrollTop), redraw).toEqual(scrolled);
     }
     expect(getState().lineup.captain).toBe(id);
-    expect(q('[data-player-action="sell"]').textContent).toBe('No buyer');
-    expect((q('[data-player-action="sell"]') as StubNode).disabled).toBe(true);
+    expect(q('[data-player-action="sell"]').textContent).toMatch(/^Sell \+/);
+    const beforeSale = structuredClone(getState());
+    q('[data-player-action="sell"]').click();
+    expect(page.words()).toContain('Contract stays unchanged');
+    q('[data-sale-cancel]').click();
+    expect(getState()).toEqual(beforeSale);
     expect(page.querySelector('[data-player-rename]')).not.toBeNull();
+  });
+});
+
+describe('player sale and history routes', () => {
+  it('explicitly confirms an offer and returns once to the opening screen', () => {
+    const id = getState().lineup.starters[3]!; const back = vi.fn();
+    openPlayerPage(getState().squad.find(p => p.id === id)!, { kind: 'squad' }, { onClose: back });
+    expect(q('[data-club-history]').words()).toContain(getState().clubName);
+    q('[data-player-action="sell"]').click();
+    const confirm = q('[data-sale-confirm]'); confirm.click(); confirm.click();
+    expect(getState().squad.some(p => p.id === id)).toBe(false);
+    expect(back).toHaveBeenCalledOnce();
+    expect(body().querySelector('[data-player-page]')).toBeNull();
+  });
+  it('shows club history in rival and unsigned player pages', () => {
+    const rival = getState().league.clubs.find(c => c.squad)!;
+    openPlayerPage(rival.squad![0]!, { kind: 'rival', club: rival });
+    expect(q('[data-club-history]').words()).toContain(rival.name);
+    closeModal();
+    openPlayerPage(getState().freeAgents[0]!, { kind: 'freeAgent' });
+    expect(q('[data-club-history]').words()).toContain('No recorded club spells.');
   });
 });
 

@@ -87,6 +87,7 @@ import { afterEach, beforeEach, vi } from 'vitest';
 import { StubNode, stubDocument } from '../stubDom';
 import { createNewGame, getState } from '../../../src/core/state';
 import { bus } from '../../../src/core/events';
+import { initLeague } from '../../../src/systems/fixtures';
 import { openContractsScreen } from '../../../src/ui/screens/contracts';
 
 const slot = vi.hoisted(() => ({ screen: null as unknown, close: null as (() => void) | null }));
@@ -122,19 +123,39 @@ describe('Sell and Release disarm (#612)', () => {
   });
   afterEach(() => { slot.close?.(); slot.close = null; vi.useRealTimers(); vi.unstubAllGlobals(); });
 
-  it('the first tap arms a sale and the second does not remove the player', () => {
+  it('no buyer explains the refusal and leaves the player and funds unchanged', () => {
     const id = rows()[0]!.attrs['data-contract']!;
     const n = getState().squad.length;
     const money = getState().money;
     expect(sell(0).textContent).toBe('NO BUYER');
     sell(0).click();
-    expect(sell(0).textContent).toBe('REALLY SELL?');
-    expect(sell(0).classList.contains(ARMED_CLASS)).toBe(true);
+    expect(sell(0).textContent).toBe('NO BUYER');
+    expect((slot.screen as StubNode).words()).toContain('No club');
+    expect((slot.screen as StubNode).querySelector('[data-sale-confirm]')).toBeNull();
     vi.advanceTimersByTime(400);
     sell(0).click();
     expect(getState().squad.some((p) => p.id === id)).toBe(true);
     expect(getState().squad).toHaveLength(n);
     expect(getState().money).toBe(money);
+  });
+
+  it('a funded sale opens its actual quote, cancels safely, then leaves a sold row after confirmation', () => {
+    initLeague(getState());
+    const s = getState(); const p = s.squad[0]!;
+    p.stats = { speed: 90, strength: 90, stamina: 90, handling: 90, kicking: 90, footyIQ: 90 };
+    p.deal = { salary: 1000, startSeason: 1, endSeason: 1 };
+    for (const c of s.league.clubs) if (c.squad) {
+      c.cash = 1000000; c.squad = c.squad.map(x => ({ ...x, deal: { salary: 1000, startSeason: 1, endSeason: 3 } }));
+    }
+    openContractsScreen();
+    const screen = slot.screen as StubNode; const before = structuredClone(getState());
+    screen.querySelector(`[data-contract-sell="${p.id}"]`)!.click();
+    expect(screen.words()).toContain('Contract stays unchanged');
+    screen.querySelector('[data-sale-cancel]')!.click(); expect(getState()).toEqual(before);
+    screen.querySelector(`[data-contract-sell="${p.id}"]`)!.click();
+    screen.querySelector('[data-sale-confirm]')!.click();
+    expect(screen.querySelector(`[data-contract-gone="${p.id}"]`)!.words()).toContain('sold to');
+    expect(getState().squad.some(x => x.id === p.id)).toBe(false);
   });
 
   it('the same for Release: 150ms is ignored, 300ms goes through (#617)', () => {

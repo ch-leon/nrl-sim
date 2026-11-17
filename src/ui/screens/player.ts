@@ -1,3 +1,6 @@
+import { quotePlayerSale } from '../../systems/playerTransfers';
+import { saleConfirmation } from '../saleConfirmation';
+import { playerHistory } from '../playerHistory';
 import { discoveredFreeAgents } from '../../systems/playerCareer';
 // src/ui/screens/player.ts — the player page (N7, GitHub #185).
 //
@@ -165,6 +168,7 @@ export function playerActions(p: Player, ctx: PlayerContext, state: GameState): 
   const minWhy = `Squad at the minimum (${SQUAD_MIN})`;
   const terms = releaseTerms(p, state.season, state.week);
   const short = state.money < terms.payout;
+  const sale = quotePlayerSale(state, p.id);
   return [
     {
       id: 'renew',
@@ -179,9 +183,9 @@ export function playerActions(p: Player, ctx: PlayerContext, state: GameState): 
     },
     {
       id: 'sell',
-      label: 'No buyer',
-      enabled: false,
-      why: 'No club has bought him yet.',
+      label: sale.ok ? `Sell +${fmtMoney(sale.offer.fee)}` : 'No buyer',
+      enabled: sale.ok,
+      ...(sale.ok ? { detail: `Review offer from ${state.league.clubs.find(c => c.id === sale.offer.buyerId)!.name}.` } : { why: sale.message }),
     },
     {
       id: 'release',
@@ -378,6 +382,7 @@ export const PLAYER_CSS = `
 .nrl-player-expiring { color: var(--nrl-neg); }
 /* The middle column scrolls on its own; the left and the actions hold still. */
 .nrl-player-about { min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; padding-right: 4px; }
+.nrl-player [data-club-history] { flex: 0 0 auto; }
 .nrl-player h3 { flex: 0 0 auto; margin: 10px 0 4px; font-family: var(--nrl-f-label); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); }
 .nrl-player h3:first-child { margin-top: 0; }
 .nrl-player-stats { display: flex; flex-direction: column; flex: 0 0 auto; }
@@ -515,6 +520,7 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
     stopWait?.();
     stopWait = id ? armGuard(() => { armed = null; stopWait = null; atRest?.(); }) : null;
   };
+  let saleReview: HTMLElement | null = null;
   let closed = false;
   // Rename (#398): the field's open, and what's typed survives a re-render.
   let renaming: string | null = null;
@@ -604,12 +610,13 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
       ...(m.season || m.career ? [el('h3', { text: 'Record' })] : []),
       ...(m.season ? [line('This season', fmtTally(m.season))] : []),
       ...(m.career ? [line('Career', fmtTally(m.career))] : []),
+      playerHistory(p, state),
     );
 
     // Right: his jobs in the nine (N11), then the deals pinned at the foot.
     const side = el('div', { class: 'nrl-player-side' });
     const notes: { text: string; attn: boolean }[] = [];
-    if (m.roles) {
+    if (m.roles && !saleReview) {
       const roles = m.roles;
       // The Lineup screen's switches: picking the man already chosen goes back to the default.
       const role = (job: string, on: boolean, attr: 'kicker' | 'captain', pick: () => void): HTMLButtonElement => {
@@ -634,18 +641,27 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
       else if (a.detail) notes.push({ text: `${verb}: ${a.detail}`, attn: false });
     }
     if (ctx.kind === 'rival') notes.push({ text: `Plays for ${ctx.club.name}: not for sale`, attn: false });
-    if (notes.length) {
+    if (notes.length && !saleReview) {
       side.append(el('div', { class: 'nrl-player-why' },
         ...notes.map((n) => el('div', { class: n.attn ? 'nrl-attn' : '', text: n.text, attrs: { title: n.text } }))));
     }
     atRest = null;
-    if (m.actions.length) {
+    if (saleReview) side.append(saleReview);
+    else if (m.actions.length) {
       const actions = el('div', { class: 'nrl-player-actions' });
       for (const a of m.actions) {
         // Renew or Sign is the page's one primary; Sell and Release share the row under it.
         const primary = a.id === 'renew' || a.id === 'sign';
         const ask = armed === a.id ? a.confirm : undefined;
         const btn = button(ask ?? a.label, () => {
+          if (a.id === 'sell') {
+            arm(null);
+            saleReview = saleConfirmation(p.id, {
+              onCancel: () => { saleReview = null; render(); content.querySelector<HTMLButtonElement>('[data-player-action="sell"]')?.focus(); },
+              onSold: () => finish(),
+            });
+            render(); saleReview.querySelector<HTMLButtonElement>('[data-sale-cancel]')?.focus(); return;
+          }
           if (a.confirm && armed !== a.id) { arm(a.id); render(); return; }
           if (a.confirm && !armedTap(performance.now() - armedAt)) return;
           arm(null);
