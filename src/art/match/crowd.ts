@@ -79,8 +79,10 @@ export function drawSpectator(shirt: number, look: number, view: CrowdView, fram
   const b = new PixelBuffer(CROWD_FW, CROWD_FH);
   const px = (x: number, y: number, c: number): void => b.set(x, y, c);
   const rect = (x: number, y: number, w: number, h: number, c: number): void => b.fillRect(x, y, w, h, c);
-  const shirtShade = shade(shirt, 0.74);
-  const shirtLight = mix(shirt, 0xffffff, 0.22);
+  // Keep team colours recognizable while reducing the high-contrast shirt blocks
+  // that compete with the match at small screen sizes.
+  const shirtShade = shade(shirt, 0.82);
+  const shirtLight = mix(shirt, 0xffffff, 0.12);
   const skinShade = shade(f.skin, 0.78);
   const front = view === 'front';
   // The groan hunches the head down into the shoulders; looking up tips it back a row.

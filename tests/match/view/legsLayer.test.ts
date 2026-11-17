@@ -49,4 +49,17 @@ describe('legsMarks', () => {
     const s = sim.snapshot();
     expect(s.players.every((p) => typeof p.legs === 'number' && p.legs > 0 && p.legs <= 1)).toBe(true);
   });
+
+  it('hides fatigue marks during the whistle picture and restores them when live play resumes', () => {
+    const player = P('home', 0, { legs: 0.3 });
+    const live = snap([player]);
+    const whistle: Snapshot = { ...live, phase: { kind: 'full-time', since: 0 } };
+    const walkOn: Snapshot = { ...live, tick: 40, phase: { kind: 'restart', since: 38 }, clock: { half: 2, seconds: 0, minute: 40, siren: false, finished: false } };
+    const underway: Snapshot = { ...walkOn, tick: 41, clock: { ...walkOn.clock!, seconds: 1 } };
+    expect(legsMarks(live, FATIGUE)).toHaveLength(1);
+    expect(legsMarks(whistle, FATIGUE)).toEqual([]);
+    expect(legsMarks(walkOn, FATIGUE)).toEqual([]);
+    expect(legsMarks(underway, FATIGUE)).toHaveLength(1);
+    expect(legsMarks(live, FATIGUE)).toHaveLength(1);
+  });
 });

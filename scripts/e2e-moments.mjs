@@ -1,18 +1,20 @@
 // Actual engine moments, replay consistency and grounded shadows. No forced outcomes.
-// Seed 8 has every moment in its first 6,000 ticks (seed 1 no longer has a grubber in them).
+// After #649/#650/#652, seed 8 has no grubber before full time. Seed 28 supplies all seven:
+// punt 43, high 120, grubber 2378, error 5194, try 5235, routine 5374, goal strike 5404 (<6,000 ticks).
 // E2E_URL=http://localhost:4176/ CHROMIUM_PATH=/usr/bin/chromium node scripts/e2e-moments.mjs
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium, webkit } from 'playwright-core';
 const out=process.env.E2E_OUT ?? 'e2e-output/moments'; await mkdir(out,{recursive:true});
+const seed=28;
 const browser=process.env.E2E_BROWSER==='webkit'?await webkit.launch():await chromium.launch({executablePath:process.env.CHROMIUM_PATH ?? '/opt/pw-browsers/chromium',args:['--no-sandbox']});
 try {
  const page=await browser.newPage({viewport:{width:1280,height:800}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
- await page.goto(`${process.env.E2E_URL ?? 'http://localhost:5176/'}#lab?seed=8`);
+ await page.goto(`${process.env.E2E_URL ?? 'http://localhost:5176/'}#lab?seed=${seed}`);
  await page.waitForFunction(()=>window.__lab?.game.scene.getScene('Lab')?.view);
  await page.locator('.nrl-lab-collapse').click();
  const moments=await page.evaluate(()=>{const r=window.__lab.ctrl.runner;r.onEvents=null;const found={};
-  while(r.tick<6000){r.step();for(const p of r.cur.players){const ref={side:p.side,slot:p.slot,who:p.who};
+  while(r.tick<6000&&!r.finished){r.step();for(const p of r.cur.players){const ref={side:p.side,slot:p.slot,who:p.who};
    if(p.kick){const kind=p.kick.kind;found[kind]??={...ref,tick:p.kick.strikeTick};}
    if(p.aerialCatchTick===r.tick)found.high??={...ref,tick:r.tick};
    if(p.tryTick===r.tick)found.try??={...ref,tick:r.tick};
@@ -50,6 +52,6 @@ try {
  await page.screenshot({path:`${out}/react-${reacted}.png`});
  await page.setViewportSize({width:844,height:390});await seek(moments.high.tick+1);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
  await page.screenshot({path:`${out}/phone-high.png`});await seek(moments.try.tick+14);await page.screenshot({path:`${out}/phone-try.png`});
- assert.deepEqual(errors,[]);await writeFile(`${out}/report.json`,JSON.stringify({moments,errors,paused:true,replayed:true,groundedShadows:true,singleBall:true,mobile:true},null,2));
+ assert.deepEqual(errors,[]);await writeFile(`${out}/report.json`,JSON.stringify({seed,moments,errors,paused:true,replayed:true,groundedShadows:true,singleBall:true,mobile:true},null,2));
  console.log('PASS: actual punt, grubber, goal kick and the kicker\'s routine, high take, try/recovery/celebration, a reaction to an error or miss; one ball, grounded shadows, pause/seek and phone layout.');
 } finally {await browser.close();}

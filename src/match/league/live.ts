@@ -75,6 +75,7 @@ export class LiveSim extends LivePositioning implements MatchSim {
       const c = this.controlList[this.controlRead++]!;
       if (c.tick === this.tick && c.side === this.attacking && (c.kind !== 'kick' || this.tackles === SET_TACKLES - 1)) {
         this.pendingControl[c.side] = c;
+        this.cancelRuckDecision();
         // A manual decision can arrive during the AI's wind-up, including its
         // launch tick. Keep the animation lock, but let the input decide the action.
         if (this.phase.kind === 'play' && this.holder()?.side === c.side) this.pendingKick = null;
@@ -206,7 +207,14 @@ export class LiveSim extends LivePositioning implements MatchSim {
       ball = { x: h.body.pos.x, y: h.body.pos.y, lift: lying ? 0.3 : CARRY_LIFT, holder: { side: h.side, slot: h.slot } };
     } else if (b.kind === 'flight') {
       const f = flightAt(b, this.tick);
-      ball = { x: f.pos.x, y: f.pos.y, lift: f.lift, holder: null };
+      const receiver = b.receiver === null ? undefined : this.players[b.receiver];
+      const launch = b.via === 'pass' && b.t0 <= this.tick && this.tick < b.t0 + b.ticks && this.visualPass?.tick === b.t0 ? this.visualPass : null;
+      const source = launch && this.players.find(p => p.side === launch.player.side && p.slot === launch.player.slot && p.key === launch.player.who);
+      ball = { x: f.pos.x, y: f.pos.y, lift: f.lift, holder: null, flight: {
+        via: b.via, from: { ...b.from }, to: { ...b.to }, startedTick: b.t0, arrivesTick: b.t0 + b.ticks, fromLift: b.fromLift,
+        ...(receiver ? { receiver: { side: receiver.side, slot: receiver.slot, who: receiver.key } } : {}),
+        ...(source && launch ? { source: { player: { ...launch.player }, headX: launch.headX, headY: launch.headY, speed: launch.speed, odometer: launch.odometer, legs: launch.legs, blown: launch.blown } } : {}),
+      } };
     } else {
       ball = { x: b.pos.x, y: b.pos.y, lift: 0, holder: null };
     }
@@ -216,6 +224,7 @@ export class LiveSim extends LivePositioning implements MatchSim {
     const short = this.players.some((p) => !this.onField(p)) ? ` · ${this.side('home').length} v ${this.side('away').length}` : '';
     const snap: Snapshot = {
       tick: this.tick,
+      attacking: this.attacking,
       players,
       ball,
       label: `${this.names[this.attacking]} ball · ${state} · ${this.points.home}–${this.points.away} · ${clockText(this.half, this.clockTicks * TICK_S)}${this.siren && (kind === 'play' || kind === 'tackle' || kind === 'ruck') ? ' · siren' : ''} · ${legs}${short}`,
@@ -225,6 +234,10 @@ export class LiveSim extends LivePositioning implements MatchSim {
       phase: { kind: ph.kind, since: this.phaseSince, ...(this.golden ? { golden: true } : {}) },
     };
     const w = ph.kind === 'tackle' ? ph.wrestle : null;
+    if (ph.kind === 'ruck' && ph.decision && this.tick < ph.decision.until && this.ruckReceiver(ph)) {
+      const d = ph.decision;
+      snap.passCall = { from: { ...d.from }, to: { ...d.to! }, startedTick: d.decidedAt, releasesTick: d.until };
+    }
     const contact = this.visualContact;
     if (contact) {
       const c = this.players.find(p => p.key === contact.carrier.who && p.side === contact.carrier.side && p.slot === contact.carrier.slot);

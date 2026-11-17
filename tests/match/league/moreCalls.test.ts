@@ -42,12 +42,12 @@ interface Played {
 }
 
 /**
- * Seeds for the penalty pair: a home penalty in range is rare in a 6-minute half,
- * and one the captain doesn't tap himself (Tap and go's moment) rarer still.
- * The completed retreat (#625) reshuffled the previous fixtures: seed 6 has
- * both Take the two and Tap and go on at tick 4506.
+ * A home penalty in range is rare in a six-minute half. Early DH commitment
+ * (#672) reshuffles the old seeds 7/10/19/20: seed 15 offers Take the two at 7438;
+ * seed 41 offers both overrides at 2326 (25.04 m out). Keep actual penalties and
+ * captain choices, without forcing the award or changing the call assertions.
  */
-const PENALTY_SEEDS = [6];
+const PENALTY_SEEDS = [15, 41];
 
 /** Play with the home coach making `call` whenever he may (as a player at the tray does: a tap, in on the next tick). */
 function play(seed: number, call: CoachCall | null, minutes = 6, side: 'home' | 'away' = 'home'): Played {
@@ -206,7 +206,8 @@ describe('five more calls (#396): each does what it says', () => {
     let kicks = 0;
     let inReach = 0;
     let found = 0;
-    for (let seed = 1; seed <= 40; seed++) {
+    // 40/20s are rare: 60 seeds hold one with the last-tackle call (#650) on and off (was 40).
+    for (let seed = 1; seed <= 60; seed++) {
       const calls: CallInput[] = [];
       const sim = new LiveSim(H, A, seed, { length: { halves: 1, halfMinutes: 6 }, calls });
       let aimed = false;

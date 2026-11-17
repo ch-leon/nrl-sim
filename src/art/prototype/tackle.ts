@@ -149,7 +149,9 @@ export function contactPainter(out: PixelBuffer) {
   };
   const arm = (start: Point, elbow: Point, hand: Point, look: Appearance, dark = false) => {
     limb(start, elbow, hand, dark ? shade(look.skin, .7) : look.skin, look.build === 'stocky' ? 3 : 2);
-    if (look.tape) out.fillRect(hand[0], hand[1], 2, 2, 0xf6edda);
+    out.fillRect(hand[0], hand[1], 2, 2, dark ? shade(look.skin, .7) : look.skin);
+    if (!dark) out.set(hand[0] + 1, hand[1], shade(look.skin, 1.12));
+    if (look.tape) out.fillRect(hand[0], hand[1] - 1, 2, 1, 0xf6edda);
   };
   const legs = (p: Body, look: Appearance, kit: Kit) => {
     const width = look.build === 'stocky' ? 4 : 3;
@@ -159,6 +161,7 @@ export function contactPainter(out: PixelBuffer) {
       out.fillRect(foot[0], foot[1] - 3, width, 3, kit.sock);
       out.fillRect(foot[0], foot[1] - 2, width, 1, kit.trim);
       out.fillRect(foot[0] - 1, foot[1], width + 2, 2, dark ? shade(look.boots, .7) : look.boots);
+      out.fillRect(foot[0] - 1, foot[1] + 1, width + 2, 1, shade(look.boots, .55));
     }
   };
   const torso = (p: Body, look: Appearance, kit: Kit) => {
@@ -166,10 +169,10 @@ export function contactPainter(out: PixelBuffer) {
     const dx = p.hip[0] - p.shoulder[0]; const dy = p.hip[1] - p.shoulder[1];
     const length = Math.max(1, Math.hypot(dx, dy));
     const side: Point = [dy / length * width / 2, -dx / length * width / 2];
-    const corner = (p: Point, sign: number) => ({ x: p[0] + side[0] * sign, y: p[1] + side[1] * sign });
-    const corners = [corner(p.shoulder, -1), corner(p.shoulder, 1), corner(p.hip, 1), corner(p.hip, -1)];
+    const corner = (p: Point, sign: number, spread: number) => ({ x: p[0] + side[0] * sign * spread, y: p[1] + side[1] * sign * spread });
+    const corners = [corner(p.shoulder, -1, 1.2), corner(p.shoulder, 1, 1.2), corner(p.hip, 1, .85), corner(p.hip, -1, .85)];
     out.fillPoly(corners, kit.jersey);
-    out.line(corners[0]!.x, corners[0]!.y, corners[3]!.x, corners[3]!.y, kit.jerseyShade);
+    out.fillPoly([corners[0]!, corner(p.shoulder, -.55, 1), corner(p.hip, -.55, 1), corners[3]!], kit.jerseyShade);
     out.line(corners[0]!.x, corners[0]!.y, corners[1]!.x, corners[1]!.y, kit.jerseyLight);
     const chest = blend(p.shoulder, p.hip, .45);
     if (kit.pattern === 'v') {
@@ -187,6 +190,7 @@ export function contactPainter(out: PixelBuffer) {
     }
     const shorts = blend(p.shoulder, p.hip, .88);
     out.fillRect(shorts[0] - width / 2, shorts[1], width, 3, kit.shorts);
+    out.fillRect(shorts[0] - width / 2, shorts[1] + 2, width, 1, kit.shortsShade);
   };
   return { arm, legs, torso };
 }

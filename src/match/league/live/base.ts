@@ -50,6 +50,10 @@ export abstract class LiveBase {
   protected readonly captain: Record<Side, CaptainRead>;
   protected ball!: BallState;
   protected phase!: Phase;
+  /** An admitted input can supersede the early DH choice, even if its attempted pass/play fails. */
+  protected cancelRuckDecision(): void {
+    if (this.phase.kind === 'ruck' && this.phase.decision) this.phase.decision.cancelled = true;
+  }
   protected attacking: Side = 'home';
   protected dir: 1 | -1 = 1;
   protected tackles = 0;
@@ -71,8 +75,8 @@ export abstract class LiveBase {
   protected kickInAir: KickChoice | null = null;
   /** The kick in the air is a kick-off (chased as a line, not for a regather). */
   protected kickoffUp = false;
-  /** The kicker's call for this last tackle (rolled once): run it, or which kick. */
-  protected kickCall: 'run' | KickChoice | null = null;
+  /** The kicker's call for this last tackle (rolled once): run it, shift it wide (#650), or which kick. */
+  protected kickCall: 'run' | 'pass' | KickChoice | null = null;
   /** The kicker's field-goal call for this set (rolled once, only when one is on). */
   protected fgCall: boolean | null = null;
   /** A field goal about to leave the boot, and one in the air (with how it will end). */
@@ -561,7 +565,7 @@ export abstract class LiveBase {
   protected abstract resolveOut(): void;
   protected abstract endKick(side: Side, at: Vec): void;
   protected abstract groundInGoal(p: Player, raced?: boolean): boolean;
-  protected abstract startSetPiece(side: Side, spot: Vec, how: 'ptb' | 'tap', prefer?: number): void;
+  protected abstract startSetPiece(side: Side, spot: Vec, how: 'ptb' | 'tap', prefer?: number, tackles?: number): void;
   protected abstract startDropOut(side: Side): void;
   protected abstract penalize(offender: Side, spot: Vec, why: string, culprit: Player, kind: string, trait?: string, bin?: boolean): void;
   protected abstract takePenalty(award: Side, mark: Vec, choice: PenaltyChoice): void;
@@ -581,6 +585,7 @@ export abstract class LiveBase {
   protected abstract contest(c: Player, t: Player, committed: readonly Player[]): void;
   protected abstract stepWrestle(ph: Extract<Phase, { kind: 'tackle' }>, w: WrestleState): boolean;
   protected abstract goForBonus(h: Player): boolean;
+  protected abstract heldUpAtLine(h: Player): boolean;
   protected abstract score(scorer: Player): void;
   protected abstract committed(h: Player, defenders: readonly Player[]): Player[];
   protected abstract candidates(passer: Player, plan?: AttackPlan): Candidate[];

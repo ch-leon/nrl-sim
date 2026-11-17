@@ -52,7 +52,7 @@ const SAMPLES: SimEvent[] = [
   nobody('dead-ball'),
   ev('charge-down'), ev('handover'), ev('six-again'), ev('quick-ptb'), ev('slow-ptb'), ev('dart'),
   ev('line-break'), ev('step'), ev('fend'), ev('break-tackle'), ev('break-tackle', { detail: 'wrestle' }), ev('offload'), ev('cut-out'),
-  ev('tackle'), ev('tackle', { trait: 'Wrecking Ball II' }), ev('big-hit'), ev('run-down'), ev('intercept'), ev('gamble'), ev('strip'),
+  ev('tackle'), ev('tackle', { trait: 'Wrecking Ball II' }), ev('big-hit'), ev('run-down'), ev('held-up'), ev('intercept'), ev('gamble'), ev('strip'),
   ev('loose'), nobody('loose'), ev('error'), ev('error', { detail: 'contact' }),
   ev('gassed'), ev('blown'), ev('injury'), ev('interchange'),
   ev('penalty', { detail: 'offside' }), ev('penalty', { detail: 'high' }),

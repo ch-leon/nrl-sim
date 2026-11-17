@@ -26,7 +26,7 @@ import { DEFAULT_TACTICS } from '../league/presets';
 import { applyTuning } from '../league/tuning';
 import { labSheet, starTraits } from '../lab/sheets';
 import { POSITION_GROUPS, type Cell, type SideSpec } from './plan';
-import { FLOW, LAST_TACKLES, ORIGINS, PlayWatch, ScoreLine, type FlowKey, type LastTackleKey, type OriginKey } from './watch';
+import { FLOW, FirstReceivers, LAST_TACKLES, ORIGINS, PlayWatch, RECEIVERS, ScoreLine, TERRITORY, Territory, type FlowKey, type LastTackleKey, type OriginKey, type ReceiverKey, type TerritoryKey } from './watch';
 
 /** Exact fit fixtures belong to the headless harness, never the live game or saved sheets. */
 export class BalanceSim extends LiveSim {
@@ -59,6 +59,10 @@ export class BalanceSim extends LiveSim {
   get ballX(): number {
     return this.ballPos().x;
   }
+  /** Metres from the ball to the line the side with it is attacking (#650). */
+  get toGo(): number {
+    return this.toLineFor(this.attacking, this.ballPos());
+  }
 }
 
 /** A full match: two halves. Stretches scale their counts up to this. */
@@ -76,7 +80,7 @@ export const COUNTS = [
   'lostInContact', 'injuries', 'lineBreaks', 'coachCalls', 'callsPaid', 'completion',
   'sinBins', 'shortMin', 'binSwing', 'points', 'margin', 'homeMargin', 'goldenPoint', 'goldenPointWon', 'draws', 'possession',
   'bombs', 'bombsWon', 'bombsSpilled', 'grubbers', 'grubberTries', 'grubberRepeats', 'grubberDropouts', 'grubberTurnovers', 'kickTries',
-  'scrambles',
+  'scrambles', 'heldUp', 'heldUpMatches',
 ] as const;
 export type CountKey = (typeof COUNTS)[number];
 
@@ -100,6 +104,10 @@ export interface WatchStats {
   flow: Record<FlowKey, Stat>;
   origins: Record<OriginKey, Stat>;
   lastTackles: Record<LastTackleKey, Stat>;
+  /** Absent in results written before #649. */
+  receivers?: Record<ReceiverKey, Stat>;
+  /** Absent in results written before #650. */
+  territory?: Record<TerritoryKey, Stat>;
 }
 
 export interface CellResult {
@@ -381,6 +389,9 @@ export function countEvents(es: readonly SimEvent[], side?: Side): Record<CountK
       case 'run-down':
         c.runDowns++;
         break;
+      case 'held-up':
+        c.heldUp++;
+        break;
       case 'blown':
         c.blown++;
         break;
@@ -522,6 +533,8 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
     const flowPerSeed: Record<FlowKey, number>[] = [];
     const originsPerSeed: Record<OriginKey, number>[] = [];
     const lastPerSeed: Record<LastTackleKey, number>[] = [];
+    const receiversPerSeed: Record<ReceiverKey, number>[] = [];
+    const territoryPerSeed: Record<TerritoryKey, number>[] = [];
     let wrestleTicks = 0;
     let wins = 0;
     let draws = 0;
@@ -556,6 +569,8 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
       const bins = new BinSwing();
       const score = new ScoreLine(minutes * 60);
       const watch = new PlayWatch();
+      const receivers = new FirstReceivers();
+      const territory = new Territory();
       let inW = 0;
       let lastMen = 0;
       let nextLegs = 3;
@@ -598,7 +613,10 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
             if (pts > 0 && e.side) score.note(sim.matchSeconds, e.side, pts);
           }
         }
-        watch.tick(tickEvents, { phase: sim.phaseKind, lastPlay: sim.lastTackleUp, attacking: sim.inPossession, holder: sim.holderIndex, x: () => sim.ballX });
+        const view = { phase: sim.phaseKind, lastPlay: sim.lastTackleUp, attacking: sim.inPossession, holder: sim.holderIndex, x: () => sim.ballX };
+        watch.tick(tickEvents, view);
+        receivers.tick(view, sim.tackleCount);
+        territory.tick(tickEvents, view, sim.tackleCount, () => sim.toGo);
         const men = sim.wrestleMen;
         if (men > 0) {
           inW++;
@@ -634,6 +652,8 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
         flowPerSeed.push(score.result());
         originsPerSeed.push(watch.origins);
         lastPerSeed.push(watch.lastTackles);
+        receiversPerSeed.push(receivers.result());
+        territoryPerSeed.push(territory.result());
         const c = countEvents(events);
         c.wrestles = matchWrestles;
         c.held1 = held[1]!;
@@ -652,6 +672,8 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
         c.margin = Math.abs(sim.points.home - sim.points.away);
         c.homeMargin = sim.points.home - sim.points.away;
         c.draws = sim.points.home === sim.points.away ? 1 : 0;
+        // Held up over the line (#652): the share of matches with at least one (%), a share like completion.
+        c.heldUpMatches = c.heldUp > 0 ? 100 : 0;
         perSeed.push(c);
         if (sim.points.home > sim.points.away) wins++;
         else if (sim.points.home === sim.points.away) draws++;
@@ -673,7 +695,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
       noteTracked(playOne(sides.home, sides.away, s, false), false);
       if (bothWays) noteTracked(playOne(sides.away, sides.home, s, true), true);
     }
-    const counts = Object.fromEntries(COUNTS.map((k) => [k, stat(perSeed.map((c) => c[k] * (k === 'completion' || k === 'possession' ? 1 : scale)))])) as Record<CountKey, Stat>;
+    const counts = Object.fromEntries(COUNTS.map((k) => [k, stat(perSeed.map((c) => c[k] * (k === 'completion' || k === 'possession' || k === 'heldUpMatches' ? 1 : scale)))])) as Record<CountKey, Stat>;
     const sideStats = (matches: SideCounts[]): Record<SideCountKey, Stat> => Object.fromEntries(SIDE_COUNTS.map((k) => [k, stat(matches.map((c) => c[k] * scale))])) as Record<SideCountKey, Stat>;
     // Lead changes, tries by origin and last tackles are counts (scaled to a full match); the late margins are shares and points, which a stretch does not scale.
     const scaled = (k: string): number => (k === 'leadChanges' ? scale : 1);
@@ -681,6 +703,10 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
       flow: Object.fromEntries(FLOW.map((k) => [k, stat(flowPerSeed.map((f) => f[k] * scaled(k)))])) as Record<FlowKey, Stat>,
       origins: Object.fromEntries(ORIGINS.map((k) => [k, stat(originsPerSeed.map((o) => o[k] * scale))])) as Record<OriginKey, Stat>,
       lastTackles: Object.fromEntries(LAST_TACKLES.map((k) => [k, stat(lastPerSeed.map((o) => o[k] * scale))])) as Record<LastTackleKey, Stat>,
+      // A share and a count of distinct slots: neither scales with a stretch's length.
+      receivers: Object.fromEntries(RECEIVERS.map((k) => [k, stat(receiversPerSeed.map((o) => o[k]))])) as Record<ReceiverKey, Stat>,
+      // Early kicks are a count (scaled); where sets start is metres, not scaled.
+      territory: Object.fromEntries(TERRITORY.map((k) => [k, stat(territoryPerSeed.map((o) => o[k] * (k === 'earlyKicks' ? scale : 1)))])) as Record<TerritoryKey, Stat>,
     };
     const totalWrestles = perSeed.reduce((a, c) => a + c.wrestles, 0);
     return {

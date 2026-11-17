@@ -254,9 +254,15 @@ export async function runMatchPlays(browser, sizes = [[844, 390], [667, 375], [5
           for (let tries = 0; tries < 4 && !result; tries++) {
             await openTray();
             await waitTitle('Your ball');
+            // Called early in a set, so there are plays left to run it on: a play called on the fourth or the
+            // last tackle lapses when the set ends ("not run"), and four of those in a row failed this check
+            // (568x320 on 4c43c0f). Where the tackle chip is not showing, call as before.
             const play = await page.waitForFunction(() => {
               const b = document.querySelector('[data-tray-plays]:not([hidden]) [data-play]:not([disabled])');
               if (!b) return null;
+              const chip = document.querySelector('.nrl-mo-tackle');
+              const shown = chip && !chip.hidden && getComputedStyle(chip).display !== 'none';
+              if (shown && !/^TACKLE [123]\//.test(chip.textContent.trim())) return null;
               b.click();
               return b.hasAttribute('data-called') ? b.dataset.play : null;
             }, null, { timeout: TRAY_OPEN_WAIT_MS }).then((hdl) => hdl.jsonValue());

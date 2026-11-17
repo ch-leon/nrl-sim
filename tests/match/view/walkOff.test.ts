@@ -1,18 +1,27 @@
 // tests/match/view/walkOff.test.ts — the whistle's pictures (#675): the walk-off at half-time and
 // full time, the huddle before golden point, and nobody snapping when the next phase takes over.
 import { describe, expect, it } from 'vitest';
+import { LivePlayback, type LivePlaybackScene } from '../../../src/match/view/livePlayback';
+import { sideSheet } from '../../../src/match/balance/measure';
+import { createNewGame } from '../../../src/core/state';
+import type Phaser from 'phaser';
 import { LiveSim } from '../../../src/match/league/live';
 import { labSheet, DEFAULT_HOME, DEFAULT_AWAY } from '../../../src/match/lab/sheets';
 import { LiveView, type ActorView } from '../../../src/match/view/liveView';
+import type { ContactAnimation } from '../../../src/match/view/contactAnimation';
 import { fieldOffsetX, fieldToWorldPoint } from '../../../src/scenes/matchField';
+import { toFieldPt } from '../../../src/match/core/field';
+import { binnedSpot } from '../../../src/match/view/officials';
+import { NINES } from '../../../src/match/league/rules';
+import type { PlayerPicture } from '../../../src/match/view/playerPicture';
 import type { Snapshot } from '../../../src/match/core/snapshot';
-import { BreakClock, CAPTAIN_SLOT, FT_GONE, TUNNEL, breakMan, breakScene } from '../../../src/match/view/walkOff';
+import { BreakClock, CAPTAIN_SLOT, FT_GONE, FT_FADE, RESTART_FADE, HT_FADE, TUNNEL, breakMan, breakScene } from '../../../src/match/view/walkOff';
 
-interface Drawn { x: number; y: number; alpha: number }
+interface Drawn { x: number; y: number; alpha: number; visible: boolean }
 function surface() {
   const off = fieldOffsetX();
   const make = (): ActorView & Drawn => {
-    const a = { x: 0, y: 0, alpha: 1, place(x: number, y: number) { a.x = x; a.y = y; }, play() {}, fade(v: number) { a.alpha = v; } };
+    const a = { x: 0, y: 0, alpha: 1, visible: true, place(x: number, y: number) { a.x = x; a.y = y; }, play() {}, fade(v: number) { a.alpha = v; }, setSpriteVisible(v: boolean) { a.visible = v; } };
     return a;
   };
   return {
@@ -22,14 +31,22 @@ function surface() {
   };
 }
 
-/** Seed 12 with golden point on (the lab's `final=1`) and the historical seven-minute halves (#678 cut them to 2:30) is level at full time with the lab's default sides. */
-const GOLDEN_SEED = 12;
+/**
+ * A match level at full time, with golden point on (the lab's `final=1`) and the historical seven-minute
+ * halves (#678 cut them to 2:30), with the lab's default sides: the first such seed from 28 (seed 12 before
+ * the weighted receiver, #649, then 28; held up at the line, #652, reshuffled 28, and the last-tackle call, #650,
+ * found 63; so the seed is searched for rather than pinned).
+ */
+const GOLDEN_FROM = 28;
 
 function play(): Snapshot[] {
-  const sim = new LiveSim(labSheet(DEFAULT_HOME), labSheet(DEFAULT_AWAY), GOLDEN_SEED, { goldenPoint: true, length: { halves: 2, halfMinutes: 7 } });
-  const snaps: Snapshot[] = [sim.snapshot()];
-  while (!sim.finished) { sim.step(); snaps.push(sim.snapshot()); }
-  return snaps;
+  for (let seed = GOLDEN_FROM; seed < GOLDEN_FROM + 60; seed++) {
+    const sim = new LiveSim(labSheet(DEFAULT_HOME), labSheet(DEFAULT_AWAY), seed, { goldenPoint: true, length: { halves: 2, halfMinutes: 7 } });
+    const snaps: Snapshot[] = [sim.snapshot()];
+    while (!sim.finished) { sim.step(); snaps.push(sim.snapshot()); }
+    if (snaps.some((q) => q.phase?.kind === 'half-time' && !!q.phase.golden)) return snaps;
+  }
+  throw new Error('no level match in 60 seeds');
 }
 
 describe('the whistle (#675)', () => {
@@ -57,7 +74,8 @@ describe('the whistle (#675)', () => {
       const e = breakMan(early, p)!; const l = breakMan(later, p)!;
       if (p.side === winner) expect(['fistPump', 'celebrate', 'point']).toContain(e.action);
       else expect(['handsOnHips', 'handsOnHead']).toContain(e.action);
-      expect(e.dx).toBe(0); expect(e.alpha).toBe(1);
+      // Not moved yet (a man west of the tunnel stands at −0, which is still no step).
+      expect(Math.abs(e.dx)).toBe(0); expect(e.alpha).toBe(1);
       // Closer to the tunnel, never further from it, and fully gone by FT_GONE.
       const d0 = Math.hypot(TUNNEL.x - p.x, TUNNEL.y - p.y); const d1 = Math.hypot(TUNNEL.x - p.x - l.dx, TUNNEL.y - p.y - l.dy);
       expect(d1).toBeLessThan(d0);
@@ -97,7 +115,7 @@ describe('the whistle (#675)', () => {
       const frame = (prev: Snapshot, cur: Snapshot, a: number, held: number) => {
         view.draw(prev, cur, a, 1, held);
         const now = new Map<string, Drawn>();
-        for (const side of ['home', 'away'] as const) s.players[side].forEach((p, slot) => now.set(`${side}/${slot}`, { x: p.x, y: p.y, alpha: p.alpha }));
+        for (const side of ['home', 'away'] as const) s.players[side].forEach((p, slot) => now.set(`${side}/${slot}`, { x: p.x, y: p.y, alpha: p.alpha, visible: p.visible }));
         if (last) for (const [k, d] of now) {
           const b = last.get(k)!;
           // A step only counts where he is to be seen on both frames.
@@ -124,5 +142,199 @@ describe('the whistle (#675)', () => {
     expect(clock.advance(s, 100_000, 1, true)).toBe(FT_GONE); // and no further than the picture needs
     expect(clock.advance(snaps[ft - 50]!, 500, 1, true)).toBe(0); // a seek back: not a break
     expect(clock.advance(snaps[gp]!, 0, 1, true)).toBe(0);
+  });
+
+  it('starts again after a seek forward within the same break, not only back (#682)', () => {
+    const clock = new BreakClock();
+    expect(clock.advance(snaps[ht + 2]!, 0, 1, false)).toBe(0);
+    expect(clock.advance(snaps[ht + 2]!, 500, 1, true)).toBe(10); // the card has held the picture for 10 ticks
+    // Play carries on from the card: a frame is a tick or a few, at ×1 or at ×8, and the clock stays.
+    expect(clock.advance(snaps[ht + 3]!, 50, 1, false)).toBe(10);
+    expect(clock.advance(snaps[ht + 19]!, 100, 8, false)).toBe(10); // 100 ms at ×8 is 16 ticks
+    // A jump of 40 ticks in a 16 ms frame is a seek, in the same phase: the old clock is not carried over.
+    expect(clock.advance(snaps[ht + 59]!, 16, 1, false)).toBe(0);
+    expect(snaps[ht + 59]!.phase!.since).toBe(snaps[ht + 2]!.phase!.since);
+    // A held picture that is sought forward restarts from nothing too.
+    clock.advance(snaps[ht + 59]!, 500, 1, true);
+    expect(clock.advance(snaps[ht + 100]!, 0, 1, true)).toBe(0);
+  });
+});
+
+describe('a binned man at the whistle (#688)', () => {
+  const fixture = (kind: string, age = 0, golden = false): Snapshot => ({
+    tick: 100 + age, phase: { kind, since: 100, ...(golden ? { golden: true } : {}) },
+    clock: { half: 2, seconds: 0, minute: 5, siren: false, finished: kind === 'full-time' },
+    score: { home: 10, away: 4 }, label: '', events: [],
+    ball: { x: 50, y: 34, lift: 0, holder: null },
+    players: [
+      { side: 'home', slot: 0, who: 'bin-home', x: 49.5, y: 1, pose: 'idle', speed: 0, headX: 1, binned: true },
+      { side: 'home', slot: 1, who: 'home', x: 35, y: 40, pose: 'idle', speed: 0, headX: 1 },
+      { side: 'away', slot: 0, who: 'bin-away', x: 49.5, y: 1, pose: 'idle', speed: 0, headX: -1, binned: true },
+      { side: 'away', slot: 1, who: 'away', x: 65, y: 30, pose: 'idle', speed: 0, headX: -1 },
+      { side: 'home', slot: 2, who: 'second-bin', x: 49.5, y: 1, pose: 'idle', speed: 0, headX: 1, binned: true },
+    ],
+  });
+  const make = () => {
+    const contacts: (ContactAnimation | null)[] = [];
+    const focus: ({ side: 'home' | 'away'; x: number; y: number } | null)[] = [];
+    const s = { ...surface(), contact: { paint(state: ContactAnimation | null) { contacts.push(state); } }, focus: { carrier(target: { side: 'home' | 'away'; x: number; y: number } | null) { focus.push(target); } }, officials: { spot: binnedSpot, draw() {} } };
+    const pictures = new Map<string, PlayerPicture>();
+    for (const side of ['home', 'away'] as const) s.players[side].forEach((a, slot) => { a.paint = p => { pictures.set(`${side}/${slot}`, p); }; });
+    return { s, view: new LiveView(s), pictures, contacts, focus };
+  };
+  const seat = (s: ReturnType<typeof surface>, snap: Snapshot, slot = 0) => {
+    const at = binnedSpot(snap.players.find(p => p.side === 'home' && p.slot === slot)!, snap)!;
+    const f = toFieldPt(at), w = s.fieldToWorld(f.fx, f.fy);
+    return { x: Math.round(w.x), y: Math.round(w.y) };
+  };
+
+  it('fades both bins with their sides at half/full time and the golden-point huddle, without moving or celebrating', () => {
+    for (const [kind, golden, fade, gone] of [
+      ['half-time', false, NINES.halfTimeTicks - HT_FADE, NINES.halfTimeTicks],
+      ['full-time', false, FT_FADE, FT_GONE],
+      ['half-time', true, NINES.goldenPointBreakTicks - 10, NINES.goldenPointBreakTicks],
+    ] as const) {
+      const { s, view, pictures } = make(), snap = fixture(kind, 0, golden);
+      for (const age of [0, fade, (fade + gone) / 2, gone]) {
+        const scene = breakScene(snap, age, age)!;
+        const at = { ...snap, tick: snap.tick + age };
+        view.draw(at, at, 1);
+        for (const p of snap.players) {
+          const man = breakMan(scene, p)!, a = s.players[p.side][p.slot]!;
+          expect(a.alpha).toBe(man.alpha);
+          if (age === gone) expect(a.alpha).toBe(0);
+          if (!p.binned) continue;
+          const peer = breakMan(scene, { side: p.side, slot: 1 })!;
+          expect(man.alpha).toBe(peer.alpha);
+          expect(man).toMatchObject({ dx: 0, dy: 0, action: null, gait: -1 });
+          expect(pictures.get(`${p.side}/${p.slot}`)).toMatchObject({ action: 'armsFolded', possession: false });
+          const at = binnedSpot(p, snap)!, f = toFieldPt(at), w = s.fieldToWorld(f.fx, f.fy);
+          expect({ x: a.x, y: a.y }).toEqual({ x: Math.round(w.x), y: Math.round(w.y) });
+        }
+      }
+      expect(seat(s, snap, 2)).not.toEqual(seat(s, snap));
+    }
+  });
+
+  it('keeps live bins opaque, freezes on pause, seeks back exactly, and fades still-binned or returned men into the restart', () => {
+    const { s, view, pictures } = make(), live = fixture('play'), whistle = fixture('half-time');
+    const a = s.players.home[0]!, at = seat(s, live), clock = new BreakClock();
+    view.draw(live, live, 1); expect(a.alpha).toBe(1); expect({ x: a.x, y: a.y }).toEqual(at);
+    const held = clock.advance(whistle, (NINES.halfTimeTicks - HT_FADE / 2) * 50, 1, true);
+    view.draw(whistle, whistle, 1, 1, held);
+    const paused = { x: a.x, y: a.y, alpha: a.alpha, picture: pictures.get('home/0') };
+    expect(paused.alpha).toBe(.5);
+    for (let i = 0; i < 3; i++) view.draw(whistle, whistle, 1, 1, clock.advance(whistle, 1000, 1, false));
+    expect({ x: a.x, y: a.y, alpha: a.alpha, picture: pictures.get('home/0') }).toEqual(paused);
+    view.draw(whistle, whistle, 1, 1, NINES.halfTimeTicks); expect(a.alpha).toBe(0);
+    view.draw(live, live, 1); expect(a.alpha).toBe(1);
+    view.draw(whistle, whistle, 1, 1, held);
+    expect({ x: a.x, y: a.y, alpha: a.alpha, picture: pictures.get('home/0') }).toEqual(paused);
+    for (const golden of [false, true]) for (const returned of [false, true]) {
+      for (const age of [0, RESTART_FADE / 2, RESTART_FADE]) {
+        const restart = fixture('restart', age, golden);
+        if (returned) restart.players[0] = { ...restart.players[0]!, binned: false, x: 45, y: 30 };
+        view.draw(whistle, restart, 1);
+        expect(a.alpha).toBe(age / RESTART_FADE);
+        expect(pictures.get('home/0')!.action).toBe(returned ? 'idle' : 'armsFolded');
+        if (!returned) expect({ x: a.x, y: a.y }).toEqual(at);
+      }
+    }
+    view.draw(live, live, 1); expect(a.alpha).toBe(1);
+  });
+
+  it('leaves no lone binned actor after the real seed45 final whistle', () => {
+    // Current main's real witness: #lab?seed=45&final=1, full time 9075,
+    // home7 Xavier Stampton still in the bin. The old #688 witness used seven-minute halves.
+    const sim = new LiveSim(labSheet(DEFAULT_HOME), labSheet(DEFAULT_AWAY), 45, { goldenPoint: true });
+    let prev = sim.snapshot();
+    let liveContact: [Snapshot, Snapshot] | null = null;
+    while (!sim.finished && sim.tick < 12_000) {
+      const before = sim.snapshot();
+      sim.step();
+      const current = sim.snapshot();
+      if (!liveContact && current.contact) liveContact = [before, current];
+      prev = before;
+    }
+    const snap = sim.snapshot(), binned = snap.players.filter(p => p.binned);
+    expect(snap.phase?.kind).toBe('full-time');
+    expect([prev.tick, snap.tick]).toEqual([9074, 9075]);
+    expect(binned.map(p => [p.side, p.slot])).toEqual([['home', 7]]);
+    expect(liveContact).not.toBeNull();
+    const { s, view, contacts, focus } = make();
+    const [contactPrev, contactCur] = liveContact!;
+    view.draw(contactPrev, contactCur, 1);
+    expect(contacts[contacts.length - 1]).not.toBeNull();
+    const participants = [contactCur.contact!.carrier, ...contactCur.contact!.defenders];
+    expect(participants.every(p => !s.players[p.side][p.slot]!.visible)).toBe(true);
+    view.draw(prev, snap, 1);
+    expect(contacts[contacts.length - 1]).toBeNull();
+    expect(focus[focus.length - 1]).toBeNull();
+    expect(participants.every(p => s.players[p.side][p.slot]!.visible)).toBe(true);
+    const seats = binned.map(p => ({ x: s.players[p.side][p.slot]!.x, y: s.players[p.side][p.slot]!.y }));
+    for (const alpha of [0, 0.5, 0.999]) {
+      view.draw(prev, snap, alpha, 1, FT_GONE);
+      for (const p of snap.players) expect(s.players[p.side][p.slot]!.alpha, `${p.side}/${p.slot} at alpha ${alpha}`).toBe(0);
+    }
+    binned.forEach((p, i) => expect({ x: s.players[p.side][p.slot]!.x, y: s.players[p.side][p.slot]!.y }).toEqual(seats[i]));
+    // A seek back into that exact live contact reconstructs the shared picture.
+    view.draw(contactPrev, contactCur, 1);
+    expect(contacts[contacts.length - 1]).not.toBeNull();
+    expect(focus[focus.length - 1]).not.toBeNull();
+    expect(participants.every(p => !s.players[p.side][p.slot]!.visible)).toBe(true);
+    view.draw(snap, snap, 1);
+    for (const p of snap.players) expect(s.players[p.side][p.slot]!.alpha).toBe(1);
+  });
+});
+
+// ── The half-time card against the player's own pause (#682) ────────────────
+
+/** Anything a Phaser layer asks of the scene: a callable that returns itself. */
+const noop: unknown = new Proxy(function () {}, { get: (_t, p) => (p === Symbol.toPrimitive ? () => 0 : noop), apply: () => noop });
+function fakeScene(): LivePlaybackScene & Phaser.Scene {
+  const actor = () => ({ sprite: { x: 0, y: 0, flipX: false }, place() {}, play() {} });
+  const base = {
+    players: { home: Array.from({ length: 9 }, actor), away: Array.from({ length: 9 }, actor) },
+    ball: { place() {} },
+    cameras: { main: { zoom: 1, worldView: { x: 0, y: 0, width: 800, height: 400 }, shake() {} } },
+    fieldToWorld: (fx: number, fy: number) => ({ x: fx * 10, y: fy * 4 }),
+    focus: { carrier() {} },
+    sideColors: { home: 0xffffff, away: 0 },
+  };
+  return new Proxy(base, { get: (t, p) => (p in t ? (t as Record<string | symbol, unknown>)[p] : noop) }) as unknown as LivePlaybackScene & Phaser.Scene;
+}
+
+describe('the walk-off behind the half-time card and under a pause (#682)', () => {
+  it('plays on behind the card, stands still under the player’s pause, and plays on again when it is let go', () => {
+    createNewGame('Walk-off', 682);
+    const pb = new LivePlayback(fakeScene(), {
+      home: sideSheet('H', { rating: 70 }), away: sideSheet('A', { rating: 45 }), seed: 11, weather: 'clear', calls: [], speed: 8,
+      keyMoments: () => false, fixture: undefined, overlay: null, closeUpDone: () => {},
+    });
+    const inner = pb as unknown as { runner: { cur: Snapshot; tick: number }; view: { draw: (...a: unknown[]) => void } };
+    const shown: number[] = [];
+    const draw = inner.view.draw.bind(inner.view);
+    inner.view.draw = (...a: unknown[]) => { shown.push((a[4] as number | undefined) ?? 0); draw(...a); };
+    for (let i = 0; i < 400_000 && !pb.finished && inner.runner.cur.phase?.kind !== 'half-time'; i++) pb.update(16);
+    expect(inner.runner.cur.phase?.kind).toBe('half-time');
+    const frames = (n: number): number => { for (let i = 0; i < n; i++) pb.update(16); return shown[shown.length - 1]!; };
+    const tick = inner.runner.tick;
+    // The plan card holds the sim; the walk-off plays on behind it.
+    pb.hold(true);
+    const a = frames(10);
+    expect(a).toBeGreaterThan(5);
+    expect(frames(10)).toBeGreaterThan(a);
+    // The player pauses over it (the pause sheet): the picture, walk-off included, stands still.
+    pb.hold();
+    const b = frames(1);
+    expect(frames(60)).toBe(b);
+    pb.release();
+    expect(frames(10)).toBeGreaterThan(b);
+    // A pause with no card is the same: the sim is stood still and so is the picture.
+    pb.release(true);
+    pb.hold();
+    const c = frames(1);
+    expect(frames(60)).toBe(c);
+    expect(inner.runner.tick).toBe(tick);
   });
 });

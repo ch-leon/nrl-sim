@@ -42,4 +42,10 @@ describe('sprintMarks', () => {
     expect(gasColor(0.9, false)).toBe(GAS_COLORS.full);
     expect(sprintMarks(snap([P('home', 1, 50, { sprint: true, gas: 0.5 })], null))).toEqual([{ side: 'home', slot: 1, streak: true, bar: null, blown: false }]);
   });
+  it('clears gas bars and sprint trails from break pictures, then restores live marks', () => {
+    const live = snap([P('home', 1, 50, { sprint: true, gas: 0.1, blown: true, odometer: 8 })], { side: 'home', slot: 1 });
+    expect(sprintMarks(live)).toHaveLength(1);
+    expect(sprintMarks({ ...live, phase: { kind: 'full-time', since: live.tick } })).toEqual([]);
+    expect(sprintMarks(live)).toHaveLength(1);
+  });
 });

@@ -98,7 +98,8 @@ describe('field goals in the live sim', () => {
     const drops: Seen[] = [];
     const results: Seen[] = [];
     let after: Seen[] = [];
-    for (const seed of [1, 2, 3, 4, 5]) {
+    // Early DH choice (#672): seed 6 drops at 1853/5238; old seed 5 no longer drops.
+    for (const seed of [1, 2, 3, 4, 6]) {
       const { sim, events } = play(seed, { halves: 1, halfMinutes: 6 });
       drops.push(...events.filter((x) => x.e.kind === 'drop-goal'));
       const fgs = events.filter((x) => x.e.kind === 'field-goal');
@@ -147,7 +148,8 @@ describe('bonus-zone tries (Nines)', () => {
   it('a carrier clear over the line goes round under the posts: a five-point try, grounded in the zone', () => {
     let bonus = 0;
     let plain = 0;
-    for (let seed = 1; seed <= 10 && (bonus < 2 || plain < 2); seed++) {
+    // Up to 20 seeds (10 until held up at the line, #652, and the last-tackle call, #650, together left 1–10 short).
+    for (let seed = 1; seed <= 20 && (bonus < 2 || plain < 2); seed++) {
       const { events } = play(seed);
       for (const t of events.filter((x) => x.e.kind === 'try')) {
         const scorer = t.snap.players.find((p) => p.side === t.e.side && p.slot === t.e.slot)!;

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Side, SimEvent } from '../../../src/match/core/snapshot';
 import { MATCH_MINUTES, measureCell, type CellResult } from '../../../src/match/balance/measure';
 import { reportMarkdown, sharesOf } from '../../../src/match/balance/report';
-import { PlayWatch, ScoreLine, type TickView } from '../../../src/match/balance/watch';
+import { FirstReceivers, PlayWatch, ScoreLine, Territory, type TickView } from '../../../src/match/balance/watch';
 
 const ev = (tick: number, kind: string, side?: Side, detail?: string): SimEvent => ({ tick, kind, text: '', ...(side ? { side } : {}), ...(detail ? { detail } : {}) });
 
@@ -250,5 +250,75 @@ describe('the report', () => {
     expect(line).not.toContain('(');
     const both = reportMarkdown({ plan, meta, results: [old, { ...old, variant: 'again', watch: { ...fresh!, flow: { ...fresh!.flow, leadChanges: stat(fresh!.flow.leadChanges.mean + 3) } } }] });
     expect(both).toMatch(/\| again \| [\d.]+ \(\+3\.0/);
+  });
+  it('adds the first-receiver columns last, with a dash for results from before them (#649)', () => {
+    expect(reportMarkdown({ plan, meta, results: [old] })).toContain('| Last tackle pass % | 1st receiver same man % | 1st receiver slots |');
+    // Results from before #649 lack the #650 columns after them too (#650: four dashes, was two).
+    const { receivers: _, territory: _t, ...older } = fresh!;
+    const md = reportMarkdown({ plan, meta, results: [{ ...old, watch: older }] });
+    // The baseline's second (watchability) row.
+    const line = md.split('\n').filter((l) => l.startsWith('| baseline | ')).pop()!;
+    expect(line.trim().endsWith('| — | — | — | — |')).toBe(true);
+    expect(line.split('—').length).toBe(5);
+  });
+  it('adds the second-last kicks and set start columns last, with a dash for results from before them (#650)', () => {
+    expect(reportMarkdown({ plan, meta, results: [old] })).toContain('| 1st receiver slots | 2nd-last kicks | Set start m to go |');
+    const { territory: _, ...older } = fresh!;
+    const line = reportMarkdown({ plan, meta, results: [{ ...old, watch: older }] }).split('\n').filter((l) => l.startsWith('| baseline | ')).pop()!;
+    expect(line.trim().endsWith('| — | — |')).toBe(true);
+    expect(line.split('—').length).toBe(3);
+  });
+});
+
+describe('territory (#650)', () => {
+  it('counts kicks on the second-last tackle only, and where a set starts after the ball changes hands', () => {
+    const w = new Territory();
+    let toGo = 70;
+    const at = () => toGo;
+    // A kick hands the ball over as it is struck (the set reads 0 on its tick): the tick before says which tackle it was.
+    w.tick([], view({ attacking: 'home' }), 2, at);
+    w.tick([ev(1, 'kick', 'home', 'long')], view({ attacking: 'home' }), 0, at); // struck on tackle 3: not counted
+    w.tick([], view({ attacking: 'home', phase: 'ruck' }), 3, at); // same side's ruck: no set start
+    toGo = 64;
+    w.tick([ev(2, 'kick', 'home', 'grubber')], view({ attacking: 'away' }), 0, at); // struck on the second-last; the ball changes hands…
+    w.tick([], view({ attacking: 'away', phase: 'ruck' }), 1, at); // …its first play-the-ball
+    toGo = 30;
+    w.tick([], view({ attacking: 'away', phase: 'ruck' }), 2, at); // later rucks: not again
+    toGo = 80;
+    w.tick([], view({ attacking: 'home', phase: 'ruck' }), 0, at);
+    expect(w.result()).toEqual({ earlyKicks: 1, startM: 72 });
+    expect(new Territory().result()).toEqual({ earlyKicks: 0, startM: 0 });
+  });
+});
+
+describe('first receivers (#649)', () => {
+  // Home is 0..8, away 9..17; the hooker (slot 6) plays the ball at the ruck.
+  const ruck = (w: FirstReceivers, tackle: number, then: number[], end = 'tackle'): void => {
+    w.tick(view({ phase: 'ruck', holder: 6 }), tackle);
+    w.tick(view({ phase: 'play', holder: -1 }), tackle); // the pass in the air
+    for (const h of then) w.tick(view({ phase: 'play', holder: h }), tackle);
+    w.tick(view({ phase: end, holder: -1 }), tackle);
+  };
+  it('counts the first man after the dummy-half, not a dart, a turnover or the men after him', () => {
+    const w = new FirstReceivers();
+    ruck(w, 1, [5, 4]); // to the halfback, who passes on: only the halfback counts
+    ruck(w, 1, [6]); // a dart: nobody
+    ruck(w, 1, [12]); // picked off: nobody
+    ruck(w, 1, [5]);
+    expect(w.result()).toEqual({ sameMan: 100, slots: 0.5 });
+  });
+  it('compares first receivers on the same tackle only, and reads nothing with no pair', () => {
+    const w = new FirstReceivers();
+    ruck(w, 1, [5]);
+    ruck(w, 1, [7]);
+    ruck(w, 2, [7]);
+    expect(w.result()).toEqual({ sameMan: 0, slots: 1 });
+    const v = new FirstReceivers();
+    ruck(v, 1, [5]);
+    ruck(v, 1, [5]);
+    ruck(v, 1, [4]);
+    // Pairs: 3·2 = 6, same 2·1 = 2.
+    expect(v.result().sameMan).toBeCloseTo(100 / 3);
+    expect(new FirstReceivers().result()).toEqual({ sameMan: 0, slots: 0 });
   });
 });

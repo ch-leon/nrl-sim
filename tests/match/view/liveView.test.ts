@@ -232,3 +232,91 @@ describe('LiveView', () => {
     expect(s.players.home[2]!.scale).toBe(2);
   });
 });
+
+it('aligns current-pass sprite centres with painted moving/tired anchors and the interpolated receiver, preserving ground placement', async () => {
+  const { PlayerFrameCache } = await import('../../../src/scenes/matchPlayers');
+  const { buildKit } = await import('../../../src/art/match/kit');
+  const { pictureContext, playerPicture, strideFor, tiredLevel } = await import('../../../src/match/view/playerPicture');
+  const { screenPlayerFacing } = await import('../../../src/match/view/screenFacing');
+  const kit = buildKit(0xe6b632, 0x21394a, 'v'), cache = new PlayerFrameCache({ home: kit, away: kit });
+  const from = player({ who: 'passer', x: 50, y: 34, pose: 'pass', slot: 5, headY: .1, speed: 6, odometer: 11, legs: .2 });
+  const to = player({ who: 'receiver', x: 49, y: 15, pose: 'run', slot: 1, headY: .1, speed: 6, odometer: 15, legs: .2 });
+  const flight = { via: 'pass' as const, from: { x: 50, y: 34 }, to: { x: 49, y: 15 }, startedTick: 100, arrivesTick: 116, fromLift: 1,
+    receiver: { side: to.side, slot: to.slot, who: to.who! }, source: { player: { side: from.side, slot: from.slot, who: from.who! }, headX: from.headX, headY: from.headY!, speed: 6, odometer: 11, legs: .2, blown: false } };
+  const s = surface();
+  let shown: { x: number; y: number; lift: number; motion: import('../../../src/match/view/liveView').BallMotion | undefined } | undefined;
+  s.ball.place = (x, y, lift, _depth, motion) => { shown = { x, y, lift, motion }; };
+  for (const actor of s.players.home) { actor.paint = () => {}; actor.ballAnchor = p => cache.ballAnchor(p); }
+  const view = new LiveView(s);
+  const release = snap(100, [from, to], { x: 50, y: 34, lift: 1, holder: null, flight });
+  const held = snap(99, [from, to], { x: 50, y: 34, lift: 1, holder: { side: 'home', slot: 5 } });
+  view.draw(held, release, 1);
+  const face = screenPlayerFacing(from, from), tired = tiredLevel(from);
+  const sourceAnchor = cache.ballAnchor({ who: from.who!, action: 'carry', frame: 0, strideFrame: strideFor(from, from, 100), ...(tired ? { tired } : {}), possession: true, ...face });
+  const sourceField = toFieldPt(flight.from), sourceWorld = s.fieldToWorld(sourceField.fx, sourceField.fy);
+  expect(shown!.x + shown!.motion!.offsetX!).toBeCloseTo(Math.round(sourceWorld.x) + sourceAnchor.x);
+  expect(shown!.y - shown!.lift - 1.5 + shown!.motion!.offsetY!).toBeCloseTo(Math.round(sourceWorld.y) + sourceAnchor.y);
+  const beforeReceiver = { ...to, x: to.x - .3, odometer: 14.7 };
+  const before = snap(114, [from, beforeReceiver], { x: 49.125, y: 17.375, lift: .4, holder: null, flight });
+  const last = snap(115, [from, to], { x: 49.0625, y: 16.1875, lift: .2, holder: null, flight });
+  for (const alpha of [.25, .5, 1]) {
+    view.draw(before, last, alpha);
+    const ground = toFieldPt({ x: before.ball.x + (last.ball.x - before.ball.x) * alpha, y: before.ball.y + (last.ball.y - before.ball.y) * alpha });
+    const expectedGround = s.fieldToWorld(ground.fx, ground.fy);
+    expect(shown!.x).toBe(Math.round(expectedGround.x)); expect(shown!.y).toBe(Math.round(expectedGround.y));
+    const picture = playerPicture(to, beforeReceiver, 115, null, 1, pictureContext(last, before));
+    const anchor = cache.ballAnchor({ ...picture, action: 'catch', frame: 0, possession: true });
+    const aimed = toFieldPt(flight.to), aim = s.fieldToWorld(aimed.fx, aimed.fy);
+    const actual = s.players.home[1]!, u = (114 + alpha - 100) / 16;
+    expect(shown!.motion!.offsetX).toBeCloseTo(sourceAnchor.x * (1 - u) + (anchor.x + actual.x - aim.x) * u);
+    expect(shown!.motion!.offsetY).toBeCloseTo((sourceAnchor.y + 11.5) * (1 - u) + (anchor.y + actual.y - aim.y + 1.5) * u);
+    const cold = new LiveView(s); cold.draw(before, last, alpha);
+    expect(shown!.motion!.offsetX).toBeCloseTo(sourceAnchor.x * (1 - u) + (anchor.x + actual.x - aim.x) * u);
+  }
+});
+
+it('joins the pinned seed-1 short and long passes to the actual painted catch without an added ball hop', async () => {
+  // Early DH commitment (#672) changes recipients: pickup 169, short pass 175→180 (5 ticks).
+  // The later long moving pass is 3303→3322 (19 ticks), from Sonny Tamihana at 6.9 m/s.
+  const { LiveSim } = await import('../../../src/match/league/live');
+  const { labSheet, DEFAULT_HOME, DEFAULT_AWAY } = await import('../../../src/match/lab/sheets');
+  const { PlayerFrameCache } = await import('../../../src/scenes/matchPlayers');
+  const { castLooks } = await import('../../../src/art/prototype/player');
+  const { buildKit } = await import('../../../src/art/match/kit');
+  const home = labSheet(DEFAULT_HOME), away = labSheet(DEFAULT_AWAY), sim = new LiveSim(home, away, 1);
+  const kit = buildKit(0xe6b632, 0x21394a, 'v'), cache = new PlayerFrameCache({ home: kit, away: kit }, castLooks([home, away]));
+  const s = surface(), pictures = new Map<string, import('../../../src/match/view/playerPicture').PlayerPicture>();
+  for (const side of ['home', 'away'] as const) s.players[side].forEach((actor, slot) => {
+    actor.paint = p => { pictures.set(`${side}/${slot}`, p); };
+    actor.ballAnchor = p => cache.ballAnchor(p);
+  });
+  let centre = { x: 0, y: 0 };
+  s.ball.place = (x, y, lift, _depth, motion) => { centre = { x: x + (motion?.offsetX ?? 0), y: y - lift - 1.5 + (motion?.offsetY ?? 0) }; };
+  const view = new LiveView(s), records = new Map<number, { centre: { x: number; y: number }; previous: { x: number; y: number } }>();
+  let before = sim.snapshot(), previousCentre = centre, selected = 0;
+  for (let tick = 1; tick <= 3323; tick++) {
+    sim.step(); const cur = sim.snapshot(); view.draw(before, cur, 1);
+    if (tick === 175 || tick === 3303) {
+      expect(cur.ball.flight?.startedTick).toBe(tick);
+      expect(cur.ball.flight?.arrivesTick).toBe(tick === 175 ? 180 : 3322);
+      expect(cur.ball.flight?.source).toBeDefined();
+      if (tick === 3303) expect(cur.ball.flight!.source!.speed).toBeGreaterThan(6);
+    }
+    if (tick === 179 || tick === 3321) records.set(tick, { centre: { ...centre }, previous: { ...previousCentre } });
+    if (tick === 180 || tick === 3322) {
+      const holder = cur.ball.holder!;
+      expect(holder).not.toBeNull();
+      const picture = pictures.get(`${holder.side}/${holder.slot}`)!;
+      expect(picture).toMatchObject({ action: 'catch', frame: 0, possession: true });
+      const actor = s.players[holder.side][holder.slot]!, anchor = cache.ballAnchor(picture);
+      // Compare the actually painted held centre, never the hidden standalone ball sprite.
+      const painted = { x: actor.x + anchor.x, y: actor.y + anchor.y }, last = records.get(tick - 1)!;
+      const step = Math.hypot(last.centre.x - last.previous.x, last.centre.y - last.previous.y);
+      const handoff = Math.hypot(painted.x - last.centre.x, painted.y - last.centre.y);
+      expect(handoff).toBeLessThan(step * 1.8 + 3);
+      selected++;
+    }
+    previousCentre = { ...centre }; before = cur;
+  }
+  expect(selected).toBe(2);
+});

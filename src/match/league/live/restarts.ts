@@ -5,13 +5,13 @@ import { bounceFlight, kickFlight, landed, rollFlight, type BallState } from '..
 import type { Side } from '../../core/snapshot';
 import { dist, type Vec } from '../../core/vec';
 import { FULLBACK } from '../roles';
-import { pickReceiver } from '../tactics';
+import { MAX_LAT_M, pickReceiver, pickReceiverWeighted } from '../tactics';
 import { NINES } from '../rules';
 import { conversionSpot, goalChance, goalStrikeTick, postsFor } from '../goals';
 import { PENALTY, offsideChance } from '../penalties';
 import { TOUCH, exitPoint, inOwnInGoal, isFortyTwenty, ownLineX, touchRestartSpot, twentySpot } from '../touch';
 import { LIVE } from './knobs';
-import { other, type Player, type Phase } from './types';
+import { other, type Player, type Phase, type RuckDecision } from './types';
 import { LivePlay } from './play';
 
 export abstract class LiveRestarts extends LivePlay {
@@ -63,8 +63,16 @@ export abstract class LiveRestarts extends LivePlay {
     }
     // 'dh': wait for the heel to arrive, a beat, then move it.
     const h = this.holder();
-    if (!h || h !== this.dummyHalf(this.attacking)) return;
+    if (!h || h !== this.dummyHalf(this.attacking)) { this.cancelRuckDecision(); return; }
     if (ph.heldAt === 0) ph.heldAt = this.tick;
+    if (ph.decision?.to && !this.ruckReceiver(ph)) ph.decision.cancelled = true;
+    const release = ph.heldAt + LIVE.dhHoldTicks;
+    // Scripted/controlled decisions keep their existing release-time path. No extra hold or roll.
+    if (!ph.decision && LIVE.dhDecisionLeadTicks > 0 && this.tick < release
+      && this.tick >= release - Math.min(LIVE.dhHoldTicks, LIVE.dhDecisionLeadTicks)
+      && this.sheetPlays[this.attacking].length === 0 && !this.pendingPlay[this.attacking] && !this.pendingControl[this.attacking]) {
+      ph.decision = this.chooseRuck(h, release);
+    }
     if (this.tick < ph.heldAt + LIVE.dhHoldTicks) return;
     this.lastPlay = this.tackles === SET_TACKLES - 1;
     const intent = this.pendingControl[this.attacking];
@@ -82,25 +90,57 @@ export abstract class LiveRestarts extends LivePlay {
       this.phase = { kind: 'play' };
       return;
     }
-    let receiver: number | null = null;
-    if (this.lastPlay) {
-      const k = this.kicker(this.attacking);
-      if (!this.locked(k) && this.tick >= k.busyUntil) receiver = this.indexOf(k);
-    }
-    // The coach's Grubber or 40/20 (#396): the dummy-half finds the kicker rather than dart (no roll for it).
-    const toKicker = this.lastPlay && receiver !== null && (this.callState[this.attacking].attack === 'grubber' || this.callState[this.attacking].attack === 'forty-twenty');
-    if (receiver === null) receiver = pickReceiver(h.body.pos, this.dir, this.candidates(h));
-    if (receiver === null || (!toKicker && this.rng.next() < LIVE.dartChance)) {
-      // Dummy-half dart.
+    const decision = ph.decision ?? this.chooseRuck(h, release);
+    // A cancelled/invalid commitment becomes a carry, never a second unseen receiver draw.
+    // A later explicit last-tackle kick call retains its deterministic DH-to-kicker override.
+    const calledKick = this.lastPlay && ['grubber', 'forty-twenty'].includes(this.callState[this.attacking].attack ?? '');
+    const kicker = calledKick ? this.kicker(this.attacking) : null;
+    const override = kicker && !this.locked(kicker) && this.tick >= kicker.busyUntil ? kicker : null;
+    const receiver = decision.cancelled ? override : ph.decision ? this.ruckReceiver(ph)
+      : decision.to ? this.at(decision.to.side, decision.to.slot) : null;
+    if (!receiver) {
       h.catchTick = this.tick;
       h.decided = false;
       h.pose = 'run';
       h.poseUntil = 0;
       this.emit('dart', `${h.name} darts from dummy-half`, h);
-    } else {
-      this.pass(h, this.players[receiver]!);
-    }
+    } else this.pass(h, receiver);
     this.phase = { kind: 'play' };
+  }
+
+  private chooseRuck(h: Player, until: number): RuckDecision {
+    const last = this.tackles === SET_TACKLES - 1;
+    let receiver: number | null = null, kicker = false;
+    if (last) {
+      const k = this.kicker(this.attacking);
+      if (!this.locked(k) && this.tick >= k.busyUntil) { receiver = this.indexOf(k); kicker = true; }
+    }
+    // The coach's Grubber or 40/20 (#396): the dummy-half finds the kicker rather than dart (no roll for it).
+    const toKicker = last && receiver !== null && (this.callState[this.attacking].attack === 'grubber' || this.callState[this.attacking].attack === 'forty-twenty');
+    if (receiver === null) {
+      // The first receiver (#649): weighted like an open-play pass while it is on at the ruck, one roll before the dart's.
+      receiver = LIVE.receiverMargin > 0 && LIVE.receiverAtRuck > 0
+        ? pickReceiverWeighted(h.body.pos, this.dir, this.candidates(h), MAX_LAT_M, 0, LIVE.receiverMargin, LIVE.receiverSpread, this.rng.next())
+        : pickReceiver(h.body.pos, this.dir, this.candidates(h));
+    }
+    if (receiver === null || (!toKicker && this.rng.next() < LIVE.dartChance)) {
+      receiver = null;
+    }
+    const ref = (p: Player) => ({ side: p.side, slot: p.slot, who: p.key });
+    return { from: ref(h), to: receiver === null ? null : ref(this.players[receiver]!), decidedAt: this.tick, until, kicker };
+  }
+
+  /** Pure identity/eligibility check, also used by snapshot projection. Never recruits a replacement. */
+  protected ruckReceiver(ph: Extract<Phase, { kind: 'ruck' }>): Player | null {
+    const d = ph.decision, h = this.holder();
+    if (!d?.to || d.cancelled || ph.stage !== 'dh' || this.tick > d.until || !h || h !== this.dummyHalf(this.attacking)
+      || h.side !== d.from.side || h.slot !== d.from.slot || h.key !== d.from.who
+      || this.pendingControl[this.attacking] || this.pendingPlay[this.attacking]) return null;
+    const to = this.side(h.side).find(p => p.side === d.to!.side && p.slot === d.to!.slot && p.key === d.to!.who);
+    if (!to) return null;
+    if (d.kicker) return to === this.kicker(h.side) && !this.locked(to) && this.tick >= to.busyUntil ? to : null;
+    const candidate = this.candidates(h).find(c => this.players[c.idx] === to);
+    return candidate && pickReceiver(h.body.pos, this.dir, [candidate]) !== null ? to : null;
   }
 
   protected stepTry(ph: Extract<Phase, { kind: 'try' }>): void {
@@ -269,15 +309,16 @@ export abstract class LiveRestarts extends LivePlay {
    * A restart in play: the side gets the ball at `spot` — a play-the-ball (after
    * touch) or a tap (a 20 m restart, a 40/20). A player walks the ball to the
    * spot, both sides set, then play goes on. A stoppage: the coach can freshen up.
+   * `tackles`: the count the set carries on from (held up over the line, #652); a fresh set otherwise.
    */
-  protected startSetPiece(side: Side, spot: Vec, how: 'ptb' | 'tap', prefer?: number): void {
+  protected startSetPiece(side: Side, spot: Vec, how: 'ptb' | 'tap', prefer?: number, tackles = 0): void {
     this.callSwaps();
     const free = this.side(side).filter((p) => p.subFor === null && p !== this.dummyHalf(side));
     const pick = (prefer !== undefined ? free.find((p) => p.slot === prefer) : undefined) ?? [...free].sort((a, b) => dist(a.body.pos, spot) - dist(b.body.pos, spot))[0] ?? this.fullback(side);
     this.ball = { kind: 'held', by: this.indexOf(pick) };
     this.attacking = side;
     this.dir = this.dirOf(side);
-    this.tackles = 0;
+    this.tackles = tackles;
     this.lastPlay = false;
     this.kickCall = this.fgCall = null;
     this.pendingKick = null;

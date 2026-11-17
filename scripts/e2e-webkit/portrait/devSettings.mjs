@@ -93,6 +93,7 @@ export async function runDevSettings(browser) {
     // 2. The old Labs URL shows it; the career continues from the title.
     await page.goto(`${BASE}&labs=1`);
     await page.locator('[data-nrl-continue-1]').tap();
+    await page.waitForFunction(() => typeof window.__nrlState === 'function');
     if (await page.locator('.nrl-tutorial-skip').count()) await page.locator('.nrl-tutorial-skip').tap();
     const clubName = await page.evaluate(() => window.__nrlState().clubName);
     await page.evaluate(() => window.dispatchEvent(new Event('pagehide'))); // whatever is unsaved lands now, as a backgrounded tab would
@@ -254,6 +255,8 @@ export async function runDevSettings(browser) {
     if (left.length) throw new Error(`playtest keys left after Return: ${left}`);
     if (await page.locator('.nrl-dev-marker').count()) throw new Error('the TEST CAREER tag stayed after Return');
     await page.locator('[data-nrl-continue-1]').tap();
+    // Continue resolves the title before async boot installs the E2E hooks (main.ts).
+    await page.waitForFunction(() => typeof window.__nrlState === 'function');
     if (await page.locator('.nrl-tutorial-skip').count()) await page.locator('.nrl-tutorial-skip').tap();
     const back = await page.evaluate(() => window.__nrlState().clubName);
     if (back !== clubName) throw new Error(`continued into ${back}, want ${clubName}`);

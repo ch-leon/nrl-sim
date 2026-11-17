@@ -6,6 +6,7 @@
 import type Phaser from 'phaser';
 import type { Side, Snapshot } from '../core/snapshot';
 import type { TraitRoster } from './traitLayer';
+import { breakKind } from './walkOff';
 
 /** A chaser this close to the carrier gets his gas bar shown too (metres). */
 export const CHASE_BAR_M = 10;
@@ -40,6 +41,7 @@ export interface SprintMark {
 
 /** What to draw this frame: streaks for sprinters, gas bars for the carrier and his chasers. */
 export function sprintMarks(s: Snapshot, isJets?: (side: Side, who: string | undefined) => boolean): SprintMark[] {
+  if (breakKind(s)) return [];
   const holder = s.ball.holder ? s.players.find((p) => p.side === s.ball.holder!.side && p.slot === s.ball.holder!.slot) : undefined;
   const out: SprintMark[] = [];
   for (const p of s.players) {

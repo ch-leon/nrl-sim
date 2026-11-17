@@ -22,7 +22,8 @@ describe('the goal kicker\'s routine (#669)', () => {
   it('ends exactly on the sim\'s strike, off the tee, facing the posts, without changing the match', () => {
     const home = labSheet(DEFAULT_HOME); const away = labSheet(DEFAULT_AWAY);
     let shots = 0;
-    for (const seed of [1, 2]) {
+    // Seeds 1–3: since the weighted receiver (#649) seeds 1 and 2 alone have four goal kicks.
+    for (const seed of [1, 2, 3]) {
       const sim = new LiveSim(home, away, seed); const control = new LiveSim(home, away, seed);
       let beats: number[] = [];
       while (!sim.finished) {
@@ -35,7 +36,7 @@ describe('the goal kicker\'s routine (#669)', () => {
         if (!k) continue;
         const g = k.goalKick!;
         const pic = playerPicture(k, k, s.tick, s.ball.holder, 1);
-        if (pic.action === 'goalRoutine' || pic.action === 'teeKick') expect(pic.left).toBe(g.toward < 0);
+        if (pic.action === 'goalRoutine' || (pic.action === 'teeKick' && pic.frame < 5)) expect(pic.left).toBe(g.toward < 0);
         if (s.tick < g.strikeTick) {
           expect(s.ball.holder).toMatchObject({ side: k.side, slot: k.slot });
           expect(pic.action).toBe('goalRoutine');

@@ -64,7 +64,21 @@ export interface PlayerSnap {
 /** Ticks a reaction stays on the snapshot (#667): the view holds it for less, once he is free to show it. */
 export const REACT_SNAP_TICKS = 40;
 
+/** Current engine flight, already launched. Receiver follows the actual flight, including interceptions. */
+export interface BallFlightSnap {
+  via: 'pass' | 'kick' | 'roll' | 'bounce';
+  from: { x: number; y: number };
+  to: { x: number; y: number };
+  startedTick: number;
+  arrivesTick: number;
+  fromLift: number;
+  receiver?: ContactPlayer;
+  /** Written only for an actual pass launch, never used by match decisions. */
+  source?: { player: ContactPlayer; headX: number; headY: number; speed: number; odometer: number; legs: number; blown: boolean };
+}
+
 export interface BallSnap {
+  flight?: BallFlightSnap;
   x: number;
   y: number;
   /** Height above the ground, metres. */
@@ -94,7 +108,11 @@ export interface SimEvent {
 }
 
 export interface Snapshot {
+  /** The ordinary dummy-half's committed intended recipient, before release. Interceptions/spills can prevent the catch. */
+  passCall?: { from: ContactPlayer; to: ContactPlayer; startedTick: number; releasesTick: number };
   tick: number;
+  /** Side currently attacking, including passes/kicks in flight and loose balls. View context only. */
+  attacking?: Side;
   players: PlayerSnap[];
   ball: BallSnap;
   /** Short state label for the lab readout (phase, set, tackle count...). */

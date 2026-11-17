@@ -2,7 +2,7 @@ import type { ControlInput } from '../controls';
 import type { RosterEntry, TeamSheet } from '../../../sim/events';
 import type { Position } from '../../../core/state';
 import type { Body } from '../../core/body';
-import type { Side } from '../../core/snapshot';
+import type { ContactPlayer, Side } from '../../core/snapshot';
 import type { Vec } from '../../core/vec';
 import { AVERAGE, type ContestStats } from '../contest';
 import { FULLBACK, HOOKER, KICKER } from '../roles';
@@ -113,12 +113,18 @@ export interface BenchMan {
   position?: Position;
 }
 
+/** The ordinary dummy-half's committed choice; discarded with its ruck. */
+export interface RuckDecision {
+  from: ContactPlayer; to: ContactPlayer | null;
+  decidedAt: number; until: number; kicker: boolean; cancelled?: true;
+}
+
 export type Phase =
   | { kind: 'restart'; t0: number; kicking: Side; from?: 'goal-line' }
   | { kind: 'set-piece'; t0: number; side: Side; spot: Vec; how: 'ptb' | 'tap'; player: number }
   | { kind: 'play' }
   | { kind: 'tackle'; t0: number; carrier: number; tackler: number; big: boolean; wrestle: WrestleState | null; wreck: number }
-  | { kind: 'ruck'; t0: number; carrier: number; tackler: number; stage: 'down' | 'ptb' | 'dh'; handover: boolean; heldAt: number; down: number; pace: 'quick' | 'slow' | null; contactStartedTick?: number }
+  | { kind: 'ruck'; t0: number; carrier: number; tackler: number; stage: 'down' | 'ptb' | 'dh'; handover: boolean; heldAt: number; down: number; pace: 'quick' | 'slow' | null; contactStartedTick?: number; decision?: RuckDecision }
   | { kind: 'try'; t0: number; scorer: number }
   | { kind: 'half-time'; t0: number }
   | { kind: 'full-time' }
