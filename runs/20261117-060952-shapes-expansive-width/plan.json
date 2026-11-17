@@ -1,0 +1,43 @@
+{
+  "name": "shapes expansive width",
+  "description": "Does retaining Expansive's existing wide fan more often restore its tracked results against Balanced? Compare current shapes-on defaults against only Expansive spread/edge weights 5/2 (pod remains 1), over 400 seeds per orientation, with a 20-seed neutral mechanics row. No source defaults change.",
+  "seeds": 20,
+  "base": {
+    "shapes.on": 1
+  },
+  "scenarios": [
+    {
+      "name": "even 60 v 60",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "expansive v balanced",
+      "seeds": 400,
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "expansive spread5 edge2",
+      "tuning": {
+        "shapes.weights.expansive.spread": 5,
+        "shapes.weights.expansive.edge": 2
+      }
+    }
+  ]
+}
