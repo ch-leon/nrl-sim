@@ -44,8 +44,11 @@ obvious at phone size.
 The next stage-5 pass, [PR #706](https://github.com/ch-leon/nrl-sim/pull/706),
 addresses [#688](https://github.com/ch-leon/nrl-sim/issues/688):
 the player in the sin bin must fade with his side at the whistle, from his existing
-seat, and return with the restart. Review also found detached bin/fatigue indicators
-after the players disappeared. Officials, benches and the crowd already use
+seat, and return with the restart. Review also found retained tackle artwork,
+carrier markers and bin/gas/fatigue indicators after the players disappeared,
+plus a fade that stopped one interpolation tick short. The candidate clears those
+layers for the break and restores live pictures when seeking back.
+Officials, benches and the crowd already use
 compatible proportions and kit colours; clear/rain/wind screenshots did not justify
 another asset change. Keep this pass focused on those demonstrated continuity
 problems and full-match verification. Earlier receiver commitment follows in its
