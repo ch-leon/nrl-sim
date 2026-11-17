@@ -36,6 +36,27 @@ the branches integrate the newer career work before their final checks. The PRs
 record the merge outcome. Back-door passing and support runs are next; their new
 PR stays open for review.
 
+## Pause handoff — 17 November 2026
+
+Leon approved merging #714 and #715, then asked to finish up and pause at his
+usage limit. Both integrated heads passed every CI group and aggregate; #715
+also passed Android. #714 merged at `2b88ef3`; #715 merged at `2bdb86b`.
+Integration preserved the new career work and updated the combined season RNG
+checksum to `119391389`, with both UI-read/no-read parity checks retained.
+
+[PR #722](https://github.com/ch-leon/nrl-sim/pull/722) is an **unfinished, unmerged
+draft**, saved on `feat/match-back-door`. Fourteen focused checks, typecheck and
+diff checks pass. The new option preserves ordinary pass choices/odds and
+handling; its OFF switch preserves #715's match hash and 842 post-kickoff RNG
+draws. Full-suite, balance and browser validation remain outstanding.
+
+The bounded default Lab seeds 1–6 produced no genuine back-door witness.
+Seed 5 has a real half-to-fullback pass at tick 4322, but its lead remains 0.90 m
+behind the half. One through-running/sprint adjustment did not establish physical
+readiness; no odds, weights or geometry threshold was relaxed. Resume with the
+lead's readiness **before dummy-half run-on**, then prove ordinary play and
+validate. No further agent work is scheduled while usage is paused.
+
 Status: stages 1–4 presentation and the first stage-5 pass are implemented in
 five linked PRs. Leon reviewed the clip and approved merging on 17 November
 2026; the full stack merged through #705 at `f9f1641`. Wider stage-5 consistency
