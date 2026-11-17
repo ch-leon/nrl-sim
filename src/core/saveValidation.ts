@@ -1,3 +1,4 @@
+import { careerActionClock } from './season';
 import { validatePlayerPopulation } from '../systems/playerCareer';
 import { validMatchIncome } from '../systems/matchIncome';
 // Save boundary only. Historical defaults belong to MIGRATIONS, never to ticks.
@@ -206,10 +207,6 @@ export function validateInput(v: Record<string, unknown>, version: number): stri
     if ((c.squad !== undefined || (version >= 8 && c.id !== 'player')) && !roster(c.squad)) return fail('rival squad');
   }
   if (version < 30 && 'playerPopulation' in v) return fail('player population version');
-  if (version >= 30) {
-    const problem = validatePlayerPopulation(v as unknown as GameState);
-    if (problem) return fail(problem);
-  }
   if (clubs.size && !clubs.has('player')) return fail('player club reference');
   if (v.competitions !== undefined) {
     if (version < 25) return fail('competition metadata version');
@@ -217,6 +214,14 @@ export function validateInput(v: Record<string, unknown>, version: number): stri
     if (record(v.competitions) && v.competitions.leagueCareer !== undefined && version < 31) return fail('league career version');
     if (record(v.competitions) && v.competitions.world !== undefined && version < 27) return fail('division world version');
     const problem = validateCompetitions(v.competitions, { pack: v.pack === 'uk' ? 'uk' : 'au', season: v.season as number, week: v.week as number, clubIds: [...clubs], clubId: v.clubId as string });
+    if (problem) return fail(problem);
+  }
+  if (version >= 30) {
+    // The competition/progression boundary above must verify the pending phase
+    // before management history may reach its target-year action date. Annual
+    // intake and retirement bounds remain tied to the raw source year.
+    const state = v as unknown as GameState;
+    const problem = validatePlayerPopulation(state, careerActionClock(state));
     if (problem) return fail(problem);
   }
   if ((!record(v.competitions) || v.competitions.calendar === undefined) && !integer(v.week, 1, v.pack === 'uk' ? 25 : 27)) return fail('career fields');

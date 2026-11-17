@@ -1,3 +1,4 @@
+import type { CareerActionClock } from '../core/season';
 // src/systems/rivals.ts — rival clubs with real squads (GitHub #74). Each rival
 // keeps a persistent squad of Player objects on its RivalClub entry; its
 // `strength` is derived from that squad, so everything that reads strength (the
@@ -21,7 +22,7 @@ import { bus } from '../core/events';
 import { registerTickHook } from '../core/time';
 import { LEAGUE, ON_FIELD, SQUAD_MIN, SEASON_ROUNDS, STAT_MAX, WEEKS_PER_SEASON } from '../config';
 import { generatePlayerAround, withShownStats, shownStats, marketWage, overallRating, POSITIONS, wageForOverall } from '../data/player';
-import { admitOpeningSquad, AI_OPENING_CASH, capRoomFor, commitPlayer, freshCapAccount, SINGLE_LEAGUE_TIER, tierCap, salaryDemand, releaseTerms, expireEndedDeals, reconcileProtection, protectAddedDeals } from './cap';
+import { admitOpeningSquad, AI_OPENING_CASH, capRoomFor, commitPlayer, freshCapAccount, SINGLE_LEAGUE_TIER, tierCap, salaryDemand, releaseTerms, expireEndedDeals, reconcileProtection, protectAddedDeals, signForRestOfSeason } from './cap';
 import { signingFeeQuote, type FinanceTier } from '../data/financeRules';
 import { makeRng, type Rng } from '../utils/rng';
 import { ageAndRetirePlayers } from './aging';
@@ -346,6 +347,8 @@ export interface SigningOptions {
   /** Season the new one-season deal starts in. */
   season?: number;
   week?: number;
+  /** Canonical marked-career quote date; omitted by legacy and DEV owners. */
+  actionClock?: CareerActionClock;
 }
 
 /**
@@ -358,7 +361,9 @@ export interface SigningOptions {
  * can take a player a later one wanted. Signings at `notable` or above make the news.
  */
 export function rivalSigningTick(clubs: readonly RivalClub[], freeAgents: readonly Player[], rng: Rng, opts: SigningOptions = {}): SigningResult {
-  const { playerId = 'player', perClub = RIVAL_SIGNINGS_PER_WEEK, start = 0, notable = notableOverall(freeAgents), season = 1, week = 1 } = opts;
+  const { playerId = 'player', perClub = RIVAL_SIGNINGS_PER_WEEK, start = 0, notable = notableOverall(freeAgents) } = opts;
+  const { season = 1, week = 1 } = opts.actionClock ?? opts;
+  const duration = opts.actionClock?.duration;
   let pool = [...freeAgents];
   const news: string[] = [];
   const signed: SigningResult['signed'] = [];
@@ -378,7 +383,7 @@ export function rivalSigningTick(clubs: readonly RivalClub[], freeAgents: readon
       const affordable = pool.filter(p => {
         const room = makeRoom(squad, p);
         return room && capRoomFor(room.squad, account, season, salaryDemand(p))
-          && cash >= signingFeeQuote(salaryDemand(p), false) + (room.released ? releaseTerms(room.released, season, week).payout : 0);
+          && cash >= signingFeeQuote(salaryDemand(p), false) + (room.released ? releaseTerms(room.released, season, week, duration).payout : 0);
       });
       const target = need ? pickNeedSigning(squad, affordable, need) : pickSigning(squad, affordable);
       if (!target) break;
@@ -386,11 +391,12 @@ export function rivalSigningTick(clubs: readonly RivalClub[], freeAgents: readon
       // player (one at most); annual commitment and cash were checked above.
       const room = makeRoom(squad, target);
       if (!room) break;
-      const signedPlayer = openClubSpell(commitPlayer({ ...installPlayerHistory(target, 'unsigned', { season, week }), morale: 50, departed: false, joinedSeason: season }, season, 1), club.id, { season, week }, 'signing');
+      const incoming = { ...installPlayerHistory(target, 'unsigned', { season, week }), morale: 50, departed: false, joinedSeason: season };
+      const signedPlayer = openClubSpell(opts.actionClock?.structural ? signForRestOfSeason(incoming, season, week, duration) : commitPlayer(incoming, season, 1), club.id, { season, week }, 'signing');
       const salary = signedPlayer.deal?.salary ?? 0;
       const fee = signingFeeQuote(salaryDemand(target), false);
       // A rival pays for any voluntary release as well as the replacement.
-      const payout = room.released ? releaseTerms(room.released, season, week).payout : 0;
+      const payout = room.released ? releaseTerms(room.released, season, week, duration).payout : 0;
       if (!capRoomFor(room.squad, account, season, salary) || cash < fee + payout) break;
       if (room.released) {
         const { deal: _releasedDeal, ...bare } = closeClubSpell(installPlayerHistory(room.released, club.id, { season, week }), { season, week }, 'release');

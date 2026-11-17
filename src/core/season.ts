@@ -20,3 +20,20 @@ export function seasonWeekLabel(s: Pick<GameState, 'week' | 'season' | 'preseaso
 export function elapsedInterval(s: Pick<GameState, 'season' | 'week'> & Partial<Pick<GameState, 'competitions'>>): number {
   return s.competitions?.calendar ? s.competitions.calendar.elapsedIntervals + 1 : (s.season - 1) * WEEKS_PER_SEASON + s.week;
 }
+
+/** Read-only management date. Pending League choices retain the completed raw
+ * cursor while every new promise belongs to the following authored year.
+ * Call only on trusted state; save validation verifies progression first. */
+export function careerActionClock(s: Pick<GameState, 'season' | 'week'> & Partial<Pick<GameState, 'competitions'>>) {
+  const progress = s.competitions?.leagueCareer;
+  const calendar = progress && s.competitions?.calendar;
+  const planning = !!calendar && progress.phase === 'next-season-choice';
+  const duration = calendar ? calendar.slots.length : WEEKS_PER_SEASON;
+  const season = s.season + (planning ? 1 : 0);
+  const week = planning ? 1 : s.week;
+  return { season, week, duration, remaining: Math.max(1, duration - Math.max(1, Math.trunc(week)) + 1),
+    phase: progress?.phase ?? 'legacy', structural: !!calendar,
+    // Acceptance may keep the effective date but invalidates pending offers/undo.
+    key: `${s.season}:${s.week}:${progress?.phase ?? 'legacy'}:${progress?.accepted?.receiptId ?? ''}` };
+}
+export type CareerActionClock = ReturnType<typeof careerActionClock>;

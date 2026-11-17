@@ -1,3 +1,4 @@
+import { careerActionClock } from '../core/season';
 // GitHub #42: Academy junior intake at season rollover. Runs at order 6, right
 // after aging/retirement (order 5). Generates 3-5 prospects aged 17-19 into the
 // free-agent pool (flagged `junior`), on cheap contracts. The Academy level lifts
@@ -15,7 +16,7 @@ import { getState, setState } from '../core/state';
 import type { GameState, Player } from '../core/state';
 import { withTrait, withoutTrait } from '../data/traits';
 import { registerSeasonHook } from '../core/time';
-import { SQUAD_CAP, SQUAD_MIN, STAT_MAX, WEEKS_PER_SEASON } from '../config';
+import { SQUAD_CAP, SQUAD_MIN, STAT_MAX } from '../config';
 import { overallRating, shownStats, withShownStats, generatePlayer, POSITIONS } from '../data/player';
 import type { Rng } from '../utils/rng';
 import { makeRng } from '../utils/rng';
@@ -108,7 +109,7 @@ export type AnnualYouthResult = { ok: true; state: GameState; notices: Events['u
 
 /** Complete annual candidate, including the durable intake receipt. Failed
  * emergency admission rejects the ordinary batch too. No store or primary dice. */
-export function applyAnnualYouth(state: GameState, seasonWeeks = WEEKS_PER_SEASON): AnnualYouthResult {
+export function applyAnnualYouth(state: GameState, seasonWeeks = careerActionClock(state).duration): AnnualYouthResult {
   const season = state.season;
   if (state.playerPopulation.lastAcademyIntakeSeason >= season) return { ok: true, state, notices: [] };
   const rng = makeRng((state.rngSeed ^ Math.imul(season, 0x9e3779b1)) >>> 0);

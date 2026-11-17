@@ -1,3 +1,4 @@
+import { careerActionClock } from '../core/season';
 // Real club-to-club transfers: quote without writes, then revalidate and commit once.
 import { getState, setState, type GameState, type Player } from '../core/state';
 import { bus } from '../core/events';
@@ -5,7 +6,7 @@ import { weekHeld } from '../core/time';
 import { SQUAD_CAP, SQUAD_MIN } from '../config';
 import { overallRating } from '../data/player';
 import { saleOfferQuote } from '../data/financeRules';
-import { commitment, publishedCap, reconcileProtection, salaryDemand, type CapAccount } from './cap';
+import { commitment, publishedCap, reconcileProtection, salaryDemand, type CapAccount, contractActionView } from './cap';
 import { bookPlayerMovement, closeClubSpell, openClubSpell, ownerOf } from './playerCareer';
 import { withDerivedStrength } from './rivals';
 import type { SignResult } from './freeagency';
@@ -13,7 +14,7 @@ import { fmtMoney } from '../utils/money';
 
 export interface SaleOffer {
   playerId: string; sellerId: string; buyerId: string; fee: number;
-  season: number; week: number; playerFingerprint: string;
+  season: number; week: number; playerFingerprint: string; actionKey?: string;
 }
 type Refusal = { ok: false; reason: string; message: string };
 export type SalePreview = { ok: true; offer: SaleOffer; buyerCommitments: { season: number; used: number; cap: number }[] } | Refusal;
@@ -34,7 +35,7 @@ function terms(state: GameState, buyerId: string, p: Player) {
   const buyer = club(state, buyerId)!; const cap = publishedCap(buyer.capAccount);
   const end = p.deal?.renewal?.endSeason ?? p.deal?.endSeason ?? state.season;
   const rows: { season: number; used: number; cap: number }[] = [];
-  for (let season = state.season; season <= end; season++) rows.push({ season, used: commitment([...buyer.squad, p], season), cap });
+  for (let season = careerActionClock(state).season; season <= end; season++) rows.push({ season, used: commitment([...buyer.squad, p], season), cap });
   return rows;
 }
 /** Seller refusals apply to every candidate and must remain visible in quotes. */
@@ -44,8 +45,10 @@ function checkSeller(state: GameState, sellerId: string, playerId: string, fee: 
   const p = seller.squad.find(x => x.id === playerId);
   try { if (!p || ownerOf(state, playerId) !== sellerId) return refuse('not-found', 'That player is no longer at the selling club.'); }
   catch { return refuse('invalid-owner', 'That player has conflicting ownership records.'); }
-  if (!p!.deal || p!.deal.endSeason < state.season || !p!.clubHistory) return refuse('no-contract', 'There is no current agreement to transfer.');
-  if ((p!.emergencyDealEndSeason ?? 0) >= state.season) return refuse('scholarship', 'An emergency scholarship cannot generate transfer proceeds.');
+  const season = careerActionClock(state).season;
+  const agreement = contractActionView(state, p!).deal;
+  if (!agreement || (careerActionClock(state).structural && agreement.startSeason > season) || agreement.endSeason < season || !p!.clubHistory) return refuse('no-contract', 'There is no current agreement to transfer.');
+  if ((p!.emergencyDealEndSeason ?? 0) >= season) return refuse('scholarship', 'An emergency scholarship cannot generate transfer proceeds.');
   if (seller.squad.length <= SQUAD_MIN) return refuse('squad-min', `The selling squad cannot drop below ${SQUAD_MIN}.`);
   // Receiving proceeds may reduce an existing negative balance. Only the buyer
   // spends cash, and that side must still fund the entire fee without debt.
@@ -65,7 +68,8 @@ function check(state: GameState, sellerId: string, buyerId: string, playerId: st
   return null;
 }
 function offerFor(state: GameState, sellerId: string, buyerId: string, p: Player, fee: number): SaleOffer {
-  return { playerId: p.id, sellerId, buyerId, fee, season: state.season, week: state.week, playerFingerprint: fingerprint(p) };
+  const clock = careerActionClock(state);
+  return { playerId: p.id, sellerId, buyerId, fee, season: clock.season, week: clock.week, playerFingerprint: fingerprint(p), ...(clock.structural ? { actionKey: clock.key } : {}) };
 }
 /** Need first, then an improvement at the position, then stable club ID. No RNG. */
 export function quotePlayerSale(state: GameState, playerId: string): SalePreview {
@@ -88,30 +92,32 @@ export function transferBetweenClubs(state: GameState, sellerId: string, buyerId
   const blocked = check(state, sellerId, buyerId, playerId, fee); if (blocked) return blocked;
   const seller = club(state, sellerId)!; const p = seller.squad.find(x => x.id === playerId)!;
   const offer = offerFor(state, sellerId, buyerId, p, fee);
-  let moved = openClubSpell(closeClubSpell(p, state, 'transfer'), buyerId, state, 'transfer', fee);
-  if (buyerId === state.clubId) moved = { ...moved, joinedSeason: state.season };
+  const clock = careerActionClock(state);
+  let moved = openClubSpell(closeClubSpell(contractActionView(state, p), clock, 'transfer'), buyerId, clock, 'transfer', fee);
+  if (buyerId === state.clubId) moved = { ...moved, joinedSeason: clock.season };
   const leaving = seller.squad.filter(x => x.id !== playerId);
   const arriving = [...club(state, buyerId)!.squad, moved];
   const clubs = state.league.clubs.map(c => {
     if (c.id === state.clubId || c.id !== sellerId && c.id !== buyerId) return c;
     const squad = c.id === sellerId ? leaving : arriving;
     return withDerivedStrength({ ...c, squad, cash: c.cash! + (c.id === sellerId ? fee : -fee),
-      capAccount: reconcileProtection(squad, c.capAccount!, state.season) });
+      capAccount: reconcileProtection(squad, c.capAccount!, clock.season) });
   });
   const ownSeller = sellerId === state.clubId; const ownBuyer = buyerId === state.clubId;
   const squad = ownSeller ? leaving : ownBuyer ? arriving : state.squad;
   let next: GameState = { ...state, squad, league: { ...state.league, clubs },
-    capAccount: reconcileProtection(squad, state.capAccount, state.season),
+    capAccount: reconcileProtection(squad, state.capAccount, clock.season),
     ...(ownSeller ? { lineup: { ...state.lineup,
       starters: state.lineup.starters.map(id => id === playerId ? null : id),
       bench: state.lineup.bench.filter(id => id !== playerId),
       captain: state.lineup.captain === playerId ? null : state.lineup.captain,
       kicker: state.lineup.kicker === playerId ? null : state.lineup.kicker } } : {}) };
-  if (ownSeller || ownBuyer) next = bookPlayerMovement(next, ownSeller ? fee : -fee, 'transfers');
+  if (ownSeller || ownBuyer) next = bookPlayerMovement(next, ownSeller ? fee : -fee, 'transfers', clock);
   return { ok: true, state: next, offer };
 }
 export function applyPlayerSale(state: GameState, offer: SaleOffer): SaleTransition {
-  if (offer.sellerId !== state.clubId || offer.season !== state.season || offer.week !== state.week) return refuse('stale-offer', 'This offer has expired. Review a new offer.');
+  const clock = careerActionClock(state);
+  if (offer.sellerId !== state.clubId || offer.season !== clock.season || offer.week !== clock.week || (clock.structural && offer.actionKey !== clock.key)) return refuse('stale-offer', 'This offer has expired. Review a new offer.');
   const preview = quotePlayerSale(state, offer.playerId);
   if (!preview.ok || Object.keys(preview.offer).some(key => preview.offer[key as keyof SaleOffer] !== offer[key as keyof SaleOffer])) return refuse('stale-offer', 'The player or buying club’s terms have changed. Review a new offer.');
   return transferBetweenClubs(state, offer.sellerId, offer.buyerId, offer.playerId, offer.fee);

@@ -1,4 +1,4 @@
-import { currentRound, inTrials } from '../../core/season';
+import { careerActionClock, currentRound, inTrials } from '../../core/season';
 // src/ui/screens/finance.ts — Finance nav screen (GitHub #39, part of #49;
 // Broadcast Quiet 3j). Three key tiles on the left (net weekly with the runway,
 // the next home gate, the contracts ending soon and the way to Contracts); on
@@ -14,7 +14,7 @@ import {
   weeklyWages, weeklyUpkeep, weeklyOverhead, weeklyIncome, groundCapacity, homeGate, nextStandGate, financeNet,
   classifyReason, stampMovement, type StandProjection,
 } from '../../systems/economy';
-import { capTotals } from '../../systems/cap';
+import { capTotals, contractActionView } from '../../systems/cap';
 import { SEASON_ROUNDS, WEEKS_PER_SEASON } from '../../config';
 import { fmtMoney, fmtMoneyShort } from '../../utils/money';
 import { openHistoryScreen } from './history';
@@ -126,9 +126,9 @@ export function financeSummary(state: GameState): FinanceSummary {
   const burnWeekly = 0;
   const runwayWeeks = null;
   const weeksToFloor = null;
-  const cap = capTotals(state.squad, state.capAccount, state.season);
+  const cap = capTotals(state.squad, state.capAccount, careerActionClock(state).season);
 
-  const expiring = state.squad
+  const expiring = state.squad.map(p => contractActionView(state, p))
     .filter((p) => !p.deal?.renewal && p.contractWeeks <= EXPIRY_WINDOW_WEEKS)
     .map((p) => ({ id: p.id, name: p.name, contractWeeks: p.contractWeeks, wage: p.wage }))
     .sort((a, b) => a.contractWeeks - b.contractWeeks);
@@ -296,8 +296,9 @@ export interface SeasonPnl {
  * shows until the new one is booked. Pure.
  */
 export function seasonPnl(state: GameState): SeasonPnl {
-  const open: SeasonFinance | undefined = state.finance.find((e) => e.season === state.season) ?? state.finance[state.finance.length - 1];
-  const season = open?.season ?? state.season;
+  const clock = careerActionClock(state);
+  const open: SeasonFinance | undefined = state.finance.find((e) => e.season === clock.season) ?? (clock.structural ? undefined : state.finance[state.finance.length - 1]);
+  const season = open?.season ?? clock.season;
   const last = state.finance.find((e) => e.season === season - 1);
   const rows = FINANCE_LINES
     .map((line): PnlRow => ({ line, label: FINANCE_LINE_LABELS[line], thisSeason: open?.[line] ?? 0, lastSeason: last ? last[line] : null }))
@@ -548,10 +549,12 @@ function buildLedger(ledgerRows: LedgerWeek[]): HTMLElement {
 
 /** The left column (3j): net weekly, the next home gate, and the way to Contracts. */
 function buildKeyTiles(state: GameState, s: FinanceSummary): HTMLElement {
+  const clock = careerActionClock(state);
+  const nextLabel = clock.structural ? `Season ${clock.season + 1}` : 'Next season';
   const capNote = s.protectedExcess > 0
-    ? `Next season ${fmtMoney(s.capNext)} · ${fmtMoney(s.protectedExcess)} protected`
-    : `Next season ${fmtMoney(s.capNext)}`;
-  const net = keyTile('Salary cap', `${fmtMoney(s.capCurrent)} / ${fmtMoney(s.cap)}`, capNote, s.capCurrent > s.cap ? 'nrl-finance-losing' : 'nrl-finance-making');
+    ? `${nextLabel} ${fmtMoney(s.capNext)} · ${fmtMoney(s.protectedExcess)} protected`
+    : `${nextLabel} ${fmtMoney(s.capNext)}`;
+  const net = keyTile(clock.structural ? `Salary cap · season ${clock.season}` : 'Salary cap', `${fmtMoney(s.capCurrent)} / ${fmtMoney(s.cap)}`, capNote, s.capCurrent > s.cap ? 'nrl-finance-losing' : 'nrl-finance-making');
   const gate = s.nextHome
     ? keyTile(`Next home gate · ${s.nextHome.round <= 0 ? `trial ${s.nextHome.round + 2}` : s.nextHome.round > SEASON_ROUNDS ? 'final' : `R${s.nextHome.round}`}`, fmtMoney(s.nextHome.projectedGate), fmtCrowd(s.nextHome))
     : keyTile('Next home gate', 'None left', `${groundCapacity(state).toLocaleString('en-US')} seats`);

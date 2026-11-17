@@ -1,3 +1,4 @@
+import { careerActionClock } from '../../core/season';
 import { quotePlayerSale } from '../../systems/playerTransfers';
 import { saleConfirmation } from '../saleConfirmation';
 import { playerHistory } from '../playerHistory';
@@ -25,7 +26,7 @@ import { ROMAN, TRAITS, headlineTrait, traitTip } from '../../data/traits';
 import { PROGRESSION, MORALE, SQUAD_CAP, SQUAD_MIN } from '../../config';
 import { renewEarly, renewalRefusal, sellPlayer } from '../../systems/contracts';
 import { releasePlayer, signingFee, signingFeeBasis } from '../../systems/freeagency';
-import { capRoomFor, releaseTerms, renewalAsk, salaryDemand } from '../../systems/cap';
+import { capRoomFor, releaseTerms, renewalAsk, salaryDemand, contractActionView, activeSalary } from '../../systems/cap';
 import { hasStaff } from '../../systems/staff';
 import { signWithUndo } from '../../systems/undo';
 import { activePack } from '../../content';
@@ -141,13 +142,15 @@ export function moraleReasons(p: Player): string[] {
 
 /** The actions that apply where the player is, priced the way the screens price them. */
 export function playerActions(p: Player, ctx: PlayerContext, state: GameState): PlayerAction[] {
+  const clock = careerActionClock(state);
+  p = contractActionView(state, p);
   if (ctx.kind === 'rival') return [];
   if (ctx.kind === 'freeAgent') {
     const fee = signingFee(state, p);
     const salary = salaryDemand(p);
     const full = state.squad.length >= SQUAD_CAP;
     const broke = state.money < fee;
-    const overCap = !capRoomFor(state.squad, state.capAccount, state.season, salary);
+    const overCap = !capRoomFor(state.squad, state.capAccount, clock.season, salary);
     return [{
       id: 'sign',
       label: `Sign · ${fmtMoney(fee)}`,
@@ -161,12 +164,12 @@ export function playerActions(p: Player, ctx: PlayerContext, state: GameState): 
   }
   const ask = renewalAsk(p, hasStaff(state, 'welfare'));
   const queued = p.deal?.renewal;
-  const start = queued?.startSeason ?? (p.deal && p.deal.endSeason >= state.season ? p.deal.endSeason + 1 : state.season);
+  const start = queued?.startSeason ?? (p.deal && p.deal.endSeason >= clock.season ? p.deal.endSeason + 1 : clock.season);
   const changed = p.deal && ask.salary !== p.deal.salary ? ` ${ask.why}.` : '';
   const blocked = renewalRefusal(state, p);
   const atMin = state.squad.length <= SQUAD_MIN;
   const minWhy = `Squad at the minimum (${SQUAD_MIN})`;
-  const terms = releaseTerms(p, state.season, state.week);
+  const terms = releaseTerms(p, clock.season, clock.week, clock.duration);
   const short = state.money < terms.payout;
   const sale = quotePlayerSale(state, p.id);
   return [
@@ -259,16 +262,18 @@ function rolesOf(r: ReturnType<typeof sideRoles>, id: string): { starter: boolea
 
 /** Everything the page shows, from the player, where he is and the game state. */
 export function playerPageModel(p: Player, ctx: PlayerContext, state: GameState): PlayerPageModel {
+  const clock = careerActionClock(state);
+  p = contractActionView(state, p);
   const squad = ctx.kind === 'squad';
   const headline = headlineTrait(p.position, p.traits);
   const queuedDeal = p.deal?.renewal;
-  const annual = p.deal?.salary ?? salaryDemand(p);
+  const annual = clock.structural ? activeSalary(p, clock.season) : p.deal?.salary ?? salaryDemand(p);
   const contract = ctx.kind === 'freeAgent'
-    ? { text: `Fee ${fmtMoney(signingFee(state, p))} · ${fmtMoney(salaryDemand(p))} a season for the rest of this season`, expiring: false }
+    ? { text: `Fee ${fmtMoney(signingFee(state, p))} · ${fmtMoney(salaryDemand(p))} a season for the rest of ${clock.structural ? `season ${clock.season}` : 'this season'}`, expiring: false }
     : queuedDeal
       ? { text: `${weeksText(p.contractWeeks)} left on this deal · renewed from season ${queuedDeal.startSeason} at ${fmtMoney(queuedDeal.salary)}/season`, expiring: false }
       : { text: `${weeksText(p.contractWeeks)} left · ${fmtMoney(annual)}/season on the cap`, expiring: p.contractWeeks <= MORALE.EXPIRING_WEEKS };
-  const seasonsAtClub = p.joinedSeason !== undefined ? state.season - p.joinedSeason + 1 : null;
+  const seasonsAtClub = p.joinedSeason !== undefined ? clock.season - p.joinedSeason + 1 : null;
   // Keep the squad focus visible: it now controls level-point spending.
   const focus = state.training?.focus ?? 'balanced';
   return {

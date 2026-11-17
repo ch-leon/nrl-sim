@@ -1,3 +1,4 @@
+import { careerActionClock } from '../../core/season';
 // src/ui/screens/contracts.ts — Contracts screen (GitHub #40, part of #49), under
 // Finance (its "contracts end … VIEW ▸" tile). A sheet in the Broadcast Quiet
 // look: "◂ FINANCE", a summary line, and one table row a player, soonest to end
@@ -111,7 +112,7 @@ const gone = new Map<string, GoneRow>();
 
 function render(sub: HTMLElement, tbody: HTMLElement, saleHost: HTMLElement): void {
   const s = getState();
-  sub.textContent = contractsSummary(s.squad, s.season);
+  sub.textContent = contractsSummary(contractRows(s), careerActionClock(s).season) + (careerActionClock(s).structural ? ` · season ${careerActionClock(s).season}` : '');
   const rows: HTMLElement[] = [];
   const rerender = (): void => render(sub, tbody, saleHost);
   atRest = null;
@@ -129,7 +130,7 @@ function render(sub: HTMLElement, tbody: HTMLElement, saleHost: HTMLElement): vo
     const weeks = p.contractWeeks;
     const ask = renewalAsk(p, hasStaff(s, 'welfare'));
     const queued = p.deal?.renewal;
-    const start = queued?.startSeason ?? (p.deal && p.deal.endSeason >= s.season ? p.deal.endSeason + 1 : s.season);
+    const start = queued?.startSeason ?? (p.deal && p.deal.endSeason >= careerActionClock(s).season ? p.deal.endSeason + 1 : careerActionClock(s).season);
     const changed = p.deal && ask.salary !== p.deal.salary ? ` ${ask.why}.` : '';
     const blocked = renewalRefusal(s, p);
     const meta = queued
@@ -166,7 +167,7 @@ function render(sub: HTMLElement, tbody: HTMLElement, saleHost: HTMLElement): vo
       renew.title = `No fee. From season ${start} at ${fmtMoney(ask.salary)} a season.${changed}`;
     }
     renew.setAttribute('data-contract-renew', p.id);
-    const terms = releaseTerms(p, s.season, s.week);
+    const terms = releaseTerms(p, careerActionClock(s).season, careerActionClock(s).week, careerActionClock(s).duration);
     const releaseArmed = armed === `release:${p.id}`;
     const releaseLabel = `RELEASE ${fmtShort(terms.payout)}`;
     const release = button(releaseArmed ? 'REALLY RELEASE?' : releaseLabel, () => {

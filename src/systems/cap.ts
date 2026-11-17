@@ -1,3 +1,4 @@
+import { careerActionClock, type CareerActionClock } from '../core/season';
 // Season salary cap (#557). Cash stays on GameState.money. A signed deal is an
 // annual commitment for an inclusive run of seasons. Ordinary cash movements
 // never read or write this module's numbers.
@@ -95,10 +96,10 @@ export function renewalAsk(
 }
 
 /** Season-equivalents still to run, including the unplayed part of the current season. */
-function termRemaining(term: SignedTerm, season: number, week: number): number {
+export function termRemaining(term: SignedTerm, season: number, week: number, duration = WEEKS_PER_SEASON): number {
   if (season > term.endSeason) return 0;
   if (season < term.startSeason) return term.endSeason - term.startSeason + 1;
-  return weeksLeftInSeason(week) / WEEKS_PER_SEASON + (term.endSeason - season);
+  return weeksLeftInSeason(week, duration) / duration + (term.endSeason - season);
 }
 
 export function seasonsForWeeks(weeks: number): number {
@@ -107,13 +108,13 @@ export function seasonsForWeeks(weeks: number): number {
 }
 
 /** Weeks still to play in the competitive season, including the current week. */
-export function weeksLeftInSeason(week: number): number {
-  return Math.max(1, WEEKS_PER_SEASON - Math.max(1, Math.trunc(week)) + 1);
+export function weeksLeftInSeason(week: number, duration = WEEKS_PER_SEASON): number {
+  return Math.max(1, duration - Math.max(1, Math.trunc(week)) + 1);
 }
 
 /** A one-season signing whose displayed weeks are the rest of this season. */
-export function signForRestOfSeason(player: Player, season: number, week: number): Player {
-  const contractWeeks = weeksLeftInSeason(week);
+export function signForRestOfSeason(player: Player, season: number, week: number, duration = WEEKS_PER_SEASON): Player {
+  const contractWeeks = weeksLeftInSeason(week, duration);
   return commitPlayer({ ...player, contractWeeks }, season, 1);
 }
 
@@ -333,17 +334,17 @@ export interface ReleaseTerms {
  * run, and never more than the larger of this deal and a queued renewal.
  * The signing fee is not refunded.
  */
-export function releaseTerms(player: { deal?: SignedDeal }, season: number, week: number): ReleaseTerms {
+export function releaseTerms(player: { deal?: SignedDeal }, season: number, week: number, duration = WEEKS_PER_SEASON): ReleaseTerms {
   const deal = player.deal;
   const salary = deal?.salary ?? 0;
   const renewalSalary = deal?.renewal?.salary ?? 0;
   let quarter = 0;
   if (deal && salary > 0) {
-    const current = termRemaining(deal, season, week);
+    const current = termRemaining(deal, season, week, duration);
     if (current > 0) quarter += releasePayoutQuote(salary, Math.min(3, current));
   }
   if (deal?.renewal && renewalSalary > 0) {
-    const later = termRemaining(deal.renewal, season, week);
+    const later = termRemaining(deal.renewal, season, week, duration);
     if (later > 0) quarter += releasePayoutQuote(renewalSalary, Math.min(3, later));
   }
   return {
@@ -355,4 +356,25 @@ export function releaseTerms(player: { deal?: SignedDeal }, season: number, week
 
 export function tierCap(tier: FinanceTier): number {
   return FINANCE_TIERS[tier].annualCap;
+}
+
+/** Promote only a consumed base agreement. An unconsumed signed renewal is
+ * never replaced by a quote or another promise. No expiry/ownership side effects. */
+export function normaliseContractForAction(player: Player, clock: CareerActionClock): Player {
+  if (!clock.structural) return player;
+  let deal = player.deal;
+  if (deal && deal.endSeason < clock.season && deal.renewal && deal.renewal.startSeason <= clock.season) {
+    deal = { ...deal.renewal };
+  }
+  const contractWeeks = deal ? Math.round(termRemaining(deal, clock.season, clock.week, clock.duration) * clock.duration) : 0;
+  // A consumed emergency receipt never moves onto a different agreement.
+  if (player.emergencyDealEndSeason !== undefined && player.emergencyDealEndSeason < clock.season && deal && deal.endSeason >= clock.season) {
+    const { emergencyDealEndSeason: _end, emergencyForPlayerId: _vacancy, ...ordinary } = player;
+    return { ...ordinary, deal, contractWeeks };
+  }
+  return { ...player, ...(deal ? { deal } : {}), contractWeeks };
+}
+/** Pure projection for displays and future acceptance/interval owners. */
+export function contractActionView(state: GameState, player: Player): Player {
+  return normaliseContractForAction(player, careerActionClock(state));
 }
