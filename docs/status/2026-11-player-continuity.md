@@ -119,3 +119,9 @@ Cancel as a no-op, the actual buyer's single payment, unchanged contracts,
 unique ownership and reload persistence. Screenshots and the report are CI
 artifacts, not committed files. This is targeted browser evidence, not a claim
 that the later full PR gates have passed.
+
+The existing small-screen flow additionally caught a renewal notification over
+Contracts' sale buttons. The review now sits above ordinary notifications;
+the notification remains queued and readable again after Cancel. A real renewal
+before sale reproduced the issue, then passed all five production layouts with
+retained-notification and button hit-test assertions.

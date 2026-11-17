@@ -32,8 +32,8 @@ live gameplay change; work still open below has not shipped.
   [technical contract](../specs/career-competitions.md) against current main;
   [delivery status](../status/2026-11-career.md) records evidence and dependencies.
   #536–#539 and #545 have merged, clearing structural state/calendar/division
-  work. Annual-cap finance #555–#562 and progression tuning #547 remain open;
-  paid rewards, transfers and release balance retain those prerequisites.
+  work. Remaining annual-cap finance tasks #560–#562 and progression tuning
+  #547 stay open; paid rewards and release balance retain those prerequisites.
   The state/calendar foundation, isolated AU/UK regional setup and Open Cup are
   merged through [PR #591](https://github.com/ch-leon/nrl-sim/pull/591).   The finance
   model is approved for initial testing: [contract](../specs/finance-prototype.md),
