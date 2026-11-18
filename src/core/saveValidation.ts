@@ -237,7 +237,7 @@ export function validateInput(v: Record<string, unknown>, version: number): stri
   }
   if (!unique(ladderIds)) return fail('duplicate ladder club');
   if (!record(v.settings) || typeof v.settings.muted !== 'boolean' || typeof v.settings.tutorialDone !== 'boolean' || !range(v.settings.volume, 0, 1) || (version >= 3 && !oneOf(v.settings.difficulty, ['easy', 'normal', 'hard']))) return fail('settings');
-  for (const key of ['coachCalls', 'liveRivals', 'keyMoments', 'weekSummary', 'teamLetters']) if (v.settings[key] !== undefined && typeof v.settings[key] !== 'boolean') return fail(`settings.${key}`);
+  for (const key of ['coachCalls', 'liveRivals', 'keyMoments', 'weekSummary', 'teamLetters', 'spendPointsMyself']) if (v.settings[key] !== undefined && typeof v.settings[key] !== 'boolean') return fail(`settings.${key}`);
   if ((v.settings.playbackSpeed !== undefined && !oneOf(v.settings.playbackSpeed, [1, 2, 4, 8])) || (v.settings.textSize !== undefined && !oneOf(v.settings.textSize, ['normal', 'large', 'larger'])) || (v.settings.hintsSeen !== undefined && !strings(v.settings.hintsSeen))) return fail('settings preferences');
   if (!Array.isArray(v.history) || !v.history.every(record)) return fail('history');
 

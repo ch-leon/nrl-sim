@@ -319,7 +319,9 @@ export interface GameState {
    * teamLetters: each side's letter over its players on the pitch (#371); off when absent.
    * (An old save's liveMatch flag is ignored: every match is live since BAK-207 Phase 4.)
    */
-  settings: { muted: boolean; volume: number; tutorialDone: boolean; difficulty: Difficulty; coachCalls?: boolean; liveRivals?: boolean; playbackSpeed?: 1 | 2 | 4 | 8; keyMoments?: boolean; weekSummary?: boolean; hintsSeen?: string[]; textSize?: TextSize; teamLetters?: boolean };
+  settings: { muted: boolean; volume: number; tutorialDone: boolean; difficulty: Difficulty; coachCalls?: boolean; liveRivals?: boolean; playbackSpeed?: 1 | 2 | 4 | 8; keyMoments?: boolean; weekSummary?: boolean; hintsSeen?: string[]; textSize?: TextSize; teamLetters?: boolean;
+    /** SuperCOOKED §7 #1: level points bank on the player page for the coach to spend; off (unset), the training focus spends them as they are earned. */
+    spendPointsMyself?: boolean };
   history: SeasonRecord[];
   boardPatience: number; // 0..BOARD.MAX_PATIENCE; zero = sacked (#47)
   objectives: Objective[]; // this season's board objectives (#47)
