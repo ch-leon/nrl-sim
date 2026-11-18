@@ -1,3 +1,4 @@
+import { isolateMiniatureLeagueProgression } from '../../helpers/miniatureLeague';
 import { entrySnapshots } from '../../data/leagueCareerFixtures';
 import { closeLeagueSeason } from '../../../src/systems/leagueCareer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -54,8 +55,8 @@ const dealLine = (id: string): StubNode => {
 /** The list's red contract-ending dot on his name (#369). */
 const alertDot = (id: string): StubNode | null => row(id).querySelector('[data-row-alert]');
 
-beforeEach(() => { bus.clear(); stubDocument(); });
-afterEach(() => { closeScreen(); bus.clear(); vi.unstubAllGlobals(); });
+beforeEach(() => { isolateMiniatureLeagueProgression(); bus.clear(); stubDocument(); });
+afterEach(() => { closeScreen(); bus.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('League Squad contracts and dock alert', () => {
   it('shows the last authored active interval and alerts despite a stale stored countdown', () => {

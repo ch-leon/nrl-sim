@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   fmtSeasonSummary,
   fmtFinalsOutcome,
@@ -9,8 +9,12 @@ import {
   fmtRulesNote,
   playedBeforeNines,
   PRE_NINES_NOTE,
+  openHistoryScreen,
 } from '../../../src/ui/screens/history';
 import { bus } from '../../../src/core/events';
+import { buildNewGameState, getState, loadState } from '../../../src/core/state';
+import { closeScreen } from '../../../src/ui/dom';
+import { stubDocument, type StubNode } from '../stubDom';
 
 describe('fmtSeasonSummary', () => {
   it('formats a regular finish', () => {
@@ -136,4 +140,37 @@ describe('the History table (3l)', () => {
     // Before the extended record (v4) and the review (v12): dashes, and the rules it was played under.
     expect(historyRowView(s3, state)).toMatchObject({ wl: '—', pts: '—', player: '—', note: PRE_NINES_NOTE });
   });
+});
+
+it('shows the saved champion and whole registered title squad under Trophies without changing state', () => {
+  stubDocument();
+  try {
+    const state = buildNewGameState('Renamed Club', 11);
+    state.season = 8;
+    state.competitionRewards = [{
+      id: 'promise', version: 1, season: 2, instanceId: 'cup-instance', fixtureId: 'final',
+      definitionId: 'au:open-cup', definitionName: 'Open Cup', definitionVersion: 1,
+      stageId: 'cup', round: 5, slot: 19, homeId: 'player', awayId: 'rival-gulls', neutral: true,
+      status: 'settled', matchBase: 4_000, policies: [],
+      resolution: { kind: 'result', result: { homeScore: 12, awayScore: 6, winnerId: 'player', decider: 'score' } },
+      receipts: [{ id: 'honour', outcomeId: 'title', policyId: 'honour', clubId: 'player', kind: 'honour',
+        title: 'Open Cup', squad: { clubId: 'player', clubName: 'Original Name',
+          players: [{ id: 'left-player', name: 'Sam Left' }, { id: 'reserve', name: 'Lee Reserve' }] } }],
+    }];
+    loadState(state);
+    const original = structuredClone(state);
+    for (let i = 0; i < 2; i++) {
+      const history = openHistoryScreen() as unknown as StubNode;
+      history.querySelector('[data-seg="trophies"]')?.click();
+      const title = history.querySelector('[data-competition-honour]');
+      expect(title?.words()).toMatch(/Open Cup.*Season 2.*Original Name.*Sam Left.*Lee Reserve/);
+      expect(title?.querySelector('[data-trophy-player-id="left-player"]')).not.toBeNull();
+      expect(title?.words()).not.toContain('Renamed Club');
+      closeScreen();
+    }
+    expect(getState()).toEqual(original);
+  } finally {
+    closeScreen();
+    vi.unstubAllGlobals();
+  }
 });

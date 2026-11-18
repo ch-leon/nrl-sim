@@ -1,55 +1,22 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { preparePack, selectPack, activePack } from '../../src/content';
+import { describe, expect, it, vi } from 'vitest';
 import { AU_CAREER_PROFILE } from '../../src/content/career/au';
-import { UK_CAREER_PROFILE } from '../../src/content/career/uk';
-import { createNewGame, getState, setState, type Fixture, type GameState } from '../../src/core/state';
+import { createNewGame, getState, setState, type Fixture } from '../../src/core/state';
 import { bus, type LiveMatchData } from '../../src/core/events';
-import { advanceWeek, advanceWeeks, clearHeldWeek, clearSeasonHooks, clearTickHooks, registerTickHook, TICK_ORDER, weekHeld } from '../../src/core/time';
-import { __setStorage, __unlockSaves, importSave, installImportedSave, loadSlot, save, setActiveSlot } from '../../src/core/save';
-import { setCareerNamespace } from '../../src/core/storage/local';
+import { advanceWeek, advanceWeeks, clearTickHooks, registerTickHook, weekHeld } from '../../src/core/time';
+import { importSave, installImportedSave, loadSlot, save } from '../../src/core/save';
 import { DEV_TEST_PREFIX, liveMatchKey, slotKey } from '../../src/core/storageKeys';
 import { setupStructuralDivisionCareer } from '../../src/systems/divisionCareer';
-import { openCupProfileSlots, prepareOpenCup, structuralOpenCup } from '../../src/systems/openCupCareer';
+import { openCupProfileSlots, prepareOpenCup } from '../../src/systems/openCupCareer';
 import { isOpenCupInstance, openCupByes, openCupSportingOutcomes } from '../../src/systems/openCup';
-import { finaliseCalendarFixture, structuralPolicyProblem } from '../../src/systems/competitionCalendar';
-import { getCurrentFixture, registerFixturesSystem } from '../../src/systems/fixtures';
+import { structuralPolicyProblem } from '../../src/systems/competitionCalendar';
+import { registerFixturesSystem } from '../../src/systems/fixtures';
 import { registerPlayerMatchSystem } from '../../src/systems/matchday';
 import { runMatch } from '../../src/match/league/match';
 import type { TeamSheet } from '../../src/sim/events';
 import type { RegionalCareerProfile } from '../../src/data/divisions';
+import { bytes, clone, cup, firstTieSeed, fixtureHooks, installCupTestHooks, received, setup } from '../helpers/openCupCareer';
 
-const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
-const cup = (state = getState()) => state.competitions!.instances.find(isOpenCupInstance)!;
-let bytes: Map<string, string>;
-beforeAll(async () => { await preparePack('uk'); });
-beforeEach(() => {
-  bus.clear(); clearTickHooks(); clearSeasonHooks(); clearHeldWeek(); selectPack('au'); setCareerNamespace(DEV_TEST_PREFIX);
-  bytes = new Map(); const storage = { getItem: (k: string) => bytes.get(k) ?? null, setItem: (k: string, v: string) => { bytes.set(k, v); }, removeItem: (k: string) => { bytes.delete(k); } };
-  setActiveSlot(1); __unlockSaves(); __setStorage(storage); vi.stubGlobal('localStorage', storage);
-  vi.spyOn(console, 'warn').mockImplementation(() => {});
-});
-afterEach(() => { bus.clear(); clearTickHooks(); clearSeasonHooks(); clearHeldWeek(); setCareerNamespace(null); __setStorage(null); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
-function setup(pack: 'au' | 'uk' = 'au', enterOpenCup?: boolean, seed = 575): GameState {
-  createNewGame('Cup career', seed, pack === 'uk' ? { home: { town: 'Here', country: 'GB' } } : {});
-  return setupStructuralDivisionCareer(pack === 'uk' ? UK_CAREER_PROFILE : AU_CAREER_PROFILE, seed, undefined,
-    enterOpenCup === undefined ? {} : { enterOpenCup });
-}
-function fixtureHooks(playerWins = true): void {
-  registerFixturesSystem();
-  registerTickHook('player-test-score', TICK_ORDER.match, () => {
-    const state = getState(); const fixture = getCurrentFixture(state, state.clubId); if (!fixture) return;
-    const homeWins = (fixture.homeId === state.clubId) === playerWins;
-    setState(finaliseCalendarFixture(state, fixture, homeWins ? { homeScore: 24, awayScore: 0 } : { homeScore: 0, awayScore: 24 }));
-  }, { trials: true });
-}
-function firstTieSeed(): number {
-  selectPack('au');
-  for (let seed = 1; seed < 128; seed++) {
-    const candidate = structuralOpenCup(AU_CAREER_PROFILE, activePack(), seed, ['player', ...AU_CAREER_PROFILE.clubs.map(c => c.id)], 'player')!;
-    if (candidate.fixtures.some(f => f.homeId === 'player' || f.awayId === 'player')) return seed;
-  }
-  throw new Error('No deterministic first-round test field');
-}
+installCupTestHooks();
 
 describe('regional cup entry and existing calendar hooks', () => {
   it.each(['au', 'uk'] as const)('adds the %s cross-division cup at setup with snapshotted free dates', pack => {
@@ -182,8 +149,3 @@ describe('early supported cup import policy', () => {
     setState(bad); const unchanged = JSON.stringify(getState()); advanceWeek(); expect(JSON.stringify(getState())).toBe(unchanged);
   });
 });
-
-
-function received(state = getState(), clubId: string = state.clubId): number {
-  return state.matchIncome.reduce((sum, r) => sum + (r.fixture.homeId === clubId ? r.receipt?.home.total ?? 0 : r.fixture.awayId === clubId ? r.receipt?.away.total ?? 0 : 0), 0);
-}
