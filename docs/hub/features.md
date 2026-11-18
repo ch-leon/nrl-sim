@@ -1,6 +1,6 @@
 # Features
 
-Last updated: 2026-11-17
+Last updated: 2026-11-18
 
 What's in the game, with the PR that added each.
 
@@ -64,7 +64,7 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
-- **League choice — draft, unavailable in play** ([PR #719](https://github.com/ch-leon/nrl-sim/pull/719)): permanent title records, deterministic league fields, shared annual player updates and the season-close choice gate have passed independent checkpoint reviews. Invalid interval results preserve the last saved game. Contract protection follows exact signed terms. League confirmation and the chooser remain in development; existing careers keep their format.
+- **League choice — draft, unavailable in play** ([PR #719](https://github.com/ch-leon/nrl-sim/pull/719)): permanent title records, deterministic league fields, shared annual player updates and the season-close choice gate have passed independent checkpoint reviews. Invalid interval results preserve the last saved game. Contract protection follows exact signed terms. League confirmation and the chooser have passed independent checkpoint reviews, including retained club salary-cap capacity on downward choices. Normal new-game integration remains outstanding; existing careers keep their format.
 
 - **Real players and funded transfers** ([PR #716](https://github.com/ch-leon/nrl-sim/pull/716)): review the actual buyer, fee and unchanged deal before selling; the same player joins that club. Sale and event recruitment fees appear under Transfers in Finance. Market refreshes reveal existing unsigned players, club spells remain readable, and History includes retired people. Annual births are bounded. Emergency scholarships only replace unavoidable expiry/retirement vacancies below 13; injuries and bans no longer manufacture extra players. Save v30 retains supported v28/v29 careers.
 

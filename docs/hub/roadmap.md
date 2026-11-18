@@ -1,6 +1,6 @@
 # Roadmap
 
-Last updated: 2026-11-17
+Last updated: 2026-11-18
 
 Status checked against GitHub on 7 Nov 2026. Merged tooling is not the same as a
 live gameplay change; work still open below has not shipped.
@@ -58,8 +58,10 @@ live gameplay change; work still open below has not shipped.
   [evidence report](../status/2026-11-player-continuity.md).
   [Draft PR #719](https://github.com/ch-leon/nrl-sim/pull/719) starts league choice
   and lasting title unlocks using the [implementation plan](../plans/2026-11-17-league-selection.md).
-  Its foundation remains inactive while the deliberate entry UI and resumable
-  annual lifecycle are built. Voluntary lower-cap treatment is a pending decision.
+  Its entry confirmation and chooser passed independent checkpoint reviews; normal
+  new-game integration remains outstanding. Clubs retain their highest attained
+  salary-cap capacity when choosing an easier league (approved 18 November).
+  Match income continues to follow the selected sporting division.
   The approved product direction is recorded in
   [PR #709](https://github.com/ch-leon/nrl-sim/pull/709).
 - **Expansive attack still under par** ([issue #322](https://github.com/ch-leon/nrl-sim/issues/322), open).

@@ -50,6 +50,14 @@ Approved product rules:
 
 ### Critical implementation seams
 
+Retained capacity separates `capAccount.tier` from sporting division rank. Marked
+League fixture M and gate/sponsor projections must read saved current division
+membership using one shared pure basis helper, retaining existing host/neutral,
+trial and facility formulas. Frozen kickoff receipts and legacy/unmarked flows
+remain unchanged; easier leagues do not inherit higher match payments from cap
+capacity. The confirmation writer owns receipt/annual logic; an independent-file
+income task owns this basis/display correction, reviewed together before UI.
+
 `createDivisionWorld` and trial construction hardcode season 1 and generate people: extract schedule-only construction for later years. Existing structural rollover increments counters and runs aging/youth/tenure, while cap/fixtures/board/events skip work: never feed historical waiting saves into the new lifecycle. `protectedIds` can leak protection into renewals; bind protection to signed terms. Reuse existing `matchIncome` kickoff promises/receipts. Audit calendar finance/training/read-model consumers before activation.
 
 ## File ownership and recommended contracts
@@ -150,7 +158,7 @@ Files: `src/data/divisions.ts`, `src/systems/divisionCareer.ts`; tests `tests/da
 - [x] Validate complete home/away coverage, stage slots, no double bookings, legal finals placeholders and known clubs. Without an enabled cup, its five windows remain explicit quiet intervals; do not register a paid cup implicitly.
 - [x] Run `npx vitest run tests/data/divisions.test.ts tests/systems/divisionCareer.test.ts tests/systems/competitionCalendar.test.ts` and `npx tsc --noEmit`.
 - [x] Review the stage diff for accidental runtime enablement, then make the focused foundation commit. Stage 2 starts only after this boundary is reviewed.
-- [ ] Before annual acceptance, add a saved-snapshot schedule adapter. Clone the
+- [x] Before annual acceptance, add a saved-snapshot schedule adapter. Clone the
   current saved division definitions, calendar and per-division trial templates;
   reuse canonical pairing/seed/ID functions without reading today's content
   catalogue. Test AU/UK later years, custom saved rules/dates, deterministic complete
