@@ -19,6 +19,7 @@ import { ATTACK_COACHES, ATTACK_SPECIALITIES, STAFF } from '../../systems/staff'
 import { playsOfFamily } from '../../data/plays';
 import { PLAYS } from '../../match/league/plays';
 import { sponsorReturn } from '../../systems/economy';
+import { matchIncomeTier } from '../../systems/matchIncome';
 import { officeUnlockLine } from '../coachCallsText';
 
 const percent = (x: number): string => `${Math.round(x * 100)}%`;
@@ -27,7 +28,7 @@ const IQ = activePack().vocab.iqStat;
 const IQ_INLINE = inlineIqStat(activePack());
 
 /** The club the page is read for; null before a game is loaded (the Guide's text then quotes a new club). */
-function clubNow(): Pick<GameState, 'reputation' | 'facilities'> | null {
+function clubNow(): GameState | null {
   try {
     return getState();
   } catch {
@@ -37,12 +38,13 @@ function clubNow(): Pick<GameState, 'reputation' | 'facilities'> | null {
 
 /**
  * The Money page's Sponsor Board line (N12): the rule, then what the club's own
- * board pays at today's reputation (or what a new one would), the number the
- * weekly tick pays (economy.sponsorReturn). Worked out each time the page is shown.
+ * board pays at its current sporting tier (or what a new one would). Worked
+ * out each time the page is shown using the same basis as match income.
  */
-export function sponsorBullet(club: (Pick<GameState, 'reputation' | 'facilities'> & Partial<Pick<GameState, 'capAccount'>>) | null = clubNow()): string {
+export function sponsorBullet(club: GameState | (Pick<GameState, 'reputation' | 'facilities'> & Partial<Pick<GameState, 'capAccount'>>) | null = clubNow()): string {
   const level = (club?.facilities ?? []).reduce((m, f) => (f.defId === 'sponsorBoard' ? Math.max(m, f.level) : m), 0);
-  const amount = fmtMoney(sponsorReturn(level || 1, 0, club?.capAccount?.tier ?? 'premier'));
+  const tier = club && 'clubId' in club ? matchIncomeTier(club) : club?.capAccount?.tier ?? 'premier';
+  const amount = fmtMoney(sponsorReturn(level || 1, 0, tier));
   return `A Sponsor Board pays 3% / 9% / 18% of match base at levels 1 / 2 / 3 on played non-trial matches. ${level ? `Yours (level ${level}) pays` : 'A new one would pay'} ${amount} per eligible match. No income while idle.`;
 }
 
