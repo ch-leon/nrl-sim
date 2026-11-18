@@ -1247,9 +1247,17 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
   border-radius: 1px;
   background: var(--nrl-accent);
 }
-.nrl-office-name { font-family: var(--nrl-f-label); font-size: 1.125rem; font-weight: 700; letter-spacing: 0.02em; color: var(--nrl-text); }
+.nrl-office-name { font-family: var(--nrl-f-label); font-size: 1.125rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--nrl-text); }
 .nrl-office-status { font-family: var(--nrl-f-body); font-size: 0.75rem; font-weight: 400; color: var(--nrl-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .nrl-office-status[data-attn] { color: var(--nrl-accent); }
+/* SuperCOOKED 50: "OFFICE" over the tiles; a tile that wants you has an orange edge and dot as well as its orange line. */
+.nrl-office-head { grid-column: 1 / -1; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 2px 2px 0; }
+.nrl-office-title { font-family: var(--nrl-f-display); font-size: 1.25rem; letter-spacing: -0.02em; text-transform: uppercase; color: var(--nrl-text); }
+.nrl-office-note { font-size: 0.75rem; color: var(--nrl-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nrl-nav-sheet > .nrl-btn:has(.nrl-office-status[data-attn]) { position: relative; box-shadow: inset 0 0 0 1px var(--nrl-accent); }
+.nrl-nav-sheet > .nrl-btn:has(.nrl-office-status[data-attn])::after { content: ''; position: absolute; top: 10px; right: 10px; width: 8px; height: 8px; border-radius: 50%; background: var(--nrl-accent); }
+/* A short phone (956×330, 568×320): the tiles need the room; OFFICE on its tab says where you are. */
+@media (max-height: 360px) { .nrl-office-head { display: none; } }
 .nrl-office-status:empty { display: none; }
 .nrl-nav-sheet > .nrl-btn.nrl-office-locked { cursor: default; opacity: 0.55; }
 .nrl-office-locked .nrl-office-status { white-space: normal; }
