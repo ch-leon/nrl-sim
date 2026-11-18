@@ -14,7 +14,8 @@ const SHORT = { 'second-man': 'Second man', 'block-play': 'Block play', 'cut-out
  * keep, #326 risk 4): the head (title, note), the list of call tiles, the footer.
  * Nothing else is in the tray: no Plays section, hidden or not.
  */
-const TODAY_TRAY = 'div.nrl-mo-tray.nrl-mo-calls[div.nrl-mo-tray-head[span.nrl-mo-tray-title,span.nrl-mo-tray-note],div.nrl-mo-tray-list,div.nrl-mo-tray-foot]';
+// SuperCOOKED 41: the title and the tackle sit together, a dot before them.
+const TODAY_TRAY = 'div.nrl-mo-tray.nrl-mo-calls[div.nrl-mo-tray-head[span.nrl-mo-tray-who[span.nrl-mo-tray-title,span.nrl-mo-tray-tackle],span.nrl-mo-tray-note],div.nrl-mo-tray-list,div.nrl-mo-tray-foot]';
 
 /**
  * Set plays on the match screen (#326, phase 3): the coach tray's Plays section at
@@ -293,7 +294,8 @@ export async function runMatchPlays(browser, sizes = [[844, 390], [667, 375], [5
               if (!b) return null;
               const chip = document.querySelector('.nrl-mo-tackle');
               const shown = chip && !chip.hidden && getComputedStyle(chip).display !== 'none';
-              if (shown && !/^TACKLE [123]\//.test(chip.textContent.trim())) return null;
+              // "Your ball · tackle 2/5" (SuperCOOKED 40): the count after whose ball.
+              if (shown && !/(^|· )TACKLE [123]\//i.test(chip.textContent.trim())) return null;
               b.click();
               return b.hasAttribute('data-called') ? b.dataset.play : null;
             }, null, 'a callable early-tackle set play');

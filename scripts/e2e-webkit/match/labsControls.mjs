@@ -91,7 +91,8 @@ export async function runLabsControls(browser) {
       if (!Object.keys(localStorage).filter((k) => k.startsWith('nrl-live-match-')).some((k) => JSON.parse(localStorage.getItem(k)).controls?.length)) throw new Error('attacking swipe was not recorded');
       return true;
     }, null, { timeout: 20000 });
-    if (await page.locator('.nrl-mo-speed:visible').count() !== 4) throw new Error('a speed choice is hidden');
+    // One speed button (SuperCOOKED 40): it shows the speed playing and moves it on a tap.
+    if (await page.locator('.nrl-mo-speed:visible').count() !== 1) throw new Error('the speed button is hidden');
     // The tackle count stays up through passes, kicks and dead time (Leon on iPhone: it
     // flashed). 15 s of live play at 844×390, read every 100 ms.
     await page.setViewportSize({ width: 844, height: 390 });

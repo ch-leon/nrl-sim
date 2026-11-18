@@ -1957,10 +1957,11 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 }
 .nrl-mo-scoreboard:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
 .nrl-mo-scoreboard[aria-expanded="true"]::after { content: ''; position: absolute; inset: 0; border-radius: 12px; box-shadow: inset 0 0 0 2px var(--nrl-accent); pointer-events: none; }
-/* The ball chip (40): under the score bar, a dot and whose ball, then the tackle; on the last tackle it goes orange. */
+/* The ball chip (40): under the score bar, a dot and whose ball, then the tackle; on the last tackle it goes orange.
+   One width, room for the longest it says ("Their ball · last tackle · 5/5"), so a new count never moves it. */
 .nrl-mo-tackle {
-  position: fixed; top: calc(var(--nrl-mo-score-foot, 66px) + 6px); left: 0; right: 0; z-index: 15; width: max-content; margin: 0 auto;
-  display: flex; align-items: center; gap: 8px; height: 24px; padding: 0 12px; box-sizing: border-box; border-radius: 12px; pointer-events: none;
+  position: fixed; top: calc(var(--nrl-mo-score-foot, 66px) + 6px); left: 0; right: 0; z-index: 15; width: 18.5em; max-width: calc(100vw - 24px); margin: 0 auto;
+  display: flex; align-items: center; justify-content: center; gap: 8px; height: 24px; padding: 0 12px; box-sizing: border-box; border-radius: 12px; pointer-events: none;
   background: rgba(5, 7, 13, 0.85); color: var(--nrl-text); font: 700 0.75rem var(--nrl-f-label); letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap;
 }
 .nrl-mo-tackle::before { content: ''; flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; background: var(--nrl-accent); }
@@ -1970,6 +1971,11 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 .nrl-mo-tackle-last { background: var(--nrl-accent); color: var(--nrl-on-accent); }
 .nrl-mo-tackle-last::before { background: var(--nrl-on-accent); }
 .nrl-mo-bug { display: flex; height: 48px; }
+/* A phone on its side (390 tall or less): the bar and the chip close up, so a full tray fits under them unscrolled (#396). */
+@media (max-height: 400px) {
+  .nrl-mo-bug { height: 44px; }
+  .nrl-mo-tackle { top: calc(var(--nrl-mo-score-foot, 62px) + 4px); height: 22px; }
+}
 .nrl-mo-team { display: flex; align-items: stretch; }
 .nrl-mo-stripe { flex: 0 0 6px; width: 6px; }
 .nrl-mo-code { display: flex; align-items: center; padding: 0 10px 0 12px; font-family: var(--nrl-f-label); font-size: 1.125rem; font-weight: 700; letter-spacing: 0.06em; white-space: nowrap; }
@@ -2101,7 +2107,7 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 .nrl-mo-coach { gap: 10px; padding: 0 7px 0 16px; font-size: 1.125rem; }
 .nrl-mo-coach-label { position: relative; }
 .nrl-mo-coach-badge {
-  box-sizing: border-box; width: 6.8em; height: 32px; padding: 0 6px; border-radius: 8px; font-size: 0.8125rem; line-height: 32px; text-align: center; text-transform: uppercase;
+  box-sizing: border-box; width: 6.8em; height: 32px; padding: 0 6px; border-radius: 8px; font-size: 0.8125rem; line-height: 32px; letter-spacing: 0.02em; text-align: center; text-transform: uppercase;
   overflow: hidden; text-overflow: ellipsis;
   background: var(--nrl-navy); color: var(--nrl-muted);
 }
@@ -2121,17 +2127,18 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 .nrl-mo-coach[aria-expanded="true"] .nrl-mo-coach-badge { visibility: hidden; }
 .nrl-mo-coach[aria-expanded="true"] .nrl-mo-coach-label::after { content: '▾'; position: absolute; left: 100%; margin-left: 0.3em; }
 /* The coach tray (41): only the calls on now; the match keeps playing. #396: at most five rows
-   (six buttons), as tiles two a line (three on a short wide phone), so it never scrolls. Its height is
-   capped by the score bar, not the ball chip: open, it may cover the chip, and says the tackle itself. */
+   (six buttons), as tiles two a line (three on a short wide phone), so it never scrolls, and never
+   over the ball chip (its height stops at the chip's foot). */
 .nrl-mo-tray {
   position: fixed; left: calc(12px + var(--nrl-safe-l)); bottom: calc(80px + var(--nrl-safe-b)); z-index: 21;
-  width: min(440px, calc(100vw - 24px)); max-height: calc(100vh - 88px - var(--nrl-mo-score-foot, 60px));
-  max-height: calc(100dvh - 88px - var(--nrl-mo-score-foot, 60px)); overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box;
+  width: min(440px, calc(100vw - 24px)); max-height: calc(100vh - 88px - var(--nrl-mo-board, 60px));
+  max-height: calc(100dvh - 88px - var(--nrl-mo-board, 60px)); overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box;
   display: flex; flex-direction: column; gap: 6px; padding: 8px 12px; border-radius: 16px; background: var(--nrl-ink);
   box-shadow: inset 0 0 0 1px var(--nrl-line), 0 6px 20px rgba(0, 0, 0, 0.45);
   pointer-events: auto; animation: nrl-sheet-up var(--nrl-dur-sheet) var(--nrl-ease-out);
 }
 .nrl-mo-tray[hidden] { display: none; }
+@media (max-height: 400px) { .nrl-mo-tray { padding: 6px 12px; } }
 /* Its rows changed while it was open (#608): they dip and come back, so the change reads before a tap lands. */
 .nrl-mo-tray[data-changed] .nrl-mo-tray-list, .nrl-mo-tray[data-changed] .nrl-mo-tray-plays { animation: nrl-mo-tray-changed var(--nrl-dur-fast) var(--nrl-ease-out); }
 @keyframes nrl-mo-tray-changed { from { opacity: 0.6; } }
