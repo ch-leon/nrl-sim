@@ -146,6 +146,7 @@ async function exerciseLeagueCareer(options: LeagueQAOptions, control?: { target
       }
       for (let interval = 0; interval < slotCount; interval++) {
         stage = `season ${year}, interval ${interval + 1}`;
+        if (control && year === 1 && interval === slotCount - 1) roundTrip('season-1-before-final');
         const before = getState();
         assert(before.competitions!.leagueCareer!.phase === 'active', 'season closed before its saved final interval');
         if (control) controlledSportingInterval(year <= control.winSeasons);

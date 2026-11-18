@@ -27,6 +27,15 @@ it('creates normal annual UI saves for earned access, staying, moving down and r
   expect(result.evidence).toBe('controlled-sporting-results');
   expect(result.finalSeason).toBe(5);
   expect(result.seasons.map(s => s.premiership)).toEqual([true, true, true, false]);
+  const beforeFinal = snapshots.get('season-1-before-final')!;
+  expect(beforeFinal).toBeDefined();
+  expect(beforeFinal.week).toBe(beforeFinal.competitions!.calendar!.slots.length);
+  expect(beforeFinal.competitions!.leagueCareer!.phase).toBe('active');
+  expect(beforeFinal.history).toHaveLength(0);
+  const final = beforeFinal.competitions!.instances.flatMap(i => i.fixtures).find(f => f.slot === beforeFinal.week
+    && (f.homeId === beforeFinal.clubId || f.awayId === beforeFinal.clubId));
+  expect(final?.status).toBe('scheduled');
+  expect(final?.result).toBeUndefined();
   const lost = snapshots.get('season-4-closed')!;
   expect(lost.history[3]).toMatchObject({ wins: 0, losses: 14, premiership: false });
   expect(lost.competitions!.leagueCareer!.access.map(a => a.leagueId)).toContain('au-championship');

@@ -179,6 +179,61 @@ export async function runLeagueSelection(browser) {
   try {
     await promisify(execFile)('npx', ['vite-node', 'scripts/qa-league-career.ts', '--controlled-only', '--out', controlledOut],
       { timeout: 180000, maxBuffer: 2 * 1024 * 1024 });
+    await record('au-controlled-live-final-review', { width: 844, height: 390 }, async (page, report, shot) => {
+      report.evidence = 'controlled-sporting-setup-with-real-final';
+      const source = JSON.parse(readFileSync(join(controlledOut, 'au-season-1-before-final.json'), 'utf8'));
+      const expectedFixture = source.competitions.instances.flatMap(i => i.fixtures).find(f => f.slot === source.week
+        && f.status === 'scheduled' && (f.homeId === source.clubId || f.awayId === source.clubId));
+      assert(expectedFixture && progress(source).phase === 'active' && !source.history.length,
+        'Automatic review setup must be an active, unclosed final interval');
+      await page.addInitScript(([key, raw]) => { if (!localStorage.getItem(key)) localStorage.setItem(key, raw); }, [SAVE, JSON.stringify(source)]);
+      await page.goto(BASE); await page.locator('[data-nrl-continue-1]').tap();
+      await page.waitForFunction(() => !!window.__nrlState?.()?.competitions?.leagueCareer);
+      await skipIntro(page);
+      assert(!(await page.locator(CHOOSER).count()), 'Review setup prematurely opened an annual chooser');
+      await page.locator('[data-hud="advance"]').tap();
+      await page.waitForFunction(() => document.querySelector('[data-ask-proceed]') || document.querySelector('.nrl-mo-controls'));
+      const proceed = page.locator('[data-ask-proceed]'); if (await proceed.isVisible()) await proceed.tap();
+      await page.locator('.nrl-mo-controls').waitFor({ timeout: 60000 });
+      const held = await page.evaluate(key => JSON.parse(localStorage.getItem(key)), SIDECAR);
+      assert(held.fixtureId === expectedFixture.id && held.competitionId === expectedFixture.competitionId,
+        'The UI played a different final fixture');
+      await skipFromPill(page);
+      await page.locator('.nrl-mo-ft [data-back-to-club]').waitFor({ timeout: 120000 });
+      const closed = await state(page);
+      const close = progress(closed).close;
+      assert(progress(closed).phase === 'next-season-choice' && closed.season === source.season
+        && closed.history.length === 1 && closed.history[0].league.closeId === close.id
+        && close.id === `${source.competitions.world.profile.id}:close:s${source.season}`,
+        'Live final did not produce the exact once-only closed source identity');
+      assert(progress(closed).accepted.receiptId === progress(source).accepted.receiptId,
+        'Closing the final accepted next year without a choice');
+      const receipts = closed.matchIncome.filter(r => r.fixture.id === expectedFixture.id);
+      assert(receipts.length === 1 && receipts[0].receipt, 'Real final payment did not settle exactly once');
+      // This is the automatic live season review. Never open History or inject its callback.
+      await page.locator('.nrl-mo-ft [data-back-to-club]').tap();
+      await page.locator('[data-review-choose-league]').waitFor();
+      assert(!(await page.locator(CHOOSER).count()), 'A chooser bypassed the automatic review');
+      await shot('automatic-review');
+      await page.locator('[data-review-choose-league]').tap(); await page.locator(CHOOSER).waitFor();
+      assert(progress(await state(page)).close.id === close.id, 'Review CTA opened a different source year');
+      const leagueId = progress(source).accepted.leagueId;
+      await page.locator(`[data-nrl-league-choice="${leagueId}"]`).tap();
+      assert(await page.locator(CONFIRM).getAttribute('aria-disabled') === 'false', 'Current league is not confirmable');
+      await shot('review-cta-choice');
+      await page.locator(CONFIRM).tap(); await page.locator(CHOOSER).waitFor({ state: 'detached' });
+      const entered = await state(page), receipt = progress(entered).accepted;
+      assert(entered.season === source.season + 1 && entered.week === 1 && entered.history.length === 1
+        && entered.money === closed.money && receipt.leagueId === leagueId
+        && receipt.receiptId === `${source.competitions.world.profile.id}:entry:s2:${source.clubId}:${leagueId}`
+        && receipt.startInterval === close.endingInterval, 'Review CTA did not accept exactly one correct annual entry');
+      await resume(page); const restored = await state(page);
+      assert(restored.money === entered.money && restored.history.length === 1
+        && JSON.stringify(progress(restored).accepted) === JSON.stringify(receipt), 'Automatic review acceptance replayed on reload');
+      await shot('review-cta-accepted');
+      report.fixtureId = expectedFixture.id; report.closeId = close.id; report.entryId = receipt.receiptId;
+      report.money = restored.money; report.actualFinalResult = closed.competitions.instances.flatMap(i => i.fixtures).find(f => f.id === expectedFixture.id).result;
+    });
     for (const pack of ['au', 'uk']) {
       for (const [season, rank, name] of [[1, 0, 'title-stay'], [2, 1, 'title-up'], [3, 0, 'retained-cap-down'],
         [4, 1, 'losing-year-return-up'], [4, 0, 'losing-year-stay']]) {
