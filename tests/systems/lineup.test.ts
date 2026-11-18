@@ -4,8 +4,8 @@
 // (each man in the slot he was picked for, at the stats his fit leaves him).
 import { describe, it, expect } from 'vitest';
 import {
-  FIT, LINEUP_SLOTS, POSITION_SHORT, autoPick, describeFills, effectiveRating, lineupAverage, lineupChanges, occupant, placeAt, placeSigning, positionFit,
-  resolveLineup, signingNote, spotOf, statsAt, swapSpots,
+  FIT, LINEUP_SLOTS, POSITION_SHORT, autoPick, autoPickKeepingPlan, describeFills, effectiveRating, lineupAverage, lineupChanges, occupant, placeAt, placeSigning, positionFit,
+  resolveLineup, setCaptain, setKicker, signingNote, spotOf, statsAt, swapSpots,
 } from '../../src/systems/lineup';
 import { ROLES } from '../../src/match/league/roles';
 import { POSITIONS, generatePlayerAround, overallRating } from '../../src/data/player';
@@ -105,6 +105,59 @@ describe('auto pick', () => {
 });
 
 describe('resolving the lineup on the day', () => {
+  it('covers an away starter and bench player, then restores their places and roles on return', () => {
+    const s = squad();
+    const base = autoPick(s);
+    const awayStarter = base.starters[5]!;
+    const awayBench = base.bench[0]!;
+    const l = { ...base, captain: awayStarter, kicker: awayStarter };
+    const away = new Set([awayStarter, awayBench]);
+    const r = resolveLineup(l, s, away);
+    expect(r.lineup).toBe(l);
+    expect(r.changed).toBe(false);
+    expect(r.starters[5]!.id).not.toBe(awayStarter);
+    const player = s.find((p) => p.id === awayStarter)!;
+    expect(r.fills).toEqual([{ slot: 5, position: 'halfback', why: 'away', out: player.name, player: r.starters[5] }]);
+    expect(describeFills(r.fills)).toContain(`for ${player.name}, who is away`);
+    expect(r.bench).toHaveLength(BENCH.size);
+    expect(r.bench.some((p) => away.has(p.id))).toBe(false);
+
+    const acting = teamSheetFromSquad(s, 'me', 'Me', ['#111', '#eee'], r, away);
+    expect(acting.captain).not.toBe(awayStarter);
+    expect(acting.kicker).not.toBe(awayStarter);
+    expect(acting.roster!.map((p) => p.id)).toContain(acting.captain);
+    expect(acting.roster!.map((p) => p.id)).toContain(acting.kicker);
+    const home = resolveLineup(r.lineup, s);
+    const restored = teamSheetFromSquad(s, 'me', 'Me', ['#111', '#eee'], home);
+    expect(restored.roster![5]!.id).toBe(awayStarter);
+    expect(restored.bench![0]!.id).toBe(awayBench);
+    expect(restored.captain).toBe(awayStarter);
+    expect(restored.kicker).toBe(awayStarter);
+  });
+
+  it('leaves the actual bench short with only twelve eligible players', () => {
+    const l = autoPick(squad());
+    const s = squad().filter((p) => [...l.starters, ...l.bench].includes(p.id));
+    const away = new Set([l.starters[0]!]);
+    const r = resolveLineup(l, s, away);
+    expect(r.starters.filter(Boolean)).toHaveLength(LINEUP_SLOTS.length);
+    expect(r.bench).toHaveLength(BENCH.size - 1);
+    expect(r.lineup).toBe(l);
+  });
+
+  it('deliberate Auto pick selects available players and keeps the coach’s role preferences', () => {
+    const s = squad();
+    const base = autoPick(s);
+    const starter = base.starters[0]!;
+    const bench = base.bench[0]!;
+    const l = { ...base, captain: starter, kicker: starter };
+    const away = new Set([starter, bench]);
+    const picked = autoPickKeepingPlan(s, l, away);
+    expect([...picked.starters, ...picked.bench].some((id) => id !== null && away.has(id))).toBe(false);
+    expect(picked).toMatchObject({ captain: starter, kicker: starter });
+    expect(resolveLineup(picked, s).starters[0]!.id).toBe(picked.starters[0]);
+  });
+
   it('an injured starter is covered by the best bench man for the slot, with a note, and keeps his slot', () => {
     const s = squad();
     const l = autoPick(s);
@@ -180,6 +233,55 @@ describe('resolving the lineup on the day', () => {
 });
 
 describe('the screen’s taps', () => {
+  it('allows deliberate replacements and preserves unrelated away choices', () => {
+    const s = squad();
+    const base = autoPick(s);
+    const awayStarter = base.starters[0]!;
+    const awayBench = base.bench[0]!;
+    const away = new Set([awayStarter, awayBench]);
+    const l = { ...base, captain: awayStarter, kicker: 'halfback-65', bench: base.bench.slice(0, 3) };
+    const replacement = s.find((p) => ![...base.starters, ...base.bench].includes(p.id))!;
+    const fullback = { kind: 'starter', slot: 0 } as const;
+    const centre = { kind: 'starter', slot: 3 } as const;
+    const winger = { kind: 'starter', slot: 1 } as const;
+    const swapped = swapSpots(l, centre, winger, away);
+    expect(swapped.starters[3]).toBe(l.starters[1]);
+    expect(swapped.starters[0]).toBe(awayStarter);
+    expect(swapped.bench).toEqual(l.bench);
+    const directCover = swapSpots(swapped, fullback, winger, away);
+    expect(directCover.starters[0]).toBe(swapped.starters[1]);
+    expect(directCover.starters[1]).toBeNull();
+    expect(placeAt(swapped, winger, awayBench, away)).toBe(swapped);
+    expect(setKicker(swapped, awayStarter, away)).toBe(swapped);
+    expect(setCaptain(swapped, awayBench, away)).toBe(swapped);
+
+    const updated = placeAt(swapped, fullback, replacement.id, away);
+    expect(updated.starters[0]).toBe(replacement.id);
+    expect(updated.bench).toEqual(l.bench);
+    expect(updated.captain).toBe(awayStarter);
+    expect(resolveLineup(updated, s).starters[0]!.id).toBe(replacement.id);
+  });
+
+  it('can deliberately move a bench player into an away starter’s spot', () => {
+    const l = autoPick(squad());
+    const away = new Set([l.starters[0]!]);
+    const chosen = l.bench[0]!;
+    const updated = placeAt(l, { kind: 'starter', slot: 0 }, chosen, away);
+    expect(updated.starters).toEqual([chosen, ...l.starters.slice(1)]);
+    expect(updated.bench).toEqual(l.bench.slice(1));
+    expect(swapSpots(l, { kind: 'starter', slot: 0 }, { kind: 'bench', index: 0 }, away)).toEqual(updated);
+    expect(swapSpots(l, { kind: 'bench', index: 0 }, { kind: 'starter', slot: 0 }, away)).toEqual(updated);
+  });
+
+  it('can deliberately move a bench player into an away bench player’s seat', () => {
+    const l = autoPick(squad());
+    const away = new Set([l.bench[0]!]);
+    const chosen = l.bench[1]!;
+    const updated = placeAt(l, { kind: 'bench', index: 0 }, chosen, away);
+    expect(updated.bench).toEqual(l.bench.slice(1));
+    expect(updated.starters).toEqual(l.starters);
+  });
+
   const s = squad();
   const l = autoPick(s);
   it('a newcomer into a slot sends the starter to a free seat, else out of the thirteen', () => {
@@ -230,6 +332,24 @@ describe('the screen’s taps', () => {
 });
 
 describe('the sheet the sim gets', () => {
+  it('validates a supplied selection against eligible squad IDs and uses the squad’s player records', () => {
+    const s = squad();
+    const selected = resolveLineup(autoPick(s), s);
+    const [absent, injured, unowned, starter, ...rest] = selected.starters as Player[];
+    const [banned, bench] = selected.bench;
+    const eligibleSource = s.filter((p) => p.id !== unowned!.id).map((p) =>
+      p.id === injured!.id ? { ...p, injuredWeeks: 2 } : p.id === banned!.id ? { ...p, suspendedWeeks: 1 } : p);
+    const selection = {
+      ...selected,
+      starters: [absent!, injured!, unowned!, { ...starter!, name: 'Stale starter name' }, ...rest],
+      bench: [banned!, { ...bench!, name: 'Stale bench name' }, starter!, bench!, absent!],
+    };
+    const sheet = teamSheetFromSquad(eligibleSource, 'me', 'Me', ['#111', '#eee'], selection, new Set([absent!.id]));
+    expect(sheet.roster!.map((p) => p.id)).toEqual([starter!.id, ...rest.map((p) => p.id)]);
+    expect(sheet.roster![0]!.name).toBe(starter!.name);
+    expect(sheet.bench!.map((p) => ({ id: p.id, name: p.name }))).toEqual([{ id: bench!.id, name: bench!.name }]);
+  });
+
   it('each man plays the slot he was picked for, at his fit, and the bench and rotation follow', () => {
     const s = squad();
     // A prop at halfback, the halfback on the bench.

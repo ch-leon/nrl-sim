@@ -154,6 +154,14 @@ Rest and declining remain valid choices. No obligatory stream of event pop-ups.
 
 ## 5. Sending players on assignments
 
+The first approved implementation is [Skills Camp](player-assignments.md), tracked
+in [#708](https://github.com/ch-leon/nrl-sim/issues/708). Book one free place in
+Weeks 1–4; the player misses the opening league fixture in Week 5 and returns
+before Week 6 selection. Its starting award is 70 base XP replacing ordinary
+training, with existing progression modifiers and ceilings. Leon chose this
+opportunity and requested the early window on 19 November. Implementation and
+recovery/balance evidence are in progress; this is not a shipped-feature claim.
+
 An assignment belongs to real player IDs in the existing squad. It does not
 create a second copy, transfer their club ownership or generate a replacement star.
 Its saved record owns its participants, dates, rules, progress, coaching choices,

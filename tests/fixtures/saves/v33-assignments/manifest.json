@@ -1,0 +1,125 @@
+{
+  "source_commit": "6b1cfa76145f8b399c4ce2c97e194fdfabcacdb7",
+  "saved_format": 33,
+  "season": 1,
+  "career_seed": 573,
+  "difficulty": "normal",
+  "namespace": null,
+  "storage": "Fresh process and private in-memory localStorage per pack and verification. Normal slot 1.",
+  "runtime": "Node v22.22.3, vite-node 2.1.9",
+  "regions": {
+    "au": {
+      "club": "QA AU League",
+      "home": "Brisbane, AU",
+      "boundaries": [
+        {
+          "pack": "au",
+          "week": 4,
+          "elapsed_intervals": 3,
+          "rng_state": 4224861016,
+          "phase": "active",
+          "open_cup_lifecycle": "open",
+          "open_cup_choice": "unanswered",
+          "slot": {
+            "filename": "v33-au-week-4.json",
+            "bytes": 416496,
+            "sha256": "66b184d963f0a9e2590df1e9661894bbe444d90dc9c0fde52901746240a70af7"
+          }
+        },
+        {
+          "pack": "au",
+          "week": 5,
+          "elapsed_intervals": 4,
+          "rng_state": 937800272,
+          "phase": "active",
+          "open_cup_lifecycle": "open",
+          "open_cup_choice": "unanswered",
+          "slot": {
+            "filename": "v33-au-week-5.json",
+            "bytes": 424832,
+            "sha256": "3bf7898100b81ce205a87b37c355d86dc7d9c38dfa3a4d0fcb410e522d6097f6"
+          },
+          "sidecar": {
+            "filename": "live-matches/v33-au-week-5.json",
+            "bytes": 286,
+            "sha256": "94817c91d4c4a63154bbe853cb5e0a037739e25a2093061ce0985e3028b4517a"
+          },
+          "fixture_id": "au-career-3x8:au-local:s1:i0:f3",
+          "competition_id": "au-career-3x8:au-local:s1:i0",
+          "match_seed": 398475218,
+          "engine_id": "nrl-live-6-0a1b2b2c68eb48",
+          "tick": 0
+        }
+      ]
+    },
+    "uk": {
+      "club": "QA UK League",
+      "home": "Leeds, GB",
+      "boundaries": [
+        {
+          "pack": "uk",
+          "week": 4,
+          "elapsed_intervals": 3,
+          "rng_state": 1030012198,
+          "phase": "active",
+          "open_cup_lifecycle": "open",
+          "open_cup_choice": "unanswered",
+          "slot": {
+            "filename": "v33-uk-week-4.json",
+            "bytes": 412973,
+            "sha256": "f056d1df0de0b114a803163394820213238a21ca92a22f0f18603183f332930f"
+          }
+        },
+        {
+          "pack": "uk",
+          "week": 5,
+          "elapsed_intervals": 4,
+          "rng_state": 2037918750,
+          "phase": "active",
+          "open_cup_lifecycle": "open",
+          "open_cup_choice": "unanswered",
+          "slot": {
+            "filename": "v33-uk-week-5.json",
+            "bytes": 421176,
+            "sha256": "330a5895614756142d11e04cfb453e80f9626acc068f8e1455980ab9747f4079"
+          },
+          "sidecar": {
+            "filename": "live-matches/v33-uk-week-5.json",
+            "bytes": 285,
+            "sha256": "ffcced16508010a70ae9fcdeb9220a7a0e384172334c2866516242bca6f0ab3e"
+          },
+          "fixture_id": "uk-career-3x8:uk-local:s1:i0:f0",
+          "competition_id": "uk-career-3x8:uk-local:s1:i0",
+          "match_seed": 665041055,
+          "engine_id": "nrl-live-6-017a0b6bfc64d1",
+          "tick": 0
+        }
+      ]
+    }
+  },
+  "capture_driver": {
+    "filename": "capture.ts",
+    "derived_from": "/private/tmp/nrl-assignments-v33-captures/capture.ts",
+    "sha256": "08d93303d427e051c3afe0a9ceadecf6e666fe983bef9bca57b5a71a47cc8e1d"
+  },
+  "commands": [
+    "git -C '/Users/leoncreed-baker/Documents/Cavehole/NRL-Sim/.claude/worktrees/player-assignments' archive 6b1cfa76145f8b399c4ce2c97e194fdfabcacdb7 | tar -x -C /private/tmp/nrl-v33-capture-source.MqmLSX",
+    "ln -s '/Users/leoncreed-baker/Documents/Cavehole/NRL-Sim/.claude/worktrees/player-assignments/node_modules' /private/tmp/nrl-v33-capture-source.MqmLSX/node_modules",
+    "cp /private/tmp/nrl-assignments-v33-opening-captures/capture.ts /private/tmp/nrl-v33-capture-source.MqmLSX/scripts/capture-opening.ts",
+    "cd /private/tmp/nrl-v33-capture-source.MqmLSX",
+    "node_modules/.bin/vite-node scripts/capture-opening.ts capture au /private/tmp/nrl-assignments-v33-opening-captures",
+    "node_modules/.bin/vite-node scripts/capture-opening.ts capture uk /private/tmp/nrl-assignments-v33-opening-captures",
+    "node_modules/.bin/vite-node scripts/capture-opening.ts verify au /private/tmp/nrl-assignments-v33-opening-captures",
+    "node_modules/.bin/vite-node scripts/capture-opening.ts verify uk /private/tmp/nrl-assignments-v33-opening-captures",
+    "mkdir -p reproduction-opening",
+    "node_modules/.bin/vite-node scripts/capture-opening.ts capture au reproduction-opening",
+    "node_modules/.bin/vite-node scripts/capture-opening.ts capture uk reproduction-opening"
+  ],
+  "method": [
+    "Unmodified tree from git archive of the exact immutable source commit. Temporary driver only, calling production save owners and the existing League QA simulation. No fabricated fixtures, scores or players.",
+    "Normal seed-573 AU or UK League creation, preview and confirmed initial League entry. No other coach actions. Cup offer remains open and unanswered during these weeks. The four elapsed intervals include the Week 1 and Week 4 trials, played with advanceWeekAsTapped.",
+    "The Week 4 snapshot precedes the second trial. The Week 5 snapshot is the durable start of the first regular League fixture; advanceWeek then holds at real kickoff tick 0. Held exportSave equals the exact documented envelope based on the captured raw slot and sidecar.",
+    "Fresh verification process per pack installs and loads Week 4, validates it without repair, replays the real trial, and reproduces the raw Week 5 checkpoint byte for byte. It installs the held Week 5 envelope, reopens the saved fixture, and compares its ID, seed and exact sidecar; the checkpoint stayed intact. A second full independent generation reproduced all six captured files byte for byte."
+  ],
+  "held_export_recipe": "JSON.stringify({ ...JSON.parse(week5Slot), nrlLiveMatch: JSON.parse(week5Sidecar) }, null, 2)"
+}
