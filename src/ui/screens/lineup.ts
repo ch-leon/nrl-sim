@@ -77,7 +77,7 @@ const LINEUP_CSS = `
 .nrl-pitch-lane-label { flex: 0 0 4.5rem; font-family: var(--nrl-f-label); font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255, 255, 255, 0.7); }
 .nrl-pitch-cards { flex: 1 1 auto; min-width: 0; display: flex; justify-content: center; gap: 8px; }
 .nrl-pitch-cards > .nrl-pcard { flex: 0 1 7.5rem; min-width: 0; width: auto; box-shadow: inset 0 0 0 1px var(--nrl-line-2), 0 4px 12px rgba(0, 0, 0, 0.35); }
-.nrl-btn.nrl-pitch-empty { flex: 0 1 7.5rem; min-width: 0; min-height: 52px; border-radius: 10px; background: rgba(11, 18, 32, 0.6); box-shadow: inset 0 0 0 1px dashed; border: 1px dashed var(--nrl-outline); font-size: 0.8125rem; }
+.nrl-btn.nrl-pitch-empty { flex: 0 1 7.5rem; min-width: 0; min-height: 52px; border-radius: 10px; background: rgba(11, 18, 32, 0.6); border: 1px dashed var(--nrl-outline); font-size: 0.8125rem; }
 /* A swap under way (32): the picked card wears the accent ring, the rest dim. */
 .nrl-pcard[data-selected], .nrl-btn.nrl-pitch-empty[data-selected] { box-shadow: 0 0 0 2px var(--nrl-accent), 0 4px 12px rgba(0, 0, 0, 0.35); }
 .nrl-pcard[data-dim] { opacity: 0.5; }

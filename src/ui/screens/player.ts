@@ -425,7 +425,8 @@ export const PLAYER_CSS = `
 .nrl-player-deal { font-size: 0.8125rem; line-height: 1.35; color: var(--nrl-text-2); }
 .nrl-player-expiring { color: var(--nrl-neg); }
 /* The deals sit in the page's foot (3f): it never scrolls, so they are always on screen. */
-.nrl-player-deal-foot { justify-content: flex-end; }
+.nrl-player-deal-foot { flex-direction: column; align-items: flex-end; gap: 6px; }
+.nrl-player-deal-foot .nrl-player-why { flex: 0 0 auto; align-self: stretch; }
 .nrl-player-actions { flex: 0 0 auto; display: flex; gap: 8px; }
 .nrl-player-actions .nrl-btn { min-width: 7.5rem; padding: 0 14px; white-space: normal; }
 /* What each deal costs, and why one is shut (in amber, SuperCOOKED §3.2). Whole lines, wrapped (#415). */
@@ -743,13 +744,17 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
         ...(m.endSeason ? [el('div', { class: 'nrl-player-contract-ends', text: `Ends season ${m.endSeason}` })] : []),
         el('div', { class: `nrl-player-deal${m.contract.expiring ? ' nrl-player-expiring' : ''}`, text: ctx.kind === 'freeAgent' ? m.contract.text : `Contract: ${m.contract.text}` }),
         ...(m.tenure ? [el('div', { class: 'nrl-player-deal', text: m.tenure })] : []));
-      // What each deal costs, or why it is shut, under the contract (§3.2: disabled says why).
-      if (notes.length) card.append(el('div', { class: 'nrl-player-why' },
-        ...notes.map((n) => el('div', { class: n.attn ? 'nrl-attn' : '', text: n.text, attrs: { title: n.text } }))));
+      // What each deal costs sits under the contract; why one is shut (§3.2: disabled says why) goes
+      // above the deals in the foot, which never scrolls, so a phone (no `title`) reads it whole.
+      const whyLines = (list: typeof notes): HTMLElement => el('div', { class: 'nrl-player-why' },
+        ...list.map((n) => el('div', { class: n.attn ? 'nrl-attn' : '', text: n.text, attrs: { title: n.text } })));
+      const costs = notes.filter((n) => !n.attn);
+      const shut = notes.filter((n) => n.attn);
+      if (costs.length) card.append(whyLines(costs));
       panel.append(el('div', { class: `nrl-player-deal-tab${m.roles ? '' : ' nrl-player-deal-one'}` }, ...(m.roles ? [jobs] : []), card));
       // The deals hold still at the foot, on screen without scrolling (3f).
       const deals = dealButtons(p, m);
-      if (deals) foot = el('div', { class: 'nrl-player-foot nrl-player-deal-foot' }, deals);
+      if (deals) foot = el('div', { class: 'nrl-player-foot nrl-player-deal-foot' }, ...(shut.length ? [whyLines(shut)] : []), deals);
     } else {
       // Record: what the first view leaves out, all still here (SuperCOOKED 35, "moved off the page").
       const moraleText = `${m.morale.word} (${m.morale.value})${m.morale.reasons.length ? ' · ' + m.morale.reasons.join(', ') : ''}`;

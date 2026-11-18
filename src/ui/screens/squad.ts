@@ -249,10 +249,12 @@ function openSquadList(): void {
       const men = sorted.filter((p) => POSITION_GROUPS[p.position] === group);
       if (!men.length) continue;
       const keys = SHOWN_BY_GROUP[group];
-      list.appendChild(el('div', { class: 'nrl-squad-group', attrs: { 'aria-hidden': 'true', 'data-group': group } },
-        el('span'), el('span', { class: 'nrl-squad-group-name', text: label }), el('span', { text: 'Pos' }), el('span', { text: 'Rating' }),
-        ...keys.map((k) => el('span', { class: 'nrl-num-head', text: STAT_HEAD[k] })),
-        el('span', { text: 'Fitness' }), el('span', { class: 'nrl-num-head', text: 'In side' })));
+      // The group name is a heading a screen reader steps between; the column labels repeat the row's own cells, so they stay silent.
+      const quiet = { 'aria-hidden': 'true' };
+      list.appendChild(el('div', { class: 'nrl-squad-group', attrs: { role: 'heading', 'aria-level': '3', 'data-group': group } },
+        el('span', { attrs: quiet }), el('span', { class: 'nrl-squad-group-name', text: label }), el('span', { text: 'Pos', attrs: quiet }), el('span', { text: 'Rating', attrs: quiet }),
+        ...keys.map((k) => el('span', { class: 'nrl-num-head', text: STAT_HEAD[k], attrs: quiet })),
+        el('span', { text: 'Fitness', attrs: quiet }), el('span', { class: 'nrl-num-head', text: 'In side', attrs: quiet })));
       for (const p of men) {
         const no = numbers.get(p.id);
         const pct = fitnessPct(p);
