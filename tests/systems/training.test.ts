@@ -76,6 +76,20 @@ describe('XP progression', () => {
     after = applyMatchXp(squad, own, result, 'player', 'rival', []);
     expect(after.find(p => p.id === scorer.id)?.xp).toBe(PROGRESSION.STARTER_XP + PROGRESSION.TRY_XP + PROGRESSION.LINE_BREAK_XP + PROGRESSION.POTM_XP);
   });
+
+  it('only the playing namesake earns match and player-of-the-match XP', () => {
+    const played = mkPlayer({ id: 'starter' });
+    const absent = mkPlayer({ id: 'away' });
+    const own = teamSheetFromSquad([played], 'player', 'XP', ['#000000', '#ffffff']);
+    const result: MatchResult = {
+      homeScore: 6, awayScore: 0, weather: 'clear', momentumTimeline: [], injuries: [],
+      stats: { possession: [50, 50], tackles: [0, 0], errors: [0, 0], tries: [1, 0] },
+      events: [{ t: 1, kind: 'try', teamId: 'player', player: played.name }],
+    };
+    const [unchanged, rewarded] = applyMatchXp([absent, played], own, result, 'player', 'rival', []);
+    expect(unchanged).toBe(absent);
+    expect(rewarded!.xp).toBe(PROGRESSION.STARTER_XP + PROGRESSION.TRY_XP + PROGRESSION.POTM_XP);
+  });
 });
 describe('spendByFocus', () => {
   it('spends on an eligible focus before the stat with most room', () => {

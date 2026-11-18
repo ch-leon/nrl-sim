@@ -31,7 +31,10 @@ live gameplay change; work still open below has not shipped.
   slices: league choice and unlocks are shipped. The first normal Open Cup adds
   seasonal registration and cash/reputation/trophies in [PR #736](https://github.com/ch-leon/nrl-sim/pull/736)
   ([evidence and release gates](../status/2026-11-open-cup.md)).
-  Assignments, challenges, other formats and their rewards remain later work.
+  The first assignment, [Skills Camp](../specs/player-assignments.md), is implemented in
+  [PR #742](https://github.com/ch-leon/nrl-sim/pull/742): book during Weeks 1–4, miss the Week 5 opener, return
+  before Week 6 with development. [Delivery evidence](../status/2026-11-player-assignments.md).
+  Further assignments, coached challenges, other formats and their rewards remain later work.
   Earlier structural execution context follows:
   [#569](https://github.com/ch-leon/nrl-sim/issues/569) publishes the
   [technical contract](../specs/career-competitions.md) against current main;
