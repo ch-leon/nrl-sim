@@ -76,7 +76,9 @@ storage when the phone is very low on space; a native copy of every save is Phas
 the spec. Saves from the website do not appear in the app.
 
 The game saves when it is hidden (`visibilitychange` / `pagehide`, `src/core/save.ts`)
-as well as at every week.
+as well as at every week. That the hide events fire when iOS sends the app to the
+background is **not yet checked** in the app (the spec's "Still unproven" list); if it
+turns out they do not, the backstop is Capacitor's app `pause` event (`@capacitor/app`).
 
 ## What the iPhone build does differently
 
@@ -113,3 +115,4 @@ The Simulator cannot check these. They are Leon's to try on the phone:
 - The real notch / Dynamic Island insets in landscape.
 - A cold start in airplane mode.
 - Saves surviving the 7-day re-install.
+- Saving when the app is sent to the background (see Saves).
