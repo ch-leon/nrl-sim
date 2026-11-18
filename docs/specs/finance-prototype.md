@@ -205,8 +205,10 @@ next levels are 5M, 10M and 20M of the division at purchase. Local prices are
 90,000/180,000/360,000. Purchased capacity applies immediately and persists
 through future seasons, promotion and relegation. It never edits a signed salary.
 
-The first Sponsor Shield title activates its permanent +5% from the next season,
-once per club career. Repeats grant only their published cash/honours. Use the
+The planned Sponsor Shield rule is a permanent +5% from the next season after
+the first title, once per club career. Repeats would grant only their published
+cash/honours. This is a design rule for later reward integration, not an active
+League-career prize. Use the
 same entitlement for AI; no second cap system in competition code. For example,
 one bought level plus Shield means a Local cap of 385,000, not 385,875.
 
