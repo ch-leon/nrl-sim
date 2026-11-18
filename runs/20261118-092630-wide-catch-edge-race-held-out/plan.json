@@ -1,0 +1,62 @@
+{
+  "name": "wide catch edge race held out",
+  "description": "On the wide back-door catch revision, does turning on the edge race add more than one tracked bust per 14 minutes for Expansive fast backs versus flat Slide? This held-out comparison uses seeds 101–300 in both orientations, with a matched flat Speed 60 control and the default match length.",
+  "seedStart": 101,
+  "seeds": 200,
+  "base": {
+    "counters.slide.expansiveSigned": 1,
+    "counters.compressed.expansiveRelative": 1,
+    "race.single": 0,
+    "race.perPoint": 0.02,
+    "race.on": 0
+  },
+  "scenarios": [
+    {
+      "name": "fast-backs expansive v flat slide",
+      "home": {
+        "rating": 60,
+        "positionStats": {
+          "backs": {
+            "speed": 85
+          }
+        },
+        "tactics": {
+          "attack": "expansive"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "neutral flat 60 expansive v flat 60 slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    }
+  ],
+  "variants": [
+    {
+      "name": "edge race on",
+      "tuning": {
+        "race.on": 1
+      }
+    }
+  ]
+}

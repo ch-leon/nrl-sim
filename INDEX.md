@@ -363,3 +363,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261117-105546-standard | standard | 2bdb86b | main | [report](runs/20261117-105546-standard/report.md) |
 | 20261118-031501-back-door-on-off-standard | back-door on-off standard | a9a9c35 | feat/match-back-door | [report](runs/20261118-031501-back-door-on-off-standard/report.md) |
 | 20261118-070129-standard | standard | a448210 | main | [report](runs/20261118-070129-standard/report.md) |
+| 20261118-092630-wide-catch-edge-race-held-out | wide catch edge race held out | 40c4d7d | feat/match-back-door | [report](runs/20261118-092630-wide-catch-edge-race-held-out/report.md) |
