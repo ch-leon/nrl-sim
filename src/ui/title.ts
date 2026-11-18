@@ -152,7 +152,7 @@ ${MOTION_CSS}
 .nrl-title-swatch:active:not(:disabled) { transform: scale(var(--nrl-press)); transition: transform var(--nrl-dur-press) var(--nrl-ease-out); }
 .nrl-title-pick { background: #1b264a; }
 /* Switch the fill and ink together so the newly selected mode is readable on the tap frame. */
-.nrl-title .nrl-title-career-mode[aria-pressed] { transition: none; }
+.nrl-title .nrl-title-career-mode[aria-pressed] { transition: transform var(--nrl-dur-press) var(--nrl-ease-out); }
 .nrl-title-career-mode[aria-pressed="false"] { color: #fff; }
 .nrl-title-difficulty-copy { margin: 0; font-size: 0.8125rem; line-height: 1.3; color: #c9d1ea; }
 .nrl-title-difficulty-hint { color: #f4d03f; }

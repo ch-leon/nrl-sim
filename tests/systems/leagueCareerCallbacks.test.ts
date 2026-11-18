@@ -4,7 +4,7 @@ import { confirmLeagueEntry } from '../../src/systems/leagueEntryCommit';
 import { entrySnapshots } from '../data/leagueCareerFixtures';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createLegacyGame } from '../helpers/legacyGame';
-import { createNewGame, getState, setState, loadState } from '../../src/core/state';
+import { buildNewGameState, createNewGame, getState, setState, loadState } from '../../src/core/state';
 import { advanceUntil } from '../../src/core/advance';
 import { advanceWeek, advanceWeeks, clearHeldWeek, clearSeasonHooks, clearTickHooks, failedIntervalProblem, weekHeld, withFastForward } from '../../src/core/time';
 import { getCurrentFixture, initLeague, registerFixturesSystem } from '../../src/systems/fixtures';
@@ -15,11 +15,11 @@ import * as jobs from '../../src/systems/matchJobs';
 import type { MatchResult } from '../../src/sim/events';
 import { bus, type Events } from '../../src/core/events';
 import { setCareerNamespace } from '../../src/core/storage/local';
-import { DEV_TEST_PREFIX, liveMatchKey, slotKey } from '../../src/core/storageKeys';
+import { DEV_TEST_PREFIX, liveMatchKey, saveMetaKey, slotKey } from '../../src/core/storageKeys';
 import { setupStructuralDivisionCareer } from '../../src/systems/divisionCareer';
 import { AU_CAREER_PROFILE } from '../../src/content/career/au';
 import { leagueEntryReceiptId } from '../../src/data/leagueCareer';
-import { __setStorage, __unlockSaves, saveIfChanged, exportSave, enableAutosave, pendingLeagueSaveProblem, downloadSave, exportFilename, installImportedSave, loadSlot, setActiveSlot } from '../../src/core/save';
+import { __setStorage, __unlockSaves, saveIfChanged, exportSave, enableAutosave, pendingLeagueSaveProblem, downloadSave, exportFilename, installImportedSave, flushSaveMeta, getSlotMeta, loadSlot, setActiveSlot, writeSlot } from '../../src/core/save';
 
 afterEach(() => {vi.restoreAllMocks();vi.unstubAllGlobals();clearHeldWeek();clearTickHooks();clearSeasonHooks();bus.clear();setCareerNamespace(null);__setStorage(null);});
 function installStorage() {
@@ -330,6 +330,32 @@ describe('async result ownership across fresh careers', () => {
         bytes.set(slotKey(2), source);
         expect(() => exportSave(getState())).toThrow();
       } finally { setActiveSlot(1); setCareerNamespace(null); }
+    }
+    if (!prototype) {
+      // Both real recovery exports must refuse either storage failure. The pending
+      // export replaces an occupied slot; the quarantined export uses an empty one.
+      bytes.delete(slotKey(2));
+      if (status === 'pending') {
+        expect(writeSlot(2, buildNewGameState('Original destination', 80))).toBe(true);
+        bytes.set(liveMatchKey(2), JSON.stringify({...JSON.parse(sidecar), tick: 5}, null, 2));
+      }
+      flushSaveMeta();
+      const before = [slotKey(2), saveMetaKey(2), liveMatchKey(2)].map(key => bytes.get(key));
+      const meta = getSlotMeta(2);
+      for (const failingKey of [liveMatchKey(2), slotKey(2)]) {
+        const fault = vi.spyOn(localStorage, 'setItem').mockImplementation((key, value) => {
+          if (key === failingKey) throw new Error('Destination quota');
+          bytes.set(key, value);
+        });
+        const refused = installImportedSave(file, 2);
+        fault.mockRestore();
+        expect(refused).toMatchObject({ok: false, message: expect.stringMatching(/match/i)});
+        flushSaveMeta();
+        expect([slotKey(2), saveMetaKey(2), liveMatchKey(2)].map(key => bytes.get(key))).toEqual(before);
+        expect(getSlotMeta(2)).toEqual(meta);
+        expect(bytes.get(saveKey)).toBe(source);
+        expect(bytes.get(matchKey)).toBe(sidecar);
+      }
     }
     const installed = installImportedSave(file, 2);
     expect(installed.ok).toBe(true);

@@ -188,7 +188,8 @@ describe('verified pending history upper bound', () => {
     const s=verifiedPending();expect(inputProblem(s)).toBeNull();setState(s);
     expect(signPlayer(s,s.freeAgents[0]!.id).ok).toBe(true);
     const after=getState();expect(inputProblem(after)).toBeNull();
-    expect(importSave(JSON.stringify(after))).toMatchObject({ok:false,outcome:'unsupported'});
+    // This clock-only fixture omits the authored trial dates required for full save admission.
+    expect(importSave(JSON.stringify(after))).toEqual({ok:false,outcome:'unrecoverable',reason:'corrupt',message:'Missing or inconsistent saved trial dates'});
     expect(installImportedSave(JSON.stringify(after),1).ok).toBe(false);
     const forged=structuredClone(after);forged.squad.slice(-1)[0]!.clubHistory!.spells.slice(-1)[0]!.start.week=2;
     expect(inputProblem(forged)).toContain('history');

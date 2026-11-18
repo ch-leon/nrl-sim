@@ -478,6 +478,10 @@ export function getSlotSummaries(): SlotSummary[] {
 
 /** Write `state` to `slot`. Returns false (after warning + ui:notify) on failure. */
 export function writeSlot(slot: number, state: GameState, expectedOriginal?: string | null): boolean {
+  return persistSlot(slot, state, expectedOriginal);
+}
+
+function persistSlot(slot: number, state: GameState, expectedOriginal?: string | null, parkedMatch?: string): boolean {
   if (savesLocked) return false;
   const store = getStore();
   if (!store) {
@@ -499,7 +503,7 @@ export function writeSlot(slot: number, state: GameState, expectedOriginal?: str
     }
     const payload = JSON.stringify(state);
     const facts = { saveVersion: state.version, club: String(state.clubName), season: state.season, week: state.week };
-    store.write(slot, payload, nextMeta(store.storedMeta(slot), payload, facts, store.deviceId(), Date.now()));
+    store.write(slot, payload, nextMeta(store.storedMeta(slot), payload, facts, store.deviceId(), Date.now()), parkedMatch);
     approveOriginal(store, slot, payload, false);
   } catch (err) {
     console.warn('nrl-sim: save failed', err);
@@ -1066,6 +1070,10 @@ export function installImportedSave(text: string, slot: number): ImportResult {
       store.keepCorrupt(text, slot);
       if (destination !== null) store.keepCorrupt(destination, slot);
     } catch { return { ok: false, message: 'Could not preserve originals. Import was not installed.' }; }
+  }
+  if (installed.state.competitions?.leagueCareer && peeled.live) {
+    return persistSlot(slot, installed.state, expectedOriginal, JSON.stringify(peeled.live)) ? installed
+      : { ok: false, message: 'Could not save the League career and its parked match. Check storage and retry the import.' };
   }
   if (!writeSlot(slot, installed.state, expectedOriginal)) return { ok: false, message: '' };
   if (peeled.live) {
