@@ -57,7 +57,7 @@ function preview() {
 
 async function startWaitingCareer() {
   await preparePack('au');
-  const state = setupStructuralDivisionCareer(AU_CAREER_PROFILE, 573);
+  const state = setupStructuralDivisionCareer(AU_CAREER_PROFILE, 573, undefined, { enterOpenCup: false });
   const c = state.competitions!;
   setState({ competitions: { ...c, leagueCareer: {
     version: 1, scheduleSeed: 573, clubId: state.clubId, phase: 'initial-choice',
