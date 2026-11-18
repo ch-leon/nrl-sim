@@ -237,7 +237,7 @@ export function nextMatchPreview(
   return {
     round: f.round,
     stage: dated?.stageLabel ?? matchStage(f.round),
-    ...(dated ? { slot: dated.slot, label: `Week ${dated.slot} · ${dated.stageLabel}`, neutral: dated.fixture.neutral } : {}),
+    ...(dated ? { ...(dated.slot === null ? {} : { slot: dated.slot }), label: `${dated.dateLabel} · ${dated.stageLabel}`, neutral: dated.fixture.neutral } : {}),
     home,
     opponent: side(opp, opp.strength),
     you: side(me, bestNineMean(state.squad)),

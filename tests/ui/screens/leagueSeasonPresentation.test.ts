@@ -1,6 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createNewGame, setState } from '../../../src/core/state';
+import { createNewGame, getState, loadState, setState } from '../../../src/core/state';
 import { bus } from '../../../src/core/events';
+import { AU_CAREER_PROFILE } from '../../../src/content/career/au';
+import { setCareerNamespace } from '../../../src/core/storage/local';
+import { DEV_TEST_PREFIX } from '../../../src/core/storageKeys';
+import { setupStructuralDivisionCareer } from '../../../src/systems/divisionCareer';
+import { acceptLeagueEntry, previewLeagueEntry } from '../../../src/systems/leagueEntry';
+import { leagueCareerStateProblem } from '../../../src/systems/leagueEntryValidation';
+import { leagueSeasonView } from '../../../src/systems/leagueSeasonView';
+import { registerAllSystems } from '../../../src/qa/soak';
 import { competitions, progress } from '../../data/leagueCareerFixtures';
 import { nextMatchPreview, seasonClubResults } from '../../../src/systems/league';
 import { ladderStanding, objectiveLine } from '../../../src/systems/board';
@@ -25,7 +33,7 @@ function state(complete = false) {
 }
 
 beforeEach(() => { bus.clear(); stubDocument(); vi.stubGlobal('requestAnimationFrame', () => 1); vi.stubGlobal('cancelAnimationFrame', () => {}); });
-afterEach(() => { closeScreen(); closeModal(); bus.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { closeScreen(); closeModal(); bus.clear(); time.clearHeldWeek(); time.clearTickHooks(); time.clearSeasonHooks(); setCareerNamespace(null); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('League career presentation', () => {
   it('previews the saved scheduled fixture and only forecasts its actual week', () => {
@@ -110,5 +118,80 @@ describe('League choice HUD routing', () => {
     held.mockReturnValue(false);
     setState({ sacked: { season: 1, reason: 'Board decision' } });
     advanceFromClub(advance, choose); expect(choose).not.toHaveBeenCalled(); expect(advance).not.toHaveBeenCalled();
+  });
+});
+
+
+function admittedAu() {
+  setCareerNamespace(DEV_TEST_PREFIX);
+  createNewGame('Real League', 573);
+  const s = structuredClone(setupStructuralDivisionCareer(AU_CAREER_PROFILE, 573, undefined, { enterOpenCup: false }));
+  const c = s.competitions!;
+  c.leagueCareer = { version: 1, scheduleSeed: 573, clubId: s.clubId, phase: 'initial-choice',
+    access: [{ leagueId: AU_CAREER_PROFILE.startingDivisionId }],
+    initialFields: Object.fromEntries(c.world!.divisions.map(d => [d.id, c.instances.find(i => i.id === d.instanceId)!.entrantIds.slice()])) };
+  const preview = previewLeagueEntry(s, AU_CAREER_PROFILE.startingDivisionId);
+  if (!preview.ok) throw new Error(preview.message);
+  const accepted = acceptLeagueEntry(s, preview.preview);
+  if (!accepted.ok) throw new Error(accepted.message);
+  expect(leagueCareerStateProblem(accepted.state)).toBeNull();
+  return accepted.state;
+}
+
+describe('admitted League cancellations', () => {
+  it('derives a missing cancelled fixture date from the saved stage and preserves chronological trials', () => {
+    const s = admittedAu();
+    const own = leagueSeasonView(s)!.instance;
+    const f = own.fixtures.find(f => f.homeId === s.clubId || f.awayId === s.clubId)!;
+    const date = f.slot!; f.status = 'cancelled'; delete f.slot;
+    expect(leagueCareerStateProblem(s)).toBeNull();
+    const before = JSON.stringify(s);
+    const view = leagueSeasonView(s)!;
+    expect(view.fixtures.slice(0, 2).map(f => f.slot)).toEqual([1, 4]);
+    expect(view.fixtures.find(row => row.fixture.id === f.id)?.slot).toBe(date);
+    const row = myFixtureRows(s, {}).find(row => row.fixtureId === f.id)!;
+    expect(row).toMatchObject({ rd: `W${date}`, label: `Week ${date} · League · round 1`, res: 'Cancelled' });
+    expect(JSON.stringify(s)).toBe(before);
+    setState(s);
+    const screen = openFixturesScreen() as unknown as StubNode;
+    expect(screen.words()).toContain('Cancelled'); expect(screen.words()).not.toContain('undefined');
+  });
+
+  it('describes an actually reached cancelled week as quiet and points to the future match date', () => {
+    loadState(admittedAu()); registerAllSystems();
+    time.withFastForward(() => { for (let i = 0; i < 4; i++) time.advanceWeek(); });
+    const s = structuredClone(getState()); expect(s.week).toBe(5);
+    const f = leagueSeasonView(s)!.next!.fixture; f.status = 'cancelled';
+    expect(leagueCareerStateProblem(s)).toBeNull();
+    expect(leagueSeasonView(s)!.currentLabel).toBe('No club fixture');
+    expect(playWeekSub(s)).toContain('No club fixture · Week 6:');
+    expect(playWeekSub(s)).not.toContain('round 1');
+    expect(myFixtureRows(s, {}).find(row => row.fixtureId === f.id)?.res).toBe('Cancelled');
+  });
+
+  it('labels and stably orders cancellations without any saved date', () => {
+    const s = state(); const own = s.competitions!.instances[0]!;
+    delete own.definition.stages[0]!.slotIds;
+    for (const f of own.fixtures) { f.status = 'cancelled'; delete f.slot; }
+    own.fixtures.reverse();
+    const trial = structuredClone(own); trial.id = 'dated-trial';
+    trial.definition.format = { kind: 'exhibition' };
+    trial.definition.stages = [{ id: 'warmup', name: 'Warm up', kind: 'exhibition', rounds: 1, slotIds: [1] }];
+    trial.fixtures = [{ ...trial.fixtures[0]!, id: 'dated-trial:f0', competitionId: trial.id, stageId: 'warmup', round: 1, slot: 1, status: 'scheduled' }];
+    s.competitions!.instances.push(trial);
+    const view = leagueSeasonView(s)!;
+    expect(view.fixtures.map(f => f.slot)).toEqual([1, null, null]);
+    expect(view.fixtures.slice(1).map(f => f.fixture.id)).toEqual(own.fixtures.map(f => f.id).sort());
+    expect(myFixtureRows(s, {}).filter(r => r.res === 'Cancelled').map(r => [r.rd, r.label, r.res])).toEqual([
+      ['—', 'Date not recorded · League · round 1', 'Cancelled'],
+      ['—', 'Date not recorded · League · round 2', 'Cancelled'],
+    ]);
+    setState(s); const screen = openFixturesScreen() as unknown as StubNode;
+    expect(screen.words()).toContain('Date not recorded'); expect(screen.words()).not.toMatch(/undefined|NaN/);
+    // This DOM double has no layout; the viewport/scroll contract is tested in WebKit.
+    Object.assign(screen.querySelector('.nrl-fixtures-list')!, { clientHeight: 100, scrollHeight: 100 });
+    screen.querySelector('.nrl-fixtures-toggle')!.click();
+    expect(screen.words()).toContain('Date not recorded'); expect(screen.words()).not.toMatch(/undefined|NaN/);
+    screen.querySelector('.nrl-fixtures-toggle')!.click();
   });
 });

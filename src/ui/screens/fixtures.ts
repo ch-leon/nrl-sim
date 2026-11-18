@@ -214,9 +214,9 @@ function calendarFixtureRow(f: LeagueFixtureView, view: LeagueSeasonView, names:
   const tone = result ?? (view.next?.fixture.id === f.fixture.id ? 'next' : 'later');
   const decider = f.decider && !['score', 'draw'].includes(f.decider) ? ` · ${f.decider.replace(/-/g, ' ')}` : '';
   const res = result ? `${result} ${us}–${them}${decider}` : f.status === 'cancelled' ? 'Cancelled'
-    : f.instance.status === 'withdrawn' ? 'Withdrawn' : tone === 'next' ? 'NEXT' : f.status === 'pending' ? 'Pending' : `Week ${f.slot}`;
-  return { round: f.fixture.round, rd: `W${f.slot}`, slot: f.slot, fixtureId: f.fixture.id,
-    label: `Week ${f.slot} · ${f.stageLabel}`, opponentId, opponent: names[opponentId] ?? opponentId,
+    : f.instance.status === 'withdrawn' ? 'Withdrawn' : tone === 'next' ? 'NEXT' : f.status === 'pending' ? 'Pending' : f.dateLabel;
+  return { round: f.fixture.round, rd: f.slot === null ? '—' : `W${f.slot}`, ...(f.slot === null ? {} : { slot: f.slot }), fixtureId: f.fixture.id,
+    label: `${f.dateLabel} · ${f.stageLabel}`, opponentId, opponent: names[opponentId] ?? opponentId,
     home, neutral: f.fixture.neutral, tone, res };
 }
 
@@ -235,7 +235,7 @@ function buildCalendarFixtures(state: GameState, view: LeagueSeasonView): League
     if (fixturesView === 'mine') {
       for (const f of view.fixtures.filter(f => f.fixture.homeId === view.clubId || f.fixture.awayId === view.clubId)) {
         const r = calendarFixtureRow(f, view, names, view.clubId);
-        const attrs = { 'data-fixture-id': f.fixture.id, 'data-slot': String(f.slot), 'data-player': 'true',
+        const attrs = { 'data-fixture-id': f.fixture.id, 'data-slot': f.slot === null ? 'undated' : String(f.slot), 'data-player': 'true',
           'aria-label': `${r.label} · ${r.opponent} · ${r.neutral ? 'Neutral' : r.home ? 'Home' : 'Away'} · ${r.res}` };
         const row = r.tone === 'next'
           ? el('button', { class: 'nrl-fixture-row nrl-fixture-mine', attrs: { ...attrs, type: 'button', 'data-next-row': '' }, onClick: () => openNextMatch() }, ...myFixtureParts(r))
@@ -246,12 +246,13 @@ function buildCalendarFixtures(state: GameState, view: LeagueSeasonView): League
         list.append(item);
       }
     } else {
-      let slot = -1;
+      let dateGroup = '';
       for (const f of view.fixtures) {
-        if (f.slot !== slot) {
-          slot = f.slot;
-          const header = el('div', { class: 'nrl-label nrl-fixtures-round', text: `Week ${slot} · ${f.stageLabel}` });
-          if (slot === state.week) { header.setAttribute('data-current', 'true'); current = header; }
+        const group = `${f.dateLabel} · ${f.stageLabel}`;
+        if (group !== dateGroup) {
+          dateGroup = group;
+          const header = el('div', { class: 'nrl-label nrl-fixtures-round', text: group });
+          if (f.slot === state.week) { header.setAttribute('data-current', 'true'); current = header; }
           list.append(header);
         }
         const fixture = f.fixture;

@@ -17,7 +17,9 @@ export interface LeagueFixtureView {
   instance: CompetitionInstance;
   fixture: CompetitionFixture;
   bridge: Fixture;
-  slot: number;
+  /** Null only when neither the fixture nor its saved stage supplies a date. */
+  slot: number | null;
+  dateLabel: string;
   stageLabel: string;
   stageKind: CompetitionInstance['definition']['stages'][number]['kind'];
   status: CompetitionFixture['status'];
@@ -27,7 +29,15 @@ export interface LeagueFixtureView {
 
 export function leagueFixtureView(instance: CompetitionInstance, fixture: CompetitionFixture): LeagueFixtureView {
   const stage = instance.definition.stages.find(s => s.id === fixture.stageId)!;
-  return { instance, fixture, bridge: fixtureBridge({ instance, fixture }), slot: fixture.slot!,
+  // Cancelled fixtures may omit their date; retain the authored stage date
+  // for display without restoring it to the saved sporting fixture.
+  const validDate = (value: number | undefined): value is number => typeof value === 'number'
+    && Number.isSafeInteger(value) && value > 0 && value <= instance.definition.slotCount;
+  const savedDate = stage.slotIds?.[fixture.round - 1];
+  const slot = validDate(fixture.slot) ? fixture.slot : validDate(savedDate) ? savedDate : null;
+  const bridge = fixtureBridge({ instance, fixture });
+  if (slot === null) delete bridge.slot; else bridge.slot = slot;
+  return { instance, fixture, bridge, slot, dateLabel: slot === null ? 'Date not recorded' : `Week ${slot}`,
     stageLabel: `${stage.name}${stage.rounds > 1 ? ` · round ${fixture.round}` : ''}`,
     stageKind: stage.kind, status: fixture.status,
     ...(fixture.result?.winnerId ? { winnerId: fixture.result.winnerId } : {}),
@@ -47,16 +57,22 @@ export function leagueSeasonView(state: LeagueReadState) {
     (i.id === instance.id || i.entrantIds.includes(clubId) &&
       ['scheduled', 'active', 'completed', 'withdrawn'].includes(i.status)));
   const fixtures = instances.flatMap(i => i.fixtures.map(f => leagueFixtureView(i, f)))
-    .sort((a, b) => a.slot - b.slot || a.fixture.id.localeCompare(b.fixture.id));
+    .sort((a, b) => {
+      if (a.slot === b.slot) return a.fixture.id.localeCompare(b.fixture.id);
+      if (a.slot === null) return 1;
+      if (b.slot === null) return -1;
+      return a.slot - b.slot;
+    });
   const choiceRequired = leagueChoiceRequired(state);
   const week = state.week ?? 1;
   const next = choiceRequired || calendar.status !== 'active' ? undefined : fixtures.find(f =>
-    f.slot >= week && f.status === 'scheduled' && ['scheduled', 'active'].includes(f.instance.status) &&
+    f.slot !== null && f.slot >= week && f.status === 'scheduled' && ['scheduled', 'active'].includes(f.instance.status) &&
     (f.fixture.homeId === clubId || f.fixture.awayId === clubId));
   const currentFixtures = fixtures.filter(f => f.slot === week);
   const currentSlot = calendar.slots.find(s => s.id === week);
   const currentLabel = currentSlot?.kind === 'rest' ? 'Rest week'
-    : currentFixtures.find(f => f.fixture.homeId === clubId || f.fixture.awayId === clubId)?.stageLabel
+    : currentFixtures.find(f => f.status !== 'cancelled' && f.instance.status !== 'withdrawn'
+      && (f.fixture.homeId === clubId || f.fixture.awayId === clubId))?.stageLabel
       ?? (currentSlot?.kind === 'preseason' ? 'Pre-season' : 'No club fixture');
   const finalsSize = instance.definition.format.kind === 'league' ? instance.definition.format.finalsSize : 0;
   const harder = competitions.world.divisions.find(d => d.rank === division.rank + 1);
@@ -82,7 +98,7 @@ export function nextSeasonFixture(state: LeagueReadState, clubId: string = state
     if (view.choiceRequired || view.calendar.status !== 'active') return undefined;
     if (clubId === view.clubId) return view.next?.bridge;
     return view.fixtures.find(f => f.status === 'scheduled' && ['scheduled', 'active'].includes(f.instance.status)
-      && f.slot >= (state.week ?? 1) && (f.fixture.homeId === clubId || f.fixture.awayId === clubId))?.bridge;
+      && f.slot !== null && f.slot >= (state.week ?? 1) && (f.fixture.homeId === clubId || f.fixture.awayId === clubId))?.bridge;
   }
   const week = state.week ?? 1;
   return state.league.fixtures.filter(f => !f.result && (f.round >= week || week === 1 && f.round <= 0)
@@ -97,7 +113,7 @@ export function leagueClubResults(view: LeagueSeasonView, clubId: string) {
     const result = f.fixture.result!;
     const pointsFor = home ? result.homeScore : result.awayScore;
     const pointsAgainst = home ? result.awayScore : result.homeScore;
-    return { round: f.fixture.round, slot: f.slot, label: `Week ${f.slot} · ${f.stageLabel}`,
+    return { round: f.fixture.round, slot: f.slot, label: `${f.dateLabel} · ${f.stageLabel}`,
       opponentId: home ? f.fixture.awayId : f.fixture.homeId, home, pointsFor, pointsAgainst,
       result: (f.winnerId ? f.winnerId === clubId ? 'W' : 'L' : pointsFor > pointsAgainst ? 'W' : pointsFor < pointsAgainst ? 'L' : 'D') as 'W' | 'D' | 'L',
       ...(f.decider && f.decider !== 'score' && f.decider !== 'draw' ? { decider: f.decider } : {}) };

@@ -33,7 +33,8 @@ describe('saved League season view', () => {
     own.fixtures[0]!.status = 'cancelled';
     expect(leagueSeasonView(s)!.next?.slot).toBe(4);
     expect(leagueSeasonView(s)!.fixtures[0]!.status).toBe('cancelled');
-    own.status = 'withdrawn';
+    own.status = 'withdrawn'; s.week = 4;
+    expect(leagueSeasonView(s)!.currentLabel).toBe('No club fixture');
     expect(leagueSeasonView(s)!.next).toBeUndefined();
   });
 
