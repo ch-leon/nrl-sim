@@ -27,6 +27,18 @@ export interface LeagueFixtureView {
   decider?: NonNullable<CompetitionFixture['result']>['decider'];
 }
 
+/** Scheduled or played sporting activity; pending/cancelled rows are only records. */
+export function leagueFixtureActivity(f: LeagueFixtureView): boolean {
+  return ['scheduled', 'completed'].includes(f.status)
+    && ['scheduled', 'active', 'completed'].includes(f.instance.status);
+}
+
+/** Pending games still affect the attainable ladder finish, even without a date. */
+export function remainingLeagueFixtures(view: LeagueSeasonView): LeagueFixtureView[] {
+  return view.fixtures.filter(f => f.instance.id === view.instance.id && f.stageKind === 'league'
+    && ['scheduled', 'active'].includes(f.instance.status) && ['pending', 'scheduled'].includes(f.status));
+}
+
 export function leagueFixtureView(instance: CompetitionInstance, fixture: CompetitionFixture): LeagueFixtureView {
   const stage = instance.definition.stages.find(s => s.id === fixture.stageId)!;
   // Cancelled fixtures may omit their date; retain the authored stage date
@@ -71,8 +83,7 @@ export function leagueSeasonView(state: LeagueReadState) {
   const currentFixtures = fixtures.filter(f => f.slot === week);
   const currentSlot = calendar.slots.find(s => s.id === week);
   const currentLabel = currentSlot?.kind === 'rest' ? 'Rest week'
-    : currentFixtures.find(f => ['scheduled', 'completed'].includes(f.status)
-      && ['scheduled', 'active', 'completed'].includes(f.instance.status)
+    : currentFixtures.find(f => leagueFixtureActivity(f)
       && (f.fixture.homeId === clubId || f.fixture.awayId === clubId))?.stageLabel
       ?? (currentSlot?.kind === 'preseason' ? 'Pre-season' : 'No club fixture');
   const finalsSize = instance.definition.format.kind === 'league' ? instance.definition.format.finalsSize : 0;

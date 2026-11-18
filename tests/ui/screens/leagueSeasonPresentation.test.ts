@@ -13,10 +13,10 @@ import { leagueSeasonView } from '../../../src/systems/leagueSeasonView';
 import { registerAllSystems } from '../../../src/qa/soak';
 import { competitions, progress } from '../../data/leagueCareerFixtures';
 import { nextMatchPreview, seasonClubResults } from '../../../src/systems/league';
-import { ladderStanding, objectiveLine } from '../../../src/systems/board';
+import { ladderStanding, objectiveLine, objectiveRisk } from '../../../src/systems/board';
 import { seasonWeekLabel } from '../../../src/core/season';
 import { nextMatchChip, playWeekSub, createHud, advanceFromClub } from '../../../src/ui/hud';
-import { forecastFor, myFixtureRows, openFixturesScreen } from '../../../src/ui/screens/fixtures';
+import { forecastFor, myFixtureRows, openFixturesScreen, ladderHeading } from '../../../src/ui/screens/fixtures';
 import * as time from '../../../src/core/time';
 import * as matchday from '../../../src/systems/matchday';
 import { closeScreen, closeModal } from '../../../src/ui/dom';
@@ -64,6 +64,25 @@ describe('League career presentation', () => {
     expect(ladderStanding(s).rank).toBeGreaterThan(0);
     expect(ladderStanding(s).roundsLeft).toBe(0);
     expect(objectiveLine({ id: 'finish', kind: 'finals', target: 1, status: 'pending', text: 'Finish first' }, s)).toContain('currently');
+  });
+
+  it('counts pending regular games as remaining for ladder finality and board chances', () => {
+    const s = state(); const own = s.competitions!.instances[0]!;
+    const played = own.fixtures[0]!, pending = own.fixtures[1]!;
+    const rival = own.entrantIds.find(id => id !== s.clubId)!;
+    played.status = 'completed';
+    played.result = { homeScore: played.homeId === rival ? 12 : 0, awayScore: played.awayId === rival ? 12 : 0,
+      winnerId: rival, decider: 'score' };
+    pending.status = 'pending'; delete pending.slot;
+    expect(ladderStanding(s).roundsLeft).toBe(1);
+    expect(ladderHeading(s)).toBe('Ladder · after R1');
+    expect(objectiveRisk({ id: 'finish', kind: 'finals', target: 1, status: 'pending', text: 'Finish first' }, s)).toBe('at-risk');
+    pending.status = 'cancelled';
+    expect(ladderStanding(s).roundsLeft).toBe(0);
+    expect(ladderHeading(s)).toBe('Ladder · final');
+    pending.status = 'pending'; own.status = 'withdrawn';
+    expect(ladderStanding(s).roundsLeft).toBe(0);
+    expect(ladderHeading(s)).toBe('Ladder · final');
   });
 
   it.each(['initial-choice', 'next-season-choice'] as const)('shows %s without a next match and routes only the live gate to choice', phase => {
@@ -189,6 +208,35 @@ describe('admitted League cancellations', () => {
     setState(s);
     const screen = openFixturesScreen() as unknown as StubNode;
     expect(screen.words()).toContain('Pending');
+  });
+
+  it.each(['au', 'uk'] as const)('marks All games current only for actual %s activity and labels pending rows', async region => {
+    await preparePack(region);
+    loadState(admittedCareer(region)); registerAllSystems();
+    time.withFastForward(() => { for (let i = 0; i < 4; i++) time.advanceWeek(); });
+    const s = structuredClone(getState()); expect(s.week).toBe(5);
+    const own = leagueSeasonView(s)!.instance;
+    const current = own.fixtures.filter(f => f.slot === s.week);
+    expect(current.length).toBeGreaterThan(1);
+    for (const [i, f] of current.entries()) { f.status = i % 2 ? 'cancelled' : 'pending'; delete f.slot; }
+    expect(leagueCareerStateProblem(s)).toBeNull();
+    setState(s);
+    const screen = openFixturesScreen() as unknown as StubNode;
+    Object.assign(screen.querySelector('.nrl-fixtures-list')!, { clientHeight: 100, scrollHeight: 100 });
+    const toggle = screen.querySelector('.nrl-fixtures-toggle')!;
+    if (toggle.getAttribute('data-fixtures-view') === 'all') toggle.click();
+    for (const f of current) expect(screen.querySelector(`[data-fixture-id="${f.id}"]`)!.words()).toContain(f.status === 'pending' ? 'Pending' : 'Cancelled');
+    expect(screen.querySelector('[data-current]')).toBeNull();
+    // A later row in the same group is real activity, even if its first row is pending.
+    const ordered = [...current].sort((a, b) => a.id.localeCompare(b.id));
+    const later = ordered[ordered.length - 1]!;
+    later.status = 'scheduled'; later.slot = s.week;
+    expect(leagueCareerStateProblem(s)).toBeNull();
+    setState(s);
+    const mixed = openFixturesScreen() as unknown as StubNode;
+    expect(mixed.querySelector('[data-current]')?.textContent).toBe('Week 5 · League · round 1');
+    Object.assign(mixed.querySelector('.nrl-fixtures-list')!, { clientHeight: 100, scrollHeight: 100 });
+    mixed.querySelector('.nrl-fixtures-toggle')!.click();
   });
 
   it('labels and stably orders cancellations without any saved date', () => {

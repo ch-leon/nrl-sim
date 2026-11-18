@@ -23,7 +23,7 @@ import { bus } from '../../core/events';
 import { currentRound } from '../../core/season';
 import { weekHeld } from '../../core/time';
 import { playerMatchPending } from '../../systems/matchday';
-import { leagueSeasonView, leagueChoiceRequired, nextSeasonFixture, type LeagueFixtureView, type LeagueSeasonView } from '../../systems/leagueSeasonView';
+import { leagueSeasonView, leagueFixtureActivity, remainingLeagueFixtures, leagueChoiceRequired, nextSeasonFixture, type LeagueFixtureView, type LeagueSeasonView } from '../../systems/leagueSeasonView';
 import { PLAYER_ID } from '../../systems/fixtures';
 import { seasonFormGuide, matchStage, nextFixture, nextMatchPreview, type ClubResult, type FormResult, type PreviewSide } from '../../systems/league';
 import { SEASON_ROUNDS } from '../../config';
@@ -149,7 +149,7 @@ export function ladderHeading(state: Pick<GameState, 'week' | 'league'> & Partia
   const view = leagueSeasonView(state);
   const played = (view?.ladder ?? state.league.ladder).reduce((m, r) => Math.max(m, r.played), 0);
   if (played === 0) return 'Ladder';
-  if (view ? !view.fixtures.some(f => f.instance.id === view.instance.id && f.stageKind === 'league' && f.status === 'scheduled') : state.week > SEASON_ROUNDS) return 'Ladder · final';
+  if (view ? remainingLeagueFixtures(view).length === 0 : state.week > SEASON_ROUNDS) return 'Ladder · final';
   return `Ladder · after R${played}`;
 }
 
@@ -247,18 +247,21 @@ function buildCalendarFixtures(state: GameState, view: LeagueSeasonView): League
       }
     } else {
       let dateGroup = '';
+      let header: HTMLElement | undefined;
       for (const f of view.fixtures) {
         const group = `${f.dateLabel} · ${f.stageLabel}`;
         if (group !== dateGroup) {
           dateGroup = group;
-          const header = el('div', { class: 'nrl-label nrl-fixtures-round', text: group });
-          if (f.slot === state.week) { header.setAttribute('data-current', 'true'); current = header; }
+          header = el('div', { class: 'nrl-label nrl-fixtures-round', text: group });
           list.append(header);
+        }
+        if (f.slot === state.week && leagueFixtureActivity(f) && header) {
+          header.setAttribute('data-current', 'true'); current = header;
         }
         const fixture = f.fixture;
         const result = fixture.result;
         const score = result ? `${result.homeScore}–${result.awayScore}` : 'v';
-        const status = f.status === 'cancelled' ? ' · Cancelled' : f.instance.status === 'withdrawn' && !result ? ' · Withdrawn' : '';
+        const status = f.status === 'cancelled' ? ' · Cancelled' : f.status === 'pending' ? ' · Pending' : f.instance.status === 'withdrawn' && !result ? ' · Withdrawn' : '';
         const decider = result && f.decider && !['score', 'draw'].includes(f.decider)
           ? ` · ${names[f.winnerId ?? ''] ?? f.winnerId} won by ${f.decider.replace(/-/g, ' ')}` : '';
         const line = el('div', { class: 'nrl-fixture', attrs: { 'data-fixture-id': fixture.id },

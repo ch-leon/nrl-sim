@@ -9,7 +9,7 @@ import { getState, setState, type GameState, type Objective } from '../core/stat
 import { bus } from '../core/events';
 import { registerSeasonHook } from '../core/time';
 import { hasStructuralCalendar } from './competitionCalendar';
-import { leagueSeasonView, type LeagueReadState } from './leagueSeasonView';
+import { leagueSeasonView, remainingLeagueFixtures, type LeagueReadState } from './leagueSeasonView';
 import { earnMoney } from '../data/club';
 import { makeRng } from '../utils/rng';
 import { fmtMoney } from '../utils/money';
@@ -268,9 +268,7 @@ export function ladderStanding(state: Pick<GameState, 'league' | 'clubId'> & Par
     rank: started && i >= 0 ? i + 1 : 0,
     points: i >= 0 ? order[i]!.points : 0,
     pointsAt: (n) => order[n - 1]?.points ?? 0,
-    roundsLeft: view ? view.fixtures.filter(f => f.instance.id === view.instance.id && f.stageKind === 'league'
-      && f.status === 'scheduled' && view.instance.status !== 'withdrawn'
-      && (f.fixture.homeId === clubId || f.fixture.awayId === clubId)).length : state.league.fixtures.filter((f) => !f.result && f.round > 0 && f.round <= SEASON_ROUNDS
+    roundsLeft: view ? remainingLeagueFixtures(view).filter(f => f.fixture.homeId === clubId || f.fixture.awayId === clubId).length : state.league.fixtures.filter((f) => !f.result && f.round > 0 && f.round <= SEASON_ROUNDS
       && (f.homeId === clubId || f.awayId === clubId)).length,
   };
 }
