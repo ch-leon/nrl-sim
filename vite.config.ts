@@ -8,6 +8,7 @@ import { claudeDirIgnored } from './src/utils/devWatch';
 import { minifyCssConsts } from './src/utils/cssMinify';
 import { PWA_MANIFEST, brandIndexHtml } from './src/brandBuild';
 import { resolveMatchPreview } from './src/match/preview';
+import { platformFromEnv } from './src/platform';
 
 // BAK-204 (WU-16): installable, offline-capable PWA via generateSW.
 // The Phaser chunk is large, so the Workbox precache size cap is raised to ~6MB.
@@ -19,7 +20,11 @@ import { resolveMatchPreview } from './src/match/preview';
 // build is served from inside the APK, so base is always '/' (never the Pages
 // sub-path), the PWA service worker is turned off so a stale cache can never shadow
 // the bundled build, and no source maps are emitted (docs/android-test-build.md).
+// The iPhone app is the same native build with NRL_PLATFORM=ios (docs/ios-test-build.md);
+// src/platform.ts reads which one it is from __NRL_PLATFORM__.
 const native = process.env.NRL_NATIVE === '1';
+// NRL_PLATFORM without NRL_NATIVE=1 throws, by design: a web build can't be labelled an app.
+const platform = platformFromEnv(process.env);
 const matchPreview = resolveMatchPreview(process.env.NRL_MATCH_PREVIEW_LENGTH);
 const base = native ? '/' : (process.env.BASE_PATH ?? '/');
 
@@ -80,6 +85,8 @@ export default defineConfig(({ command }) => ({
     __NRL_BUILD__: JSON.stringify(BUILD_LABEL),
     // #89: src/fx/pwa.ts skips service-worker registration in the native app.
     __NRL_NATIVE__: JSON.stringify(native),
+    // web, android or ios (src/platform.ts): analytics, entitlements and the store rules.
+    __NRL_PLATFORM__: JSON.stringify(platform),
     __NRL_MATCH_PREVIEW__: JSON.stringify(matchPreview),
   },
   plugins: [
@@ -108,7 +115,7 @@ export default defineConfig(({ command }) => ({
       transformIndexHtml: { order: 'pre', handler: (html) => brandIndexHtml(html) },
     },
     VitePWA({
-      // #89: no service worker in the native Android build. The APK ships the build
+      // #89: no service worker in the native Android or iPhone build. The APK ships the build
       // directly, so a SW would only add a second, cache-first copy that could go
       // stale; src/fx/pwa.ts also skips registration when __NRL_NATIVE__ is set.
       disable: native || matchPreview !== null,

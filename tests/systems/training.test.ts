@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { applyInjuries, applyTraining, ageMod, traitMult, awardXp, spendByFocus, trainPlayer, trainWeek, facilityXpMultiplier, applyMatchXp } from '../../src/systems/training';
+import { applyInjuries, applyTraining, ageMod, traitMult, awardXp, spendByFocus, trainPlayer, trainWeek, facilityXpMultiplier, applyMatchXp, setSpendPointsMyself, spendPoint, spendPointBlock, spendSquadPoint } from '../../src/systems/training';
+import { validateCurrent } from '../../src/core/saveValidation';
 import { createNewGame, getState, loadState, type Player, type PlacedFacility } from '../../src/core/state';
 import { PROGRESSION } from '../../src/config';
 import { shownStats, POSITIONS } from '../../src/data/player';
@@ -108,6 +109,85 @@ describe('spendByFocus', () => {
     expect(trainPlayer(p)).toEqual({ ...p.stats, speed: 49.7, stamina: 49.7 });
   });
 });
+// SuperCOOKED §7 #1: the coach can spend level points by hand, opt-in (settings.spendPointsMyself).
+describe('spending level points by hand', () => {
+  // A lock's shown stats are strength, stamina, speed and footyIQ; kicking and handling are hidden.
+  it('one point into a shown stat, up to its ceiling, and no further', () => {
+    const p = mkPlayer({ unspentPoints: 3 });
+    const q = spendPoint(p, 'speed');
+    expect(q.stats.speed).toBe(51);
+    expect(q.unspentPoints).toBe(2);
+    expect(p.stats.speed).toBe(50); // pure
+    const top = spendPoint(spendPoint(q, 'speed'), 'speed'); // ceiling 52
+    expect(top.stats.speed).toBe(52);
+    expect(top.unspentPoints).toBe(1);
+    expect(spendPointBlock(top, 'speed')).toBe('at-ceiling');
+    expect(spendPoint(top, 'speed')).toBe(top);
+  });
+
+  it('never a hidden stat, and nothing without a banked point', () => {
+    const p = mkPlayer({ unspentPoints: 2 });
+    expect(spendPointBlock(p, 'kicking')).toBe('not-shown');
+    expect(spendPoint(p, 'kicking')).toBe(p);
+    const none = mkPlayer({ unspentPoints: 0 });
+    expect(spendPointBlock(none, 'strength')).toBe('no-points');
+    expect(spendPoint(none, 'strength')).toBe(none);
+    expect(spendPointBlock(p, 'strength')).toBeNull();
+  });
+
+  it('off (as every career starts), the focus spends points as they are earned, as before', () => {
+    expect(getState().settings.spendPointsMyself).toBeUndefined();
+    const p = mkPlayer({ xp: PROGRESSION.XP_PER_LEVEL - 1 });
+    const auto = trainWeek(p, [], 'strength');
+    expect(auto.unspentPoints).toBe(0);
+    expect(auto.stats.strength).toBe(51);
+    expect(trainWeek(p, [], 'strength', false)).toEqual(auto);
+  });
+
+  it('on, weekly and match points bank for the coach, and the level still counts them', () => {
+    const p = mkPlayer({ xp: PROGRESSION.XP_PER_LEVEL - 1 });
+    const banked = trainWeek(p, [], 'strength', true);
+    expect(banked).toMatchObject({ level: 2, unspentPoints: PROGRESSION.POINTS_PER_LEVEL, stats: p.stats });
+    const squad = getState().squad.map(q => ({ ...q, age: 25, traits: [], xp: 90, level: 1, unspentPoints: 0 }));
+    const own = teamSheetFromSquad(squad, 'player', 'XP', ['#000000', '#ffffff']);
+    const result = { homeScore: 0, awayScore: 0, events: [] } as unknown as MatchResult;
+    const after = applyMatchXp(squad, own, result, 'player', 'rival', [], 'balanced', true);
+    const starter = after.find(q => q.id === own.roster![0]!.id)!;
+    expect(starter).toMatchObject({ level: 2, unspentPoints: PROGRESSION.POINTS_PER_LEVEL });
+    expect(starter.stats).toEqual(squad.find(q => q.id === starter.id)!.stats);
+  });
+
+  it("the weekly tick follows the setting, the coach spends from the squad, and off again the focus takes what's banked", () => {
+    const first = getState().squad[0]!;
+    const stat = shownStats(first.position).find(k => first.stats[k] < (first.ceilings[k] ?? 0))!;
+    loadState({ ...getState(), squad: getState().squad.map(q => (q.id === first.id ? { ...q, xp: PROGRESSION.XP_PER_LEVEL - 1, unspentPoints: 0 } : q)) });
+    setSpendPointsMyself(true);
+    expect(getState().settings.spendPointsMyself).toBe(true);
+    applyTraining(getState());
+    const banked = getState().squad.find(q => q.id === first.id)!;
+    expect(banked.unspentPoints).toBe(PROGRESSION.POINTS_PER_LEVEL);
+    expect(spendSquadPoint(first.id, stat)).toBe(true);
+    const spent = getState().squad.find(q => q.id === first.id)!;
+    expect(spent.stats[stat]).toBe(banked.stats[stat] + 1);
+    expect(spent.unspentPoints).toBe(PROGRESSION.POINTS_PER_LEVEL - 1);
+    expect(spendSquadPoint('nobody', stat)).toBe(false);
+    setSpendPointsMyself(false);
+    applyTraining(getState());
+    expect(getState().squad.find(q => q.id === first.id)!.unspentPoints).toBe(0);
+  });
+
+  it('the setting saves, and a save without it still loads', () => {
+    setSpendPointsMyself(true);
+    expect(validateCurrent(JSON.parse(JSON.stringify(getState()))).ok).toBe(true);
+    expect(validateCurrent({ ...JSON.parse(JSON.stringify(getState())), settings: { ...getState().settings, spendPointsMyself: 'yes' } }).ok).toBe(false);
+    const { spendPointsMyself, ...without } = getState().settings;
+    expect(spendPointsMyself).toBe(true);
+    const old = validateCurrent({ ...JSON.parse(JSON.stringify(getState())), settings: without });
+    expect(old.ok).toBe(true);
+    expect(old.ok && old.state.settings.spendPointsMyself).toBeUndefined();
+  });
+});
+
 describe('applyInjuries', () => {
   it('base recovery of 1/wk with no medical facilities', () => {
     const p = mkPlayer({ id: 'inj', injuredWeeks: 3 });

@@ -1,9 +1,16 @@
-// capacitor.config.ts — the native Android wrap around the Vite build (#89, first slice:
-// a sideloadable test APK, docs/android-test-build.md). `npm run build:android` builds
-// dist/ with base '/' and no service worker (NRL_NATIVE=1, vite.config.ts) and copies it
-// into android/; CI builds the debug APK (.github/workflows/android-apk.yml).
+// capacitor.config.ts — the native Android and iPhone wraps around the Vite build (#89,
+// first slice: a sideloadable test APK, docs/android-test-build.md; the iPhone shell,
+// docs/ios-test-build.md and docs/specs/ios.md). `npm run build:android` builds dist/ with
+// base '/' and no service worker (NRL_NATIVE=1, vite.config.ts); `npx cap sync android`
+// copies it into android/; CI builds the debug APK (.github/workflows/android-apk.yml).
+// `npm run build:ios` is the same build marked as the iPhone app (NRL_PLATFORM=ios,
+// src/platform.ts), and `npx cap sync ios` copies it into ios/.
 //
-// The app id and name below are PLACEHOLDERS for the test build only. Leon hasn't
+// The iPhone app does not use the id and name below: its bundle id
+// (au.com.supercooked.bigrugbycoach.dev while on the free Apple ID) and its name
+// (Big Coach) are set in the Xcode project, ios/App/App.xcodeproj and ios/App/App/Info.plist.
+//
+// The app id and name below are PLACEHOLDERS for the Android test build only. Leon hasn't
 // picked the final name; changing appId later makes a different app on the phone
 // (a fresh install, so a tester's saves don't carry over). After changing either,
 // run `npx cap sync android` and update android/app/build.gradle (applicationId) and
@@ -31,6 +38,7 @@ const config: CapacitorConfig = {
   plugins: {
     SystemBars: {
       // Full screen: no status bar or nav bar (a swipe from the edge shows them for a moment).
+      // On iPhone the same setting hides the status bar and dims the home bar.
       hidden: true,
       // index.html asks for viewport-fit=cover, so the game runs edge to edge and
       // env(safe-area-inset-*) carries the notch / camera cutout, which dom.ts reads
@@ -39,6 +47,10 @@ const config: CapacitorConfig = {
       insetsHandling: 'css',
       initialViewportFitValueHint: 'cover',
     },
+  },
+  ios: {
+    // The game is one screen that never scrolls: no rubber-band bounce in the web view.
+    scrollEnabled: false,
   },
 };
 

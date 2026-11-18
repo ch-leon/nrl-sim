@@ -10,7 +10,8 @@
 //   * captures `beforeinstallprompt` so we can offer an Install button
 //     (Android/desktop Chromium) via canInstall()/promptInstall(),
 //   * on install-incapable iOS Safari, shows a one-time "Add to Home Screen"
-//     instruction toast through the typed event bus ('ui:notify').
+//     instruction toast through the typed event bus ('ui:notify'); never inside
+//     the native Android or iPhone app (src/platform.ts), which is already installed.
 //
 // No Phaser import. SW registration uses `virtual:pwa-register`, dynamically
 // imported inside initPwa() and wrapped in try/catch so the Vitest node env
@@ -29,6 +30,7 @@ import { domUpdateHooks, scheduleUpdatePrompt } from '../ui/updatePrompt';
 import { browserStorage } from '../core/storage/local';
 import { IOS_INSTALL_HINT_KEY } from '../core/storageKeys';
 import { MATCH_PREVIEW } from '../match/preview';
+import { isNativeApp } from '../platform';
 
 /** The `beforeinstallprompt` event, typed minimally (not in lib.dom yet). */
 interface BeforeInstallPromptEvent extends Event {
@@ -187,8 +189,16 @@ async function registerServiceWorker(): Promise<void> {
   }
 }
 
+/**
+ * Whether to offer "Add to Home Screen": only in iOS Safari, never once installed, and
+ * never in the native app (its web view can look like Safari, and it is already an app).
+ */
+export function wantsIosHint(native = isNativeApp()): boolean {
+  return !native && isIosSafari() && !isStandalone();
+}
+
 function maybeShowIosHint(): void {
-  if (!isIosSafari() || isStandalone()) return;
+  if (!wantsIosHint()) return;
   try {
     const storage = browserStorage();
     if (storage?.getItem(IOS_INSTALL_HINT_KEY)) return;
