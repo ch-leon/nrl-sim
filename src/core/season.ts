@@ -12,6 +12,12 @@ export function currentRound(s: Pick<GameState, 'week' | 'preseason'>): number {
 }
 
 export function seasonWeekLabel(s: Pick<GameState, 'week' | 'season' | 'preseason'> & Partial<Pick<GameState, 'competitions'>>): string {
+  if (s.competitions?.leagueCareer && s.competitions.calendar) {
+    const phase = s.competitions.leagueCareer.phase;
+    if (phase === 'initial-choice') return `Choose your league · Season ${s.season}`;
+    if (phase === 'next-season-choice') return `Choose next league · Season ${s.season} complete`;
+    return `Week ${s.week} of ${s.competitions.calendar.slots.length} · Season ${s.season}`;
+  }
   if (s.competitions?.calendar) return `Prototype slot ${s.week} of ${s.competitions.calendar.slots.length} · Season ${s.season}`;
   return inTrials(s) ? `Trial ${s.preseason} of 2 · Season ${s.season}` : `Week ${s.week} of ${WEEKS_PER_SEASON} · Season ${s.season}`;
 }

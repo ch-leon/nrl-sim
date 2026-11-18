@@ -9,6 +9,7 @@ import { getState, setState, type GameState, type Objective } from '../core/stat
 import { bus } from '../core/events';
 import { registerSeasonHook } from '../core/time';
 import { hasStructuralCalendar } from './competitionCalendar';
+import { leagueSeasonView, type LeagueReadState } from './leagueSeasonView';
 import { earnMoney } from '../data/club';
 import { makeRng } from '../utils/rng';
 import { fmtMoney } from '../utils/money';
@@ -208,8 +209,10 @@ export function ensureObjectives(): void {
   setState({ objectives: generateObjectives(s) });
 }
 
-/** The ladder in order: points, then points difference. */
-function ladderOrder(state: Pick<GameState, 'league'>): GameState['league']['ladder'] {
+/** Saved League standings keep their published tiebreak order; legacy uses points/difference. */
+function ladderOrder(state: LeagueReadState): GameState['league']['ladder'] {
+  const view = leagueSeasonView(state);
+  if (view) return view.ladder;
   return [...state.league.ladder].sort((a, b) => b.points - a.points
     || (b.pointsFor - b.pointsAgainst) - (a.pointsFor - a.pointsAgainst));
 }
@@ -221,8 +224,9 @@ export function objectiveLine(o: Objective, state: GameState): string {
     case 'solvent': return `${o.text} — now ${fmtMoney(state.money)}`;
     case 'build': return `${o.text} — ${state.facilities.length} now`;
     case 'finals': {
-      const rank = ladderOrder(state).findIndex((r) => r.clubId === state.clubId) + 1;
-      return `${o.text} — ${state.league.ladder.some((r) => r.played > 0) && rank > 0 ? `currently ${ordinal(rank)}` : 'season not started'}`;
+      const ladder = ladderOrder(state);
+      const rank = ladder.findIndex((r) => r.clubId === state.clubId) + 1;
+      return `${o.text} — ${ladder.some((r) => r.played > 0) && rank > 0 ? `currently ${ordinal(rank)}` : 'season not started'}`;
     }
     default: return `${o.text} — pending`;
   }
@@ -255,23 +259,26 @@ export interface LadderStanding {
   roundsLeft: number;
 }
 
-export function ladderStanding(state: Pick<GameState, 'league' | 'clubId'>, clubId: string = state.clubId): LadderStanding {
+export function ladderStanding(state: Pick<GameState, 'league' | 'clubId'> & Partial<Pick<GameState, 'week' | 'season' | 'competitions'>>, clubId: string = state.clubId): LadderStanding {
   const order = ladderOrder(state);
-  const started = state.league.ladder.some((r) => r.played > 0);
+  const started = order.some((r) => r.played > 0);
+  const view = leagueSeasonView(state);
   const i = order.findIndex((r) => r.clubId === clubId);
   return {
     rank: started && i >= 0 ? i + 1 : 0,
     points: i >= 0 ? order[i]!.points : 0,
     pointsAt: (n) => order[n - 1]?.points ?? 0,
-    roundsLeft: state.league.fixtures.filter((f) => !f.result && f.round > 0 && f.round <= SEASON_ROUNDS
+    roundsLeft: view ? view.fixtures.filter(f => f.instance.id === view.instance.id && f.stageKind === 'league'
+      && f.status === 'scheduled' && view.instance.status !== 'withdrawn'
+      && (f.fixture.homeId === clubId || f.fixture.awayId === clubId)).length : state.league.fixtures.filter((f) => !f.result && f.round > 0 && f.round <= SEASON_ROUNDS
       && (f.homeId === clubId || f.awayId === clubId)).length,
   };
 }
 
-/** Behind on the ladder by `gap` points: off track when the rounds left can't make it up (2 a win), at risk late or when it needs more than every other win. */
-function ladderRisk(gap: number, roundsLeft: number): ObjectiveRisk {
-  if (gap > roundsLeft * 2) return 'off-track';
-  return roundsLeft <= RISK_ROUNDS_LEFT || gap > roundsLeft ? 'at-risk' : 'on-track';
+/** Behind on the ladder by `gap` points: off track when the rounds left can't make it up (saved win points, legacy 2), at risk late or when it needs more than every other win. */
+function ladderRisk(gap: number, roundsLeft: number, winPoints = 2): ObjectiveRisk {
+  if (gap > roundsLeft * winPoints) return 'off-track';
+  return roundsLeft <= RISK_ROUNDS_LEFT || gap > roundsLeft * winPoints / 2 ? 'at-risk' : 'on-track';
 }
 
 /**
@@ -283,12 +290,14 @@ function ladderRisk(gap: number, roundsLeft: number): ObjectiveRisk {
  */
 export function objectiveRisk(o: Objective, state: GameState, runwayWeeks: number | null = null): ObjectiveRisk {
   if (o.status !== 'pending') return 'on-track';
-  const weeksLeft = Math.max(0, WEEKS_PER_SEASON - state.week + 1);
+  const view = leagueSeasonView(state);
+  const winPoints = view?.instance.definition.standings?.win ?? 2;
+  const weeksLeft = view?.choiceRequired ? 0 : Math.max(0, (view?.calendar.slots.length ?? WEEKS_PER_SEASON) - state.week + 1);
   switch (o.kind) {
     case 'finals': {
       const me = ladderStanding(state);
       if (me.rank === 0 || me.rank <= o.target) return 'on-track';
-      return ladderRisk(me.pointsAt(o.target) - me.points, me.roundsLeft);
+      return ladderRisk(me.pointsAt(o.target) - me.points, me.roundsLeft, winPoints);
     }
     case 'beatRival': {
       if (!o.rivalId) return 'on-track';
@@ -296,7 +305,7 @@ export function objectiveRisk(o: Objective, state: GameState, runwayWeeks: numbe
       const them = ladderStanding(state, o.rivalId);
       if (me.rank === 0 || them.rank === 0 || me.rank < them.rank) return 'on-track';
       // Level on points still counts: he has to finish above.
-      return ladderRisk(them.points - me.points, me.roundsLeft);
+      return ladderRisk(them.points - me.points, me.roundsLeft, winPoints);
     }
     case 'solvent': {
       const burning = runwayWeeks !== null;
