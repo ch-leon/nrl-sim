@@ -107,7 +107,8 @@ describe('a press under the finger (#604)', () => {
     expect(CSS).toContain('.nrl-seg > .nrl-btn[aria-pressed="true"]:active:not(:disabled)');
     expect(CSS).toContain('.nrl-dock-tabs > .nrl-btn[aria-current="page"]:active:not(:disabled)');
     expect(OVERLAY_CSS).toContain('.nrl-btn.nrl-mo-tray-call[data-called]:active {');
-    expect(OVERLAY_CSS).toContain('.nrl-mo-speed[aria-pressed="true"]:active:not(:disabled) {');
+    // SuperCOOKED 40: one speed button, filled, keeps its fill pressed.
+    expect(OVERLAY_CSS).toContain('.nrl-mo-controls .nrl-btn.nrl-mo-speed:active:not(:disabled) {');
     // Selected comes after the plain press in the sheet and outweighs it.
     expect(CSS.indexOf('.nrl-seg > .nrl-btn[aria-pressed="true"]:active')).toBeGreaterThan(CSS.indexOf('.nrl-btn:active:not(:disabled) {'));
   });
@@ -122,7 +123,8 @@ describe('a press under the finger (#604)', () => {
     for (const sel of ['.nrl-lineup-tile', '.nrl-kit-swatch', 'button.nrl-finance-contracts', 'button.nrl-club-home-row', '.nrl-mo-coach', '.nrl-mo-log-toggle', '.nrl-mo-scoreboard']) {
       expect(CSS.slice(CSS.indexOf(':is(.nrl-lineup-tile'), CSS.indexOf('):active {', CSS.indexOf(':is(.nrl-lineup-tile')))).toContain(sel);
     }
-    expect(rule(OVERLAY_CSS, '.nrl-mo-strip:active')).toContain('transform: translateX(-50%) scale(var(--nrl-press));');
+    // In the bottom bar now (SuperCOOKED 40), not centred on its own: the press's scale is all its transform.
+    expect(rule(OVERLAY_CSS, '.nrl-mo-strip:active')).toContain('transform: scale(var(--nrl-press));');
   });
 
   it('a segmented pill and the speed circle change with their label, in one frame', () => {
