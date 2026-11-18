@@ -78,7 +78,7 @@ describe('tracked counter measurements', () => {
     expect(both.trackedCounts!.pointsFor).toEqual(both.opponentCounts!.pointsAgainst);
   });
   it('calculates wins plus half draws and its sample SE on a two-seed cell', () => {
-    // Ordinary structures (#649): seeds 5/6 now give a loss and a draw (draw/loss after #672).
+    // The normal back-door run changes seed 5 to a win; seed 6 remains a draw.
     // Seed 3 supplies a neutral one-minute draw (seed 2 before #649).
     // This two-sample fixture checks aggregation mechanics, not match balance.
     const tiny = cell;
@@ -86,7 +86,7 @@ describe('tracked counter measurements', () => {
     const second = measureCell(tiny, 1, 4, 6);
     const both = measureCell(tiny, 2, 4, 5);
     const xs = [first, second].map((r) => r.trackedWin! + r.trackedDraw! / 2);
-    expect(xs).toEqual([0, 0.5]);
+    expect(xs).toEqual([1, 0.5]);
     expect(measureCell({ ...cell, scenario: even }, 1, 1, 3).pointsShare).toEqual({ mean: 0.5, se: 0 });
     expect(new Set(xs).size).toBe(2);
     const mean = (xs[0]! + xs[1]!) / 2;
