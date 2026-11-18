@@ -301,9 +301,12 @@ export function createHud(opts: HudOpts = {}): Hud {
   // Finance) over the week and season.
   const moneyEl = el('span', { class: 'nrl-dock-money', attrs: { 'data-hud': 'money' } });
   const weekEl = el('span', { class: 'nrl-dock-week', attrs: { 'data-hud': 'week' } });
+  // SuperCOOKED 20: the money is labelled CASH, a small word before it (on the money's line, so the
+  // status block is no wider than the week under it: the dock's tabs keep their room).
+  const moneyLine = el('span', { class: 'nrl-dock-money-line' }, el('span', { class: 'nrl-dock-cash', text: 'Cash', attrs: { 'aria-hidden': 'true' } }), moneyEl);
   const statusBox = opts.onMoney
-    ? el('button', { class: 'nrl-dock-statusbox', attrs: { type: 'button' }, onClick: () => opts.onMoney?.() }, moneyEl, weekEl)
-    : el('div', { class: 'nrl-dock-statusbox' }, moneyEl, weekEl);
+    ? el('button', { class: 'nrl-dock-statusbox', attrs: { type: 'button' }, onClick: () => opts.onMoney?.() }, moneyLine, weekEl)
+    : el('div', { class: 'nrl-dock-statusbox' }, moneyLine, weekEl);
   let runway: number | null = null;
   parts.status.replaceChildren(statusBox, el('span', { class: 'nrl-dock-divider', attrs: { 'aria-hidden': 'true' } }));
 
@@ -449,9 +452,8 @@ export function createHud(opts: HudOpts = {}): Hud {
     renderMoney(s.money);
     // "/total" is a separate span so a narrow dock can drop it.
     const calendar = s.competitions?.leagueCareer ? s.competitions.calendar : undefined;
-    // SuperCOOKED 20: the money is labelled CASH, then the week ("WK 2/27") and the season.
+    // SuperCOOKED 20: the week as "WK 2/27", then the season.
     weekEl.replaceChildren(
-      el('span', { class: 'nrl-dock-cash', text: 'Cash · ' }),
       document.createTextNode(inTrials(s) ? `TRIAL ${s.preseason}` : `WK ${s.week}`),
       el('span', { class: 'nrl-dock-week-total', text: inTrials(s) ? '/2' : `/${calendar?.slots.length ?? WEEKS_PER_SEASON}` }),
       document.createTextNode(` · S${s.season}`),

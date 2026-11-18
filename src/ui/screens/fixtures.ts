@@ -764,20 +764,23 @@ export const LEAGUE_CSS = `
 }
 .nrl-next-card:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
 @media (hover: hover) and (pointer: fine) { .nrl-next-card:hover { background: var(--nrl-raised-hover); } }
+.nrl-next-card:active { background: var(--nrl-raised-hover); }
 .nrl-next-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .nrl-next-card-when { font-family: var(--nrl-f-num); font-size: 0.625rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--nrl-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nrl-next-card-who { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .nrl-next-card-stripe { flex: 0 0 auto; width: 6px; height: 26px; border-radius: 3px; }
 .nrl-next-card-name { min-width: 0; font-family: var(--nrl-f-display); font-size: 1.5rem; line-height: 1.1; letter-spacing: -0.02em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nrl-next-card-line { font-size: 0.8125rem; line-height: 1.3; color: var(--nrl-text-2); overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-/* A short phone: the card is its name line and its "next" line; the preview has the rest. */
+/* A phone on its side: one line, their name and when, so four of the club's rounds still show under it;
+   the preview a tap away has their stars, place, record and meetings. */
 @media (max-height: 400px) {
-  .nrl-next-card { gap: 2px; padding: 6px 10px; margin-bottom: 6px; }
-  .nrl-next-card-name { font-size: 1.125rem; }
-  .nrl-next-card-stripe { height: 20px; }
-  .nrl-next-card-line { -webkit-line-clamp: 1; }
+  .nrl-next-card { flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 10px; margin-bottom: 6px; }
+  .nrl-next-card-who { order: 0; flex: 1 1 auto; }
+  .nrl-next-card-top { order: 1; flex: 0 1 auto; min-width: 0; }
+  .nrl-next-card-top .nrl-stars, .nrl-next-card-line { display: none; }
+  .nrl-next-card-name { font-size: 1rem; }
+  .nrl-next-card-stripe { height: 18px; }
 }
-@media (max-height: 340px) { .nrl-next-card-line { display: none; } }
 /* The rows under the card on a short phone: a played or later round is not a button, so it can be slimmer; NEXT keeps 44 on touch. */
 @media (max-height: 400px) { .nrl-fixture-row { height: 32px; } .nrl-fixtures-list { gap: 3px; } }
 .nrl-league-calendar-heading h2 { margin: 0; font-size: 1rem; }
