@@ -14,6 +14,7 @@ import {
   weeklyWages, weeklyUpkeep, weeklyOverhead, weeklyIncome, groundCapacity, homeGate, nextStandGate, financeNet,
   classifyReason, stampMovement, type StandProjection,
 } from '../../systems/economy';
+import { leagueSeasonView } from '../../systems/leagueSeasonView';
 import { capTotals, contractActionView } from '../../systems/cap';
 import { SEASON_ROUNDS, WEEKS_PER_SEASON } from '../../config';
 import { fmtMoney, fmtMoneyShort } from '../../utils/money';
@@ -73,7 +74,7 @@ export interface FinanceSummary {
    * The next home fixture (round ≥ current week) and its projected gate, with the
    * crowd against the seats (#169: sold out means a bigger stand would earn more).
    */
-  nextHome: { round: number; projectedGate: number; attendance: number; capacity: number; soldOut: boolean } | null;
+  nextHome: { round: number; dateLabel?: string; stageLabel?: string; projectedGate: number; attendance: number; capacity: number; soldOut: boolean } | null;
   /**
    * What the next Grandstand level would earn at the next home game's demand
    * (nextStandGate, N12): only when that game sells out, and not at the top level.
@@ -102,16 +103,20 @@ export function financeSummary(state: GameState): FinanceSummary {
   const sponsorWeekly = 0; // Sponsor income belongs to played matches, never the weekly projection.
   const grantWeekly = incomeWeekly - sponsorWeekly;
 
-  const nextFixture = state.league.fixtures
+  const league = leagueSeasonView(state);
+  const upcoming = league ? futureHomeFixtures(state) : null;
+  const nextView = upcoming?.[0];
+  const nextFixture = league ? nextView?.bridge : state.league.fixtures
     .filter((f) => f.homeId === state.clubId && f.round >= currentRound(state))
     .reduce<typeof state.league.fixtures[number] | undefined>(
       (best, f) => (!best || f.round < best.round ? f : best),
       undefined,
     );
-  const projected = nextFixture ? homeGate({ ...state, week: nextFixture.round }, nextFixture) : null;
+  const projected = nextFixture ? homeGate({ ...state, week: nextView?.slot ?? nextFixture.round }, nextFixture) : null;
   const nextHome = nextFixture && projected
     ? {
       round: nextFixture.round,
+      ...(nextView ? { dateLabel: nextView.dateLabel, stageLabel: nextView.stageLabel } : {}),
       projectedGate: projected.receipts,
       attendance: projected.attendance,
       capacity: projected.capacity,
@@ -119,7 +124,7 @@ export function financeSummary(state: GameState): FinanceSummary {
     }
     : null;
 
-  const nextStand = nextFixture ? nextStandGate({ ...state, week: nextFixture.round }, nextFixture) : null;
+  const nextStand = nextFixture ? nextStandGate({ ...state, week: nextView?.slot ?? nextFixture.round }, nextFixture) : null;
 
   const gateWeekly = averageGateWeekly(state, nextHome?.projectedGate ?? 0);
   // Salaries, upkeep and overhead no longer leave the bank. Cash net is income only.
@@ -161,7 +166,19 @@ export function financeSummary(state: GameState): FinanceSummary {
  * home fixtures from this week on (finals ties appear as they are drawn) and
  * divides by the weeks left in the regular season, or in the finals once there.
  */
+function futureHomeFixtures(state: GameState) {
+  const view = leagueSeasonView(state);
+  if (!view || view.choiceRequired || view.calendar.status !== 'active') return [];
+  return view.fixtures.filter(f => f.status === 'scheduled' && ['scheduled', 'active'].includes(f.instance.status)
+    && f.slot !== null && f.slot >= state.week && f.fixture.homeId === state.clubId && !f.fixture.neutral);
+}
+
 export function averageGateWeekly(state: GameState, projectedGate: number): number {
+  const view = leagueSeasonView(state);
+  if (view) {
+    const gates = futureHomeFixtures(state).reduce((sum, f) => sum + homeGate({ ...state, week: f.slot! }, f.bridge).receipts, 0);
+    return Math.round(gates / Math.max(1, view.calendar.slots.length - state.week + 1));
+  }
   if (inTrials(state)) {
     const gates = state.league.fixtures.filter((f) => f.homeId === state.clubId && f.round >= currentRound(state))
       .reduce((sum, f) => sum + homeGate(state, f).receipts, 0);
@@ -556,7 +573,7 @@ function buildKeyTiles(state: GameState, s: FinanceSummary): HTMLElement {
     : `${nextLabel} ${fmtMoney(s.capNext)}`;
   const net = keyTile(clock.structural ? `Salary cap · season ${clock.season}` : 'Salary cap', `${fmtMoney(s.capCurrent)} / ${fmtMoney(s.cap)}`, capNote, s.capCurrent > s.cap ? 'nrl-finance-losing' : 'nrl-finance-making');
   const gate = s.nextHome
-    ? keyTile(`Next home gate · ${s.nextHome.round <= 0 ? `trial ${s.nextHome.round + 2}` : s.nextHome.round > SEASON_ROUNDS ? 'final' : `R${s.nextHome.round}`}`, fmtMoney(s.nextHome.projectedGate), fmtCrowd(s.nextHome))
+    ? keyTile(`Next home gate · ${s.nextHome.dateLabel ? `${s.nextHome.dateLabel} · ${s.nextHome.stageLabel}` : s.nextHome.round <= 0 ? `trial ${s.nextHome.round + 2}` : s.nextHome.round > SEASON_ROUNDS ? 'final' : `R${s.nextHome.round}`}`, fmtMoney(s.nextHome.projectedGate), fmtCrowd(s.nextHome))
     : keyTile('Next home gate', 'None left', `${groundCapacity(state).toLocaleString('en-US')} seats`);
   gate.classList.add('nrl-finance-gate');
   // Sold out: what a bigger stand would earn (N12, #169).

@@ -1,3 +1,4 @@
+import { leagueFixtureView } from './leagueSeasonView';
 import { freezeMatchIncome, matchIncomePatch, commitMatchState, reconcileMatchIncome } from './matchIncome';
 // Orchestrator-owned: the PLAYER's match of the round (rival-vs-rival matches
 // are handled by fixtures.ts's own hook). The match is played on the live sim
@@ -215,6 +216,14 @@ export function roundLabel(round: number): string {
   return `Round ${round}`;
 }
 
+/** Saved stage/date label for League notices; legacy and DEV labels stay unchanged. */
+function fixtureNoticeLabel(state: GameState, fixture: Fixture): string {
+  const context = state.competitions?.leagueCareer ? calendarFixtureContext(state, fixture) : null;
+  if (!context) return roundLabel(fixture.round);
+  const view = leagueFixtureView(context.instance, context.fixture);
+  return `${view.dateLabel} · ${view.stageLabel}`;
+}
+
 /**
  * Apply the player's match result: ladder, player stats, injuries (ours and the
  * rival's). Returns the toast to show when the player sees the final score.
@@ -262,17 +271,18 @@ function applyPlayerResult(fixture: Fixture, home: TeamSheet, away: TeamSheet, s
   // A final level at full time goes to golden point (N9.4); still level after it, it is decided on
   // seeding (home = higher seed advances), so say
   // which way it went rather than leaving the player guessing.
-  const verdict = us > them ? 'WIN' : us < them ? 'LOSS' : 'DRAW';
+  const savedResult = before.competitions?.leagueCareer ? applied.competitions!.instances.find(i => i.id === fixture.competitionId)!.fixtures.find(f => f.id === fixture.id)!.result : undefined;
+  const verdict = savedResult?.winnerId ? savedResult.winnerId === PLAYER_ID ? 'WIN' : 'LOSS' : us > them ? 'WIN' : us < them ? 'LOSS' : 'DRAW';
   const goldenPoint = sim.events.some((e) => e.kind === 'full-time' && e.detail === 'golden-point');
   const decidedWinner = structural ? applied.competitions!.instances.find(i => i.id === fixture.competitionId)!.fixtures.find(f => f.id === fixture.id)!.result!.winnerId : undefined;
   const seedingNote = us === them && knockout
-    ? (structural ? (decidedWinner === PLAYER_ID ? ' — through on the published tie draw' : ' — out on the published tie draw') : playerHome ? ' — through on seeding' : ' — out on seeding')
+    ? (savedResult ? ` — ${savedResult.winnerId === PLAYER_ID ? 'through' : 'out'} on ${savedResult.decider.replace(/-/g, ' ')}` : structural ? (decidedWinner === PLAYER_ID ? ' — through on the published tie draw' : ' — out on the published tie draw') : playerHome ? ' — through on seeding' : ' — out on seeding')
     : goldenPoint ? ' in golden point' : '';
   return (): void => {
     bus.emit('ui:notify', {
-      text: `${context ? `${context.instance.definition.name}, ${context.fixture.round}` : roundLabel(fixture.round)}: ${verdict} ${us}–${them}${seedingNote}`,
+      text: `${before.competitions?.leagueCareer ? fixtureNoticeLabel(before, fixture) : context ? `${context.instance.definition.name}, ${context.fixture.round}` : roundLabel(fixture.round)}: ${verdict} ${us}–${them}${seedingNote}`,
       // A loss is news, not a problem (#339): red is kept for injuries, debt and errors.
-      kind: us > them ? 'success' : 'info',
+      kind: verdict === 'WIN' ? 'success' : 'info',
     });
     for (const text of injuryToasts) bus.emit('ui:notify', { text, kind: 'danger' });
   };
@@ -295,8 +305,8 @@ export function registerPlayerMatchSystem(): void {
       bus.emit('ui:notify', {
         text:
           fit === 0
-            ? `No fit players — ${roundLabel(fixture.round)} forfeited (${result.homeScore}–${result.awayScore}).`
-            : `Only ${fit} fit (need ${SQUAD_MIN}) — ${roundLabel(fixture.round)} forfeited (${result.homeScore}–${result.awayScore}).`,
+            ? `No fit players — ${fixtureNoticeLabel(state, fixture)} forfeited (${result.homeScore}–${result.awayScore}).`
+            : `Only ${fit} fit (need ${SQUAD_MIN}) — ${fixtureNoticeLabel(state, fixture)} forfeited (${result.homeScore}–${result.awayScore}).`,
         kind: 'danger',
       });
       return;

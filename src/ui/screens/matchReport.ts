@@ -18,6 +18,7 @@ import { PLAYER_ID, ladderPosition } from '../../systems/fixtures';
 import { gateReceipts } from '../../systems/economy';
 import { roundLabel } from '../../systems/matchday';
 import { recordMatchAward, playerOfTheMatch, type PlayerOfMatch } from '../../systems/stats';
+import { leagueFixtureView, type LeagueFixtureView } from '../../systems/leagueSeasonView';
 import { hasStructuralCalendar, sameFixtureIdentity } from '../../systems/competitionCalendar';
 import type { Fixture } from '../../core/state';
 import { lossReasons, type LossReason, type ReasonScreen } from '../../systems/lossReasons';
@@ -56,6 +57,8 @@ export interface ReportRow {
 }
 
 export interface MatchReport {
+  /** Saved stage decides whether this result can move the regular ladder. */
+  regularLeagueMatch?: boolean;
   title: string;
   /** "Round 3", "Grand Final": the full-time card's head. */
   round: string;
@@ -110,9 +113,11 @@ export function buildMatchReport(
   names: Record<string, string>,
   potm: PlayerOfMatch | null,
   reasons: readonly LossReason[] = [],
+  saved?: LeagueFixtureView,
 ): MatchReport {
-  const home = side(result, fixture.homeId, names[fixture.homeId] ?? fixture.homeId, result.homeScore);
-  const away = side(result, fixture.awayId, names[fixture.awayId] ?? fixture.awayId, result.awayScore);
+  const official = saved?.status === 'completed' ? saved.fixture.result : undefined;
+  const home = side(result, fixture.homeId, names[fixture.homeId] ?? fixture.homeId, official?.homeScore ?? result.homeScore);
+  const away = side(result, fixture.awayId, names[fixture.awayId] ?? fixture.awayId, official?.awayScore ?? result.awayScore);
   // Two clubs with the same last word ("Brisbane Larrikins" v "Launceston Larrikins"): full names.
   if (home.short === away.short) {
     home.short = home.name;
@@ -136,12 +141,24 @@ export function buildMatchReport(
   ];
   const golden = result.events.some((e) => e.kind === 'full-time' && e.detail === 'golden-point');
   const final = fixture.round > SEASON_ROUNDS;
-  const note = golden ? 'Won in golden point' : result.homeScore === result.awayScore ? (final ? `Drawn — ${home.name} through on seeding` : 'Drawn') : '';
+  const legacyNote = golden ? 'Won in golden point' : result.homeScore === result.awayScore ? (final ? `Drawn — ${home.name} through on seeding` : 'Drawn') : '';
+  const note = saved ? saved.status === 'cancelled' ? 'Cancelled'
+    : saved.status !== 'completed' ? 'Result pending'
+    : saved.decider && !['score', 'draw'].includes(saved.decider)
+      ? `${names[saved.winnerId ?? ''] ?? saved.winnerId} won by ${saved.decider.replace(/-/g, ' ')}`
+      : golden ? 'Won in golden point' : home.score === away.score ? 'Drawn' : '' : legacyNote;
+  let headline = resultHeadline(home, away);
+  if (saved && saved.status !== 'completed') headline = null;
+  else if (saved?.winnerId && home.score === away.score && (home.id === PLAYER_ID || away.id === PLAYER_ID)) {
+    headline = { text: saved.winnerId === PLAYER_ID ? 'WIN' : 'LOSS', kind: saved.winnerId === PLAYER_ID ? 'win' : 'loss' };
+  }
+  const label = saved ? `${saved.dateLabel} · ${saved.stageLabel}` : roundLabel(fixture.round);
   const potmShort = potm ? (potm.teamId === home.id ? home.short : potm.teamId === away.id ? away.short : names[potm.teamId] ?? potm.teamId) : '';
   return {
-    title: `${roundLabel(fixture.round)} · Full time`,
-    round: roundLabel(fixture.round),
-    headline: resultHeadline(home, away),
+    title: `${label} · Full time`,
+    round: label,
+    ...(saved ? { regularLeagueMatch: saved.stageKind === 'league' && saved.status === 'completed' } : {}),
+    headline,
     home,
     away,
     note,
@@ -365,7 +382,7 @@ export function showFullTime(r: MatchReport, result: MatchResult, fixture: { rou
 
   // The ladder after the round: it moves once the week has finished.
   let offWeek: (() => void) | null = null;
-  if (mine && fixture.round > 0 && fixture.round <= SEASON_ROUNDS) {
+  if (mine && (r.regularLeagueMatch ?? (fixture.round > 0 && fixture.round <= SEASON_ROUNDS))) {
     let before = 0;
     try {
       before = ladderPosition(getState(), PLAYER_ID);
@@ -508,7 +525,13 @@ export function initMatchReport(opts: ReportOpts = {}): () => void {
     const p = structural ? playerOfTheMatch(result, fixture.homeId, fixture.awayId) : recordMatchAward(result, fixture.homeId, fixture.awayId);
     const sheets = kickOff && sameFixtureIdentity(kickOff.fixture, fixture) ? kickOff : null;
     const reasons = sheets ? lossReasons(result, fixture, sheets, getState()) : [];
-    const report = buildMatchReport(result, fixture, clubNames(), p, reasons);
+    // Committed fixtures are no longer returned by the scheduled-match query.
+    const competitions = getState().competitions;
+    const instance = competitions?.leagueCareer ? competitions.instances.find(i => i.id === fixture.competitionId) : undefined;
+    const actual = instance?.fixtures.find(f => f.id === fixture.id);
+    const saved = instance && actual ? leagueFixtureView(instance, actual) : undefined;
+    const report = buildMatchReport(result, fixture, clubNames(), p, reasons,
+      saved && sameFixtureIdentity(saved.bridge, fixture) ? saved : undefined);
     if (typeof document !== 'undefined' && document.body?.classList.contains(MATCH_ACTIVE_CLASS)) showFullTime(report, result, fixture, opts);
     else openMatchReport(report, opts);
   };

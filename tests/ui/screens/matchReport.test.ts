@@ -185,3 +185,25 @@ describe('the full-time card occasion (#640)', () => {
     expect(fullTimeStats(ra, result)[0]).toMatchObject({ first: `${result.stats.possession[1]}%`, second: `${result.stats.possession[0]}%` });
   });
 });
+
+import { competitions } from '../../data/leagueCareerFixtures';
+import { leagueFixtureView } from '../../../src/systems/leagueSeasonView';
+
+describe('saved League match reports', () => {
+  it.each(['higher-seed', 'seeded-draw', 'forfeit'] as const)('uses saved dates, stage and official %s winner', decider => {
+    const instance = competitions().instances[0]!;
+    const f = instance.fixtures[2]!;
+    f.homeId = 'player'; f.awayId = 'rival-gulls';
+    f.result = { homeScore: decider === 'forfeit' ? 0 : 12, awayScore: 12, winnerId: f.awayId, decider };
+    const saved = leagueFixtureView(instance, f);
+    const result = runMatch(sheet('player', 'Live Test FC'), sheet('rival-gulls', 'Gulls'), { seed: 11 });
+    const report = buildMatchReport({ ...result, ...f.result }, saved.bridge, names, null, [], saved);
+    expect(report.round).toBe('Week 5 · Finals');
+    expect(report.headline?.kind).toBe('loss');
+    expect(report.note).toContain('Gulls'); expect(report.note).toContain(decider.replace(/-/g, ' '));
+    expect(report.regularLeagueMatch).toBe(false);
+    expect(report.note).not.toContain('Live Test FC through');
+    const regular = leagueFixtureView(instance, instance.fixtures[0]!);
+    expect(buildMatchReport(result, regular.bridge, names, null, [], regular).regularLeagueMatch).toBe(true);
+  });
+});

@@ -261,7 +261,7 @@ function buildCalendarFixtures(state: GameState, view: LeagueSeasonView): League
         const fixture = f.fixture;
         const result = fixture.result;
         const score = result ? `${result.homeScore}–${result.awayScore}` : 'v';
-        const status = f.status === 'cancelled' ? ' · Cancelled' : f.status === 'pending' ? ' · Pending' : f.instance.status === 'withdrawn' && !result ? ' · Withdrawn' : '';
+        const status = f.status === 'cancelled' ? ' · Cancelled' : f.instance.status === 'withdrawn' && !result ? ' · Withdrawn' : f.status === 'pending' ? ' · Pending' : '';
         const decider = result && f.decider && !['score', 'draw'].includes(f.decider)
           ? ` · ${names[f.winnerId ?? ''] ?? f.winnerId} won by ${f.decider.replace(/-/g, ' ')}` : '';
         const line = el('div', { class: 'nrl-fixture', attrs: { 'data-fixture-id': fixture.id },

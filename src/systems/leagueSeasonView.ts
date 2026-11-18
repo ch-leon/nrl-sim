@@ -41,8 +41,8 @@ export function remainingLeagueFixtures(view: LeagueSeasonView): LeagueFixtureVi
 
 export function leagueFixtureView(instance: CompetitionInstance, fixture: CompetitionFixture): LeagueFixtureView {
   const stage = instance.definition.stages.find(s => s.id === fixture.stageId)!;
-  // Cancelled fixtures may omit their date; retain the authored stage date
-  // for display without restoring it to the saved sporting fixture.
+  // Pending and cancelled fixtures may omit their date; retain the authored
+  // stage date for display without restoring it to the saved sporting fixture.
   const validDate = (value: number | undefined): value is number => typeof value === 'number'
     && Number.isSafeInteger(value) && value > 0 && value <= instance.definition.slotCount;
   const savedDate = stage.slotIds?.[fixture.round - 1];
