@@ -1,6 +1,8 @@
 # League selection implementation checkpoint
 
-17 November 2026. Pausing at Leon's request because usage is exhausted.
+Resumed 18 November 2026 at Leon's request. The 17 November pause checkpoint
+remains recorded below; work proceeds through the close correction, league
+confirmation and UI, with independent Claude reviews between stages.
 
 [Issue #574](https://github.com/ch-leon/nrl-sim/issues/574) is being implemented in
 [draft PR #719](https://github.com/ch-leon/nrl-sim/pull/719), branch
@@ -22,8 +24,17 @@ remain on their existing path.
   once, freezes history/review/unlocks without annual people work, and gates time.
   Strict history clocks, canonical retained fields, cancellation-zero receipts,
   identity-bound async completion and save quarantine are implemented. Independent
-  spec review passed after fixing watched invalidation. Claude reviewed `fdf0cfa3`
-  and returned **CHANGES REQUESTED**: the post-hook validation gap below remains.
+  spec review passed after fixing watched invalidation. Claude's post-hook
+  validation finding at `fdf0cfa3` was corrected in `9f7a7756`; independent spec
+  review and **SEASON CLOSE REVIEW: APPROVE** both passed on 18 November.
+
+The `9f7a7756` correction validates detached settlement/cursor candidates before
+installation, advancement or autosave, including remaining held-week hooks, and
+validates close output. Regression tests reproduce the original failures and
+verify quarantine, preserved save bytes, blocked save routes, resolved async waits
+and no replay. Typecheck/build passed. The full run passed 4,714 of 4,715 tests;
+the only failure was the file-watcher control, whose separate run with local
+file-event access passed all three tests. This is not a single green full run.
 
 The close implementation passed 4,707 tests and build before the final small
 validation/gate corrections. Final targeted checks and typecheck passed. An
@@ -41,17 +52,8 @@ integrated into this branch; it changes no game behavior.
 ## Resume here
 
 Follow [the implementation plan](../plans/2026-11-17-league-selection.md).
-**First fix the remaining Claude P2:** `src/core/time.ts` can install, announce
-and autosave invalid post-hook state on non-final marked intervals. Held release
-also validates before its remaining hooks. Validate the resulting candidate before
-installation, `week:advanced` or saving; validate close output defensively too.
-Reproduce with a valid marked week 2 and a hook introducing unsupported
-`boardLoan: { owed: 1 }`. Cover ordinary and remaining-held-hook paths: preserve
-occupied save bytes, block every save route, emit `week:blocked`, resolve the async
-wait and prevent replay. Obtain an independent Claude re-review before acceptance.
-The exact-head review finished; no reviewer or implementation agent remains active.
-
-Then implement exact entry previews and atomic initial/annual confirmation:
+The season-close correction is independently approved. Continue with exact entry
+previews and atomic initial/annual confirmation:
 
 1. Clone saved league definitions, calendar and trial snapshots when scheduling;
    the existing profile/content-based builders must not silently rebase a save
@@ -73,10 +75,13 @@ Then implement exact entry previews and atomic initial/annual confirmation:
    short landscape/Larger text, final CI/full QA and full Claude issue-level review
    before marking ready or merging.
 
-**Open product rule:** Leon has not yet answered whether voluntary entry into a
-lower-cap league requires all signed commitments to fit, or protects existing
-signed terms. Do not assume grandfathering. Legal choices that already fit can
-be implemented; production completion waits for the answer and corresponding tests.
+**Open product rule:** On 18 November Leon reopened whether salary caps should be
+rules of individual leagues at all. Examples of league-set caps, retained club
+capacity and temporary signed-term protection were explained; no option has been
+approved. Do not treat the earlier two-option question or the recommendation of
+retained club capacity as a decision. Scheduling and confirmation plumbing can
+proceed independently; cap-policy-dependent activation waits for the answer and
+corresponding tests.
 
 Annual acceptance, the chooser, production admission and multi-year browser proof
-have **not** been implemented. No further agent work should start until Leon resumes.
+have **not** been implemented at the resume checkpoint.

@@ -18,7 +18,16 @@ implemented through `fdf0cfa3` and passed spec review, but Claude requested chan
 for non-final post-hook candidate validation before installation/autosave. Fix and
 re-review that first; annual confirmation and UI remain unimplemented. See the
 [resume notes and evidence](../status/2026-11-league-selection.md). PR #719 stays
-draft; do not start further work until Leon resumes.
+draft. Leon resumed this work on 18 November, authorizing the close correction,
+league confirmation and UI with continued agent orchestration and Claude review.
+
+**18 November close correction:** `9f7a7756` resolves the post-hook validation P2;
+independent spec review and Claude `SEASON CLOSE REVIEW: APPROVE` passed. Candidate
+settlement/cursor and close output validate before publication. Typecheck/build
+passed; 4,714/4,715 full-suite tests passed, with the lone file-watcher control
+passing separately with local file-event access. Saved-snapshot schedules and
+atomic entry are next. The salary-cap product question has reopened to include
+whether capacity should belong to the club rather than the selected league.
 
 Baseline inspected: `03812a1618b80fbc1348bd6b0966b3df704e9b7a`, branch `codex/league-selection-unlocks`, save version 30. Read `AGENTS.md`, `CLAUDE.md`, `docs/hub/`, `docs/specs/career-opportunities.md`, `docs/specs/career-competitions.md` and `docs/plans/2026-11-career-competitions.md`. The opportunities specification supersedes historical forced promotion/relegation. Numerical tuning and optional events remain separate work.
 
@@ -141,6 +150,12 @@ Files: `src/data/divisions.ts`, `src/systems/divisionCareer.ts`; tests `tests/da
 - [x] Validate complete home/away coverage, stage slots, no double bookings, legal finals placeholders and known clubs. Without an enabled cup, its five windows remain explicit quiet intervals; do not register a paid cup implicitly.
 - [x] Run `npx vitest run tests/data/divisions.test.ts tests/systems/divisionCareer.test.ts tests/systems/competitionCalendar.test.ts` and `npx tsc --noEmit`.
 - [x] Review the stage diff for accidental runtime enablement, then make the focused foundation commit. Stage 2 starts only after this boundary is reviewed.
+- [ ] Before annual acceptance, add a saved-snapshot schedule adapter. Clone the
+  current saved division definitions, calendar and per-division trial templates;
+  reuse canonical pairing/seed/ID functions without reading today's content
+  catalogue. Test AU/UK later years, custom saved rules/dates, deterministic complete
+  fields, unchanged people/RNG and byte-identical initial acceptance. Refuse
+  inconsistent or missing required snapshots instead of inventing replacements.
 
 Stage 1 checkpoint: Claude approved the inactive foundation at `6241a47b` after two review rounds; separate spec review passed. This is not a final #574 checker verdict. The earlier `e8a82fce` QA workflow passed; its CI match shard had one labs-controls timeout under investigation.
 
