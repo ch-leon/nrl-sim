@@ -2,6 +2,7 @@
 // module-singleton store. See ARCHITECTURE §4 and BAK-172. No Phaser, no class
 // instances in state (must JSON round-trip).
 
+import { awaitingCampReplay } from '../systems/parkedLeagueFixture';
 import type { PlayerCareerHistory, PlayerPopulation } from '../data/playerCareer';
 import { initialPlayerPopulation, installPlayerHistory } from '../systems/playerCareer';
 import type { TeamTactics } from '../match/league/presets';
@@ -129,8 +130,8 @@ export interface LeagueState {
 export type WeatherKind = 'clear' | 'rain' | 'wind';
 
 /** v30 adds player histories, v31 optional league progression, and v32 exact
- * protected agreements. Finance state migrates from v28; v27 requires a new career. */
-export const SAVE_VERSION = 33;
+ * protected agreements. v33 adds Open Cup entry and v34 optional Skills Camp records. Finance state migrates from v28; v27 requires a new career. */
+export const SAVE_VERSION = 34;
 
 /** The hires the facilities don't cover (N14.5), and the attack coach who opens set plays to buy (#326). */
 export type StaffRole = 'assistantCoach' | 'analyst' | 'welfare' | 'attackCoach';
@@ -384,6 +385,7 @@ export function getState(): GameState {
  */
 export function setState(patch: Partial<GameState>): void {
   const current = getState();
+  if (awaitingCampReplay(current)) return;
   if ('pack' in patch) selectPack(patch.pack);
   state = { ...current, ...patch };
   bus.emit('state:changed', state);

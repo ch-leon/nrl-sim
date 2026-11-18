@@ -9,7 +9,7 @@ import {
   migrateState,
   setActiveSlot
 } from '../../src/core/save';
-import { getState, loadState, type GameState } from '../../src/core/state';
+import { SAVE_VERSION, getState, loadState, type GameState } from '../../src/core/state';
 
 import { preparePack } from '../../src/content';
 import { bus, type Events } from '../../src/core/events';
@@ -56,7 +56,7 @@ describe('released v32 cup entry migration', () => {
         const source = JSON.stringify(old);
         const result = migrateState(old);
         if (!result.ok) throw Error(result.message);
-        expect(result.state.version).toBe(33);
+        expect(result.state.version).toBe(SAVE_VERSION);
         expect(result.state.competitionRewards).toEqual([]);
         const { competitionRewards: _rewards, ...preserved } = structuredClone(result.state);
         delete preserved.competitions!.openCupEntry;
@@ -79,7 +79,7 @@ describe('released v32 cup entry migration', () => {
   it('keeps the old developer cup inert', () => {
     const old = capture('dev-open-cup');
     const r = migrateState(old);
-    expect(r.ok && r.state).toEqual({ ...old, version: 33, competitionRewards: [] });
+    expect(r.ok && r.state).toEqual({ ...old, version: SAVE_VERSION, competitionRewards: [] });
   });
   it('rejects new fields in an old format by presence', () => {
     for (const mutate of [
