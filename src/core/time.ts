@@ -16,7 +16,8 @@ import { inTrials } from './season';
 import { demoStops } from '../commercial/demo';
 import { hasStructuralCalendar, isPlayableLeagueCareer, settleStructuralCalendar, structuralAdvanceProblem, structuralSeasonResolved } from '../systems/competitionCalendar';
 import { closeLeagueSeason } from '../systems/leagueCareer';
-import { saveIfChanged, saveSettledLeagueMatch, retryPendingLeagueSave } from './save';
+import { careerNamespace } from './storage/local';
+import { getActiveSlot, saveIfChanged, saveSettledLeagueMatch, retryPendingLeagueSave } from './save';
 
 // ── Public hook contracts ──────────────────────────────────────────────────
 
@@ -154,8 +155,13 @@ function sortedEntries<T extends { order: number; seq: number }>(m: Map<string, 
 
 // ── Advancing time ─────────────────────────────────────────────────────────
 
-interface LeagueInterval {
+export interface IntervalCheckpoint {
   source: GameState;
+  slot: number;
+  namespace: string | null;
+}
+
+interface LeagueInterval extends IntervalCheckpoint {
   installation: number;
   published: boolean;
   afterSaved?: () => void;
@@ -177,7 +183,7 @@ function failLeagueInterval(interval: LeagueInterval, reason: string, error?: un
   if (error) console.error('nrl-sim: League interval failed', error);
   held = null;
   leagueInterval = undefined;
-  failedInterval = {installation: interval.installation, reason};
+  failedInterval = {installation: interval.installation, reason, checkpoint: interval};
   bus.emitSettled('week:blocked', {week: interval.source.week, season: interval.source.season, reason},
     () => interval.installation === stateInstallation());
 }
@@ -210,8 +216,9 @@ export function advanceWeek(): void {
   if (demoStops()) return; // the demo's last week is played (#362; never with the commercial flag off)
   const { week, season, competitions } = getState();
   const installation = stateInstallation();
+  const checkpoint = {source: getState(), slot: getActiveSlot(), namespace: careerNamespace()};
   const interval: LeagueInterval | undefined = competitions?.leagueCareer
-    ? {source: getState(), installation, published: false} : undefined;
+    ? {...checkpoint, installation, published: false} : undefined;
   leagueInterval = interval;
   const tokens = new Set<WeekRelease>();
   const identity = {};
@@ -228,7 +235,7 @@ export function advanceWeek(): void {
         const problem = structuralAdvanceProblem(getState());
         if (problem) {
           if (interval) failLeagueInterval(interval, problem);
-          else { held = null; blockInterval(problem); }
+          else { held = null; blockInterval(problem, checkpoint); }
           return;
         }
         if (interval && afterSaved) interval.afterSaved = afterSaved;
@@ -277,15 +284,19 @@ export function advanceWeek(): void {
 
 /** A held week (coach calls #73; N9.2): the hooks still to run, and how many holds are still out. */
 let held: { ctx: TickContext; rest: TickEntry[]; tokens: Set<WeekRelease>; identity: object; installation: number } | null = null;
-let failedInterval: {installation: number; reason: string} | null = null;
+let failedInterval: {installation: number; reason: string; checkpoint: IntervalCheckpoint} | null = null;
 
 /** Unexpected post-hook failure is quarantined until a full career reload. */
 export function failedIntervalProblem(): string | null {
   return failedInterval?.installation === stateInstallation() ? failedInterval.reason : null;
 }
 
-function blockInterval(reason: string): void {
-  failedInterval = {installation: stateInstallation(), reason};
+export function failedIntervalCheckpoint(): IntervalCheckpoint | undefined {
+  return failedInterval?.installation === stateInstallation() ? failedInterval.checkpoint : undefined;
+}
+
+function blockInterval(reason: string, checkpoint: IntervalCheckpoint): void {
+  failedInterval = {installation: stateInstallation(), reason, checkpoint};
   const s = getState(); bus.emit('week:blocked', {week: s.week, season: s.season, reason});
 }
 
@@ -337,7 +348,7 @@ function finishLeagueInterval(interval: LeagueInterval, settled: GameState): voi
   const current = (): boolean => ownsInterval(interval);
   if (final || interval.afterSaved) {
     try {
-      if (interval.afterSaved) saveSettledLeagueMatch(getState(), interval.afterSaved);
+      if (interval.afterSaved) saveSettledLeagueMatch(getState(), interval, interval.afterSaved);
       else saveIfChanged(getState());
     } catch (error) {
       console.error('nrl-sim: could not persist the settled League interval', error);

@@ -6,6 +6,7 @@ import { advanceUntil } from '../../src/core/advance';
 import { advanceWeek, advanceWeeks, clearHeldWeek, clearSeasonHooks, clearTickHooks, failedIntervalProblem, weekHeld, withFastForward } from '../../src/core/time';
 import { getCurrentFixture, initLeague, registerFixturesSystem } from '../../src/systems/fixtures';
 import { forfeitResult, playerMatchPending, registerPlayerMatchSystem, resumePlayerMatch } from '../../src/systems/matchday';
+import { readLiveMatch } from '../../src/systems/liveMatchRecord';
 import * as rivalRound from '../../src/systems/rivalRound';
 import * as jobs from '../../src/systems/matchJobs';
 import type { MatchResult } from '../../src/sim/events';
@@ -15,7 +16,7 @@ import { DEV_TEST_PREFIX, liveMatchKey, slotKey } from '../../src/core/storageKe
 import { setupStructuralDivisionCareer } from '../../src/systems/divisionCareer';
 import { AU_CAREER_PROFILE } from '../../src/content/career/au';
 import { leagueEntryReceiptId } from '../../src/data/leagueCareer';
-import { __setStorage, __unlockSaves, saveIfChanged, exportSave, enableAutosave, pendingLeagueSaveProblem } from '../../src/core/save';
+import { __setStorage, __unlockSaves, saveIfChanged, exportSave, enableAutosave, pendingLeagueSaveProblem, downloadSave, exportFilename, installImportedSave, setActiveSlot } from '../../src/core/save';
 
 afterEach(() => {vi.restoreAllMocks();vi.unstubAllGlobals();clearHeldWeek();clearTickHooks();clearSeasonHooks();bus.clear();setCareerNamespace(null);__setStorage(null);});
 function startLeagueMatch() {
@@ -222,7 +223,10 @@ describe('async result ownership across fresh careers', () => {
       expect(getState()).toBe(settled);
       expect(bytes.get(saveKey)).toBe(original);
       expect(bytes.get(matchKey)).toBe(sidecar);
-      expect(exportSave(getState())).toBe(original);
+      const file = JSON.parse(exportSave(getState()));
+      expect(file.nrlLiveMatch).toEqual(JSON.parse(sidecar!));
+      delete file.nrlLiveMatch;
+      expect(JSON.stringify(file)).toBe(original);
       expect(matches).toHaveLength(1);
       expect(advanced).toHaveBeenCalledOnce();
       write.mockRestore();
@@ -233,6 +237,92 @@ describe('async result ownership across fresh careers', () => {
       advanceWeek();
       expect(weekHeld() || getState().week === 3).toBe(true);
     } finally { off(); }
+  });
+
+  it.each(['pending', 'quarantined', 'isolated prototype'] as const)('exports the actual kick-off checkpoint and parked calls when %s', status => {
+    const {bytes} = startLeagueMatch();
+    const saveKey = DEV_TEST_PREFIX + slotKey(1), matchKey = DEV_TEST_PREFIX + liveMatchKey(1);
+    if (status === 'isolated prototype') {
+      const competitions = {...getState().competitions!};
+      delete competitions.leagueCareer;
+      setState({competitions});
+      expect(saveIfChanged(getState())).toBe(true);
+    }
+    const source = bytes.get(saveKey)!;
+    const matches: Events['match:started'][] = [];
+    bus.on('match:started', value => { matches.push(value); });
+    registerPlayerMatchSystem();
+    registerFixturesSystem();
+    advanceWeek();
+    const live = matches[0]!.live;
+    const calls = [{tick:1, side:'home' as const, call:'hit-up' as const}];
+    expect(live.onProgress?.(calls, 47, [])).toBe(true);
+    const sidecar = bytes.get(matchKey)!;
+    if (status === 'pending') {
+      vi.spyOn(localStorage, 'setItem').mockImplementation((k,v) => {
+        if (k === saveKey) throw new Error('Slot quota');
+        bytes.set(k, v);
+      });
+    } else {
+      const c = getState().competitions!;
+      setState({competitions:{...c, calendar:{...c.calendar!, status:'awaiting-next-season'}}});
+    }
+    bus.emit('match:finished', {fixture:matches[0]!.fixture, result:matchResult()});
+    if (status === 'pending') expect(pendingLeagueSaveProblem()).toBeTruthy();
+    else expect(failedIntervalProblem()).toBeTruthy();
+    const file = exportSave(getState());
+    const envelope = JSON.parse(file);
+    expect(envelope.nrlLiveMatch).toEqual(JSON.parse(sidecar));
+    delete envelope.nrlLiveMatch;
+    expect(JSON.stringify(envelope)).toBe(source);
+    expect(bytes.get(saveKey)).toBe(source);
+    expect(bytes.get(matchKey)).toBe(sidecar);
+
+    if (status === 'pending') {
+      const a = {href:'', download:'', click:vi.fn(), remove:vi.fn()};
+      vi.stubGlobal('document', {createElement:() => a, body:{appendChild:vi.fn()}});
+      const notice = vi.fn();
+      bus.on('ui:notify', notice);
+      downloadSave(getState());
+      expect(a.download).toBe(exportFilename(JSON.parse(source)));
+      expect(notice).toHaveBeenCalledWith(expect.objectContaining({text:expect.stringMatching(/saved|start/i)}));
+    }
+    const installed = installImportedSave(file, 2);
+    if (status === 'isolated prototype') {
+      expect(installed.ok).toBe(true);
+      if (!installed.ok) throw new Error(installed.message);
+      try {
+        setActiveSlot(2);
+        loadState(installed.state);
+        expect(readLiveMatch()).toEqual(JSON.parse(sidecar));
+        advanceWeek();
+        expect(matches[1]!.fixture).toEqual(matches[0]!.fixture);
+        expect(matches[1]!.live).toMatchObject({calls, resumeAt:47, seed: live.seed});
+      } finally { setActiveSlot(1); }
+    } else {
+      expect(installed.ok).toBe(false);
+      const record = JSON.parse(sidecar);
+      bytes.set(matchKey, JSON.stringify({...record, fixtureId: record.fixtureId + '-foreign'}));
+      expect(() => exportSave(getState())).toThrow();
+      expect(bytes.get(saveKey)).toBe(source);
+      bytes.set(matchKey, 'unreadable');
+      expect(() => exportSave(getState())).toThrow();
+      bytes.delete(matchKey);
+      expect(exportSave(getState())).toBe(source);
+      bytes.set(matchKey, sidecar);
+      bytes.set(saveKey, JSON.stringify({...JSON.parse(source), clubName:'Replaced slot'}));
+      expect(() => exportSave(getState())).toThrow();
+      bytes.set(saveKey, source);
+      try {
+        setCareerNamespace(null);
+        bytes.set(slotKey(1), source);
+        expect(() => exportSave(getState())).toThrow();
+        setCareerNamespace(DEV_TEST_PREFIX);
+        setActiveSlot(2);
+        bytes.set(DEV_TEST_PREFIX + slotKey(2), source);
+        expect(() => exportSave(getState())).toThrow();
+      } finally { setActiveSlot(1); setCareerNamespace(DEV_TEST_PREFIX); }
+    }
   });
 
   it.each(['advance', 'replacement'] as const)('a pending write is bound to the settled career when resuming by %s', async route => {

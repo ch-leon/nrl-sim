@@ -4,7 +4,7 @@ import { reconcileMatchIncome } from '../systems/matchIncome';
 import { currentRound } from './season';
 import { careerNamespace } from './storage/local';
 import { DEV_TEST_PREFIX } from './storageKeys';
-import { fixtureBridge, hasStructuralCalendar, recoverUnfinishableCompetitions, sameFixtureIdentity, structuralPolicyProblem } from '../systems/competitionCalendar';
+import { currentCalendarFixtures, fixtureBridge, hasStructuralCalendar, recoverUnfinishableCompetitions, sameFixtureIdentity, structuralPolicyProblem } from '../systems/competitionCalendar';
 // src/core/save.ts — persistence, migration, slots + title flow
 // (BAK-174, WU-4; migration/export/import/slots: GitHub #34; storage seam: #360).
 //
@@ -27,9 +27,9 @@ import { withRivalSquads } from '../systems/rivals';
 import { autoPick } from '../systems/lineup';
 import { DEFAULT_TACTICS } from '../match/league/presets';
 import { bus } from './events';
-import { registerTickHook, TICK_ORDER, unregisterTickHook, weekHeld, leagueIntervalSaveHeld, failedIntervalProblem } from './time';
-import { clearLiveMatch, LIVE_MATCH_EXPORT_FIELD, peelLiveMatchExport, readLiveMatch, writeLiveMatch } from '../systems/liveMatchRecord';
-import { CORRUPT_SAVE_KEY, LEGACY_SAVE_KEY, slotKey } from './storageKeys';
+import { registerTickHook, TICK_ORDER, unregisterTickHook, weekHeld, leagueIntervalSaveHeld, failedIntervalProblem, failedIntervalCheckpoint, type IntervalCheckpoint } from './time';
+import { clearLiveMatch, isLiveMatchRecord, LIVE_MATCH_EXPORT_FIELD, peelLiveMatchExport, readLiveMatch, writeLiveMatch } from '../systems/liveMatchRecord';
+import { CORRUPT_SAVE_KEY, LEGACY_SAVE_KEY, liveMatchKey, slotKey } from './storageKeys';
 import { BRAND } from '../brand';
 import { cleanName } from '../data/names';
 import { allPlayers, renameClubsPatch, renamePlayersPatch, validClubColors, type ClubEdit } from '../systems/rename';
@@ -561,11 +561,9 @@ export function __unlockSaves(): void {
 }
 
 const PENDING_LEAGUE_SAVE = 'The completed week could not be saved. Retry saving or reload the last saved match.';
-interface PendingLeagueSave {
+interface PendingLeagueSave extends IntervalCheckpoint {
   state: GameState;
   installation: number;
-  slot: number;
-  namespace: string | null;
   saving: boolean;
   retireMatch: () => void;
 }
@@ -576,7 +574,7 @@ function currentPendingSave(): PendingLeagueSave | undefined {
   return pendingLeagueSave;
 }
 
-function sameDestination(pending: PendingLeagueSave): boolean {
+function sameDestination(pending: IntervalCheckpoint): boolean {
   return activeSlot === pending.slot && careerNamespace() === pending.namespace;
 }
 
@@ -586,8 +584,9 @@ export function pendingLeagueSaveProblem(): string | null {
 
 /** The sidecar belongs to the saved kick-off until the exact settled snapshot
  * is durable. Retry that snapshot before advancing or saving a later edit. */
-export function saveSettledLeagueMatch(state: GameState, retireMatch: () => void): boolean {
-  pendingLeagueSave = {state, installation: stateInstallation(), slot: activeSlot, namespace: careerNamespace(), saving: false, retireMatch};
+export function saveSettledLeagueMatch(state: GameState, checkpoint: IntervalCheckpoint, retireMatch: () => void): boolean {
+  pendingLeagueSave = {state, source: checkpoint.source, slot: checkpoint.slot, namespace: checkpoint.namespace,
+    installation: stateInstallation(), saving: false, retireMatch};
   return saveIfChanged(state);
 }
 
@@ -800,17 +799,40 @@ function heldWeekSnapshot(): GameState | null {
  * caller (downloadSave) refuses; this falls back to `state` only then.
  */
 export function exportSave(state: GameState): string {
-  const pending = currentPendingSave();
-  if (pending && !sameDestination(pending)) throw new Error(PENDING_LEAGUE_SAVE);
-  if (pending || failedIntervalProblem()) {
-    const original = exportOriginalSave(activeSlot);
-    if (original === null) throw new Error('The saved interval is unavailable for export.');
-    return original;
-  }
+  return saveExport(state).text;
+}
+
+interface SaveExport { text: string; state: GameState; notice?: string }
+
+function saveExport(state: GameState): SaveExport {
+  const checkpoint = currentPendingSave() ?? failedIntervalCheckpoint();
+  if (checkpoint) return recoveryExport(checkpoint);
   const snap = heldWeekSnapshot();
   const live = snap ? readLiveMatch() : null;
   const payload = live ? { ...snap, [LIVE_MATCH_EXPORT_FIELD]: live } : (snap ?? state);
-  return JSON.stringify(payload, null, 2);
+  return {text: JSON.stringify(payload, null, 2), state: snap ?? state, ...(snap ? {notice: EXPORT_HELD_TEXT} : {})};
+}
+
+/** Export only a checkpoint belonging to this interval and its saved match.
+ * The actual replay rechecks its computed seed and engine compatibility. */
+function recoveryExport(checkpoint: IntervalCheckpoint): SaveExport {
+  if (!sameDestination(checkpoint)) throw new Error('The recovery slot changed.');
+  const store = getStore();
+  const original = store?.read(checkpoint.slot);
+  if (!store || original == null) throw new Error('The saved interval is unavailable.');
+  const saved: GameState = JSON.parse(original);
+  if (JSON.stringify(saved) !== JSON.stringify(checkpoint.source)) throw new Error('The saved interval changed.');
+  const rawMatch = store.storage.getItem(liveMatchKey(checkpoint.slot));
+  if (rawMatch === null) return {text: original, state: saved, notice: 'Exported the saved checkpoint from the start of the week.'};
+  const live: unknown = JSON.parse(rawMatch);
+  if (!isLiveMatchRecord(live) || live.season !== saved.season || live.week !== saved.week ||
+    !currentCalendarFixtures(saved).some(({instance, fixture}) =>
+      live.competitionId === instance.id && live.fixtureId === fixture.id && live.slot === fixture.slot &&
+      live.round === fixture.round && live.homeId === fixture.homeId && live.awayId === fixture.awayId &&
+      (fixture.homeId === saved.clubId || fixture.awayId === saved.clubId)))
+    throw new Error('The saved match does not belong to this checkpoint.');
+  return {text: JSON.stringify({...saved, [LIVE_MATCH_EXPORT_FIELD]: live}, null, 2), state: saved,
+    notice: 'Exported the saved checkpoint from the start of the week with its parked match.'};
 }
 
 export type ImportResult = MigrateResult | { ok: false; message: string };
@@ -928,24 +950,23 @@ export function downloadSave(state: GameState): void {
     bus.emit('ui:notify', { text: EXPORT_HELD_FAILED_TEXT, kind: 'danger' });
     return;
   }
-  const held = weekHeld();
   if (typeof document === 'undefined' || typeof Blob === 'undefined') return;
-  let payload: string;
-  try { payload = exportSave(state); }
+  let file: SaveExport;
+  try { file = saveExport(state); }
   catch (error) {
     if (!failedIntervalProblem() && !pendingLeagueSaveProblem()) throw error;
-    bus.emit('ui:notify', {text: 'Could not read the saved interval for export.', kind: 'danger'});
+    bus.emit('ui:notify', {text: 'Could not verify the saved week and its match for export. The recovery data has been kept.', kind: 'danger'});
     return;
   }
-  const url = URL.createObjectURL(new Blob([payload], { type: 'application/json' }));
+  const url = URL.createObjectURL(new Blob([file.text], { type: 'application/json' }));
   const a = document.createElement('a');
   a.href = url;
-  a.download = exportFilename(state);
+  a.download = exportFilename(file.state);
   document.body.appendChild(a);
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-  if (held) bus.emit('ui:notify', { text: EXPORT_HELD_TEXT, kind: 'info' });
+  if (file.notice) bus.emit('ui:notify', { text: file.notice, kind: 'info' });
 }
 
 /** Browser: open a file picker and resolve with the chosen file's text (null if
