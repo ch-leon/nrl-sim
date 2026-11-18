@@ -147,8 +147,7 @@ describe('spending level points by hand', () => {
   it('on, weekly and match points bank for the coach, and the level still counts them', () => {
     const p = mkPlayer({ xp: PROGRESSION.XP_PER_LEVEL - 1 });
     const banked = trainWeek(p, [], 'strength', true);
-    expect(banked).toMatchObject({ level: 2, unspentPoints: PROGRESSION.POINTS_PER_LEVEL, stats: trainWeek(p, [], 'strength', true).stats });
-    expect(banked.stats.strength).toBe(50);
+    expect(banked).toMatchObject({ level: 2, unspentPoints: PROGRESSION.POINTS_PER_LEVEL, stats: p.stats });
     const squad = getState().squad.map(q => ({ ...q, age: 25, traits: [], xp: 90, level: 1, unspentPoints: 0 }));
     const own = teamSheetFromSquad(squad, 'player', 'XP', ['#000000', '#ffffff']);
     const result = { homeScore: 0, awayScore: 0, events: [] } as unknown as MatchResult;
@@ -181,8 +180,11 @@ describe('spending level points by hand', () => {
     setSpendPointsMyself(true);
     expect(validateCurrent(JSON.parse(JSON.stringify(getState()))).ok).toBe(true);
     expect(validateCurrent({ ...JSON.parse(JSON.stringify(getState())), settings: { ...getState().settings, spendPointsMyself: 'yes' } }).ok).toBe(false);
-    setSpendPointsMyself(false);
-    expect(validateCurrent(JSON.parse(JSON.stringify(getState()))).ok).toBe(true);
+    const { spendPointsMyself, ...without } = getState().settings;
+    expect(spendPointsMyself).toBe(true);
+    const old = validateCurrent({ ...JSON.parse(JSON.stringify(getState())), settings: without });
+    expect(old.ok).toBe(true);
+    expect(old.ok && old.state.settings.spendPointsMyself).toBeUndefined();
   });
 });
 
