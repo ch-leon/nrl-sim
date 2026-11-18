@@ -100,6 +100,60 @@ The separate test-harness fix [#721](https://github.com/ch-leon/nrl-sim/pull/721
 merged at `8c5e289e` after Claude approval and green CI/full QA. It is already
 integrated into this branch; it changes no game behavior.
 
+## Current integration work
+
+The reviewed entry checkpoint was recorded at `fb696cfe`. Main through
+`ac9647b0` is integrated at `82a1c449`; the only merge conflict was adjacent hub
+feature notes, both retained. That exact merged head passed all 4,792 tests
+(361 files), typecheck and production build, and is pushed to draft PR #719.
+Its CI run `44238894040` passed `check` and the screens, portrait and text
+browser shards. The match shard hit its 30-minute limit after about 20 minutes
+fetching WebKit dependencies; completed sections reported zero failures before
+cancellation. Its aggregate remains red; this does not satisfy final CI.
+Recovery handling and saved-season UI read models have separate owners.
+`3329c922` adds owner-bound interval recovery. Independent review found three
+required corrections: invalid same-installation cursors must quarantine,
+reentrant career replacement must stop all remaining result effects, and a failed
+settlement write must preserve its checkpoint/sidecar pair through later play.
+`e3bd42e5` resolves all three. Independent re-review passed 23 callback tests,
+including the original three failing probes and additional slot/namespace and
+exact-snapshot retry probes. Real playback and parked resume keep the exact
+kick-off fixture object; equivalent objects cannot settle a different hold.
+
+`7458ed15` adds the saved-season read model and League/HUD/board views. Review
+found that cancelled fixtures can omit their direct date; `30df6946` derives
+saved stage dates for display, labels genuinely undated rows and excludes
+cancelled/withdrawn games from current activity. A follow-up pending-fixture
+case is corrected at `33e0d869`, with actual AU/UK Week 5 regression tests.
+Isolated WebKit checks passed at 844×390 Normal and 568×320 Larger, including a
+44px All games control and a short-screen scrolling layout that keeps the full
+goal and all eight clubs reachable. This is component evidence, not normal
+production flow. Independent Stage A re-review passed on `33e0d869`: 24 committed tests and
+two additional regional probes, plus typecheck. The combined checkpoint is
+reviewed by Claude, which requires two P2 corrections before approval: recovery
+exports must retain their matching parked match and truthful checkpoint filename,
+and All games must label pending rows without marking pending-only groups as
+current. A P3 remaining-fixture count correction is also being addressed so
+pending regular games do not make the ladder or board prematurely final.
+The report is `/private/tmp/nrl-574-recovery-ui-review-33e0d869.md`.
+`e590ff04` corrects the pending labels/group marker and remaining-game counts;
+62 affected tests and typecheck passed, followed by an independent 20-test
+presentation run including four extra probes. `34c62e7b` corrects recovery export, retaining the matching parked match and
+checkpoint filename/notice, with source/destination guards. All 410 affected tests
+and typecheck passed. A supported unmarked DEV export imported into another slot
+and resumed the same fixture, seed, coaching call and tick 47. Independent spec re-review passed 45 tests (36 committed plus nine extra
+probes), production build passed, and Claude **RECOVERY AND LEAGUE VIEW REVIEW:
+APPROVE** passed on exact `34c62e7b`. Report:
+`/private/tmp/nrl-574-recovery-ui-review-34c62e7b.md`. Production activation and
+remaining finance/help/history/review/match presentation now proceed with
+separate owners; normal multi-season and browser evidence remains outstanding. Marked save import remains intentionally refused until activation;
+its complete export/import/resume proof belongs to that activation stage.
+Production build passed; the first full run passed
+4,834 of 4,835 tests, with the file-watcher control failing without native file-event
+access. The unchanged exact `33e0d869` rerun with native file-event access passed
+all 4,835 tests across 363 files. Normal bootstrap/admission and final browser/QA proof
+remain outstanding.
+
 ## Admission and persistence notes
 
 The shared `saveIfChanged` contract now refuses held/quarantined intervals,
@@ -114,26 +168,18 @@ a minimum attained tier; no missing past membership is fabricated.
 ## Resume here
 
 Follow [the implementation plan](../plans/2026-11-17-league-selection.md).
-The season-close correction is independently approved. Continue with exact entry
-previews and atomic initial/annual confirmation:
+The close and entry checkpoints are independently approved. Continue from the
+recovery/read-model checkpoint above:
 
-1. Clone saved league definitions, calendar and trial snapshots when scheduling;
-   the existing profile/content-based builders must not silently rebase a save
-   onto today's catalogue. Initial confirmation retains its original schedule.
-2. Bind the preview key to all relevant current state. Store bounded pre-annual
-   field/strength/rule/cap quotes separately from annual changes; require the new
-   receipt fields strictly. Intermediate manually constructed marked draft saves
-   remain unsupported, with originals preserved; do not convert old prototypes.
-3. Apply destination accounts, then expiry, aging, bounded youth, checked rival
-   population, tenure and target-calendar normalization once on a detached state.
-   Rival rollover already owns unsigned intake and returns its new RNG separately.
-   Preserve the coach's lineup via `resolveLineup`; preserve frozen source review.
-4. Validate all clubs' future cap legality, ownership, schedules and source books.
-   Require no `validateCurrent` repairs **and** no unreported returned-state changes.
-   Persist successfully before installing, clearing undo/sidecars or notifying.
-5. Add explicit fresh-game opt-in, canonical opening unsigned pool, reusable chooser
-   and truthful League/HUD/history read models. Keep ordinary Continue unchanged.
-6. Prove real AU/UK new-game, reload, held match and multiple annual transitions,
+1. Recovery/read-model review is complete at `34c62e7b`; preserve its invariants
+   while implementing activation.
+2. Add explicit fresh-game League opt-in, a canonical opening unsigned pool,
+   strict normal load/import admission and safe destination-bound persistence.
+3. Initialize the gated hub before presenting the reusable chooser. Support
+   initial/annual reload, closing and reopening the gate, and first-entry intro.
+4. Complete saved-season finance/help/history/review/match labels and an exact
+   current-close-bound Choose next league action.
+5. Prove real AU/UK new-game, reload, held match and multiple annual transitions,
    short landscape/Larger text, final CI/full QA and full Claude issue-level review
    before marking ready or merging.
 
@@ -149,12 +195,7 @@ Annual acceptance and the reusable chooser are implemented and independently app
 Production admission, normal-flow integration and multi-year browser proof remain
 outstanding.
 
-Before production activation, revisit the earlier optional close-review notes:
-exception paths in close/watched completion must not leave an async advance
-waiting forever. Read-only inspection confirms that close can throw after the
-last hold is removed, and watched-result processing can throw after deleting
-its recovery sidecar. The correction must bind failure to the original
-installation/interval, preserve stored recovery data and emit `week:blocked`
-once; stale callbacks must never quarantine a replacement career. Also, sacking takes precedence over the choice prompt; UI formatting
-should not repeatedly run full save validation. These were outside the narrow
-approved correction, not evidence that the production loop has been proved.
+The earlier optional exception-recovery notes led to the bounded recovery
+checkpoint above; its review must complete before production activation.
+Sacking takes precedence over the choice prompt, and UI formatting reads trusted
+installed state rather than repeatedly running full save validation.
