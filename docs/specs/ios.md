@@ -131,7 +131,9 @@ and lock screen only show while you are out of the app. So:
 - **Local version (free account).** While you are away the activity shows the frozen
   score and minute with "Paused, tap to return", and after full-time it shows the
   result for 15 minutes. This is honest but modest. Its real job is to prove the
-  extension, the bridge and the designs.
+  extension, the bridge and the designs. *As built (Phase 3, 18 Nov 2026):* no timed
+  end, per §6's "nothing timed". Full time stays on the activity until you leave the
+  match, and leaving (Back to club, Save & exit) ends it at once.
 - **Push version (paid account).** For the score to move while the phone is locked,
   the match has to keep going without you. The sim is deterministic and can already
   play a match to the end off screen in one go (it does this for Skip). So on leaving,
@@ -203,7 +205,7 @@ do not start it until Leon reopens it.
 | 0 | This spec | | Answered §6 on 18 Nov 2026 | Merged |
 | 1 | **iOS shell.** `@capacitor/ios`, `ios/`, `build:ios`, landscape and iPhone only, status and home bar, dev app id, icon and launch screen, the platform flag, `docs/ios-test-build.md` | Free | The five steps in §1 | The game runs full screen in landscape on Leon's iPhone from a cold start in airplane mode, with sound, and a career survives closing the app |
 | 2 | **Durable saves.** Native file mirror with restore at launch; export through the share sheet; import checked | Free | Play, delete nothing, confirm a save survives | A save comes back after web view storage is cleared; export and import work on the phone |
-| 3 | **Widget extension and bridge, with the local match ticker.** Extension target, shared data group, the plugin, lock screen and island layouts with a static ball icon | Free (unproven on device; Simulator otherwise) | Pick the team for the new target; leave a match mid-game and look at the lock screen | Start a match, leave the app: the score and "Paused" show; tap returns to the match; full-time shows the result, then clears |
+| 3 | **Widget extension and bridge, with the local match ticker.** Extension target, shared data group, the plugin, lock screen and island layouts with a static ball icon | Free (unproven on device; Simulator otherwise) | Pick the team for the new target; leave a match mid-game and look at the lock screen | Start a match, leave the app: the score and "Paused" show; tap returns to the match; full-time shows the result, then clears when you leave the match (not after 15 minutes: built 18 Nov 2026 with no timed end) |
 | 4 | **Captain poses.** Export script, pose per event, tight-space layout | Free | Look at it during a match | Try, tackle and full-time each change the icon |
 | 5 | **Club widgets.** Next fixture and injured star back, in rounds; points to spend once SuperCOOKED manual spending has shipped | Free | Add the widget to the lock screen | The widget is right after advancing a week and after a week away |
 | 6 | **Paid account switch.** Real app id, TestFlight upload steps in the test-build doc, Apple's privacy declarations file, the encryption question answered once in the project | **Paid** | Enrol (US$99) once Phase 3 works on the phone, create the app in App Store Connect, archive and upload from Xcode | A TestFlight build installs on a second phone |
