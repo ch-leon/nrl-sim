@@ -42,3 +42,42 @@ dormant-metadata cases as v25. They exercise supported legacy careers through
 the new migration; structural active/held/rollover saves have focused source
 regressions in `tests/systems/competitionCalendar.test.ts`. These are not phone
 playtest evidence, and no production competition entry is activated.
+
+## Format 32 League and Open Cup migration sources
+
+The seven files in `league-career/` are immutable headless captures from
+`8d7d9c5dbaaae3d06eb42018f48e18a0b461a159` with `SAVE_VERSION = 32`.
+Dedicated migration tests use these snapshots. The older generic soak corpus
+uses the JSON files at the top level.
+
+For AU and UK, run `npx vite-node scripts/qa-league-career.ts --seed 573 --seasons 1 --out <dir>`
+at that revision. `runLeagueCareerQA()` uses the production League constructor
+and entry confirmation, normal difficulty, and the registered systems with
+simulated match results. Copy `initial-gate` at the first entry choice,
+`season-1-accepted` just after accepting the starting league, and
+`season-1-closed` after the final interval and before accepting the next season.
+Both packs completed 25 intervals and 16 player matches, with four save/load
+round trips per pack across the one-season run.
+
+The developer capture uses AU seed 575, `DEV_TEST_PREFIX`, and
+`createNewGame('QA AU Open Cup', 575, { home: { town: 'Brisbane', country: 'AU' } })`.
+It enters via `setupStructuralDivisionCareer(AU_CAREER_PROFILE, 575, undefined,
+{ enterOpenCup: true })`, then uses `registerAllSystems()` and 19 calls to
+`advanceWeekAsTapped()`. The stored snapshot is from season 1, week 20, after
+23 played Open Cup ties and with 167 ordinary match-income records. The saved
+cup definition has empty rewards, and the career has no League marker.
+
+At capture, all seven passed baseline version 32 import, migration and slot load
+with zero repairs, equal parsed state and unchanged source bytes in storage.
+The marked snapshots also passed `leagueCareerStateProblem()`. The developer
+snapshot passed `structuralPolicyProblem()` in its isolated namespace.
+
+| File under `league-career/` | Bytes |
+| --- | ---: |
+| `v32-au-initial-choice.json` | 401,953 |
+| `v32-au-active.json` | 403,260 |
+| `v32-au-next-season-choice.json` | 548,814 |
+| `v32-uk-initial-choice.json` | 398,556 |
+| `v32-uk-active.json` | 399,850 |
+| `v32-uk-next-season-choice.json` | 543,561 |
+| `v32-dev-open-cup.json` | 517,522 |
