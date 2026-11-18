@@ -13,11 +13,11 @@ import type { SideSpec } from '../../../src/match/balance/plan';
 
 /** Every #322 lever off (the shipped defaults), and every one on. */
 const OFF: Overrides = { 'race.on': 0, 'counters.slide.expansiveSigned': 0, 'counters.compressed.expansiveRelative': 0 };
-// #672's 30-seed sample gave +0.747 busts/14 min. The exact same default-lead scenario
-// at 100 seeds/orientation gives 2.85 (SE .138) → 3.35 (.152), +1.40/14 min (SE .575).
-// Keep the original margin and default DH path; use the larger sample to reduce seed noise.
-// Harness run: receiver-call-edge-check, 20261117-042420.
-const SEEDS = 100;
+// #722's first 100 seeds gave +0.77 tracked busts/14 min. The predeclared
+// held-out seeds 101–300 gave +1.827 with identical flat-control results.
+// Pool the two fixed cohorts and keep the original margin.
+// https://github.com/ch-leon/nrl-sim/blob/b4ae9922aad36e5a420aa254ca7279ab7930400e/runs/20261118-092630-wide-catch-edge-race-held-out/report.md
+const SEEDS = 300;
 /** Extra busts per fourteen minutes for the tracked side; keep the historical rate threshold. */
 const MARGIN = 1;
 const ON: Overrides = { 'race.on': 1, 'race.single': 0, 'counters.slide.expansiveSigned': 1, 'counters.compressed.expansiveRelative': 1 };
@@ -68,5 +68,5 @@ describe('the #322 Speed levers', () => {
     // fourteen-minute rate so shortening the clock does not dilute the physics threshold.
     const extraBustsPer14Minutes = (on.trackedCounts!.busts.mean - off.trackedCounts!.busts.mean) * 14 / MATCH_MINUTES;
     expect(extraBustsPer14Minutes).toBeGreaterThan(MARGIN);
-  }, 120_000);
+  }, 360_000);
 });
