@@ -6,7 +6,7 @@ the lock screen. This spec says what to build, in what order, what each step cos
 and what Leon has to do by hand.
 
 - **GitHub:** [#335](https://github.com/ch-leon/nrl-sim/issues/335) (iOS and Android apps), [#89](https://github.com/ch-leon/nrl-sim/issues/89) (app store builds with Capacitor)
-- **Status:** plan only, written 18 Nov 2026. This is a documentation change. Nothing here is built, and each phase in §4 ships as its own PR.
+- **Status:** plan only, written 18 Nov 2026. This is a documentation change. Nothing here is built, and each phase in §4 ships as its own PR. Leon answered the questions in §6 the same day; Phase 8 (the push ticker) is parked.
 - **Depends on:** the SuperCOOKED UI rework ([ui-supercooked.md](ui-supercooked.md); Phase 0 is open as [#724](https://github.com/ch-leon/nrl-sim/pull/724)).
 - **Checked against:** Apple, Capacitor and RevenueCat docs on 18 Nov 2026 (iOS 27, Xcode 27, Capacitor 8.6). Anything we could not confirm is marked **unproven** and listed in [Still unproven](#still-unproven).
 
@@ -20,7 +20,7 @@ and what Leon has to do by hand.
   1. A match stops when the app is hidden. So a lock-screen ticker has nothing to show unless we change that, and keeping it moving while the phone is locked needs push, which needs the paid account and a small server.
   2. Nothing in the game runs on real time. The season moves when you tap Advance, fixtures have a round number and no date, and there is no transfer window. A real-time countdown would have to invent a wait timer, which the brief rules out.
   3. Training points are spent automatically today. "Points ready to spend" only exists once SuperCOOKED's manual spending ships.
-- **Recommendation:** build the match ticker as the Live Activity, and build the countdowns and "points to spend" as Lock Screen widgets that count in game rounds. Same Swift extension, no push, no paid account. See §3.
+- **The plan (agreed 18 Nov 2026):** build the match ticker as the Live Activity, updated by the app itself, and build the countdowns and "points to spend" as Lock Screen widgets that count in game rounds. Same Swift extension, no push, no paid account. See §3. A ticker that moves while the phone is locked is parked.
 
 ## 1. The iOS shell
 
@@ -48,7 +48,7 @@ No game code changes for layout: the game already draws edge to edge and reads t
 | Purchases | Fake purchases only: RevenueCat's Test Store, in debug builds (unproven on a phone; the Simulator otherwise) | Real sandbox and live purchases, after the App Store Connect paperwork (§2) |
 | iCloud, Game Center, Sign in with Apple | No | Yes |
 
-Use a separate app id while on the free account, for example
+Use a separate app id while on the free account,
 `au.com.supercooked.bigrugbycoach.dev`, and keep the real id
 (`au.com.supercooked.bigrugbycoach`, decided 4 Nov 2026 in `docs/hub/marketing.md`)
 for the paid account. Changing the id later makes a new app, so saves do not carry
@@ -72,7 +72,7 @@ phone (sound, the notch, Live Activities on the lock screen) is Leon's check.
 
 | Area | Today | On iPhone | What we do |
 | --- | --- | --- | --- |
-| **Landscape** | A rotate card blocks portrait on phones (`src/ui/orientation.ts`); Android is locked in its manifest. | A web page cannot lock rotation on iOS; the app can. | Remove Portrait from the app's supported orientations. The rotate card then never shows. Ship iPhone only (the template includes iPad; see §6 Q6). |
+| **Landscape** | A rotate card blocks portrait on phones (`src/ui/orientation.ts`); Android is locked in its manifest. | A web page cannot lock rotation on iOS; the app can. | Remove Portrait from the app's supported orientations. The rotate card then never shows. Ship iPhone only (the template includes iPad; §6 Q6). |
 | **Notch, Dynamic Island, home bar** | `viewport-fit=cover`, and nearly all UI reads `--nrl-safe-t/r/b/l` (`src/ui/dom.ts`). Android needs a Capacitor setting for this. | iOS supplies the insets itself; the Android setting does nothing there. In landscape expect insets on one or both sides and a strip at the bottom for the home bar. Exact numbers: measure on the phone. | Nothing new in principle. Check every SuperCOOKED phase in the Simulator on a Dynamic Island phone: its mockups are full-bleed 844x390 and the spec does not mention safe areas. Switch the few places that read the insets directly (`expansionIntro.ts`) to the shared variables. |
 | **Home bar and edge swipes** | Not relevant on Android (bars hidden). | The home bar sits over the bottom of the screen, where the match's bottom bar is, and a swipe up leaves the app. | In the app's native screen code: ask iOS to dim the home bar and to hold back the swipe-up at the bottom edge. Small Swift change. |
 | **Web view quirks** | Already handled for Safari: no text selection or long-press callout, no pinch zoom, inputs at 16px, touch targets 44px. | Same engine, so these carry over. Two differences: the page can rubber-band (turn scrolling off in the Capacitor config), and drawing is capped at 60 frames a second even on 120Hz phones (fine: the sim steps at 20Hz). | Config change plus a test pass. Do not show the "Add to Home Screen" hint in the app. |
@@ -89,8 +89,7 @@ phase lands. Three things to hold to: every new screen keeps using the safe-area
 variables; the app name, icon and launch colour come from the brand config; and the
 lock-screen designs in §3 use SuperCOOKED's colours and fonts (the fonts must be
 copied into the widget extension, and its colours pinned to the tokens by a test).
-No build goes to other people until the SuperCOOKED phases Leon names have landed
-(§6 Q10).
+No build goes to other people until SuperCOOKED Phases 0 to 5 have landed (§6 Q10).
 
 ## 3. Live Activities and the Dynamic Island
 
@@ -140,8 +139,8 @@ and lock screen only show while you are out of the app. So:
   server, and the server would push each moment at the right time. A match is two 2:30
   halves and runs a few minutes of real time (not yet measured), so this is a short
   burst of perhaps 10 to 20 updates. It is a product change, not just plumbing:
-  leaving the app would mean handing the match to the assistant coach. That is Leon's
-  call (§6 Q2), and it gets its own spec.
+  leaving the app would mean handing the match to the assistant coach. **Parked** by
+  Leon on 18 Nov 2026 (§6 Q2). If he reopens it, it gets its own spec first.
 
 ### (b) Countdowns to natural events
 
@@ -151,7 +150,7 @@ star returning, with no artificial wait timers. Against the game as it is:
 | Event | In the game today |
 | --- | --- |
 | Next kickoff | The next fixture is known (round, opponent, home or away). It has no date or time. |
-| Transfer window closing | Does not exist. There is no window in the recruit system. |
+| Transfer window closing | Does not exist. There is no window in the recruit system. Dropped (§6 Q4). |
 | Injured star returning | Exists as a count of weeks out per player. |
 
 None of these is tied to the real clock, so a real-time countdown would be a wait
@@ -163,8 +162,9 @@ small snapshot the app writes whenever the week advances, needs no push and no p
 account, and never goes out of date while the app is closed. The trade-off: the
 player has to add a widget themselves; a Live Activity appears on its own.
 
-If the game ever gains real-clock events, a countdown Live Activity is cheap: one
-local start, and the timer text ticks by itself with no updates, for up to 8 hours.
+Real-clock countdowns are parked (§6). For the record, if Leon reopens them a
+countdown Live Activity is cheap: one local start, and the timer text ticks by itself
+with no updates, for up to 8 hours.
 
 ### (c) Training points ready to spend
 
@@ -180,7 +180,7 @@ The fit is the same widget as (b): "3 points to spend", tapping through to the s
 - **Changing pose.** Each update names a pose; iOS cross-fades or slides to the new image. No run cycle, no frame animation. A pose stays until the next update, so "try" holds until the next event arrives.
 - **Which captain.** First version: a generic player in brand colours, images built into the extension. Later: the app draws the save's real captain in the club's kit and passes the images to the extension through the shared container (unproven for Live Activity images, check in Phase 4).
 - **Tight spaces.** On reduced-width layouts (the phone in landscape, the folding iPhone, two activities on an iPhone 18 Pro) we get a 28-point circle: icon only, no score.
-- **Alerts.** Default: only full-time alerts (lights the screen). Tries update silently (§6 Q9).
+- **Alerts.** Only full-time alerts (lights the screen). Tries update silently (§6 Q9).
 
 ### The bridge
 
@@ -195,19 +195,20 @@ and Android builds get a no-op.
 
 ## 4. Build order
 
-One PR per phase. Phases 1 to 5 need only the free Apple ID.
+One PR per phase. Phases 1 to 5 need only the free Apple ID. Phase 8 is parked (§6 Q2):
+do not start it until Leon reopens it.
 
 | # | PR | Needs | Leon by hand | Done when |
 | --- | --- | --- | --- | --- |
-| 0 | This spec | | Answer §6 | Merged |
+| 0 | This spec | | Answered §6 on 18 Nov 2026 | Merged |
 | 1 | **iOS shell.** `@capacitor/ios`, `ios/`, `build:ios`, landscape and iPhone only, status and home bar, dev app id, icon and launch screen, the platform flag, `docs/ios-test-build.md` | Free | The five steps in §1 | The game runs full screen in landscape on Leon's iPhone from a cold start in airplane mode, with sound, and a career survives closing the app |
 | 2 | **Durable saves.** Native file mirror with restore at launch; export through the share sheet; import checked | Free | Play, delete nothing, confirm a save survives | A save comes back after web view storage is cleared; export and import work on the phone |
 | 3 | **Widget extension and bridge, with the local match ticker.** Extension target, shared data group, the plugin, lock screen and island layouts with a static ball icon | Free (unproven on device; Simulator otherwise) | Pick the team for the new target; leave a match mid-game and look at the lock screen | Start a match, leave the app: the score and "Paused" show; tap returns to the match; full-time shows the result, then clears |
 | 4 | **Captain poses.** Export script, pose per event, tight-space layout | Free | Look at it during a match | Try, tackle and full-time each change the icon |
 | 5 | **Club widgets.** Next fixture and injured star back, in rounds; points to spend once SuperCOOKED manual spending has shipped | Free | Add the widget to the lock screen | The widget is right after advancing a week and after a week away |
-| 6 | **Paid account switch.** Real app id, TestFlight upload steps in the test-build doc, Apple's privacy declarations file, the encryption question answered once in the project | **Paid** | Enrol (US$99), create the app in App Store Connect, archive and upload from Xcode | A TestFlight build installs on a second phone |
+| 6 | **Paid account switch.** Real app id, TestFlight upload steps in the test-build doc, Apple's privacy declarations file, the encryption question answered once in the project | **Paid** | Enrol (US$99) once Phase 3 works on the phone, create the app in App Store Connect, archive and upload from Xcode | A TestFlight build installs on a second phone |
 | 7 | **Purchases.** RevenueCat SDK behind the existing placeholder, Restore button. The code can start earlier against the Test Store in the Simulator. | **Paid** for real purchases | Agreements, tax and banking; create the unlock product; add the purchase key to RevenueCat | A sandbox purchase unlocks the full game and survives reinstall through Restore |
-| 8 | **Push ticker.** Own spec first: play-on while away, the server, the push key | **Paid**, a server | Create the push key; decide Q2 | Lock the phone at kickoff; the score moves on the lock screen and ends at full-time |
+| 8 | **Push ticker. Parked.** Own spec first: play-on while away, the server, the push key | **Paid**, a server | Reopen Q2; create the push key | Lock the phone at kickoff; the score moves on the lock screen and ends at full-time |
 | 9 | **App Store submission.** Screenshots (landscape; one iPhone size, plus the folding iPhone if submitted from April 2027), privacy answers, age rating, review | **Paid** | Fill in the listing, submit | Approved |
 
 Phases 2 and 3 are independent and can swap. Bugs Leon finds on the phone are batched
@@ -242,21 +243,27 @@ reaches iPhone players only through a new build and review.
 **If the push ticker ships:** a small server and a push key to keep alive and watch.
 The cost is close to nothing at this scale, but it is a running service.
 
-## 6. Open questions for Leon
+## 6. Questions for Leon
 
-| # | Question | Phase | Default if no answer |
+Answered by Leon on 18 Nov 2026 (on the PR that added this spec).
+
+| # | Question | Phase | Decided |
 | --- | --- | --- | --- |
-| 1 | App id and name: confirm `au.com.supercooked.bigrugbycoach` and "Big Coach" for iPhone, with a `.dev` id while on the free account? | 1 | Yes to both |
-| 2 | Should a match keep playing on auto-coach when you lock the phone, so the ticker has something to show? Without it the lock screen only ever shows a paused match. | 8 | No change: the match pauses, and Phase 8 waits |
-| 3 | Countdowns and "points to spend" as Lock Screen widgets counting game rounds, not Live Activities on real time? | 5 | Yes, widgets |
-| 4 | There is no transfer window in the game. Drop that countdown, or is a window planned? | 5 | Drop it |
-| 5 | When do you want to pay the US$99? Nothing before Phase 6 needs it. | 6 | After Phase 3 works on your phone |
-| 6 | iPhone only, or iPad as well? iPad adds layout work and its own screenshots. | 1 | iPhone only |
-| 7 | Minimum iOS 16.2 (needed for Live Activities; iPhone 8 and newer)? | 1 | Yes |
-| 8 | Game sound follows the ring/silent switch, and other apps' music keeps playing? | 1 | Yes |
-| 9 | Should a try light up the lock screen, or only full-time? | 3 | Only full-time |
-| 10 | Which SuperCOOKED phases must land before a build goes to anyone else? | 6 | Phases 0 to 5 (every screen with a mockup) |
-| 11 | Captain icon: generic player in brand colours first, the real captain in club kit later? | 4 | Yes |
+| 1 | App id and name for iPhone? | 1 | **Decided:** `au.com.supercooked.bigrugbycoach` and "Big Coach", with a `.dev` id while on the free account |
+| 2 | Should a match keep playing on auto-coach when you lock the phone, so the ticker has something to show? | 8 | **Parked.** Leon does not mind the idea but it needs more thought. Phase 8 waits until he reopens it. |
+| 3 | Countdowns and "points to spend" as Lock Screen widgets counting game rounds, not Live Activities on real time? | 5 | **Decided:** yes, widgets |
+| 4 | There is no transfer window in the game. Drop that countdown? | 5 | **Decided:** dropped |
+| 5 | When to pay the US$99? | 6 | **Decided:** after Phase 3 works on Leon's phone |
+| 6 | iPhone only, or iPad as well? | 1 | **Decided:** iPhone only |
+| 7 | Minimum iOS 16.2 (needed for Live Activities; iPhone 8 and newer)? | 1 | **Decided:** yes |
+| 8 | Game sound follows the ring/silent switch, and other apps' music keeps playing? | 1 | **Decided:** yes (the music part is still to prove on the phone) |
+| 9 | Should a try light up the lock screen, or only full-time? | 3 | **Decided:** only full-time |
+| 10 | Which SuperCOOKED phases must land before a build goes to anyone else? | 6 | **Decided:** Phases 0 to 5 |
+| 11 | Captain icon: generic player in brand colours first, the real captain in club kit later? | 4 | **Decided:** yes |
+
+**Parked for now:** anything timed or built on a real-time wait. That covers real-clock
+countdowns, wait timers, and the match continuing while you are away. Do not build
+these until Leon reopens them.
 
 ## Still unproven
 
