@@ -10,6 +10,7 @@
 // so an event or a property not listed here never leaves the page.
 
 import type { Difficulty } from '../config';
+import { APP_PLATFORMS, type AppPlatform } from '../platform';
 
 /** The dock's five tabs, by what the player reads on them (nav.ts's ids map onto these). */
 export const DOCK_TABS = ['club', 'squad', 'league', 'build', 'office'] as const;
@@ -34,7 +35,7 @@ export type EventName = keyof EventProps;
 /** Context on every event: which build sent it and from where. No device or person id. */
 export interface EventContext {
   app_build: string;
-  platform: 'web' | 'android';
+  platform: AppPlatform;
 }
 
 type Check = (v: unknown) => boolean;
@@ -58,7 +59,7 @@ const SCHEMA: { [K in EventName]: { [P in keyof EventProps[K]]-?: Check } } = {
 
 const CONTEXT: { [P in keyof EventContext]-?: Check } = {
   app_build: (v) => typeof v === 'string' && /^[0-9a-z -]{1,32}$/.test(v),
-  platform: oneOf('web', 'android'),
+  platform: oneOf(...APP_PLATFORMS),
 };
 
 export const EVENT_NAMES = Object.keys(SCHEMA) as EventName[];
