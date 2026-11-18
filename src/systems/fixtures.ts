@@ -697,11 +697,11 @@ export function registerFixturesSystem(): void {
         const playLocally = (error: unknown): void => {
           if (!release.current()) return;
           console.error('rival round failed to land; playing it on the main thread', error);
-          land(jobs.map(playRivalJob));
+          release.applyResult(() => land(jobs.map(playRivalJob)));
         };
         const worker = playRivalJobsInWorker(jobs);
         if (release.fail) {
-          void worker.then(results => { if (release.current()) land(results); }, playLocally)
+          void worker.then(results => release.applyResult(() => land(results)), playLocally)
             .catch(release.fail).finally(release);
         } else {
           void worker.then(results => { if (release.current()) land(results); }).catch(error => {

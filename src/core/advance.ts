@@ -13,6 +13,7 @@
 // last (commercial flag on only); the demo's end has its own event, not the toast.
 
 import { bus } from './events';
+import { pendingLeagueSaveProblem, retryPendingLeagueSave } from './save';
 import { getState, stateInstallation, type GameState } from './state';
 import { advanceWeek, failedIntervalProblem, weekHeld, withFastForward } from './time';
 import { isPlayableLeagueCareer, structuralAdvanceProblem } from '../systems/competitionCalendar';
@@ -81,7 +82,7 @@ function newCards(before: GameState, after: GameState): string[] {
  */
 export async function advanceUntil(target: AdvanceTarget, frame: () => Promise<void> = nextFrame): Promise<AdvanceRun> {
   const state = getState();
-  const failed = failedIntervalProblem();
+  const failed = failedIntervalProblem() ?? retryPendingLeagueSave();
   if (failed) return { weeksPlayed: 0, stop: { kind: 'stopped', text: failed } };
   if (state.sacked) return { weeksPlayed: 0, stop: { kind: 'target', text: 'The board has sacked you.' } };
   const blocked = structuralAdvanceProblem(state);
@@ -114,6 +115,7 @@ export async function advanceUntil(target: AdvanceTarget, frame: () => Promise<v
       bus.emit('state:changed', getState());
     }
   }
+  if (state.competitions?.leagueCareer && installation !== stateInstallation()) return run;
   if (run.stop.kind === 'target') {
     bus.emit('ui:notify', { text: `Advanced ${targetLabel(target)}.`, kind: 'info' });
   } else if (run.stop.kind === 'demo') {
@@ -157,7 +159,7 @@ async function runUntil(target: AdvanceTarget, frame: () => Promise<void>): Prom
       }
       const before = getState();
       if (installation !== stateInstallation()) return {weeksPlayed, stop: {kind: 'stopped', text: 'The career changed during advance.'}};
-      const unavailable = failedIntervalProblem() ?? structuralAdvanceProblem(before);
+      const unavailable = failedIntervalProblem() ?? retryPendingLeagueSave() ?? structuralAdvanceProblem(before);
       if (unavailable) return { weeksPlayed, stop: { kind: choiceRequired(before) ? 'choice-required' : 'stopped', text: unavailable } };
       // The demo ends here: stop before the week, not inside it (#362).
       if (demoBlocked(before)) return { weeksPlayed, stop: { kind: 'demo', text: DEMO_ENDED_TEXT } };
@@ -188,6 +190,8 @@ async function runUntil(target: AdvanceTarget, frame: () => Promise<void>): Prom
       const failure = failedIntervalProblem();
       if (failure) return {weeksPlayed, stop: {kind:'stopped',text:failure}};
       weeksPlayed++;
+      const pending = pendingLeagueSaveProblem();
+      if (pending) return {weeksPlayed, stop: {kind: 'stopped', text:pending}};
 
       const after = getState();
       if (after.sacked) return { weeksPlayed, stop: { kind: 'target', text: 'The board has sacked you.' } };

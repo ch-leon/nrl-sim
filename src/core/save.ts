@@ -21,7 +21,7 @@ import { fixtureBridge, hasStructuralCalendar, recoverUnfinishableCompetitions, 
 
 import type { Fixture, GameState } from './state';
 import { validateInput, validateCurrent, REPAIR_NOTICE, type SaveRepair } from './saveValidation';
-import { emptyFinance, getState, SAVE_VERSION, setState } from './state';
+import { emptyFinance, getState, SAVE_VERSION, setState, stateInstallation } from './state';
 import { fromLegacy, isTraitId, type TraitInstance } from '../data/traits';
 import { withRivalSquads } from '../systems/rivals';
 import { autoPick } from '../systems/lineup';
@@ -67,6 +67,7 @@ function approveOriginal(store: LocalSaveStore, slot: number, raw: string, prese
 export function __setStorage(s: StorageLike | null): void {
   injectedStorage = s;
   approvedOriginals = new WeakMap();
+  pendingLeagueSave = undefined;
   slotImported = false; // a fresh storage is a fresh page
 }
 
@@ -559,6 +560,43 @@ export function __unlockSaves(): void {
   savesLocked = false;
 }
 
+const PENDING_LEAGUE_SAVE = 'The completed week could not be saved. Retry saving or reload the last saved match.';
+interface PendingLeagueSave {
+  state: GameState;
+  installation: number;
+  slot: number;
+  namespace: string | null;
+  saving: boolean;
+  retireMatch: () => void;
+}
+let pendingLeagueSave: PendingLeagueSave | undefined;
+
+function currentPendingSave(): PendingLeagueSave | undefined {
+  if (pendingLeagueSave && pendingLeagueSave.installation !== stateInstallation()) pendingLeagueSave = undefined;
+  return pendingLeagueSave;
+}
+
+function sameDestination(pending: PendingLeagueSave): boolean {
+  return activeSlot === pending.slot && careerNamespace() === pending.namespace;
+}
+
+export function pendingLeagueSaveProblem(): string | null {
+  return currentPendingSave() ? PENDING_LEAGUE_SAVE : null;
+}
+
+/** The sidecar belongs to the saved kick-off until the exact settled snapshot
+ * is durable. Retry that snapshot before advancing or saving a later edit. */
+export function saveSettledLeagueMatch(state: GameState, retireMatch: () => void): boolean {
+  pendingLeagueSave = {state, installation: stateInstallation(), slot: activeSlot, namespace: careerNamespace(), saving: false, retireMatch};
+  return saveIfChanged(state);
+}
+
+export function retryPendingLeagueSave(): string | null {
+  const pending = currentPendingSave();
+  if (!pending) return null;
+  return saveIfChanged(pending.state) && stateInstallation() === pending.installation ? null : PENDING_LEAGUE_SAVE;
+}
+
 /**
  * Save the game being played unless the active slot already holds exactly these
  * bytes, so a career with nothing new to save is not written at all (#519: going
@@ -567,6 +605,22 @@ export function __unlockSaves(): void {
  */
 export function saveIfChanged(state: GameState): boolean {
   if (weekHeld() || leagueIntervalSaveHeld() || failedIntervalProblem() || slotImported || savesLocked) return false;
+  const pending = currentPendingSave();
+  if (pending) {
+    if (pending.saving || !sameDestination(pending)) return false;
+    pending.saving = true;
+    try {
+      if (!persistIfChanged(pending.state) || currentPendingSave() !== pending || !sameDestination(pending)) return false;
+      lastSaved = pending.state;
+      pendingLeagueSave = undefined;
+      pending.retireMatch();
+      if (pending.state === state) return true;
+    } finally { pending.saving = false; }
+  }
+  return persistIfChanged(state);
+}
+
+function persistIfChanged(state: GameState): boolean {
   const store = getStore();
   if (!store) return false;
   try {
@@ -587,6 +641,7 @@ export function saveIfChanged(state: GameState): boolean {
  */
 export function save(state: GameState): void {
   if (weekHeld() || leagueIntervalSaveHeld() || failedIntervalProblem() || slotImported || savesLocked) return;
+  if (currentPendingSave()) { saveIfChanged(state); return; }
   if (writeSlot(activeSlot, state)) lastSaved = state;
 }
 
@@ -745,7 +800,9 @@ function heldWeekSnapshot(): GameState | null {
  * caller (downloadSave) refuses; this falls back to `state` only then.
  */
 export function exportSave(state: GameState): string {
-  if (failedIntervalProblem()) {
+  const pending = currentPendingSave();
+  if (pending && !sameDestination(pending)) throw new Error(PENDING_LEAGUE_SAVE);
+  if (pending || failedIntervalProblem()) {
     const original = exportOriginalSave(activeSlot);
     if (original === null) throw new Error('The saved interval is unavailable for export.');
     return original;
@@ -876,7 +933,7 @@ export function downloadSave(state: GameState): void {
   let payload: string;
   try { payload = exportSave(state); }
   catch (error) {
-    if (!failedIntervalProblem()) throw error;
+    if (!failedIntervalProblem() && !pendingLeagueSaveProblem()) throw error;
     bus.emit('ui:notify', {text: 'Could not read the saved interval for export.', kind: 'danger'});
     return;
   }

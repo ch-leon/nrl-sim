@@ -16,7 +16,7 @@ import { inTrials } from './season';
 import { demoStops } from '../commercial/demo';
 import { hasStructuralCalendar, isPlayableLeagueCareer, settleStructuralCalendar, structuralAdvanceProblem, structuralSeasonResolved } from '../systems/competitionCalendar';
 import { closeLeagueSeason } from '../systems/leagueCareer';
-import { saveIfChanged } from './save';
+import { saveIfChanged, saveSettledLeagueMatch, retryPendingLeagueSave } from './save';
 
 // ── Public hook contracts ──────────────────────────────────────────────────
 
@@ -25,6 +25,7 @@ export type TickHook = (ctx: TickContext) => void;
 export interface WeekRelease {
   (afterSaved?: () => void): void;
   current(): boolean;
+  applyResult(work: () => void): void;
   /** Only marked intervals quarantine partially applied work. A retired token is a no-op. */
   fail?: (error: unknown) => void;
 }
@@ -184,7 +185,7 @@ function failLeagueInterval(interval: LeagueInterval, reason: string, error?: un
 function runIntervalWork(interval: LeagueInterval | undefined, work: () => void): void {
   if (!interval) { work(); return; }
   if (!ownsInterval(interval)) return;
-  try { work(); }
+  try { bus.runLeagueWork(() => interval.installation === stateInstallation(), work); }
   catch (error) { failLeagueInterval(interval, INVALID_SETTLED_INTERVAL, error); }
 }
 
@@ -200,6 +201,7 @@ function runIntervalWork(interval: LeagueInterval | undefined, work: () => void)
  *    subscribers read fully-settled state.
  */
 export function advanceWeek(): void {
+  if (retryPendingLeagueSave()) return;
   if (getState().sacked) return; // game over (#47): the save stays, time stops
   if (failedIntervalProblem()) return;
   if (weekHeld() || (leagueInterval && ownsInterval(leagueInterval))) return;
@@ -214,10 +216,14 @@ export function advanceWeek(): void {
   const tokens = new Set<WeekRelease>();
   const identity = {};
   function hold(): WeekRelease {
-    const sameHold = (): boolean => held?.identity === identity && tokens.has(release) && stateInstallation() === installation
-      && getState().season === season && getState().week === week;
+    const ownsToken = (): boolean => held?.identity === identity && tokens.has(release) && stateInstallation() === installation;
+    const sameCursor = (): boolean => getState().season === season && getState().week === week;
     const release: WeekRelease = Object.assign((afterSaved?: () => void) => {
-      if (!sameHold()) return;
+      if (!ownsToken()) return;
+      if (!sameCursor()) {
+        if (interval) failLeagueInterval(interval, INVALID_SETTLED_INTERVAL);
+        return;
+      }
       runIntervalWork(interval, () => {
         const problem = structuralAdvanceProblem(getState());
         if (problem) {
@@ -237,9 +243,14 @@ export function advanceWeek(): void {
         if (!interval || ownsInterval(interval)) finishWeek(week, interval);
       });
     }, {
-      current: () => sameHold() && !structuralAdvanceProblem(getState()),
+      current: () => ownsToken() && sameCursor() && !structuralAdvanceProblem(getState()),
+      applyResult: (work: () => void) => {
+        if (!release.current()) return;
+        if (interval) bus.runLeagueWork(() => ownsToken() && sameCursor(), work);
+        else work();
+      },
       ...(interval ? {fail: (error: unknown) => {
-        if (sameHold()) failLeagueInterval(interval, INVALID_SETTLED_INTERVAL, error);
+        if (ownsToken()) failLeagueInterval(interval, INVALID_SETTLED_INTERVAL, error);
       }} : {}),
     });
     tokens.add(release);
@@ -326,7 +337,8 @@ function finishLeagueInterval(interval: LeagueInterval, settled: GameState): voi
   const current = (): boolean => ownsInterval(interval);
   if (final || interval.afterSaved) {
     try {
-      if (saveIfChanged(getState()) && current()) interval.afterSaved?.();
+      if (interval.afterSaved) saveSettledLeagueMatch(getState(), interval.afterSaved);
+      else saveIfChanged(getState());
     } catch (error) {
       console.error('nrl-sim: could not persist the settled League interval', error);
     }
@@ -434,10 +446,10 @@ function readSeasonOutcome(): { ladderPosition: number; premiership: boolean } {
  * The flag is restored in finally so a thrown hook never leaves it stuck.
  */
 export function advanceWeeks(n: number): void {
-  if (n <= 0 || structuralAdvanceProblem(getState())) return;
+  if (n <= 0 || retryPendingLeagueSave() || structuralAdvanceProblem(getState())) return;
   withFastForward(() => {
     for (let i = 0; i < n; i++) {
-      if (failedIntervalProblem() || structuralAdvanceProblem(getState()) || getState().sacked || weekHeld()) return;
+      if (retryPendingLeagueSave() || failedIntervalProblem() || structuralAdvanceProblem(getState()) || getState().sacked || weekHeld()) return;
       if (demoStops()) return; // once, not once per week left (#362)
       advanceWeek();
     }

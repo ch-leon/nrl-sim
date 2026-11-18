@@ -3,9 +3,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createLegacyGame } from '../helpers/legacyGame';
 import { createNewGame, getState, setState, loadState } from '../../src/core/state';
 import { advanceUntil } from '../../src/core/advance';
-import { advanceWeek, clearHeldWeek, clearSeasonHooks, clearTickHooks, failedIntervalProblem, weekHeld, withFastForward } from '../../src/core/time';
-import { initLeague, registerFixturesSystem } from '../../src/systems/fixtures';
-import { forfeitResult, playerMatchPending, registerPlayerMatchSystem } from '../../src/systems/matchday';
+import { advanceWeek, advanceWeeks, clearHeldWeek, clearSeasonHooks, clearTickHooks, failedIntervalProblem, weekHeld, withFastForward } from '../../src/core/time';
+import { getCurrentFixture, initLeague, registerFixturesSystem } from '../../src/systems/fixtures';
+import { forfeitResult, playerMatchPending, registerPlayerMatchSystem, resumePlayerMatch } from '../../src/systems/matchday';
 import * as rivalRound from '../../src/systems/rivalRound';
 import * as jobs from '../../src/systems/matchJobs';
 import type { MatchResult } from '../../src/sim/events';
@@ -15,7 +15,7 @@ import { DEV_TEST_PREFIX, liveMatchKey, slotKey } from '../../src/core/storageKe
 import { setupStructuralDivisionCareer } from '../../src/systems/divisionCareer';
 import { AU_CAREER_PROFILE } from '../../src/content/career/au';
 import { leagueEntryReceiptId } from '../../src/data/leagueCareer';
-import { __setStorage, __unlockSaves, saveIfChanged, exportSave } from '../../src/core/save';
+import { __setStorage, __unlockSaves, saveIfChanged, exportSave, enableAutosave, pendingLeagueSaveProblem } from '../../src/core/save';
 
 afterEach(() => {vi.restoreAllMocks();vi.unstubAllGlobals();clearHeldWeek();clearTickHooks();clearSeasonHooks();bus.clear();setCareerNamespace(null);__setStorage(null);});
 function startLeagueMatch() {
@@ -64,6 +64,215 @@ describe('async result ownership across fresh careers', () => {
     advanceWeek();expect(saveIfChanged(getState())).toBe(false);bus.emit('match:finished',{fixture:started!.fixture,result});
     expect(getState()).toBe(invalid);expect(blocked).toHaveBeenCalledTimes(1);expect(bytes.get(DEV_TEST_PREFIX+liveMatchKey(1))).toBe(sidecar);
   });
+  it('only the kick-off fixture completes a resumed League match and delivers its committed and full-time events', () => {
+    startLeagueMatch();
+    const earlier = getCurrentFixture(getState(), getState().clubId)!;
+    const started: Events['match:started'][] = [];
+    bus.on('match:started', value => { started.push(value); });
+    const report = vi.fn();
+    bus.on('match:committed', report);
+    registerPlayerMatchSystem();
+    registerFixturesSystem();
+    advanceWeek();
+    const kickoff = started[0]!.fixture;
+    expect(earlier).toEqual(kickoff);
+    expect(earlier).not.toBe(kickoff);
+    const held = getState();
+    for (const equivalent of [earlier, structuredClone(kickoff)]) {
+      bus.emit('match:finished', {fixture:equivalent, result:matchResult()});
+      expect(getState()).toBe(held);
+      expect(playerMatchPending()).toBe(true);
+      expect(report).not.toHaveBeenCalled();
+    }
+    expect(resumePlayerMatch()).toBe(true);
+    expect(started[1]!.fixture).toBe(kickoff);
+    const fullTime = vi.fn();
+    bus.on('match:finished', event => fullTime(event.fixture, getState().week));
+    const result = matchResult();
+    bus.emit('match:finished', {fixture:started[1]!.fixture, result});
+    expect(report).toHaveBeenCalledOnce();
+    expect(report).toHaveBeenCalledWith({fixture:kickoff, result});
+    expect(fullTime).toHaveBeenCalledOnce();
+    expect(fullTime).toHaveBeenCalledWith(kickoff, 2);
+    expect(weekHeld()).toBe(false);
+  });
+
+  it('an old exact fixture and its clone cannot complete a new same-seed League match', () => {
+    startLeagueMatch();
+    const source = structuredClone(getState());
+    const started: Events['match:started'][] = [];
+    bus.on('match:started', value => { started.push(value); });
+    const report = vi.fn();
+    bus.on('match:committed', report);
+    registerPlayerMatchSystem();
+    advanceWeek();
+    const old = started[0]!.fixture;
+    loadState(source);
+    advanceWeek();
+    expect(started[1]!.fixture).toEqual(old);
+    expect(started[1]!.fixture).not.toBe(old);
+    const replacement = getState();
+    for (const fixture of [old, structuredClone(old)]) {
+      bus.emit('match:finished', {fixture, result:matchResult()});
+      expect(getState()).toBe(replacement);
+      expect(playerMatchPending()).toBe(true);
+    }
+    expect(report).not.toHaveBeenCalled();
+    expect(failedIntervalProblem()).toBeNull();
+  });
+
+  it('blocks a held token whose own career cursor changed, while preserving the saved match', () => {
+    const {bytes, original} = startLeagueMatch();
+    let started: Events['match:started'] | undefined;
+    bus.on('match:started', value => { started = value; });
+    const blocked = vi.fn();
+    bus.on('week:blocked', blocked);
+    registerPlayerMatchSystem();
+    advanceWeek();
+    const sidecarKey = DEV_TEST_PREFIX + liveMatchKey(1), sidecar = bytes.get(sidecarKey);
+    setState({week: 2});
+    bus.emit('match:finished', {fixture: started!.fixture, result: matchResult()});
+    expect(weekHeld()).toBe(false);
+    expect(failedIntervalProblem()).toBeTruthy();
+    expect(blocked).toHaveBeenCalledOnce();
+    expect(bytes.get(sidecarKey)).toBe(sidecar);
+    expect(bytes.get(DEV_TEST_PREFIX + slotKey(1))).toBe(original);
+  });
+
+  it('wakes the waiting advance after a worker returns to a corrupted cursor or a replaced career', async () => {
+    for (const change of ['cursor', 'replacement'] as const) {
+      const {original, bytes} = startLeagueMatch();
+      let finish: ((results: MatchResult[]) => void) | undefined;
+      vi.spyOn(jobs, 'canUseWorker').mockReturnValue(true);
+      vi.spyOn(jobs, 'playMatchesInWorker').mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+      registerPlayerMatchSystem();
+      const run = advanceUntil({kind:'weeks', weeks:1});
+      expect(weekHeld()).toBe(true);
+      if (change === 'cursor') setState({week:2});
+      else loadState(structuredClone(getState()));
+      const notices = vi.fn();
+      const off = bus.on('ui:notify', notices);
+      finish!([matchResult()]);
+      expect(await run).toMatchObject({weeksPlayed:0, stop:{kind:'stopped'}});
+      expect(!!failedIntervalProblem()).toBe(change === 'cursor');
+      if (change === 'replacement') expect(notices).not.toHaveBeenCalled();
+      expect(bytes.get(DEV_TEST_PREFIX + slotKey(1))).toBe(original);
+      off();
+      clearHeldWeek();
+    }
+  });
+
+  it('stops the retired result after an observer starts a replacement match and returns normally', () => {
+    const {bytes} = startLeagueMatch();
+    const replacement = structuredClone(getState());
+    const matches: Events['match:started'][] = [];
+    bus.on('match:started', value => { matches.push(value); });
+    registerPlayerMatchSystem();
+    advanceWeek();
+    let expected: string | undefined, sidecar: string | undefined;
+    const key = DEV_TEST_PREFIX + liveMatchKey(1);
+    const off = bus.on('state:changed', () => {
+      off();
+      loadState(replacement);
+      advanceWeek();
+      expected = JSON.stringify(getState());
+      sidecar = bytes.get(key);
+    });
+    const attempted = vi.fn();
+    bus.on('money:changed', () => { if (expected) attempted('money'); });
+    bus.on('ui:notify', () => { if (expected) attempted('notice'); });
+    bus.on('match:committed', () => attempted('presentation'));
+    bus.on('match:finished', () => { if (expected) attempted('retired full time'); });
+    const result = matchResult();
+    result.injuries = [{teamId: replacement.clubId, playerId: replacement.squad[0]!.id, playerName: replacement.squad[0]!.name, weeks: 9}];
+    bus.emit('match:finished', {fixture: matches[0]!.fixture, result});
+    expect(matches).toHaveLength(2);
+    expect(JSON.stringify(getState())).toBe(expected);
+    expect(playerMatchPending()).toBe(true);
+    expect(failedIntervalProblem()).toBeNull();
+    expect(bytes.get(key)).toBe(sidecar);
+    expect(attempted).not.toHaveBeenCalled();
+  });
+
+  it('holds a settled watched week for storage retry without overwriting its checkpoint or starting another match', async () => {
+    const {bytes, original} = startLeagueMatch();
+    const matches: Events['match:started'][] = [];
+    bus.on('match:started', value => { matches.push(value); });
+    const advanced = vi.fn();
+    bus.on('week:advanced', advanced);
+    registerPlayerMatchSystem();
+    registerFixturesSystem();
+    advanceWeek();
+    const off = enableAutosave({});
+    try {
+      const saveKey = DEV_TEST_PREFIX + slotKey(1), matchKey = DEV_TEST_PREFIX + liveMatchKey(1);
+      const sidecar = bytes.get(matchKey);
+      const write = vi.spyOn(localStorage, 'setItem').mockImplementation((key, value) => {
+        if (key === saveKey) throw new Error('Slot quota');
+        bytes.set(key, value);
+      });
+      bus.emit('match:finished', {fixture: matches[0]!.fixture, result: matchResult()});
+      expect(getState().week).toBe(2);
+      const settled = getState();
+      const run = await advanceUntil({kind:'weeks', weeks:3});
+      expect(run).toMatchObject({weeksPlayed:0, stop:{kind:'stopped'}});
+      expect(run.stop.text).toMatch(/save|saving|storage/i);
+      advanceWeek();
+      advanceWeeks(4);
+      expect(getState()).toBe(settled);
+      expect(bytes.get(saveKey)).toBe(original);
+      expect(bytes.get(matchKey)).toBe(sidecar);
+      expect(exportSave(getState())).toBe(original);
+      expect(matches).toHaveLength(1);
+      expect(advanced).toHaveBeenCalledOnce();
+      write.mockRestore();
+      expect(saveIfChanged(settled)).toBe(true);
+      expect(bytes.get(saveKey)).toBe(JSON.stringify(settled));
+      expect(bytes.get(matchKey)).toBeUndefined();
+      expect(advanced).toHaveBeenCalledOnce();
+      advanceWeek();
+      expect(weekHeld() || getState().week === 3).toBe(true);
+    } finally { off(); }
+  });
+
+  it.each(['advance', 'replacement'] as const)('a pending write is bound to the settled career when resuming by %s', async route => {
+    const {bytes} = startLeagueMatch();
+    const source = structuredClone(getState());
+    const matches: Events['match:started'][] = [];
+    bus.on('match:started', value => { matches.push(value); });
+    const advanced = vi.fn();
+    bus.on('week:advanced', advanced);
+    registerPlayerMatchSystem();
+    registerFixturesSystem();
+    advanceWeek();
+    const slot = DEV_TEST_PREFIX + slotKey(1), sidecarKey = DEV_TEST_PREFIX + liveMatchKey(1);
+    const retained = bytes.get(sidecarKey);
+    const write = vi.spyOn(localStorage, 'setItem').mockImplementation((key, value) => {
+      if (key === slot) throw new Error('Slot quota');
+      bytes.set(key, value);
+    });
+    bus.emit('match:finished', {fixture:matches[0]!.fixture, result:matchResult()});
+    expect(pendingLeagueSaveProblem()).toBeTruthy();
+    expect(advanced).toHaveBeenCalledOnce();
+    write.mockRestore();
+    if (route === 'advance') {
+      const run = await advanceUntil({kind:'weeks', weeks:1});
+      expect(run.weeksPlayed).toBe(1);
+      expect(getState().week).toBe(3);
+      expect(advanced).toHaveBeenCalledTimes(2);
+      expect(bytes.has(sidecarKey)).toBe(false);
+    } else {
+      loadState(source);
+      expect(bytes.get(sidecarKey)).toBe(retained);
+      advanceWeek();
+      expect(matches).toHaveLength(2);
+      expect(playerMatchPending()).toBe(true);
+      expect(bytes.has(sidecarKey)).toBe(true);
+      expect(advanced).toHaveBeenCalledOnce();
+    }
+    expect(pendingLeagueSaveProblem()).toBeNull();
+  });
+
   it.each(['watched','worker'] as const)('a partially applied %s result preserves the checkpoint and blocks further work', async path => {
     const { bytes, original } = startLeagueMatch();
     let started: Events['match:started'] | undefined;

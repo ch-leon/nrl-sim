@@ -8,7 +8,7 @@ import { applyMatchXp } from './training';
 import { DEFAULT_TACTICS } from '../match/league/presets';
 import type { RivalPlanContext } from '../match/league/ai';
 import { bus, type LiveMatchData } from '../core/events';
-import { getState, setState, type Fixture, type GameState, type RivalClub } from '../core/state';
+import { getState, setState, stateInstallation, type Fixture, type GameState, type RivalClub } from '../core/state';
 import { registerTickHook, weekHeld, TICK_ORDER, type WeekRelease } from '../core/time';
 import { clearLiveMatch, liveMatchSameRules, readLiveMatch, writeLiveMatch, type LiveMatchRecord } from './liveMatchRecord';
 import { matchEngineIdentity } from './matchEngineIdentity';
@@ -359,6 +359,10 @@ export function registerPlayerMatchSystem(): void {
       const release = ctx.hold();
       const record: LiveMatchRecord = { season: state.season, week: state.week, round: fixture.round, homeId: fixture.homeId, awayId: fixture.awayId, seed, calls: resumed ? [...resumed.calls] : [], ...(resumed?.controls?.length ? { controls: [...resumed.controls] } : {}), plans: resumed?.plans ? [...resumed.plans] : [], tick: resumed?.tick ?? 0, halfMinutes: NINES.halfMinutes, engineId: matchEngineIdentity() };
       if (fixture.id) { record.fixtureId = fixture.id; record.competitionId = fixture.competitionId!; record.slot = fixture.slot!; }
+      if (state.competitions?.leagueCareer) {
+        const installation = stateInstallation();
+        bus.bindLeaguePlayback(fixture, () => stateInstallation() === installation);
+      }
       const off = bus.on('match:finished', ({ fixture: done, result }) => {
         if (!release.current()) {off(); release(); return;}
         // This is an in-process playback handoff: echo the actual kick-off
@@ -367,7 +371,7 @@ export function registerPlayerMatchSystem(): void {
         off();
         parked = null;
         if (release.fail) {
-          try { applyPlayerResult(fixture, home, away, result, true)(); }
+          try { release.applyResult(() => applyPlayerResult(fixture, home, away, result, true)()); }
           catch (error) { release.fail(error); return; }
           // A grouped rival hold may still fail. Retire the match only after the
           // complete interval for this installation reaches durable storage.
@@ -422,7 +426,7 @@ export function registerPlayerMatchSystem(): void {
     if (ctx.fastForward && ctx.hold && canUseWorker()) {
       const release = ctx.hold();
       void playMatchesInWorker([{ home, away, opts: matchOpts }], PLAYER_WORKER_TIMEOUT_MS)
-        .then(([result]) => { if (release.current()) applyPlayerResult(fixture, home, away, result ?? runMatch(home, away, matchOpts))(); })
+        .then(([result]) => release.applyResult(() => applyPlayerResult(fixture, home, away, result ?? runMatch(home, away, matchOpts))()))
         .catch((err: unknown) => {
           if (release.fail) release.fail(err);
           else console.error('the fast-forwarded match failed to land', err);
