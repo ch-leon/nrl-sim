@@ -41,6 +41,7 @@ export interface WeekSnapshot {
   season: number;
   week: number;
   preseason?: GameState['preseason'];
+  elapsedIntervals?: number;
   squad: { id: string; name: string; stats: PlayerStats; injuredWeeks: number; suspendedWeeks: number }[];
   /** Each season's books on the snapshot, by line (GameState.finance). */
   finance: { season: number; lines: Record<FinanceLine, number> }[];
@@ -55,6 +56,7 @@ export function weekSnapshot(s: GameState, runwayWeeks: number | null = null): W
   return {
     season: s.season,
     week: s.week,
+    ...(s.competitions?.leagueCareer ? { elapsedIntervals: s.competitions.calendar!.elapsedIntervals } : {}),
     ...(s.preseason === undefined ? {} : { preseason: s.preseason }),
     squad: s.squad.map((p) => ({ id: p.id, name: p.name, stats: { ...p.stats }, injuredWeeks: p.injuredWeeks, suspendedWeeks: p.suspendedWeeks ?? 0 })),
     finance: s.finance.map((f) => ({ season: f.season, lines: Object.fromEntries(FINANCE_LINES.map((l) => [l, f[l]])) as Record<FinanceLine, number> })),
@@ -92,7 +94,8 @@ export interface WeekSummary {
 }
 
 /** Weeks from one snapshot to the next, across a season's end. */
-function weeksBetween(a: Pick<WeekSnapshot, 'season' | 'week' | 'preseason'>, b: Pick<WeekSnapshot, 'season' | 'week' | 'preseason'>): number {
+function weeksBetween(a: Pick<WeekSnapshot, 'season' | 'week' | 'preseason' | 'elapsedIntervals'>, b: Pick<WeekSnapshot, 'season' | 'week' | 'preseason' | 'elapsedIntervals'>): number {
+  if (a.elapsedIntervals !== undefined && b.elapsedIntervals !== undefined) return b.elapsedIntervals - a.elapsedIntervals;
   const offset = (s: typeof a): number => s.preseason === undefined ? s.week
     : s.week === 1 && s.preseason ? s.preseason - 2 : s.week;
   return (b.season - a.season) * (WEEKS_PER_SEASON + (a.preseason === undefined ? 0 : 2)) + offset(b) - offset(a);
@@ -113,8 +116,8 @@ export function boardMood(patience: number, risk: ObjectiveRisk | null): BoardMo
 /** What changed from `before` to `after` (#368). Pure. */
 export function weekSummary(before: WeekSnapshot, after: WeekSnapshot): WeekSummary {
   const weeks = weeksBetween(before, after);
-  const lastWeek = after.week - 1;
-  const trialStart = before.week === 1 && before.preseason;
+  const lastWeek = before.elapsedIntervals === undefined ? after.week - 1 : before.week + weeks - 1;
+  const trialStart = before.elapsedIntervals === undefined && before.week === 1 && before.preseason;
   const title = trialStart ? (weeks <= 1 ? `Pre-season trial ${before.preseason}` : `Last ${weeks} weeks`)
     : weeks <= 1 ? `Week ${before.week}` : before.season === after.season && lastWeek >= before.week
     ? `Weeks ${before.week}–${lastWeek}` : `Last ${weeks} weeks`;
@@ -286,6 +289,7 @@ export function initWeekSummary(opts: { onAdvance: () => void; runwayWeeks: (s: 
     due = false;
     if (poll) clearInterval(poll);
     poll = undefined;
+    if (weeksBetween(before, after) <= 0) { before = after; return; }
     openWeekSummary(weekSummary(before, after), {
       onAdvance: opts.onAdvance,
       coach: coachSays(s, { decisions: pendingDecisionCount(s), runwayWeeks: opts.runwayWeeks(s) }),

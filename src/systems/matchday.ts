@@ -1,3 +1,4 @@
+import { leagueFixtureView } from './leagueSeasonView';
 import { freezeMatchIncome, matchIncomePatch, commitMatchState, reconcileMatchIncome } from './matchIncome';
 // Orchestrator-owned: the PLAYER's match of the round (rival-vs-rival matches
 // are handled by fixtures.ts's own hook). The match is played on the live sim
@@ -8,8 +9,8 @@ import { applyMatchXp } from './training';
 import { DEFAULT_TACTICS } from '../match/league/presets';
 import type { RivalPlanContext } from '../match/league/ai';
 import { bus, type LiveMatchData } from '../core/events';
-import { getState, setState, type Fixture, type GameState, type RivalClub } from '../core/state';
-import { registerTickHook, resumeWeek, weekHeld, TICK_ORDER } from '../core/time';
+import { getState, setState, stateInstallation, type Fixture, type GameState, type RivalClub } from '../core/state';
+import { registerTickHook, weekHeld, TICK_ORDER, type WeekRelease } from '../core/time';
 import { clearLiveMatch, liveMatchSameRules, readLiveMatch, writeLiveMatch, type LiveMatchRecord } from './liveMatchRecord';
 import { matchEngineIdentity } from './matchEngineIdentity';
 import { NINES } from '../match/league/rules';
@@ -50,6 +51,7 @@ export function breakRuleSidesFor(
  * is already held; resuming re-emits match:started and does not hold again.
  */
 interface ParkedMatch {
+  release: WeekRelease;
   fixture: Fixture;
   home: TeamSheet;
   away: TeamSheet;
@@ -65,7 +67,7 @@ let parked: ParkedMatch | null = null;
  * and leave the held week with nothing that will release it.
  */
 export function playerMatchPending(): boolean {
-  return parked !== null && weekHeld();
+  return parked !== null && weekHeld() && parked.release.current();
 }
 
 /** Said once per incompatible fixture, through the existing match toast lane. */
@@ -82,7 +84,7 @@ function explainRestart(): void {
  * An incompatible record starts again at kick-off.
  */
 export function resumePlayerMatch(): boolean {
-  if (!parked || !weekHeld()) return false;
+  if (!parked || !weekHeld() || !parked.release.current()) return false;
   const rec = readLiveMatch();
   const live = parked.live;
   // Prefer the stored record (a kill, or a write newer than this page). A missing
@@ -214,6 +216,14 @@ export function roundLabel(round: number): string {
   return `Round ${round}`;
 }
 
+/** Saved stage/date label for League notices; legacy and DEV labels stay unchanged. */
+function fixtureNoticeLabel(state: GameState, fixture: Fixture): string {
+  const context = state.competitions?.leagueCareer ? calendarFixtureContext(state, fixture) : null;
+  if (!context) return roundLabel(fixture.round);
+  const view = leagueFixtureView(context.instance, context.fixture);
+  return `${view.dateLabel} · ${view.stageLabel}`;
+}
+
 /**
  * Apply the player's match result: ladder, player stats, injuries (ours and the
  * rival's). Returns the toast to show when the player sees the final score.
@@ -261,17 +271,18 @@ function applyPlayerResult(fixture: Fixture, home: TeamSheet, away: TeamSheet, s
   // A final level at full time goes to golden point (N9.4); still level after it, it is decided on
   // seeding (home = higher seed advances), so say
   // which way it went rather than leaving the player guessing.
-  const verdict = us > them ? 'WIN' : us < them ? 'LOSS' : 'DRAW';
+  const savedResult = before.competitions?.leagueCareer ? applied.competitions!.instances.find(i => i.id === fixture.competitionId)!.fixtures.find(f => f.id === fixture.id)!.result : undefined;
+  const verdict = savedResult?.winnerId ? savedResult.winnerId === PLAYER_ID ? 'WIN' : 'LOSS' : us > them ? 'WIN' : us < them ? 'LOSS' : 'DRAW';
   const goldenPoint = sim.events.some((e) => e.kind === 'full-time' && e.detail === 'golden-point');
   const decidedWinner = structural ? applied.competitions!.instances.find(i => i.id === fixture.competitionId)!.fixtures.find(f => f.id === fixture.id)!.result!.winnerId : undefined;
   const seedingNote = us === them && knockout
-    ? (structural ? (decidedWinner === PLAYER_ID ? ' — through on the published tie draw' : ' — out on the published tie draw') : playerHome ? ' — through on seeding' : ' — out on seeding')
+    ? (savedResult ? ` — ${savedResult.winnerId === PLAYER_ID ? 'through' : 'out'} on ${savedResult.decider.replace(/-/g, ' ')}` : structural ? (decidedWinner === PLAYER_ID ? ' — through on the published tie draw' : ' — out on the published tie draw') : playerHome ? ' — through on seeding' : ' — out on seeding')
     : goldenPoint ? ' in golden point' : '';
   return (): void => {
     bus.emit('ui:notify', {
-      text: `${context ? `${context.instance.definition.name}, ${context.fixture.round}` : roundLabel(fixture.round)}: ${verdict} ${us}–${them}${seedingNote}`,
+      text: `${before.competitions?.leagueCareer ? fixtureNoticeLabel(before, fixture) : context ? `${context.instance.definition.name}, ${context.fixture.round}` : roundLabel(fixture.round)}: ${verdict} ${us}–${them}${seedingNote}`,
       // A loss is news, not a problem (#339): red is kept for injuries, debt and errors.
-      kind: us > them ? 'success' : 'info',
+      kind: verdict === 'WIN' ? 'success' : 'info',
     });
     for (const text of injuryToasts) bus.emit('ui:notify', { text, kind: 'danger' });
   };
@@ -294,8 +305,8 @@ export function registerPlayerMatchSystem(): void {
       bus.emit('ui:notify', {
         text:
           fit === 0
-            ? `No fit players — ${roundLabel(fixture.round)} forfeited (${result.homeScore}–${result.awayScore}).`
-            : `Only ${fit} fit (need ${SQUAD_MIN}) — ${roundLabel(fixture.round)} forfeited (${result.homeScore}–${result.awayScore}).`,
+            ? `No fit players — ${fixtureNoticeLabel(state, fixture)} forfeited (${result.homeScore}–${result.awayScore}).`
+            : `Only ${fit} fit (need ${SQUAD_MIN}) — ${fixtureNoticeLabel(state, fixture)} forfeited (${result.homeScore}–${result.awayScore}).`,
         kind: 'danger',
       });
       return;
@@ -355,16 +366,31 @@ export function registerPlayerMatchSystem(): void {
     // holds here; the result and the rest of the week come at full time, from
     // what the player watched (and called).
     if (!ctx.fastForward && ctx.hold) {
-      ctx.hold();
+      const release = ctx.hold();
       const record: LiveMatchRecord = { season: state.season, week: state.week, round: fixture.round, homeId: fixture.homeId, awayId: fixture.awayId, seed, calls: resumed ? [...resumed.calls] : [], ...(resumed?.controls?.length ? { controls: [...resumed.controls] } : {}), plans: resumed?.plans ? [...resumed.plans] : [], tick: resumed?.tick ?? 0, halfMinutes: NINES.halfMinutes, engineId: matchEngineIdentity() };
       if (fixture.id) { record.fixtureId = fixture.id; record.competitionId = fixture.competitionId!; record.slot = fixture.slot!; }
+      if (state.competitions?.leagueCareer) {
+        const installation = stateInstallation();
+        bus.bindLeaguePlayback(fixture, () => stateInstallation() === installation);
+      }
       const off = bus.on('match:finished', ({ fixture: done, result }) => {
-        if (!sameFixtureIdentity(done, fixture) || getState().season !== state.season || getState().week !== state.week) return;
+        if (!release.current()) {off(); release(); return;}
+        // This is an in-process playback handoff: echo the actual kick-off
+        // object. Durable IDs can repeat after a fresh same-profile career.
+        if (done !== fixture || !sameFixtureIdentity(done, fixture) || getState().season !== state.season || getState().week !== state.week) return;
         off();
         parked = null;
-        clearLiveMatch();
-        applyPlayerResult(fixture, home, away, result, true)();
-        resumeWeek();
+        if (release.fail) {
+          try { release.applyResult(() => applyPlayerResult(fixture, home, away, result, true)()); }
+          catch (error) { release.fail(error); return; }
+          // A grouped rival hold may still fail. Retire the match only after the
+          // complete interval for this installation reaches durable storage.
+          release(() => clearLiveMatch());
+        } else {
+          clearLiveMatch();
+          applyPlayerResult(fixture, home, away, result, true)();
+          release();
+        }
       });
       const live: LiveMatchData = {
         seed,
@@ -385,6 +411,7 @@ export function registerPlayerMatchSystem(): void {
       // Keep the tick on the parked match too, so Resume still has it if the
       // stored record is later missing or unreadable.
       live.onProgress = (calls, tick, plans, controls = []) => {
+        if (!release.current()) return false;
         const progress = { ...record, calls: [...calls], plans: [...plans], tick };
         if (controls.length) {
           progress.controls = [...controls];
@@ -397,7 +424,7 @@ export function registerPlayerMatchSystem(): void {
         if (wrote && tick > 0) live.resumeAt = tick;
         return wrote;
       };
-      parked = { fixture, home, away, live, record, restartExplained: stale };
+      parked = { release, fixture, home, away, live, record, restartExplained: stale };
       writeLiveMatch(record);
       // Replacing the sidecar is safe only after construction and the hold above.
       if (stale) explainRestart();
@@ -407,11 +434,14 @@ export function registerPlayerMatchSystem(): void {
     // Fast-forward in a browser, inside the async advance (N10.3): the same match,
     // headless, in the Worker; the week waits for it, so the page keeps painting.
     if (ctx.fastForward && ctx.hold && canUseWorker()) {
-      ctx.hold();
+      const release = ctx.hold();
       void playMatchesInWorker([{ home, away, opts: matchOpts }], PLAYER_WORKER_TIMEOUT_MS)
-        .then(([result]) => applyPlayerResult(fixture, home, away, result ?? runMatch(home, away, matchOpts))())
-        .catch((err: unknown) => console.error('the fast-forwarded match failed to land', err))
-        .finally(resumeWeek);
+        .then(([result]) => release.applyResult(() => applyPlayerResult(fixture, home, away, result ?? runMatch(home, away, matchOpts))()))
+        .catch((err: unknown) => {
+          if (release.fail) release.fail(err);
+          else console.error('the fast-forwarded match failed to land', err);
+        })
+        .finally(release);
       return;
     }
     // Fast-forward elsewhere (the soak, the tests, advanceWeeks): the same match, headless, here.

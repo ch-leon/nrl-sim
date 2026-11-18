@@ -88,10 +88,14 @@ Its published rewards remain appropriate to that level; easier titles cannot
 repeatedly grant a first-win upgrade. Do not silently scale opponents up to match
 the squad or force a harder league because the club won.
 
-Before confirming, preview the selected league's annual cap and existing
-commitments using the finance system. A lower-budget choice cannot silently
-release players, rewrite contracts or bypass the cap. Resolve any invalid
-registration before accepting entry, following the finance owner's transition policy.
+Before confirming, preview the club's projected annual capacity and existing
+commitments using the finance system. **Approved 18 November 2026:** choosing an
+easier league does not reduce the club's capacity. Higher-tier entry can raise its
+base, which remains with the club on later downward moves. Apply this to player
+and AI clubs, preserving purchased/earned additions and lawful exact-term
+protection. Downward movement grants no new protection. New signings and renewals
+still need ordinary cap room. Entry cannot silently release players, rewrite
+contracts or charge annual salaries to cash.
 
 Keep at least one accessible entry route each season. Time cannot advance past
 the initial league-choice gate without a deliberate valid selection. Once confirmed,

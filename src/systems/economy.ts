@@ -3,19 +3,20 @@
 // Waiting neither earns income nor pays salaries, staff wages or upkeep.
 
 import { emptyFinance, getState, setState, type FinanceLine, type Fixture, type GameState, type PlacedFacility } from '../core/state';
-import { bus } from '../core/events';
+import { bus, type Events } from '../core/events';
 import { ECON, SEASON_ROUNDS, WEEKS_PER_SEASON, difficultyMultipliers } from '../config';
 import { sortLadder } from './fixtures';
 import { FACILITY_CATALOG, facilityUpkeep } from '../data/facility';
 import { closedGatesFlag, EVENT_CARDS } from '../data/events';
-import { currentRound, inTrials } from '../core/season';
+import { careerActionClock, currentRound, inTrials } from '../core/season';
 import { registerSeasonHook, registerTickHook, TICK_ORDER } from '../core/time';
-import { hasStructuralCalendar } from './competitionCalendar';
+import { leagueClubResults, leagueSeasonView } from './leagueSeasonView';
+import { competitionLadder, hasStructuralCalendar } from './competitionCalendar';
 import { staffWages } from './staff';
 import { BOARD_LOAN, BOARD_LOAN_REPAID, warnForWeeks, notifyContractWarning } from './contracts';
 import { FINANCE_TIERS, matchCashQuote, type FinanceLevel, type FinanceTier } from '../data/financeRules';
-import { expireEndedDeals } from './cap';
-import { reconcileMatchIncome, commitMatchState } from './matchIncome';
+import { expireEndedDeals, reconcileClubProtection } from './cap';
+import { reconcileMatchIncome, commitMatchState, fixtureMatchBase, matchIncomeTier } from './matchIncome';
 
 /**
  * Level of the built facility with `defId`, or 0 if none is built. Placement
@@ -60,7 +61,7 @@ export function sponsorReturn(level: number, _reputation: number, tier: FinanceT
 
 /** Sponsor extra per eligible match at the club's own tier (not a weekly grant). */
 export function sponsorIncome(state: GameState): number {
-  return sponsorReturn(facilityLevel(state, 'sponsorBoard'), state.reputation, state.capAccount.tier);
+  return sponsorReturn(facilityLevel(state, 'sponsorBoard'), state.reputation, matchIncomeTier(state));
 }
 
 /** Retired passive revenue: waiting never earns cash. */
@@ -138,21 +139,32 @@ export interface GateEstimate {
  */
 export function homeGate(state: GameState, fixture: Fixture): GateEstimate {
   const base = ECON.ATTEND_BASE + state.reputation * ECON.ATTEND_PER_REP;
-  const form = 1 + ECON.FORM_SWING * recentForm(state, fixture.round);
+  const view = leagueSeasonView(state);
+  const saved = view?.fixtures.find(f => f.instance.id === fixture.competitionId && f.fixture.id === fixture.id);
+  const slot = saved?.slot ?? fixture.slot ?? state.week;
+  const formValue = view ? leagueClubResults(view, state.clubId).filter(f => f.slot !== null && f.slot < slot)
+    .slice(-ECON.FORM_GAMES).reduce((n, f) => n + (f.result === 'W' ? 1 : f.result === 'L' ? -1 : 0), 0) / ECON.FORM_GAMES
+    : recentForm(state, fixture.round);
+  const form = 1 + ECON.FORM_SWING * formValue;
   const opponent = fixture.homeId === state.clubId ? fixture.awayId : fixture.homeId;
-  const occasion = fixture.round > SEASON_ROUNDS ? ECON.FINALS_MULT : topEight(state, opponent) ? ECON.BIG_MATCH_MULT : 1;
+  // Crowd appeal follows the saved sporting field before this date. Its cash
+  // quote below is fixed independently of form, standings and attendance.
+  const priorLadder = view ? competitionLadder({ ...view.instance, fixtures: view.fixtures
+    .filter(f => f.instance.id === view.instance.id && f.status === 'completed' && f.slot !== null && f.slot < slot)
+    .map(f => f.fixture) }) : [];
+  const opponentPlace = priorLadder.findIndex(r => r.clubId === opponent && r.played > 0);
+  const bigMatch = view ? opponentPlace >= 0 && opponentPlace < view.finalsSize : topEight(state, opponent);
+  const final = view ? saved?.stageKind === 'knockout' || saved?.stageKind === 'series' : fixture.round > SEASON_ROUNDS;
+  const occasion = final ? ECON.FINALS_MULT : bigMatch ? ECON.BIG_MATCH_MULT : 1;
   const demand = Math.round(base * form * occasion);
   const capacity = groundCapacity(state);
-  const closed = state.eventDeck.flags.includes(closedGatesFlag(state.season, fixture.round));
+  const closed = state.eventDeck.flags.includes(closedGatesFlag(state.season, view ? slot : fixture.round));
   const attendance = closed ? 0 : Math.min(capacity, demand);
   // Crowd presentation is independent of the fixed venue payment. Never multiply
   // attendance by ticket prices or apply a hidden difficulty modifier to cash.
   const context = state.competitions?.instances.find(i => i.id === fixture.competitionId);
   const actual = context?.fixtures.find(f => f.id === fixture.id);
-  const homeAccount = fixture.homeId === state.clubId ? state.capAccount : state.league.clubs.find(c => c.id === fixture.homeId)?.capAccount;
-  const awayAccount = fixture.awayId === state.clubId ? state.capAccount : state.league.clubs.find(c => c.id === fixture.awayId)?.capAccount;
-  const hostBase = FINANCE_TIERS[homeAccount?.tier ?? 'premier'].matchBase;
-  const matchBase = actual?.neutral ? Math.min(hostBase, FINANCE_TIERS[awayAccount?.tier ?? 'premier'].matchBase) : hostBase;
+  const matchBase = fixtureMatchBase(state, fixture, actual?.neutral ?? false);
   const receipts = matchCashQuote({ matchBase,
     kind: fixture.unplayed || actual?.status === 'cancelled' || actual?.result?.decider === 'forfeit' ? 'unplayed' : context?.definition.format.kind === 'exhibition' || (!context && fixture.round <= 0) ? 'trial' : 'played',
     venue: actual?.neutral ? 'neutral' : fixture.homeId === state.clubId ? 'home' : 'away', result: 'loss',
@@ -244,6 +256,17 @@ export function applyEconomy(state: GameState): GameState {
   return getState();
 }
 
+/** Candidate-only expiry owner. The legacy structural-calendar skip stays in the hook. */
+export function expirePlayerDeals(state: GameState, seasonWeeks = WEEKS_PER_SEASON): { state: GameState; notices: Events['ui:notify'][] } {
+  const next = expireEndedDeals(state.squad, state.freeAgents, state.capAccount, state.season, seasonWeeks);
+  if (next.squad.length === state.squad.length && next.squad.every((p, i) => p === state.squad[i]) && next.capAccount === state.capAccount) return { state, notices: [] };
+  const left = state.squad.filter(player => !next.squad.some(kept => kept.id === player.id));
+  return { state: { ...state, ...next }, notices: left.length ? [{
+    text: left.length === 1 ? `${left[0]!.name} is unsigned. The deal ended with last season.`
+      : `${left.length} players are unsigned. Their deals ended with last season.`, kind: 'info',
+  }] : [] };
+}
+
 /**
  * Install the economy tick hook (order 30). Called explicitly by the orchestrator
  * (main.ts) — importing this module has no side effects. The hook reads/writes
@@ -257,19 +280,15 @@ export function registerEconomySystem(): void {
   // The structural prototype does not run this career finance clock.
   registerSeasonHook('cap-season', 4, () => {
     const s = getState();
-    if (hasStructuralCalendar(s)) return;
-    const next = expireEndedDeals(s.squad, s.freeAgents, s.capAccount, s.season);
-    if (next.squad.length === s.squad.length && next.squad.every((player, index) => player === s.squad[index]) && next.capAccount === s.capAccount) return;
-    const left = s.squad.filter(player => !next.squad.some(kept => kept.id === player.id));
-    setState({ squad: next.squad, freeAgents: next.freeAgents, capAccount: next.capAccount });
-    if (left.length > 0) {
-      bus.emit('ui:notify', {
-        text: left.length === 1
-          ? `${left[0]!.name} is unsigned. The deal ended with last season.`
-          : `${left.length} players are unsigned. Their deals ended with last season.`,
-        kind: 'info',
-      });
+    if (hasStructuralCalendar(s)) {
+      const next = reconcileClubProtection(s);
+      if (next !== s) setState({ capAccount: next.capAccount, league: next.league });
+      return;
     }
+    const { state: next, notices } = expirePlayerDeals(s);
+    if (next === s) return;
+    setState({ squad: next.squad, freeAgents: next.freeAgents, capAccount: next.capAccount });
+    for (const notice of notices) bus.emit('ui:notify', notice);
   });
 }
 
@@ -318,7 +337,8 @@ const CLOSING_LINES: ReadonlySet<FinanceLine> = new Set(['prize', 'boardGrant'])
 export interface MovementStamp { line: FinanceLine; season: number; week: number }
 
 /**
- * Stamp a money movement made at `state`'s clock. Usually the clock itself, but
+ * Stamp a movement at its explicit owner date, or the canonical action clock.
+ * Legacy and unmarked DEV careers retain their existing closing rule:
  * the rollover pays the finals prize money and the board grant after the season
  * counter has moved to the next season, in week 1, so those two lines at week 1
  * close the season just played: they are stamped to its last week
@@ -326,8 +346,15 @@ export interface MovementStamp { line: FinanceLine; season: number; week: number
  * (registerFinanceSystem) and the Finance screen's weekly ledger both stamp with
  * this, so the two always agree on where the rollover's money belongs (N12).
  */
-export function stampMovement(state: Pick<GameState, 'season' | 'week' | 'finance' | 'preseason'>, reason: string): MovementStamp {
+export function stampMovement(state: Pick<GameState, 'season' | 'week' | 'finance' | 'preseason'> & Partial<Pick<GameState, 'competitions'>>,
+  reason: string, explicit?: Pick<MovementStamp, 'season' | 'week'>): MovementStamp {
   const line = classifyReason(reason);
+  // Explicit owner receipts take precedence in both the books and the ledger.
+  if (explicit) return { line, season: explicit.season, week: explicit.week };
+  const clock = careerActionClock(state);
+  // League planning belongs to the target year without moving the stored
+  // sporting cursor. Marked active years use their actual authored slot.
+  if (clock.structural) return { line, season: clock.season, week: clock.week };
   // A loan taken in week 1 is that season's; its repayment, like the grant, closes the one before.
   const closing = state.week === 1 && CLOSING_LINES.has(line) && reason !== BOARD_LOAN && state.finance.some((e) => e.season === state.season - 1);
   return closing
@@ -338,16 +365,17 @@ export function stampMovement(state: Pick<GameState, 'season' | 'week' | 'financ
 /**
  * Keep the club's books: every money:changed delta is added to its line in the
  * entry for the season stampMovement gives (opened on the first movement, so a
- * save written at any moment loads right): the current season, except the
- * rollover's prize money and board grant, which close the season just played.
+ * save written at any moment loads right). Explicit owner dates take priority;
+ * League planning uses its target year. Legacy rollover prize money and board
+ * grants retain their existing closing-season date.
  * Pure bookkeeping: nothing here depends on the order listeners fire in. Called
  * once from main.ts (and the soak); returns the unsubscribe.
  */
 export function registerFinanceSystem(): () => void {
-  return bus.on('money:changed', ({ delta, reason, booked }) => {
+  return bus.on('money:changed', ({ delta, reason, booked, stamp }) => {
     if (booked) return;
     const s = getState();
-    const { line, season } = stampMovement(s, reason);
+    const { line, season } = stampMovement(s, reason, stamp);
     const books = s.finance.some((e) => e.season === season)
       ? s.finance
       : [...s.finance, emptyFinance(season)].sort((a, b) => a.season - b.season);

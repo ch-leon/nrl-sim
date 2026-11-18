@@ -5,9 +5,10 @@
 // GitHub #5: soft-curve age retirement from RETIRE_SOFT_AGE, hard cut at
 // RETIRE_HARD_AGE. Retired players leave squad and free-agent pool entirely.
 import { archiveRetirees, reconcileShortlist, installPlayerHistory } from './playerCareer';
-import { bus } from '../core/events';
+import { bus, type Events } from '../core/events';
+import { reconcileProtection } from './cap';
 import { getState, setState } from '../core/state';
-import type { Player } from '../core/state';
+import type { GameState, Player } from '../core/state';
 import { registerSeasonHook } from '../core/time';
 import { RETIRE_HARD_AGE, RETIRE_SOFT_AGE, SQUAD_MIN } from '../config';
 import { hasTrait, withTrait, withoutTrait } from '../data/traits';
@@ -87,32 +88,25 @@ export function ageAndRetirePlayers(
   };
 }
 
+/** Candidate-only owner: archives both pools, captures only the club's notices. */
+export function agePlayerPopulation(state: GameState): { state: GameState; notices: Events['ui:notify'][] } {
+  const result = ageAndRetirePlayers(state.squad, state.freeAgents, makeRng(state.rngSeed));
+  const next = archiveRetirees(reconcileShortlist({ ...state, squad: result.squad, freeAgents: result.freeAgents, rngSeed: result.rngSeed,
+    capAccount: reconcileProtection(result.squad, state.capAccount, state.season) }),
+    result.retired.map(p => installPlayerHistory(p, state.squad.some(x => x.id === p.id) ? state.clubId : 'unsigned', state)), state);
+  const ownIds = new Set(state.squad.map(p => p.id));
+  const ownRetirees = result.retired.filter(p => ownIds.has(p.id));
+  const notices: Events['ui:notify'][] = ownRetirees.map(p => ({ text: `${p.name} retired at ${p.age}.`, kind: 'info', quiet: true }));
+  if (ownRetirees.length > 0 && result.squad.length < SQUAD_MIN) notices.push({
+    text: `Squad down to ${result.squad.length} after retirements — sign players (need ${SQUAD_MIN}) or forfeit.`, kind: 'danger',
+  });
+  return { state: next, notices };
+}
+
 export function registerAgingSystem(): void {
   registerSeasonHook('aging', 5, () => {
-    const state = getState();
-    const rng = makeRng(state.rngSeed);
-    const result = ageAndRetirePlayers(state.squad, state.freeAgents, rng);
-    const next = archiveRetirees(reconcileShortlist({ ...state, squad: result.squad, freeAgents: result.freeAgents, rngSeed: result.rngSeed }),
-      result.retired.map(p => installPlayerHistory(p, state.squad.some(x => x.id === p.id) ? state.clubId : 'unsigned', state)), state);
-    setState({ squad: next.squad, freeAgents: next.freeAgents, rngSeed: next.rngSeed, playerPopulation: next.playerPopulation });
-    // Only the player's own retirees are announced — free-agent pool exits are
-    // silent (a toast per stranger at every rollover is noise).
-    const squadIds = new Set(state.squad.map((p) => p.id));
-    const ownRetirees = result.retired.filter((p) => squadIds.has(p.id));
-    for (const p of ownRetirees) {
-      bus.emit('ui:notify', {
-        text: `${p.name} retired at ${p.age}.`,
-        kind: 'info',
-        quiet: true, // in the season review (N14)
-      });
-    }
-    // Retirement ignores the SQUAD_MIN floor (careers end regardless), so warn
-    // the player before week 1 — below SQUAD_MIN fit, matchday forfeits (#4).
-    if (ownRetirees.length > 0 && result.squad.length < SQUAD_MIN) {
-      bus.emit('ui:notify', {
-        text: `Squad down to ${result.squad.length} after retirements — sign players (need ${SQUAD_MIN}) or forfeit.`,
-        kind: 'danger',
-      });
-    }
+    const { state: next, notices } = agePlayerPopulation(getState());
+    setState({ squad: next.squad, freeAgents: next.freeAgents, rngSeed: next.rngSeed, playerPopulation: next.playerPopulation, capAccount: next.capAccount });
+    for (const notice of notices) bus.emit('ui:notify', notice);
   });
 }

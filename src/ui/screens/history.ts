@@ -37,6 +37,18 @@ export function fmtSeasonSummary(entry: SeasonHistoryEntry): string {
  * says it) and for seasons without a review (before v12), which kept no finals.
  */
 export function fmtFinalsOutcome(entry: SeasonHistoryEntry): string {
+  if (entry.league) {
+    const league = entry.league;
+    if (entry.premiership) return '';
+    if (!league.finalsSize) return 'No finals this season';
+    const last = league.lastPlayerFinal;
+    if (last) {
+      const decider = ['score', 'draw'].includes(last.result.decider) ? '' : ` (${last.result.decider.replace(/-/g, ' ')})`;
+      if (last.result.winnerId !== 'player') return `${last.fixtureId === league.final?.fixtureId ? 'lost the final' : `out in ${last.stageName} · round ${last.round}`} · Week ${last.slot}${decider}`;
+      return `Last completed final: ${last.stageName} · round ${last.round} · Week ${last.slot}${decider}`;
+    }
+    return entry.ladderPosition > league.finalsSize ? 'missed the finals' : 'No completed finals result recorded';
+  }
   if (entry.premiership || !entry.review) return '';
   const f = entry.review.finals;
   if (f && !f.won) return f.round === FINALS_ROUNDS.GF ? 'lost the Grand Final' : `out in the ${roundLabel(f.round)}`;
@@ -62,7 +74,7 @@ export const PRE_NINES_NOTE = 'Before Nines: 80-minute matches, no bonus tries';
  * so a season without one was played on the old rules.
  */
 export function playedBeforeNines(e: SeasonRecord): boolean {
-  return e.review === undefined;
+  return e.review === undefined && e.league === undefined;
 }
 
 /** The season's rules note for History, or '' for a Nines season. */
@@ -223,7 +235,7 @@ function buildSeasonsTable(state: GameState): HTMLElement {
   const rows = el('div', { class: 'nrl-history-rows', attrs: { role: 'rowgroup' } });
   const grid = el('div', { class: 'nrl-history-table', attrs: { role: 'table' } });
   grid.append(el('div', { class: 'nrl-history-row nrl-history-headrow', attrs: { role: 'row' } },
-    ...['Season', 'Finish', draws ? 'W–D–L' : 'W–L', 'Pts', 'Player of the season', 'Net', ''].map((h) => el('span', { class: 'nrl-label', text: h, attrs: { role: 'columnheader' } }))));
+    ...['Year', 'Finish', draws ? 'W–D–L' : 'W–L', 'Pts', 'Player of the season', 'Net', ''].map((h) => el('span', { class: 'nrl-label', text: h, attrs: { role: 'columnheader' } }))));
   for (const entry of historyNewestFirst(state.history)) {
     const v = historyRowView(entry, state);
     // The season review (#190), for seasons that have one (v12+), and its books (N14, #262).
@@ -335,8 +347,8 @@ export function openSeasonBooks(entry: SeasonHistoryEntry, opts: { back?: () => 
  * screen; the toast with ladder position / premiership where there is no
  * document (headless). Called once from main.ts. Returns unsubscribe.
  */
-export function initSeasonEndFeedback(): () => void {
-  return initSeasonReview();
+export function initSeasonEndFeedback(opts: { onChooseLeague?: () => HTMLElement } = {}): () => void {
+  return initSeasonReview(opts);
 }
 
 /** Latest history entry from state, if any. */

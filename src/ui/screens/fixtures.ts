@@ -21,8 +21,11 @@ import { el, button, hintScroll, openModal, openScreen, ensureStyles } from '../
 import { getState, type GameState, type Fixture, type LadderRow, type RivalClub, type WeatherKind } from '../../core/state';
 import { bus } from '../../core/events';
 import { currentRound } from '../../core/season';
+import { weekHeld } from '../../core/time';
+import { playerMatchPending } from '../../systems/matchday';
+import { leagueSeasonView, leagueFixtureActivity, remainingLeagueFixtures, leagueChoiceRequired, nextSeasonFixture, type LeagueFixtureView, type LeagueSeasonView } from '../../systems/leagueSeasonView';
 import { PLAYER_ID } from '../../systems/fixtures';
-import { formGuide, matchStage, nextFixture, nextMatchPreview, type ClubResult, type FormResult, type PreviewSide } from '../../systems/league';
+import { seasonFormGuide, matchStage, nextFixture, nextMatchPreview, type ClubResult, type FormResult, type PreviewSide } from '../../systems/league';
 import { SEASON_ROUNDS } from '../../config';
 import { openRivalSquad } from './rivalSquad';
 import { playerRivalContext, rivalSheet, rivalStyle } from '../../systems/rivalRound';
@@ -107,7 +110,7 @@ export function fmtHeadToHead(results: readonly ClubResult[]): string {
   if (results.length === 0) return 'First meeting this season';
   const verb = { W: 'won', D: 'drew', L: 'lost' } as const;
   return results
-    .map((r) => `R${r.round}: ${verb[r.result]} ${r.pointsFor}–${r.pointsAgainst} ${r.home ? 'at home' : 'away'}`)
+    .map((r) => `${r.label ?? `R${r.round}`}: ${verb[r.result]} ${r.pointsFor}–${r.pointsAgainst} ${r.home ? 'at home' : 'away'}${r.decider ? ` (${r.decider.replace(/-/g, ' ')})` : ''}`)
     .join(' · ');
 }
 
@@ -142,10 +145,11 @@ export const FINALS_PLACES = 8;
  * The ladder's heading (3h): "LADDER · AFTER R2" once a round is in, "LADDER ·
  * FINAL" in the finals, plain "LADDER" before a ball is kicked.
  */
-export function ladderHeading(state: Pick<GameState, 'week' | 'league'>): string {
-  const played = state.league.ladder.reduce((m, r) => Math.max(m, r.played), 0);
+export function ladderHeading(state: Pick<GameState, 'week' | 'league'> & Partial<Pick<GameState, 'clubId' | 'season' | 'competitions'>>): string {
+  const view = leagueSeasonView(state);
+  const played = (view?.ladder ?? state.league.ladder).reduce((m, r) => Math.max(m, r.played), 0);
   if (played === 0) return 'Ladder';
-  if (state.week > SEASON_ROUNDS) return 'Ladder · final';
+  if (view ? remainingLeagueFixtures(view).length === 0 : state.week > SEASON_ROUNDS) return 'Ladder · final';
   return `Ladder · after R${played}`;
 }
 
@@ -163,6 +167,10 @@ export function roundShort(round: number): string {
 
 /** One row of "Your fixtures" (3h): round, opponent, H/A, and the result, NEXT or the week to come. */
 export interface MyFixtureRow {
+  label?: string;
+  neutral?: boolean;
+  slot?: number;
+  fixtureId?: string;
   round: number;
   rd: string;
   opponentId: string;
@@ -175,7 +183,10 @@ export interface MyFixtureRow {
 }
 
 /** The club's season one row a round, oldest first (fmtMyFixture's result, your score first). Pure. */
-export function myFixtureRows(state: Pick<GameState, 'league' | 'week'>, names: Record<string, string>, playerId: string = PLAYER_ID): MyFixtureRow[] {
+export function myFixtureRows(state: Pick<GameState, 'league' | 'week'> & Partial<Pick<GameState, 'clubId' | 'season' | 'competitions'>>, names: Record<string, string>, playerId: string = PLAYER_ID): MyFixtureRow[] {
+  const view = leagueSeasonView(state);
+  if (view) return view.fixtures.filter(f => f.fixture.homeId === playerId || f.fixture.awayId === playerId)
+    .map(f => calendarFixtureRow(f, view, names, playerId));
   const next = nextFixture(state.league.fixtures, state.week, playerId);
   const out: MyFixtureRow[] = [];
   for (const { fixtures } of fixturesByRound(state.league.fixtures)) {
@@ -191,6 +202,84 @@ export function myFixtureRows(state: Pick<GameState, 'league' | 'week'>, names: 
   return out;
 }
 
+/** Preserve actual scores and official deciders without turning a tied final into a draw. */
+function calendarFixtureRow(f: LeagueFixtureView, view: LeagueSeasonView, names: Record<string, string>, playerId: string): MyFixtureRow {
+  const home = f.fixture.homeId === playerId;
+  const opponentId = home ? f.fixture.awayId : f.fixture.homeId;
+  const score = f.fixture.result;
+  const us = score ? home ? score.homeScore : score.awayScore : 0;
+  const them = score ? home ? score.awayScore : score.homeScore : 0;
+  const result: FormResult | undefined = f.status === 'completed' && score
+    ? f.winnerId ? f.winnerId === playerId ? 'W' : 'L' : us > them ? 'W' : us < them ? 'L' : 'D' : undefined;
+  const tone = result ?? (view.next?.fixture.id === f.fixture.id ? 'next' : 'later');
+  const decider = f.decider && !['score', 'draw'].includes(f.decider) ? ` · ${f.decider.replace(/-/g, ' ')}` : '';
+  const res = result ? `${result} ${us}–${them}${decider}` : f.status === 'cancelled' ? 'Cancelled'
+    : f.instance.status === 'withdrawn' ? 'Withdrawn' : tone === 'next' ? 'NEXT' : f.status === 'pending' ? 'Pending' : f.dateLabel;
+  return { round: f.fixture.round, rd: f.slot === null ? '—' : `W${f.slot}`, ...(f.slot === null ? {} : { slot: f.slot }), fixtureId: f.fixture.id,
+    label: `${f.dateLabel} · ${f.stageLabel}`, opponentId, opponent: names[opponentId] ?? opponentId,
+    home, neutral: f.fixture.neutral, tone, res };
+}
+
+function buildCalendarFixtures(state: GameState, view: LeagueSeasonView): LeagueColumn {
+  const col = el('div', { class: 'nrl-league-col nrl-league-fixtures nrl-league-calendar-fixtures' });
+  const label = el('span', { class: 'nrl-label nrl-league-label' });
+  const list = el('div', { class: 'nrl-fixtures-list' });
+  const names = clubLabels(state.league.clubs);
+  let current: HTMLElement | null = null;
+  const toggle = button('', () => { fixturesView = fixturesView === 'mine' ? 'all' : 'mine'; render(); scroll.reveal(); }, { class: 'nrl-fixtures-toggle' });
+  const render = (): void => {
+    current = null; list.replaceChildren();
+    label.textContent = fixturesView === 'mine' ? 'Your fixtures' : 'League games';
+    toggle.textContent = fixturesView === 'mine' ? 'All games ▸' : '◂ Yours';
+    toggle.setAttribute('data-fixtures-view', fixturesView === 'mine' ? 'all' : 'mine');
+    if (fixturesView === 'mine') {
+      for (const f of view.fixtures.filter(f => f.fixture.homeId === view.clubId || f.fixture.awayId === view.clubId)) {
+        const r = calendarFixtureRow(f, view, names, view.clubId);
+        const attrs = { 'data-fixture-id': f.fixture.id, 'data-slot': f.slot === null ? 'undated' : String(f.slot), 'data-player': 'true',
+          'aria-label': `${r.label} · ${r.opponent} · ${r.neutral ? 'Neutral' : r.home ? 'Home' : 'Away'} · ${r.res}` };
+        const row = r.tone === 'next'
+          ? el('button', { class: 'nrl-fixture-row nrl-fixture-mine', attrs: { ...attrs, type: 'button', 'data-next-row': '' }, onClick: () => openNextMatch() }, ...myFixtureParts(r))
+          : el('div', { class: 'nrl-fixture-row nrl-fixture-mine', attrs }, ...myFixtureParts(r));
+        const item = el('div', { class: 'nrl-calendar-fixture' },
+          el('div', { class: 'nrl-label nrl-fixtures-round', text: r.label ?? '' }), row);
+        if (r.tone === 'next') current = item;
+        list.append(item);
+      }
+    } else {
+      let dateGroup = '';
+      let header: HTMLElement | undefined;
+      for (const f of view.fixtures) {
+        const group = `${f.dateLabel} · ${f.stageLabel}`;
+        if (group !== dateGroup) {
+          dateGroup = group;
+          header = el('div', { class: 'nrl-label nrl-fixtures-round', text: group });
+          list.append(header);
+        }
+        if (f.slot === state.week && leagueFixtureActivity(f) && header) {
+          header.setAttribute('data-current', 'true'); current = header;
+        }
+        const fixture = f.fixture;
+        const result = fixture.result;
+        const score = result ? `${result.homeScore}–${result.awayScore}` : 'v';
+        const status = f.status === 'cancelled' ? ' · Cancelled' : f.instance.status === 'withdrawn' && !result ? ' · Withdrawn' : f.status === 'pending' ? ' · Pending' : '';
+        const decider = result && f.decider && !['score', 'draw'].includes(f.decider)
+          ? ` · ${names[f.winnerId ?? ''] ?? f.winnerId} won by ${f.decider.replace(/-/g, ' ')}` : '';
+        const line = el('div', { class: 'nrl-fixture', attrs: { 'data-fixture-id': fixture.id },
+          text: `${names[fixture.homeId] ?? fixture.homeId} ${score} ${names[fixture.awayId] ?? fixture.awayId}${status}${decider}${fixture.neutral ? ' · Neutral' : ''}` });
+        if (fixture.homeId === view.clubId || fixture.awayId === view.clubId) line.setAttribute('data-player', 'true');
+        list.append(line);
+      }
+    }
+    if (!list.children.length) list.append(el('p', { text: 'No scheduled fixtures.' }));
+  };
+  const scroll = columnScroll(list, () => centreIn(list, current));
+  render();
+  const currentText = view.choiceRequired ? 'League selection required' : `Week ${state.week} · ${view.currentLabel}`;
+  col.append(el('div', { class: 'nrl-fixtures-head' }, label, toggle),
+    el('p', { class: 'nrl-league-foot', text: currentText }), list);
+  return { el: col, ...scroll };
+}
+
 // ── DOM screens ────────────────────────────────────────────────────────────────
 
 /** One "Your fixtures" row's parts: round, opponent, H / A, result. */
@@ -199,7 +288,7 @@ export function myFixtureParts(r: MyFixtureRow): HTMLElement[] {
     el('span', { class: 'nrl-fixture-rd', text: r.rd }),
     // H / A beside the name, not in it (#616): a long opponent is cut, never the marker.
     el('span', { class: 'nrl-fixture-opp', text: `v ${r.opponent}` }),
-    el('span', { class: 'nrl-fixture-ha', text: r.home ? 'H' : 'A', attrs: { title: r.home ? 'Home' : 'Away' } }),
+    el('span', { class: 'nrl-fixture-ha', text: r.neutral ? 'N' : r.home ? 'H' : 'A', attrs: { title: r.neutral ? 'Neutral' : r.home ? 'Home' : 'Away' } }),
     el('span', { class: `nrl-fixture-res nrl-fixture-${r.tone}`, text: r.tone === 'next' ? 'NEXT ▸' : r.res }),
   ];
 }
@@ -209,9 +298,9 @@ export function myFixtureParts(r: MyFixtureRow): HTMLElement[] {
  * coming week's (rolled at the end of the last), so it counts only when the next
  * fixture is this coming week's. Pure.
  */
-export function forecastFor(state: Pick<GameState, 'league' | 'week' | 'weather' | 'preseason'>): WeatherKind | undefined {
-  const f = nextFixture(state.league.fixtures, state.week, 'player');
-  return f && f.round === currentRound(state) ? state.weather : undefined;
+export function forecastFor(state: Pick<GameState, 'league' | 'week' | 'weather' | 'preseason'> & Partial<Pick<GameState, 'clubId' | 'season' | 'competitions'>>): WeatherKind | undefined {
+  const f = nextSeasonFixture(state);
+  return f && (f.slot ?? f.round) === (state.competitions?.leagueCareer ? state.week : currentRound(state)) ? state.weather : undefined;
 }
 
 /** No club's name on the ladder is longer than this (QA finding 3: long names wrapped at 844px). */
@@ -231,13 +320,15 @@ export function clubLabels(clubs: readonly { id: string; name: string }[]): Reco
 }
 
 /** Open the League sheet ('fixtures' lights League; so does 'ladder', which it holds). */
-export function openFixturesScreen(): HTMLElement {
-  return openLeagueScreen('fixtures');
+export interface LeagueScreenOptions { onChooseLeague?: () => void }
+
+export function openFixturesScreen(opts: LeagueScreenOptions = {}): HTMLElement {
+  return openLeagueScreen('fixtures', opts);
 }
 
 /** Open the League sheet from somewhere that asked for the ladder (the Guide). */
-export function openLadderScreen(): HTMLElement {
-  return openLeagueScreen('ladder');
+export function openLadderScreen(opts: LeagueScreenOptions = {}): HTMLElement {
+  return openLeagueScreen('ladder', opts);
 }
 
 /**
@@ -245,7 +336,7 @@ export function openLadderScreen(): HTMLElement {
  * are drawn again when the state changes under the open sheet (#603): a week
  * advanced from the dock, a rival renamed in the squad sheet over this one.
  */
-function openLeagueScreen(key: 'fixtures' | 'ladder'): HTMLElement {
+function openLeagueScreen(key: 'fixtures' | 'ladder', opts: LeagueScreenOptions): HTMLElement {
   ensureLeagueStyles();
   const sheet = el('div', { class: 'nrl-screen nrl-league' });
   let cols: LeagueColumn[] = [];
@@ -254,6 +345,26 @@ function openLeagueScreen(key: 'fixtures' | 'ladder'): HTMLElement {
     const state = getState();
     drop();
     cols = [buildLadder(state), buildFixtures(state)];
+    const view = leagueSeasonView(state);
+    sheet.classList.toggle('nrl-league-calendar', !!view);
+    if (view) {
+      const heading = el('div', { class: 'nrl-league-calendar-heading' },
+        el('h2', { text: view.division.name }),
+        el('p', { text: `Nines · ${view.fieldSize} clubs · ${view.regularRounds} regular rounds · ${view.finalsSize ? `Top ${view.finalsSize} finals` : 'No finals'} · ${view.calendar.slots.length} weeks` }));
+      if (!view.choiceRequired) heading.append(el('p', { text: view.goal }));
+      if (view.choiceRequired) {
+        heading.append(el('p', { text: view.phase === 'initial-choice' ? 'Choose and confirm your league before playing. This is the proposed opening schedule.' : 'Season complete. Choose your next league before playing.' }));
+        if (opts.onChooseLeague && !state.sacked) {
+          const choose = button(view.phase === 'initial-choice' ? 'Choose league' : 'Choose next league', () => {
+            const live = getState();
+            if (!live.sacked && !weekHeld() && !playerMatchPending() && leagueChoiceRequired(live)) opts.onChooseLeague?.();
+          }, { class: 'nrl-btn-primary' });
+          choose.setAttribute('data-choose-league', '');
+          heading.append(choose);
+        }
+      }
+      cols[0]!.el.prepend(heading);
+    }
     sheet.replaceChildren(...cols.map((c) => c.el));
   };
   // Each column goes back where it was, and the preview over the sheet is of the match now coming.
@@ -316,19 +427,23 @@ interface LeagueColumn {
  * its place follows its row again (the club moves on the ladder, NEXT moves down
  * a round); one the player scrolled goes back to where he put it.
  */
-function columnScroll(box: HTMLElement | null, show: () => void): Omit<LeagueColumn, 'el'> {
+function columnScroll(box: HTMLElement | null | (() => HTMLElement), show: () => void): Omit<LeagueColumn, 'el'> {
+  const currentBox = (): HTMLElement | null => typeof box === 'function' ? box() : box;
   let rest = 0;
-  // Put back where the player had it: his until the column is revealed again, even at the very top.
   let held = false;
-  const reveal = (): void => { show(); rest = box?.scrollTop ?? 0; held = false; };
+  const reveal = (): void => { show(); rest = currentBox()?.scrollTop ?? 0; held = false; };
   return {
     reveal,
-    where: () => ({ top: box?.scrollTop ?? 0, left: box?.scrollLeft ?? 0, byHand: held || Math.abs((box?.scrollTop ?? 0) - rest) > 1 }),
+    where: () => {
+      const node = currentBox();
+      return { top: node?.scrollTop ?? 0, left: node?.scrollLeft ?? 0, byHand: held || Math.abs((node?.scrollTop ?? 0) - rest) > 1 };
+    },
     resume: (at) => {
-      if (!box) return;
-      box.scrollLeft = at.left;
+      const node = currentBox();
+      if (!node) return;
+      node.scrollLeft = at.left;
       if (!at.byHand) { reveal(); return; }
-      box.scrollTop = at.top;
+      node.scrollTop = at.top;
       held = true;
     },
   };
@@ -352,15 +467,18 @@ function formCells(form: readonly FormResult[]): HTMLElement {
  */
 function buildLadder(state: GameState): LeagueColumn {
   const col = el('div', { class: 'nrl-league-col nrl-league-ladder' });
-  if (state.league.ladder.length === 0) {
+  const view = leagueSeasonView(state);
+  const ladder = view?.ladder ?? state.league.ladder;
+  const clubs = view?.clubs ?? state.league.clubs;
+  if (ladder.length === 0) {
     col.append(el('div', { class: 'nrl-label nrl-league-label', text: 'Ladder' }), el('p', { class: 'nrl-league-empty', text: 'No ladder yet — season not started.' }));
     return { el: col, ...columnScroll(null, () => {}) };
   }
-  const names = clubLabels(state.league.clubs);
-  const full = clubNameMap(state.league.clubs);
-  const rows = ladderView(state.league.ladder, names);
+  const names = clubLabels(clubs);
+  const full = clubNameMap(clubs);
+  const rows = ladderView(ladder, names, state.clubId);
   const draws = ladderHasDraws(rows);
-  const cut = Math.min(FINALS_PLACES, rows.length);
+  const cut = Math.min(view?.finalsSize ?? FINALS_PLACES, rows.length);
 
   const table = el('table', { class: `nrl-table nrl-ladder-table${draws ? ' nrl-ladder-draws' : ''}` });
   const cols = ['pos', 'club', 'n', 'n', ...(draws ? ['n'] : []), 'n', 'diff', 'pts', 'form'];
@@ -390,7 +508,7 @@ function buildLadder(state: GameState): LeagueColumn {
       el('td', { class: 'nrl-num nrl-ladder-diff', text: diff }),
       el('td', { class: 'nrl-num nrl-ladder-pts', text: String(r.points) }),
       // Last five, oldest first (N7, #183). How a side plays is on its squad page (#351 X4).
-      el('td', { class: 'nrl-ladder-form' }, formCells(formGuide(state.league.fixtures, r.clubId))),
+      el('td', { class: 'nrl-ladder-form' }, formCells(seasonFormGuide(state, r.clubId))),
     );
     if (r.isPlayer) { tr.setAttribute('data-player', 'true'); mine = tr; }
     if (r.pos === cut && cut < rows.length) tr.setAttribute('data-cut', '');
@@ -402,9 +520,16 @@ function buildLadder(state: GameState): LeagueColumn {
   }
   table.append(tbody);
   const scroll = el('div', { class: 'nrl-ladder-scroll' }, table);
-  const drop = hintScroll(scroll); // five rows of sixteen looked like the ladder (#610); each redraw's box gets its own
-  col.append(scroll, el('div', { class: 'nrl-league-foot', text: `Top ${cut} make the finals · tap a club for its squad` }));
-  return { el: col, drop, ...columnScroll(scroll, () => centreIn(scroll, mine)) };
+  // Short League screens scroll the heading and table together, avoiding a
+  // second vertical scroll box with only a sliver left for the ladder.
+  const scrollBox = (): HTMLElement => view && typeof getComputedStyle === 'function' && getComputedStyle(col).overflowY === 'auto' ? col : scroll;
+  const drops = [hintScroll(scroll), ...(view ? [hintScroll(col)] : [])];
+  const drop = (): void => { for (const off of drops) off(); };
+  col.append(scroll, el('div', { class: 'nrl-league-foot', text: `${cut ? `Top ${cut} make the finals` : 'No finals'} · tap a club for its squad` }));
+  return { el: col, drop, ...columnScroll(scrollBox, () => {
+    // Start at the goal on a short screen; the whole table is reached by scrolling.
+    if (scrollBox() === scroll) centreIn(scroll, mine);
+  }) };
 }
 
 // ── The fixtures ───────────────────────────────────────────────────────────────
@@ -430,6 +555,8 @@ export function fmtMyFixture(f: Fixture, names: Record<string, string>, playerId
  * the coming round is in view.
  */
 function buildFixtures(state: GameState): LeagueColumn {
+  const view = leagueSeasonView(state);
+  if (view) return buildCalendarFixtures(state, view);
   const col = el('div', { class: 'nrl-league-col nrl-league-fixtures' });
   const label = el('span', { class: 'nrl-label nrl-league-label' });
   const list = el('div', { class: 'nrl-fixtures-list' });
@@ -511,14 +638,15 @@ function nextMatchCard(state: GameState, card: HTMLElement = el('div', { class: 
   const forecast = forecastFor(state);
   const p = nextMatchPreview(state, forecast ? { weather: forecast } : {});
   if (!p) {
-    const text = state.week > SEASON_ROUNDS ? 'No more matches this season' : 'No match this week';
+    const view = leagueSeasonView(state);
+    const text = view ? view.choiceRequired ? 'Choose a league before playing' : `${view.currentLabel} · no scheduled club match` : state.week > SEASON_ROUNDS ? 'No more matches this season' : 'No match this week';
     card.append(el('div', { class: 'nrl-next-head' }, el('span', { class: 'nrl-next-label', text: 'Next match' }), el('span', { class: 'nrl-next-where', text })));
     return card;
   }
-  const stage = p.stage === 'Trial' ? `Pre-season trial ${p.round + 2}` : p.stage === 'Round' ? `Round ${p.round}` : p.stage;
+  const stage = p.label ?? (p.stage === 'Trial' ? `Pre-season trial ${p.round + 2}` : p.stage === 'Round' ? `Round ${p.round}` : p.stage);
   card.append(el('div', { class: 'nrl-next-head' },
     el('span', { class: 'nrl-next-label', text: 'Next match' }),
-    el('span', { class: 'nrl-next-where', text: `${stage} · ${p.home ? 'Home' : 'Away'}` }),
+    el('span', { class: 'nrl-next-where', text: `${stage} · ${p.neutral ? 'Neutral' : p.home ? 'Home' : 'Away'}` }),
   ));
 
   const oppClub = state.league.clubs.find((c) => c.id === p.opponent.id);
@@ -582,8 +710,20 @@ function ensureLeagueStyles(): void {
 
 export const LEAGUE_CSS = `
 /* 3h: one sheet, the ladder and the fixtures side by side; each column scrolls inside itself. */
+.nrl-league-calendar-heading h2 { margin: 0; font-size: 1rem; }
+.nrl-league-calendar-heading p { font-size: 0.75rem; margin: 4px 0; }
+.nrl-league-calendar-heading { margin-bottom: 8px; }
+.nrl-league-calendar-fixtures .nrl-fixtures-toggle.nrl-btn { min-height: 44px; height: auto; white-space: normal; }
+.nrl-league-calendar-fixtures .nrl-fixtures-toggle.nrl-btn::after { inset: 0; }
+.nrl-league-calendar-fixtures .nrl-fixture-res { white-space: normal; overflow-wrap: anywhere; text-align: right; max-width: 45%; }
+.nrl-league-calendar-fixtures .nrl-fixture-row { min-height: 44px; height: auto; }
+.nrl-league-calendar-fixtures .nrl-fixtures-round { white-space: normal; }
 .nrl-screen.nrl-league { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 18px; }
 .nrl-league-col { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+@media (max-height: 360px) {
+  .nrl-league-calendar .nrl-league-ladder { display: block; overflow-y: auto; overscroll-behavior: contain; }
+  .nrl-league-calendar .nrl-ladder-scroll { overflow: visible; }
+}
 .nrl-league-label { display: flex; align-items: center; min-height: 24px; }
 .nrl-league-empty { color: var(--nrl-muted); margin: 8px 0; }
 .nrl-league-foot { flex: 0 0 auto; margin-top: 4px; font-size: 0.6875rem; color: var(--nrl-muted); }

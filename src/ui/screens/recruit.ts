@@ -1,3 +1,4 @@
+import { careerActionClock } from '../../core/season';
 import { discoveredFreeAgents } from '../../systems/playerCareer';
 // src/ui/screens/recruit.ts — free-agency browser screen (BAK-179, WU-9).
 // Renders GameState.freeAgents as a table (3g, Broadcast Quiet) with SIGN
@@ -449,7 +450,7 @@ export function openRecruitScreen(): void {
     const when = n === 1 ? 'after this week' : `in ${n} weeks`;
     // The bank as the dock writes it (#600): in debt it is "-$84,448", the sign before the dollar.
     const bank = fmtMoney(s.money);
-    sub.textContent = `Free agents · ${discovered.length} scouted · next discovery ${when} · squad ${s.squad.length}/${SQUAD_CAP} · bank ${bank}`;
+    sub.textContent = `Free agents${careerActionClock(s).structural ? ` · season ${careerActionClock(s).season}` : ''} · ${discovered.length} scouted · next discovery ${when} · squad ${s.squad.length}/${SQUAD_CAP} · bank ${bank}`;
     sub.title = `${discovered.length} scouted players; discovery refreshes ${when}. Squad ${s.squad.length} of ${SQUAD_CAP}. Bank ${bank}.`;
     if (discovered.length === 0) {
       list.appendChild(el('div', { class: 'nrl-screen-empty', text: `No scouted free agents available. Discovery refreshes ${when}.` }));
@@ -465,7 +466,7 @@ export function openRecruitScreen(): void {
     for (const { p: agent, fee, ovr } of visible) {
       const reach = !fullView && agent.id === shortlist.reachId;
       const salary = salaryDemand(agent);
-      const overCap = !capRoomFor(s.squad, s.capAccount, s.season, salary);
+      const overCap = !capRoomFor(s.squad, s.capAccount, careerActionClock(s).season, salary);
       const short = fee - s.money;
       const blocked = full || short > 0 || overCap;
       const action = button(full ? 'SQUAD FULL' : overCap ? 'OVER CAP' : short > 0 ? `NEED ${fmtMoneyShort(short, { roundUp: true })}` : 'SIGN', () => {

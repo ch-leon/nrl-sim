@@ -1,9 +1,11 @@
+import { leagueCareerStateProblem } from '../systems/leagueEntryValidation';
+import { migrateObservedProtection } from '../systems/cap';
 import { initialPlayerPopulation, installPlayerHistory } from '../systems/playerCareer';
 import { reconcileMatchIncome } from '../systems/matchIncome';
 import { currentRound } from './season';
 import { careerNamespace } from './storage/local';
 import { DEV_TEST_PREFIX } from './storageKeys';
-import { fixtureBridge, hasStructuralCalendar, recoverUnfinishableCompetitions, sameFixtureIdentity, structuralPolicyProblem } from '../systems/competitionCalendar';
+import { currentCalendarFixtures, fixtureBridge, hasStructuralCalendar, recoverUnfinishableCompetitions, sameFixtureIdentity, structuralPolicyProblem } from '../systems/competitionCalendar';
 // src/core/save.ts — persistence, migration, slots + title flow
 // (BAK-174, WU-4; migration/export/import/slots: GitHub #34; storage seam: #360).
 //
@@ -20,15 +22,15 @@ import { fixtureBridge, hasStructuralCalendar, recoverUnfinishableCompetitions, 
 
 import type { Fixture, GameState } from './state';
 import { validateInput, validateCurrent, REPAIR_NOTICE, type SaveRepair } from './saveValidation';
-import { emptyFinance, getState, SAVE_VERSION, setState } from './state';
+import { emptyFinance, getState, SAVE_VERSION, setState, stateInstallation } from './state';
 import { fromLegacy, isTraitId, type TraitInstance } from '../data/traits';
 import { withRivalSquads } from '../systems/rivals';
 import { autoPick } from '../systems/lineup';
 import { DEFAULT_TACTICS } from '../match/league/presets';
 import { bus } from './events';
-import { registerTickHook, TICK_ORDER, unregisterTickHook, weekHeld } from './time';
-import { clearLiveMatch, LIVE_MATCH_EXPORT_FIELD, peelLiveMatchExport, readLiveMatch, writeLiveMatch } from '../systems/liveMatchRecord';
-import { CORRUPT_SAVE_KEY, LEGACY_SAVE_KEY, slotKey } from './storageKeys';
+import { registerTickHook, TICK_ORDER, unregisterTickHook, weekHeld, leagueIntervalSaveHeld, failedIntervalProblem, failedIntervalCheckpoint, type IntervalCheckpoint } from './time';
+import { clearLiveMatch, isLiveMatchRecord, LIVE_MATCH_EXPORT_FIELD, peelLiveMatchExport, readLiveMatch, writeLiveMatch } from '../systems/liveMatchRecord';
+import { CORRUPT_SAVE_KEY, LEGACY_SAVE_KEY, liveMatchKey, slotKey } from './storageKeys';
 import { BRAND } from '../brand';
 import { cleanName } from '../data/names';
 import { allPlayers, renameClubsPatch, renamePlayersPatch, validClubColors, type ClubEdit } from '../systems/rename';
@@ -66,6 +68,7 @@ function approveOriginal(store: LocalSaveStore, slot: number, raw: string, prese
 export function __setStorage(s: StorageLike | null): void {
   injectedStorage = s;
   approvedOriginals = new WeakMap();
+  pendingLeagueSave = undefined;
   slotImported = false; // a fresh storage is a fresh page
 }
 
@@ -323,6 +326,16 @@ export const MIGRATIONS: readonly MigrationStep[] = [
   } },
   // v29 starts receipt-backed income without retroactive claims on v28 results.
   { from: 28, to: 29, run: old => ({ ...old, matchIncome: [] }) },
+  // v31 adds optional progression; no historical titles or entry are inferred.
+  { from: 30, to: 31, run: old => ({ ...old }) },
+  // v32 snapshots the agreement observed under v31 ID-only protection.
+  // Already recorded exact terms keep their provenance, including queued terms.
+  { from: 31, to: 32, run: old => {
+    const state = old as unknown as GameState;
+    return { ...old, capAccount: migrateObservedProtection(state.squad, state.capAccount, state.season),
+      league: { ...state.league, clubs: state.league.clubs.map(c => c.squad && c.capAccount
+        ? { ...c, capAccount: migrateObservedProtection(c.squad, c.capAccount, state.season) } : c) } };
+  } },
 ];
 
 /** Old string traits → instances; instances already in the new shape pass through. */
@@ -363,6 +376,14 @@ function migrateChecked(raw: unknown): MigrateResult {
       outcome: 'unsupported', reason: 'future',
       message: `This save is from a newer version of ${BRAND.name} (save v${version}, this game supports v${SAVE_VERSION}). Update the game to load it.`,
     };
+  }
+  const competitions = cur.competitions;
+  if (competitions && typeof competitions === 'object' && 'leagueCareer' in competitions) {
+    const state = cur as unknown as GameState;
+    const problem = leagueCareerStateProblem(state);
+    return problem ? { ok: false, outcome: problem.reason === 'unsupported' ? 'unsupported' : 'unrecoverable',
+      reason: 'corrupt', message: problem.message }
+      : { ok: true, outcome: 'valid', state, repairs: [] };
   }
   // Pre-finance careers are kept and are not converted. v28 and later migrate.
   if (version <= LAST_PRE_FINANCE_VERSION) {
@@ -456,7 +477,11 @@ export function getSlotSummaries(): SlotSummary[] {
 // ── save / load / clear ──────────────────────────────────────────────────────
 
 /** Write `state` to `slot`. Returns false (after warning + ui:notify) on failure. */
-export function writeSlot(slot: number, state: GameState): boolean {
+export function writeSlot(slot: number, state: GameState, expectedOriginal?: string | null): boolean {
+  return persistSlot(slot, state, expectedOriginal);
+}
+
+function persistSlot(slot: number, state: GameState, expectedOriginal?: string | null, parkedMatch?: string): boolean {
   if (savesLocked) return false;
   const store = getStore();
   if (!store) {
@@ -466,6 +491,7 @@ export function writeSlot(slot: number, state: GameState): boolean {
   }
   try {
     const original = store.read(slot);
+    if (expectedOriginal !== undefined && expectedOriginal !== original) return false;
     if (original !== null) {
       const approved = approvedOriginals.get(store)?.get(slot);
       if (approved?.raw !== original) {
@@ -477,7 +503,7 @@ export function writeSlot(slot: number, state: GameState): boolean {
     }
     const payload = JSON.stringify(state);
     const facts = { saveVersion: state.version, club: String(state.clubName), season: state.season, week: state.week };
-    store.write(slot, payload, nextMeta(store.storedMeta(slot), payload, facts, store.deviceId(), Date.now()));
+    store.write(slot, payload, nextMeta(store.storedMeta(slot), payload, facts, store.deviceId(), Date.now()), parkedMatch);
     approveOriginal(store, slot, payload, false);
   } catch (err) {
     console.warn('nrl-sim: save failed', err);
@@ -543,6 +569,42 @@ export function __unlockSaves(): void {
   savesLocked = false;
 }
 
+const PENDING_LEAGUE_SAVE = 'The completed week could not be saved. Retry saving or reload the last saved match.';
+interface PendingLeagueSave extends IntervalCheckpoint {
+  state: GameState;
+  installation: number;
+  saving: boolean;
+  retireMatch: () => void;
+}
+let pendingLeagueSave: PendingLeagueSave | undefined;
+
+function currentPendingSave(): PendingLeagueSave | undefined {
+  if (pendingLeagueSave && pendingLeagueSave.installation !== stateInstallation()) pendingLeagueSave = undefined;
+  return pendingLeagueSave;
+}
+
+function sameDestination(pending: IntervalCheckpoint): boolean {
+  return activeSlot === pending.slot && careerNamespace() === pending.namespace;
+}
+
+export function pendingLeagueSaveProblem(): string | null {
+  return currentPendingSave() ? PENDING_LEAGUE_SAVE : null;
+}
+
+/** The sidecar belongs to the saved kick-off until the exact settled snapshot
+ * is durable. Retry that snapshot before advancing or saving a later edit. */
+export function saveSettledLeagueMatch(state: GameState, checkpoint: IntervalCheckpoint, retireMatch: () => void): boolean {
+  pendingLeagueSave = {state, source: checkpoint.source, slot: checkpoint.slot, namespace: checkpoint.namespace,
+    installation: stateInstallation(), saving: false, retireMatch};
+  return saveIfChanged(state);
+}
+
+export function retryPendingLeagueSave(): string | null {
+  const pending = currentPendingSave();
+  if (!pending) return null;
+  return saveIfChanged(pending.state) && stateInstallation() === pending.installation ? null : PENDING_LEAGUE_SAVE;
+}
+
 /**
  * Save the game being played unless the active slot already holds exactly these
  * bytes, so a career with nothing new to save is not written at all (#519: going
@@ -550,12 +612,28 @@ export function __unlockSaves(): void {
  * a save was needed and did not land.
  */
 export function saveIfChanged(state: GameState): boolean {
+  if (weekHeld() || leagueIntervalSaveHeld() || failedIntervalProblem() || slotImported || savesLocked) return false;
+  const pending = currentPendingSave();
+  if (pending) {
+    if (pending.saving || !sameDestination(pending)) return false;
+    pending.saving = true;
+    try {
+      if (!persistIfChanged(pending.state) || currentPendingSave() !== pending || !sameDestination(pending)) return false;
+      lastSaved = pending.state;
+      pendingLeagueSave = undefined;
+      pending.retireMatch();
+      if (pending.state === state) return true;
+    } finally { pending.saving = false; }
+  }
+  return persistIfChanged(state);
+}
+
+function persistIfChanged(state: GameState): boolean {
   const store = getStore();
   if (!store) return false;
   try {
     if (store.read(activeSlot) === JSON.stringify(state)) return true;
-  } catch { /* unreadable: try the write */ }
-  if (weekHeld() || slotImported || savesLocked) return false;
+  } catch { return false; } // An unreadable slot cannot safely be replaced.
   return writeSlot(activeSlot, state) ? (lastSaved = state, true) : false;
 }
 
@@ -570,7 +648,8 @@ export function saveIfChanged(state: GameState): boolean {
  * the active slot: the page is on its way to the title screen to load it.
  */
 export function save(state: GameState): void {
-  if (weekHeld() || slotImported || savesLocked) return;
+  if (weekHeld() || leagueIntervalSaveHeld() || failedIntervalProblem() || slotImported || savesLocked) return;
+  if (currentPendingSave()) { saveIfChanged(state); return; }
   if (writeSlot(activeSlot, state)) lastSaved = state;
 }
 
@@ -581,29 +660,39 @@ export type LoadResult =
 
 /** Read without changing the source, including legacy and future-version bytes. */
 export function loadSlot(slot = activeSlot): LoadResult {
+  return captureSlot(slot).result;
+}
+
+/** The status shown when replacing a club and the bytes authorized by that choice
+ * come from one read. The writer compares them again after asynchronous setup. */
+export function captureSlot(slot: number): { result: LoadResult; raw: string | null } {
   const store = getStore();
-  if (!store) return { status: 'corrupt', outcome: 'unrecoverable', message: 'Storage unavailable. Your career may still be on this device.' };
   try {
+    if (!store) throw new Error('Storage unavailable');
     const raw = store.read(slot);
-    if (raw === null) return { status: 'empty' };
-    const res = parseSave(raw);
-    if (!res.ok) return { status: res.reason, outcome: res.outcome, message: res.message };
-    if (hasStructuralCalendar(res.state) && (careerNamespace() !== DEV_TEST_PREFIX || structuralPolicyProblem(res.state)))
-      return { status: 'corrupt', outcome: 'unrecoverable', message: structuralPolicyProblem(res.state) ?? 'Competition prototypes require the isolated developer career.' };
-    // An offered, qualified or entered competition can never finish on this calendar.
-    // Close it here so a save that would freeze the week loads ready to advance.
-    const state = reconcileMatchIncome(recoverUnfinishableCompetitions(res.state));
-    // A repaired state must not reach trusted memory until its exact source is
-    // retained and verified by #522's preservation path. Persisting comes later.
-    if (res.repairs.length) {
-      try { store.keepCorrupt(raw, slot); }
-      catch { return { status: 'corrupt', outcome: 'unrecoverable', message: 'Could not preserve the original. The repaired career was not loaded.' }; }
-    }
-    approveOriginal(store, slot, raw, res.repairs.length > 0 || JSON.parse(raw).version !== SAVE_VERSION);
-    return { status: 'ok', outcome: res.outcome, state, repairs: res.repairs };
+    return { raw, result: classifySlot(store, slot, raw) };
   } catch {
-    return { status: 'corrupt', outcome: 'unrecoverable', message: 'Storage could not be read. Your career has been kept.' };
+    return { raw: null, result: { status: 'corrupt', outcome: 'unrecoverable', message: 'Storage could not be read. Your career has been kept.' } };
   }
+}
+
+function classifySlot(store: LocalSaveStore, slot: number, raw: string | null): LoadResult {
+  if (raw === null) return { status: 'empty' };
+  const res = parseSave(raw);
+  if (!res.ok) return { status: res.reason, outcome: res.outcome, message: res.message };
+  if (!res.state.competitions?.leagueCareer && hasStructuralCalendar(res.state) && (careerNamespace() !== DEV_TEST_PREFIX || structuralPolicyProblem(res.state)))
+    return { status: 'corrupt', outcome: 'unrecoverable', message: structuralPolicyProblem(res.state) ?? 'Competition prototypes require the isolated developer career.' };
+  // An offered, qualified or entered competition can never finish on this calendar.
+  // Close it here so a save that would freeze the week loads ready to advance.
+  const state = res.state.competitions?.leagueCareer ? res.state : reconcileMatchIncome(recoverUnfinishableCompetitions(res.state));
+  // A repaired state must not reach trusted memory until its exact source is
+  // retained and verified by #522's preservation path. Persisting comes later.
+  if (res.repairs.length) {
+    try { store.keepCorrupt(raw, slot); }
+    catch { return { status: 'corrupt', outcome: 'unrecoverable', message: 'Could not preserve the original. The repaired career was not loaded.' }; }
+  }
+  approveOriginal(store, slot, raw, res.repairs.length > 0 || JSON.parse(raw).version !== SAVE_VERSION);
+  return { status: 'ok', outcome: res.outcome, state, repairs: res.repairs };
 }
 
 /** Compatibility wrapper. Rejected careers stay in place and cannot be autosaved over. */
@@ -729,10 +818,40 @@ function heldWeekSnapshot(): GameState | null {
  * caller (downloadSave) refuses; this falls back to `state` only then.
  */
 export function exportSave(state: GameState): string {
+  return saveExport(state).text;
+}
+
+interface SaveExport { text: string; state: GameState; notice?: string }
+
+function saveExport(state: GameState): SaveExport {
+  const checkpoint = currentPendingSave() ?? failedIntervalCheckpoint();
+  if (checkpoint) return recoveryExport(checkpoint);
   const snap = heldWeekSnapshot();
   const live = snap ? readLiveMatch() : null;
   const payload = live ? { ...snap, [LIVE_MATCH_EXPORT_FIELD]: live } : (snap ?? state);
-  return JSON.stringify(payload, null, 2);
+  return {text: JSON.stringify(payload, null, 2), state: snap ?? state, ...(snap ? {notice: EXPORT_HELD_TEXT} : {})};
+}
+
+/** Export only a checkpoint belonging to this interval and its saved match.
+ * The actual replay rechecks its computed seed and engine compatibility. */
+function recoveryExport(checkpoint: IntervalCheckpoint): SaveExport {
+  if (!sameDestination(checkpoint)) throw new Error('The recovery slot changed.');
+  const store = getStore();
+  const original = store?.read(checkpoint.slot);
+  if (!store || original == null) throw new Error('The saved interval is unavailable.');
+  const saved: GameState = JSON.parse(original);
+  if (JSON.stringify(saved) !== JSON.stringify(checkpoint.source)) throw new Error('The saved interval changed.');
+  const rawMatch = store.storage.getItem(liveMatchKey(checkpoint.slot));
+  if (rawMatch === null) return {text: original, state: saved, notice: 'Exported the saved checkpoint from the start of the week.'};
+  const live: unknown = JSON.parse(rawMatch);
+  if (!isLiveMatchRecord(live) || live.season !== saved.season || live.week !== saved.week ||
+    !currentCalendarFixtures(saved).some(({instance, fixture}) =>
+      live.competitionId === instance.id && live.fixtureId === fixture.id && live.slot === fixture.slot &&
+      live.round === fixture.round && live.homeId === fixture.homeId && live.awayId === fixture.awayId &&
+      (fixture.homeId === saved.clubId || fixture.awayId === saved.clubId)))
+    throw new Error('The saved match does not belong to this checkpoint.');
+  return {text: JSON.stringify({...saved, [LIVE_MATCH_EXPORT_FIELD]: live}, null, 2), state: saved,
+    notice: 'Exported the saved checkpoint from the start of the week with its parked match.'};
 }
 
 export type ImportResult = MigrateResult | { ok: false; message: string };
@@ -850,17 +969,23 @@ export function downloadSave(state: GameState): void {
     bus.emit('ui:notify', { text: EXPORT_HELD_FAILED_TEXT, kind: 'danger' });
     return;
   }
-  const held = weekHeld();
   if (typeof document === 'undefined' || typeof Blob === 'undefined') return;
-  const url = URL.createObjectURL(new Blob([exportSave(state)], { type: 'application/json' }));
+  let file: SaveExport;
+  try { file = saveExport(state); }
+  catch (error) {
+    if (!failedIntervalProblem() && !pendingLeagueSaveProblem()) throw error;
+    bus.emit('ui:notify', {text: 'Could not verify the saved week and its match for export. The recovery data has been kept.', kind: 'danger'});
+    return;
+  }
+  const url = URL.createObjectURL(new Blob([file.text], { type: 'application/json' }));
   const a = document.createElement('a');
   a.href = url;
-  a.download = exportFilename(state);
+  a.download = exportFilename(file.state);
   document.body.appendChild(a);
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-  if (held) bus.emit('ui:notify', { text: EXPORT_HELD_TEXT, kind: 'info' });
+  if (file.notice) bus.emit('ui:notify', { text: file.notice, kind: 'info' });
 }
 
 /** Browser: open a file picker and resolve with the chosen file's text (null if
@@ -925,14 +1050,14 @@ export function installImportedSave(text: string, slot: number): ImportResult {
   if (peeled.bad) return { ok: false, message: 'the match in this file could not be read.' };
   const res = importSave(peeled.text);
   if (!res.ok) return res;
-  if (hasStructuralCalendar(res.state) && careerNamespace() !== DEV_TEST_PREFIX) return { ok: false, message: 'Competition prototypes can only be imported into the isolated developer career.' };
+  if (!res.state.competitions?.leagueCareer && hasStructuralCalendar(res.state) && careerNamespace() !== DEV_TEST_PREFIX) return { ok: false, message: 'Competition prototypes can only be imported into the isolated developer career.' };
   if (hasStructuralCalendar(res.state)) {
     const policy = structuralPolicyProblem(res.state);
     if (policy) return { ok: false, message: policy };
   }
-  const recovered = recoverUnfinishableCompetitions(res.state);
+  const recovered = res.state.competitions?.leagueCareer ? res.state : recoverUnfinishableCompetitions(res.state);
   const installed = recovered === res.state ? res : { ...res, state: recovered };
-  const destinationStatus = loadSlot(slot);
+  const {result: destinationStatus, raw: expectedOriginal} = captureSlot(slot);
   if (destinationStatus.status !== 'empty' && destinationStatus.status !== 'ok') return { ok: false, message: 'Destination needs recovery before replacement.' };
   // Repaired/historical imports retain both the exact incoming file (including
   // its match envelope) and the occupied destination before any installation.
@@ -946,7 +1071,11 @@ export function installImportedSave(text: string, slot: number): ImportResult {
       if (destination !== null) store.keepCorrupt(destination, slot);
     } catch { return { ok: false, message: 'Could not preserve originals. Import was not installed.' }; }
   }
-  if (!writeSlot(slot, installed.state)) return { ok: false, message: '' };
+  if (installed.state.competitions?.leagueCareer && peeled.live) {
+    return persistSlot(slot, installed.state, expectedOriginal, JSON.stringify(peeled.live)) ? installed
+      : { ok: false, message: 'Could not save the League career and its parked match. Check storage and retry the import.' };
+  }
+  if (!writeSlot(slot, installed.state, expectedOriginal)) return { ok: false, message: '' };
   if (peeled.live) {
     if (!writeLiveMatch(peeled.live, slot)) clearLiveMatch(slot);
   } else {

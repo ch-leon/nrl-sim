@@ -95,10 +95,12 @@ describe('funded player transfers', () => {
   });
   it('removes seller protection and lineup references without granting buyer protection', () => {
     const { s, p, buyer } = fixture(); s.capAccount.protectedIds = [p.id];
+    s.capAccount.protectedTerms = [{playerId: p.id, salary: p.deal!.salary, startSeason: p.deal!.startSeason, endSeason: p.deal!.endSeason}];
     s.lineup.captain = p.id; s.lineup.kicker = p.id; s.lineup.starters[0] = p.id;
     const q = quotePlayerSale(s, p.id); if (!q.ok) throw Error(q.message);
     const r = applyPlayerSale(s, q.offer); if (!r.ok) throw Error(r.message);
     expect(r.state.capAccount.protectedIds).not.toContain(p.id);
+    expect(r.state.capAccount.protectedTerms).toEqual([]);
     expect(r.state.league.clubs.find(c => c.id === buyer.id)!.capAccount!.protectedIds).not.toContain(p.id);
     expect(r.state.lineup.captain).toBeNull(); expect(r.state.lineup.kicker).toBeNull();
     expect(r.state.lineup.starters).not.toContain(p.id);

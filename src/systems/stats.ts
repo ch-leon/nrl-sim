@@ -185,6 +185,11 @@ export function potmSummary(tally: PotmTally | undefined, season: number): Seaso
  * board sets the new season's objectives.
  */
 export function buildSeasonReview(before: RolloverSnapshot, after: GameState): SeasonReview {
+  return {...buildCompletedSeasonReview(before, after), ...buildAnnualReviewAdditions(before, after)};
+}
+
+/** Frozen completed-year facts, independent of next year's annual population work. */
+export function buildCompletedSeasonReview(before: Pick<RolloverSnapshot, 'season' | 'finals' | 'reputation'>, after: GameState): SeasonReview {
   const ended = before.season;
   const review: SeasonReview = {};
 
@@ -217,6 +222,13 @@ export function buildSeasonReview(before: RolloverSnapshot, after: GameState): S
     review.money = { in: Math.round(moneyIn), out: Math.round(moneyOut) };
   }
 
+  review.reputation = { from: before.reputation, to: after.reputation };
+  return review;
+}
+
+/** Acceptance can append these facts without rebuilding completed books/board/reputation. */
+export function buildAnnualReviewAdditions(before: RolloverSnapshot, after: GameState): Pick<SeasonReview, 'retired' | 'juniors' | 'movers'> {
+  const review: Pick<SeasonReview, 'retired' | 'juniors' | 'movers'> = {};
   const retiredIds = new Set(after.playerPopulation.retired.filter(p => p.retiredAt.season === after.season).map(p => p.id));
   const retired = before.squad.filter(p => retiredIds.has(p.id)).map(p => ({ name: p.name, age: p.age + 1 }));
   if (retired.length > 0) review.retired = retired;
@@ -231,7 +243,6 @@ export function buildSeasonReview(before: RolloverSnapshot, after: GameState): S
     .map((c) => ({ name: c.name, from: c.from, to: c.to }));
   if (movers.length > 0) review.movers = movers;
 
-  review.reputation = { from: before.reputation, to: after.reputation };
   return review;
 }
 
