@@ -166,7 +166,9 @@ export function decisionCard(view: DecisionView, onChoose: (id: string, index: n
     b.setAttribute('data-event-choice', String(c.index));
     b.append(el('span', { class: 'nrl-event-choice-label', text: c.label }));
     if (c.sure) {
-      b.append(el('span', { class: 'nrl-event-choice-hint', text: c.risks.length > 0 ? `Sure: ${c.sure}` : c.sure }));
+      // SuperCOOKED 56: a pill each; "Sure:" beside a risk is the green one.
+      const sure = c.risks.length > 0;
+      b.append(el('span', { class: `nrl-event-choice-hint${sure ? ' nrl-event-choice-sure' : ''}`, text: sure ? `Sure: ${c.sure}` : c.sure }));
     }
     for (const r of c.risks) b.append(el('span', { class: 'nrl-event-choice-risk', text: r }));
     choices.append(b);
