@@ -12,7 +12,8 @@ import {
   fileForKey, isMirroredKey, keyForFile, mirroredStorage, NativeMirror, startNativeMirror, type NativeFiles,
 } from '../../src/core/storage/nativeMirror';
 import { bootNativeMirror, deliverFile, exportPath } from '../../src/core/storage/native';
-import { isIosNative } from '../../src/core/storage/platform';
+import { IOS_CODE, isIosNative } from '../../src/core/storage/platform';
+import { APP_PLATFORM, IS_IOS_APP } from '../../src/platform';
 import { CACHE_KEY, STUB_KEY, commercialStorage } from '../../src/commercial/entitlements';
 import { FIRST_RUN_KEY } from '../../src/commercial/demo';
 import { LOG_MODE_KEY as OVERLAY_LOG_MODE_KEY } from '../../src/ui/screens/matchOverlay';
@@ -518,12 +519,17 @@ describe('boot on iOS, through save.ts', () => {
 });
 
 describe('web and Android: the mirror is off', () => {
-  it('isIosNative is true only for the iOS Capacitor bridge', () => {
-    expect(isIosNative({})).toBe(false); // a browser: no bridge
-    expect(isIosNative({ Capacitor: { isNativePlatform: () => true, getPlatform: () => 'android' } })).toBe(false);
-    expect(isIosNative({ Capacitor: { isNativePlatform: () => false, getPlatform: () => 'web' } })).toBe(false);
-    expect(isIosNative({ Capacitor: { isNativePlatform: () => true, getPlatform: () => 'ios' } })).toBe(true);
-    expect(isIosNative(null)).toBe(false);
+  it('isIosNative is the iPhone build flag, a build-time literal (false in this web build)', () => {
+    expect(APP_PLATFORM).toBe('web');
+    expect(IS_IOS_APP).toBe(false);
+    expect(IOS_CODE).toBe(IS_IOS_APP);
+    expect(isIosNative()).toBe(false);
+    // On the raw define, so the bundler can fold it and drop the Capacitor imports.
+    const src = readFileSync(new URL('../../src/platform.ts', import.meta.url), 'utf8');
+    expect(src).toContain("export const IS_IOS_APP: boolean = typeof __NRL_PLATFORM__ !== 'undefined' && __NRL_PLATFORM__ === 'ios';");
+    const native = readFileSync(new URL('../../src/core/storage/native.ts', import.meta.url), 'utf8');
+    expect(native.match(/import\('\.\/capacitorFiles'\)/g)).toHaveLength(2);
+    expect(native.match(/IOS_CODE \? import\('\.\/capacitorFiles'\)/g)).toHaveLength(2);
   });
 
   it('startNativeMirror off iOS loads nothing and installs nothing', async () => {
@@ -536,8 +542,6 @@ describe('web and Android: the mirror is off', () => {
 
   it('bootNativeMirror in a browser (and the Android app) leaves browserStorage as it was', async () => {
     const before = browserStorage();
-    expect(await bootNativeMirror()).toBe('inactive');
-    vi.stubGlobal('Capacitor', { isNativePlatform: () => true, getPlatform: () => 'android' });
     expect(await bootNativeMirror()).toBe('inactive');
     expect(browserStorage()).toBe(before);
   });
@@ -553,10 +557,7 @@ describe('export', () => {
   it('shares on iOS and downloads everywhere else', () => {
     expect(exportPath(true)).toBe('share-sheet');
     expect(exportPath(false)).toBe('browser-download');
-    vi.stubGlobal('Capacitor', { isNativePlatform: () => true, getPlatform: () => 'android' });
-    expect(exportPath()).toBe('browser-download');
-    vi.stubGlobal('Capacitor', { isNativePlatform: () => true, getPlatform: () => 'ios' });
-    expect(exportPath()).toBe('share-sheet');
+    expect(exportPath()).toBe('browser-download'); // this web build
   });
 
   it('the browser path downloads and says so at once, never touching the share sheet', () => {

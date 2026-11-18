@@ -3,8 +3,8 @@
 A way to put the game on Leon's own iPhone as a real app, for play-testing, with a
 free Apple ID: no Apple Developer Program, no TestFlight, no App Store. It plays
 exactly like the web build, with saves kept on that phone. This is Phase 1 of
-[docs/specs/ios.md](specs/ios.md) (the shell); durable saves, the widget extension
-and Live Activities are later phases.
+[docs/specs/ios.md](specs/ios.md) (the shell) plus Phase 2 (durable saves, below); the
+widget extension and Live Activities are later phases.
 
 The app is wrapped with [Capacitor](https://capacitorjs.com/), the same as the
 [Android test build](android-test-build.md): the same Vite build the website uses,
@@ -78,15 +78,58 @@ they need the paid account and would stop the free team signing the app.
 
 ## Saves
 
-Saves live **only on that phone**, in the app's web view storage, and persist across
-app restarts. They are **lost if the app is deleted**. iOS may also clear web view
-storage when the phone is very low on space; a native copy of every save is Phase 2 of
-the spec. Saves from the website do not appear in the app.
+Saves live **only on that phone** and persist across app restarts. They are **lost if
+the app is deleted**. iOS may clear the web view's storage when the phone is very low on
+space, so the app keeps a native copy of every save (Saves on iPhone, below). Saves from
+the website do not appear in the app: export them on the website and import the file.
 
 The game saves when it is hidden (`visibilitychange` / `pagehide`, `src/core/save.ts`)
 as well as at every week. That the hide events fire when iOS sends the app to the
 background is **not yet checked** in the app (the spec's "Still unproven" list); if it
 turns out they do not, the backstop is Capacitor's app `pause` event (`@capacitor/app`).
+
+## Saves on iPhone
+
+Phase 2 of the spec ([commercial-saves.md, "Native mirror"](specs/commercial-saves.md)).
+
+- **Where the copies live.** The game still plays from the web view's storage. Every
+  save, its meta, the live match, recovery copies, the device id, Labs, the log mode and
+  the commercial keys are also written to one file per key in the app's
+  `Library/nrl-sim-saves/` folder (not shown in the Files app; included in the phone's
+  backups). File names are the storage key, URI-encoded, plus `.txt`; a `.gone` file
+  marks a deleted key. The playtest career and the corrupt-save copy are not copied.
+- **At launch**, before the title screen reads anything, a save missing from the web
+  view is put back from its file, and a file older than the web view's copy is
+  rewritten. A deleted slot is never put back.
+- **Export** (Settings > Export save, Export names, and the recovery downloads on the
+  title screen) opens the iOS share sheet: Save to Files, AirDrop, Mail. "Exported"
+  shows only once the share completes; cancelling shows nothing. **Import** is the
+  normal file picker.
+
+**Checks by hand** (Simulator or phone). None has been run yet: the Simulator could not
+boot on the build Mac, so Phase 2 is compiled, not run.
+
+1. **Files appear after a save.** Start a career, play a week. In the Simulator:
+   `xcrun simctl get_app_container booted au.com.supercooked.bigrugbycoach.dev data`,
+   then look in `Library/nrl-sim-saves/` for `nrl-sim-save-slot-1.txt` and
+   `nrl-sim-save-meta-1.txt`. On the phone: Xcode > Window > Devices and Simulators >
+   the app > Download Container, and look in the same folder.
+2. **A cleared web view brings the career back.** Quit the app. In the Simulator, delete
+   the web view's storage: in the app's data container, remove `Library/WebKit` (and
+   `Library/Caches`), leaving `Library/nrl-sim-saves`. Relaunch: Continue shows the same
+   club, season and week. (On the phone this cannot be done by hand short of filling
+   the storage; the Simulator check stands in for it.)
+3. **A deleted slot stays deleted.** Delete a slot on the title screen, quit, clear the
+   web view's storage as in 2, relaunch: the slot is still empty, and
+   `nrl-sim-saves` holds only a `.gone` file for it.
+4. **Export to Files.** Settings > Export save: the share sheet opens; Save to Files;
+   the `.json` file is in Files and opens as the save's JSON. Cancel once: no toast.
+5. **Import through the file picker.** Settings > Import save, pick that file from
+   Files: the career loads into the slot.
+
+**For a later phase:** the Filesystem plugin reads and writes files, so Apple's privacy
+declarations file (`PrivacyInfo.xcprivacy`) will need an entry for it before App Store
+submission (spec Phase 6).
 
 ## What the iPhone build does differently
 
@@ -132,3 +175,4 @@ The Simulator cannot check these. They are Leon's to try on the phone:
 - A cold start in airplane mode.
 - Saves surviving the 7-day re-install.
 - Saving when the app is sent to the background (see Saves).
+- The Saves on iPhone checks, if the Simulator is still unavailable.

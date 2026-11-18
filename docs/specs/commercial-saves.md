@@ -84,14 +84,13 @@ copy. localStorage stays the working copy; nothing changes on the web or Android
   which writes the file to the cache and opens the share sheet (`@capacitor/share`). On
   iOS the "exported" toast shows only once the share completes; a cancel shows nothing.
   Import is unchanged.
-- **Packaging.** The Capacitor plugins load only by dynamic import on iOS
-  (`capacitorFiles.ts`), each behind `IOS_CODE` (`platform.ts`), so the web bundle has no
-  static dependency on them; their chunks are named `capacitor-*` and kept out of the PWA
-  precache. `capacitor.config.ts` sets `android.includePlugins: []` so the Android project
+- **Packaging.** The Capacitor plugins load only by dynamic import in the iOS build
+  (`capacitorFiles.ts`), each behind `IOS_CODE` (`platform.ts`); their chunks are named
+  `capacitor-*` and kept out of the PWA precache. `capacitor.config.ts` sets `android.includePlugins: []` so the Android project
   links none of them.
-- **Platform.** `isIosNative()` (`platform.ts`) reads the native bridge's
-  `Capacitor.getPlatform()`. Once there is a compile-time platform constant, setting
-  `IOS_CODE` to it drops the Capacitor chunks from web and Android builds.
+- **Platform.** `IOS_CODE` / `isIosNative()` (`platform.ts`) is `IS_IOS_APP` from
+  `src/platform.ts`, a build-time literal true only in `npm run build:ios`, so web and
+  Android builds contain no Capacitor plugin code at all.
 - **Known limits.** The Labs field length is read when `src/match/core/field.ts` loads
   (before the boot sync), so a restored Labs value applies from the next launch. File
   names assume no two keys differ only by case (the iOS volume is case-insensitive);
