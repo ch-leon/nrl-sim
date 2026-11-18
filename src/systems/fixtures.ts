@@ -691,20 +691,24 @@ export function registerFixturesSystem(): void {
       };
       if (ctx.hold && canUseWorker() && jobs.length > 0) {
         const release = ctx.hold();
-        // The week always resumes, even if landing the results throws.
-        void playRivalJobsInWorker(jobs)
-          .then(results => {if (release.current()) land(results);})
-          .catch((err: unknown) => {
-            if (!release.current()) return;
-            // Never leave the round unplayed: play it here (fixtures already landed are skipped).
-            console.error('rival round failed to land; playing it on the main thread', err);
-            try {
-              land(jobs.map(playRivalJob));
-            } catch (again: unknown) {
-              console.error('rival round failed to land again', again);
-            }
-          })
-          .finally(release);
+        // A rejected worker computation hasn't touched the career. Only that
+        // failure is safe to retry in a League interval: landing may throw
+        // after a result or a payment has already reached the live state.
+        const playLocally = (error: unknown): void => {
+          if (!release.current()) return;
+          console.error('rival round failed to land; playing it on the main thread', error);
+          land(jobs.map(playRivalJob));
+        };
+        const worker = playRivalJobsInWorker(jobs);
+        if (release.fail) {
+          void worker.then(results => { if (release.current()) land(results); }, playLocally)
+            .catch(release.fail).finally(release);
+        } else {
+          void worker.then(results => { if (release.current()) land(results); }).catch(error => {
+            try { playLocally(error); }
+            catch (again) { console.error('rival round failed to land again', again); }
+          }).finally(release);
+        }
         return;
       }
       land(jobs.map(playRivalJob));

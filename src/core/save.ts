@@ -27,7 +27,7 @@ import { withRivalSquads } from '../systems/rivals';
 import { autoPick } from '../systems/lineup';
 import { DEFAULT_TACTICS } from '../match/league/presets';
 import { bus } from './events';
-import { registerTickHook, TICK_ORDER, unregisterTickHook, weekHeld, failedIntervalProblem } from './time';
+import { registerTickHook, TICK_ORDER, unregisterTickHook, weekHeld, leagueIntervalSaveHeld, failedIntervalProblem } from './time';
 import { clearLiveMatch, LIVE_MATCH_EXPORT_FIELD, peelLiveMatchExport, readLiveMatch, writeLiveMatch } from '../systems/liveMatchRecord';
 import { CORRUPT_SAVE_KEY, LEGACY_SAVE_KEY, slotKey } from './storageKeys';
 import { BRAND } from '../brand';
@@ -566,7 +566,7 @@ export function __unlockSaves(): void {
  * a save was needed and did not land.
  */
 export function saveIfChanged(state: GameState): boolean {
-  if (weekHeld() || failedIntervalProblem() || slotImported || savesLocked) return false;
+  if (weekHeld() || leagueIntervalSaveHeld() || failedIntervalProblem() || slotImported || savesLocked) return false;
   const store = getStore();
   if (!store) return false;
   try {
@@ -586,7 +586,7 @@ export function saveIfChanged(state: GameState): boolean {
  * the active slot: the page is on its way to the title screen to load it.
  */
 export function save(state: GameState): void {
-  if (weekHeld() || failedIntervalProblem() || slotImported || savesLocked) return;
+  if (weekHeld() || leagueIntervalSaveHeld() || failedIntervalProblem() || slotImported || savesLocked) return;
   if (writeSlot(activeSlot, state)) lastSaved = state;
 }
 
@@ -745,6 +745,11 @@ function heldWeekSnapshot(): GameState | null {
  * caller (downloadSave) refuses; this falls back to `state` only then.
  */
 export function exportSave(state: GameState): string {
+  if (failedIntervalProblem()) {
+    const original = exportOriginalSave(activeSlot);
+    if (original === null) throw new Error('The saved interval is unavailable for export.');
+    return original;
+  }
   const snap = heldWeekSnapshot();
   const live = snap ? readLiveMatch() : null;
   const payload = live ? { ...snap, [LIVE_MATCH_EXPORT_FIELD]: live } : (snap ?? state);
@@ -868,7 +873,14 @@ export function downloadSave(state: GameState): void {
   }
   const held = weekHeld();
   if (typeof document === 'undefined' || typeof Blob === 'undefined') return;
-  const url = URL.createObjectURL(new Blob([exportSave(state)], { type: 'application/json' }));
+  let payload: string;
+  try { payload = exportSave(state); }
+  catch (error) {
+    if (!failedIntervalProblem()) throw error;
+    bus.emit('ui:notify', {text: 'Could not read the saved interval for export.', kind: 'danger'});
+    return;
+  }
+  const url = URL.createObjectURL(new Blob([payload], { type: 'application/json' }));
   const a = document.createElement('a');
   a.href = url;
   a.download = exportFilename(state);

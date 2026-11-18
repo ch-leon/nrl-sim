@@ -97,6 +97,7 @@ export async function advanceUntil(target: AdvanceTarget, frame: () => Promise<v
     bus.emit('ui:notify', { text, kind: 'info' });
     return { weeksPlayed: 0, stop: { kind: 'stopped', text } };
   }
+  const installation = stateInstallation();
   running = true;
   stopAsked = false;
   let run: AdvanceRun;
@@ -106,7 +107,12 @@ export async function advanceUntil(target: AdvanceTarget, frame: () => Promise<v
     running = false;
     stopAsked = false;
     // A last state:changed, so the HUD drops its progress line.
-    bus.emit('state:changed', getState());
+    const current = (): boolean => stateInstallation() === installation;
+    if (state.competitions?.leagueCareer) {
+      bus.emitSettled('state:changed', getState(), current);
+    } else {
+      bus.emit('state:changed', getState());
+    }
   }
   if (run.stop.kind === 'target') {
     bus.emit('ui:notify', { text: `Advanced ${targetLabel(target)}.`, kind: 'info' });

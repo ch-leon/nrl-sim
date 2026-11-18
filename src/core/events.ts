@@ -138,6 +138,17 @@ export class EventEmitter {
     }
   }
 
+  /** A committed League interval must reach every observer, including its waiting advance. */
+  emitSettled<K extends 'state:changed' | 'season:ended' | 'board:sacked' | 'week:advanced' | 'week:blocked'>(
+    k: K, payload: Events[K], current: () => boolean,
+  ): void {
+    for (const fn of [...(this.listeners.get(k) ?? [])]) {
+      if (!current()) return;
+      try { (fn as Handler<K>)(payload); }
+      catch (error) { console.error(`nrl-sim: ${k} observer failed`, error); }
+    }
+  }
+
   /** Test helper: remove all listeners. */
   clear(): void {
     this.listeners.clear();

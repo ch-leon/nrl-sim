@@ -9,7 +9,7 @@
 // await, no setTimeout — so pipeline order is exact and no hook can observe a
 // later hook's mutation.
 
-import { getState, setState, resetForNewSeason, stateInstallation } from './state';
+import { getState, setState, resetForNewSeason, stateInstallation, type GameState } from './state';
 import { bus } from './events';
 import { WEEKS_PER_SEASON } from '../config';
 import { inTrials } from './season';
@@ -22,7 +22,12 @@ import { saveIfChanged } from './save';
 
 /** A weekly tick hook. Synchronous by contract — never block the tick. */
 export type TickHook = (ctx: TickContext) => void;
-export interface WeekRelease { (): void; current(): boolean }
+export interface WeekRelease {
+  (afterSaved?: () => void): void;
+  current(): boolean;
+  /** Only marked intervals quarantine partially applied work. A retired token is a no-op. */
+  fail?: (error: unknown) => void;
+}
 
 export interface TickContext {
   week: number;
@@ -148,6 +153,41 @@ function sortedEntries<T extends { order: number; seq: number }>(m: Map<string, 
 
 // ── Advancing time ─────────────────────────────────────────────────────────
 
+interface LeagueInterval {
+  source: GameState;
+  installation: number;
+  published: boolean;
+  afterSaved?: () => void;
+}
+
+let leagueInterval: LeagueInterval | undefined;
+
+function ownsInterval(interval: LeagueInterval): boolean {
+  return leagueInterval === interval && interval.installation === stateInstallation();
+}
+
+/** A hook that changes the state before settlement must never displace its checkpoint. */
+export function leagueIntervalSaveHeld(): boolean {
+  return !!leagueInterval && ownsInterval(leagueInterval) && !leagueInterval.published && getState() !== leagueInterval.source;
+}
+
+function failLeagueInterval(interval: LeagueInterval, reason: string, error?: unknown): void {
+  if (!ownsInterval(interval) || interval.published) return;
+  if (error) console.error('nrl-sim: League interval failed', error);
+  held = null;
+  leagueInterval = undefined;
+  failedInterval = {installation: interval.installation, reason};
+  bus.emitSettled('week:blocked', {week: interval.source.week, season: interval.source.season, reason},
+    () => interval.installation === stateInstallation());
+}
+
+function runIntervalWork(interval: LeagueInterval | undefined, work: () => void): void {
+  if (!interval) { work(); return; }
+  if (!ownsInterval(interval)) return;
+  try { work(); }
+  catch (error) { failLeagueInterval(interval, INVALID_SETTLED_INTERVAL, error); }
+}
+
 /**
  * Advance a single (interactive) week.
  *
@@ -162,43 +202,66 @@ function sortedEntries<T extends { order: number; seq: number }>(m: Map<string, 
 export function advanceWeek(): void {
   if (getState().sacked) return; // game over (#47): the save stays, time stops
   if (failedIntervalProblem()) return;
-  if (weekHeld()) return; // a held week finishes first (resumeWeek)
+  if (weekHeld() || (leagueInterval && ownsInterval(leagueInterval))) return;
   // Also refuse inactive or malformed League markers before any interval work.
   if (structuralAdvanceProblem(getState())) return;
   if (demoStops()) return; // the demo's last week is played (#362; never with the commercial flag off)
   const { week, season, competitions } = getState();
-  const markedInterval = competitions?.leagueCareer !== undefined;
+  const installation = stateInstallation();
+  const interval: LeagueInterval | undefined = competitions?.leagueCareer
+    ? {source: getState(), installation, published: false} : undefined;
+  leagueInterval = interval;
   const tokens = new Set<WeekRelease>();
   const identity = {};
-  const installation = stateInstallation();
-  const canHold = !fastForwardFlag || fastForwardHolds;
-  const ctx: TickContext = { week, season, fastForward: fastForwardFlag, ...(canHold ? { hold: (): WeekRelease => {
+  function hold(): WeekRelease {
     const sameHold = (): boolean => held?.identity === identity && tokens.has(release) && stateInstallation() === installation
       && getState().season === season && getState().week === week;
-    const release: WeekRelease = Object.assign(() => {
+    const release: WeekRelease = Object.assign((afterSaved?: () => void) => {
       if (!sameHold()) return;
-      const problem = structuralAdvanceProblem(getState());
-      if (problem) {held = null; blockInterval(problem); return;}
-      tokens.delete(release);
-      if (tokens.size > 0) return;
-      const h = held!; held = null;
-      for (const entry of h.rest) entry.fn(h.ctx);
-      finishWeek(h.ctx.week, markedInterval);
-    }, {current: () => sameHold() && !structuralAdvanceProblem(getState())});
-    tokens.add(release); return release;
-  } } : {}) };
-
-  const entries = sortedEntries(tickHooks).filter((entry) => !inTrials(getState()) || entry.trials);
-  for (let i = 0; i < entries.length; i++) {
-    entries[i]!.fn(ctx);
-    // Held: finish this order's hooks (the player's match and the rival round
-    // run side by side), then wait for every hold to be released.
-    if (tokens.size > 0 && entries[i + 1]?.order !== entries[i]!.order) {
-      held = { ctx: { week, season, fastForward: fastForwardFlag }, rest: entries.slice(i + 1), tokens, identity, installation };
-      return;
-    }
+      runIntervalWork(interval, () => {
+        const problem = structuralAdvanceProblem(getState());
+        if (problem) {
+          if (interval) failLeagueInterval(interval, problem);
+          else { held = null; blockInterval(problem); }
+          return;
+        }
+        if (interval && afterSaved) interval.afterSaved = afterSaved;
+        tokens.delete(release);
+        if (tokens.size > 0) return;
+        const h = held!;
+        held = null;
+        for (const entry of h.rest) {
+          if (interval && !ownsInterval(interval)) return;
+          entry.fn(h.ctx);
+        }
+        if (!interval || ownsInterval(interval)) finishWeek(week, interval);
+      });
+    }, {
+      current: () => sameHold() && !structuralAdvanceProblem(getState()),
+      ...(interval ? {fail: (error: unknown) => {
+        if (sameHold()) failLeagueInterval(interval, INVALID_SETTLED_INTERVAL, error);
+      }} : {}),
+    });
+    tokens.add(release);
+    return release;
   }
-  finishWeek(week, markedInterval);
+  const canHold = !fastForwardFlag || fastForwardHolds;
+  const ctx: TickContext = {week, season, fastForward: fastForwardFlag, ...(canHold ? {hold} : {})};
+
+  runIntervalWork(interval, () => {
+    const entries = sortedEntries(tickHooks).filter((entry) => !inTrials(getState()) || entry.trials);
+    for (let i = 0; i < entries.length; i++) {
+      entries[i]!.fn(ctx);
+      if (interval && !ownsInterval(interval)) return;
+      // Held: finish this order's hooks (the player's match and the rival round
+      // run side by side), then wait for every hold to be released.
+      if (tokens.size > 0 && entries[i + 1]?.order !== entries[i]!.order) {
+        held = { ctx: { week, season, fastForward: fastForwardFlag }, rest: entries.slice(i + 1), tokens, identity, installation };
+        return;
+      }
+    }
+    finishWeek(week, interval);
+  });
 }
 
 /** A held week (coach calls #73; N9.2): the hooks still to run, and how many holds are still out. */
@@ -233,40 +296,63 @@ export function resumeWeek(): void {
 
 /** Test helper: forget a held week. */
 export function clearHeldWeek(): void {
+  leagueInterval = undefined;
   held = null;
   failedInterval = null;
 }
 
 const INVALID_SETTLED_INTERVAL = 'The settled interval is invalid. Reload the saved interval to recover.';
 
-function finishWeek(week: number, markedInterval: boolean): void {
+function finishLeagueInterval(interval: LeagueInterval, settled: GameState): void {
+  const week = interval.source.week;
+  const competitions = settled.competitions!;
+  const calendar = competitions.calendar!;
+  const final = week >= calendar.slots.length;
+  const next = final ? closeLeagueSeason(settled) : {...settled, week: week + 1,
+    competitions: {...competitions, calendar: {...calendar, elapsedIntervals: calendar.elapsedIntervals + 1}}};
+  if (final && next === settled) {
+    failLeagueInterval(interval, 'The settled final interval could not be closed. Reload the saved interval to recover.');
+    return;
+  }
+  if (!final && (competitions.leagueCareer?.phase !== 'active' || !isPlayableLeagueCareer(next))) {
+    failLeagueInterval(interval, INVALID_SETTLED_INTERVAL);
+    return;
+  }
+  if (!ownsInterval(interval)) return;
+  setState(next);
+  if (!ownsInterval(interval)) return;
+  // Once published, a failed storage write leaves the old checkpoint and its match together.
+  interval.published = true;
+  const current = (): boolean => ownsInterval(interval);
+  if (final || interval.afterSaved) {
+    try {
+      if (saveIfChanged(getState()) && current()) interval.afterSaved?.();
+    } catch (error) {
+      console.error('nrl-sim: could not persist the settled League interval', error);
+    }
+  }
+  try {
+    if (final && current()) {
+      if (!settled.sacked && next.sacked) bus.emitSettled('board:sacked', next.sacked, current);
+      if (current()) bus.emitSettled('season:ended', {season: settled.season, ...readSeasonOutcome()}, current);
+    }
+  } finally {
+    if (current()) {
+      const post = getState();
+      bus.emitSettled('week:advanced', {week: post.week, season: post.season}, current);
+      if (current()) leagueInterval = undefined;
+    }
+  }
+}
+
+function finishWeek(week: number, interval: LeagueInterval | undefined): void {
   const s = getState();
   if (hasStructuralCalendar(s)) {
     // A result that never landed, or a competition that can never finish, is closed
     // and logged. The interval still ends, so a later advance is not held forever.
     const settled = settleStructuralCalendar(s, week);
-    const competitions = settled.competitions!;
-    const calendar = competitions.calendar!;
-    if (markedInterval || competitions.leagueCareer) {
-      if (week >= calendar.slots.length) {
-        const closed = closeLeagueSeason(settled);
-        if (closed === settled) {blockInterval('The settled final interval could not be closed. Reload the saved interval to recover.'); return;}
-        // The live gate is installed first: a failed persistence attempt cannot replay this interval.
-        setState(closed);
-        saveIfChanged(getState());
-        if (!settled.sacked && closed.sacked) bus.emit('board:sacked', closed.sacked);
-        const outcome = readSeasonOutcome();
-        bus.emit('season:ended', {season: settled.season, ...outcome});
-      } else {
-        const next = {...settled, week: week + 1,
-          competitions: {...competitions, calendar: {...calendar, elapsedIntervals: calendar.elapsedIntervals + 1}}};
-        if (competitions.leagueCareer?.phase !== 'active' || !isPlayableLeagueCareer(next)) {
-          blockInterval(INVALID_SETTLED_INTERVAL);
-          return;
-        }
-        setState(next);
-      }
-      const post = getState(); bus.emit('week:advanced', {week: post.week, season: post.season});
+    if (interval) {
+      finishLeagueInterval(interval, settled);
       return;
     }
     if (settled !== s) setState(settled);
@@ -279,7 +365,7 @@ function finishWeek(week: number, markedInterval: boolean): void {
     bus.emit('week:advanced', { week: post.week, season: post.season });
     return;
   }
-  if (markedInterval) {blockInterval(INVALID_SETTLED_INTERVAL); return;}
+  if (interval) { failLeagueInterval(interval, INVALID_SETTLED_INTERVAL); return; }
   if (inTrials(s)) {
     setState({ preseason: s.preseason === 1 ? 2 : 0 });
     bus.emit('week:advanced', { week: s.week, season: s.season });

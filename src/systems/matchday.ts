@@ -366,9 +366,17 @@ export function registerPlayerMatchSystem(): void {
         if (done !== fixture || !sameFixtureIdentity(done, fixture) || getState().season !== state.season || getState().week !== state.week) return;
         off();
         parked = null;
-        clearLiveMatch();
-        applyPlayerResult(fixture, home, away, result, true)();
-        release();
+        if (release.fail) {
+          try { applyPlayerResult(fixture, home, away, result, true)(); }
+          catch (error) { release.fail(error); return; }
+          // A grouped rival hold may still fail. Retire the match only after the
+          // complete interval for this installation reaches durable storage.
+          release(() => clearLiveMatch());
+        } else {
+          clearLiveMatch();
+          applyPlayerResult(fixture, home, away, result, true)();
+          release();
+        }
       });
       const live: LiveMatchData = {
         seed,
@@ -415,7 +423,10 @@ export function registerPlayerMatchSystem(): void {
       const release = ctx.hold();
       void playMatchesInWorker([{ home, away, opts: matchOpts }], PLAYER_WORKER_TIMEOUT_MS)
         .then(([result]) => { if (release.current()) applyPlayerResult(fixture, home, away, result ?? runMatch(home, away, matchOpts))(); })
-        .catch((err: unknown) => console.error('the fast-forwarded match failed to land', err))
+        .catch((err: unknown) => {
+          if (release.fail) release.fail(err);
+          else console.error('the fast-forwarded match failed to land', err);
+        })
         .finally(release);
       return;
     }

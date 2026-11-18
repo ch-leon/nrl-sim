@@ -20,6 +20,7 @@ import { freshCapAccount } from '../../src/systems/cap';
 import { AU_CAREER_PROFILE } from '../../src/content/career/au';
 import { buildDivisionTrials, setupStructuralDivisionCareer } from '../../src/systems/divisionCareer';
 import { competitionFixtureId } from '../../src/data/competition';
+import * as leagueSeason from '../../src/systems/leagueCareer';
 import * as leagueSelection from '../../src/systems/leagueSelection';
 
 export function closingState(): GameState {
@@ -189,6 +190,98 @@ describe('League interval gate', () => {
     expect(getState().sacked).toMatchObject({season:1});expect(getState().money).toBe(s.money);expect(sacked).toHaveBeenCalledTimes(1);
     const closed=getState();advanceWeek();advanceWeeks(2);expect(getState()).toBe(closed);expect(sacked).toHaveBeenCalledTimes(1);
   });
+  it.each(['immediate', 'held'])('a throwing %s close stops once without losing its saved interval', async path => {
+    setCareerNamespace(DEV_TEST_PREFIX);
+    const bytes = new Map<string,string>();
+    __setStorage({getItem: k => bytes.get(k) ?? null, setItem: (k,v) => { bytes.set(k,v); }, removeItem: k => { bytes.delete(k); }});
+    __unlockSaves();
+    setState(closingState());
+    expect(saveIfChanged(getState())).toBe(true);
+    const original = exportOriginalSave(1);
+    let release: WeekRelease | undefined;
+    if (path === 'held') registerTickHook('hold', 40, ctx => { release = ctx.hold!(); });
+    vi.spyOn(leagueSeason, 'closeLeagueSeason').mockImplementation(() => { throw new Error('Injected close failure'); });
+    const blocked = vi.fn(), advanced = vi.fn();
+    bus.on('week:blocked', blocked);
+    bus.on('week:advanced', advanced);
+    const run = advanceUntil({kind: 'weeks', weeks: 1});
+    release?.();
+    expect(await run).toMatchObject({weeksPlayed: 0, stop: {kind: 'stopped'}});
+    expect(failedIntervalProblem()).toBeTruthy();
+    expect(weekHeld()).toBe(false);
+    advanceWeek();
+    expect(blocked).toHaveBeenCalledTimes(1);
+    expect(advanced).not.toHaveBeenCalled();
+    expect(saveIfChanged(getState())).toBe(false);
+    expect(exportOriginalSave(1)).toBe(original);
+  });
+
+  it('refuses to save a half-published close if a state observer fails before persistence', async () => {
+    setCareerNamespace(DEV_TEST_PREFIX);
+    const bytes = new Map<string,string>();
+    __setStorage({getItem: k => bytes.get(k) ?? null, setItem: (k,v) => { bytes.set(k,v); }, removeItem: k => { bytes.delete(k); }});
+    __unlockSaves();
+    setState(closingState());
+    expect(saveIfChanged(getState())).toBe(true);
+    const original = exportOriginalSave(1);
+    const attempted = vi.fn();
+    bus.on('state:changed', state => {
+      if (state.competitions?.leagueCareer?.phase !== 'next-season-choice') return;
+      attempted(saveIfChanged(state));
+      throw new Error('Close observer failed');
+    });
+    const run = await advanceUntil({kind:'weeks', weeks:1});
+    expect(run).toMatchObject({weeksPlayed:0, stop:{kind:'stopped'}});
+    expect(attempted).toHaveBeenCalledWith(false);
+    expect(failedIntervalProblem()).toBeTruthy();
+    expect(exportOriginalSave(1)).toBe(original);
+  });
+
+  it('a trailing hook replacing its installation then throwing does not release or quarantine the replacement', async () => {
+    setCareerNamespace(DEV_TEST_PREFIX);
+    const original = closingState();
+    setState(original);
+    const holds: WeekRelease[] = [];
+    registerTickHook('hold', 40, ctx => { holds.push(ctx.hold!()); });
+    registerTickHook('replace', 50, () => {
+      loadState(structuredClone(original));
+      advanceWeek();
+      throw new Error('Retired trailing hook');
+    });
+    const blocked = vi.fn();
+    bus.on('week:blocked', blocked);
+    const run = advanceUntil({kind:'weeks', weeks:1});
+    holds[0]!();
+    expect(await run).toMatchObject({weeksPlayed:0, stop:{kind:'stopped', text:'The career changed during advance.'}});
+    expect(holds).toHaveLength(2);
+    holds[0]!();
+    expect(holds[1]!.current()).toBe(true);
+    expect(weekHeld()).toBe(true);
+    expect(failedIntervalProblem()).toBeNull();
+    expect(blocked).not.toHaveBeenCalled();
+  });
+
+  it('a throwing season or week observer cannot quarantine a committed close or strand the held advance', async () => {
+    setCareerNamespace(DEV_TEST_PREFIX);
+    const bytes = new Map<string,string>();
+    __setStorage({getItem: k => bytes.get(k) ?? null, setItem: (k,v) => { bytes.set(k,v); }, removeItem: k => { bytes.delete(k); }});
+    __unlockSaves();
+    setState(closingState());
+    expect(saveIfChanged(getState())).toBe(true);
+    for (const name of ['season:ended','week:advanced'] as const)
+      bus.on(name, () => { throw new Error('Injected presentation failure'); });
+    const observed = vi.fn();
+    bus.on('week:advanced', observed);
+    let release: WeekRelease | undefined;
+    registerTickHook('hold', 40, ctx => { release = ctx.hold!(); });
+    const run = advanceUntil({kind: 'weeks', weeks: 1});
+    release!();
+    expect((await run).weeksPlayed).toBe(1);
+    expect(observed).toHaveBeenCalledOnce();
+    expect(failedIntervalProblem()).toBeNull();
+    expect(JSON.parse(exportOriginalSave(1)!).competitions.leagueCareer.phase).toBe('next-season-choice');
+  });
+
   it('stops explicitly if a final held interval becomes unsupported during its hooks, without hanging or replaying it', async () => {
     setCareerNamespace(DEV_TEST_PREFIX);__unlockSaves();const bytes=new Map<string,string>();
     __setStorage({getItem:k=>bytes.get(k)??null,setItem:(k,v)=>{bytes.set(k,v);},removeItem:k=>{bytes.delete(k);}});
