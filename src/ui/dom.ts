@@ -1778,8 +1778,13 @@ body:has(.nrl-update-toast) .nrl-hub-chips { max-width: calc(100vw - 32px - 310p
 .nrl-ask-due .nrl-ask-note { color: var(--nrl-accent); }
 /* Short landscape phones: the choices side by side, so all of them show with their hints. */
 @media (max-height: 500px) {
-  .nrl-event-title { font-size: 1.375rem; }
-  .nrl-event-text { margin: 4px 0 8px; font-size: 0.8125rem; line-height: 1.35; }
+  /* The pills and the big title cost height: tighter here, so both choices and their risks fit (portrait's bali-choices-fit). */
+  .nrl-decisions-count { margin-bottom: 2px; min-height: 0; }
+  .nrl-event-head { gap: 2px; }
+  .nrl-event-title { font-size: 1rem; }
+  .nrl-event-text { margin: 2px 0 6px; font-size: 0.8125rem; line-height: 1.35; }
+  .nrl-btn.nrl-event-choice { padding: 8px 12px; gap: 3px; }
+  .nrl-event-choice-hint, .nrl-event-choice-risk { padding-top: 0; padding-bottom: 0; line-height: 1.3; }
   .nrl-event-choices { flex-direction: row; align-items: stretch; }
   .nrl-btn.nrl-event-choice { flex: 1 1 0; min-width: 0; width: auto; justify-content: flex-start; }
   .nrl-decisions h2, .nrl-ask h2 { margin-bottom: 4px; }
