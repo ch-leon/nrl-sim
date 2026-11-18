@@ -204,12 +204,21 @@ snapshot the game last wrote and nothing else: no dates, no times, nothing that 
 down by itself. The game writes a new one when a career loads or starts, the week
 advances, a match is committed, points are spent, or an injury comes or goes, and only
 when something on the widget changed. A round is one week's advance (a pre-season trial
-or a rest week counts as one), the same weeks the game's own "out 3 wk" counts; the
-injury count uses the club's medical bay and physio centre as they are today. If you
+or a rest week counts as one). The injury count uses the club's medical bay and physio
+centre as they are today, so it is how many advances until he is fit. The Squad
+screen's "out N wk" shows his raw weeks out, so with a medical bay or physio centre the
+two differ ("out 4 wk" on the Squad screen, "back in 2 rounds" on the widget). If you
 build one mid-injury, the count drops faster from the next advance.
 
-**Sizes.** Lock screen: rectangular (the match, the injury, the points) and inline (the
-match, short: "R7 v Brisbane · away"); these take the lock screen's own tint. Home
+**Known gap: deleting a save.** Deleting the career's save on the title screen changes
+nothing the widget listens to, so it keeps showing the deleted club until you load or
+start another career. Fixing it needs an event from the save code, which the website and
+Android would carry too, so it is left for now.
+
+**Sizes.** Lock screen: rectangular (the match with the short stage, "W5 v Brisbane ·
+away", so the opponent always fits; the injury; the points) and inline (the same match
+line); these take the lock screen's own tint. VoiceOver reads each row in words
+("Walker, 4.5 stars, back in 2 rounds"). Home
 screen: small and medium, on the SuperCOOKED ink with the accent on the match's stage.
 
 **Add it.** Lock screen: touch and hold the lock screen, **Customise**, **Lock Screen**,
