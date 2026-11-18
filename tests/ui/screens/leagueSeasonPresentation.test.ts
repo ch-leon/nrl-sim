@@ -4,6 +4,7 @@ import { bus } from '../../../src/core/events';
 import { preparePack, selectPack } from '../../../src/content';
 import { UK_CAREER_PROFILE } from '../../../src/content/career/uk';
 import { AU_CAREER_PROFILE } from '../../../src/content/career/au';
+import { __setStorage, __unlockSaves } from '../../../src/core/save';
 import { setCareerNamespace } from '../../../src/core/storage/local';
 import { DEV_TEST_PREFIX } from '../../../src/core/storageKeys';
 import { setupStructuralDivisionCareer } from '../../../src/systems/divisionCareer';
@@ -34,8 +35,12 @@ function state(complete = false) {
   return s;
 }
 
-beforeEach(() => { bus.clear(); stubDocument(); vi.stubGlobal('requestAnimationFrame', () => 1); vi.stubGlobal('cancelAnimationFrame', () => {}); });
-afterEach(() => { closeScreen(); closeModal(); bus.clear(); time.clearHeldWeek(); time.clearTickHooks(); time.clearSeasonHooks(); setCareerNamespace(null); selectPack('au'); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+beforeEach(() => {
+  const bytes = new Map<string,string>();
+  __setStorage({getItem: k => bytes.get(k) ?? null, setItem: (k,v) => {bytes.set(k,v);}, removeItem: k => {bytes.delete(k);}});
+  __unlockSaves();
+  bus.clear(); stubDocument(); vi.stubGlobal('requestAnimationFrame', () => 1); vi.stubGlobal('cancelAnimationFrame', () => {}); });
+afterEach(() => { __setStorage(null); closeScreen(); closeModal(); bus.clear(); time.clearHeldWeek(); time.clearTickHooks(); time.clearSeasonHooks(); setCareerNamespace(null); selectPack('au'); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('League career presentation', () => {
   it('previews the saved scheduled fixture and only forecasts its actual week', () => {

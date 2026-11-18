@@ -1148,6 +1148,9 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
   html[data-text-size="larger"] .nrl-dock-statusbox { padding-right: 6px; }
   html[data-text-size="larger"] .nrl-dock-tabs > .nrl-btn { padding: 0 4px; }
   html[data-text-size="larger"] .nrl-dock-advance { padding: 0 6px; }
+  /* Larger at 667: an alert dot in its tab's corner, as at 620 and under. After the label it took 14px, so an open
+     OFFICE ▴ with unread news was cut (webkit portrait, dock 667×375 larger: it failed only when the news had a dot). */
+  html[data-text-size="larger"] .nrl-dock-tabs > .nrl-btn > .nrl-nav-dot { position: absolute; top: 5px; right: 3px; }
 }
 /* ▴'s room is 12px of air after each label (#607), so on a phone at Normal the tabs give some of
    their padding back and what fitted before still does: a decisions count on PLAY WEEK inside the

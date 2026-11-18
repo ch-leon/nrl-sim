@@ -5,7 +5,7 @@ import {
 } from '../../src/core/save';
 import { createNewGame, SAVE_VERSION } from '../../src/core/state';
 import { bus } from '../../src/core/events';
-import { DEVICE_ID_KEY, LEGACY_SAVE_KEY, saveMetaKey, slotKey } from '../../src/core/storageKeys';
+import { DEVICE_ID_KEY, LEGACY_SAVE_KEY, liveMatchKey, saveMetaKey, slotKey } from '../../src/core/storageKeys';
 import { LocalSaveStore } from '../../src/core/storage/local';
 import { MemorySaveStore } from '../../src/core/storage/memory';
 import { checksumOf, metaFor, nextMeta, parseMeta } from '../../src/core/storage/meta';
@@ -55,6 +55,49 @@ describe('LocalSaveStore', () => {
     expect(storage.map.get(slotKey(2))).toBe(payload);
     expect(direct.map.get(slotKey(2))).toBe(payload);
     expect(store.read(2)).toBe(payload);
+  });
+
+  it.each([1, 2, 3])('restores the exact career and sidecar when a verified slot %i write fails readback', async slot => {
+    const store = new LocalSaveStore(storage, SLOT_COUNT);
+    storage.map.set(LEGACY_SAVE_KEY, 'legacy');
+    if (slot !== 1) storage.map.set(slotKey(slot), 'previous');
+    storage.map.set(liveMatchKey(slot), 'previous match');
+    const before = new Map(storage.map);
+    const meta = metaFor('new', null, 'test');
+    vi.spyOn(storage, 'setItem').mockImplementation((key, value) => {
+      storage.map.set(key, value === 'new' ? 'truncated' : value);
+    });
+    expect(() => store.write(slot, 'new', meta, 'new match', true)).toThrow();
+    await settle();
+    expect(storage.map).toEqual(before);
+    expect(store.storedMeta(slot)).toBeNull();
+  });
+
+  describe.each([2, 3])('verified career-only write to slot %i', slot => {
+    it.each(['mismatch', 'exception'] as const)('restores the previous payload and metadata after a readback %s', async failure => {
+      const store = new LocalSaveStore(storage, SLOT_COUNT);
+      const previous = metaFor('previous', null, 'test');
+      store.write(slot, 'previous', previous);
+      await settle();
+      storage.map.set(LEGACY_SAVE_KEY, 'legacy career');
+      storage.map.set(liveMatchKey(slot), 'parked match');
+      const before = new Map(storage.map);
+      const readback = vi.fn();
+      vi.spyOn(storage, 'getItem').mockImplementation(key => {
+        const value = storage.map.get(key) ?? null;
+        if (key === slotKey(slot) && value === 'next') {
+          readback();
+          if (failure === 'exception') throw new Error('Readback unavailable');
+          return 'truncated';
+        }
+        return value;
+      });
+      expect(() => store.write(slot, 'next', metaFor('next', previous, 'test'), undefined, true)).toThrow();
+      expect(readback).toHaveBeenCalledOnce();
+      expect(store.storedMeta(slot)).toEqual(previous);
+      await settle();
+      expect(storage.map).toEqual(before);
+    });
   });
 
   it('round-trips every corpus save byte for byte', () => {

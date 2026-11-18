@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { afterEach, expect, it, vi } from 'vitest';
 import { bus } from '../../src/core/events';
 import { activePack, selectPack } from '../../src/content';
@@ -87,7 +88,7 @@ it('publishes only after a confirmed historical replacement retains the old save
   const classic = createNewGame('Before', 24);
   expect(writeSlot(1,classic)).toBe(true);
   const revision = getSlotMeta(1)!.revision;
-  const original = JSON.stringify({...classic,version:SAVE_VERSION - 1});
+  const original = readFileSync(new URL('../fixtures/saves/league-career/v32-au-active.json', import.meta.url), 'utf8');
   bytes.set(slotKey(1),original);
   bytes.set(liveMatchKey(1),'parked');
   const seen = vi.fn();

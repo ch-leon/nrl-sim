@@ -11,6 +11,7 @@ import { el, button, openScreen, closeScreen, screenHead, segmented, backButton 
 import { initSeasonReview, openSeasonReview } from './seasonReview';
 import { FINANCE_LINE_LABELS, ensureFinanceStyles, fmtMoney, fmtMoneyCompact, fmtNetClosing, seasonBooks } from './finance';
 import { FINALS_ROUNDS } from '../../systems/fixtures';
+import { competitionHonours } from '../../systems/competitionRewards';
 import { roundLabel } from '../../systems/matchday';
 
 /** The top eight make the finals (systems/fixtures finalsSeeds). */
@@ -223,7 +224,8 @@ export function historyRowView(entry: SeasonHistoryEntry, state: Pick<GameState,
 }
 
 /** Seasons, club records or retired players; the choice holds while the game is open. */
-let historyView: 'seasons' | 'records' | 'players' = 'seasons';
+type HistoryView = 'seasons' | 'records' | 'players' | 'trophies';
+let historyView: HistoryView = 'seasons';
 
 /** The seasons table (3l): one row a season, newest first, with its review and books. */
 function buildSeasonsTable(state: GameState): HTMLElement {
@@ -275,14 +277,30 @@ function buildRecords(state: GameState): HTMLElement {
     ...rows.map(([label, value]) => el('div', { class: 'nrl-history-record' }, el('span', { class: 'nrl-label', text: label }), el('span', { class: 'nrl-name-wrap', text: value }))));
 }
 
+function buildTrophies(state: GameState): HTMLElement {
+  const honours = [...competitionHonours(state, state.clubId)].sort((a, b) => b.season - a.season);
+  if (!honours.length) return el('p', { class: 'nrl-screen-empty nrl-history-empty', text: 'No cup trophies yet.' });
+  return el('div', { class: 'nrl-history-trophies' }, ...honours.map(honour =>
+    el('article', { class: 'nrl-history-trophy', attrs: { 'data-competition-honour': honour.id } },
+      el('h2', { text: honour.title }),
+      el('p', { text: `Season ${honour.season} · Champion: ${honour.clubName}` }),
+      el('h3', { text: 'Registered squad at the final' }),
+      el('ul', { class: 'nrl-history-trophy-squad' }, ...honour.players.map(player => el('li', {
+        text: player.name, attrs: { 'data-trophy-player-id': player.id },
+      }))),
+    )));
+}
+
 /** Open the History sheet (3l): past seasons from GameState.history, and the club's records. */
 export function openHistoryScreen(): HTMLElement {
   ensureHistoryStyles();
   const state = getState();
   const body = el('div', { class: 'nrl-history-body' });
-  const render = (): void => { body.replaceChildren(historyView === 'seasons' ? buildSeasonsTable(state) : historyView === 'records' ? buildRecords(state) : retiredPlayerRecords(state)); };
-  const seg = segmented<'seasons' | 'records' | 'players'>(
-    [{ id: 'seasons', label: 'Seasons' }, { id: 'records', label: 'Records' }, { id: 'players', label: 'Retired players' }],
+  const views = { seasons: buildSeasonsTable, records: buildRecords, players: retiredPlayerRecords, trophies: buildTrophies };
+  const render = (): void => { body.replaceChildren(views[historyView](state)); };
+  const seg = segmented<HistoryView>(
+    [{ id: 'seasons', label: 'Seasons' }, { id: 'records', label: 'Records' },
+      { id: 'players', label: 'Retired players' }, { id: 'trophies', label: 'Trophies' }],
     historyView,
     (id) => { historyView = id; seg.set(id); render(); },
     { label: 'History view' },
@@ -411,6 +429,13 @@ export const HISTORY_CSS = `
 .nrl-history-records { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); column-gap: 24px; }
 .nrl-history-record { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 32px; border-top: 1px solid var(--nrl-button); font-size: 0.8125rem; }
 .nrl-history-record > span:last-child { text-align: right; }
+
+.nrl-history-trophies { display: grid; gap: 10px; padding: 4px 0; }
+.nrl-history-trophy { padding: 10px 14px; border-radius: 10px; background: var(--nrl-raised); overflow-wrap: anywhere; }
+.nrl-history-trophy h2 { margin: 0; color: var(--nrl-accent); font-size: 1.125rem; }
+.nrl-history-trophy p { margin: 3px 0 12px; }
+.nrl-history-trophy h3 { margin: 0 0 4px; font-size: 0.875rem; }
+.nrl-history-trophy-squad { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr)); gap: 4px 12px; margin: 0; padding: 0; list-style: none; }
 
 /* A season's books: the table scrolls, the net and the closing balance beside it. */
 .nrl-books-body { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 460px) minmax(180px, 240px); gap: 16px; }

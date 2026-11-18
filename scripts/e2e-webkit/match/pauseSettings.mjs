@@ -1,6 +1,6 @@
 import { mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, reachProblems } from '../common.mjs';
+import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, reachProblems, setMatchSpeed } from '../common.mjs';
 
 /**
  * #421 and #414 at 667×375 and 844×390: in a match, ❚❚ → Settings (text size Large)
@@ -48,7 +48,7 @@ export async function runPauseSettings(browser) {
         if (await ask.count()) await ask.first().tap();
       }
       await page.waitForSelector('.nrl-mo-controls', { timeout: 20000 });
-      await page.locator('.nrl-mo-controls [data-speed="8"]').tap();
+      await setMatchSpeed(page, 8);
       const start = await clock();
       await page.waitForFunction((t) => document.querySelector('.nrl-mo-clock')?.textContent !== t, start, { timeout: 20000 });
     });

@@ -1,3 +1,4 @@
+import { isolateMiniatureLeagueProgression } from '../../helpers/miniatureLeague';
 import { entrySnapshots } from '../../data/leagueCareerFixtures';
 import { closeLeagueSeason } from '../../../src/systems/leagueCareer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -41,8 +42,8 @@ function install(s: GameState): void {
 const body = (): StubNode => document.body as unknown as StubNode;
 const row = (id: string): StubNode => body().querySelector(`[data-row-player="${id}"]`)!;
 
-beforeEach(() => { bus.clear(); stubDocument(); });
-afterEach(() => { closeScreen(); bus.clear(); vi.unstubAllGlobals(); });
+beforeEach(() => { isolateMiniatureLeagueProgression(); bus.clear(); stubDocument(); });
+afterEach(() => { closeScreen(); bus.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('League Squad contracts and dock alert', () => {
   it('shows the last authored active interval and alerts despite a stale stored countdown', () => {

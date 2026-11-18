@@ -117,7 +117,8 @@ try {
     if(await ask.count()) await ask.first().click();
   }
   await career.locator('.nrl-mo-controls').waitFor({timeout:30000});
-  await career.locator('.nrl-mo-speed[data-speed="1"]').click();
+  // One speed button (SuperCOOKED 40): click until it reads ×1.
+  for (let i = 0; i < 4 && (await career.locator('.nrl-mo-speed').getAttribute('data-speed')) !== '1'; i++) await career.locator('.nrl-mo-speed').click();
   await career.waitForFunction(()=>window.__nrlGame?.scene.getScene('Match').contact?.sprite.visible,null,{timeout:30000});
   const actual=await career.evaluate(()=>{
     const s=window.__nrlGame.scene.getScene('Match');s.playback.runner.pause();
