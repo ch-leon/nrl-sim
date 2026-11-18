@@ -223,6 +223,13 @@ Each row: mockup → current source → what changes. Anything not listed keeps 
 - **`42-match-half-time`**: bottom sheet. Score and a one-line read first, the opponent's tendency on the right, then Attack / Defence / Bench as three segmented rows (white selected), a line explaining the picked option, the plays line, and **Start 2nd half ▸**. The same sheet is the pre-match plan sheet (§6).
 - **`43-match-full-time`**: centred card. Result tag, big score, one line, three effect pills (ladder move, gate, injuries), player of the match with portrait and stars, Report (outline) and **Back to club ▸**.
 - **`44-match-report`**: both teams with tries and goals, a one-line story, the plan change, **Back to club ▸**; right column five stats with split bars (home white, away green) and **All stats ▸** for the rest.
+- **Built in Phase 2 on the build plan's defaults** ([ui-supercooked-phase-2-plan.md](ui-supercooked-phase-2-plan.md) Q2–Q5; one PR for the phase, as asked):
+  - The report's five are possession, line breaks, tackles, errors and big hits: completion, run metres and missed tackles are not tracked by the match. Kicks, scrambles won and calls paid off are behind All stats.
+  - No Bench row at half-time: the bench is fixed once the match starts. The pre-match Game plan keeps it, and its primary reads **Save plan**.
+  - The LOG switch is gone; a stored `'hidden'` log mode reads as the line.
+  - The full-time card's three stat rows are gone (they are in the report).
+  - Speed is one button that cycles 1× → 2× → 4× → 8×.
+  - The ball chip keeps the tackle count for both sides ("Their ball · tackle 3/5"); the read at half-time is the score line, plus where the other side goes when behind once the Analyst is hired.
 
 ### Club (Phase 3)
 

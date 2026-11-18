@@ -327,15 +327,16 @@ export async function runPortrait(browser) {
       const what = box(mode === 'full' ? '.nrl-mo-full' : '.nrl-mo-strip');
       if (!what) return { pending: true, problems: [`the ${mode === 'full' ? 'full log' : 'commentary line'} is not laid out`] };
       if (what.left < 0 || what.top < 0 || what.right > innerWidth || what.bottom > innerHeight) hits.push(`${mode === 'full' ? 'full log' : 'line'} off screen`);
-      for (const el of document.querySelectorAll('.nrl-mo-bar .nrl-btn, .nrl-mo-bar [data-coach], .nrl-mo-log-toggle')) {
+      // The line is in the bottom bar (SuperCOOKED 40), beside COACH and the controls: it meets none of them.
+      for (const el of document.querySelectorAll('.nrl-mo-bar .nrl-btn, .nrl-mo-bar [data-coach]')) {
         const r = el.getBoundingClientRect();
         if (r.width < 1 || r.height < 1) continue;
         if (meets(what, r)) hits.push(el.getAttribute('aria-label') || el.textContent.trim() || 'button');
       }
       const score = box('.nrl-mo-scoreboard');
       if (score && meets(what, score)) hits.push('score bug');
-      const log = box('.nrl-mo-log-toggle');
-      if (!log || log.width < 44 || log.height < 44) hits.push(`LOG switch ${Math.round(log?.width ?? 0)}×${Math.round(log?.height ?? 0)}`);
+      const line = box('.nrl-mo-strip');
+      if (!line || line.height < 44) hits.push(`the commentary line is ${Math.round(line?.width ?? 0)}×${Math.round(line?.height ?? 0)}, under a 44px tap`);
       if (mode === 'full') {
         const tray = box('.nrl-mo-calls');
         if (!tray) hits.push('the coach tray is not open');
@@ -353,10 +354,8 @@ export async function runPortrait(browser) {
     const setMode = async (mode) => {
       const sc = () => page.evaluate((open) => window.__nrlGame.scene.getScene('Match').toggleTray(open), mode === 'full');
       if (mode === 'full') {
-        if (await page.locator('.nrl-match-overlay[data-log="hidden"]').count()) await page.locator('.nrl-mo-log-toggle').evaluate((el) => el.click());
         if (await page.locator('.nrl-match-overlay[data-log="line"]').count()) await page.locator('.nrl-mo-strip').evaluate((el) => el.click());
       } else if (await page.locator('.nrl-match-overlay[data-log="full"]').count()) await page.locator('.nrl-mo-full-x').evaluate((el) => el.click());
-      else if (await page.locator('.nrl-match-overlay[data-log="hidden"]').count()) await page.locator('.nrl-mo-log-toggle').evaluate((el) => el.click());
       await sc();
     };
     const problems = [];
@@ -407,10 +406,11 @@ export async function runPortrait(browser) {
     }
     await turn(844, 390);
     await setMode('line');
-    await page.locator('.nrl-mo-log-toggle').hover();
-    const bg = await page.evaluate(() => getComputedStyle(document.querySelector('.nrl-mo-log-toggle .nrl-mo-switch')).backgroundColor);
-    if (bg !== 'rgb(255, 107, 26)') problems.push(`the LOG switch's on fill is ${bg} under hover, want rgb(255, 107, 26) (the accent)`);
-    else rec.notes.push('LOG switch keeps its fill under hover');
+    // COACH keeps its orange under hover (the LOG switch whose fill this checked went with SuperCOOKED 40).
+    await page.locator('.nrl-mo-bar [data-coach]').hover();
+    const bg = await page.evaluate(() => getComputedStyle(document.querySelector('.nrl-mo-bar [data-coach]')).backgroundColor);
+    if (bg !== 'rgb(255, 107, 26)') problems.push(`COACH's fill is ${bg} under hover, want rgb(255, 107, 26) (the accent)`);
+    else rec.notes.push('COACH keeps its fill under hover');
     return problems;
   });
 

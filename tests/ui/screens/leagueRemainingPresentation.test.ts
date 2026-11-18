@@ -158,8 +158,9 @@ describe('saved League presentation outside the hub', () => {
       homeScore: 12, awayScore: 0, events: [], injuries: [],
       stats: { possession: [50, 50], tackles: [0, 0], errors: [0, 0], tries: [0, 0] }, weather: 'clear', momentumTimeline: [],
     } });
-    const report = (document.body as unknown as StubNode).querySelector('.nrl-rp-title')!;
-    expect(report.textContent).toBe(`${expected.dateLabel} · ${expected.stageLabel} · Full time`);
+    // SuperCOOKED 44: "Match report" heads the sheet; the saved date and stage ride in its result pill.
+    const report = (document.body as unknown as StubNode).querySelector('.nrl-rp-head')!;
+    expect(report.textContent).toContain(`${expected.dateLabel} · ${expected.stageLabel}`);
     off();
   });
 

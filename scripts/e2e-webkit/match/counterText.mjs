@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { BASE, OUT_ROOT, IPHONE_UA, closeWeekSummary, openNav, log, skipFromPill } from '../common.mjs';
+import { BASE, OUT_ROOT, IPHONE_UA, closeWeekSummary, openNav, log, skipFromPill, setMatchSpeed } from '../common.mjs';
 
 /**
  * The seeds this check may play, in order. It needs a match that shows a real Compressed
@@ -124,7 +124,7 @@ async function playCounterText(browser, out, width, height, textSize, seed) {
         });
         observer.observe(strip, { childList: true, characterData: true, subtree: true });
       });
-      await page.locator('.nrl-mo-controls [data-speed="8"]').tap();
+      await setMatchSpeed(page, 8);
       if (!(await page.waitForFunction(() => window.__counterLine, null, { timeout: 30000 }).then(() => true, () => false))) {
         rec.notWitness = 'no counter line in 30 s';
         await context.close();
@@ -134,10 +134,11 @@ async function playCounterText(browser, out, width, height, textSize, seed) {
       rec.problems.push(...await page.locator('.nrl-mo-strip').evaluate(strip => {
         const r = strip.getBoundingClientRect();
         const text = strip.querySelector('.nrl-mo-strip-text');
-        const bar = document.querySelector('.nrl-mo-bar').getBoundingClientRect();
+        // In the bottom bar (SuperCOOKED 40): beside COACH and the controls, over neither.
+        const meets = (sel) => { const e = document.querySelector(sel); if (!e) return false; const q = e.getBoundingClientRect(); return q.width > 0 && r.left < q.right - 1 && q.left < r.right - 1 && r.top < q.bottom - 1 && q.top < r.bottom - 1; };
         return [
           ...(r.left < 0 || r.right > innerWidth + 1 || r.top < 0 || r.bottom > innerHeight + 1 ? ['ticker outside viewport'] : []),
-          ...(r.bottom > bar.top + 1 ? ['ticker overlaps controls'] : []),
+          ...(meets('.nrl-mo-bar [data-coach]') || meets('.nrl-mo-controls') ? ['ticker overlaps controls'] : []),
           ...(text.scrollHeight > text.clientHeight + 1 ? ['ticker text clipped'] : []),
         ];
       }));

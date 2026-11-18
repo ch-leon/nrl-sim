@@ -1,6 +1,6 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, skipFromPill } from '../common.mjs';
+import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, skipFromPill, setMatchSpeed } from '../common.mjs';
 
 /**
  * Developer settings (#519), the real route on an iPhone, in landscape:
@@ -185,7 +185,7 @@ export async function runDevSettings(browser) {
     }
     await page.waitForSelector('.nrl-mo-controls', { timeout: 30000 });
     await page.locator('.nrl-mo-bar [data-coach]').waitFor({ timeout: 30000 });
-    if ((await page.locator('.nrl-mo-speed[data-speed="1"]').getAttribute('aria-pressed')) !== 'true') throw new Error('the match did not open at ×1');
+    if ((await page.locator('.nrl-mo-controls .nrl-mo-speed').getAttribute('data-speed')) !== '1') throw new Error('the match did not open at ×1');
     let called = false;
     for (let tries = 0; tries < 6 && !called; tries++) {
       if (await page.locator('.nrl-mo-calls[hidden]').count()) await page.locator('.nrl-mo-bar [data-coach]').tap();
@@ -214,8 +214,8 @@ export async function runDevSettings(browser) {
     if (!record.stored?.includes('block-play')) throw new Error('the match record is not under the playtest prefix');
     if (record.normal.length) throw new Error(`a normal match record was written: ${record.normal}`);
     await page.screenshot({ path: join(OUT, 'block-play-called-844x390.png') });
-    await page.locator('.nrl-mo-controls [data-speed="2"]').tap();
-    if ((await page.locator('.nrl-mo-speed[data-speed="2"]').getAttribute('aria-pressed')) !== 'true') throw new Error('×2 did not take');
+    await setMatchSpeed(page, 2);
+    if ((await page.locator('.nrl-mo-controls .nrl-mo-speed').getAttribute('data-speed')) !== '2') throw new Error('×2 did not take');
     step('first match at ×1: Block play called from the tray; ×2 on');
 
     // Mid-match: Return waits, with its reason.
