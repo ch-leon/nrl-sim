@@ -28,7 +28,7 @@ import { COLOR_TOKENS as C } from './tokens';
 import { fillParentLine, fillWordmark } from './wordmark';
 import { commercialEnabled } from '../commercial/flags';
 import { openLoginDialog, openPaywall } from './screens/paywall';
-import { listenForPress, MOTION_CSS } from './dom';
+import { HOVER_FILL, listenForPress, MOTION_CSS } from './dom';
 
 export type TitleChoice = {
   clubName?: string;
@@ -73,7 +73,9 @@ ${MOTION_CSS}
   padding: calc(12px + var(--nrl-safe-t, env(safe-area-inset-top, 0px))) calc(12px + var(--nrl-safe-r, env(safe-area-inset-right, 0px)))
     calc(24px + var(--nrl-safe-b, env(safe-area-inset-bottom, 0px))) calc(12px + var(--nrl-safe-l, env(safe-area-inset-left, 0px)));
   background: ${C.ink}; color: ${C.text};
-  font-family: 'Inter', system-ui, sans-serif; font-size: 0.875rem; }
+  font-family: 'Inter', system-ui, sans-serif; font-size: 0.875rem;
+  /* dom.ts's hover fills, under the names its sheet gives them (the title is up before that sheet). */
+  --nrl-raised-hover: ${HOVER_FILL.raised}; --nrl-accent-hover: ${HOVER_FILL.accent}; }
 .nrl-title * { box-sizing: border-box; }
 /* Controls, as in the game's sheet (#604): no browser tap box, no long-press selection or callout, no double-tap zoom. */
 .nrl-title, .nrl-title * { -webkit-tap-highlight-color: transparent; }
@@ -109,12 +111,12 @@ ${MOTION_CSS}
   background: ${C.button}; border: 0; border-radius: 10px; flex: 1 1 0; white-space: nowrap;
   transition: background-color var(--nrl-dur-press) ease; }
 /* Hover for a mouse only; a press takes the same fill and shrinks a little (#604), and snaps back. */
-@media (hover: hover) and (pointer: fine) { .nrl-title-btn:hover { background: #233050; } }
-.nrl-title-btn:active:not(:disabled) { background: #233050; transform: scale(var(--nrl-press));
+@media (hover: hover) and (pointer: fine) { .nrl-title-btn:hover { background: var(--nrl-raised-hover); } }
+.nrl-title-btn:active:not(:disabled) { background: var(--nrl-raised-hover); transform: scale(var(--nrl-press));
   transition: background-color var(--nrl-dur-press) ease, transform var(--nrl-dur-press) var(--nrl-ease-out); }
 .nrl-title-btn:focus-visible { outline: 2px solid ${C.accent}; outline-offset: 2px; }
 .nrl-title-btn-go, .nrl-title-btn-go:hover { background: ${C.accent}; color: ${C.onAccent}; flex-basis: 100%; }
-.nrl-title-btn-go:active:not(:disabled) { background: #ff8540; }
+.nrl-title-btn-go:active:not(:disabled) { background: var(--nrl-accent-hover); }
 /* A slot's own Continue or New game when another slot holds the screen's one yellow (#613). */
 .nrl-title-btn-row { flex-basis: 100%; }
 /* Disabled stays visible and its label says why (#613). Two lines fit the narrow Start column. */

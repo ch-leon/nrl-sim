@@ -1,7 +1,8 @@
 // WCAG AA over the theme's tokens (#371): a theme change that drops a text/background
 // pair under 4.5:1 fails here.
 import { describe, expect, it } from 'vitest';
-import { AA_TEXT, TEXT_PAIRS, contrastFailures, contrastRatio, parseColor } from '../../src/ui/contrast';
+import { AA_TEXT, ARMED_FILL, TEXT_PAIRS, blend, contrastFailures, contrastRatio, parseColor } from '../../src/ui/contrast';
+import { CSS } from '../../src/ui/dom';
 import { COLOR_TOKENS } from '../../src/ui/tokens';
 
 describe('contrast', () => {
@@ -23,6 +24,20 @@ describe('contrast', () => {
   it('every text/background pair the theme uses passes AA', () => {
     const fails = contrastFailures().map((f) => `${f.pair.where} (${f.pair.text} on ${f.pair.on}): ${f.ratio.toFixed(2)}:1`);
     expect(fails).toEqual([]);
+  });
+
+  it('words on ink (the dock, toasts, the title, the placement bar) are checked too', () => {
+    for (const text of ['text', 'text2', 'muted', 'accent', 'pos', 'neg'] as const) {
+      expect(TEXT_PAIRS).toContainEqual(expect.objectContaining({ text, on: 'ink' }));
+      expect(contrastRatio(COLOR_TOKENS[text], COLOR_TOKENS.ink)).toBeGreaterThanOrEqual(AA_TEXT);
+    }
+  });
+
+  it('an armed Sell or Release (amber on its 16% amber tint over the raised fill) passes AA', () => {
+    expect(CSS).toContain(`background: ${ARMED_FILL}; color: var(--nrl-neg);`);
+    const fill = blend(ARMED_FILL, COLOR_TOKENS.raised);
+    expect(blend('rgba(0, 0, 0, 0)', '#123456')).toBe('#123456');
+    expect(contrastRatio(COLOR_TOKENS.neg, fill)).toBeGreaterThanOrEqual(AA_TEXT);
   });
 
   it('catches a pair a theme change would break', () => {

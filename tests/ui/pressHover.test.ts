@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { CSS, MOTION_CSS } from '../../src/ui/dom';
+import { CSS, MOTION_CSS, HOVER_FILL } from '../../src/ui/dom';
 import { OVERLAY_CSS } from '../../src/ui/screens/matchOverlay';
 import { TITLE_CSS } from '../../src/ui/title';
 
@@ -160,7 +160,8 @@ describe('controls, not content (#604)', () => {
     expect(TITLE_CSS.startsWith(`\n${MOTION_CSS}`)).toBe(true);
     expect(MOTION_CSS).toContain('--nrl-press: 0.97;');
     expect(MOTION_CSS).toContain('--nrl-press: 1;');
-    expect(TITLE_CSS).toContain('@media (hover: hover) and (pointer: fine) { .nrl-title-btn:hover { background: #233050; } }');
+    expect(TITLE_CSS).toContain('@media (hover: hover) and (pointer: fine) { .nrl-title-btn:hover { background: var(--nrl-raised-hover); } }');
+    expect(TITLE_CSS).toContain(`--nrl-raised-hover: ${HOVER_FILL.raised}; --nrl-accent-hover: ${HOVER_FILL.accent};`);
     expect(rule(TITLE_CSS, '.nrl-title-btn:active:not(:disabled)')).toContain('transform: scale(var(--nrl-press));');
     expect(rule(TITLE_CSS, '.nrl-title :is(button, label)')).toContain('user-select: none;');
     // #613's disabled look still comes after the yellow it must beat.

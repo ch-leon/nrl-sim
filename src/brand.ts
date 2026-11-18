@@ -62,7 +62,9 @@ export const BRAND: Brand = {
   titleText: 'BIG COACH',
   parentBrand: { name: 'SuperCOOKED', show: true },
   colors: {
-    background: COLOR_TOKENS.navy,
+    // Ink, as the title and the loading screen are, so a cold start shows no navy
+    // before the first frame (SuperCOOKED §2; Leon, 18 Nov).
+    background: COLOR_TOKENS.ink,
     primary: COLOR_TOKENS.accent,
     onPrimary: COLOR_TOKENS.onAccent,
     text: COLOR_TOKENS.text,

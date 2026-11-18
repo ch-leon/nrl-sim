@@ -671,6 +671,13 @@ export function listenForPress(): void {
   document.addEventListener('touchstart', () => {}, { passive: true });
 }
 
+/**
+ * Hover and press fills (SuperCOOKED): a raised control a shade lighter, the orange a shade
+ * lighter. The stylesheet below writes them as --nrl-raised-hover / --nrl-accent-hover; the
+ * title, whose sheet is up before this one, reads them from here.
+ */
+export const HOVER_FILL = { raised: '#233050', accent: '#ff8540' } as const;
+
 /** Motion (#597): every entrance and transition in src/ui takes its time, curve and travel from these. */
 const MOTION_TOKENS = `--nrl-dur-press: 120ms;
   --nrl-dur-fast: 150ms;
@@ -734,8 +741,8 @@ export const CSS = `
   /* A dialog's and a player card's edge, a shade up from --nrl-line. */
   --nrl-line-2: #2c3757;
   /* Hover and press fills: a raised control a shade lighter, the orange a shade lighter. */
-  --nrl-raised-hover: #233050;
-  --nrl-accent-hover: #ff8540;
+  --nrl-raised-hover: ${HOVER_FILL.raised};
+  --nrl-accent-hover: ${HOVER_FILL.accent};
   /* The outline button's 1px edge. */
   --nrl-outline: rgba(255, 255, 255, 0.3);
   --nrl-shadow-chip: 0 4px 14px rgba(0, 0, 0, 0.35);

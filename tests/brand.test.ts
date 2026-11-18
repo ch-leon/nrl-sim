@@ -70,7 +70,7 @@ describe('BRAND today (Big Coach, SuperCOOKED §2)', () => {
   });
 
   it("points its colours at the theme's tokens instead of copying them", () => {
-    expect(BRAND.colors.background).toBe(COLOR_TOKENS.navy);
+    expect(BRAND.colors.background).toBe(COLOR_TOKENS.ink); // no navy flash on a cold start
     expect(BRAND.colors.primary).toBe(COLOR_TOKENS.accent);
     expect(BRAND.colors.onPrimary).toBe(COLOR_TOKENS.onAccent);
     expect(BRAND.colors.text).toBe(COLOR_TOKENS.text);
@@ -155,8 +155,8 @@ describe('each consumer reads BRAND', () => {
     expect(html).not.toContain('%BRAND_');
     expect(html).toContain('<title>Big Coach</title>');
     expect(html).toContain('<meta name="apple-mobile-web-app-title" content="Big Coach" />');
-    expect(html).toContain('<meta name="theme-color" content="#0b1220" />');
-    expect(html).toContain('background: #0b1220;');
+    expect(html).toContain('<meta name="theme-color" content="#05070d" />');
+    expect(html).toContain('background: #05070d;');
     expect(html).toContain('<meta name="color-scheme" content="dark" />');
     expect(html).toContain('<meta name="mobile-web-app-capable" content="yes" />');
     // A name with markup in it is escaped, and an unknown placeholder fails the build.
