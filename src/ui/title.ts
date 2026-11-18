@@ -203,7 +203,9 @@ ${MOTION_CSS}
   .nrl-title-main { gap: 6px; }
   /* The compact left column keeps Start and the veteran switch above the fold. */
   .nrl-title-kit { display: none; }
-  .nrl-title-form { gap: 6px; }
+  /* Keep the town and name inputs reachable when the mode or difficulty buttons wrap. */
+  .nrl-title-form { gap: 6px; max-height: none; }
+  .nrl-title-details { max-height: 8rem; }
   .nrl-title-setup { padding: 10px; gap: 6px 16px;
     grid-template-areas: "start form" "veteran form"; grid-template-rows: max-content 1fr; }
   .nrl-title-confirm { font-size: 0.75rem; line-height: 1.25; }
