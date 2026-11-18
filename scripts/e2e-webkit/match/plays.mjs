@@ -292,10 +292,13 @@ export async function runMatchPlays(browser, sizes = [[844, 390], [667, 375], [5
             const play = await waitMatchState(() => {
               const b = document.querySelector('[data-tray-plays]:not([hidden]) [data-play]:not([disabled])');
               if (!b) return null;
+              // The tackle from the open tray's head (" · tackle 2", SuperCOOKED 41: the ball chip steps aside under
+              // the tray), else from the chip ("Your ball · tackle 2/5").
+              const head = document.querySelector('.nrl-mo-calls:not([hidden]) .nrl-mo-tray-tackle')?.textContent.trim() ?? '';
               const chip = document.querySelector('.nrl-mo-tackle');
               const shown = chip && !chip.hidden && getComputedStyle(chip).display !== 'none';
-              // "Your ball · tackle 2/5" (SuperCOOKED 40): the count after whose ball.
-              if (shown && !/(^|· )TACKLE [123]\//i.test(chip.textContent.trim())) return null;
+              if (head) { if (!/tackle [123]$/i.test(head)) return null; }
+              else if (shown && !/(^|· )TACKLE [123]\//i.test(chip.textContent.trim())) return null;
               b.click();
               return b.hasAttribute('data-called') ? b.dataset.play : null;
             }, null, 'a callable early-tackle set play');
