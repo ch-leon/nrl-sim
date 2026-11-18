@@ -292,6 +292,14 @@ limits, currency, lower-budget league transitions and AI rules; the v1 audit is
 not their current approval status. No competition operation charges annual salary to
 cash, reprices an active contract or quietly releases a player to fit a limit.
 
+For the selectable League career, the 18 November 2026 product decision supersedes
+the draft lower-budget transition question: player and AI clubs retain their
+highest attained base-cap tier. Higher-tier entry can raise capacity; entry or
+allocation into an easier league never reduces it. Preserve existing purchased
+and earned capacity, receipts, cash and lawful exact-term protection. Do not grant
+new protection for downward movement. New deals must fit ordinary cap room. The
+selected competition rank and the club's retained finance tier are distinct.
+
 ## 7. Integrated rollover
 
 Current baseline order increments counters first, then review snapshot (1),

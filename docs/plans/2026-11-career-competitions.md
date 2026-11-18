@@ -71,8 +71,9 @@ with the [17 November implementation plan](2026-11-17-league-selection.md), foll
 merged player continuity [#716](https://github.com/ch-leon/nrl-sim/pull/716). It delivers
 an explicitly selected new-game format and preserves existing careers. Its three
 sequential review stages cover permanent access and legal fields, resumable annual
-close/entry, then the actual player-facing flow. Voluntary lower-cap entry remains
-an explicit pending product decision; foundation work does not resolve it.
+close/entry, then the actual player-facing flow. Leon approved retained club capacity on 18 November: easier league entry never
+reduces it. Higher-tier entry may raise the base; preserve existing purchased and
+earned additions, with no new downward-movement protection.
 
 Before dependent implementation, settle AI field allocation for freely chosen
 leagues, calendar phases and durations, lower-league cap commitments, assignment

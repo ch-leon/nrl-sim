@@ -75,13 +75,13 @@ previews and atomic initial/annual confirmation:
    short landscape/Larger text, final CI/full QA and full Claude issue-level review
    before marking ready or merging.
 
-**Open product rule:** On 18 November Leon reopened whether salary caps should be
-rules of individual leagues at all. Examples of league-set caps, retained club
-capacity and temporary signed-term protection were explained; no option has been
-approved. Do not treat the earlier two-option question or the recommendation of
-retained club capacity as a decision. Scheduling and confirmation plumbing can
-proceed independently; cap-policy-dependent activation waits for the answer and
-corresponding tests.
+**Approved 18 November: club capacity is retained.** Leon confirmed that choosing
+an easier league does not reduce the club's salary-cap capacity. Higher-tier entry
+can raise base capacity; downward entry/allocation retains it for player and AI
+clubs. Preserve purchased/earned additions and existing exact protection; grant no
+new protection merely for moving down. New signings and renewals must still fit
+ordinary room under retained capacity. No salary rewrite, automatic release or
+cash wage charge is introduced.
 
 Annual acceptance, the chooser, production admission and multi-year browser proof
 have **not** been implemented at the resume checkpoint.
