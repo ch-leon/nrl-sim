@@ -4,13 +4,14 @@
 // position keeps all of it, a related one (centre and winger, the two halves,
 // prop and second-row) ×0.92, anything else (a prop at halfback) ×0.8. The
 // saved lineup is the coach's intent; `resolveLineup` turns it into the side
-// that actually runs out on the day, filling a slot whose man is injured or has
-// left the club. Pure: the lineup screen, matchday and the save migration
+// that actually runs out on the day, filling a slot whose man is unavailable or
+// has left the club. Pure: the lineup screen, matchday and the save migration
 // call these. Calculations stay pure; commitLineup owns the coach edits'
 // store write and immediate save. No Phaser, no dice.
 import { getState, setState, type Lineup, type Player, type PlayerStats, type Position } from '../core/state';
 import { save } from '../core/save';
 import { overallRating } from '../data/player';
+import { awaitingCampReplay } from './parkedLeagueFixture';
 import { BENCH, DEFAULT_ROTATION, isRotation, type Rotation } from '../match/league/bench';
 import { DEFAULT_TACTICS, isAttackPreset, isDefencePreset, type TeamTactics } from '../match/league/presets';
 
@@ -69,7 +70,13 @@ export function isFieldable(p: { injuredWeeks: number; suspendedWeeks?: number }
   return p.injuredWeeks <= 0 && (p.suspendedWeeks ?? 0) <= 0;
 }
 
-const isFit = (p: Player): boolean => isFieldable(p);
+/** Temporarily away player IDs. They still belong to the squad. */
+export type LineupAvailability = ReadonlySet<string>;
+
+export function isSelectable(p: Pick<Player, 'id' | 'injuredWeeks' | 'suspendedWeeks'>, away?: LineupAvailability): boolean {
+  return isFieldable(p) && !away?.has(p.id);
+}
+
 const cmp = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 const byOverall = (a: Player, b: Player): number => overallRating(b) - overallRating(a) || cmp(a.id, b.id);
 
@@ -85,8 +92,8 @@ function bestFor(pool: readonly Player[], slot: number): Player | undefined {
  * natural halfback gets his slot before a centre is moved there. The bench is
  * the next best fit players by overall. Old saves and the Auto pick button.
  */
-export function autoPick(squad: readonly Player[], rotation: Rotation = DEFAULT_ROTATION, tactics: TeamTactics = DEFAULT_TACTICS): Lineup {
-  const fit = squad.filter(isFit);
+export function autoPick(squad: readonly Player[], rotation: Rotation = DEFAULT_ROTATION, tactics: TeamTactics = DEFAULT_TACTICS, away?: LineupAvailability): Lineup {
+  const fit = squad.filter((p) => isSelectable(p, away));
   const starters: (string | null)[] = LINEUP_SLOTS.map(() => null);
   const used = new Set<string>();
   const pairs = fit.flatMap((p) => LINEUP_SLOTS.map((pos, slot) => ({ p, slot, eff: effectiveRating(p, pos) })));
@@ -101,14 +108,14 @@ export function autoPick(squad: readonly Player[], rotation: Rotation = DEFAULT_
 }
 
 /** Why a slot had to be filled on the day. */
-export type FillReason = 'injured' | 'suspended' | 'gone' | 'empty';
+export type FillReason = 'injured' | 'suspended' | 'away' | 'gone' | 'empty';
 
 export interface Fill {
   slot: number;
   position: Position;
   /** The man who fills it. */
   player: Player;
-  /** The man picked for it, when he is still at the club (injured). */
+  /** The man picked for it, when he still belongs to the club. */
   out: string | null;
   why: FillReason;
 }
@@ -138,30 +145,32 @@ export interface Resolved extends Selection {
 
 /**
  * The side for today from the saved lineup and the squad as it stands. A
- * starter who is injured is replaced for this match only (he keeps his slot);
+ * starter who is temporarily unavailable is replaced for this match only;
  * one who has left the club is replaced in the saved lineup too. A slot is
  * filled by the best man for it from the bench, then from the rest of the
  * squad. The bench is the coach's men who are fit and not now starting,
  * topped up from the rest by overall.
  */
-export function resolveLineup(lineup: Lineup, squad: readonly Player[]): Resolved {
+export function resolveLineup(lineup: Lineup, squad: readonly Player[], away?: LineupAvailability): Resolved {
   const byId = new Map(squad.map((p) => [p.id, p] as const));
   const used = new Set<string>();
+  const free = (p: Player): boolean => !used.has(p.id) && isSelectable(p, away);
   const starters: (Player | null)[] = [];
   const empties: { slot: number; why: FillReason; out: string | null }[] = [];
   const clean: (string | null)[] = LINEUP_SLOTS.map((_, i) => lineup.starters[i] ?? null);
   LINEUP_SLOTS.forEach((_, slot) => {
     const id = clean[slot];
     const p = id ? byId.get(id) : undefined;
-    if (p && !used.has(p.id) && isFit(p)) {
+    if (p && free(p)) {
       starters[slot] = p;
       used.add(p.id);
       return;
     }
     starters[slot] = null;
     if (p && !used.has(p.id)) {
-      // Hurt or banned: his slot is kept for him.
-      empties.push({ slot, why: p.injuredWeeks > 0 ? 'injured' : 'suspended', out: p.name });
+      // His slot is kept for him while unavailable.
+      const why = away?.has(p.id) ? 'away' : p.injuredWeeks > 0 ? 'injured' : 'suspended';
+      empties.push({ slot, why, out: p.name });
       used.add(p.id);
       return;
     }
@@ -172,10 +181,9 @@ export function resolveLineup(lineup: Lineup, squad: readonly Player[]): Resolve
   // The coach's bench: men still at the club, listed once, never also a starter.
   let cleanBench: string[] = [];
   for (const id of lineup.bench) if (byId.has(id) && !clean.includes(id) && !cleanBench.includes(id)) cleanBench.push(id);
-  const benchPool = cleanBench.map((id) => byId.get(id)!).filter((p) => isFit(p) && !used.has(p.id));
+  const benchPool = cleanBench.map((id) => byId.get(id)!).filter(free);
   const fills: Fill[] = [];
   for (const e of empties) {
-    const free = (p: Player): boolean => isFit(p) && !used.has(p.id);
     const pick = bestFor(benchPool.filter(free), e.slot) ?? bestFor(squad.filter(free), e.slot);
     if (!pick) continue;
     used.add(pick.id);
@@ -188,12 +196,12 @@ export function resolveLineup(lineup: Lineup, squad: readonly Player[]): Resolve
   }
   const bench: Player[] = benchPool.filter((p) => !used.has(p.id)).slice(0, BENCH.size);
   for (const p of bench) used.add(p.id);
-  for (const p of squad.filter((p) => isFit(p) && !used.has(p.id)).sort(byOverall)) {
+  for (const p of squad.filter(free).sort(byOverall)) {
     if (bench.length >= BENCH.size) break;
     bench.push(p);
     used.add(p.id);
   }
-  // A short bench is topped up in the saved lineup too (injured bench men keep their place).
+  // A short bench is topped up in the saved lineup too. Unavailable bench men keep their place.
   for (const p of bench) {
     if (cleanBench.length >= BENCH.size) break;
     if (!cleanBench.includes(p.id)) cleanBench.push(p.id);
@@ -227,10 +235,12 @@ export function setTactics(lineup: Lineup, pick: Partial<TeamTactics>): Lineup {
 }
 
 /** The coach makes a man the goal-kicker or the captain (N11); picking the one already chosen goes back to the default. */
-export function setKicker(lineup: Lineup, id: string): Lineup {
+export function setKicker(lineup: Lineup, id: string, away?: LineupAvailability): Lineup {
+  if (lineup.kicker !== id && away?.has(id)) return lineup;
   return { ...lineup, kicker: lineup.kicker === id ? null : id };
 }
-export function setCaptain(lineup: Lineup, id: string): Lineup {
+export function setCaptain(lineup: Lineup, id: string, away?: LineupAvailability): Lineup {
+  if (lineup.captain !== id && away?.has(id)) return lineup;
   return { ...lineup, captain: lineup.captain === id ? null : id };
 }
 
@@ -240,6 +250,7 @@ export function describeFills(fills: readonly Fill[]): string {
     const at = f.position;
     if (f.why === 'injured' && f.out) return `${f.player.name} fills in at ${at} for the injured ${f.out}`;
     if (f.why === 'suspended' && f.out) return `${f.player.name} fills in at ${at} for ${f.out}, who is suspended`;
+    if (f.why === 'away' && f.out) return `${f.player.name} fills in at ${at} for ${f.out}, who is away`;
     return `${f.player.name} comes in at ${at}`;
   });
   return `Lineup: ${parts.join('; ')}.`;
@@ -292,11 +303,20 @@ function fromSeats(lineup: Lineup, starters: (string | null)[], seats: readonly 
 }
 
 /** Swap whoever is at two spots (a tap on a second slot or seat); into an empty one is a move. */
-export function swapSpots(lineup: Lineup, a: Spot, b: Spot): Lineup {
+export function swapSpots(lineup: Lineup, a: Spot, b: Spot, away?: LineupAvailability): Lineup {
   if (sameSpot(a, b)) return lineup;
   const pa = occupant(lineup, a);
   const pb = occupant(lineup, b);
   if (pa === null && pb === null) return lineup;
+  const aAway = pa !== null && away?.has(pa);
+  const bAway = pb !== null && away?.has(pb);
+  // A deliberate cover choice removes the away preference instead of moving
+  // an unavailable player into another seat. Either tap order means the same edit.
+  if (aAway || bAway) {
+    if (aAway && pb !== null && !bAway) return placeAt(lineup, a, pb, away);
+    if (bAway && pa !== null && !aAway) return placeAt(lineup, b, pa, away);
+    return lineup;
+  }
   const starters = LINEUP_SLOTS.map((_, i) => lineup.starters[i] ?? null);
   const seats = seatsOf(lineup);
   const set = (s: Spot, id: string | null): void => {
@@ -310,19 +330,23 @@ export function swapSpots(lineup: Lineup, a: Spot, b: Spot): Lineup {
 
 /**
  * Put `id` at `spot` (a tap on a player with a spot picked). A man already in
- * the thirteen swaps places with whoever is there; a newcomer from the rest of
- * the squad takes the spot, and the man he replaces goes to the bench if a
- * seat is free (a starter), else out of the thirteen.
+ * the thirteen swaps places with whoever is there. A newcomer takes the spot
+ * and the starter he displaces goes to the bench if a seat is free. An away
+ * occupant is removed from the saved thirteen when deliberately replaced.
  */
-export function placeAt(lineup: Lineup, spot: Spot, id: string): Lineup {
+export function placeAt(lineup: Lineup, spot: Spot, id: string, away?: LineupAvailability): Lineup {
+  if (away?.has(id)) return lineup;
   const from = spotOf(lineup, id);
-  if (from) return swapSpots(lineup, from, spot);
   const out = occupant(lineup, spot);
+  const outAway = out !== null && away?.has(out);
+  if (from && !outAway) return swapSpots(lineup, from, spot, away);
   const starters = LINEUP_SLOTS.map((_, i) => lineup.starters[i] ?? null);
   const seats = seatsOf(lineup);
+  if (from?.kind === 'starter') starters[from.slot] = null;
+  else if (from?.kind === 'bench') seats[from.index] = null;
   if (spot.kind === 'starter') starters[spot.slot] = id;
   else seats[spot.index] = id;
-  if (out !== null && spot.kind === 'starter') {
+  if (out !== null && spot.kind === 'starter' && !outAway) {
     const free = seats.indexOf(null);
     if (free >= 0) seats[free] = out;
   }
@@ -370,8 +394,8 @@ function seatOnBench(lineup: Lineup, byId: ReadonlyMap<string, Player>, p: Playe
  * pick, resolveLineup and the rivals never call it, so the sim's own path and
  * the pinned matches don't see it. `squad` is the squad with him in it.
  */
-export function placeSigning(lineup: Lineup, squad: readonly Player[], signed: Player): SigningPlacement {
-  if (!isFit(signed) || spotOf(lineup, signed.id)) return { lineup, where: 'out' };
+export function placeSigning(lineup: Lineup, squad: readonly Player[], signed: Player, away?: LineupAvailability): SigningPlacement {
+  if (!isSelectable(signed, away) || spotOf(lineup, signed.id)) return { lineup, where: 'out' };
   const byId = new Map(squad.map((p) => [p.id, p] as const));
   const best = Math.max(...LINEUP_SLOTS.map((pos) => positionFit(signed.position, pos)));
   let take: { slot: number; margin: number; out: Player | undefined } | undefined;
@@ -385,8 +409,8 @@ export function placeSigning(lineup: Lineup, squad: readonly Player[], signed: P
   if (take) {
     const { slot, out } = take;
     // placeAt seats the man he replaces only when a seat is free; seatOnBench also tries the weakest seat.
-    let next = placeAt(lineup, { kind: 'starter', slot }, signed.id);
-    if (out && !next.bench.includes(out.id)) next = seatOnBench(next, byId, out);
+    let next = placeAt(lineup, { kind: 'starter', slot }, signed.id, away);
+    if (out && !away?.has(out.id) && !next.bench.includes(out.id)) next = seatOnBench(next, byId, out);
     return { lineup: next, where: 'nine', slot, ...(out ? { displaced: out.id } : {}) };
   }
   const next = seatOnBench(lineup, byId, signed);
@@ -402,7 +426,7 @@ export function signingNote(placed: Pick<SigningPlacement, 'where' | 'slot'>): s
 
 /** Keep a coach edit once, immediately; unchanged pure results do not save. No toast or Undo. */
 export function commitLineup(next: Lineup): boolean {
-  if (next === getState().lineup) return false;
+  if (next === getState().lineup || awaitingCampReplay(getState())) return false;
   setState({ lineup: next });
   save(getState());
   return true;
@@ -422,7 +446,7 @@ export function lineupChanges(a: Lineup, b: Lineup): number {
 }
 
 /** Auto pick changes the thirteen while retaining the coach's roles and plays. */
-export function autoPickKeepingPlan(squad: readonly Player[], lineup: Lineup): Lineup {
-  return { ...autoPick(squad, lineup.rotation, validTactics(lineup.tactics)),
+export function autoPickKeepingPlan(squad: readonly Player[], lineup: Lineup, away?: LineupAvailability): Lineup {
+  return { ...autoPick(squad, lineup.rotation, validTactics(lineup.tactics), away),
     kicker: lineup.kicker ?? null, captain: lineup.captain ?? null, plays: lineup.plays ?? [] };
 }

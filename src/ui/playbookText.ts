@@ -8,12 +8,13 @@ import { PLAYS_BY_ID, type Play, type PlayId } from '../data/plays';
 import { playFit, PLAYS, type PlayMan } from '../match/league/plays';
 import { PRESET_LABEL, type Zone } from '../match/league/presets';
 import { LINEUP_SLOTS, resolveLineup, statsAt } from '../systems/lineup';
+import { awayPlayerIds } from '../systems/playerAssignments';
 
 const surname = (name: string): string => name.trim().split(/\s+/).pop() ?? name;
 
 /** Today's nine by slot as a play reads them (name, footy IQ as he plays the slot); an empty slot is a hole. */
-export function todaysNine(state: Pick<GameState, 'lineup' | 'squad'>): PlayMan[] {
-  const starters = resolveLineup(state.lineup, state.squad).starters;
+export function todaysNine(state: GameState): PlayMan[] {
+  const starters = resolveLineup(state.lineup, state.squad, awayPlayerIds(state)).starters;
   return LINEUP_SLOTS.map((pos, slot) => {
     const p = starters[slot];
     return p ? { name: p.name, footyIQ: statsAt(p, pos).footyIQ } : (undefined as unknown as PlayMan);

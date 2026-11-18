@@ -1,3 +1,5 @@
+import { runningCampContext } from '../core/time';
+import type { RunningCamp } from '../data/playerAssignments';
 import { CompetitionRewardError } from './competitionRewards';
 import { freezeMatchEffects, reconcileMatchEffects } from './matchIncome';
 // Regional calendar and results for League careers and isolated competition prototypes.
@@ -64,12 +66,12 @@ export function structuralPolicyProblem(state: GameState): string | null {
 // Match hooks keep that receipt while applying individual results to the calendar.
 const admitted = new WeakMap<object, {installation: number; world: unknown}>();
 
-function normalLeagueProblem(state: GameState): string | null {
+function normalLeagueProblem(state: GameState, runningCamp?: RunningCamp): string | null {
   const progress = state.competitions?.leagueCareer;
   if (!progress || typeof progress !== 'object' || careerNamespace() !== null) return 'This League career is unsupported.';
   const cached = admitted.get(progress);
   if (cached?.installation === stateInstallation() && cached.world === state.competitions!.world) return null;
-  const problem = leagueCareerStateProblem(state);
+  const problem = leagueCareerStateProblem(state,runningCamp);
   if (problem) return problem.message;
   admitted.set(progress, {installation: stateInstallation(), world: state.competitions!.world});
   return null;
@@ -78,7 +80,7 @@ function normalLeagueProblem(state: GameState): string | null {
 export function structuralAdvanceProblem(state: GameState): string | null {
   if (state.competitions && 'leagueCareer' in state.competitions) {
     if (!structuralRuntimeAllowed()) {
-      const problem = normalLeagueProblem(state);
+      const problem = normalLeagueProblem(state,runningCampContext(state));
       if (problem) return problem;
     }
     if (!isPlayableLeagueCareer(state)) return 'The League career progression snapshot is invalid or unsupported.';
@@ -96,7 +98,7 @@ export function structuralAdvanceProblem(state: GameState): string | null {
 /** Check the live lifecycle shape during interval settlement. */
 export function isPlayableLeagueCareer(state: GameState): boolean {
   return !!state.competitions?.leagueCareer && state.boardLoan?.owed === 0
-    && !validateInput(state as unknown as Record<string, unknown>, state.version);
+    && !validateInput(state as unknown as Record<string, unknown>, state.version,runningCampContext(state));
 }
 
 /** Activation is an explicit local developer operation, never an imported flag. */
@@ -203,7 +205,8 @@ export function finaliseCalendarFixture(state: GameState, bridge: Fixture, score
     competitions.openCupEntry = {...entry,current:{...offer,withdrawal:{...offer.withdrawal,
       fulfilled:{fixtureId:fixture.id,slot:state.week,result:{...result}}}}};
   }
-  const problem = validateCompetitions(competitions, { pack: state.pack ?? 'au', season: state.season, week: state.week, clubIds: state.league.clubs.map(c => c.id) });
+  const runningCamp = runningCampContext(state);
+  const problem = validateCompetitions(competitions, { pack: state.pack ?? 'au', season: state.season, week: state.week, clubIds: state.league.clubs.map(c => c.id), ...(runningCamp ? {runningCamp} : {}) });
   if (problem) throw new Error(`Invalid result transition: ${problem}`);
   const stage = instance.definition.stages.find(s => s.id === fixture.stageId)!;
   // A compatibility read model for the player's own league. Cup results never change it.
@@ -255,9 +258,10 @@ function withdrawInstance(instance: CompetitionInstance): CompetitionInstance {
 }
 
 function applyInstances(state: GameState, instances: CompetitionInstance[]): GameState | null {
+  const runningCamp = runningCampContext(state);
   const competitions = { ...state.competitions!, instances };
   const problem = validateCompetitions(competitions, {
-    pack: state.pack ?? 'au', season: state.season, week: state.week, clubIds: state.league.clubs.map(c => c.id),
+    pack: state.pack ?? 'au', season: state.season, week: state.week, clubIds: state.league.clubs.map(c => c.id), ...(runningCamp ? {runningCamp} : {}),
   });
   if (problem) {
     recoveryLog(`left unchanged (${problem})`);

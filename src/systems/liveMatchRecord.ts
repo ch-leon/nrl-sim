@@ -9,6 +9,7 @@
 // and plan change, when the page hides, every LIVE_MATCH_SAVE_SECONDS of match
 // time, and on Save & exit, so a compatible kill that never fires pagehide loses at most
 // that much. A few hundred bytes, kept next to the save slot; cleared at full time.
+import type { Fixture, GameState } from '../core/state';
 import { type ControlInput, isControlInput } from '../match/league/controls';
 import { getActiveSlot } from '../core/save';
 import { browserStorage, inCareerNamespace, type StorageLike } from '../core/storage/local';
@@ -120,6 +121,13 @@ function recoveryRecord(x: unknown): LiveMatchRecord | null {
     return isLiveMatchRecord(legacy) ? legacy : null;
   }
   return isLiveMatchRecord(x) ? x : null;
+}
+
+/** Matchday and pre-resume controls compare the complete saved fixture identity. */
+export function belongsToFixture(record: LiveMatchRecord, state: Pick<GameState,'season'|'week'>, fixture: Fixture): boolean {
+  return record.season === state.season && record.week === state.week && record.round === fixture.round
+    && record.homeId === fixture.homeId && record.awayId === fixture.awayId && record.competitionId === fixture.competitionId
+    && record.fixtureId === fixture.id && record.slot === fixture.slot;
 }
 
 export function readLiveMatch(): LiveMatchRecord | null {

@@ -15,7 +15,8 @@ import { aiCoachSides } from '../match/league/calls';
 import { teamSheetFromRival, teamSheetFromSquad, withRivalStyle } from '../match/league/sheets';
 import type { RivalPlanContext } from '../match/league/ai';
 import type { StyleEntry, TeamTactics } from '../match/league/presets';
-import { autoPick, isFieldable, resolveLineup } from './lineup';
+import { awayPlayerIds } from './playerAssignments';
+import { autoPick, isFieldable, isSelectable, resolveLineup } from './lineup';
 import { applyMatchStats } from './stats';
 import { injureRivalPlayers } from './rivals';
 import { calendarFixtureContext, calendarKnockout, currentCalendarFixtures, fixtureBridge, hasStructuralCalendar, sameFixtureIdentity } from './competitionCalendar';
@@ -53,12 +54,13 @@ export function rivalSheet(club: RivalClub, context?: RivalPlanContext): TeamShe
 
 /** Shared fixed inputs for player-match scouting and kick-off; never includes upcoming tactics. */
 export function playerRivalContext(
-  state: Pick<GameState, 'clubId' | 'clubName' | 'settings' | 'recentPlans' | 'lineup' | 'squad'>,
+  state: Pick<GameState, 'clubId' | 'clubName' | 'settings' | 'recentPlans' | 'lineup' | 'squad' | 'competitions' | 'season'>,
   playerRoster?: readonly StyleEntry[],
 ): RivalPlanContext {
-  const roster = playerRoster ?? (state.squad.some(isFieldable)
+  const away = awayPlayerIds(state);
+  const roster = playerRoster ?? (state.squad.some(p => isSelectable(p,away))
     ? teamSheetFromSquad(state.squad, state.clubId, state.clubName, DEFAULT_PLAYER_COLORS,
-      resolveLineup(state.lineup ?? autoPick(state.squad), state.squad)).roster ?? []
+      resolveLineup(state.lineup ?? autoPick(state.squad), state.squad,away),away).roster ?? []
     : []);
   return { difficulty: state.settings.difficulty, recentPlans: state.recentPlans, playerRoster: roster };
 }
@@ -159,7 +161,8 @@ export function applyRivalResults(
       const sheet = c.id === job.homeId ? job.home : c.id === job.awayId ? job.away : null;
       if (!sheet || !c.squad) return c;
       const played = (sheet.roster ?? []).flatMap((p) => (p.id ? [p.id] : []));
-      return { ...c, squad: applyMatchStats(c.squad, r.events, c.id, played, next.season) };
+      const participantIds = new Set([...played, ...(sheet.bench ?? []).flatMap((p) => (p.id ? [p.id] : []))]);
+      return { ...c, squad: applyMatchStats(c.squad, r.events, c.id, played, next.season, participantIds) };
     });
     next = { ...next, league: { ...next.league, clubs } };
   });

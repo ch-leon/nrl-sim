@@ -70,10 +70,11 @@ it('keeps the original slot, parked match and installed career on refused replac
   expect(bytes.get(liveMatchKey(1))).toBe('parked');
 });
 
-it('refuses old, future and invalid marked snapshots before normalization', async () => {
+it('refuses unsupported, future and invalid marked snapshots before normalization', async () => {
   const { bytes } = storage();
   const candidate = await prepareLeagueCareer(options);
-  for(const bad of [{...candidate,version:SAVE_VERSION-1},{...candidate,version:SAVE_VERSION+1},
+  // v32/v33 League saves have supported migrations; v31 marked careers do not.
+  for(const bad of [{...candidate,version:31},{...candidate,version:SAVE_VERSION+1},
     {...candidate,pack:'au'}, {...candidate,competitions:{...candidate.competitions,leagueCareer:null}}]){
     const raw=JSON.stringify(bad);
     bytes.set(slotKey(1),raw);

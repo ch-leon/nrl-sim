@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- **Skills Camp:** book one free annual place in Weeks 1–4, send a squad player away for the Week 5 league opener, and get him back before Week 6 with a saved development report. The League view shows named cover, the chosen focus, XP and cancellation terms. Automatic cover keeps the preferred team; actual awards use existing age/trait modifiers, point spending and ceilings. Release checks are tracked in the [evidence record](../status/2026-11-player-assignments.md) for [PR #742](https://github.com/ch-leon/nrl-sim/pull/742).
+
 - **iPhone app, Phase 2 (durable saves):** in the iPhone app every save is also kept as a native file, so a career survives iOS clearing the web view's storage. It comes back at the next launch, and a deleted slot stays deleted. Export opens the share sheet (Files, AirDrop). The website and Android are unchanged. [docs/ios-test-build.md](../ios-test-build.md#saves-on-iphone) · [spec](../specs/commercial-saves.md)
 
 - **iPhone app, Phase 1 (the shell):** the game now builds as an iPhone app, **Big Coach**, from the same code as the website and the Android test build. Landscape only, iPhone only, full screen with no status bar, the home bar dimmed while you play, no page bounce, the ball icon and a launch screen in the brand's ink. Leon runs it on his own iPhone from Xcode with a free Apple ID (re-run every 7 days). Analytics and the store rules now know the iPhone app from the website and Android. [docs/ios-test-build.md](../ios-test-build.md) · [spec](../specs/ios.md)
