@@ -2,8 +2,16 @@
 import { SEASON_ROUNDS } from '../config';
 import { bus } from '../core/events';
 import { emptyFinance, getState, setState, type Fixture, type GameState } from '../core/state';
+import { isExecutableCompetitionRewardPolicy, isOpenCupDefinitionId } from '../data/competition';
 import { divisionForClub } from '../data/competitionDivisions';
 import { FINANCE_TIERS, matchCashQuote, tierForRank, type FinanceLevel, type FinanceTier, type MatchCashInput, type MatchCashQuote } from '../data/financeRules';
+import { AI_OPENING_CASH } from './cap';
+import { CompetitionRewardError, freezeCompetitionRewards, pruneCompetitionRewards, reconcileCompetitionRewards } from './competitionRewards';
+
+export function hasExecutableCupRewards(state: GameState): boolean {
+  return !!state.competitions?.instances.some(instance => isOpenCupDefinitionId(instance.definition.id)
+    && instance.definition.rewards.some(isExecutableCompetitionRewardPolicy));
+}
 
 export interface MatchIncomeRecord {
   id: string;
@@ -102,25 +110,50 @@ export function reconcileMatchIncome(state: GameState): GameState {
     const clubs = next.league.clubs.map(club => {
       if (cancelled) return club;
       if (club.id === state.clubId || (club.id !== fixture.homeId && club.id !== fixture.awayId)) return club;
-      const cash = (club.cash ?? 60_000) + (club.id === fixture.homeId ? receipt.home.total : receipt.away.total);
+      const cash = (club.cash ?? AI_OPENING_CASH) + (club.id === fixture.homeId ? receipt.home.total : receipt.away.total);
       if (!Number.isSafeInteger(cash)) throw new Error('Match income exceeds safe cash balance');
       return { ...club, cash };
     });
     if (!Number.isSafeInteger(money)) throw new Error('Match income exceeds safe cash balance');
     const books = next.finance.some(f => f.season === record.season) ? next.finance : [...next.finance, emptyFinance(record.season)];
-    next = { ...next, money, league: { ...next.league, clubs },
-      finance: playerQuote && !cancelled ? books.map(f => f.season !== record.season ? f : { ...f,
-        grant: f.grant + playerQuote.base, gate: f.gate + playerQuote.home,
-        sponsor: f.sponsor + playerQuote.sponsor, other: f.other + playerQuote.performance }) : next.finance,
+    const finance = playerQuote && !cancelled ? books.map(book => {
+      if (book.season !== record.season) return book;
+      const lines = { grant: book.grant + playerQuote.base, gate: book.gate + playerQuote.home,
+        sponsor: book.sponsor + playerQuote.sponsor, other: book.other + playerQuote.performance };
+      if (!Object.values(lines).every(Number.isSafeInteger)) throw new Error('Match income exceeds safe season book total');
+      return { ...book, ...lines };
+    }) : next.finance;
+    next = { ...next, money, league: { ...next.league, clubs }, finance,
       matchIncome: next.matchIncome.map(r => r.id === record.id ? { ...r, receipt } : r),
     };
   }
   return next;
 }
 
+// A financial error in a paid cup must never be recovered as a sporting forfeit.
+function ordinaryEffects(state: GameState, work: () => GameState): GameState {
+  try { return work(); }
+  catch (error) {
+    if (!hasExecutableCupRewards(state)) throw error;
+    throw new CompetitionRewardError(error instanceof Error ? error.message : 'Invalid ordinary match income');
+  }
+}
+
+export function freezeMatchEffects(state: GameState, fixture: Fixture): GameState {
+  const ordinary = ordinaryEffects(state, () => freezeMatchIncome(state, fixture));
+  return freezeCompetitionRewards(ordinary, fixture);
+}
+
+/** Both ledgers and wallets are detached until the result owner commits them. */
+export function reconcileMatchEffects(state: GameState): GameState {
+  const ordinary = ordinaryEffects(state, () => reconcileMatchIncome(state));
+  return pruneCompetitionRewards(reconcileCompetitionRewards(ordinary));
+}
+
 /** Include this patch whenever a result owner commits its returned state. */
-export function matchIncomePatch(state: GameState): Pick<GameState, 'money' | 'finance' | 'matchIncome'> {
-  return { money: state.money, finance: state.finance, matchIncome: state.matchIncome };
+export function matchIncomePatch(state: GameState): Pick<GameState, 'money' | 'finance' | 'matchIncome' | 'competitionRewards' | 'reputation'> {
+  return { money: state.money, finance: state.finance, matchIncome: state.matchIncome,
+    competitionRewards: state.competitionRewards, reputation: state.reputation };
 }
 
 /** Bounded, plain-data persistence validation; malformed receipts cannot mint cash. */
@@ -189,6 +222,15 @@ export function commitMatchState(next: GameState, extra: Partial<GameState> = {}
     if (!q) continue;
     for (const [reason, delta] of [['grant', q.base], ['gate', q.home], ['sponsor', q.sponsor], ['match performance', q.performance]] as const) {
       if (delta) bus.emit('money:changed', { reason, delta, balance: getState().money, booked: true, stamp: { season: r.season, week: r.fixture.slot ?? r.fixture.round } });
+    }
+  }
+  const deliveredPrizes = new Set(before.competitionRewards.flatMap(r => r.status === 'settled' ? r.receipts.map(receipt => receipt.id) : []));
+  for (const record of next.competitionRewards) {
+    if (record.status !== 'settled') continue;
+    for (const receipt of record.receipts) {
+      if (receipt.kind !== 'cash' || receipt.clubId !== next.clubId || deliveredPrizes.has(receipt.id) || !receipt.delta) continue;
+      bus.emit('money:changed', { reason: 'prize', delta: receipt.delta, balance: getState().money,
+        booked: true, stamp: { season: record.season, week: record.slot } });
     }
   }
 }
