@@ -1,3 +1,4 @@
+import { entrySnapshots } from '../../data/leagueCareerFixtures';
 import { closeLeagueSeason } from '../../../src/systems/leagueCareer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { stubDocument, type StubNode } from '../stubDom';
@@ -28,7 +29,7 @@ function fixture(planning: boolean): GameState {
   c.instances.forEach(instance => { instance.definition.slotCount = 25; });
   c.leagueCareer = { ...progress(), phase: 'active',
     accepted: { season: 1, startInterval: 0, leagueId: c.world!.profile.startingDivisionId,
-      receiptId: leagueEntryReceiptId(c.world!.profile.id, 1, s.clubId, c.world!.profile.startingDivisionId),
+      ...entrySnapshots(c, 1, c.world!.profile.startingDivisionId), receiptId: leagueEntryReceiptId(c.world!.profile.id, 1, s.clubId, c.world!.profile.startingDivisionId),
       allocationPolicy: 'adjacent-vacancy-v1', movements: [] } };
   s.squad.forEach(p => { p.deal = { salary: 1000, startSeason: 1, endSeason: 2 }; p.contractWeeks = 27; });
   return planning ? closeLeagueSeason(s) : s;

@@ -1,3 +1,4 @@
+import { entrySnapshots } from '../data/leagueCareerFixtures';
 import { closeLeagueSeason } from '../../src/systems/leagueCareer';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { WEEKS_PER_SEASON } from '../../src/config';
@@ -163,7 +164,7 @@ function verifiedPending(finance?: GameState['finance']): GameState {
   s.league.ladder=s.league.ladder.filter(c=>clubIds.includes(c.clubId));
   s.competitions=competitions();
   const world=s.competitions.world!;
-  s.competitions.leagueCareer={...progress(),phase:'active',accepted:{season:1, startInterval: 0,leagueId:world.profile.startingDivisionId,receiptId:leagueEntryReceiptId(world.profile.id,1,s.clubId,world.profile.startingDivisionId),allocationPolicy:'adjacent-vacancy-v1',movements:[]}};
+  s.competitions.leagueCareer={...progress(),phase:'active',accepted:{season:1, startInterval: 0,leagueId:world.profile.startingDivisionId,...entrySnapshots(s.competitions, 1, world.profile.startingDivisionId), receiptId:leagueEntryReceiptId(world.profile.id,1,s.clubId,world.profile.startingDivisionId),allocationPolicy:'adjacent-vacancy-v1',movements:[]}};
   s.competitions.calendar!.status='active';s.competitions.calendar!.elapsedIntervals=4;
   if(finance) s.finance=finance;
   return closeLeagueSeason(s);

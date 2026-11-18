@@ -12,9 +12,9 @@ import {
 } from '../data/financeRules';
 
 /** The supported single league contains the premier clubs, so it uses that cap.
- * Division worlds use the tier of the division a club actually plays in. */
+ * A regional club starts at its division tier. League entry retains the highest base it attains. */
 export const SINGLE_LEAGUE_TIER: FinanceTier = 'premier';
-export const DIVISION_TIERS = ['local', 'championship', 'premier'] as const;
+export { DIVISION_TIERS, tierForRank } from '../data/financeRules';
 /** Rival transfer wallets start here. Difficulty does not scale them. */
 export const AI_OPENING_CASH = 60_000;
 
@@ -49,12 +49,6 @@ export interface CapAccount {
   protectedIds: string[];
   /** Exact agreements; the compatibility IDs never grant protection by themselves. */
   protectedTerms?: ProtectedTerm[];
-}
-
-export function tierForRank(rank: number): FinanceTier {
-  const tier = DIVISION_TIERS[rank];
-  if (!tier) throw new Error('Invalid division rank');
-  return tier;
 }
 
 export function freshCapAccount(tier: FinanceTier): CapAccount {

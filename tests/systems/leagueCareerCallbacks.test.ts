@@ -1,3 +1,4 @@
+import { entrySnapshots } from '../data/leagueCareerFixtures';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createLegacyGame } from '../helpers/legacyGame';
 import { createNewGame, getState, setState } from '../../src/core/state';
@@ -24,7 +25,7 @@ describe('async result ownership across fresh careers', () => {
     c.leagueCareer={version:1,scheduleSeed:573,clubId:s.clubId,phase:'active',
       initialFields:Object.fromEntries(c.world!.divisions.map(d=>[d.id,[...c.instances.find(i=>i.id===d.instanceId)!.entrantIds]])),
       access:[{leagueId:c.world!.profile.startingDivisionId}],accepted:{season:1,startInterval:0,leagueId:c.world!.profile.startingDivisionId,
-        receiptId:leagueEntryReceiptId(c.world!.profile.id,1,s.clubId,c.world!.profile.startingDivisionId),allocationPolicy:'adjacent-vacancy-v1',movements:[]}};
+        ...entrySnapshots(c, 1, c.world!.profile.startingDivisionId), receiptId:leagueEntryReceiptId(c.world!.profile.id,1,s.clubId,c.world!.profile.startingDivisionId),allocationPolicy:'adjacent-vacancy-v1',movements:[]}};
     setState(s);expect(saveIfChanged(getState())).toBe(true);const original=bytes.get(DEV_TEST_PREFIX+slotKey(1));
     let started: Events['match:started'] | undefined;bus.on('match:started',value=>{started=value;});const blocked=vi.fn();bus.on('week:blocked',blocked);
     registerPlayerMatchSystem();advanceWeek();expect(started).toBeDefined();expect(weekHeld()).toBe(true);expect(playerMatchPending()).toBe(true);

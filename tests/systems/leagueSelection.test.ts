@@ -104,12 +104,12 @@ describe('all covered signed obligations', () => {
     ]);
     expect(commitmentYears([], account, 5)).toEqual([{season: 5, committed: 0, cap, protectedExcess: 0, protectedAmount: 0, unprotectedExcess: 0}]);
   });
-  it('discloses lower-cap pending policy and preserves purchased/earned basis without granting protection', () => {
+  it('retains the attained cap tier and its purchased and earned additions without granting protection', () => {
     const account = {...freshCapAccount('premier'), purchasedLevel: 2 as const, earnedBasisPoints: 1000 as const, protectedIds: ['p']};
     const players = [{id: 'p', deal: {salary: 999999, startSeason: 1, endSeason: 3}}];
     const before = JSON.stringify({account,players}); const preview = leagueCommitmentPreview(players, account, 2, 0);
-    expect(preview.policyPendingReason).toMatch(/voluntary lower-cap/i);
-    expect(preview.cap).toBe(publishedCap({...account, tier: 'local'}));
+    expect(preview).not.toHaveProperty('policyPendingReason');
+    expect(preview.cap).toBe(publishedCap(account));
     expect(preview.purchasedAddition + preview.earnedAddition + preview.baseCap).toBe(preview.cap);
     expect(preview.years.every(y => y.protectedAmount === 0 && y.unprotectedExcess > 0)).toBe(true);
     expect(JSON.stringify({account,players})).toBe(before);
@@ -120,8 +120,13 @@ describe('all covered signed obligations', () => {
     expect(() => commitmentYears(players, freshCapAccount('local'), 2)).toThrow(/future base commitment/i);
     expect(JSON.stringify(players)).toBe(before);
   });
-  it('allows a lower cap when every signed year fits without a pending-policy blocker', () => {
-    expect(leagueCommitmentPreview([{deal: {salary: 100, startSeason: 1, endSeason: 3}}], freshCapAccount('premier'), 2, 0).policyPendingReason).toBeUndefined();
+  it('raises the base cap on higher entry and carries exact signed protection through a return', () => {
+    const term = {salary: 999999, startSeason: 1, endSeason: 3};
+    const account = {...freshCapAccount('championship'), protectedIds: ['p'], protectedTerms: [{playerId: 'p', ...term}]};
+    const down = leagueCommitmentPreview([{id: 'p', deal: term}], account, 2, 0);
+    expect(down.cap).toBe(publishedCap(account));
+    expect(down.years.every(y => y.protectedAmount === term.salary && y.unprotectedExcess === 0)).toBe(true);
+    expect(leagueCommitmentPreview([], account, 2, 2).cap).toBe(publishedCap({...account, tier: 'premier'}));
   });
 
 });

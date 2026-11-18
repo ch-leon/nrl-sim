@@ -5,6 +5,7 @@ import type { LeagueFields } from './divisions';
 import type { CompetitionWorldMetadata } from './competitionDivisions';
 import type { GameState } from '../core/state';
 import { BOARD } from '../config';
+import { validEntrySnapshots, type EntryQuote, type AnnualEntryChanges } from './leagueEntryReceipt';
 
 export interface LeagueTitleEvidence {
   season: number; leagueId: string; targetLeagueId: string; instanceId: string; finalFixtureId: string;
@@ -28,6 +29,7 @@ export interface LeagueCloseFacts {
 export interface LeagueMovement { clubId: string; fromLeagueId: string; toLeagueId: string }
 export interface LeagueEntryReceipt {
   season: number; startInterval: number; leagueId: string; receiptId: string; allocationPolicy: 'adjacent-vacancy-v1'; movements: LeagueMovement[];
+  quote: EntryQuote; annualChanges: AnnualEntryChanges | null;
 }
 /** Historical format and official honours survive pruning of source fixtures. */
 export interface LeagueHistoryFacts {
@@ -109,7 +111,8 @@ const keys = (v: Record<string, unknown>, allowed: readonly string[]): boolean =
 const integer = (v: unknown, min = 1): v is number => Number.isSafeInteger(v) && (v as number) >= min;
 const canonical = (v: unknown): unknown => Array.isArray(v) ? v.map(canonical) : record(v)
   ? Object.fromEntries(Object.keys(v).sort().map(k => [k, canonical(v[k])])) : v;
-const equal = (a: unknown, b: unknown): boolean => JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
+export const canonicalLeagueJson = (v: unknown): string => JSON.stringify(canonical(v));
+const equal = (a: unknown, b: unknown): boolean => canonicalLeagueJson(a) === canonicalLeagueJson(b);
 
 export function validateLeagueCareer(v: unknown, competitions: CompetitionCareerState,
   context: { pack: string; season: number; week?: number; clubIds: readonly string[]; clubId?: string }): string | null {
@@ -190,7 +193,7 @@ export function validateLeagueCareer(v: unknown, competitions: CompetitionCareer
     || (context.week !== undefined && context.week !== calendar.slots.length)
     || !instances.filter(i => i.season === context.season).every(i => ['completed', 'withdrawn', 'declined'].includes(i.status))) return 'league career phase';
   const accepted = v.accepted;
-  if (!record(accepted) || !keys(accepted, ['season', 'startInterval', 'leagueId', 'receiptId', 'allocationPolicy', 'movements']) || accepted.season !== context.season
+  if (!record(accepted) || !keys(accepted, ['season', 'startInterval', 'leagueId', 'receiptId', 'allocationPolicy', 'movements', 'quote', 'annualChanges']) || accepted.season !== context.season
     || !integer(accepted.startInterval, 0) || (context.season === 1 && accepted.startInterval !== 0)
     || accepted.allocationPolicy !== 'adjacent-vacancy-v1' || !Array.isArray(accepted.movements)
     || new Set(accepted.movements.map(m => record(m) ? m.clubId : undefined)).size !== accepted.movements.length
@@ -214,6 +217,7 @@ export function validateLeagueCareer(v: unknown, competitions: CompetitionCareer
         return 'league career allocation';
     }
   } catch { return 'league career allocation source'; }
+  if (!validEntrySnapshots(accepted as unknown as LeagueEntryReceipt, world, instances, v.clubId as string)) return 'league career entry quote';
   if (v.close !== undefined) {
     const close = v.close;
     if (!record(close) || !keys(close, ['id', 'season', 'startInterval', 'endingInterval', 'leagues']) || !integer(close.season)

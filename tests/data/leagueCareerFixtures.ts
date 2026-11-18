@@ -2,7 +2,9 @@ import { AU_PACK } from '../../src/content/au';
 import { AU_CAREER_PROFILE } from '../../src/content/career/au';
 import { buildDivisionSchedule, type RegionalCareerProfile } from '../../src/data/divisions';
 import { competitionFixtureId, standingsOrder, type CompetitionCareerState } from '../../src/data/competition';
-import type { LeagueProgress } from '../../src/data/leagueCareer';
+import { leagueCommitmentPreview } from '../../src/systems/leagueSelection';
+import { freshCapAccount, tierForRank } from '../../src/systems/cap';
+import type { LeagueMovement, LeagueProgress } from '../../src/data/leagueCareer';
 
 const ids = ['player', ...AU_CAREER_PROFILE.clubs.slice(0, 5).map(c => c.id)];
 export const profile: RegionalCareerProfile = { ...AU_CAREER_PROFILE, clubs: AU_CAREER_PROFILE.clubs.slice(0, 5),
@@ -27,4 +29,20 @@ export function competitions(season = 1, complete = true): CompetitionCareerStat
 }
 export function progress(): LeagueProgress {
   return { version: 1, scheduleSeed: 573, initialFields: Object.fromEntries(Object.entries(fields).map(([id, ids]) => [id, [...ids]])), clubId: 'player', phase: 'initial-choice', access: [{leagueId: profile.startingDivisionId}] };
+}
+
+/** Historical quote for tests which construct a completed draw directly. */
+export function entrySnapshots(c: CompetitionCareerState, season: number, leagueId: string, movements: LeagueMovement[] = []) {
+  const divisions = c.world!.divisions;
+  const d = divisions.find(d => d.id === leagueId)!;
+  const instance = c.instances.find(i => i.id === d.instanceId)!;
+  const opponents = instance.entrantIds.filter(id => id !== 'player').map(clubId => ({clubId, strength:44}));
+  const commitments = ['player', ...movements.map(m => m.clubId).filter(id => id !== 'player')].map(clubId => {
+    const rank = divisions.find(d => c.instances.find(i => i.id === d.instanceId)!.entrantIds.includes(clubId))!.rank;
+    const from = movements.find(m => m.clubId === clubId)?.fromLeagueId;
+    const previous = divisions.find(d => d.id === from)?.rank ?? rank;
+    return {clubId, ...leagueCommitmentPreview([], freshCapAccount(tierForRank(previous)), season, rank)};
+  });
+  return {quote:{definitionInstanceId:instance.id, opponents, commitments}, annualChanges:season === 1 ? null :
+    {opponents:structuredClone(opponents),commitments:commitments.map(c => ({...structuredClone(c), previousTier:c.tier})),retirements:0,academyBirths:0,marketBirths:0,rivalRenewals:0}};
 }

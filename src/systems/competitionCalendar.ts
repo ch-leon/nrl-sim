@@ -33,6 +33,14 @@ function openCupScheduleProblem(state: GameState, instance: CompetitionInstance)
   return null;
 }
 
+export function competitionRulesProblem(definition: CompetitionInstance['definition']): string | null {
+  if (definition.eligibility.kind !== 'open') return 'This competition eligibility policy is not enabled yet.';
+  if (definition.lineup.onField !== ON_FIELD || definition.lineup.benchSize !== BENCH.size
+    || definition.lineup.minSquad !== SQUAD_MIN || definition.lineup.maxSquad !== SQUAD_CAP) return 'This competition lineup policy is not enabled yet.';
+  if (Object.entries(definition.matchRules).some(([key, value]) => NINES[key as keyof typeof NINES] !== value)) return 'This competition rules snapshot needs a supported match engine.';
+  return null;
+}
+
 /** Loaded active snapshots must pass the same support gate as fresh activation. */
 export function structuralPolicyProblem(state: GameState): string | null {
   for (const instance of state.competitions?.instances ?? []) {
@@ -44,11 +52,8 @@ export function structuralPolicyProblem(state: GameState): string | null {
       if (schedule) return schedule;
     }
     if (instance.season !== state.season || !['entered', 'scheduled', 'active'].includes(instance.status)) continue;
-    const definition = instance.definition;
-    if (definition.eligibility.kind !== 'open') return 'This competition eligibility policy is not enabled yet.';
-    if (definition.lineup.onField !== ON_FIELD || definition.lineup.benchSize !== BENCH.size
-      || definition.lineup.minSquad !== SQUAD_MIN || definition.lineup.maxSquad !== SQUAD_CAP) return 'This competition lineup policy is not enabled yet.';
-    if (Object.entries(definition.matchRules).some(([key, value]) => NINES[key as keyof typeof NINES] !== value)) return 'This competition rules snapshot needs a supported match engine.';
+    const problem = competitionRulesProblem(instance.definition);
+    if (problem) return problem;
   }
   return null;
 }

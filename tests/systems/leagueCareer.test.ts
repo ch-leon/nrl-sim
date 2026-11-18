@@ -1,3 +1,4 @@
+import { entrySnapshots } from '../data/leagueCareerFixtures';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createNewGame, getState, setState, loadState, emptyFinance as importedEmptyFinance, type GameState } from '../../src/core/state';
 import { closeLeagueSeason } from '../../src/systems/leagueCareer';
@@ -26,7 +27,7 @@ export function closingState(): GameState {
   const s = getState(); const c = competitions();
   c.calendar!.status = 'active'; c.calendar!.elapsedIntervals = 4;
   c.leagueCareer = {...progress(), phase: 'active', accepted: {season: 1, startInterval: 0,
-    leagueId: profile.startingDivisionId, receiptId: leagueEntryReceiptId(profile.id, 1, 'player', profile.startingDivisionId),
+    leagueId: profile.startingDivisionId, ...entrySnapshots(c, 1, profile.startingDivisionId), receiptId: leagueEntryReceiptId(profile.id, 1, 'player', profile.startingDivisionId),
     allocationPolicy: 'adjacent-vacancy-v1', movements: []}};
   return {...s, week: 5, preseason: 0 as const, competitions: c, league: {fixtures: [], ladder: competitionLadder(c.instances[0]!),
     clubs: clubIds.map(id => ({id, name: id, colors: ['#000000', '#ffffff'] as [string,string], strength: 44, ...(id === 'player' ? {} : {squad: [], cash: 60000, capAccount: freshCapAccount('local')})}))},
@@ -56,7 +57,7 @@ describe('pure League season close', () => {
     }
     c.leagueCareer={version:1,scheduleSeed:573,initialFields:Object.fromEntries(AU_CAREER_PROFILE.divisions.map(d=>[d.id,d.entrants.map(e=>e.clubId)])),clubId:'player',phase:'active',
       access:[{leagueId:AU_CAREER_PROFILE.startingDivisionId}],accepted:{season:1,startInterval:0,leagueId:AU_CAREER_PROFILE.startingDivisionId,
-        receiptId:leagueEntryReceiptId(c.world!.profile.id,1,'player',AU_CAREER_PROFILE.startingDivisionId),allocationPolicy:'adjacent-vacancy-v1',movements:[]}};
+        ...entrySnapshots(c, 1, AU_CAREER_PROFILE.startingDivisionId), receiptId:leagueEntryReceiptId(c.world!.profile.id,1,'player',AU_CAREER_PROFILE.startingDivisionId),allocationPolicy:'adjacent-vacancy-v1',movements:[]}};
     expect(validateInput(s as unknown as Record<string,unknown>,s.version)).toBeNull();
     const closed=closeLeagueSeason(s);const h=closed.history[0]!;
     expect(h.premiership).toBe(false);expect(h.league!.lastPlayerFinal).toMatchObject({round:1,stageName:'Finals',result:{winnerId:expect.not.stringMatching(/^player$/)}});
@@ -95,7 +96,7 @@ describe('pure League season close', () => {
     const c = competitions(2); c.calendar!.status='active';c.calendar!.elapsedIntervals=9;
     c.instances=[...first.competitions!.instances,...c.instances];
     c.leagueCareer={...first.competitions!.leagueCareer!,phase:'active',accepted:{...first.competitions!.leagueCareer!.accepted!,
-      season:2,startInterval:5,receiptId:leagueEntryReceiptId(profile.id,2,'player',profile.startingDivisionId)}};
+      season:2,startInterval:5,...entrySnapshots(c, 2, profile.startingDivisionId), receiptId:leagueEntryReceiptId(profile.id,2,'player',profile.startingDivisionId)}};
     const next=closeLeagueSeason({...first,season:2,week:5,competitions:c});
     expect(next.history).toHaveLength(2); expect(JSON.stringify(next.history[0])).toBe(old);
     expect(next.history[0]!.league!.minorPremierId).toBeDefined();expect(next.competitions!.leagueCareer!.close!.season).toBe(2);

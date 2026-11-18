@@ -22,7 +22,7 @@ function definitionKey(definition: CompetitionDefinition): string {
 }
 
 /** Each saved trial date must contain a complete draw for one source division. */
-function savedTrialDefinitions(profileId: string, leagues: readonly CompetitionInstance[], current: readonly CompetitionInstance[],
+export function savedTrialDefinitions(profileId: string, leagues: readonly CompetitionInstance[], current: readonly CompetitionInstance[],
   slots: readonly CompetitionCalendarSlot[]): Array<[CompetitionDefinition, CompetitionDefinition]> {
   const definitionId = divisionTrialDefinitionId(profileId);
   const divisionByClub = new Map(leagues.flatMap((league, index) => league.entrantIds.map(id => [id, index] as const)));

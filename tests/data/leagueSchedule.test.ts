@@ -1,3 +1,4 @@
+import { entrySnapshots } from './leagueCareerFixtures';
 import { describe, expect, it } from 'vitest';
 import { AU_PACK } from '../../src/content/au';
 import { UK_PACK } from '../../src/content/uk';
@@ -175,7 +176,7 @@ describe('saved League calendar scheduling', () => {
       leagueCareer: { version: 1, clubId: 'player', scheduleSeed: seed, initialFields: fields, phase: 'next-season-choice',
         access: [{ leagueId: startingDivisionId }],
         close: leagueCloseFacts(source.world, source.instances, 1),
-        accepted: { season: 1, startInterval: 0, leagueId: startingDivisionId, receiptId: leagueEntryReceiptId(id, 1, 'player', startingDivisionId),
+        accepted: { season: 1, startInterval: 0, leagueId: startingDivisionId, ...entrySnapshots(source, 1, startingDivisionId), receiptId: leagueEntryReceiptId(id, 1, 'player', startingDivisionId),
           allocationPolicy: 'adjacent-vacancy-v1', movements: [] } } };
     expect(validateCompetitions(marked, { pack: 'au', season: 1, week: source.calendar.slots.length, clubIds })).toBeNull();
     const rebuilt = buildSavedLeagueSchedule(marked, 2, fields, seed, clubIds);

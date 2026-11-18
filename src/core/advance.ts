@@ -80,9 +80,12 @@ function newCards(before: GameState, after: GameState): string[] {
  * by default). A second call while one is running does nothing.
  */
 export async function advanceUntil(target: AdvanceTarget, frame: () => Promise<void> = nextFrame): Promise<AdvanceRun> {
-  const blocked = failedIntervalProblem() ?? structuralAdvanceProblem(getState());
-  if (blocked) return { weeksPlayed: 0, stop: { kind: choiceRequired(getState()) ? 'choice-required' : 'stopped', text: blocked } };
-  if (getState().sacked) return { weeksPlayed: 0, stop: { kind: 'target', text: 'The board has sacked you.' } };
+  const state = getState();
+  const failed = failedIntervalProblem();
+  if (failed) return { weeksPlayed: 0, stop: { kind: 'stopped', text: failed } };
+  if (state.sacked) return { weeksPlayed: 0, stop: { kind: 'target', text: 'The board has sacked you.' } };
+  const blocked = structuralAdvanceProblem(state);
+  if (blocked) return { weeksPlayed: 0, stop: { kind: choiceRequired(state) ? 'choice-required' : 'stopped', text: blocked } };
   if (running) return { weeksPlayed: 0, stop: { kind: 'busy', text: 'An advance is already running.' } };
   // A week already held (Save & exit, or the rival round) must not be waited on here:
   // advanceWeek returns immediately, week:advanced never fires, and this run would

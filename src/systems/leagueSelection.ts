@@ -45,15 +45,22 @@ export function commitmentYears(players: readonly {id?: string; deal?: SignedDea
 }
 export interface LeagueCommitmentPreview {
   /** No future prizes or allowances are assumed. */
-  capacityBasis: 'current-account';
+  capacityBasis: 'retained-tier-v1';
+  previousTier: CapAccount['tier']; tier: CapAccount['tier'];
+  purchasedLevel: CapAccount['purchasedLevel']; earnedBasisPoints: CapAccount['earnedBasisPoints'];
   baseCap: number; purchasedAddition: number; earnedAddition: number; cap: number;
-  years: CommitmentYear[]; policyPendingReason?: string;
+  years: CommitmentYear[];
 }
+/** League membership can earn a higher base, never take one away. */
+export function leagueEntryAccount(account: CapAccount, targetRank: number): CapAccount {
+  const tier = tierForRank(targetRank);
+  return tierCap(tier) > tierCap(account.tier) ? {...account, tier} : account;
+}
+
 export function leagueCommitmentPreview(players: readonly {id?: string; deal?: SignedDeal}[], account: CapAccount, firstSeason: number, targetRank: number): LeagueCommitmentPreview {
-  const tier = tierForRank(targetRank); const target = {...account, tier}; const cap = publishedCap(target);
+  const target = leagueEntryAccount(account, targetRank); const cap = publishedCap(target);
   const years = commitmentYears(players, target, firstSeason);
-  const baseCap = tierCap(tier); const purchased = publishedCap({...target, earnedBasisPoints: 0});
-  return {capacityBasis: 'current-account', baseCap, purchasedAddition: purchased - baseCap, earnedAddition: cap - purchased, cap,
-    years,
-    ...(tierCap(tier) < tierCap(account.tier) && years.some(y => y.unprotectedExcess > 0) ? {policyPendingReason: 'Voluntary lower-cap entry policy is pending a user decision.'} : {})};
+  const baseCap = tierCap(target.tier); const purchased = publishedCap({...target, earnedBasisPoints: 0});
+  return {capacityBasis: 'retained-tier-v1', previousTier: account.tier, tier: target.tier, purchasedLevel: target.purchasedLevel, earnedBasisPoints: target.earnedBasisPoints, baseCap, purchasedAddition: purchased - baseCap, earnedAddition: cap - purchased, cap,
+    years};
 }
