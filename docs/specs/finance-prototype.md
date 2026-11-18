@@ -20,7 +20,18 @@ than converted. #558 now charges the signing fee, queues a fee-free
 renewal and pays the release payout, and refuses a signing that does not fit
 the cash and the cap. Receipt-backed match income and upfront investments now implement #559;
 cap upgrades and the full finance presentation remain #560–#561. End-to-end balance is #562. A funded
-sale between clubs is #572, so the old sell button refuses until that exists.
+sale between clubs subsequently shipped through [#716](https://github.com/ch-leon/nrl-sim/pull/716) for #572.
+
+## League integration delivered — 18 November 2026
+
+[PR #719](https://github.com/ch-leon/nrl-sim/pull/719) delivered normal opt-in League
+careers and annual confirmation. Player and AI clubs retain their highest attained
+base-cap tier when choosing or being allocated to an easier league. Purchased and
+earned additions and lawful exact-term protection survive; downward movement creates
+no new protection. New contracts still require ordinary room. Match income uses the
+sporting division, not retained financial capacity. The [release record](../status/2026-11-league-selection.md)
+links independent approval, CI/full QA and deployment proof. Wider finance balance
+remains #562; optional competition prizes remain with #576/#577.
 
 ## 1. Decisions and units
 
@@ -183,9 +194,10 @@ raise it; easier entry/allocation never reduces it, for player and AI clubs.
 Preserve the existing percentages and lawful exact-term protection; downward
 movement itself grants no new protection. Existing legacy careers retain their
 current rules. Ordinary fixture income still uses the sporting division above.
-No compounding. Three bought levels mean +15%. Current first-Shield entitlement
-adds +5%; reserve a second +5% for a separately designed later achievement.
-Thus initially available maximum is +20%, future combined ceiling +25%.
+No compounding. Three bought levels mean +15%. The proposed first-Shield
+entitlement adds +5%; reserve a second +5% for a separately designed later
+achievement. That proposal would allow +20% initially and +25% at the future
+combined ceiling. League selection does not activate either earned prize.
 
 After one completed season, buy at most one level per season. Prices for the
 next levels are 5M, 10M and 20M of the division at purchase. Local prices are
@@ -253,12 +265,13 @@ receipt identities alongside the existing competition/fixture identities. Never
 let screens own commitments or turn `money:changed` notifications into cash.
 
 Use the existing tick/season registry; do not add a second season manager.
-Current hooks are aging 5, youth 6, fixtures 10, tenure 12, review 15, board 20,
-derby 21 and events 25. #574 must reconcile those orders with frozen sporting
-results, due awards and movement before enabling multi-season regional play.
-Its sequence is settle sporting cash/awards → capture review → compute movement
-→ activate next-season allowances → age/retire/intake once → resolve contract
-transitions → board objectives → next season's fixtures. No contract can expire
+The audited legacy hooks are aging 5, youth 6, fixtures 10, tenure 12, review 15,
+board 20, derby 21 and events 25. #574 reconciled their owners for selectable
+League play: freeze sporting outcomes and review, pause for deliberate league
+choice, then validate and persist one detached annual candidate with age/retirement,
+intake, contract transitions, goals and saved next-season schedules. Preserve the
+existing entitlement owners without enabling unimplemented prizes. Failed or stale
+confirmation leaves the completed career intact. No contract can expire
 before a pending Champions Series ends. Salaries never tick down as cash costs.
 
 Hold financial mutations during an unresolved interval/advance transaction or
@@ -328,12 +341,13 @@ Initial acceptance targets for the existing #562 harness:
   save/import/resume/skip/recovery/rollover cases.
 - Financial preview and actual result agree at cash/cap limits. Complete phone
   tests at 390×844, 667×375 and 844×390, plus required CI/WebKit/QA and a checker
-  using a different tool. Leon's merge approval remains required.
+  using a different tool. Follow the current [repository delivery process](../../AGENTS.md).
 
-No five-season result, live finance playtest, normal regional entry or successful
-finance migration is claimed here. #557 accounting → #558/#559/#560 operations
+The original FIN-v1 slice did not establish five-season balance or finance
+migration. Normal regional League entry subsequently shipped in #719; its bounded
+AU/UK season and phone proof does not replace the wider #562 balance acceptance. #557 accounting → #558/#559/#560 operations
 → #561 presentation → #562 acceptance remains the implementation sequence.
-Competition transfers #572, promotion #574 and rewards #576/#577 reuse those
+Competition transfers #572, league selection #574 and rewards #576/#577 reuse those
 owners instead of adding parallel cash/cap/season systems.
 
 ## #559 delivery notes

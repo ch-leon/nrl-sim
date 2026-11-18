@@ -6,8 +6,10 @@ Version 1 structural contract, 11 November 2026; product reconciliation added
 [#323](https://github.com/ch-leon/nrl-sim/issues/323). Product intent and the open
 event catalogue live in the
 [Notion specification](https://app.notion.com/p/4150870d4c44810c880ae3395086e9d0).
-This file owns the implementation boundaries and prototype configuration. It
-does not report that a competition career has shipped or been balanced.
+This file owns the implementation boundaries and prototype configuration. The
+selectable League career shipped on 18 November through [PR #719](https://github.com/ch-leon/nrl-sim/pull/719).
+See the [release evidence](../status/2026-11-league-selection.md). This does not
+claim optional competitions, reward effects or wider balance are complete.
 
 The user authorised execution on 11 November. The numerical settings below are
 the initial prototype, not measured balance or a promise about the final game.
@@ -23,15 +25,17 @@ watched/coached individual challenges, playful small-sided events and connected
 rewards. Gear remains a later expansion. The [plan](../plans/2026-11-career-competitions.md)
 records the revised delivery sequence.
 
-This is a design amendment, not a change to saved definition versions or enabled
-runtime. The audited baseline and structural configuration below remain evidence
+The 16 November amendment defined product intent. The league-selection portion
+subsequently shipped in #719; optional events and assignments remain later work.
+The audited baseline and structural configuration below remain historical evidence
 of v1. Existing stable identities, snapshots, once-only results/rewards, persistent
 people, finite outcomes and calendar ownership remain required.
 
 Before extending the runtime:
 
-- Re-scope #574 to earned access, explicit selection and one rollover; settle AI
-  league-field allocation instead of applying forced one-up/one-down to the player.
+- Reuse the delivered #574 earned-access, explicit-entry and two-phase rollover
+  owners. Preserve the saved AI allocation policy below; never force the player
+  to change leagues after a title or loss.
 - Keep at most one main-team fixture per slot. Permit a simultaneous assignment
   only through separate player reservations and a legal remaining main-team squad;
   never disable the club collision guard indiscriminately.
@@ -218,9 +222,16 @@ division, 14 home-and-away rounds. Every division has semi-finals 1 v 4 / 2 v 3
 and a grand final. Higher seed hosts a semi-final; grand finals are neutral.
 The original one-champion-up/one-last-place-down proposal is superseded for the
 player club: titles unlock harder leagues and the coach chooses an eligible league
-next season. Finishing first earns a distinct minor-premiership honour. The v1
-world remains a structural input; selectable fields and AI allocation must be
-designed before activating the revised rollover. No club disappears on a poor finish.
+next season. Finishing first earns a distinct minor-premiership honour. The shipped selectable world preserves persistent clubs and legal fields. Staying
+leaves fields unchanged. Moving up shifts the lowest-ranked AI from each crossed
+higher field down the vacancy chain; moving down shifts the highest-ranked AI
+from each crossed lower field up. Selection uses the original completed regular
+standings and their saved tiebreak order, and previews disclose these administrative
+moves. Every club belongs to exactly one field. No club disappears on a poor finish.
+Initial and annual entry are deliberate gates; annual people work occurs only on
+accepted next-season entry. Saved rules and schedules cannot be rerolled by previewing.
+The [implementation plan](../plans/2026-11-17-league-selection.md) records the
+exact allocation, cap and persistence invariants.
 
 | Slots | Role | Fixtures per participating club |
 | --- | --- | --- |
@@ -230,6 +241,11 @@ designed before activating the revised rollover. No club disappears on a poor fi
 | 7, 10, 13, 16, 19 | Open Cup opening round through final | 0–5 |
 | 24, 25 | Division semi-finals, grand final | 0–2 |
 | 26–28 | Later Champions Series only | 0–3; stop on two wins |
+
+In the shipped League career, cup windows remain quiet: there is no player or AI
+Open Cup registration in this mode and no new title cash/cap prize. The following
+cup-inclusive counts describe the reusable structural prototype, not enabled
+League content.
 
 Every slot 1–25 appears once in the initial template. A finalist without an
 opening cup bye can play 14 + 2 + 5 + 2 = **23 matches across 25 intervals**.
@@ -302,18 +318,19 @@ selected competition rank and the club's retained finance tier are distinct.
 
 ## 7. Integrated rollover
 
-Current baseline order increments counters first, then review snapshot (1),
+The audited legacy baseline order increments counters first, then review snapshot (1),
 player/free-agent ageing (5), youth intake (6), sporting/board and rival rollover
 (10), tenure (12), final review (15), new goals (20), trip events (25).
 This already has owners; adding another rollover pipeline is forbidden.
 
-#574 must freeze the completed season's sporting state before clearing it, settle
-due outcomes once, record honours/review and earned league access, then pause for
-the coach's next-season choice. Validate the chosen field and cap commitments,
-activate next-season entitlements, age/retire/intake once, transition contracts
-and create the next schedule/goals. AI allocations must use the reconciled field
-policy, not an automatic forced move for the player. Refactor the existing hook order
-where necessary. Every later hook reads a documented completed-season or
+#574 now freezes the completed season's sporting state, records honours/review
+and earned league access once, then pauses for the coach's next-season choice.
+Acceptance validates the chosen field and cap commitments, invokes existing annual
+owners on a detached candidate, transitions contracts and creates the next schedule
+and goals. It persists the validated candidate before installation; failures and
+replays cannot repeat annual effects. Existing entitlement ownership is preserved,
+but no new prize entitlement is enabled. AI allocations use the saved policy above.
+Classic and isolated unmarked developer careers retain their separate paths. Every later hook reads a documented completed-season or
 new-season view; do not rely on whichever state a previous hook happened to
 overwrite. The optional title series must finish or terminate before this runs.
 
