@@ -94,11 +94,17 @@ export abstract class LiveContact extends LivePenalties {
     const lead=this.at(b.lead.side,b.lead.slot), flight=this.ball.kind==='flight'?this.ball:null;
     if (from.side!==b.caller.side || from.key!==b.caller.who || from.slot!==b.caller.slot || to.side!==b.support.side || to.key!==b.support.who || to.slot!==b.support.slot
       || lead.key!==b.lead.who || !flight || flight.via!=='pass' || flight.receiver!==this.indexOf(to)
+      || (flight.to.y - lead.body.pos.y) * shape.edge <= 0
       || !behindLead(from.body.pos,flight.to,lead.body.pos,this.dir)) {
       if (ph.kind==='play') ph.shape=null;
       return;
     }
-    shape.secondPass={startedTick:this.tick,leadTo:{...backDoorTarget(shape,lead.slot,from.body.pos)!}};
+    shape.secondPass = {
+      startedTick: this.tick,
+      leadTo: backDoorTarget(shape, lead.slot, from.body.pos)!,
+      // Run through the arrived ball along the fullback's existing line.
+      supportTo: add(flight.to, scale(to.body.heading, LIVE.runOnM)),
+    };
     if (this.visualPass) this.visualPass.backDoor={lead:{...b.lead}};
   }
 

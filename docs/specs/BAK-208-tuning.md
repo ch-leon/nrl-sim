@@ -1904,21 +1904,21 @@ same ordinary shape draw, with no extra receiver, completion or contest roll.
 All three exact participants must pass the existing reach/availability gates;
 no packet is assembled by teleporting a player. The half/lead/fullback hold a
 lateral origin captured at choice time. Ordinary carrier, actual receiver,
-retreat and explicit coach/script priorities win. Revision 8 includes the
-fullback's carry through the sweep for live-match recovery.
+retreat and explicit coach/script priorities win. Revision 9 includes the
+fullback's wide reception for live-match recovery.
 
 | Knob | Default | Meaning |
 |---|---:|---|
 | `shapes.backDoor.on` | 1 | 0 restores the preceding spread/pod/edge simulation and RNG exactly. |
 | `shapes.weights.{grind,balanced,expansive,kick-chase,all-out}.back-door` | 1 / 1 / 2 / 0 / 1 | Additional relative weight when the compact packet is feasible; no old weight changes. |
 | `shapes.backDoor.callerDepth` / `.callerWidth` | 4 / 6 m | Half behind the setup anchor and toward his own side of it. |
-| `shapes.backDoor.leadDepth` / `.leadWidth` | 3 / 4 m | Forward inside the half's lane during setup. |
-| `shapes.backDoor.supportDepth` / `.supportWidth` | 6 / 0 m | Fullback behind the setup anchor, inside the lead. |
-| `shapes.backDoor.leadAheadM` | 2 m | Lead's target ahead of the half from the heel. The target follows the first pass and half's run, then holds at second launch through the catch. |
-| `shapes.backDoor.trailDepthM` | 3 m | Supporting fullback's run behind the actual caller, subject to ordinary passing eligibility. |
+| `shapes.backDoor.leadDepth` / `.leadWidth` | 3 / 8 m | Forward outside the half's lane during setup. |
+| `shapes.backDoor.supportDepth` / `.supportWidth` | 6 / 0 m | Fullback behind the setup anchor, inside the half. |
+| `shapes.backDoor.leadAheadM` | 3 m | Lead's target ahead of the half from the heel. The target follows the first pass and half's run, then holds at second launch through the catch. |
+| `shapes.backDoor.trailDepthM` | 2 m | Fullback's running target behind the half before the pass. The actual positions determine ordinary passing eligibility. |
 | `shapes.backDoor.leadClearM` | 0.5 m | Real lead must be this far ahead of the backwards pass corridor before flight metadata calls it back-door. |
-| `shapes.backDoor.sweepWidthM` | 4 m | How far the catching fullback aims across the field toward the packet's edge. He also aims `live.runOnM` goalward from the pass landing point. |
-| `shapes.backDoor.sweepTicks` | 20 ticks | Maximum time to hold the sweep target after the actual catch. Within one body radius of the target the fullback returns to normal gap steering. |
+| `shapes.backDoor.sweepWidthM` | 15 m | Fullback's lateral running target relative to the setup origin, toward the packet's edge. On a marked pass he runs through the actual landing point by `live.runOnM` along his existing heading. |
+| `shapes.backDoor.sweepLeadTicks` | 5 ticks | How early the fullback starts his wide run before the tackled carrier begins to play the ball. |
 
 The actual first DH recipient remains the existing commitment. A different
 recipient abandons this option, and the later pass remains an ordinary weighted

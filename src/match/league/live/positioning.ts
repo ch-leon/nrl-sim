@@ -51,7 +51,7 @@ export abstract class LivePositioning extends LiveContact {
       const caller = this.at(this.attacking,slot);
       const edge: 1 | -1 = caller.body.pos.y < origin.y ? -1 : caller.body.pos.y > origin.y ? 1 : shapeEdge('back-door',origin.y,this.dir,tackle);
       const backDoor = {caller:ref(caller),lead:ref(this.at(this.attacking,lead)),support:ref(this.at(this.attacking,0)),
-        originY:clamp(origin.y,SHAPES.marginM+SHAPES.backDoor.callerWidth,FIELD_WIDTH-SHAPES.marginM-SHAPES.backDoor.callerWidth)};
+        originY:clamp(origin.y,SHAPES.marginM+SHAPES.backDoor.sweepWidthM,FIELD_WIDTH-SHAPES.marginM-SHAPES.backDoor.sweepWidthM)};
       return {edge,backDoor,cost:cost('back-door',edge,undefined,backDoor)};
     }));
     const back = backs.sort((a,b)=>a.cost-b.cost)[0];
@@ -341,14 +341,6 @@ export abstract class LivePositioning extends LiveContact {
     const attackers = this.side(atk);
     const carrier = h && h.side === atk ? h : null;
     const anchor = carrier ? carrier.body.pos : receiver && receiver.side === atk ? flight!.to : bp;
-    let sweepTarget: Vec | undefined;
-    if (ph.kind === 'play' && ph.backDoorSweep) {
-      const { carrier: support, caughtAt, until, to } = ph.backDoorSweep;
-      if (carrier && carrier.side === support.side && carrier.slot === support.slot && carrier.key === support.who
-        && carrier.catchTick === caughtAt && this.tick < until && !this.locked(carrier) && carrier.subFor === null
-        && dist(carrier.body.pos, to) > BODY_RADIUS) sweepTarget = to;
-      else delete ph.backDoorSweep;
-    }
     const supports: Player[] = [];
     if (carrier || (receiver && receiver.side === atk)) {
       const lead = carrier ?? receiver!;
@@ -380,25 +372,34 @@ export abstract class LivePositioning extends LiveContact {
           p.through = false;
           p.wantsSprint = true;
         } else if (ph.kind === 'play') {
-          if (sweepTarget) p.target = sweepTarget;
-          else {
-            const defs = this.side(def).filter((d) => !this.locked(d)).map((d) => d.body.pos);
-            p.target = gapTarget(p.body.pos, this.dir, defs);
-          }
+          const defs = this.side(def).filter((d) => !this.locked(d)).map((d) => d.body.pos);
+          p.target = gapTarget(p.body.pos, this.dir, defs);
           p.through = true;
           // Space ahead, just beaten a man, or through the line: go.
           p.wantsSprint = this.tick < p.burstUntil || broken || this.laneClear(p);
         } else p.target = { ...p.body.pos };
       } else if (p === receiver) {
-        // A pass thrown in front of him is run onto, through the catch point;
-        // one at or behind him (or a kick) he checks and gets under.
-        const onto = flight!.via === 'pass' && (flight!.to.x - p.body.pos.x) * this.dir > 0.5;
-        p.target = onto ? clampToGround(add(flight!.to, { x: this.dir * LIVE.runOnM, y: 0 }), 1) : { ...flight!.to };
-        p.through = onto;
-        // Under a kick he goes; onto a pass he runs at pace but keeps his gas for the line.
-        p.wantsSprint = flight!.via === 'kick';
+        const sweep = shape?.secondPass?.supportTo;
+        if (sweep) {
+          p.target = clampToGround(sweep, 1);
+          p.through = true;
+        } else {
+          // A pass thrown in front of him is run onto, through the catch point;
+          // one at or behind him (or a kick) he checks and gets under.
+          const onto = flight!.via === 'pass' && (flight!.to.x - p.body.pos.x) * this.dir > 0.5;
+          p.target = onto ? clampToGround(add(flight!.to, { x: this.dir * LIVE.runOnM, y: 0 }), 1) : { ...flight!.to };
+          p.through = onto;
+          p.wantsSprint = flight!.via === 'kick';
+        }
       } else if (p === this.dummyHalf(atk) && (ph.kind === 'tackle' || ph.kind === 'ruck')) {
         p.target = this.dummyHalfSpot();
+      } else if (shape?.kind === 'back-door' && ph.kind === 'ruck'
+        && (ph.stage !== 'down' || this.tick >= ph.t0 + ph.down - SHAPES.backDoor.sweepLeadTicks)
+        && p.slot === shape.backDoor!.support.slot) {
+        // The fullback starts winding out from depth as the tackled man gets up.
+        const caller = this.at(atk, shape.backDoor!.caller.slot);
+        p.target = clampToGround(backDoorTarget(shape, p.slot, caller.body.pos)!, 1);
+        p.through = true;
       } else if (shape?.kind === 'back-door' && ph.kind === 'ruck' && ph.stage === 'dh'
         && p.slot === shape.backDoor!.lead.slot) {
         // Start the lead on the heel, before the half runs onto the pass. The

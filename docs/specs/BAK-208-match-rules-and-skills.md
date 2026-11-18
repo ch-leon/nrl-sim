@@ -353,12 +353,12 @@ an initial review default, subject to browser and standard-harness comparison.
 spread/pod/edge weights. A reachable free half, forward lead and fullback prepare
 during contact/PTB under the same 12/7 m reach limits. Their exact identities and
 lateral origin are chosen once; no player is moved into place. The fullback stays
-inside and behind the half, with the forward between their lanes. As the ball is
-heeled back, the lead starts toward his target ahead of the half with ordinary
-acceleration, sprint and fatigue. This gives him time to move forward before the
-half runs onto the first pass. The fullback's supporting run starts on an actual
-DH pass to that half. A pass to another recipient, manual/coach input or scripted
-play cancels the option without a redraw.
+inside and behind the half during setup. The forward sets up outside the half.
+The fullback starts sweeping behind both players as the tackled carrier gets up
+and continues if the dummy-half passes to the chosen half. The forward starts
+his lead run on the heel. Both runners use ordinary acceleration, pace and
+fatigue. A pass to another recipient, manual or coach input, or a scripted play
+ends the option without a redraw.
 
 The half keeps his ordinary carrier line and engagement decision. His support
 must really be behind him, available and in the usual passing window to be
@@ -366,25 +366,25 @@ selected by the existing weighted receiver choice. Pass probability, intercept
 reads, catch/spill checks and contact odds are unchanged. A lead can still receive
 an ordinary pass when eligible: this adds no defender-deception or paid-play bonus.
 `ball.flight.backDoor.lead` identifies a genuine ball launched behind the exact
-lead runner, only when the actual flight goes to the support. An intercepted
-flight retains its real defender recipient and receives no back-door marker.
+lead runner to the fullback beyond him on the packet's edge. The pass leads
+the fullback from his real position and velocity. He runs through the reception
+along his existing heading, with the usual catch reach and handling checks.
+An intercepted flight retains its real defender recipient.
 
 The lead finishes his bounded run through the actual second catch, then the
 structure ends. Invalid identities, a locked/binned/interchanging participant,
 another pass choice, contact, kick, loose ball, turnover or dead phase also ends
-it. After a successful second catch, the fullback carries through a short sweep
-toward the same edge he ran to from behind the half. He runs toward a point 3 m
-goalward and 4 m wider than the catch, with ordinary acceleration and carry
-speed. Normal gap steering resumes when he reaches the target or after 20 ticks.
-Play instructions, passes and contact can end that carry earlier.
+it. The fullback returns to ordinary carrier steering on receipt and carries
+his momentum into the next step.
 
 Actor/flight metadata is copied on snapshot reads. With `shapes.backDoor.on:0`,
 the prior three-structure simulation and RNG stream remain exact. Recovery
-engine revision 8 includes the sweep.
+engine revision 9 includes the wider reception.
 
 Default Lab seed 5 shows the heel at tick 4291, DH pass to the home half at 4301,
 the half's back-door pass behind the forward at 4322 and the fullback catch at
-4330. The fullback continues the sweep screen-right through 4346.
+4338. At the catch the fullback is 10.4 m beyond the lead across the field and
+running at about 7.5 m/s. Seed 4 shows a catch on the opposite edge at tick 5003.
 
 ### 5.2 Defence presets
 

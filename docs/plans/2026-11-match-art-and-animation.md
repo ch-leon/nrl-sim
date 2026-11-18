@@ -93,20 +93,26 @@ The PR records the final test/CI outcome and normal-speed clip. Hash and
 live-match fixtures follow the changed simulation without weakening the UI-read
 RNG parity, penalty-choice or capped loss-reason assertions.
 
-### Fullback sweep after the catch
+### Fullback receives on the sweep
 
-Leon reviewed the labeled seed-5 clip and saw the fullback turn abruptly
-screen-left after catching the ball. In `c30f8ba`, the exact fullback who takes
-the second pass aims 4 m toward the packet's edge and 3 m goalward from the
-catch point. Normal steering resumes within one body radius of that point or
-after 20 ticks, and play instructions, a pass or contact can end the sweep
-earlier. The lead still releases after the catch at 4330.
+Leon marked up the labeled seed-5 clip to show the fullback running out from
+depth before catching wide. The earlier `c30f8ba` version kept the close catch
+and steered the fullback outward afterward. The revised route starts the
+fullback's run as the tackled player gets up and sets the forward outside the
+half. The fullback receives at pace outside the lead through the existing
+receiver choice, backwards pass and catch checks.
 
-The updated normal-speed clip and labeled replay were shared in the review
-thread. In the fixed-camera capture, the fullback's screen x moves from 456 px
-at the catch to 474 px at tick 4346. The CI evidence at `e65e5c1` and the on/off
-comparison at `a9a9c35` predate the sweep follow-up. PR #722 remains open and
-unmerged. [PR #722](https://github.com/ch-leon/nrl-sim/pull/722)
+Default Lab seed 5 retains the heel at 4291, DH pass at 4301 and second launch
+at 4322. The fullback catches at 4338 around field (84.1, 13.6), 10.4 m outside
+the lead and moving about 7.5 m/s. The marked sketch puts the catch around
+(83.7, 17.0). The simulated catch is about 3.4 m farther out. Seed 4 catches on
+the other edge at 5003. The focused regressions cover both attacking directions,
+legal flight, continued receiver motion, ordinary interruptions, replay and
+the feature-off fingerprint.
+
+The earlier test and CI records through `288bfd2` and published on/off comparison
+at `a9a9c35` predate the wide reception. PR #722 remains open and unmerged.
+[PR #722](https://github.com/ch-leon/nrl-sim/pull/722)
 
 Status: stages 1–4 presentation and the first stage-5 pass are implemented in
 five linked PRs. Leon reviewed the clip and approved merging on 17 November

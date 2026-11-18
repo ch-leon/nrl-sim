@@ -64,7 +64,7 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
-- **Back-door support (unmerged draft).** The forward starts on the heel to get ahead before the half receives. Default Lab seed 5 shows the pass behind the lead and the fullback continuing his sweep after the catch. The normal-speed clip and labeled replay show the route. The published on/off comparison used the earlier draft. [PR #722](https://github.com/ch-leon/nrl-sim/pull/722)
+- **Back-door support (unmerged draft).** The forward starts on the heel and the fullback sweeps out from depth before the half passes. Default Lab seed 5 shows the fullback catching on the run 10.4 m outside the lead. The published on/off comparison used an earlier draft. [PR #722](https://github.com/ch-leon/nrl-sim/pull/722)
 
 - **Attacking shapes:** free players prepare a compact forward pod or an edge shift during established tackle contact and carry that choice into the play-the-ball, alongside the existing spread. The selected players must be close enough to form it; the pod uses two forwards and a nearby free half. Real seed-1 play demonstrates both structures settled before release. [PR #715](https://github.com/ch-leon/nrl-sim/pull/715), the first slice of [#649](https://github.com/ch-leon/nrl-sim/issues/649), preserves explicit instructions, receiver commitment and unassigned support runners. The initial Expansive win-rate drop did not replicate on fresh seeds; defaults remain unchanged. Merged through #715 on 17 November. Back-door work remains a separate open candidate; decoys follow later.
 

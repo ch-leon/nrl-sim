@@ -8,7 +8,7 @@ import type { AttackShapeSnap } from '../core/snapshot';
 export type ShapeKind = AttackShapeSnap['kind'];
 export interface AttackingShape extends AttackShapeSnap {
   /** Engine-owned continuation of the actual second flight; never projected into snapshots. */
-  secondPass?: { startedTick: number; leadTo: Vec };
+  secondPass?: { startedTick: number; leadTo: Vec; supportTo: Vec };
 }
 /** Weights/multipliers and authored metres; exposed to the harness as shapes.*. */
 export const SHAPES = {
@@ -22,7 +22,7 @@ export const SHAPES = {
   marginM: 1.5, edgeRoomM: 18, setupReachM: 7, contactReachM: 12,
   pod: { propDepth: 3.5, propWidth: -3, rowDepth: 4.5, rowWidth: 4, linkDepth: 7, linkWidth: 2 },
   edge: { halfDepth: 4, halfWidth: 6, linkDepth: 5.5, linkWidth: 12, wingDepth: 7, wingWidth: 18 },
-  backDoor: { on: 1, callerDepth: 4, callerWidth: 6, leadDepth: 3, leadWidth: 4, supportDepth: 6, supportWidth: 0, leadAheadM: 2, trailDepthM: 3, leadClearM: 0.5, sweepWidthM: 4, sweepTicks: 20 },
+  backDoor: { on: 1, callerDepth: 4, callerWidth: 6, leadDepth: 3, leadWidth: 8, supportDepth: 6, supportWidth: 0, leadAheadM: 3, trailDepthM: 2, leadClearM: 0.5, sweepWidthM: 15, sweepLeadTicks: 5 },
 };
 export function shapeWeights(preset: AttackPreset, tackle: number, toLine: number, y: number): Record<ShapeKind, number> {
   const w = { ...SHAPES.weights[preset] };
@@ -86,7 +86,7 @@ export function backDoorTarget(shape: AttackingShape, slot: number, caller: Vec)
   const b = shape.backDoor, p = SHAPES.backDoor;
   if (!b) return null;
   if (slot === b.lead.slot) return shape.secondPass?.leadTo ?? { x: caller.x + shape.dir * p.leadAheadM, y: b.originY + shape.edge * p.leadWidth };
-  if (slot === b.support.slot) return { x: caller.x - shape.dir * p.trailDepthM, y: b.originY + shape.edge * p.supportWidth };
+  if (slot === b.support.slot) return shape.secondPass?.supportTo ?? { x: caller.x - shape.dir * p.trailDepthM, y: b.originY + shape.edge * p.sweepWidthM };
   return null;
 }
 
