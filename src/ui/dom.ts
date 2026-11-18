@@ -997,6 +997,9 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
   align-items: center;
   gap: 6px;
   overflow: hidden;
+  /* The open tab's fill, label colour and bar change in the same frame (as .nrl-seg's, #604): a fading
+     fill showed the orange label and bar on no fill for its first frames. A press still shrinks. */
+  transition-property: none;
 }
 @media (hover: hover) and (pointer: fine) { .nrl-dock-tabs > .nrl-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.05); } }
 .nrl-dock-tabs > .nrl-btn:active:not(:disabled) { background: rgba(255, 255, 255, 0.05); }
