@@ -86,7 +86,7 @@ export function buildSavedLeagueSchedule(source: CompetitionCareerState, season:
     const league = current.find(i => i.id === d.instanceId)!;
     const definitionId = `${world.profile.id}:${d.id}`;
     if (league.definition.id !== definitionId || league.id !== competitionInstanceId(definitionId, calendar.season, 0)
-      || league.definition.stages.length > 2 || league.entrantIds.length < 2 || league.entrantIds.length % 2 !== 0) {
+      || league.entrantIds.length < 2 || league.entrantIds.length % 2 !== 0) {
       throw new Error('Invalid saved division schedule');
     }
     return league;

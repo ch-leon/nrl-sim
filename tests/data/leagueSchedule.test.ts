@@ -142,6 +142,22 @@ describe('saved League calendar scheduling', () => {
     expect(JSON.stringify({ source, target })).toBe(before);
   });
 
+  it('preserves separate saved semifinal and grand final stages', () => {
+    const { source, fields, clubIds, leagues, trials } = snapshot(AU_CAREER_PROFILE, AU_PACK, 1);
+    const definition = leagues[0]!.definition;
+    const [semifinal, grandFinal] = definition.stages[1]!.slotIds!;
+    definition.stages.splice(1, 1,
+      { id: 'semifinal', name: 'Semifinals', kind: 'knockout', rounds: 1, slotIds: [semifinal!] },
+      { id: 'grand-final', name: 'Grand Final', kind: 'knockout', rounds: 1, slotIds: [grandFinal!] });
+    expect(validateCompetitions(source, { pack: 'au', season: 1, week: 1, clubIds })).toBeNull();
+
+    const next = buildSavedLeagueSchedule(source, 2, fields, seed, clubIds);
+    expect(next.instances[0]!.definition).toEqual(definition);
+    expect(next.instances[0]!.fixtures.every(f => f.stageId === definition.stages[0]!.id)).toBe(true);
+    expect(next.slots).toEqual(source.calendar.slots);
+    expect(next.instances.slice(leagues.length).map(i => i.definition)).toEqual(trials.map(i => i.definition));
+  });
+
   it('takes trial templates from a closed marked season and binds its saved seed', () => {
     const { source, fields, clubIds, trials } = snapshot(AU_CAREER_PROFILE, AU_PACK, 1);
     for (const i of source.instances) {
