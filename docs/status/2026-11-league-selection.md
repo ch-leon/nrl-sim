@@ -1,16 +1,31 @@
-# League selection implementation checkpoint
+# League career candidate and verification
 
-Resumed 18 November 2026 at Leon's request. The 17 November pause checkpoint
-remains recorded below; work proceeds through the close correction, league
-confirmation and UI, with independent Claude reviews between stages.
+## Local candidate · 18 November 2026
 
-[Issue #574](https://github.com/ch-leon/nrl-sim/issues/574) is being implemented in
-[draft PR #719](https://github.com/ch-leon/nrl-sim/pull/719), branch
-`codex/league-selection-unlocks`. **The feature is not complete or deployed.**
-Normal saves still cannot activate this unfinished League mode. Existing careers
-remain on their existing path.
+New Game offers Classic or League career. In a new AU or UK League career the coach confirms Local, plays the saved calendar, and reviews each completed season before choosing any earned league. Winning the league final permanently unlocks the next division. Club salary-cap capacity survives a downward choice. Ordinary match income follows the selected sporting division. Release and deployment are pending. [Issue #574](https://github.com/ch-leon/nrl-sim/issues/574) · [Draft PR #719](https://github.com/ch-leon/nrl-sim/pull/719)
 
-## Current reviewed entry checkpoint
+The normal save and reload path landed at `b16f43b4`, the saved-calendar screens at `6bdb0976`, and the regional season/browser harness at `c305f7b9`. The automatic review-to-choice browser case landed at `a583cee6`. Independent reviews verified the parked-match import correction at `d7d85cdb` and the venue and attendance corrections at `ece47cd9`. A Week 5 home game showed its $4,000 settled venue receipt. The Week 24 semifinal had 2,250 spectators wanting 2,000 seats. Lineup identified the Week 25 final as neutral and the full-time card showed the club’s $2,000 shared gate.
+
+### Played seasons and controlled results
+
+The production QA harness ran two seasons per region on Normal, seed 573. Each career advanced 50 calendar intervals, made six normal save/import/load round trips and explicitly entered Season 3 in Local. In all four years the recorded final fixture, score and winner matched History. Each run checked settled cash, contracts, ageing, ownership and bounded population through annual acceptance. The player entered no optional competition.
+
+| Region | Season 1 W–D–L | Season 2 W–D–L | Finals titles |
+| --- | --- | --- | --- |
+| AU | 7–3–4 | 2–4–8 | 0 |
+| UK | 5–4–5 | 2–7–5 | 0 |
+
+Separate four-year fixtures controlled the player's scores in each region. Three finals titles exercised staying in Local, entering Championship, then returning to Local with $450,000 of attained capacity. A subsequent 0–14 season exercised choosing either Local or the previously unlocked Championship. These cases supply annual-choice coverage. Finance and progression tuning remain separate work under [#562](https://github.com/ch-leon/nrl-sim/issues/562) and [#582](https://github.com/ch-leon/nrl-sim/issues/582).
+
+### Checks and release gates
+
+- `npx vite-node scripts/qa-league-career.ts --seed 573 --seasons 2` produced the regional results above. The harness writes its report and snapshots under `e2e-output/league-career/`.
+- The registered League WebKit section passed 22 cases. Two started at New Game and reloaded a held fixture before skipping to its settled result. Ten tested annual choices from controlled saves. One finished a real final from a controlled pre-final save, opened the automatic review, chose the next league and reloaded the accepted entry. Nine covered all combinations of 844×390, 667×375 and 568×320 with Normal, Large and Larger text. The 568×320 Larger obligations and the automatic review screenshots were visually checked. The WebKit artifact directory is `e2e-output/webkit/league-selection/`.
+- A financial refusal during normal league selection cannot be produced from an admitted, lawful save. Admission validates signed terms and choosing an easier league retains attained capacity. Component tests cover financial refusal and stale previews. The short-screen browser tests exercise an actual title lock, its explanation and confirmation reachability.
+- `npx tsc --noEmit` and `npm run build` passed on the candidate source through `a583cee6`. `npx vitest run` passed 4,869 tests across 366 files in 311 seconds. The four-file presentation correction also passed 122 focused tests. The Classic phone run of `npm run e2e:season` completed 74 steps with zero failures, layout problems or browser errors. The full `npm run e2e:webkit -- --group screens` result is pending.
+- Final Claude issue-level approval, current PR CI (code, every WebKit shard and aggregate), the separate full QA workflow, merge and deployment verification remain pending. The [earlier checkpoint CI run](https://github.com/ch-leon/nrl-sim/actions/runs/44244815513) passed all its checks. Unmarked legacy developer prototypes still require their isolated namespace. Their old awaiting-next-season state has no continuation through normal League entry.
+
+## Historical entry checkpoint
 
 `5c7c891f` combines exact entry previews and strict receipt snapshots, retained
 club capacity, saved-schedule annual updates, the persistence wrapper and the
@@ -100,7 +115,7 @@ The separate test-harness fix [#721](https://github.com/ch-leon/nrl-sim/pull/721
 merged at `8c5e289e` after Claude approval and green CI/full QA. It is already
 integrated into this branch; it changes no game behavior.
 
-## Current integration work
+## Historical integration and recovery checkpoints
 
 The reviewed entry checkpoint was recorded at `fb696cfe`. Main through
 `ac9647b0` is integrated at `82a1c449`; the only merge conflict was adjacent hub
@@ -143,16 +158,10 @@ checkpoint filename/notice, with source/destination guards. All 410 affected tes
 and typecheck passed. A supported unmarked DEV export imported into another slot
 and resumed the same fixture, seed, coaching call and tick 47. Independent spec re-review passed 45 tests (36 committed plus nine extra
 probes), production build passed, and Claude **RECOVERY AND LEAGUE VIEW REVIEW:
-APPROVE** passed on exact `34c62e7b`. Report:
-`/private/tmp/nrl-574-recovery-ui-review-34c62e7b.md`. Production activation and
-remaining finance/help/history/review/match presentation now proceed with
-separate owners; normal multi-season and browser evidence remains outstanding. Marked save import remains intentionally refused until activation;
-its complete export/import/resume proof belongs to that activation stage.
-Production build passed; the first full run passed
-4,834 of 4,835 tests, with the file-watcher control failing without native file-event
-access. The unchanged exact `33e0d869` rerun with native file-event access passed
-all 4,835 tests across 363 files. Normal bootstrap/admission and final browser/QA proof
-remain outstanding.
+APPROVE** passed on exact `34c62e7b`. The review is recorded in `/private/tmp/nrl-574-recovery-ui-review-34c62e7b.md`.
+At the earlier `33e0d869` checkpoint the first full run passed 4,834 of 4,835
+tests. A rerun with native file-event access passed all 4,835 across 363 files.
+Normal production admission and regional proof followed in the candidate above.
 
 ## Admission and persistence notes
 
@@ -165,24 +174,6 @@ Player cap attainment remains fully observable in compact history. For AI clubs,
 once historical draw years are pruned, known initial/recent membership supplies
 a minimum attained tier; no missing past membership is fabricated.
 
-## Resume here
-
-Follow [the implementation plan](../plans/2026-11-17-league-selection.md).
-The close and entry checkpoints are independently approved. Continue from the
-recovery/read-model checkpoint above:
-
-1. Recovery/read-model review is complete at `34c62e7b`; preserve its invariants
-   while implementing activation.
-2. Add explicit fresh-game League opt-in, a canonical opening unsigned pool,
-   strict normal load/import admission and safe destination-bound persistence.
-3. Initialize the gated hub before presenting the reusable chooser. Support
-   initial/annual reload, closing and reopening the gate, and first-entry intro.
-4. Complete saved-season finance/help/history/review/match labels and an exact
-   current-close-bound Choose next league action.
-5. Prove real AU/UK new-game, reload, held match and multiple annual transitions,
-   short landscape/Larger text, final CI/full QA and full Claude issue-level review
-   before marking ready or merging.
-
 **Approved 18 November: club capacity is retained.** Leon confirmed that choosing
 an easier league does not reduce the club's salary-cap capacity. Higher-tier entry
 can raise base capacity; downward entry/allocation retains it for player and AI
@@ -190,12 +181,3 @@ clubs. Preserve purchased/earned additions and existing exact protection; grant 
 new protection merely for moving down. New signings and renewals must still fit
 ordinary room under retained capacity. No salary rewrite, automatic release or
 cash wage charge is introduced.
-
-Annual acceptance and the reusable chooser are implemented and independently approved.
-Production admission, normal-flow integration and multi-year browser proof remain
-outstanding.
-
-The earlier optional exception-recovery notes led to the bounded recovery
-checkpoint above; its review must complete before production activation.
-Sacking takes precedence over the choice prompt, and UI formatting reads trusted
-installed state rather than repeatedly running full save validation.

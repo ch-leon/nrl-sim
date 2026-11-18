@@ -12,21 +12,9 @@
 
 ## Scope, evidence and decisions
 
-**Paused checkpoint, 17 November:** Leon requested a usage pause. Foundation,
-annual owners and action clock have independent Claude approvals. Season close is
-implemented through `fdf0cfa3` and passed spec review, but Claude requested changes
-for non-final post-hook candidate validation before installation/autosave. Fix and
-re-review that first; annual confirmation and UI remain unimplemented. See the
-[resume notes and evidence](../status/2026-11-league-selection.md). PR #719 stays
-draft. Leon resumed this work on 18 November, authorizing the close correction,
-league confirmation and UI with continued agent orchestration and Claude review.
+**18 November local candidate.** New AU and UK League careers now use normal save slots through selection, annual close, reload and acceptance. The 22 League browser cases and the full corrected Vitest suite passed. The status report identifies the remaining release checks. [Candidate evidence](../status/2026-11-league-selection.md) · [Draft PR #719](https://github.com/ch-leon/nrl-sim/pull/719)
 
-**18 November close correction:** `9f7a7756` resolves the post-hook validation P2;
-independent spec review and Claude `SEASON CLOSE REVIEW: APPROVE` passed. Candidate
-settlement/cursor and close output validate before publication. Typecheck/build
-passed; 4,714/4,715 full-suite tests passed, with the lone file-watcher control
-passing separately with local file-event access. Saved-snapshot schedules and
-atomic entry are next. Leon subsequently approved retained club capacity on 18 November, as recorded below.
+**Earlier checkpoints.** Leon paused work on 17 November after the foundation, annual owners and action clock reviews. Work resumed on 18 November. `9f7a7756` addressed Claude’s post-hook validation finding before install/autosave and received season-close approval. At that revision, 4,714 of 4,715 full-suite tests passed and the file-watcher control passed separately with local file-event access.
 
 Baseline inspected: `03812a1618b80fbc1348bd6b0966b3df704e9b7a`, branch `codex/league-selection-unlocks`, save version 30. Read `AGENTS.md`, `CLAUDE.md`, `docs/hub/`, `docs/specs/career-opportunities.md`, `docs/specs/career-competitions.md` and `docs/plans/2026-11-career-competitions.md`. The opportunities specification supersedes historical forced promotion/relegation. Numerical tuning and optional events remain separate work.
 
@@ -181,12 +169,9 @@ Season close passed spec and Claude review at `9f7a7756`; Task 4 is complete at
 that checkpoint. Task 5 entry orchestration passed independent spec review and
 Claude **ENTRY CONFIRMATION REVIEW: APPROVE** at `5c7c891f`, including retained
 club capacity and sporting-tier sponsor displays. The merged-main checkpoint
-`82a1c449` passed all 4,792 tests (361 files), typecheck and build. Exceptional
-marked match/close recovery is being tightened before normal activation.
-Foundation and annual-owner checkpoints passed all CI check and WebKit
-gates; final integrated QA and production activation remain later steps.
+`82a1c449` passed all 4,792 tests (361 files), typecheck and build. Recovery and saved-season views subsequently received independent checkpoint approval at `34c62e7b`.
 
-**Boundary:** Still no normal-new-game activation. Replace Stage 1's blanket in-memory advancement refusal with the tested new phase gates only when the new lifecycle is ready. Normal load/import/install admission remains denied until Stage 3. Old structural saves remain isolated and follow their existing prototype path. New lifecycle tests may construct explicitly marked candidates without making those candidates accepted normal imports.
+**Stage 2 boundary at that revision.** The new lifecycle was exercised in isolation. Normal load/import/install admission arrived in Stage 3. Older developer prototypes continue in their isolated namespace.
 
 ### Task 4. Close once and persist the choice gate
 
@@ -213,8 +198,8 @@ Files: `src/systems/aging.ts`, `youth.ts`, `rivals.ts`, `stats.ts`, `economy.ts`
 - [x] Add one effective contract/action clock for playable calendar careers: active play uses actual calendar length; annual planning uses the target year without advancing stored season/time. Quotes and commits for signing, renewal, sale, release and undo must use the same clock and explicit finance/history stamp. Existing queued renewals are the effective term in that target year; planning actions must not expire a new one-year signing before it starts. Legacy trials/countdown remain unchanged. Derive structural display weeks from signed terms rather than replayable decrements.
 - [x] Validate lawful existing protected terms separately from room for a new promise. Preserve emergency protection when staying; ordinary unprotected obligations must fit while exact protected terms can survive. New promises cannot spend protected excess. Player and AI league movement retain their attained cap tier and existing exact protection; downward movement creates no new allowance. Test a 90 ordinary + 20 protected bill against a 100 cap and expiry/renewal/transfer removal of protection.
 - [x] Keep old structural `awaiting-next-season` saves out of this acceptance API. They have already run some annual work. Leave them loadable/exportable only under the existing DEV namespace and preserve originals. If a later task offers their conversion, it must first persist a validated partial-lifecycle receipt and run only the missing owners; it cannot send them through the fresh two-phase acceptance. This plan does not silently convert or claim continued play for those historical prototypes.
-- [ ] Complete final production-path proof (headless constructed-state coverage already passes): fresh AU/UK years 1→2→3; title/stay, title/up, poor year/stay, unlocked/down and return up; min/max fields and cap paths; signed renewals/expiry/retirees; bounded population; wallet and match-income continuity; all failure paths. Add assertions that each surviving person ages once and each annual owner executes once.
-- [x] Run focused owner/lifecycle tests, `npx tsc --noEmit`, then commit the reviewed lifecycle stage. Production activation still waits for complete annual invariants and validation of the approved retained-capacity rule.
+- [x] Exercise the production loop for fresh AU/UK years 1→2→3, surviving contracts, renewal/expiry, retirees, bounded population, wallet continuity and once-only ageing. Use controlled sporting outcomes for title/stay, title/up, unlocked/down, loss/stay and return-up. Structural field limits, cap and failure paths are covered by targeted validation and entry tests.
+- [x] Run focused owner/lifecycle tests, `npx tsc --noEmit`, then commit the reviewed lifecycle stage. The production admission checks follow in Task 6.
 
 ## Stage 3 — production activation, readable entry and release evidence
 
@@ -222,31 +207,32 @@ Files: `src/systems/aging.ts`, `youth.ts`, `rivals.ts`, `stats.ts`, `economy.ts`
 
 Files: `src/ui/title.ts`, `src/main.ts`, `src/systems/divisionCareer.ts`, `src/systems/competitionCalendar.ts`, `src/core/save.ts`, `src/core/saveValidation.ts`, `src/core/season.ts`; tests title/save/recovery and new League runtime integration tests.
 
-- [ ] Add an explicit New Game choice between the existing career and League career. Preserve the existing setup screens and loading transition; pass a typed choice into bootstrap. Ordinary Continue never converts a running save.
-- [ ] Construct the regional world exactly once after pack selection, in the initial-choice phase. Show Local eligible and the other two locked. Starting an ordinary career continues through the existing `createNewGame`/`initLeague` path. The playable regional constructor must admit a bounded opening unsigned pool (reuse the fresh game's 12 opening unsigned people with canonical admission/IDs); the developer prototype's empty pool and already-stamped intake receipt would otherwise prevent all first-year recruiting. Never regenerate a market on preview or entry.
-- [ ] Add named runtime predicates for legacy, isolated prototype and playable League calendar. Audit every `hasStructuralCalendar` call listed above and every direct calendar/mode access. Schedule/result adapters operate on both supported calendar types; prototype-only refusals remain prototype-only. Finance/annual/board owners use the explicit playable capability.
-- [ ] Change normal load/import admission only for fully validated playable progress snapshots, including the complete initial/active/closed/accepted invariants. Unmarked old structural imports remain rejected outside DEV; malformed appended markers are rejected. Corrupt/future/wrong-pack/unsupported-format imports preserve the occupied save and its original recovery data.
-- [ ] Audit interval hooks and clocks: trial slots explicitly choose training/recovery/economy eligibility, quiet slots advance interval work once, fixture completion never adds an extra weekly tick, and ordinary salaries never become cash deductions. Keep unsupported event offers gated; adapt free-agency cadence/contract display to the calendar and retain bounded births.
-- [ ] Keep held-match interval-start save/sidecar matching, fixture IDs and accepted entry identity coherent. Reload at initial gate, annual gate, first accepted interval and held match must resume the same phase/opponent.
+- [x] Add an explicit New Game choice between the existing career and League career. Preserve the existing setup screens and loading transition; pass a typed choice into bootstrap. Ordinary Continue never converts a running save.
+- [x] Construct the regional world exactly once after pack selection, in the initial-choice phase. Show Local eligible and the other two locked. Starting an ordinary career continues through the existing `createNewGame`/`initLeague` path. The playable regional constructor must admit a bounded opening unsigned pool (reuse the fresh game's 12 opening unsigned people with canonical admission/IDs); the developer prototype's empty pool and already-stamped intake receipt would otherwise prevent all first-year recruiting. Never regenerate a market on preview or entry.
+- [x] Add named runtime predicates for legacy, isolated prototype and playable League calendar. Audit every `hasStructuralCalendar` call listed above and every direct calendar/mode access. Schedule/result adapters operate on both supported calendar types; prototype-only refusals remain prototype-only. Finance/annual/board owners use the explicit playable capability.
+- [x] Change normal load/import admission only for fully validated playable progress snapshots, including the complete initial/active/closed/accepted invariants. Unmarked old structural imports remain rejected outside DEV; malformed appended markers are rejected. Corrupt/future/wrong-pack/unsupported-format imports preserve the occupied save and its original recovery data.
+- [x] Audit interval hooks and clocks: trial slots explicitly choose training/recovery/economy eligibility, quiet slots advance interval work once, fixture completion never adds an extra weekly tick, and ordinary salaries never become cash deductions. Keep unsupported event offers gated; adapt free-agency cadence/contract display to the calendar and retain bounded births.
+- [x] Keep held-match interval-start save/sidecar matching, fixture IDs and accepted entry identity coherent. Reload at initial gate, annual gate, first accepted interval and held match must resume the same phase/opponent.
 ### Task 7. Deliver the complete selection and review UI
 
 Files: new `src/ui/screens/leagueSelection.ts`; `src/ui/screens/seasonReview.ts`, `fixtures.ts`, `finance.ts`, `history.ts`, `src/ui/guide/pages.ts` and existing HUD/nav owner discovered at implementation; new `tests/ui/screens/leagueSelection.test.ts`, existing relevant UI tests.
 
-- [ ] Render eligible and locked league cards from one pure preview. Show current choice, permanent-access reason, exact required finals title for locked options, actual strength range/mean of proposed opponents, complete opponent field, Nines format/field/finals size and dates from saved slots.
-- [ ] Detail the target annual base cap, purchased/earned additions, every covered signed-obligation season, protected terms if applicable, entry-blocking reasons, ordinary match income basis, title/minor honours and the precise adjacent unlock. State when no extra title cash/cap prize exists.
-- [ ] Show affected AI allocations and administrative movement policy before confirmation. Selecting a card only previews; one clear Confirm league button accepts with the selection key. A stale preview redraws and requires a fresh deliberate confirmation.
-- [ ] Initial entry cannot be skipped into play. Annual review offers Choose next league; closing/reopening either view preserves the gate. The normal League/HUD navigation must reopen unresolved selection after reload, and Play Week explains the required choice.
-- [ ] Keep locked choices discoverable, underdog strength separate from eligibility, and show the permanent unlock even when the player chooses to stay. Do not label a title as automatic promotion or a losing year as relegation.
-- [ ] Replace League-career legacy labels (Prototype slot, 24/22 regular rounds, top eight, QF/SF/GF arithmetic) with actual saved stage/date facts in fixture, review, board and help surfaces used by this path. Preserve legacy text for existing careers.
-- [ ] Test normal/large/larger text, focus/keyboard/touch targets, scrolling and no colour-only eligibility indication. Confirm button and financial blocking reason stay reachable in short landscape viewports.
+- [x] Render eligible and locked league cards from one pure preview. Show current choice, permanent-access reason, exact required finals title for locked options, actual strength range/mean of proposed opponents, complete opponent field, Nines format/field/finals size and dates from saved slots.
+- [x] Detail the target annual base cap, purchased/earned additions, every covered signed-obligation season, protected terms if applicable, entry-blocking reasons, ordinary match income basis, title/minor honours and the precise adjacent unlock. State when no extra title cash/cap prize exists.
+- [x] Show affected AI allocations and administrative movement policy before confirmation. Selecting a card only previews; one clear Confirm league button accepts with the selection key. A stale preview redraws and requires a fresh deliberate confirmation.
+- [x] Initial entry cannot be skipped into play. Annual review offers Choose next league; closing/reopening either view preserves the gate. The normal League/HUD navigation must reopen unresolved selection after reload, and Play Week explains the required choice.
+- [x] Keep locked choices discoverable, underdog strength separate from eligibility, and show the permanent unlock even when the player chooses to stay. Do not label a title as automatic promotion or a losing year as relegation.
+- [x] Replace League-career legacy labels (Prototype slot, 24/22 regular rounds, top eight, QF/SF/GF arithmetic) with actual saved stage/date facts in fixture, review, board and help surfaces used by this path. Preserve legacy text for existing careers.
+- [x] Test normal/large/larger text, focus/keyboard/touch targets, scrolling and no colour-only eligibility indication. Verify the confirm button, title-lock explanation and dated financial obligations in short landscape. The component refusal test checks the financial error and disabled confirmation. A lawful admitted save retains club capacity on entry, so a financial refusal has no normal-play browser scenario.
 ### Task 8. Prove the actual loop and publish reviewable evidence
 
 Files: new `scripts/e2e-webkit/screens/leagueSelection.mjs`; register it in `scripts/e2e-webkit.mjs` and the existing relevant shard; extend existing QA/season harness rather than add a throwaway simulator; `docs/hub/features.md`, `docs/hub/roadmap.md`, and a focused `docs/status/2026-11-league-selection.md` evidence report.
 
-- [ ] Browser test begins at the real production New Game screen, chooses League career, selects an AU/UK location, reads the initial preview, confirms Local, and reaches a real fixture. A helper-created saved state is insufficient evidence for bootstrap.
-- [ ] Use deterministic supported test fixtures to reach annual close, then exercise the real UI for title unlock → stay, next year → move up, and an earned downward choice under the approved retained-capacity policy. Reload at each gate and after acceptance. Confirm history and cap preview match the saved receipts.
-- [ ] Run a real played/skip fixture and multi-season QA for both regions. Prove final identity, once-only cash, contract transition, bounded population, stable player/club ownership, deterministic fields and no automatic player movement. Include one losing year and no optional-event entry. Wider balance conclusions remain #562/#582 work; report measured outcomes without claiming balance approval.
-- [ ] Run browser checks at 844×390, 667×375 and 568×320 plus normal/large/larger text. Capture selection, locked explanation, obligations, review/unlock and accepted schedule screenshots in PR/CI artifacts, never commits.
+- [x] Browser test begins at the real production New Game screen, chooses League career, selects an AU/UK location, reads the initial preview, confirms Local, and reaches a real fixture. A helper-created saved state is insufficient evidence for bootstrap.
+- [x] Use deterministic supported test fixtures to reach annual close, then exercise the real UI for title unlock → stay, next year → move up, and an earned downward choice under the approved retained-capacity policy. Reload at each gate and after acceptance. Confirm history and cap preview match the saved receipts.
+- [x] Run a real played/skip fixture and multi-season QA for both regions. Prove final identity, once-only cash, contract transition, bounded population, stable player/club ownership, deterministic fields and no automatic player movement. Include one losing year and no optional-event entry. Wider balance conclusions remain #562/#582 work; report measured outcomes without claiming balance approval.
+- [x] Run the nine viewport/text combinations at 844×390, 667×375 and 568×320 with Normal, Large and Larger text. Capture selection, locked explanation, dated obligations, review/unlock and accepted schedule in the local WebKit artifact directory.
+- [ ] Confirm the PR or CI artifact makes those screenshots available for review.
 - [ ] Run required local checks exactly:
 
 ```bash
@@ -257,10 +243,10 @@ npm run e2e:webkit -- --group screens
 npm run e2e:season
 ```
 
-- [ ] Update hub Recently added and roadmap with the actual candidate PR link and scope, not a claim that the candidate is deployed. Record revision, commands, outcomes, any unsupported legacy DEV continuation and remaining finance/progression tuning.
+- [x] Update hub Recently added and roadmap with the actual candidate PR link and scope, not a claim that the candidate is deployed. Record revision, commands, outcomes, any unsupported legacy DEV continuation and remaining finance/progression tuning.
 - [ ] Have Claude review the final issue acceptance criteria and diff independently. Address findings, rerun affected checks, obtain `CHECKER VERDICT: APPROVE`, and observe green `check`, every `webkit (<group>)`, `webkit` aggregate and QA workflow on the PR. Do not claim done or merge solely from agent assertions.
 - [ ] Following the repository merge/deploy process, verify the live build revision before giving Leon `https://ch-leon.github.io/nrl-sim/` and one play-test line: “Start a League career, win a title, then choose whether to stay or enter the unlocked league.”
 
 ## Completion boundary
 
-Stage 1 is ready independently. Retained club capacity is approved; implement and independently review that rule alongside AI allocation before enabling its effects. Do not activate production with only helper tests: completion requires the real new-game path, deliberate initial/annual selection, factual permanent unlocks, exact preview, deterministic complete fields, all-years cap checks, once-only resumable annual work, persistent people/contracts/cash, legacy/prototype isolation, AU/UK multi-season evidence, landscape/larger-text browser coverage, independent Claude approval and final CI/QA gates. Wider balance and optional events remain separate.
+The local candidate has passed the production AU/UK career loops, retained-cap and paid-match checks, and the League WebKit cases. Completion requires the remaining local checks, Claude’s issue-level approval, green PR CI and full QA, followed by merge and verification of the deployed revision. Wider balance and optional competition registration remain separate. [Candidate evidence](../status/2026-11-league-selection.md)
