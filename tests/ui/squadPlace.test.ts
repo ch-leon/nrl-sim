@@ -4,6 +4,8 @@
 // chips fold into "+n" rather than squeeze the name. The stand-in DOM has no layout:
 // what a row's cell has room for (fitChips) is measured in the browser, not here.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+// The Squad views draw portraits (SuperCOOKED 30–31); the stand-in DOM has no canvas.
+vi.mock('../../src/art/portrait', async original => ({ ...await original<typeof import('../../src/art/portrait')>(), portraitDataUrl: () => '' }));
 import { stubDocument, type StubNode } from './stubDom';
 import { bus } from '../../src/core/events';
 import { createNewGame, getState, type Player, type TraitInstance } from '../../src/core/state';
@@ -35,22 +37,20 @@ beforeEach(() => {
 });
 afterEach(() => { closeModal(); closeScreen(); bus.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-describe('Lineup’s list (#614)', () => {
-  it('goes back to its top when another spot is picked, and stays put while the same one is', () => {
+describe('the swap list (#614)', () => {
+  it('starts at its top for another spot, and stays put while the same one is drawn again', () => {
     openLineupScreen();
-    const list = q('.nrl-lineup-list');
-    list.scrollTop = 400;
+    // SuperCOOKED 32: Swap, then the card; the side panel lists who can go there.
+    q('[data-swap-start]').click();
     q('[data-spot="s7"]').click(); // the prop: the list is sorted for him now
-    expect(list.scrollTop).toBe(0);
-    list.scrollTop = 200;
-    q('[data-make-captain]').click(); // the same slot, drawn again
-    expect(getState().lineup.captain).toBe(getState().lineup.starters[7]);
-    expect(list.scrollTop).toBe(200);
-    q('[data-spot="b0"]').click(); // swapped with a bench seat: nothing picked now, the list in overall order
-    expect(list.scrollTop).toBe(0);
-    list.scrollTop = 120;
-    bus.emit('state:changed', getState()); // an injury, a signing: nothing picked before or after
-    expect(list.scrollTop).toBe(120);
+    expect(q('.nrl-swap-list').scrollTop ?? 0).toBe(0);
+    q('.nrl-swap-list').scrollTop = 200;
+    bus.emit('state:changed', getState()); // an injury, a signing: the same spot, drawn again
+    expect(q('.nrl-swap-list').scrollTop).toBe(200);
+    q('[data-swap-cancel]').click();
+    q('[data-swap-start]').click();
+    q('[data-spot="s5"]').click(); // another spot: back to the top, where the best man for it is
+    expect(q('.nrl-swap-list').scrollTop ?? 0).toBe(0);
   });
 });
 
@@ -177,7 +177,7 @@ describe('a row’s trait chips (#614)', () => {
   });
   it('the Squad list builds every row with its name first and its chips after', () => {
     getState().squad[0]!.traits = TRAITS4;
-    openSquadScreen();
+    openSquadScreen('list'); // SuperCOOKED 31: the list view (the pitch is the default)
     const who = q(`[data-row-player="${getState().squad[0]!.id}"]`).querySelector('.nrl-row-who')!;
     expect(who.children[0]!.className).toBe('nrl-row-name');
     expect(who.children[0]!.textContent).toBe(getState().squad[0]!.name);

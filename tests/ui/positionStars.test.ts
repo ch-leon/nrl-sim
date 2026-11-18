@@ -27,18 +27,18 @@ afterEach(() => { slot.close?.(); slot.close = null; vi.unstubAllGlobals(); });
 
 describe('temporary stars on existing screens (#537)', () => {
   it('renders stars beside existing overall on Squad', () => {
-    openSquadScreen();
+    openSquadScreen('list'); // SuperCOOKED 31: the list shows stars in place of the number
     const root = slot.screen as StubNode;
-    const ratings = root.querySelectorAll('.nrl-row-ovr').map(n => n.textContent);
+    const ratings = root.querySelectorAll('.nrl-row-ovr').map(n => n.attrs['aria-label']);
     expect(ratings).toHaveLength(getState().squad.length);
-    for (const p of getState().squad) expect(ratings).toContain(ratingText(overallRating(p)));
+    for (const p of getState().squad) expect(ratings).toContain(starsLabel(playerStars(p)));
   });
   it('renders stars beside existing overall on Recruit', () => {
     openRecruitScreen();
     const root = slot.screen as StubNode;
     for (const row of root.querySelectorAll('[data-row-player]')) {
       const p = getState().freeAgents.find(p => p.id === row.attrs['data-row-player'])!;
-      expect(row.querySelector('.nrl-row-ovr')!.textContent).toBe(ratingText(overallRating(p)));
+      expect(row.querySelector('.nrl-row-ovr')!.attrs['aria-label']).toBe(starsLabel(playerStars(p))); // SuperCOOKED 34: stars, no number
     }
   });
   it('renders stars beside existing overall on the rival squad', () => {

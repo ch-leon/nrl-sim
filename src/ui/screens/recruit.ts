@@ -1,20 +1,25 @@
 import { careerActionClock } from '../../core/season';
 import { discoveredFreeAgents } from '../../systems/playerCareer';
-// src/ui/screens/recruit.ts — free-agency browser screen (BAK-179, WU-9).
-// Renders GameState.freeAgents as a table (3g, Broadcast Quiet) with SIGN
-// inline. Built on the DOM UI kit (src/ui/dom.ts). No Phaser imports. Also
-// exports the pieces the squad screens share: their stylesheet, the trait
-// chips, the fitness bar and the ▾ menu button.
+// src/ui/screens/recruit.ts — free-agency browser screen (BAK-179, WU-9; SuperCOOKED 34).
+// Renders the scouted free agents as a table, filtered by position group, each with
+// his face, age, traits or what he grows to, stars, fee and cap, and SIGN inline.
+// Built on the DOM UI kit (src/ui/dom.ts). No Phaser imports. Also exports the
+// pieces the squad screens share: their stylesheet, the trait chips, the fitness
+// bar and the ▾ menu button.
 
-import { el, button, ensureStyles, guardDoubleTap, hintScroll, openScreen, screenHead } from '../dom';
+import { el, button, ensureStyles, guardDoubleTap, hintScroll, openScreen, screenHead, segmented } from '../dom';
 import { getState, type Player, type TraitInstance } from '../../core/state';
 import { TRAITS, traitLabel } from '../../data/traits';
 import { bus } from '../../core/events';
-import { overallRating, ratingText } from '../../data/player';
+import { POSITION_GROUPS, overallRating, playerStars, type PositionGroup } from '../../data/player';
+import { potentialStars } from '../../systems/potential';
+import { kitFromColors } from '../../art/match/kit';
+import { portraitDataUrl } from '../../art/portrait';
+import { ensurePartsStyles, starsEl, starsLabel } from '../parts';
 import {
   signingFee, signingFeeBasis, weeksToPoolRefresh,
 } from '../../systems/freeagency';
-import { capRoomFor, salaryDemand } from '../../systems/cap';
+import { capRoomFor, commitment, publishedCap, salaryDemand } from '../../systems/cap';
 import { signWithUndo } from '../../systems/undo';
 import { SQUAD_CAP } from '../../config';
 import { POSITION_SHORT } from '../../systems/lineup';
@@ -137,16 +142,38 @@ const SCREEN_CSS = `
   .nrl-squad .nrl-sq-wide { display: none; }
 }
 .nrl-squad-no { color: var(--nrl-muted); }
-/* 3g Recruit: PLAYER · POS · AGE · OVR · FEE · WAGE · action, rows 44 tall. */
-.nrl-recruit .nrl-grid-head, .nrl-recruit .nrl-row { grid-template-columns: minmax(0, 1fr) 52px 40px 3.875rem 84px 84px 96px; }
-@media (max-width: 760px) { .nrl-recruit .nrl-grid-head, .nrl-recruit .nrl-row { grid-template-columns: minmax(0, 1fr) 40px 34px 3.875rem 80px 72px 92px; } }
+/* SuperCOOKED 34 Recruit: face · PLAYER (name, then age and traits) · POS · RATING · FEE · CAP / SEASON · action. */
+.nrl-recruit { --nrl-recruit-cols: 36px minmax(0, 1fr) 2.75rem 5.25rem 4.75rem 5.25rem 6.5rem; }
+.nrl-recruit .nrl-grid-head, .nrl-recruit .nrl-row { grid-template-columns: var(--nrl-recruit-cols); column-gap: 8px; }
+@media (max-width: 760px) { .nrl-recruit { --nrl-recruit-cols: 30px minmax(0, 1fr) 2.25rem 4.6rem 4.25rem 4.5rem 6rem; } .nrl-recruit .nrl-grid-head, .nrl-recruit .nrl-row { column-gap: 5px; } }
+html[data-text-size] .nrl-recruit { --nrl-recruit-cols: 30px minmax(0, 1fr) 2.6rem 4.4rem 4.5rem 4.5rem 6.5rem; }
+.nrl-recruit .nrl-grid-head { font-size: 0.6875rem; height: 18px; }
 .nrl-recruit .nrl-row { min-height: 44px; }
+/* The filter gives way first (it scrolls sideways, #611); Squad / Recruit and Sort never do. */
+.nrl-recruit .nrl-screen-titles { min-width: 0; }
+.nrl-recruit .nrl-sq-tabs { flex-shrink: 0; }
+.nrl-recruit .nrl-screen-head { margin-bottom: 2px; }
+.nrl-sq .nrl-recruit-sub { flex: 0 0 auto; margin: 0 0 2px; font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nrl-recruit-face { width: 28px; height: 32px; border-radius: 6px; background: var(--nrl-raised); image-rendering: pixelated; }
+.nrl-recruit-who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.nrl-recruit-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.nrl-recruit-name > .nrl-row-name { flex: 0 1 auto; min-width: 3em; overflow: hidden; text-overflow: ellipsis; font-size: 0.875rem; font-weight: 600; }
+.nrl-recruit-line { font-size: 0.6875rem; color: var(--nrl-muted); padding-right: 0; }
+.nrl-recruit-grows { color: var(--nrl-pos); flex: 0 0 auto; }
+.nrl-recruit-reach { font-size: 0.6875rem; color: var(--nrl-alert); white-space: normal; }
+.nrl-recruit .nrl-row .nrl-num { font-size: 0.75rem; }
+.nrl-recruit .nrl-recruit-fee { font-weight: 700; }
+/* The position filter: All, then each group with its count (SuperCOOKED 34). */
+.nrl-recruit-groups { flex: 0 1 auto; min-width: 0; }
+.nrl-recruit-groups > .nrl-btn { padding: 0 11px; font-size: 0.875rem; white-space: nowrap; }
+@media (max-width: 760px) { .nrl-recruit-groups > .nrl-btn { padding: 0 8px; font-size: 0.8125rem; } }
+.nrl-recruit-more { padding: 8px 0; }
 /* Written in caps already, so a sum keeps its small k ("NEED $18k"). */
 .nrl-row .nrl-row-action { min-height: 36px; min-width: 0; width: 100%; padding: 0 6px; border-radius: 8px; font-size: 0.875rem; text-transform: none; }
 /* #389: a finger's height on a touch screen; the row is 44 tall already. */
 @media (pointer: coarse) { .nrl-row .nrl-row-action { min-height: 44px; } }
-/* Can't sign: the label says why (NEED $18k, SQUAD FULL), raised and muted, not faded. */
-.nrl-row .nrl-row-action:disabled { background: var(--nrl-raised); color: var(--nrl-muted); opacity: 1; }
+/* Can't sign: the label says why (NEED $18k, SQUAD FULL), raised and amber, not faded (SuperCOOKED 34). */
+.nrl-row .nrl-row-action:disabled { background: var(--nrl-raised); color: var(--nrl-neg); border-color: transparent; opacity: 1; }
 /* The ▾ menus (sort, training): a tray under their button, over the table. */
 .nrl-pop {
   position: absolute;
@@ -231,7 +258,7 @@ export function traitChips(p: Player): HTMLElement[] {
  */
 export function fitChips(list: HTMLElement): void {
   const cells = Array.from(list.querySelectorAll<HTMLElement>('.nrl-row-who'));
-  if (cells.length === 0 || typeof cells[0]!.getBoundingClientRect !== 'function') return; // no layout (the tests' DOM)
+  if (cells.length === 0 || typeof getComputedStyle !== 'function') return; // no layout (the tests' DOM)
   const pad = parseFloat(getComputedStyle(cells[0]!).paddingRight) || 0;
   // Tight: what it shows runs past the cell's edge, or out of the foot of its row.
   const tight = (who: HTMLElement): boolean => {
@@ -397,6 +424,26 @@ const RECRUIT_SORTS: readonly PopItem<RecruitSort>[] = [
 let unsub: (() => void) | null = null;
 let recruitSort: RecruitSort = 'rating';
 
+type RecruitGroup = 'all' | PositionGroup;
+/** The position filter (SuperCOOKED 34): the squad list's groups, with the outside backs as "Backs". */
+const RECRUIT_GROUPS: readonly { id: RecruitGroup; label: string }[] = [
+  { id: 'all', label: 'All' }, { id: 'halves', label: 'Halves' }, { id: 'hooker', label: 'Hooker' },
+  { id: 'forwards', label: 'Forwards' }, { id: 'outside-backs', label: 'Backs' },
+];
+/** A free agent's shirt on his face: no club's colours yet. */
+const FREE_AGENT_COLORS: [string, string] = ['#3a4566', '#8f98ab'];
+
+/**
+ * What a young man's line says he grows to (SuperCOOKED 34): "Grows to ★★★★½" when his
+ * ceilings are at least a star above where he is now and he is 23 or under; else null. Pure.
+ */
+export function growsToText(p: Player): string | null {
+  if (p.age > 23 || !p.ceilings) return null;
+  const to = potentialStars(p);
+  if (to < playerStars(p) + 1) return null;
+  return `Grows to ${'★'.repeat(Math.floor(to))}${Number.isInteger(to) ? '' : '½'}`;
+}
+
 /** Teardown run by the shared screen slot whenever this screen closes. */
 function onRecruitClosed(): void {
   if (unsub) { unsub(); unsub = null; }
@@ -415,13 +462,22 @@ function onRecruitClosed(): void {
 export function openRecruitScreen(): void {
   ensureScreenStyles();
 
+  ensurePartsStyles();
   let showAll = false;
+  let group: RecruitGroup = 'all';
   const list = el('div', { class: 'nrl-grid-body nrl-screen-body' });
   // A signing redraws the rows: the next man's SIGN is then under the finger (#598).
   guardDoubleTap(list);
   hintScroll(list); // the pool runs past the sheet's foot (#610)
-  const more = el('div');
-  const sub = el('div', { class: 'nrl-screen-sub' });
+  const more = el('div', { class: 'nrl-recruit-more' });
+  const groups = segmented<RecruitGroup>(RECRUIT_GROUPS.map((g) => ({ id: g.id, label: g.label })), group, (id) => {
+    group = id;
+    if (id !== 'all') showAll = true; // a position is a search of the whole pool, not the shortlist
+    render();
+  }, { class: 'nrl-recruit-groups', label: 'Position' });
+  for (const [id, b] of groups.buttons) { b.setAttribute('data-recruit-group', id); b.removeAttribute('data-seg'); }
+  // Under the header's one row (SuperCOOKED 34 puts the filter beside Squad / Recruit): the pool and the money.
+  const sub = el('div', { class: 'nrl-screen-sub nrl-recruit-sub' });
   const sort = popMenu<RecruitSort>({
     label: () => `Sort: ${RECRUIT_SORTS.find((s) => s.id === recruitSort)!.label}`,
     items: RECRUIT_SORTS,
@@ -435,13 +491,22 @@ export function openRecruitScreen(): void {
   const render = (): void => {
     list.replaceChildren();
     const s = getState();
-    const discovered = discoveredFreeAgents(s);
+    const pool = discoveredFreeAgents(s);
     const shortlist = recruitShortlist(s);
-    const fullView = showAll || discovered.length < 5;
+    // Each group's count is of everyone scouted, whichever is picked.
+    for (const g of RECRUIT_GROUPS) {
+      const n = g.id === 'all' ? pool.length : pool.filter((p) => POSITION_GROUPS[p.position] === g.id).length;
+      const b = groups.buttons.get(g.id)!;
+      b.textContent = `${g.label} ${n}`;
+      b.title = g.id === 'all' ? `All ${n} scouted free agents` : `${n} scouted ${g.label.toLowerCase()}`;
+    }
+    groups.set(group);
+    const discovered = group === 'all' ? pool : pool.filter((p) => POSITION_GROUPS[p.position] === group);
+    const fullView = showAll || pool.length < 5;
     sort.button.style.display = fullView ? '' : 'none';
     more.replaceChildren();
     if (!fullView) {
-      const all = button(`Show all ${discovered.length}`, () => { showAll = true; render(); });
+      const all = button(`Show all ${discovered.length}`, () => { showAll = true; render(); }, { class: 'nrl-btn-outline' });
       all.setAttribute('data-show-all', '');
       more.append(all);
     }
@@ -450,9 +515,11 @@ export function openRecruitScreen(): void {
     const when = n === 1 ? 'after this week' : `in ${n} weeks`;
     // The bank as the dock writes it (#600): in debt it is "-$84,448", the sign before the dollar.
     const bank = fmtMoney(s.money);
-    sub.textContent = `Free agents${careerActionClock(s).structural ? ` · season ${careerActionClock(s).season}` : ''} · ${discovered.length} scouted · next discovery ${when} · squad ${s.squad.length}/${SQUAD_CAP} · bank ${bank}`;
-    sub.title = `${discovered.length} scouted players; discovery refreshes ${when}. Squad ${s.squad.length} of ${SQUAD_CAP}. Bank ${bank}.`;
-    if (discovered.length === 0) {
+    const season = careerActionClock(s).season;
+    const room = fmtMoney(Math.max(0, publishedCap(s.capAccount) - commitment(s.squad, season)));
+    sub.textContent = `${careerActionClock(s).structural ? `Season ${season} · ` : ''}${pool.length} scouted · next discovery ${when} · squad ${s.squad.length}/${SQUAD_CAP} · cap room ${room} · bank ${bank}`;
+    sub.title = `${pool.length} scouted players; discovery refreshes ${when}. Squad ${s.squad.length} of ${SQUAD_CAP}. Cap room ${room} this season. Bank ${bank}.`;
+    if (pool.length === 0) {
       list.appendChild(el('div', { class: 'nrl-screen-empty', text: `No scouted free agents available. Discovery refreshes ${when}.` }));
       return;
     }
@@ -460,10 +527,13 @@ export function openRecruitScreen(): void {
     const agents = discovered.map((p) => ({ p, fee: signingFee(s, p), ovr: overallRating(p) }));
     agents.sort((a, b) => (recruitSort === 'fee' ? a.fee - b.fee : recruitSort === 'age' ? a.p.age - b.p.age : b.ovr - a.ovr) || b.ovr - a.ovr);
     const visible = fullView ? agents : shortlist.ids.map((id) => agents.find(({ p }) => p.id === id)!);
-    if (visible.length === 0) list.append(el('div', { class: 'nrl-screen-empty', text: full
-      ? 'Squad full: release or sell a player first, or show all free agents.'
-      : 'No affordable shortlist today. Show all free agents to browse the pool.' }));
-    for (const { p: agent, fee, ovr } of visible) {
+    if (visible.length === 0) list.append(el('div', { class: 'nrl-screen-empty', text: group !== 'all'
+      ? `No scouted ${RECRUIT_GROUPS.find((g) => g.id === group)!.label.toLowerCase()} today.`
+      : full
+        ? 'Squad full: release or sell a player first, or show all free agents.'
+        : 'No affordable shortlist today. Show all free agents to browse the pool.' }));
+    const kit = kitFromColors(FREE_AGENT_COLORS, 'free-agent');
+    for (const { p: agent, fee } of visible) {
       const reach = !fullView && agent.id === shortlist.reachId;
       const salary = salaryDemand(agent);
       const overCap = !capRoomFor(s.squad, s.capAccount, careerActionClock(s).season, salary);
@@ -472,7 +542,7 @@ export function openRecruitScreen(): void {
       const action = button(full ? 'SQUAD FULL' : overCap ? 'OVER CAP' : short > 0 ? `NEED ${fmtMoneyShort(short, { roundUp: true })}` : 'SIGN', () => {
         const res = signWithUndo(agent.id); // "Signed …" with a 5-second Undo (#370)
         if (!res.ok) bus.emit('ui:notify', { text: signFailureText(res.reason, res.message), kind: 'info' });
-      }, { class: `nrl-row-action${blocked ? '' : ' nrl-btn-primary'}` });
+      }, { class: `nrl-row-action${blocked ? '' : ' nrl-btn-outline'}` });
       action.addEventListener('click', (e) => e.stopPropagation());
       action.disabled = blocked;
       action.title = full
@@ -483,16 +553,22 @@ export function openRecruitScreen(): void {
             ? `The ${fmtMoney(fee)} fee is ${fmtMoney(short)} more than the bank`
             : `Signing fee ${fmtMoney(fee)} (${signingFeeBasis(s, agent)}), then ${fmtMoney(salary)} a season on the cap`;
       const chips = traitChips(agent);
-      if (agent.junior) chips.unshift(el('span', { class: 'nrl-chip nrl-chip-academy', text: 'Academy', attrs: { title: "Academy prospect: a quarter of one year's wage" } }));
-      if (agent.id === shortlist.pickId) chips.unshift(el('span', {
+      // The badges ride on his name's line, where they never fold away.
+      const badges: HTMLElement[] = [];
+      if (agent.id === shortlist.pickId) badges.push(el('span', {
         class: 'nrl-chip', text: "Coach's pick",
         attrs: { 'data-coach-pick': '', title: 'The biggest affordable improvement at his position in the starting side.' },
       }));
-      const who = whoCell(agent.name, null, chips);
-      // Keep the badge and reach reason readable on landscape phones without
-      // changing the shared row/chip styles used by other squad screens.
-      who.style.flexWrap = 'wrap';
-      who.style.whiteSpace = 'normal';
+      if (agent.junior) badges.push(el('span', { class: 'nrl-chip nrl-chip-academy', text: 'Academy', attrs: { title: "Academy prospect: a quarter of one year's wage" } }));
+      // SuperCOOKED 34: the name, then a line of his age, what a young man grows to, and the chips
+      // (which fold into "+n" for the room the line has, fitChips); the reach reason under it.
+      const grows = growsToText(agent);
+      const line = el('span', { class: 'nrl-row-who nrl-recruit-line' },
+        el('span', { text: grows || chips.length ? `Age ${agent.age} ·` : `Age ${agent.age}`, attrs: { 'data-age': '' } }),
+        ...(grows ? [el('span', { class: 'nrl-recruit-grows', text: grows, attrs: { title: `Potential: ${starsLabel(potentialStars(agent))}` } })] : []),
+        ...chips);
+      const who = el('span', { class: 'nrl-recruit-who' },
+        el('span', { class: 'nrl-recruit-name' }, el('span', { class: 'nrl-row-name', text: agent.name }), ...badges), line);
       if (reach) {
         const income = weeklyIncome(s);
         const gap = fee - s.money;
@@ -500,20 +576,17 @@ export function openRecruitScreen(): void {
           ? `Cap: he costs ${fmtMoney(salary)} a season`
           : income > 0 && gap > 0 ? `Fee ${fmtMoney(fee)}: about ${Math.ceil(gap / income)} weeks away`
           : `Fee ${fmtMoney(fee)}: more cash needed`;
-        const note = el('span', { text: reason, attrs: { title: 'The signing fee against weekly income. Gates and spending can change it. The salary sits on the cap, not the bank.' } });
-        note.style.color = 'var(--nrl-alert)';
-        note.style.flexBasis = '100%';
-        who.append(note);
+        who.append(el('span', { class: 'nrl-recruit-reach', text: reason, attrs: { title: 'The signing fee against weekly income. Gates and spending can change it. The salary sits on the cap, not the bank.' } }));
       }
-      const feeCell = el('span', { class: 'nrl-num', text: fmtMoney(fee), attrs: { title: `Signing fee (${signingFeeBasis(s, agent)})` } });
+      const feeCell = el('span', { class: 'nrl-num nrl-recruit-fee', text: fmtMoneyShort(fee), attrs: { title: `Signing fee ${fmtMoney(fee)} (${signingFeeBasis(s, agent)})` } });
       if (reach) feeCell.style.color = 'var(--nrl-alert)';
       list.appendChild(tableRow(agent, [
+        el('img', { class: 'nrl-recruit-face', attrs: { src: portraitDataUrl(agent.id, kit), alt: '', width: '28', height: '32' } }),
         who,
         el('span', { class: 'nrl-row-pos', text: posShort(agent.position), attrs: { title: positionLabel(agent.position) } }),
-        el('span', { class: 'nrl-num', text: String(agent.age) }),
-        el('span', { class: 'nrl-num nrl-row-ovr', text: ratingText(ovr), attrs: { title: 'Overall rating' } }),
+        starsEl(playerStars(agent), { size: 12, class: 'nrl-row-ovr' }),
         feeCell,
-        el('span', { class: 'nrl-num nrl-row-dim', text: fmtMoney(salary), attrs: { title: 'Annual salary on the cap' } }),
+        el('span', { class: 'nrl-num nrl-row-dim', text: fmtMoneyShort(salary), attrs: { title: `${fmtMoney(salary)} a season on the cap` } }),
         action,
       ], () => openPlayerPage(agent, { kind: 'freeAgent' })));
     }
@@ -526,9 +599,10 @@ export function openRecruitScreen(): void {
   let fitted = 0;
   const turned = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => { if (list.clientWidth !== fitted) render(); }) : null;
 
-  const head = screenHead('', { lead: [squadTabs('recruit')], sub, controls: [sort.button] });
-  const screen = el('div', { class: 'nrl-screen nrl-sq nrl-recruit' }, head,
-    gridHead(['Player', 'Pos', 'Age', ['Ovr', 'nrl-col-ovr'], 'Fee', 'Cap', '']), list);
+  sort.button.classList.add('nrl-btn-outline');
+  const head = screenHead('', { lead: [squadTabs('recruit'), groups.el], controls: [sort.button] });
+  const screen = el('div', { class: 'nrl-screen nrl-sq nrl-recruit' }, head, sub,
+    gridHead(['', 'Player', 'Pos', 'Rating', 'Fee', 'Cap / season', '']), list);
   // openScreen closes any other open screen (running its teardown) first.
   openScreen(screen, onRecruitClosed, 'recruit');
   render();
