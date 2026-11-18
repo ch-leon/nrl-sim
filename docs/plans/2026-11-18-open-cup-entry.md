@@ -20,6 +20,11 @@ Depends on [the reward foundation plan](2026-11-18-open-cup-rewards.md). Claude 
 
 Coordinate the schema before coding: the foundation proposes 32→33. If foundation and activation ship together, add activation within 33. If the foundation ships separately first, activation needs the next version, expected 34, and a fresh inspection of its actual schema/migration. Do not allocate competing version-33 meanings.
 
+Delivery choice: keep both reviewed checkpoints on the same feature branch and
+ship them together as one optional Open Cup change. The final version-33 schema
+therefore includes both reward records and entry evidence. Run the final
+independent implementation review and required CI/QA on that complete feature.
+
 ## Published product contract
 
 | Topic | Initial supported behaviour |

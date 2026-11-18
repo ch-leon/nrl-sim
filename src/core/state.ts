@@ -6,6 +6,7 @@ import type { PlayerCareerHistory, PlayerPopulation } from '../data/playerCareer
 import { initialPlayerPopulation, installPlayerHistory } from '../systems/playerCareer';
 import type { TeamTactics } from '../match/league/presets';
 import type { CompetitionCareerState } from '../data/competition';
+import type { CompetitionRewardRecord } from '../data/competitionRewards';
 import { bus } from './events';
 import { activePack, packForCountry, selectPack } from '../content';
 import { makeRng } from '../utils/rng';
@@ -109,6 +110,8 @@ export interface RivalClub {
   home?: { town: string; country?: string; lat: number; lon: number };
   /** Transfer wallet. The player's cash is GameState.money, not this copy. */
   cash?: number;
+  /** Materialized when this rival receives a competition reputation award. */
+  reputation?: number;
   /** The rival's salary-cap account. The player's account is GameState.capAccount. */
   capAccount?: CapAccount;
 }
@@ -334,6 +337,8 @@ export interface GameState {
    * just played.
    */
   matchIncome: import('../systems/matchIncome').MatchIncomeRecord[];
+  /** Frozen competition reward promises and their settlement evidence. */
+  competitionRewards: CompetitionRewardRecord[];
   finance: SeasonFinance[];
   /** The coach's nine, bench and rotation (#69); old saves get today's auto pick. */
   lineup: Lineup;
@@ -490,6 +495,7 @@ export function buildNewGameState(
     objectives: [],
     eventDeck: newEventDeck(seed),
     matchIncome: [],
+    competitionRewards: [],
     finance: [emptyFinance(1)],
     // The opening side: today's best nine by slot and the next four (#69). No dice: the squad is unchanged.
     lineup: autoPick(squad),
