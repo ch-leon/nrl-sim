@@ -303,6 +303,19 @@ describe('writes', () => {
     }
   });
 
+  it('a write cut short with both .ready (newer) and the file (older) left: the newer is never lost', async () => {
+    for (let n = 0; n < 8; n++) {
+      const native = fakeFiles();
+      native.files.set(F(slotKey(1)), 'week 4');
+      native.files.set(F(slotKey(1)) + '.ready', 'week 5'); // killed before the old file was removed
+      const mirror = new NativeMirror(native.api, quiet());
+      killAfter(native, n);
+      mirror.set(slotKey(1), 'week 6');
+      await mirror.idle();
+      expect(['week 5', 'week 6'], `killed at step ${n}`).toContain((await afterWipe(native)).get(slotKey(1)));
+    }
+  });
+
   it('a later write clears the deleted marker', async () => {
     const native = fakeFiles();
     const mirror = new NativeMirror(native.api, quiet());
@@ -550,6 +563,20 @@ describe('web and Android: the mirror is off', () => {
     expect(capacitorConfig.android?.includePlugins).toEqual([]);
     expect(capacitorConfig.appId).toBe('au.supercooked.nrlsim.test');
     expect(capacitorConfig.appName).toBe('NRL Sim (Test)');
+  });
+});
+
+describe('the iOS plugin chunks stay out of the web precache', () => {
+  const vite = readFileSync(new URL('../../vite.config.ts', import.meta.url), 'utf8');
+
+  it('names every Capacitor chunk capacitor-*', () => {
+    expect(vite).toContain("chunkFileNames: (chunk) => capacitorChunk(chunk) ? 'assets/capacitor-[name]-[hash].js' : 'assets/[name]-[hash].js'");
+    expect(vite).toContain("return chunk.name === 'capacitorFiles' || chunk.moduleIds.some((id) =>");
+    expect(vite).toMatch(/node_modules\[[^\]]*\]@capacitor\[[^\]]*\]\/\.test\(id\)/);
+  });
+
+  it('leaves exactly those chunks out of the PWA precache', () => {
+    expect(vite).toContain("globIgnores: ['**/uk-*.js', '**/posthogClient-*.js', '**/capacitor-*.js'],");
   });
 });
 

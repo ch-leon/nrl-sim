@@ -26,8 +26,8 @@
 //  - No torn files, and the only good copy is never removed. A value is written to
 //    `.tmp`, renamed to `.ready` once complete, then `.ready` replaces the file.
 //    `.ready` is always complete and newer than the file, so the sync prefers it; a
-//    `.tmp` is never read. A `.ready` left with no file (a write cut short) is first
-//    promoted to the file, never deleted.
+//    `.tmp` is never read. A `.ready` left by a write cut short is promoted to the
+//    file before the next write goes on, never deleted.
 
 import {
   COMMERCIAL_FIRST_RUN_KEY, DEVICE_ID_KEY, ENTITLEMENTS_CACHE_KEY, ENTITLEMENTS_STUB_KEY, IOS_INSTALL_HINT_KEY, LABS_KEY,
@@ -226,11 +226,11 @@ export class NativeMirror {
       await this.files.remove(gone);
     }
     await this.files.write(tmp, value);
-    // A `.ready` is the newest complete copy. With no file beside it, it is the only
-    // one: promote it rather than lose it. With a file beside it, the file is good.
+    // A `.ready` left by a write cut short is the newest complete copy (always newer
+    // than the file beside it): finish that write first, so it is never dropped.
     if (await this.files.exists(ready)) {
-      if (await this.files.exists(final)) await this.files.remove(ready);
-      else await this.files.rename(ready, final);
+      if (await this.files.exists(final)) await this.files.remove(final);
+      await this.files.rename(ready, final);
     }
     await this.files.rename(tmp, ready); // the new value, complete
     await this.files.remove(final); // `.ready` now holds the newest copy
