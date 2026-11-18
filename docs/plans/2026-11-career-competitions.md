@@ -1,6 +1,6 @@
 # Career progression, competitions and rewards
 
-## Current plan — revised 16 November 2026
+## Current plan — reconciled 18 November 2026
 
 Leon approved a broader, playful career: **choose an eligible league each season,
 win to unlock harder leagues, and send players to optional cups, events and
@@ -15,7 +15,15 @@ acceptance criteria. The existing
 remains the canonical product record. The
 [technical contract](../specs/career-competitions.md) records how this changes the
 earlier structural prototype; [delivery evidence](../status/2026-11-career.md)
-distinguishes that prototype from the player-facing work still required.
+distinguishes that prototype from shipped features and the work still required.
+
+**Delivered:** player continuity [#716](https://github.com/ch-leon/nrl-sim/pull/716)
+and league selection [#719](https://github.com/ch-leon/nrl-sim/pull/719). League
+selection is live: a finals title earns permanent access, the coach chooses each
+season, and moving down retains club salary-cap capacity. Existing Classic
+careers keep their format. [Release and verification](../status/2026-11-league-selection.md).
+The Open Cup's normal entry/reward integration remains unfinished within Slice A;
+assignments, special events and gear remain later slices.
 
 ### Changes that govern future implementation
 
@@ -37,7 +45,7 @@ distinguishes that prototype from the player-facing work still required.
 
 | Slice | Deliverable | Done when |
 | --- | --- | --- |
-| A | Selectable league career and Open Cup | Win, unlock, choose to stay or move, and finish/decline a cup with valid people, finances and next-season setup. |
+| A | Selectable league career and Open Cup — league selection shipped in #719; cup entry/rewards remain | Win, unlock, choose to stay or move, and finish/decline a cup with valid people, finances and next-season setup. |
 | B | Player assignments | Send a player away, cover an overlapping fixture, and receive the player and recorded outcome once. |
 | C | Watched/coached individual challenge | Coach animated rounds, earn a personal and supported club reward, and reveal a next opportunity. |
 | D | Distinct small-sided event and invitation chain | A beach or floodlit event changes play and squad decisions, with a saved route to a later challenge. |
@@ -51,35 +59,38 @@ requirements rather than rebuilding those foundations.
 ### Existing issue map and design gates
 
 Continue under [#323](https://github.com/ch-leon/nrl-sim/issues/323). #570/#571/#573/#575
-remain reusable foundations. #574 needs its automatic movement scope reconciled
-to unlocks, league selection and rollover; #578 needs opportunity/assignment views;
-#582 needs the revised career proof. #576/#577 retain reward/cap ownership.
-#579–#581 remain relevant, with their order reconciled to the slices above.
-On 17 November the tracker and #574/#578/#582 were reconciled to v0.2. The new
-scoped delivery tickets are [#708 assignments](https://github.com/ch-leon/nrl-sim/issues/708),
+remain reusable foundations. The tracker and #574/#578/#582 were reconciled to
+v0.2 on 17 November. Player continuity #572 shipped through
+[PR #716](https://github.com/ch-leon/nrl-sim/pull/716), following reviewed
+match-income [PR #695](https://github.com/ch-leon/nrl-sim/pull/695).
+
+League selection [#574](https://github.com/ch-leon/nrl-sim/issues/574) is complete
+through merged and deployed [PR #719](https://github.com/ch-leon/nrl-sim/pull/719).
+The [implementation plan](2026-11-17-league-selection.md) and
+[release evidence](../status/2026-11-league-selection.md) cover permanent access,
+deterministic fields, resumable close/entry, normal save admission and the UI.
+Leon approved retained club capacity on 18 November: easier league entry never
+reduces it for player or AI clubs; higher-tier entry can raise the base. Existing
+purchased/earned additions and lawful exact-term protection survive, with no new
+protection for downward movement. Match income uses the sporting division.
+
+For the first selectable world, AI field allocation and initial/annual choice
+phases are implemented and validated. Staying keeps fields unchanged; switching
+creates a deterministic vacancy chain using the saved completed standings.
+The 25-slot calendar and separated close/accept phases are shipped parameters,
+not a general balance or future-event pacing approval.
+
+Remaining scoped work includes normal optional cup offers/registration and
+reward/cap integration (#576/#577), wider opportunity/history presentation
+(#578), and integrated career balance/foundation validation (#562/#582).
+[#708 assignments](https://github.com/ch-leon/nrl-sim/issues/708),
 [#710 watched/coached individual challenge](https://github.com/ch-leon/nrl-sim/issues/710)
-and [#711 distinct small-sided event](https://github.com/ch-leon/nrl-sim/issues/711).
-All remain planned work, not shipped behaviour. The first implementation is the
-ready prerequisite [#572 player continuity](https://github.com/ch-leon/nrl-sim/issues/572),
-with a [concrete implementation plan](2026-11-17-player-continuity.md). It is stacked
-on the exact match-income candidate [#695](https://github.com/ch-leon/nrl-sim/pull/695)
-to sequence the shared save/finance files; the upstream PR's review/merge gates
-remain mandatory.
-
-League selection now proceeds under [#574](https://github.com/ch-leon/nrl-sim/issues/574)
-with the [17 November implementation plan](2026-11-17-league-selection.md), following
-merged player continuity [#716](https://github.com/ch-leon/nrl-sim/pull/716). It delivers
-an explicitly selected new-game format and preserves existing careers. Its three
-sequential review stages cover permanent access and legal fields, resumable annual
-close/entry, then the actual player-facing flow. Leon approved retained club capacity on 18 November: easier league entry never
-reduces it. Higher-tier entry may raise the base; preserve existing purchased and
-earned additions, with no new downward-movement protection.
-
-Before dependent implementation, settle AI field allocation for freely chosen
-leagues, calendar phases and durations, lower-league cap commitments, assignment
-recall/transfer rules, event simulation rules and actual reward values. The full
-design's §10 identifies each gate. Use the existing finance/progression owners
-and current contracts; exact numbers are working inputs, not approved balance.
+and [#711 distinct small-sided event](https://github.com/ch-leon/nrl-sim/issues/711)
+remain planned. #579–#581 retain the Shield/youth/Champions content, with ordering
+chosen against those prerequisites. Assignment recall/transfer rules, concurrent
+event phases, event simulation rules and actual reward values must still be
+specified before their dependent behaviour is enabled. Use existing finance and
+progression owners; numerical tuning and the wider design are not claimed complete.
 
 ## Historical specification and delivery context — 10–11 November
 

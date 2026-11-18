@@ -21,14 +21,15 @@ live gameplay change; work still open below has not shipped.
 
 - **Match-art phone play-test** ([release PR and verification](https://github.com/ch-leon/nrl-sim/pull/584)): play a full match in landscape at ×1 and your usual speed; check player recognition, possession and tacklers releasing into play-the-ball. The PR records the deployed build and required review/CI/QA evidence.
 
-- **Career competitions: execution started** ([tracker #323](https://github.com/ch-leon/nrl-sim/issues/323)).
+- **Career competitions: league selection shipped; events remain** ([tracker #323](https://github.com/ch-leon/nrl-sim/issues/323)).
   **Design expanded and approved 16 November:** [career opportunities v0.2](../specs/career-opportunities.md)
   replaces forced player promotion with winning to unlock leagues and choosing
   entry each season. Add seasonal windows, player assignments that can overlap
   club fixtures, watched/coached individual challenges, playful beach/fives events,
   recurring opponents and connected rewards. Gear is later. The
   [updated plan](../plans/2026-11-career-competitions.md) separates the delivery
-  slices and issue-scope reconciliation; these additions are not shipped.
+  slices: league choice and unlocks are shipped; seasonal event windows,
+  assignments, challenges, other formats and their rewards remain later work.
   Earlier structural execution context follows:
   [#569](https://github.com/ch-leon/nrl-sim/issues/569) publishes the
   [technical contract](../specs/career-competitions.md) against current main;
@@ -58,10 +59,13 @@ live gameplay change; work still open below has not shipped.
   [PR #716](https://github.com/ch-leon/nrl-sim/pull/716), with final
   independent-tool/CI/QA gates recorded in its
   [evidence report](../status/2026-11-player-continuity.md).
-  The local League career candidate supports explicit entry, permanent title
-  unlocks and annual choices in AU and UK. Two simulated seasons in each region
-  and the phone browser checks passed. Release still needs final independent
-  review, green PR checks and full QA. [Draft PR #719](https://github.com/ch-leon/nrl-sim/pull/719) · [Candidate evidence](../status/2026-11-league-selection.md)
+  League selection is live in AU and UK: explicit New Game entry, permanent
+  title unlocks and deliberate annual choices, with club cap capacity retained
+  when moving down. [Merged PR #719](https://github.com/ch-leon/nrl-sim/pull/719)
+  passed independent Claude review, all CI/WebKit gates and full QA; the public
+  confirmation/reload flow was verified. [Release evidence](../status/2026-11-league-selection.md)
+  Optional cup registration/rewards, assignments, watched individual challenges,
+  distinct small-sided events and wider career balance remain subsequent work.
   The approved product direction is recorded in
   [PR #709](https://github.com/ch-leon/nrl-sim/pull/709).
 - **Expansive attack still under par** ([issue #322](https://github.com/ch-leon/nrl-sim/issues/322), open).

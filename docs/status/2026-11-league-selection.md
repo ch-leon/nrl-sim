@@ -1,8 +1,10 @@
-# League career candidate and verification
+# League career release and verification
 
-## Local candidate · 18 November 2026
+## Released · 18 November 2026
 
-New Game offers Classic or League career. In a new AU or UK League career the coach confirms Local, plays the saved calendar, and reviews each completed season before choosing any earned league. Winning the league final permanently unlocks the next division. Club salary-cap capacity survives a downward choice. Ordinary match income follows the selected sporting division. Release and deployment are pending. [Issue #574](https://github.com/ch-leon/nrl-sim/issues/574) · [Draft PR #719](https://github.com/ch-leon/nrl-sim/pull/719)
+New Game offers Classic or League career. In a new AU or UK League career the coach confirms Local, plays the saved calendar, and reviews each completed season before choosing any earned league. Winning the league final permanently unlocks the next division. Club salary-cap capacity survives a downward choice. Ordinary match income follows the selected sporting division. [PR #719](https://github.com/ch-leon/nrl-sim/pull/719) merged at `a448210c99f9b42053761236cab3b9fcb1f74e6c` and [issue #574](https://github.com/ch-leon/nrl-sim/issues/574) is complete. [Deployment succeeded](https://github.com/ch-leon/nrl-sim/actions/runs/44255624603). The public game displayed `Build 2026-11-18 a448210`; a fresh League career showed three choices with two locked, confirmed Local, and reloaded the same accepted entry with no browser errors.
+
+[Play the live build](https://ch-leon.github.io/nrl-sim/): start a League career, win a finals title, then choose whether to stay or enter the unlocked league. Existing Classic careers keep their format. Optional cup registration/rewards, assignments, individual challenges, other event formats and gear are not delivered by this release.
 
 The normal save and reload path landed at `b16f43b4`, the saved-calendar screens at `6bdb0976`, and the regional season/browser harness at `c305f7b9`. The automatic review-to-choice browser case landed at `a583cee6`. Independent reviews verified the parked-match import correction at `d7d85cdb` and the venue and attendance corrections at `ece47cd9`. A Week 5 home game showed its $4,000 settled venue receipt. The Week 24 semifinal had 2,250 spectators wanting 2,000 seats. Lineup identified the Week 25 final as neutral and the full-time card showed the club’s $2,000 shared gate.
 
@@ -17,14 +19,17 @@ The production QA harness ran two seasons per region on Normal, seed 573. Each c
 
 Separate four-year fixtures controlled the player's scores in each region. Three finals titles exercised staying in Local, entering Championship, then returning to Local with $450,000 of attained capacity. A subsequent 0–14 season exercised choosing either Local or the previously unlocked Championship. These cases supply annual-choice coverage. Finance and progression tuning remain separate work under [#562](https://github.com/ch-leon/nrl-sim/issues/562) and [#582](https://github.com/ch-leon/nrl-sim/issues/582).
 
-### Checks and release gates
+### Completed checks and release evidence
 
 - `npx vite-node scripts/qa-league-career.ts --seed 573 --seasons 2` produced the regional results above. The harness writes its report and snapshots under `e2e-output/league-career/`.
 - The registered League WebKit section passed 22 cases. Two started at New Game and reloaded a held fixture before skipping to its settled result. Ten tested annual choices from controlled saves. One finished a real final from a controlled pre-final save, opened the automatic review, chose the next league and reloaded the accepted entry. Nine covered all combinations of 844×390, 667×375 and 568×320 with Normal, Large and Larger text. The 568×320 Larger obligations and the automatic review screenshots were visually checked. The WebKit artifact directory is `e2e-output/webkit/league-selection/`.
 - A financial refusal during normal league selection cannot be produced from an admitted, lawful save. Admission validates signed terms and choosing an easier league retains attained capacity. Component tests cover financial refusal and stale previews. The short-screen browser tests exercise an actual title lock, its explanation and confirmation reachability.
-- `npx tsc --noEmit` and `npm run build` passed on the candidate source through `a583cee6`. `npx vitest run` passed 4,869 tests across 366 files in 311 seconds. The four-file presentation correction also passed 122 focused tests. The Classic phone run of `npm run e2e:season` completed 74 steps with zero failures, layout problems or browser errors. The full `npm run e2e:webkit -- --group screens` result is pending.
-- The first complete screens run passed 239 checks and found one setup overlap at 568×320 with Larger text: wrapped mode buttons compressed the town/name scroller. The short-screen form now grows naturally while its details remain bounded and scrollable. The original failing setup check and 52 title/motion tests pass; the complete corrected screens run is in progress.
-- Final Claude issue-level approval, current PR CI (code, every WebKit shard and aggregate), the separate full QA workflow, merge and deployment verification remain pending. The [earlier checkpoint CI run](https://github.com/ch-leon/nrl-sim/actions/runs/44244815513) passed all its checks. Unmarked legacy developer prototypes still require their isolated namespace. Their old awaiting-next-season state has no continuation through normal League entry.
+- `npx tsc --noEmit` and `npm run build` passed on the candidate source through `a583cee6`. `npx vitest run` passed 4,869 tests across 366 files in 311 seconds before the final `673e2419` CSS-only correction; full CI unit checks subsequently passed on exact `673e2419`. The four-file presentation correction also passed 122 focused tests. The Classic phone run of `npm run e2e:season` completed 74 steps with zero failures, layout problems or browser errors. The corrected full `npm run e2e:webkit -- --group screens` run passed all 240 checks across 17 sections, including the 22 League cases.
+- The first complete screens run passed 239 checks and found one setup overlap at 568×320 with Larger text: wrapped mode buttons compressed the town/name scroller. The short-screen form now grows naturally while its details remain bounded and scrollable. The fix at `673e2419` passed the original full 10-step flow and 52 title/motion tests; the complete corrected screens run passed locally and in CI. Independent WebKit checks covered three landscape sizes at normal and Larger text with working inputs, mode buttons and Start, and no horizontal overflow.
+- [Independent Claude issue-level review](https://github.com/ch-leon/nrl-sim/pull/719#issuecomment-6970835927) approved exact head `673e2419aaa95cc44adcada6c9a41cb9b1b952e9` with no blocking findings. It inspected the complete production activation diff and supporting validation/entry code, using the earlier scoped approvals for foundation work; it did not execute tests or re-review every unchanged checkpoint file.
+- [Final CI](https://github.com/ch-leon/nrl-sim/actions/runs/44249628663) passed all code checks, each WebKit shard and both aggregates on that head. The first screens attempt reached its 30-minute limit after 21m52s fetching dependencies, with no failed test assertions. The unchanged retry passed all 240 checks. [Screenshots and reports](https://github.com/ch-leon/nrl-sim/actions/runs/44249628663/artifacts/14406370153) are CI artifacts, not committed images.
+- [Full QA](https://github.com/ch-leon/nrl-sim/actions/runs/44249683785) passed career-agency, soak, phone/desktop playthroughs and performance on the reviewed head. [The Android test APK](https://github.com/ch-leon/nrl-sim/actions/runs/44249628767) also built successfully.
+- Unmarked legacy developer prototypes still require their isolated namespace. Their old awaiting-next-season state has no continuation through normal League entry. Wider balance acceptance remains separate; the measured runs above are continuity and lifecycle evidence.
 
 ## Historical entry checkpoint
 
@@ -66,7 +71,7 @@ code checks and three WebKit shards. The screens shard and its one retry both
 exhausted the 30-minute job limit after approximately 25–26 minutes installing
 system dependencies; recorded screen assertions passed until cancellation. Its
 aggregate is therefore not green. No workflow timeout or test threshold changed.
-Final candidate CI and full QA are still required.
+Final candidate CI and full QA were still required at that checkpoint.
 
 ## Completed checkpoints
 
@@ -162,7 +167,7 @@ probes), production build passed, and Claude **RECOVERY AND LEAGUE VIEW REVIEW:
 APPROVE** passed on exact `34c62e7b`. The review is recorded in `/private/tmp/nrl-574-recovery-ui-review-34c62e7b.md`.
 At the earlier `33e0d869` checkpoint the first full run passed 4,834 of 4,835
 tests. A rerun with native file-event access passed all 4,835 across 363 files.
-Normal production admission and regional proof followed in the candidate above.
+Normal production admission and regional proof followed in the release above.
 
 ## Admission and persistence notes
 
