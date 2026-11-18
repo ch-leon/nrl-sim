@@ -10,7 +10,7 @@ import {
   openSeasonReview, MOVERS_SHOWN, potmSummary, snapshotBeforeRollover,
 } from '../../../src/ui/screens/seasonReview';
 import { initSeasonEndFeedback } from '../../../src/ui/screens/history';
-import { createNewGame, getState, setState, type GameState } from '../../../src/core/state';
+import { createNewGame, getState, loadState, setState, type GameState } from '../../../src/core/state';
 import { bus } from '../../../src/core/events';
 import { advanceWeeks, clearSeasonHooks, clearTickHooks } from '../../../src/core/time';
 import { registerAllSystems } from '../../../src/qa/soak';
@@ -213,4 +213,55 @@ it('shows the first-season line for season 1 only, even after rollover', () => {
     const second = openSeasonReview({ season: 2, ladderPosition: 10, premiership: false }) as unknown as StubNode;
     expect(second.words()).not.toContain(EXPANSION_COPY.review);
   } finally { vi.unstubAllGlobals(); }
+});
+
+it('routes only the exact live League close to next-league choice, rechecking on click', () => {
+  stubDocument();
+  const s = createNewGame('Review choice', 574);
+  const entry = { season: 1, ladderPosition: 1, premiership: false, league: {
+    closeId: 'close:1', leagueId: 'local', instanceId: 'local:1', startInterval: 0, endingInterval: 25,
+    slotCount: 25, fieldSize: 8, regularRounds: 14, finalsSize: 4,
+  } };
+  s.competitions = { schemaVersion: 1, instances: [], leagueCareer: {
+    version: 1, scheduleSeed: 574, initialFields: {}, clubId: s.clubId, access: [], phase: 'next-season-choice',
+    close: { id: 'close:1', season: 1, startInterval: 0, endingInterval: 25, leagues: [] },
+  } };
+  s.history = [entry]; setState(s);
+  const choose = vi.fn(() => document.createElement('div'));
+  try {
+    const off = initSeasonEndFeedback({ onChooseLeague: choose });
+    bus.emit('season:ended', { season: 1, ladderPosition: 1, premiership: false });
+    const action = (document.body as unknown as StubNode).querySelector('[data-review-choose-league]');
+    expect(action).not.toBeNull(); action!.click(); expect(choose).toHaveBeenCalledTimes(1);
+    const review = openSeasonReview(entry, { onChooseLeague: choose }) as unknown as StubNode;
+    const replacedAction = review.querySelector('[data-review-choose-league]')!;
+    loadState(structuredClone(s));
+    replacedAction.click(); expect(choose).toHaveBeenCalledTimes(1);
+    const freshReview = openSeasonReview(entry, { onChooseLeague: choose }) as unknown as StubNode;
+    const oldAction = freshReview.querySelector('[data-review-choose-league]')!;
+    s.competitions.leagueCareer!.close!.id = 'another-close'; setState(s);
+    oldAction.click(); expect(choose).toHaveBeenCalledTimes(1);
+    expect((openSeasonReview(entry, { onChooseLeague: choose }) as unknown as StubNode).querySelector('[data-review-choose-league]')).toBeNull();
+    s.competitions.leagueCareer!.close!.id = 'close:1'; setState(s);
+    expect((openSeasonReview(entry, { back: vi.fn(), onChooseLeague: choose }) as unknown as StubNode).querySelector('[data-review-choose-league]')).toBeNull();
+    s.sacked = { season: 1, reason: 'Board' }; setState(s);
+    expect((openSeasonReview(entry, { onChooseLeague: choose }) as unknown as StubNode).querySelector('[data-review-choose-league]')).toBeNull();
+    off();
+  } finally { vi.unstubAllGlobals(); }
+});
+
+import * as reviewPrompt from '../../../src/ui/updatePrompt';
+import { closeScreen } from '../../../src/ui/dom';
+it('never opens a queued old review after a same-seed installation replacement', () => {
+  stubDocument(); closeScreen(); bus.clear();
+  createNewGame('Same seed', 574);
+  const s = getState(); s.history = [{ season: 1, ladderPosition: 1, premiership: false }];
+  let show: (() => void) | undefined;
+  const wait = vi.spyOn(reviewPrompt, 'whenNoMatch').mockImplementation(callback => { show = callback; return 'deferred'; });
+  const off = initSeasonEndFeedback({ onChooseLeague: () => document.createElement('div') });
+  try {
+    bus.emit('season:ended', { season: 1, ladderPosition: 1, premiership: false });
+    expect(show).toBeDefined(); loadState(structuredClone(s)); show!();
+    expect((document.body as unknown as StubNode).querySelector('[data-season-review]')).toBeNull();
+  } finally { off(); wait.mockRestore(); vi.unstubAllGlobals(); }
 });

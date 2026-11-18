@@ -1,3 +1,4 @@
+import { careerActionClock } from '../core/season';
 // src/systems/contracts.ts — contract warnings, early renewal and selling (GitHub #40).
 // Pure TypeScript, no Phaser. Warnings are derived from the weekly decrement in
 // economy.tickContracts (a contract passes each threshold exactly once), so no
@@ -6,7 +7,7 @@
 import { getState, setState, type GameState, type Player } from '../core/state';
 import { bus } from '../core/events';
 import { earnMoney } from '../data/club';
-import { activeSalary, commitment, publishedCap, renewalAsk, renewedAgreement } from './cap';
+import { activeSalary, commitment, publishedCap, renewalAsk, renewedAgreement, contractActionView, normaliseContractForAction, reconcileProtection } from './cap';
 import { marketWage, overallRating } from '../data/player';
 import { BOARD, CONTRACTS, MORALE, difficultyMultipliers } from '../config';
 import { fmtMoney } from '../utils/money';
@@ -116,20 +117,22 @@ export function renewsOnLoan(_state: GameState, _p: Player): boolean {
  * season's cap can hold the new salary.
  */
 export function renewalRefusal(state: GameState, p: Player): { reason: string; message: string } | null {
+  p = contractActionView(state, p);
+  const clock = careerActionClock(state);
   if (p.deal?.renewal) {
     return {
       reason: 'already-renewed',
       message: `A renewal is already queued from season ${p.deal.renewal.startSeason}. Nothing was charged.`,
     };
   }
-  if (p.deal && state.season < p.deal.endSeason) {
+  if (p.deal && clock.season < p.deal.endSeason) {
     return {
       reason: 'not-final-season',
       message: `A renewal can be queued in season ${p.deal.endSeason}, the last season of his deal.`,
     };
   }
   const ask = renewalAsk(p, hasStaff(state, 'welfare'));
-  const start = p.deal && p.deal.endSeason >= state.season ? p.deal.endSeason + 1 : state.season;
+  const start = p.deal && p.deal.endSeason >= clock.season ? p.deal.endSeason + 1 : clock.season;
   const used = commitment(state.squad, start) - activeSalary(p, start);
   const cap = publishedCap(state.capAccount);
   if (used + ask.salary > cap) {
@@ -154,12 +157,13 @@ export function renewEarly(state: GameState, playerId: string): SignResult {
   const blocked = renewalRefusal(state, p);
   if (blocked) return { ok: false, reason: blocked.reason, message: blocked.message };
   const ask = renewalAsk(p, hasStaff(state, 'welfare'));
-  const deal = renewedAgreement(p.deal, state.season, ask.salary);
+  const view = contractActionView(state, p);
+  const deal = renewedAgreement(view.deal, careerActionClock(state).season, ask.salary);
   const start = deal.renewal?.startSeason ?? deal.startSeason;
   const changed = p.deal !== undefined && ask.salary !== p.deal.salary;
-  setState({
-    squad: state.squad.map((x) => x.id === playerId ? { ...x, deal } : x),
-  });
+  const clock = careerActionClock(state);
+  const squad = state.squad.map((x) => x.id === playerId ? normaliseContractForAction({ ...view, deal }, clock) : x);
+  setState({ squad, ...(clock.structural ? { capAccount: reconcileProtection(squad, state.capAccount, clock.season) } : {}) });
   const text = `Renewal queued for ${p.name} from season ${start} at ${fmtMoney(ask.salary)} a season. No fee.${changed ? ` ${ask.why}.` : ''}`;
   bus.emit('ui:notify', { text, kind: 'success' });
   return { ok: true };
@@ -174,7 +178,7 @@ export function sellPlayer(state: GameState, playerId: string, offer?: SaleOffer
 
 /** Squad contracts sorted by weeks remaining (soonest first), then name. */
 export function contractRows(state: GameState): Player[] {
-  return state.squad.slice().sort((a, b) => a.contractWeeks - b.contractWeeks || a.name.localeCompare(b.name));
+  return state.squad.map(p => contractActionView(state, p)).sort((a, b) => a.contractWeeks - b.contractWeeks || a.name.localeCompare(b.name));
 }
 
 /**
@@ -185,8 +189,10 @@ export function contractRows(state: GameState): Player[] {
 export const CONTRACT_DOT_WEEKS = 4;
 
 /** Squad players whose contracts end within `weeks` (juniors and departed players aside), soonest first. Pure. */
-export function contractsEndingSoon(state: Pick<GameState, 'squad'>, weeks = CONTRACT_DOT_WEEKS): Player[] {
-  return state.squad
+export function contractsEndingSoon(state: Pick<GameState, 'squad'> & Partial<Pick<GameState, 'season' | 'week' | 'competitions'>>, weeks = CONTRACT_DOT_WEEKS): Player[] {
+  const clock = state.season !== undefined && state.week !== undefined
+    ? careerActionClock({ season: state.season, week: state.week, ...(state.competitions ? { competitions: state.competitions } : {}) }) : undefined;
+  return state.squad.map(p => clock ? normaliseContractForAction(p, clock) : p)
     .filter((p) => !p.departed && !p.junior && !p.deal?.renewal && p.contractWeeks <= weeks)
     .sort((a, b) => a.contractWeeks - b.contractWeeks || a.name.localeCompare(b.name));
 }

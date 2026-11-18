@@ -13,7 +13,7 @@
 import { EXPANSION_COPY } from '../expansionCopy';
 import { bus } from '../../core/events';
 import {
-  getState, type GameState, type SeasonRecord, type SeasonReview,
+  getState, stateInstallation, type GameState, type SeasonRecord, type SeasonReview,
 } from '../../core/state';
 import { registerSeasonReview } from '../../systems/stats';
 import { BOARD, FINALS_WEEKS, SEASON_ROUNDS } from '../../config';
@@ -52,7 +52,7 @@ export function fmtMovers(movers: NonNullable<SeasonReview['movers']>): string {
  * (no document) the season still ends in the toast it always did. Returns the
  * listener's unsubscribe.
  */
-export function initSeasonReview(): () => void {
+export function initSeasonReview(opts: { onChooseLeague?: () => HTMLElement } = {}): () => void {
   registerSeasonReview();
   return bus.on('season:ended', ({ season, ladderPosition, premiership }) => {
     // The event carries enough for the toast on its own (a listener must not throw).
@@ -65,7 +65,8 @@ export function initSeasonReview(): () => void {
     }
     // The sacked screen is up and says its piece; the review waits in History.
     if (state?.sacked?.season === season) return;
-    whenNoMatch(() => { openSeasonReview(entry); });
+    const installation = stateInstallation();
+    whenNoMatch(() => { if (stateInstallation() === installation && !getState().sacked) openSeasonReview(entry, opts); });
   });
 }
 
@@ -87,7 +88,7 @@ export function moneyLineBad(closing: number | undefined): boolean {
  * row: "◂ HISTORY" and the title when opened from History (`back`); at the
  * rollover, the title with HISTORY and the one primary, CARRY ON, which closes it.
  */
-export function openSeasonReview(entry: SeasonRecord, opts: { back?: () => void } = {}): HTMLElement {
+export function openSeasonReview(entry: SeasonRecord, opts: { back?: () => void; onChooseLeague?: () => HTMLElement } = {}): HTMLElement {
   ensureHistoryStyles();
   const r = entry.review ?? {};
   const body = el('div', { class: 'nrl-review-body' });
@@ -97,9 +98,22 @@ export function openSeasonReview(entry: SeasonRecord, opts: { back?: () => void 
   const toHistory = (): void => { closeScreen(); (opts.back ?? openHistoryScreen)(); };
   const history = opts.back ? backButton('History', toHistory) : button('History', toHistory);
   history.classList.add('nrl-review-history');
+  const installation = stateInstallation();
+  const canChoose = (): boolean => {
+    const state = getState();
+    const progress = state.competitions?.leagueCareer;
+    return stateInstallation() === installation && !!opts.onChooseLeague && !opts.back && !state.sacked && !!entry.league
+      && progress?.phase === 'next-season-choice' && state.season === entry.season
+      && progress.close?.season === entry.season && progress.close.id === entry.league.closeId;
+  };
+  const done = canChoose() ? button('Choose next league ▸', () => {
+    if (!canChoose()) return;
+    closeScreen(); opts.onChooseLeague!();
+  }, { class: 'nrl-btn-primary nrl-review-done' }) : button('Carry on ▸', () => closeScreen(), { class: 'nrl-btn-primary nrl-review-done' });
+  if (canChoose()) done.setAttribute('data-review-choose-league', '');
   const head = opts.back
     ? screenHead(`Season ${entry.season} review`, { lead: [history] })
-    : screenHead(`Season ${entry.season} review`, { controls: [history, button('Carry on ▸', () => closeScreen(), { class: 'nrl-btn-primary nrl-review-done' })] });
+    : screenHead(`Season ${entry.season} review`, { controls: [history, done] });
   head.classList.add('nrl-review-head');
 
   body.append(el('div', { class: `nrl-review-finish${entry.premiership ? ' nrl-review-premiers' : ''}`, text: fmtSeasonSummary(entry).replace(/^Season \d+ — /, '') }));
@@ -108,7 +122,21 @@ export function openSeasonReview(entry: SeasonRecord, opts: { back?: () => void 
   const season = el('div', { class: 'nrl-review-col' });
   const club = el('div', { class: 'nrl-review-col' });
   const record = fmtRecord(entry);
-  if (record) season.append(line('Record', `${record} (${SEASON_ROUNDS} rounds${entry.ladderPosition > 0 && entry.ladderPosition <= 8 ? `, finals over ${FINALS_WEEKS} weeks` : ''})`));
+  if (record) season.append(line('Record', entry.league ? `${record} (${entry.league.regularRounds} regular rounds · ${entry.league.fieldSize} clubs · ${entry.league.finalsSize ? `Top ${entry.league.finalsSize} finals` : 'no finals'} · ${entry.league.slotCount} weeks)` : `${record} (${SEASON_ROUNDS} rounds${entry.ladderPosition > 0 && entry.ladderPosition <= 8 ? `, finals over ${FINALS_WEEKS} weeks` : ''})`));
+  if (entry.league) {
+    if (entry.league.final) {
+      const final = entry.league.final;
+      const name = (id: string): string => getState().league.clubs.find(c => c.id === id)?.name ?? id;
+      season.append(line('Final', `${name(final.homeId)} ${final.result.homeScore}–${final.result.awayScore} ${name(final.awayId)} · ${name(final.result.winnerId!)} won by ${final.result.decider.replace(/-/g, ' ')}`));
+    }
+    if (entry.league.minorPremierId === 'player') season.append(line('Honours', 'Minor premiers'));
+    const access = getState().competitions?.leagueCareer?.access.filter(a => a.earnedFrom?.season === entry.season && a.earnedFrom.instanceId === entry.league!.instanceId) ?? [];
+    for (const a of access) {
+      const name = getState().competitions?.world?.divisions.find(d => d.id === a.leagueId)?.name ?? a.leagueId;
+      season.append(line('Permanent access', `${name} unlocked by the finals title. Choose whether to stay or enter an earned league.`));
+    }
+    season.append(line('Rewards', 'No extra title cash, board grant or salary-cap prize. Ordinary played-match income is recorded in the books.'));
+  }
   if (entry.topScorer) season.append(line('Top try-scorer', `${entry.topScorer.name} (${entry.topScorer.tries})`));
   if (r.potm) season.append(line('Player of the match', fmtPotmTotal(r.potm)));
   if (r.board) {

@@ -12,6 +12,12 @@ export function currentRound(s: Pick<GameState, 'week' | 'preseason'>): number {
 }
 
 export function seasonWeekLabel(s: Pick<GameState, 'week' | 'season' | 'preseason'> & Partial<Pick<GameState, 'competitions'>>): string {
+  if (s.competitions?.leagueCareer && s.competitions.calendar) {
+    const phase = s.competitions.leagueCareer.phase;
+    if (phase === 'initial-choice') return `Choose your league · Season ${s.season}`;
+    if (phase === 'next-season-choice') return `Choose next league · Season ${s.season} complete`;
+    return `Week ${s.week} of ${s.competitions.calendar.slots.length} · Season ${s.season}`;
+  }
   if (s.competitions?.calendar) return `Prototype slot ${s.week} of ${s.competitions.calendar.slots.length} · Season ${s.season}`;
   return inTrials(s) ? `Trial ${s.preseason} of 2 · Season ${s.season}` : `Week ${s.week} of ${WEEKS_PER_SEASON} · Season ${s.season}`;
 }
@@ -20,3 +26,22 @@ export function seasonWeekLabel(s: Pick<GameState, 'week' | 'season' | 'preseaso
 export function elapsedInterval(s: Pick<GameState, 'season' | 'week'> & Partial<Pick<GameState, 'competitions'>>): number {
   return s.competitions?.calendar ? s.competitions.calendar.elapsedIntervals + 1 : (s.season - 1) * WEEKS_PER_SEASON + s.week;
 }
+
+/** Read-only management date. Pending League choices retain the completed raw
+ * cursor while every new promise belongs to the following authored year.
+ * Requires trusted state with validated progression, calendar and raw season
+ * aligned. Acceptance must switch the candidate to its target active phase
+ * before deriving its clock after incrementing the raw season. */
+export function careerActionClock(s: Pick<GameState, 'season' | 'week'> & Partial<Pick<GameState, 'competitions'>>) {
+  const progress = s.competitions?.leagueCareer;
+  const calendar = progress && s.competitions?.calendar;
+  const planning = !!calendar && progress.phase === 'next-season-choice';
+  const duration = calendar ? calendar.slots.length : WEEKS_PER_SEASON;
+  const season = s.season + (planning ? 1 : 0);
+  const week = planning ? 1 : s.week;
+  return { season, week, duration, remaining: Math.max(1, duration - Math.max(1, Math.trunc(week)) + 1),
+    phase: progress?.phase ?? 'legacy', structural: !!calendar,
+    // Acceptance may keep the effective date but invalidates pending offers/undo.
+    key: `${s.season}:${s.week}:${progress?.phase ?? 'legacy'}:${progress?.accepted?.receiptId ?? ''}` };
+}
+export type CareerActionClock = ReturnType<typeof careerActionClock>;

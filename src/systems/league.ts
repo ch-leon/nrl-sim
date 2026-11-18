@@ -7,6 +7,7 @@
 import type { Fixture, GameState, Player, Position, RivalClub, WeatherKind } from '../core/state';
 import { overallRating } from '../data/player';
 import { ON_FIELD, SEASON_ROUNDS } from '../config';
+import { leagueSeasonView, leagueClubResults, nextSeasonFixture, type LeagueReadState } from './leagueSeasonView';
 
 // ── Rival strength band ──────────────────────────────────────────────────────
 
@@ -104,6 +105,8 @@ export type FormResult = 'W' | 'D' | 'L';
 /** One of a club's played fixtures, from that club's side. */
 export interface ClubResult {
   round: number;
+  label?: string;
+  decider?: string;
   opponentId: string;
   home: boolean;
   pointsFor: number;
@@ -183,7 +186,11 @@ export interface PreviewPlayer {
 
 export interface NextMatchPreview {
   round: number;
-  stage: MatchStage;
+  stage: string;
+  /** Saved calendar date and stage label for League careers. */
+  slot?: number;
+  label?: string;
+  neutral?: boolean;
   /** The player's club is at home. */
   home: boolean;
   opponent: PreviewSide;
@@ -202,11 +209,12 @@ export interface NextMatchPreview {
  * when it is this match's.
  */
 export function nextMatchPreview(
-  state: Pick<GameState, 'league' | 'week' | 'squad'>,
+  state: Pick<GameState, 'league' | 'week' | 'squad'> & Partial<Pick<GameState, 'clubId' | 'season' | 'competitions'>>,
   opts: { clubId?: string; weather?: WeatherKind } = {},
 ): NextMatchPreview | null {
-  const clubId = opts.clubId ?? 'player';
-  const f = nextFixture(state.league.fixtures, state.week, clubId);
+  const clubId = opts.clubId ?? state.clubId ?? 'player';
+  const view = leagueSeasonView(state);
+  const f = nextSeasonFixture(state, clubId);
   if (!f) return null;
   const home = f.homeId === clubId;
   const oppId = home ? f.awayId : f.homeId;
@@ -214,25 +222,37 @@ export function nextMatchPreview(
   const me = state.league.clubs.find((c) => c.id === clubId);
   if (!opp || !me) return null;
   const pos = (id: string): number => {
-    const i = state.league.ladder.findIndex((r) => r.clubId === id);
+    const i = (view?.ladder ?? state.league.ladder).findIndex((r) => r.clubId === id);
     return i < 0 ? 0 : i + 1;
   };
   const side = (c: typeof opp, strength: number): PreviewSide => ({
-    id: c.id, name: c.name, colors: c.colors, strength, ladderPos: pos(c.id), form: formGuide(state.league.fixtures, c.id),
+    id: c.id, name: c.name, colors: c.colors, strength, ladderPos: pos(c.id), form: seasonFormGuide(state, c.id),
   });
   const bestThree = (opp.squad ?? [])
     .filter((p) => p.injuredWeeks === 0)
     .map((p) => ({ id: p.id, name: p.name, position: p.position, overall: overallRating(p) }))
     .sort((a, b) => b.overall - a.overall || a.name.localeCompare(b.name))
     .slice(0, 3);
+  const dated = view?.fixtures.find(row => row.fixture.id === f.id);
   return {
     round: f.round,
-    stage: matchStage(f.round),
+    stage: dated?.stageLabel ?? matchStage(f.round),
+    ...(dated ? { ...(dated.slot === null ? {} : { slot: dated.slot }), label: `${dated.dateLabel} · ${dated.stageLabel}`, neutral: dated.fixture.neutral } : {}),
     home,
     opponent: side(opp, opp.strength),
     you: side(me, bestNineMean(state.squad)),
     bestThree,
-    headToHead: clubResults(state.league.fixtures, clubId).filter((r) => r.opponentId === oppId),
+    headToHead: seasonClubResults(state, clubId).filter((r) => r.opponentId === oppId),
     ...(opts.weather ? { weather: opts.weather } : {}),
   };
+}
+
+/** Read actual saved League results; legacy callers retain their original form. */
+export function seasonClubResults(state: LeagueReadState, clubId: string): ClubResult[] {
+  const view = leagueSeasonView(state);
+  return view ? leagueClubResults(view, clubId) : clubResults(state.league.fixtures, clubId);
+}
+
+export function seasonFormGuide(state: LeagueReadState, clubId: string, n = FORM_LENGTH): FormResult[] {
+  return seasonClubResults(state, clubId).slice(-n).map(r => r.result);
 }

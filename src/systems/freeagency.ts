@@ -1,3 +1,4 @@
+import { careerActionClock } from '../core/season';
 import { bookPlayerMovement, closeClubSpell, installPlayerHistory, openClubSpell, reconcileShortlist, refreshMarketShortlist } from './playerCareer';
 // Free-agent discovery + signing/release logic. Refreshes never generate people
 // or advance the match RNG; annual intake is a separate lifecycle operation.
@@ -136,14 +137,15 @@ export function signingFeeBasis(state: Pick<GameState, 'facilities'>, agent: Pla
  */
 export function signPlayer(state: GameState, playerId: string, opts: { toast?: boolean; intoLineup?: boolean } = {}): SignResult {
   const s = state;
+  const clock = careerActionClock(s);
   const agent = s.freeAgents.find((p) => p.id === playerId);
   if (!agent) return { ok: false, reason: 'not-found', message: 'That player is no longer available.' };
   if (s.squad.length >= SQUAD_CAP) return { ok: false, reason: 'squad-full', message: 'The squad is full.' };
 
   const fee = signingFee(s, agent);
   const salary = salaryDemand(agent);
-  if (!capRoomFor(s.squad, s.capAccount, s.season, salary)) {
-    const room = Math.max(0, publishedCap(s.capAccount) - commitment(s.squad, s.season));
+  if (!capRoomFor(s.squad, s.capAccount, clock.season, salary)) {
+    const room = Math.max(0, publishedCap(s.capAccount) - commitment(s.squad, clock.season));
     return {
       ok: false,
       reason: 'over-cap',
@@ -155,14 +157,14 @@ export function signPlayer(state: GameState, playerId: string, opts: { toast?: b
   }
 
   const { junior: _junior, departed: _departed, ...rest } = agent;
-  const signed = openClubSpell(signForRestOfSeason({ ...installPlayerHistory(rest, 'unsigned', s), joinedSeason: s.season }, s.season, s.week), s.clubId, s, 'signing', fee);
+  const signed = openClubSpell(signForRestOfSeason({ ...installPlayerHistory(rest, 'unsigned', clock), joinedSeason: clock.season }, clock.season, clock.week, clock.duration), s.clubId, clock, 'signing', fee);
   const squad = [...s.squad, signed];
   const placed = opts.intoLineup ? placeSigning(s.lineup, squad, signed) : undefined;
   const next = reconcileShortlist(bookPlayerMovement({ ...s, freeAgents: s.freeAgents.filter(p => p.id !== playerId), squad,
-    ...(placed ? { lineup: placed.lineup } : {}) }, -fee, 'transfers'));
+    ...(placed ? { lineup: placed.lineup } : {}) }, -fee, 'transfers', clock));
   setState({ freeAgents: next.freeAgents, squad, money: next.money, finance: next.finance, playerPopulation: next.playerPopulation,
     ...(placed ? { lineup: placed.lineup } : {}) });
-  bus.emit('money:changed', { delta: -fee, reason: `sign:${playerId}`, balance: next.money, booked: true, stamp: { season: s.season, week: s.week } });
+  bus.emit('money:changed', { delta: -fee, reason: `sign:${playerId}`, balance: next.money, booked: true, stamp: { season: clock.season, week: clock.week } });
 
   bus.emit('player:signed', signed);
   if (opts.toast !== false) bus.emit('ui:notify', { text: `Signed ${signed.name}`, kind: 'success' });
@@ -182,14 +184,15 @@ export function signPlayer(state: GameState, playerId: string, opts: { toast?: b
  */
 export function releasePlayer(state: GameState, playerId: string): SignResult {
   const s = state;
+  const clock = careerActionClock(s);
   const player = s.squad.find((p) => p.id === playerId);
   if (!player) return { ok: false, reason: 'not-found', message: 'Player not found.' };
   if (s.squad.length <= SQUAD_MIN) {
     return { ok: false, reason: 'squad-min', message: `The squad cannot drop below ${SQUAD_MIN}.` };
   }
 
-  if (player.emergencyDealEndSeason !== undefined && player.emergencyDealEndSeason >= s.season) return { ok: false, reason: 'scholarship', message: 'This emergency scholarship must finish before he can be released.' };
-  const terms = releaseTerms(player, s.season, s.week);
+  if (player.emergencyDealEndSeason !== undefined && player.emergencyDealEndSeason >= clock.season) return { ok: false, reason: 'scholarship', message: 'This emergency scholarship must finish before he can be released.' };
+  const terms = releaseTerms(player, clock.season, clock.week, clock.duration);
   if (s.money < terms.payout) {
     return {
       ok: false,
@@ -197,16 +200,19 @@ export function releasePlayer(state: GameState, playerId: string): SignResult {
       message: `Not enough cash. Releasing him costs ${fmtMoney(terms.payout)}.`,
     };
   }
-  const { deal: _deal, junior: _junior, ...withoutDeal } = closeClubSpell(installPlayerHistory(player, s.clubId, s), s, 'release');
-  const released: Player = { ...withoutDeal, contractWeeks: 0, departed: true };
+  const expired = clock.structural && player.deal && player.deal.endSeason < clock.season
+    && (!player.deal.renewal || player.deal.renewal.endSeason < clock.season);
+  const { deal: _deal, junior: _junior, ...withoutDeal } = closeClubSpell(installPlayerHistory(player, s.clubId, clock), clock, expired ? 'expiry' : 'release');
+  const { emergencyDealEndSeason: _emergencyEnd, emergencyForPlayerId: _emergencySource, ...ordinary } = withoutDeal;
+  const released: Player = { ...(clock.structural ? ordinary : withoutDeal), contractWeeks: 0, departed: true };
   const squad = s.squad.filter(p => p.id !== playerId);
-  const next = bookPlayerMovement({ ...s, squad, freeAgents: [...s.freeAgents, released], capAccount: reconcileProtection(squad, s.capAccount, s.season) }, -terms.payout, 'contracts');
+  const next = bookPlayerMovement({ ...s, squad, freeAgents: [...s.freeAgents, released], capAccount: reconcileProtection(squad, s.capAccount, clock.season) }, -terms.payout, 'contracts', clock);
   setState({ squad, freeAgents: next.freeAgents, money: next.money, finance: next.finance, capAccount: next.capAccount });
-  if (terms.payout) bus.emit('money:changed', { delta: -terms.payout, reason: `release:${playerId}`, balance: next.money, booked: true, stamp: { season: s.season, week: s.week } });
+  if (terms.payout) bus.emit('money:changed', { delta: -terms.payout, reason: `release:${playerId}`, balance: next.money, booked: true, stamp: { season: clock.season, week: clock.week } });
   const freed = terms.nextCapFreed > 0
     ? `, freeing ${fmtMoney(terms.capFreed)} of this season's cap and ${fmtMoney(terms.nextCapFreed)} next season`
     : `, freeing ${fmtMoney(terms.capFreed)} of this season's cap`;
-  bus.emit('ui:notify', { text: `Released ${released.name} for ${fmtMoney(terms.payout)}${freed}`, kind: 'info' });
+  bus.emit('ui:notify', { text: expired ? `${released.name}'s contract expired. No payout.` : `Released ${released.name} for ${fmtMoney(terms.payout)}${freed}`, kind: 'info' });
   return { ok: true };
 }
 

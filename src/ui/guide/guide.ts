@@ -10,7 +10,7 @@ import { buildLabel } from '../buildInfo';
 import { button, closeScreen, el, openModal, revealSeg, watchSeg } from '../dom';
 import { startTutorial } from '../tutorial';
 import { reloadForUpdate, updateReady } from '../../fx/pwa';
-import { CLUB_PAGES, type GuideFigure, type GuidePage, type GuideScreen, type GuideSection } from './pages';
+import { CLUB_PAGES, guidePageForCareer, type GuideFigure, type GuidePage, type GuideScreen, type GuideSection } from './pages';
 import { openFinanceScreen } from '../screens/finance';
 import { openSquadScreen } from '../screens/squad';
 import { openLineupScreen } from '../screens/lineup';
@@ -27,7 +27,7 @@ export const GUIDE_PAGES: readonly GuidePage[] = [...CLUB_PAGES, NINES_PAGE];
 
 /** The page by id, or the first. */
 export function guidePage(id: string | undefined): GuidePage {
-  return GUIDE_PAGES.find((p) => p.id === id) ?? GUIDE_PAGES[0]!;
+  return guidePageForCareer(GUIDE_PAGES.find((p) => p.id === id) ?? GUIDE_PAGES[0]!);
 }
 
 /** Each linked screen: the button's label and how to open it (N14, #263). */

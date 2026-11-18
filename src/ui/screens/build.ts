@@ -31,6 +31,7 @@ import { ECON, PROGRESSION } from '../../config';
 import { fmtMoney, fmtMoneyShort } from '../../utils/money';
 import { bus } from '../../core/events';
 import { sponsorReturn } from '../../systems/economy';
+import { matchIncomeTier } from '../../systems/matchIncome';
 import { demolishWithUndo } from '../../systems/undo';
 import { POOL_POINTS_PER_BIAS, SCOUT_BIAS_PER_LEVEL, SCOUT_FEE_DISCOUNT_PER_LEVEL } from '../../systems/freeagency';
 import { REP_BASELINE } from '../../systems/league';
@@ -154,7 +155,7 @@ export function openBuildScreen(scene: GroundsSceneLike | null = activeGroundsSc
             el('span', { class: 'nrl-build-title', text: def.name }),
             // A unique facility already built has no price to pay (3c: "—").
             el('span', { class: 'nrl-build-cost nrl-num', text: built ? '—' : fmtMoney(def.cost) })),
-          el('div', { class: 'nrl-build-blurb', text: facilityBlurb(def, { level: 1, reputation, officeLevel, tier: s.capAccount.tier }) }),
+          el('div', { class: 'nrl-build-blurb', text: facilityBlurb(def, { level: 1, reputation, officeLevel, tier: matchIncomeTier(s) }) }),
           // Can't build: the meta line turns yellow and says why first.
           blocked
             ? el('div', { class: 'nrl-build-meta nrl-build-why', text: built || !isFacilityOpen(s, def.id) ? blocked : `${blocked} · ${meta}` })
@@ -250,7 +251,7 @@ function renderFacilityBody(facility: PlacedFacility, def: FacilityDef): HTMLEle
     el('div', { class: 'nrl-facility-head' }, el('h2', { class: 'nrl-facility-name', text: def.name }), x),
     levelPips(facility.level),
     el('div', { class: 'nrl-facility-info' },
-      el('p', { class: 'nrl-facility-blurb', text: facilityBlurb(def, { level: facility.level, tier: getState().capAccount.tier, reputation: getState().reputation, officeLevel: coachsOfficeLevel(getState()) }) }),
+      el('p', { class: 'nrl-facility-blurb', text: facilityBlurb(def, { level: facility.level, tier: matchIncomeTier(getState()), reputation: getState().reputation, officeLevel: coachsOfficeLevel(getState()) }) }),
       el('div', { class: 'nrl-facility-upkeep', text: upkeepText }),
       ...(def.id === 'coachsOffice' ? [seeCallsButton()] : [])),
   );

@@ -7,7 +7,7 @@ import { initialPlayerPopulation, installPlayerHistory } from '../systems/player
 import type { TeamTactics } from '../match/league/presets';
 import type { CompetitionCareerState } from '../data/competition';
 import { bus } from './events';
-import { packForCountry, selectPack } from '../content';
+import { activePack, packForCountry, selectPack } from '../content';
 import { makeRng } from '../utils/rng';
 import { generateFreeAgent, generatePlayer, generatePlayerAround, POSITIONS } from '../data/player';
 import type { FacilityDefId } from '../data/facility';
@@ -125,9 +125,9 @@ export interface LeagueState {
 // TODO(WU-6): reconcile WeatherKind ownership with src/sim/weather.ts
 export type WeatherKind = 'clear' | 'rain' | 'wind';
 
-/** v30 adds persistent player histories and discovery metadata. v28/v29 keep
- * all finance state via migration; v27 and earlier require a new career. */
-export const SAVE_VERSION = 30;
+/** v30 adds player histories, v31 optional league progression, and v32 exact
+ * protected agreements. Finance state migrates from v28; v27 requires a new career. */
+export const SAVE_VERSION = 32;
 
 /** The hires the facilities don't cover (N14.5), and the attack coach who opens set plays to buy (#326). */
 export type StaffRole = 'assistantCoach' | 'analyst' | 'welfare' | 'attackCoach';
@@ -221,6 +221,7 @@ export interface SeasonRecord {
   topScorer?: { name: string; tries: number };
   /** The season review (v12+, #190). */
   review?: SeasonReview;
+  league?: import('../data/leagueCareer').LeagueHistoryFacts;
 }
 
 /** Player-of-the-match awards to the club's players this season, by name (#190). */
@@ -356,6 +357,9 @@ export interface GameState {
 // ── Store (module-singleton around one GameState) ──────────────────────────
 
 let state: GameState | null = null;
+let installation = 0;
+/** In-memory installation identity; async work never crosses a career replacement. */
+export const stateInstallation = (): number => installation;
 
 /** Throws if the game has not been initialised (prevents silent undefined). */
 export function getState(): GameState {
@@ -380,9 +384,18 @@ export function setState(patch: Partial<GameState>): void {
 
 /** Replace the whole state (used by save.ts / tests). Emits 'state:changed'. */
 export function loadState(next: GameState): void {
+  installation++;
   selectPack(next.pack);
   state = next;
   bus.emit('state:changed', state);
+}
+
+export interface NewGameOptions {
+  difficulty?: Difficulty | undefined;
+  coachName?: string | undefined;
+  openAll?: boolean | undefined;
+  home?: GameState['home'];
+  groundName?: string | undefined;
 }
 
 /**
@@ -395,10 +408,23 @@ export function loadState(next: GameState): void {
 export function createNewGame(
   clubName: string,
   seed: number = Date.now() >>> 0,
-  options: { difficulty?: Difficulty | undefined; coachName?: string | undefined; openAll?: boolean | undefined; home?: GameState['home']; groundName?: string | undefined } = {},
+  options: NewGameOptions = {},
 ): GameState {
   const pack = packForCountry(options.home?.country);
   selectPack(pack);
+  const state = buildNewGameState(clubName, seed, options);
+  loadState(state);
+  return state;
+}
+
+/** Build from the caller's prepared, selected regional content without installing a career. */
+export function buildNewGameState(
+  clubName: string,
+  seed: number = Date.now() >>> 0,
+  options: NewGameOptions = {},
+): GameState {
+  const pack = packForCountry(options.home?.country);
+  if (activePack().id !== pack) throw new Error('Select the club’s regional content before building its opening state.');
   const difficulty = options.difficulty ?? DEFAULT_DIFFICULTY;
   const rng = makeRng(seed);
 
@@ -476,7 +502,6 @@ export function createNewGame(
     rngSeed: rng.state(),
   };
 
-  loadState(result);
   return result;
 }
 

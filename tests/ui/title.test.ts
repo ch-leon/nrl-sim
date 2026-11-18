@@ -6,7 +6,7 @@ import { StubNode, stubDocument } from './stubDom';
 import { DIFFICULTY_BLURB, TITLE_CSS, showTitleFlow, type TitleChoice } from '../../src/ui/title';
 import { GROUND_MAX, NAME_MAX } from '../../src/data/names';
 import { DEFAULT_DIFFICULTY, DIFFICULTIES, DIFFICULTY } from '../../src/config';
-import { deleteSlot, writeSlot } from '../../src/core/save';
+import { deleteSlot, writeSlot, slotKey } from '../../src/core/save';
 import { createNewGame } from '../../src/core/state';
 
 describe('the build label (#350 T1)', () => {
@@ -436,5 +436,33 @@ describe('the phone keyboard on the name fields (#609)', () => {
     const details = TITLE_CSS.slice(i, TITLE_CSS.indexOf('}', i));
     expect(details).toContain('overflow-y: auto');
     expect(details).toContain('overscroll-behavior: contain');
+  });
+});
+
+describe('League setup destination', () => {
+  beforeEach(() => { stubLocalStorage(); stubDocument(); });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('shows both choices and carries the captured occupied save through confirmation', async () => {
+    const original = createNewGame('Existing club', 54);
+    writeSlot(1,original);
+    const root = new StubNode('div');
+    const choice = showTitleFlow(root as unknown as HTMLElement);
+    root.querySelector('[data-nrl-new-1]')!.click();
+    await vi.dynamicImportSettled();
+    expect(root.querySelector('[data-nrl-career-mode-classic]')!.getAttribute('aria-pressed')).toBe('true');
+    root.querySelector('[data-nrl-career-mode-league]')!.click();
+    root.querySelector('[data-nrl-start]')!.click();
+    root.querySelector('[data-nrl-start-confirm]')!.click();
+    expect(await choice).toMatchObject({careerMode:'league',destination:{slot:1,expectedOriginal:JSON.stringify(original)}});
+    expect(localStorage.getItem(slotKey(1))).toBe(JSON.stringify(original));
+  });
+
+  it('returns failed starts to the slot list even if all slots remain empty', () => {
+    const root = new StubNode('div');
+    void showTitleFlow(root as unknown as HTMLElement, 'The new career could not be saved.');
+    expect(root.querySelector('[data-nrl-title-error]')!.textContent).toContain('could not be saved');
+    expect(root.querySelector('[data-nrl-new-1]')).toBeTruthy();
+    expect(root.querySelector('[data-nrl-start]')).toBeNull();
   });
 });

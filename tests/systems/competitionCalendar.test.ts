@@ -18,6 +18,8 @@ import { registerBoardSystem } from '../../src/systems/board';
 import { runMatch } from '../../src/match/league/match';
 import type { TeamSheet } from '../../src/sim/events';
 import { __setStorage, __unlockSaves, save, exportSave, importSave, installImportedSave, load } from '../../src/core/save';
+import { freezeSignedTerms } from '../../src/systems/cap';
+import { validateCurrent } from '../../src/core/saveValidation';
 import { readLiveMatch } from '../../src/systems/liveMatchRecord';
 import { initMatchReport } from '../../src/ui/screens/matchReport';
 import { stubDocument } from '../ui/stubDom';
@@ -249,6 +251,24 @@ describe('one interval and one canonical fixture finalisation', () => {
 });
 
 describe('recovery and rollover boundaries', () => {
+  it('prunes expired protection at old DEV rollover without advancing rival careers', () => {
+    const state = activate(); systems();
+    const rival = state.league.clubs.find(c => c.squad)!;
+    rival.squad = rival.squad!.map(p => ({...p, deal: {salary: 1000, startSeason: 1, endSeason: 1}}));
+    rival.capAccount = freezeSignedTerms(rival.squad, rival.capAccount!, 1);
+    setState(state);
+    expect(validateCurrent({...getState()}).ok).toBe(true);
+    let before = structuredClone(rival);
+    registerSeasonHook('before-protection-housekeeping', 3, () => { before = structuredClone(getState().league.clubs.find(c => c.id === rival.id)!); });
+    advanceWeeks(3);
+    const after = getState(); const club = after.league.clubs.find(c => c.id === rival.id)!;
+    expect(after.season).toBe(2);
+    expect(club.capAccount!.protectedIds).toEqual([]);
+    expect(club.capAccount!.protectedTerms).toEqual([]);
+    expect(club.squad).toEqual(before.squad); expect(club.cash).toBe(before.cash);
+    expect(validateCurrent({...after}).ok).toBe(true);
+  });
+
   it('exports only the interval-start snapshot plus canonical live identity and resumes without extra interval effects', () => {
     activate(); systems(); save(getState()); const before = JSON.stringify(getState());
     advanceWeek(); const first = starts[0]!;

@@ -187,7 +187,7 @@ function validRetired(p: unknown): p is RetiredPlayerRecord {
 }
 
 /** Strict boundary validation; metadata is never inferred or repaired on current saves. */
-export function validatePlayerPopulation(state: GameState): string | null {
+export function validatePlayerPopulation(state: GameState, historyUpperBound: CareerDate = state): string | null {
   if (state.league.clubs.some(c => c.id === state.clubId && c.squad?.length)) return 'Player club has a second roster';
   const population = state.playerPopulation;
   if (!record(population) || population.schemaVersion !== 1 || !Array.isArray(population.shortlistIds) || !Array.isArray(population.retired)
@@ -199,7 +199,7 @@ export function validatePlayerPopulation(state: GameState): string | null {
     if (ids.has(player.id)) return 'Duplicate live player ownership';
     ids.add(player.id);
     if (owner === 'unsigned') unsigned.add(player.id);
-    if (!validHistory(player.clubHistory, clubs, state, owner)) return 'Invalid player club history or current owner';
+    if (!validHistory(player.clubHistory, clubs, historyUpperBound, owner)) return 'Invalid player club history or current owner';
     if ((player.emergencyDealEndSeason !== undefined || player.emergencyForPlayerId !== undefined) && (!integer(player.emergencyDealEndSeason, state.season) || !player.deal || player.deal.endSeason !== player.emergencyDealEndSeason || player.deal.startSeason !== player.deal.endSeason || typeof player.emergencyForPlayerId !== 'string' || !player.emergencyForPlayerId || owner === 'unsigned' || player.clubHistory?.spells.slice(-1)[0]?.arrival !== 'emergency')) return 'Invalid emergency scholarship';
     if (!player.clubHistory.academyDiscountUsed && (owner !== 'unsigned' || !player.junior || player.departed)) return 'Invalid unused Academy discount';
   }
@@ -225,9 +225,9 @@ export function validatePlayerPopulation(state: GameState): string | null {
 }
 
 /** Book a player transaction in the same state as its ownership change. */
-export function bookPlayerMovement(state: GameState, delta: number, line: FinanceLine): GameState {
-  const finance = state.finance.some(f => f.season === state.season) ? state.finance : [...state.finance, emptyFinance(state.season)];
-  return { ...state, money: state.money + delta, finance: finance.map(f => f.season === state.season ? { ...f, [line]: f[line] + delta } : f) };
+export function bookPlayerMovement(state: GameState, delta: number, line: FinanceLine, stamp: CareerDate = state): GameState {
+  const finance = state.finance.some(f => f.season === stamp.season) ? state.finance : [...state.finance, emptyFinance(stamp.season)];
+  return { ...state, money: state.money + delta, finance: finance.map(f => f.season === stamp.season ? { ...f, [line]: f[line] + delta } : f) };
 }
 
 /** Remove IDs that changed owner without changing anyone else's discovery. */

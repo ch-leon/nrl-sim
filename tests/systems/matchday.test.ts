@@ -50,6 +50,15 @@ describe('player matchday result toast', () => {
     initLeague(getState());
     registerPlayerMatchSystem();
   });
+  it('ignores an old watched callback after a fresh same-seed career starts the same fixture', () => {
+    const c = collect(); advanceWeek(); const old = c.started[0]!;
+    createNewGame('Tester',42);initLeague(getState());registerPlayerMatchSystem();advanceWeek();
+    const current=c.started[1]!;const before=JSON.stringify(getState());
+    bus.emit('match:finished',{fixture:old.fixture,result:old.sim});
+    expect(JSON.stringify(getState())).toBe(before);
+    bus.emit('match:finished',{fixture:current.fixture,result:current.sim});
+    expect(getState().week).toBe(2);c.stop();
+  });
 
   it('holds the result until playback finishes', () => {
     const c = collect();

@@ -11,7 +11,7 @@ import type { AdvanceTarget } from '../core/advanceRules';
 import { weekHeld } from '../core/time';
 import { advanceInProgress, stopAdvance } from '../core/advance';
 import { playerMatchPending, resumePlayerMatch } from '../systems/matchday';
-import { nextFixture } from '../systems/league';
+import { leagueSeasonView, leagueChoiceRequired, nextSeasonFixture } from '../systems/leagueSeasonView';
 import { RISK_WORD, ladderStanding, worstObjective, type ObjectiveRisk } from '../systems/board';
 import { ECON, WEEKS_PER_SEASON } from '../config';
 import { fmtMoney, fmtMoneyShort } from '../utils/money';
@@ -20,6 +20,8 @@ import { MATCH_ACTIVE_CLASS } from './screens/matchOverlay';
 
 /** Options for {@link createHud}. */
 export interface HudOpts {
+  /** Reopen the required initial/annual League choice. */
+  onChooseLeague?: () => void;
   /** Called when the "Advance Week" button is clicked. Absent => button disabled. */
   onAdvanceWeek?: () => void;
   /** Called from the "Advance Week" menu (#44). Absent => menu disabled. */
@@ -111,17 +113,22 @@ export function placeName(name: string): string {
  * in. The full name is in the label. Null with no match left this season. Pure —
  * extracted for unit testing without the DOM.
  */
-export function nextMatchChip(s: Pick<GameState, 'league' | 'week'>): { opponent: string; detail: string; label: string } | null {
-  const f = nextFixture(s.league.fixtures, s.week, 'player');
+export function nextMatchChip(s: Pick<GameState, 'league' | 'week'> & Partial<Pick<GameState, 'clubId' | 'season' | 'competitions'>>): { opponent: string; detail: string; label: string } | null {
+  const view = leagueSeasonView(s);
+  const clubId = s.clubId ?? 'player';
+  const f = nextSeasonFixture(s, clubId);
   if (!f) return null;
-  const home = f.homeId === 'player';
+  const home = f.homeId === clubId;
   const opp = s.league.clubs.find((c) => c.id === (home ? f.awayId : f.homeId));
   if (!opp) return null;
-  const i = s.league.ladder.findIndex((r) => r.clubId === 'player');
-  const row = i < 0 ? undefined : s.league.ladder[i];
+  const ladder = view?.ladder ?? s.league.ladder;
+  const i = ladder.findIndex((r) => r.clubId === clubId);
+  const row = i < 0 ? undefined : ladder[i];
   const place = row && row.played > 0 ? ordinal(i + 1) : '';
-  const detail = `${home ? 'Home' : 'Away'}${place ? ` · ${place}` : ''}`;
-  const label = `Next match: ${opp.name}, ${home ? 'home' : 'away'}${place ? `. You are ${place} on the ladder` : ''}`;
+  const dated = view?.fixtures.find(row => row.fixture.id === f.id);
+  const venue = dated?.fixture.neutral ? 'Neutral' : home ? 'Home' : 'Away';
+  const detail = `${venue}${place ? ` · ${place}` : ''}${dated ? ` · W${dated.slot}` : ''}`;
+  const label = `Next match: ${opp.name}, ${venue.toLowerCase()}${place ? `. You are ${place} on the ladder` : ''}${dated ? `. Week ${dated.slot} · ${dated.stageLabel}` : ''}`;
   return { opponent: `v ${placeName(opp.name)}`, detail, label };
 }
 
@@ -176,7 +183,7 @@ export const BOARD_RISK_CLASS = { 'at-risk': 'nrl-hud-board-risk', 'off-track': 
  * Play the week from the club: PLAY WEEK, and the weekly summary's button (#368).
  * A parked match resumes, a held week says so, otherwise `onAdvanceWeek` runs.
  */
-export function advanceFromClub(onAdvanceWeek?: () => void): void {
+export function advanceFromClub(onAdvanceWeek?: () => void, onChooseLeague?: () => void): void {
   const choice = clubAdvanceChoice(playerMatchPending(), weekHeld());
   if (choice === 'resume') {
     resumePlayerMatch();
@@ -186,16 +193,25 @@ export function advanceFromClub(onAdvanceWeek?: () => void): void {
     weekStillFinishing();
     return;
   }
+  const state = getState();
+  if (state.sacked) return;
+  if (leagueChoiceRequired(state)) { onChooseLeague?.(); return; }
   onAdvanceWeek?.();
 }
 
 /** PLAY WEEK's sub-line: "v Darwin · away", empty with no match left this season. Pure. */
-export function playWeekSub(s: Pick<GameState, 'league' | 'week'>): string {
-  const f = nextFixture(s.league.fixtures, s.week, 'player');
-  if (!f) return '';
-  const home = f.homeId === 'player';
+export function playWeekSub(s: Pick<GameState, 'league' | 'week'> & Partial<Pick<GameState, 'clubId' | 'season' | 'competitions'>>): string {
+  if (leagueChoiceRequired(s)) return 'Choose a league before playing';
+  const view = leagueSeasonView(s);
+  const clubId = s.clubId ?? 'player';
+  const f = nextSeasonFixture(s, clubId);
+  if (!f) return view ? view.currentLabel : '';
+  const home = f.homeId === clubId;
   const opp = s.league.clubs.find((c) => c.id === (home ? f.awayId : f.homeId));
-  return opp ? `v ${placeName(opp.name)} · ${home ? 'home' : 'away'}` : '';
+  const dated = view?.fixtures.find(row => row.fixture.id === f.id);
+  const venue = dated?.fixture.neutral ? 'neutral' : home ? 'home' : 'away';
+  const date = dated && dated.slot !== s.week ? `${view!.currentLabel} · Week ${dated.slot}: ` : '';
+  return opp ? `${date}v ${placeName(opp.name)} · ${venue}` : '';
 }
 
 /** The PLAY WEEK button's label: the week, a parked match to resume, or the run's progress. */
@@ -294,7 +310,7 @@ export function createHud(opts: HudOpts = {}): Hud {
   // PLAY WEEK ▸ over who is next (#350 H1: "v Darwin · away").
   const advanceLabel = el('span', { class: 'nrl-dock-advance-label' });
   const advanceSub = el('span', { class: 'nrl-dock-advance-sub', attrs: { 'data-hud': 'next' } });
-  const advanceBtn = button('', () => advanceFromClub(opts.onAdvanceWeek), { class: 'nrl-dock-advance' });
+  const advanceBtn = button('', () => advanceFromClub(opts.onAdvanceWeek, opts.onChooseLeague), { class: 'nrl-dock-advance' });
   advanceBtn.setAttribute('data-hud', 'advance');
   advanceBtn.append(advanceLabel, advanceSub);
   if (!opts.onAdvanceWeek) advanceBtn.disabled = true;
@@ -320,6 +336,9 @@ export function createHud(opts: HudOpts = {}): Hud {
           weekStillFinishing();
           return;
         }
+        const state = getState();
+        if (state.sacked) return;
+        if (leagueChoiceRequired(state)) { opts.onChooseLeague?.(); return; }
         runAdvance(target);
       }, { class: 'nrl-hud-menu-item' });
       item.setAttribute('role', 'menuitem');
@@ -427,9 +446,10 @@ export function createHud(opts: HudOpts = {}): Hud {
     runway = opts.runwayWeeks?.(s) ?? null;
     renderMoney(s.money);
     // "/total" is a separate span so a narrow dock can drop it.
+    const calendar = s.competitions?.leagueCareer ? s.competitions.calendar : undefined;
     weekEl.replaceChildren(
       document.createTextNode(inTrials(s) ? `TRIAL ${s.preseason}` : `WEEK ${s.week}`),
-      el('span', { class: 'nrl-dock-week-total', text: inTrials(s) ? '/2' : `/${WEEKS_PER_SEASON}` }),
+      el('span', { class: 'nrl-dock-week-total', text: inTrials(s) ? '/2' : `/${calendar?.slots.length ?? WEEKS_PER_SEASON}` }),
       document.createTextNode(` · S${s.season}`),
     );
     weekEl.setAttribute('aria-label', seasonWeekLabel(s));
@@ -467,7 +487,7 @@ export function createHud(opts: HudOpts = {}): Hud {
     actions.toggleAttribute('data-advancing', on);
     root.toggleAttribute('data-advancing', on);
     if (on) setMenuOpen(false);
-    advanceLabel.textContent = (on ? advanceProgressLabel(s.week) : playerMatchPending() ? `${RESUME_MATCH_LABEL} ▸` : PLAY_WEEK_LABEL).toUpperCase();
+    advanceLabel.textContent = (on ? (s.competitions?.leagueCareer ? `Week ${s.week} of ${s.competitions.calendar!.slots.length}…` : advanceProgressLabel(s.week)) : playerMatchPending() ? `${RESUME_MATCH_LABEL} ▸` : leagueChoiceRequired(s) && !weekHeld() ? 'Choose league ▸' : PLAY_WEEK_LABEL).toUpperCase();
     advanceSub.hidden = on;
     // #350 H1: a decision waiting shows on the button that would take its default.
     advanceLabel.querySelector('.nrl-hud-alert')?.remove();
@@ -477,7 +497,8 @@ export function createHud(opts: HudOpts = {}): Hud {
         class: 'nrl-hud-alert', text: String(waiting), attrs: { 'aria-label': decisionsBadgeLabel(waiting), 'data-hud': 'decisions' },
       }));
     }
-    advanceBtn.disabled = on || !opts.onAdvanceWeek;
+    advanceBtn.disabled = on || !!s.sacked || (leagueChoiceRequired(s) && !playerMatchPending() && !weekHeld() ? !opts.onChooseLeague : !opts.onAdvanceWeek);
+    menuToggle.disabled = !!s.sacked || leagueChoiceRequired(s) || !opts.onAdvanceUntil;
     advanceBtn.classList.toggle('nrl-hud-progress', on);
     menuToggle.hidden = on;
     if (on && stopBtn.hidden) stopBtn.disabled = false;

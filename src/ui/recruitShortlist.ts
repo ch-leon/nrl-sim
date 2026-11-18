@@ -1,3 +1,4 @@
+import { careerActionClock } from '../core/season';
 import { discoveredFreeAgents } from '../systems/playerCareer';
 // UI-only recruitment advice: no pool changes, state writes or dice.
 import type { GameState, Player } from '../core/state';
@@ -17,7 +18,7 @@ export interface RecruitShortlist {
 export function recruitAffordable(state: GameState, p: Player): boolean {
   return state.squad.length < SQUAD_CAP
     && signingFee(state, p) <= state.money
-    && capRoomFor(state.squad, state.capAccount, state.season, salaryDemand(p));
+    && capRoomFor(state.squad, state.capAccount, careerActionClock(state).season, salaryDemand(p));
 }
 
 /** Deterministic advice; small pools keep the full table's default overall order. */

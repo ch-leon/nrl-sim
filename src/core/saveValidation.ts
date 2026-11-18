@@ -1,3 +1,4 @@
+import { careerActionClock } from './season';
 import { validatePlayerPopulation } from '../systems/playerCareer';
 import { validMatchIncome } from '../systems/matchIncome';
 // Save boundary only. Historical defaults belong to MIGRATIONS, never to ticks.
@@ -14,6 +15,7 @@ import { BENCH, isRotation } from '../match/league/bench';
 import { isAttackPreset, isDefencePreset } from '../match/league/presets';
 import { LINEUP_SLOTS, resolveLineup } from '../systems/lineup';
 import { validateCompetitions } from '../data/competition';
+import { validateLeagueHistory } from '../data/leagueCareer';
 
 export interface SaveRepair { field: string; problem: string; repair: string; rationale: string; notification: string }
 export const REPAIR_NOTICE = 'Career lineup repaired. The original save has been kept in recovery.';
@@ -89,6 +91,27 @@ function isCapAccount(v: unknown): boolean {
     && oneOf(v.earnedBasisPoints, [0, 500, 1000])
     && strings(v.receipts) && unique(v.receipts)
     && strings(v.protectedIds) && unique(v.protectedIds);
+}
+
+/** Current allowances must identify an owned, unchanged agreement exactly. */
+function validProtection(account: Record<string, unknown>, players: unknown, season: number): boolean {
+  const terms = account.protectedTerms;
+  if (terms === undefined) return (account.protectedIds as string[]).length === 0;
+  if (!Array.isArray(terms) || !Array.isArray(players)) return false;
+  const seen = new Set<string>();
+  for (const term of terms) {
+    if (!record(term) || Object.keys(term).sort().join(',') !== 'endSeason,playerId,salary,startSeason'
+      || !text(term.playerId) || !isTerm(term) || (term.endSeason as number) < season) return false;
+    const key = JSON.stringify([term.playerId, term.salary, term.startSeason, term.endSeason]);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    const player = players.find(p => record(p) && p.id === term.playerId);
+    if (!record(player) || !record(player.deal)) return false;
+    const owned = [player.deal, player.deal.renewal].some(t => record(t) && t.salary === term.salary && t.startSeason === term.startSeason && t.endSeason === term.endSeason);
+    if (!owned) return false;
+  }
+  const ids = [...new Set(terms.map(t => (t as Record<string, unknown>).playerId))];
+  return ids.length === (account.protectedIds as string[]).length && ids.every(id => (account.protectedIds as string[]).includes(id as string));
 }
 
 export function isSeasonFinance(v: unknown, version = SAVE_VERSION): v is SeasonFinance {
@@ -185,16 +208,21 @@ export function validateInput(v: Record<string, unknown>, version: number): stri
     if ((c.squad !== undefined || (version >= 8 && c.id !== 'player')) && !roster(c.squad)) return fail('rival squad');
   }
   if (version < 30 && 'playerPopulation' in v) return fail('player population version');
-  if (version >= 30) {
-    const problem = validatePlayerPopulation(v as unknown as GameState);
-    if (problem) return fail(problem);
-  }
   if (clubs.size && !clubs.has('player')) return fail('player club reference');
   if (v.competitions !== undefined) {
     if (version < 25) return fail('competition metadata version');
     if (record(v.competitions) && v.competitions.calendar !== undefined && version < 26) return fail('competition calendar version');
+    if (record(v.competitions) && v.competitions.leagueCareer !== undefined && version < 31) return fail('league career version');
     if (record(v.competitions) && v.competitions.world !== undefined && version < 27) return fail('division world version');
-    const problem = validateCompetitions(v.competitions, { pack: v.pack === 'uk' ? 'uk' : 'au', season: v.season as number, week: v.week as number, clubIds: [...clubs] });
+    const problem = validateCompetitions(v.competitions, { pack: v.pack === 'uk' ? 'uk' : 'au', season: v.season as number, week: v.week as number, clubIds: [...clubs], clubId: v.clubId as string });
+    if (problem) return fail(problem);
+  }
+  if (version >= 30) {
+    // The competition/progression boundary above must verify the pending phase
+    // before management history may reach its target-year action date. Annual
+    // intake and retirement bounds remain tied to the raw source year.
+    const state = v as unknown as GameState;
+    const problem = validatePlayerPopulation(state, careerActionClock(state));
     if (problem) return fail(problem);
   }
   if ((!record(v.competitions) || v.competitions.calendar === undefined) && !integer(v.week, 1, v.pack === 'uk' ? 25 : 27)) return fail('career fields');
@@ -212,6 +240,7 @@ export function validateInput(v: Record<string, unknown>, version: number): stri
   for (const key of ['coachCalls', 'liveRivals', 'keyMoments', 'weekSummary', 'teamLetters']) if (v.settings[key] !== undefined && typeof v.settings[key] !== 'boolean') return fail(`settings.${key}`);
   if ((v.settings.playbackSpeed !== undefined && !oneOf(v.settings.playbackSpeed, [1, 2, 4, 8])) || (v.settings.textSize !== undefined && !oneOf(v.settings.textSize, ['normal', 'large', 'larger'])) || (v.settings.hintsSeen !== undefined && !strings(v.settings.hintsSeen))) return fail('settings preferences');
   if (!Array.isArray(v.history) || !v.history.every(record)) return fail('history');
+
   if (version >= 5 && (!range(v.boardPatience, 0, BOARD.MAX_PATIENCE) || !Array.isArray(v.objectives) || !v.objectives.every(record))) return fail('board');
   if (version >= 7 && (!record(v.eventDeck) || !integer(v.eventDeck.rng, 0, 0xffffffff) || !Array.isArray(v.eventDeck.pending) || !v.eventDeck.pending.every(record) || !Array.isArray(v.eventDeck.modifiers) || !v.eventDeck.modifiers.every(isActiveModifier) || !record(v.eventDeck.cooldowns) || !integer(v.eventDeck.lastDrawn))) return fail('eventDeck');
   if (version >= 10 && (!Array.isArray(v.finance) || !v.finance.every(e => isSeasonFinance(e, version)))) return fail('finance');
@@ -221,13 +250,21 @@ export function validateInput(v: Record<string, unknown>, version: number): stri
   if (version >= 18 && (!record(v.boardLoan) || !range(v.boardLoan.owed, 0))) return fail('boardLoan');
   if (version >= 19 && (!Array.isArray(v.staff) || !v.staff.every(s => record(s) && oneOf(s.role, ['assistantCoach', 'analyst', 'welfare', 'attackCoach']) && text(s.name) && range(s.wage, 0) && integer(s.hiredSeason, 1) && (s.speciality === undefined || oneOf(s.speciality, ['direct', 'width', 'kicking', 'razzle']))) || !unique(v.staff.map(s => s.role)))) return fail('staff');
   if (version >= 29 && !validMatchIncome(v.matchIncome, { season: v.season as number, league: v.league as unknown as GameState['league'], competitions: v.competitions as GameState['competitions'] })) return fail('match income');
+  if (record(v.competitions) && v.competitions.leagueCareer !== undefined) {
+    const problem = validateLeagueHistory(v as unknown as GameState);
+    if (problem) return fail(problem);
+    const progress = (v as unknown as GameState).competitions!.leagueCareer!;
+    if (progress.phase === 'next-season-choice' && (v as unknown as GameState).matchIncome.some(r => r.season === v.season && !r.receipt)) return fail('league career unsettled income');
+  }
   if (version >= 28) {
     if (!isCapAccount(v.capAccount)) return fail('cap');
     const deals = (list: unknown, required: boolean): boolean => Array.isArray(list) && list.every(p => record(p) && (p.deal === undefined ? !required : isDeal(p.deal)));
     if (!deals(v.squad, true) || !deals(v.freeAgents, false)) return fail('deals');
+    if (version >= 32 && !validProtection(v.capAccount as Record<string, unknown>, v.squad, v.season as number)) return fail('cap protection');
     for (const c of v.league.clubs as Record<string, unknown>[]) {
       if (c.id === 'player' || c.squad === undefined) continue;
       if (!integer(c.cash) || !Number.isSafeInteger(c.cash) || !isCapAccount(c.capAccount) || !deals(c.squad, true)) return fail('rival account');
+      if (version >= 32 && !validProtection(c.capAccount as Record<string, unknown>, c.squad, v.season as number)) return fail('rival protection');
     }
   }
   return null;

@@ -125,3 +125,19 @@ describe('coachSays (#477)', () => {
     expect(JSON.stringify(s)).toBe(before);
   });
 });
+
+import { competitions, progress } from '../data/leagueCareerFixtures';
+it('names the saved League next opponent/date and makes required choice the next action', () => {
+  const s = readyClub(); s.money = 0;
+  s.competitions = competitions(1, false); s.competitions.leagueCareer = { ...progress(), phase: 'active' };
+  const f = s.competitions.instances[0]!.fixtures[0]!;
+  const id = f.homeId === s.clubId ? f.awayId : f.homeId;
+  s.league.clubs = s.league.clubs.filter(c => c.id !== id);
+  s.league.clubs.push({ id, name: 'Saved opponent', colors: ['#000', '#fff'], strength: 44 });
+  s.league.fixtures = [];
+  expect(coachSays(s, ctx).text).toContain('Saved opponent next');
+  expect(coachSays(s, ctx).text).toContain('Week 3');
+  s.competitions.leagueCareer.phase = 'next-season-choice';
+  expect(coachSays(s, ctx)).toMatchObject({ screen: 'ladder' });
+  expect(coachSays(s, ctx).text).toContain('Choose');
+});

@@ -1,5 +1,6 @@
 // Competition metadata only (#570). The existing match/time systems remain
 // authoritative until the calendar and result-lifecycle work wires this in.
+import { validateLeagueCareer, type LeagueProgress } from './leagueCareer';
 import type { MatchRules } from '../content/pack';
 import { validateCompetitionCalendar, type CompetitionCalendar } from './competitionCalendar';
 import { validateCompetitionWorld, type CompetitionWorldMetadata } from './competitionDivisions';
@@ -91,6 +92,7 @@ export interface CompetitionCareerState {
   instances: CompetitionInstance[];
   calendar?: CompetitionCalendar;
   world?: CompetitionWorldMetadata;
+  leagueCareer?: LeagueProgress;
 }
 
 const record = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -321,8 +323,8 @@ export function completedCompetition(instance: CompetitionInstance): string | nu
 }
 
 /** Returns the first invalid field; callers retain the entire rejected input. */
-export function validateCompetitions(v: unknown, context: { pack: string; season: number; week?: number; clubIds: readonly string[] }): string | null {
-  if (!record(v) || !keys(v, ['schemaVersion', 'instances', 'calendar', 'world']) || v.schemaVersion !== 1 || !Array.isArray(v.instances)) return 'competitions';
+export function validateCompetitions(v: unknown, context: { pack: string; season: number; week?: number; clubIds: readonly string[]; clubId?: string }): string | null {
+  if (!record(v) || !keys(v, ['schemaVersion', 'instances', 'calendar', 'world', 'leagueCareer']) || v.schemaVersion !== 1 || !Array.isArray(v.instances)) return 'competitions';
   const clubIds = new Set(context.clubIds);
   const instanceIds = new Set<string>();
   const fixtureIds = new Set<string>();
@@ -398,13 +400,17 @@ export function validateCompetitions(v: unknown, context: { pack: string; season
     }
   }
   if (v.calendar !== undefined) {
-    const calendar = validateCompetitionCalendar(v.calendar, v.instances as CompetitionInstance[], context.season, context.week);
+    const calendar = validateCompetitionCalendar(v.calendar, v.instances as CompetitionInstance[], context.season, context.week, record(v.leagueCareer) && v.leagueCareer.phase === 'next-season-choice');
     if (calendar) return calendar;
   }
   if (v.world !== undefined) {
     if (!record(v.calendar) || v.calendar.mode !== 'structural') return 'division world calendar';
     const world = validateCompetitionWorld(v.world, v.instances as CompetitionInstance[], { ...context, season: v.calendar.season as number, slots: (v.calendar as unknown as CompetitionCalendar).slots });
     if (world) return world;
+  }
+  if (v.leagueCareer !== undefined) {
+    const progress = validateLeagueCareer(v.leagueCareer, v as unknown as CompetitionCareerState, context);
+    if (progress) return progress;
   }
   return null;
 }

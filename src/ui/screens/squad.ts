@@ -19,6 +19,7 @@ import {
 } from './recruit';
 import { openLineupScreen } from './lineup';
 import { fitnessPct, moraleWord, openPlayerPage, positionLabel, squadNumbers } from './player';
+import { contractActionView } from '../../systems/cap';
 import { contractsEndingSoon, endsInTag } from '../../systems/contracts';
 import { fmtMoney } from '../../utils/money';
 
@@ -144,7 +145,7 @@ export function openSquadScreen(): void {
     const numbers = squadNumbers(s);
     // The dock's red dot leads here (#369): the same dot on each of those rows, its weeks in TO.
     const ending = new Set(contractsEndingSoon(s).map((p) => p.id));
-    for (const p of sortSquad(s.squad, sortKey)) {
+    for (const p of sortSquad(s.squad.map(p => contractActionView(s, p)), sortKey)) {
       const no = numbers.get(p.id);
       const fit = fitnessPct(p);
       const expiring = p.contractWeeks <= MORALE.EXPIRING_WEEKS && !p.deal?.renewal;

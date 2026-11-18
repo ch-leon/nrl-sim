@@ -66,6 +66,15 @@ on the exact match-income candidate [#695](https://github.com/ch-leon/nrl-sim/pu
 to sequence the shared save/finance files; the upstream PR's review/merge gates
 remain mandatory.
 
+League selection now proceeds under [#574](https://github.com/ch-leon/nrl-sim/issues/574)
+with the [17 November implementation plan](2026-11-17-league-selection.md), following
+merged player continuity [#716](https://github.com/ch-leon/nrl-sim/pull/716). It delivers
+an explicitly selected new-game format and preserves existing careers. Its three
+sequential review stages cover permanent access and legal fields, resumable annual
+close/entry, then the actual player-facing flow. Leon approved retained club capacity on 18 November: easier league entry never
+reduces it. Higher-tier entry may raise the base; preserve existing purchased and
+earned additions, with no new downward-movement protection.
+
 Before dependent implementation, settle AI field allocation for freely chosen
 leagues, calendar phases and durations, lower-league cap commitments, assignment
 recall/transfer rules, event simulation rules and actual reward values. The full
