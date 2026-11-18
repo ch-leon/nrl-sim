@@ -186,8 +186,10 @@ export async function runPlaytest(browser, W = 667, H = 375) {
       }
       await page.waitForSelector('[data-back-to-club]:visible', { timeout: 30000 });
       await page.locator('.nrl-mo-ft [data-report]').tap();
-      await page.locator('.nrl-report-changes:not(.nrl-report-why) summary').tap();
-      await page.locator('.nrl-report-change').filter({ hasText: 'Tight' }).last().scrollIntoViewIfNeeded();
+      // SuperCOOKED 44: one plan change is a plain line; more fold under a summary.
+      const folded = page.locator('.nrl-report-changes:not(.nrl-report-why) summary');
+      if (await folded.count()) await folded.tap();
+      await page.locator('.nrl-report-change, .nrl-report-change-one').filter({ hasText: 'Tight' }).last().scrollIntoViewIfNeeded();
       const reportText = await page.locator('.nrl-report').textContent();
       if (/grind/i.test(reportText) || !reportText.includes('Tight')) throw new Error('report did not display the plan change as Tight');
       await page.screenshot({ path: join(OUT, `full-time-match-${m}.png`) });
