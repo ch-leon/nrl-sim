@@ -193,8 +193,8 @@ describe('the launch and the script (plan §3.3)', () => {
 
   it('an intercept flies to the lane defender', () => {
     let intercepts = 0;
-    // Keep multiple trajectories; seed 22 supplies the interception after #625.
-    for (const seed of [1, 2, 22]) {
+    // Keep multiple trajectories; seed 6 supplies the real interception at 1134 after attacking structures (#649).
+    for (const seed of [1, 2, 6]) {
       const sim = new PlaySim(flat(['block-play', 'second-man']), A, seed, { length: { halves: 1, halfMinutes: 7 } });
       sim.force = 0.0001;
       let thrown = -1;
@@ -268,9 +268,12 @@ describe('calling a play (plan §3.2)', () => {
     const sim = new PlaySim(home, A, 4, opts);
     const events: SimEvent[] = [];
     while (!sim.finished) {
-      // At a tackle, so it lands at the next play-the-ball.
-      if (sim.phaseKind === 'tackle' && sim.callRefusal('home', 'set-play', 'second-man') === null) calls.push({ tick: sim.tick + 1, side: 'home', call: 'set-play', play: 'second-man' });
-      if (sim.phaseKind === 'tackle' && sim.callRefusal('home', 'hit-up') === null) calls.push({ tick: sim.tick + 1, side: 'home', call: 'hit-up' });
+      // Both channels are available at this tackle: the play waits for the PTB,
+      // while Hit-up can be made in the same tick without consuming the play channel.
+      if (sim.phaseKind === 'tackle' && sim.callRefusal('home', 'set-play', 'second-man') === null && sim.callRefusal('home', 'hit-up') === null) {
+        calls.push({ tick: sim.tick + 1, side: 'home', call: 'set-play', play: 'second-man' });
+        calls.push({ tick: sim.tick + 1, side: 'home', call: 'hit-up' });
+      }
       sim.step();
       events.push(...sim.tickEvents);
     }

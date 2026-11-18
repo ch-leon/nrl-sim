@@ -20,8 +20,52 @@ import { ownLineX } from '../touch';
 import { LIVE } from './knobs';
 import { other, type Player } from './types';
 import { LiveContact } from './contact';
+import { SHAPES, chooseShape, shapeEdge, shapeTarget, packetSlots, type ShapeKind } from '../attackingShapes';
 
 export abstract class LivePositioning extends LiveContact {
+  /** Prepare during actual contact, then retain through its ruck; null latches overrides/endings. */
+  protected prepareAttackShape(): void {
+    const ph = this.phase;
+    if (SHAPES.on <= 0 || (ph.kind !== 'tackle' && ph.kind !== 'ruck' && ph.kind !== 'play')) return;
+    if (ph.shape && !this.currentAttackShape()) { ph.shape = null; return; }
+    if (ph.kind === 'play' || ph.shape !== undefined || (ph.kind === 'ruck' && ph.handover && ph.stage !== 'dh')) return;
+    const tackle = this.tackles + (ph.kind === 'tackle' ? 1 : 0);
+    if (tackle >= SET_TACKLES) { ph.shape = null; return; }
+    if (this.sheetPlays[this.attacking].length || this.scripted || this.pendingPlay[this.attacking]
+      || this.pendingControl[this.attacking] || this.callState[this.attacking].attack) { ph.shape = null; return; }
+    const origin = ph.kind === 'tackle' ? this.players[ph.carrier]!.body.pos : this.mark;
+    const reach = ph.kind === 'tackle' ? SHAPES.contactReachM : SHAPES.setupReachM;
+    const cost = (kind: ShapeKind, edge = shapeEdge(kind, origin.y, this.dir, tackle), linkSlot?: 4 | 5) => {
+      const shape = { kind, edge, dir: this.dir, side: this.attacking, startedTick: this.tick, ...(linkSlot ? {linkSlot} : {}) };
+      const packet = packetSlots(kind, edge, linkSlot).map(slot => this.at(this.attacking, slot));
+      if (packet.some(p => !this.onField(p) || p.subFor !== null || this.locked(p)
+        || p === this.holder() || p === this.dummyHalf(this.attacking))) return Infinity;
+      const travel = Math.max(...packet.map(p => dist(p.body.pos, shapeTarget(shape,p.slot,origin))));
+      return travel <= reach ? travel : Infinity;
+    };
+    // Either free half may link the same two forwards; choose the nearest feasible packet, no dice.
+    const pods = ([-1,1] as const).flatMap(edge => ([4,5] as const).map(linkSlot => ({edge,linkSlot,cost:cost('pod',edge,linkSlot)})));
+    const pod = pods.sort((a,b)=>a.cost-b.cost)[0]!;
+    const feasible = { pod: Number.isFinite(pod.cost), edge: Number.isFinite(cost('edge')) };
+    const choice = chooseShape(this.tactics[this.attacking].attack, tackle,
+      this.toLineFor(this.attacking, origin), origin.y, this.rng.next(), this.dir, feasible);
+    ph.shape = { ...choice, ...(choice.kind === 'pod' ? {edge:pod.edge,linkSlot:pod.linkSlot} : {}),
+      side: this.attacking, dir: this.dir, startedTick: this.tick };
+  }
+
+  protected currentAttackShape() {
+    const ph = this.phase;
+    if (SHAPES.on <= 0 || (ph.kind !== 'tackle' && ph.kind !== 'ruck' && ph.kind !== 'play') || !ph.shape
+      || ph.shape.side !== this.attacking || ph.shape.dir !== this.dir || this.scripted) return null;
+    if (packetSlots(ph.shape.kind, ph.shape.edge, ph.shape.linkSlot).some(slot => {
+      const p = this.at(this.attacking, slot);
+      return !this.onField(p) || p.subFor !== null;
+    })) return null;
+    if (ph.kind === 'play' && (this.pendingKick || this.ball.kind === 'loose'
+      || (this.ball.kind === 'flight' && this.ball.via !== 'pass'))) return null;
+    return ph.shape;
+  }
+
   protected candidates(passer: Player, plan: AttackPlan = this.atkPlan(passer)): Candidate[] {
     const overlap = this.overlapSide(passer);
     // A shift call (#73): receivers on the called side, as the attacker faces the line (left is +y going +x).
@@ -118,6 +162,7 @@ export abstract class LivePositioning extends LiveContact {
 
   protected assignTargets(): void {
     const ph = this.phase;
+    const shape = this.currentAttackShape();
     const bp = this.ballPos();
     const atk = this.attacking;
     const def = other(atk);
@@ -324,14 +369,17 @@ export abstract class LivePositioning extends LiveContact {
         // The ball is heeled: the backline comes onto it, so the first receiver
         // hits the pass at pace instead of standing flat-footed. The forwards
         // standing close to the ruck keep enough depth to stay a pass option.
-        const spot = formationTarget(role, anchor, this.dir, true);
-        const advance = Math.max(0, Math.min(LIVE.ruckAdvanceM, role.atk - 3));
+        const spot = shape ? shapeTarget(shape, p.slot, anchor) : formationTarget(role, anchor, this.dir, true);
+        const depth = shape && shape.kind !== 'spread' ? (anchor.x - spot.x) * this.dir : role.atk;
+        const advance = Math.max(0, Math.min(LIVE.ruckAdvanceM, depth - 3));
         p.target = clampToGround({ x: spot.x + this.dir * advance, y: spot.y }, 1);
       } else if (this.anticipatingGrubber(p)) {
         // The chase is on before the boot: come up in his lane, then onto the spot once it is aimed.
         p.target = this.grubberChaseSpot(p);
         p.wantsSprint = this.pendingKick?.kind === 'grubber' || dist(p.body.pos, p.target) > 8;
         p.through = true;
+      } else if (shape && packetSlots(shape.kind,shape.edge,shape.linkSlot).includes(p.slot) && (ph.kind === 'tackle' || ph.kind === 'ruck') && !this.locked(p)) {
+        p.target = clampToGround(shapeTarget(shape, p.slot, anchor), 1);
       } else if (supports.includes(p)) {
         const s = spots[supports.indexOf(p) as 0 | 1];
         // Take the side he's already on.
@@ -340,7 +388,7 @@ export abstract class LivePositioning extends LiveContact {
         // Backing up: when the carrier goes, his support goes with him, staying in reach for the pass.
         p.wantsSprint = carrier !== null && (broken || carrier.sprinting) && dist(p.body.pos, carrier.body.pos) < LIVE.supportSprintM;
       } else {
-        p.target = formationTarget(role, anchor, this.dir, true);
+        p.target = shape ? clampToGround(shapeTarget(shape, p.slot, anchor), 1) : formationTarget(role, anchor, this.dir, true);
       }
     }
 

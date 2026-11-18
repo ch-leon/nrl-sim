@@ -7,7 +7,9 @@ live gameplay change; work still open below has not shipped.
 
 ## Now
 
-- **Match presentation — whole-match consistency:** [PR #706](https://github.com/ch-leon/nrl-sim/pull/706), open for review, fixes the binned player and detached overlays at the whistle. Officials, benches and crowd already read consistently with the merged art in the clear/rain/wind audit. Complete-match, interchange and normal/fast-playback evidence is recorded in the PR; real-phone validation remains. Follow the [implementation plan](../plans/2026-11-match-art-and-animation.md).
+- **Attacking shapes — first slice approved for merge:** [PR #715](https://github.com/ch-leon/nrl-sim/pull/715), under [#649](https://github.com/ch-leon/nrl-sim/issues/649), adds forward pods and edge shifts alongside the existing spread. Free players begin preparing during established contact, retaining the same choice through the play-the-ball. Ordinary receiver commitment and explicit play instructions keep priority; standard-harness comparison and real normal-speed footage accompany review. The initial Expansive win-rate drop did not replicate on held-out seeds; the PR records both samples and their limits. Leon approved merging #714/#715 on 17 November. Back-door options and support runs are the next slice; new PRs stay open for review.
+
+- **Match presentation — whole-match consistency:** [PR #706](https://github.com/ch-leon/nrl-sim/pull/706), merged 17 November, fixes the binned player and detached overlays at the whistle. Officials, benches and crowd already read consistently with the merged art in the clear/rain/wind audit. Complete-match, interchange and normal/fast-playback evidence is recorded in the PR; real-phone validation remains. Follow the [implementation plan](../plans/2026-11-match-art-and-animation.md).
 
 - **Merged animation foundation:** Leon reviewed the clip and approved the full stack, merged on 17 November 2026 through [PR #705](https://github.com/ch-leon/nrl-sim/pull/705) at `f9f1641`. It includes the art foundation (#697), movement (#699), contact (#701), handling (#703) and connected big moments. The plan records validation and remaining QA/phone performance work. Earlier receiver commitment and pre-release calls remain a separate gameplay change under #672/#649.
 
@@ -73,7 +75,7 @@ live gameplay change; work still open below has not shipped.
 
 ## Next
 
-- **Receiver preparation candidate ([PR #707](https://github.com/ch-leon/nrl-sim/pull/707), open for review):** the ordinary dummy-half chooses his intended recipient during the existing hold, so that runner can call before release. This is separate from wider attack shapes (#649) and from the whistle cleanup. The candidate addresses #672 with explicit cancellation and unchanged interception/spill rules; its balance comparison and review must be assessed before merging.
+- **Receiver preparation merged ([PR #707](https://github.com/ch-leon/nrl-sim/pull/707), 17 November):** the ordinary dummy-half chooses his intended recipient during the existing hold, so that runner can call before release. This addresses #672 with explicit cancellation and unchanged interception/spill rules. Wider attack shapes remain #649. The balance comparison records existing target gaps; real-phone playtesting and separate QA remain release work.
 
 - **Launch plumbing (decided 2 Nov 2026):** hosting, push, analytics, pop-ups, flags, email and privacy. Tracking: [issue #456](https://github.com/ch-leon/nrl-sim/issues/456), which has Leon's setup checklist. Decisions are in [marketing.md](marketing.md#engagement-and-launch-plumbing) ([PR #457](https://github.com/ch-leon/nrl-sim/pull/457), merged 6 Nov). Implementation is still open.
   - **Before launch:** Developer settings is shown in Settings on every build, including GitHub Pages and the Android test APK. Set `VITE_DEV_SETTINGS=0`, or remove Developer settings, before launch. Seeing the page does not change a career.

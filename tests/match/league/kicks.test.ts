@@ -93,10 +93,11 @@ describe('kicks in the live sim', () => {
   const restore = applyTuning({ 'penalty.ruckSixAgain': 0, 'penalty.holdDown': 0, 'penalty.offside.slide': 0, 'penalty.offside.rush': 0, 'penalty.offside.compressed': 0, 'penalty.highShot': 0, 'penalty.highShotHothead': 0 });
   // Whole matches give both sides their full field-position cycle; the opening
   // three minutes overrepresent territory kicks after completed retreats (#625).
-  // #672 moves the real no-penalty chip to seed 34, tick 2951. Use a contiguous
-  // 1–40 cohort in both windows, preserving unselected frequency/count checks.
-  const es = events(40);
-  const esOpening = events(40, 180);
+  // Ordinary structures (#649) change the field-position sample: use the predetermined
+  // contiguous 1–100 cohort in both windows, preserving unselected frequency/count checks.
+  // Attacking kicks + bombs are 245/592 (41.39%); the original 40% bound remains.
+  const es = events(100);
+  const esOpening = events(100, 180);
   restore();
   const kicks = es.filter((e) => e.kind === 'kick');
   const byKind = (d: string): number => kicks.filter((e) => e.detail === d).length;

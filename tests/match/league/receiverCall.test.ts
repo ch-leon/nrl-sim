@@ -133,7 +133,7 @@ describe('committed ordinary dummy-half choice (#672)', () => {
     expect(flight.receiver).toMatchObject({ side: 'away', slot: 0 });
     expect(intercepted.snapshot().passCall).toBeUndefined();
   });
-  it('reconstructs the real seed1 call171→release175→catch180 with the committed identity after seeking', () => {
+  it('reconstructs the real seed1 call171→release175→catch181 with the committed identity after seeking', () => {
     const home = labSheet(DEFAULT_HOME), away = labSheet(DEFAULT_AWAY);
     const runner = new Runner(seed => new LiveSim(home, away, seed), 1);
     runner.seek(171);
@@ -142,9 +142,9 @@ describe('committed ordinary dummy-half choice (#672)', () => {
       from: { side: 'away', slot: 6, who: 'Toby Cobbleton' }, to: { side: 'away', slot: 7, who: 'Hunter Faleolo' } });
     runner.seek(175); expect(runner.cur.ball.flight?.receiver).toEqual(called.passCall!.to);
     expect(runner.cur.passCall).toBeUndefined();
-    runner.seek(180);
+    runner.seek(181);
     expect(runner.cur.ball.holder).toEqual({ side: 'away', slot: 7 });
-    expect(runner.cur.players.find(p => p.side === 'away' && p.slot === 7)).toMatchObject({ who: 'Hunter Faleolo', caughtTick: 180 });
+    expect(runner.cur.players.find(p => p.side === 'away' && p.slot === 7)).toMatchObject({ who: 'Hunter Faleolo', caughtTick: 181 });
     runner.seek(100); runner.seek(171); expect(runner.cur).toEqual(called);
   });
 });

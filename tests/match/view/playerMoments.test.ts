@@ -95,8 +95,8 @@ it('turns the recovered tee kicker toward his current direction while leaving th
 
 
 it('uses the pinned seed8 aerial and try handoffs, with deterministic scorer entry and a single knee-slide drop', async () => {
-  // Early DH commitment (#672) moves the first try to 2077; the opening aerial 120
-  // and the actual try's 20-tick recovery remain.
+  // Current default structures (#649) move the first try to 570 (Dane Addison);
+  // the opening aerial 120 and the actual try's 20-tick recovery remain.
   const { LiveSim } = await import('../../../src/match/league/live');
   const { labSheet, DEFAULT_HOME, DEFAULT_AWAY } = await import('../../../src/match/lab/sheets');
   const { pictureContext } = await import('../../../src/match/view/playerPicture');
@@ -108,9 +108,9 @@ it('uses the pinned seed8 aerial and try handoffs, with deterministic scorer ent
   let before = sim.snapshot();
   let recovered: ReturnType<typeof cache.get> | undefined;
   const seen = new Set<string>();
-  for (let tick = 1; tick <= 2097; tick++) {
+  for (let tick = 1; tick <= 590; tick++) {
     sim.step(); const s = sim.snapshot();
-    if ([120, 124, 125, 126, 2086, 2087, 2096, 2097].includes(tick)) {
+    if ([120, 124, 125, 126, 579, 580, 589, 590].includes(tick)) {
       const holder = s.ball.holder!;
       expect(holder).not.toBeNull();
       const man = s.players.find(p => p.side === holder.side && p.slot === holder.slot)!;
@@ -127,10 +127,10 @@ it('uses the pinned seed8 aerial and try handoffs, with deterministic scorer ent
         expect(cache.get(man.side, carry).data).toEqual(pixels.data); seen.add('carry-end');
       }
       if (tick === 126) expect(picture.action).toBe('carry');
-      if (tick === 2086) { expect(picture).toMatchObject({ action: 'dive', frame: 5 }); recovered = pixels; }
-      if (tick === 2087) { expect(picture).toMatchObject({ action: 'tryRise', frame: 0 }); expect(pixels.data).toEqual(recovered!.data); seen.add('ground-rise'); }
-      if (tick === 2096) { expect(picture).toMatchObject({ action: 'tryRise', frame: 5 }); recovered = pixels; }
-      if (tick === 2097) {
+      if (tick === 579) { expect(picture).toMatchObject({ action: 'dive', frame: 5 }); recovered = pixels; }
+      if (tick === 580) { expect(picture).toMatchObject({ action: 'tryRise', frame: 0 }); expect(pixels.data).toEqual(recovered!.data); seen.add('ground-rise'); }
+      if (tick === 589) { expect(picture).toMatchObject({ action: 'tryRise', frame: 5 }); recovered = pixels; }
+      if (tick === 590) {
         expect(picture.frame).toBe(0); expect(pixels.data).toEqual(recovered!.data); seen.add('rise-cheer');
         playerPicture(man, was, tick + 20, holder, -1);
         expect(playerPicture(man, was, tick, holder, 1, context)).toEqual(picture);
