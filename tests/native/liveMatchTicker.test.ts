@@ -90,6 +90,7 @@ describe('half and minute labels', () => {
     expect(clockLabel('paused', 'second', 4)).toBe("2nd half 4'");
     expect(clockLabel('live', 'golden', 0)).toBe("Golden point 0'");
     expect(clockLabel('half-time', 'second', 2)).toBe('Half-time');
+    expect(clockLabel('half-time', 'golden', 0)).toBe('Golden point next');
     expect(clockLabel('full-time', 'second', 5)).toBe('Full time');
   });
 
@@ -214,12 +215,51 @@ describe('golden point', () => {
     expect(gp.matters).toBe(true);
     expect(gp.alert).toBeNull();
     t = gp.ticker;
-    expect(t.content).toMatchObject({ half: 'golden', state: 'live', clock: "Golden point 0'", moment: 'GOLDEN POINT, next score wins' });
-    t = fold(t, [ev(5, 'kickoff', 'bri'), ev(6, 'field-goal', 'mel', 'Cameron Munster', 'good')]);
+    // The break before golden point is a break, not live play.
+    expect(t.content).toMatchObject({ half: 'golden', state: 'half-time', clock: 'Golden point next', moment: 'GOLDEN POINT, next score wins' });
+    const restart = foldEvent(t, ev(5, 'kickoff', 'bri'));
+    expect(restart.matters).toBe(true);
+    t = restart.ticker;
+    expect(t.content).toMatchObject({ state: 'live', clock: "Golden point 0'" });
+    t = fold(t, [ev(6, 'field-goal', 'mel', 'Cameron Munster', 'good')]);
     expect(t.content).toMatchObject({ clock: "Golden point 1'", moment: "FIELD GOAL, Cameron Munster (MEL) 1'", awayScore: 5 });
     const ft = foldEvent(t, ev(6, 'full-time', 'bri', undefined, 'golden-point'));
     expect(ft.ticker.content).toMatchObject({ state: 'full-time', moment: 'MEL win in golden point', homeScore: 4, awayScore: 5 });
     expect(ft.alert?.body).toBe('BRI 4 – 5 MEL. MEL win in golden point.');
+  });
+});
+
+/** The states a ticker passes through, each change once, over a real match's events. */
+function states(events: readonly MatchEvent[], homeSheet: Parameters<typeof startTicker>[0]['home'], awaySheet: Parameters<typeof startTicker>[0]['away']): string[] {
+  let t = startTicker({ home: homeSheet, away: awaySheet, mine: 'home' }, NINES.halfMinutes)!;
+  const seen = [`${t.content.state}/${t.content.half}`];
+  for (const e of events) {
+    t = foldEvent(t, e).ticker;
+    const now = `${t.content.state}/${t.content.half}`;
+    if (now !== seen[seen.length - 1]) seen.push(now);
+  }
+  return seen;
+}
+
+describe('a real headless match (runMatch), not made-up events', () => {
+  const h = sideSheet('H', { rating: 60 });
+  const a = sideSheet('A', { rating: 60 });
+
+  it('the sim kicks the second half off, so the ticker goes live → half-time → live → full time', () => {
+    for (let seed = 0; seed < 3; seed++) {
+      const res = runMatch(h, a, { seed, weather: 'clear' });
+      expect(states(res.events, h, a), `seed ${seed}`).toEqual(['live/first', 'half-time/second', 'live/second', 'full-time/second']);
+    }
+  });
+
+  it('a drawn final: the break before golden point, its kick-off, then full time', () => {
+    let golden: MatchEvent[] | null = null;
+    for (let seed = 0; seed < 300 && !golden; seed++) {
+      const res = runMatch(h, a, { seed, weather: 'clear', goldenPoint: true });
+      if (res.events.filter((e) => e.kind === 'half-time').length >= 2) golden = res.events;
+    }
+    expect(golden, 'no drawn final in 300 seeds').not.toBeNull();
+    expect(states(golden!, h, a)).toEqual(['live/first', 'half-time/second', 'live/second', 'half-time/golden', 'live/golden', 'full-time/golden']);
   });
 });
 

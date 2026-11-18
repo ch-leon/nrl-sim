@@ -15,11 +15,21 @@ import type { MatchEvent, MatchEventKind, MatchResult, TeamSheet } from '../sim/
 import { initLiveState, reduceEvent, scoreBanner, teamCodes, type LiveState } from '../ui/screens/matchOverlay';
 import { COLOR_TOKENS } from '../ui/tokens';
 
-/** Live while the match plays; paused is set natively when the app goes to the background. */
-export type TickerState = 'live' | 'paused' | 'half-time' | 'full-time';
+// The unions as values too, so tests/native/liveMatchContract.test.ts can hold them to the
+// Swift enums' raw values (a mismatch is a silent decode failure on the phone).
+
+/**
+ * Live while the match plays; paused is set natively when the app goes to the background.
+ * half-time is also the break before golden point (with half 'golden').
+ */
+export const TICKER_STATES = ['live', 'paused', 'half-time', 'full-time'] as const;
+export type TickerState = (typeof TICKER_STATES)[number];
 /** The captain's pose (Phase 4 draws them; Phase 3 shows a ball for every one). */
-export type TickerPose = 'carry' | 'try' | 'tackle' | 'fulltime';
-export type TickerHalf = 'first' | 'second' | 'golden';
+export const TICKER_POSES = ['carry', 'try', 'tackle', 'fulltime'] as const;
+export type TickerPose = (typeof TICKER_POSES)[number];
+export const TICKER_HALVES = ['first', 'second', 'golden'] as const;
+export type TickerHalf = (typeof TICKER_HALVES)[number];
+export const TICKER_SIDES = ['home', 'away'] as const;
 
 /** What never changes during the match (ActivityAttributes). */
 export interface TickerAttributes {
@@ -113,7 +123,7 @@ export function startTicker(
 /** The clock line: the half and the minute as of this update, or the break it is at. */
 export function clockLabel(state: TickerState, half: TickerHalf, minute: number): string {
   if (state === 'full-time') return 'Full time';
-  if (state === 'half-time') return 'Half-time';
+  if (state === 'half-time') return half === 'golden' ? 'Golden point next' : 'Half-time';
   const m = `${Math.max(0, Math.floor(minute))}'`;
   return half === 'first' ? `1st half ${m}` : half === 'second' ? `2nd half ${m}` : `Golden point ${m}`;
 }
@@ -172,15 +182,17 @@ export function foldEvent(t: Ticker, ev: MatchEvent): { ticker: Ticker; matters:
         state = 'half-time';
         half = 'second';
       } else {
-        // A drawn final's second whistle (N9.4): golden point, next score wins.
-        state = 'live';
+        // A drawn final's second whistle (N9.4): a break, then golden point (next score wins).
+        // The sim kicks golden point off with a 'kickoff' event, which makes it live.
+        state = 'half-time';
         half = 'golden';
         moment = 'GOLDEN POINT, next score wins';
       }
       pose = 'carry';
       break;
     case 'kickoff':
-      // The second half is under way: no longer at the break.
+      // The second half (or golden point) is under way: no longer at the break. The live
+      // sim emits a kickoff at each restart after a whistle (src/match/league/live/kicks.ts).
       if (state === 'half-time') {
         state = 'live';
         matters = true;
