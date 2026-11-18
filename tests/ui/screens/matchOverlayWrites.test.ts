@@ -370,9 +370,9 @@ describe('the commentary line’s fitter (#433, #602)', () => {
       expect(layoutReads, `${how}, then back`).toBeGreaterThan(0);
       nextFrame();
     };
-    const board = one('.nrl-mo-scoreboard'), log = one('.nrl-mo-log-toggle');
+    // SuperCOOKED 40: the LOG on/off switch went (the line is always in the bar), so there is no "switched off" to try.
+    const board = one('.nrl-mo-scoreboard');
     hidden('the stats open', () => board.click(), () => board.click());
-    hidden('the log switched off', () => log.click(), () => log.click());
     hidden('the full log open', () => one('.nrl-mo-strip').click(), () => one('.nrl-mo-full-x').click());
     hidden('the coach tray open', () => o.setTrayOpen!(true), () => o.setTrayOpen!(false));
     // Full time hides the line for good.
