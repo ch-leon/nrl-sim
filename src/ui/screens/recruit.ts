@@ -147,13 +147,13 @@ const SCREEN_CSS = `
 .nrl-recruit .nrl-grid-head, .nrl-recruit .nrl-row { grid-template-columns: var(--nrl-recruit-cols); column-gap: 8px; }
 @media (max-width: 760px) { .nrl-recruit { --nrl-recruit-cols: 30px minmax(0, 1fr) 2.25rem 4.6rem 4.25rem 4.5rem 6rem; } .nrl-recruit .nrl-grid-head, .nrl-recruit .nrl-row { column-gap: 5px; } }
 html[data-text-size] .nrl-recruit { --nrl-recruit-cols: 30px minmax(0, 1fr) 2.6rem 4.4rem 4.5rem 4.5rem 6.5rem; }
-.nrl-recruit .nrl-grid-head { font-size: 0.6875rem; height: 18px; }
-.nrl-recruit .nrl-row { min-height: 44px; }
+.nrl-recruit .nrl-grid-head { font-size: 0.6875rem; height: 16px; }
+.nrl-recruit .nrl-row { min-height: 44px; box-sizing: border-box; }
 /* The filter gives way first (it scrolls sideways, #611); Squad / Recruit and Sort never do. */
 .nrl-recruit .nrl-screen-titles { min-width: 0; }
 .nrl-recruit .nrl-sq-tabs { flex-shrink: 0; }
 .nrl-recruit .nrl-screen-head { margin-bottom: 2px; }
-.nrl-sq .nrl-recruit-sub { flex: 0 0 auto; margin: 0 0 2px; font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nrl-sq .nrl-recruit-sub { flex: 0 0 auto; margin: 0 0 2px; font-size: 0.75rem; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nrl-recruit-face { width: 28px; height: 32px; border-radius: 6px; background: var(--nrl-raised); image-rendering: pixelated; }
 .nrl-recruit-who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .nrl-recruit-name { display: flex; align-items: center; gap: 6px; min-width: 0; }

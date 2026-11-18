@@ -314,9 +314,12 @@ function ensureSquadStyles(): void {
 
 /** The list's stylesheet (SuperCOOKED 31). */
 export const SQUAD_CSS = `
-.nrl-squad .nrl-squad-list { --nrl-squad-cols: 36px minmax(9rem, 1fr) 3rem 5.5rem repeat(4, 2.75rem) 5rem 4rem; }
+/* Sized for a notched phone on its side too (844 less its safe bands): the name gives way first. */
+.nrl-squad .nrl-squad-list { --nrl-squad-cols: 36px minmax(7rem, 1fr) 2.75rem 5rem repeat(4, 2.5rem) 4.5rem 3.75rem; }
 .nrl-squad-list > .nrl-row, .nrl-squad-group { display: grid; grid-template-columns: var(--nrl-squad-cols); align-items: center; column-gap: 8px; }
-.nrl-squad-group { min-height: 30px; padding: 6px 4px 2px; font-family: var(--nrl-f-num); font-size: 0.625rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--nrl-muted); position: sticky; top: 0; background: var(--nrl-sheet); z-index: 1; }
+/* A row is 44 with its rule, so four of them and a group's head show at 844×390 (the layout check). */
+.nrl-squad-list > .nrl-row { box-sizing: border-box; }
+.nrl-squad-group { min-height: 20px; padding: 2px 4px; font-family: var(--nrl-f-num); font-size: 0.625rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--nrl-muted); position: sticky; top: 0; background: var(--nrl-sheet); z-index: 1; }
 .nrl-squad-group-name { font-family: var(--nrl-f-label); font-size: 0.8125rem; font-weight: 700; letter-spacing: 0.1em; color: var(--nrl-text); }
 .nrl-squad-group .nrl-num-head, .nrl-squad-stat, .nrl-squad-inside { text-align: right; }
 .nrl-squad-face { width: 28px; height: 32px; border-radius: 6px; background: var(--nrl-raised); image-rendering: pixelated; }

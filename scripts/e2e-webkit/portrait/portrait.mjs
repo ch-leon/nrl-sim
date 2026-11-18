@@ -120,14 +120,16 @@ export async function runPortrait(browser) {
     if (await page.locator('.nrl-screen-region').count()) throw new Error('Build stayed open after the tour was skipped');
   });
   await step('menu-portrait', async (rec) => {
+    // SQUAD opens its pitch (the Lineup, keyed 'lineup') or its list ('squad'), whichever was last used (SuperCOOKED 30–31).
+    const squadSheet = ':is([data-screen-key="squad"], [data-screen-key="lineup"])';
     await page.locator('.nrl-nav > .nrl-btn[data-screen="squad"]').tap();
-    await page.waitForSelector('[data-screen-key="squad"]');
+    await page.waitForSelector(squadSheet);
     await turn(390, 844);
     await asleep('squad upright');
-    const covered = await page.evaluate(() => {
+    const covered = await page.evaluate((squadSheet) => {
       const card = document.querySelector('.nrl-rotate');
-      return !!document.querySelector('[data-screen-key="squad"]') && !!card && getComputedStyle(card).display !== 'none';
-    });
+      return !!document.querySelector(squadSheet) && !!card && getComputedStyle(card).display !== 'none';
+    }, squadSheet);
     if (!covered) throw new Error('the rotate card is not over Squad');
     rec.notes.push('card over Squad, loop asleep');
   });

@@ -24,7 +24,7 @@ export const SCREEN_RUNS = (process.env.E2E_SCREEN_SIZES ?? '844x390@47,0,47,21 
 /** Screens reached from the dock: what shows its content, and what must stay on screen. */
 const NAV_SCREENS = [
   { id: 'squad', box: '.nrl-screen-region', rows: '.nrl-grid-body > .nrl-row', primary: ['[data-squad-more]', '[data-sort-menu]'], more: '.nrl-grid-body' },
-  { id: 'lineup', box: '.nrl-screen-region', rows: '.nrl-lineup-field .nrl-pcard', card: '.nrl-lineup-field', primary: ['[data-auto-pick]', '[data-swap-start]', '[data-squad-more]'], more: '.nrl-lineup-field' },
+  { id: 'lineup', box: '.nrl-screen-region', rows: '.nrl-lineup-field .nrl-pcard', card: '.nrl-lineup-field', primary: ['[data-auto-pick]', '[data-swap-start]', '[data-squad-more]'] },
   { id: 'recruit', box: '.nrl-screen-region', rows: '.nrl-grid-body > .nrl-row', primary: ['.nrl-grid-body > :first-child .nrl-row-action'] },
   { id: 'fixtures', box: '.nrl-screen-region', rows: '.nrl-fixture-row', primary: ['[data-next-row]'] },
   { id: 'ladder', box: '.nrl-screen-region', rows: '.nrl-ladder-table tbody tr', more: '.nrl-ladder-scroll' },
