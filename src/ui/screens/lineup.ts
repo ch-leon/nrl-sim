@@ -308,6 +308,10 @@ export function openLineupScreen(): void {
   let roles: { kicker?: string; captain?: string } = {};
   // The spot the swap list was last drawn for (#614).
   let swapFor: Spot | null = null;
+  // A long press that just opened a swap. It re-renders the field, so on touch the press's own
+  // click lands on a new card whose closure never saw the hold: the screen keeps the flag, the
+  // next click uses it up, and the next pointerdown drops it (a mouse hold sends no click).
+  let heldOpen = false;
   const kit = (): Kit => kitFromColors(getState().league.clubs.find((c) => c.id === PLAYER_ID)?.colors ?? DEFAULT_PLAYER_COLORS, PLAYER_ID);
 
   /** A card for `p` in `spot` (or a reserve, spot null): tap opens his page, a long press swaps. */
@@ -349,8 +353,9 @@ export function openLineupScreen(): void {
     let timer: ReturnType<typeof setTimeout> | null = null;
     c.addEventListener('pointerdown', () => {
       held = false;
+      heldOpen = false;
       pressed = Date.now();
-      if (spot) timer = setTimeout(() => { held = true; swapSpot(spot); }, LONG_PRESS_MS);
+      if (spot) timer = setTimeout(() => { held = true; heldOpen = true; swapSpot(spot); }, LONG_PRESS_MS);
     });
     const cancel = (): void => { if (timer) { clearTimeout(timer); timer = null; } };
     c.addEventListener('pointerup', cancel);
@@ -358,7 +363,7 @@ export function openLineupScreen(): void {
     c.addEventListener('contextmenu', (e) => e.preventDefault());
     c.addEventListener('click', () => {
       cancel();
-      if (held || (pressed && Date.now() - pressed >= LONG_PRESS_MS)) { held = false; return; }
+      if (held || heldOpen || (pressed && Date.now() - pressed >= LONG_PRESS_MS)) { held = false; heldOpen = false; return; }
       if (spot && (choosing || swapping)) { swapSpot(spot); return; }
       openPlayerPage(p, { kind: 'squad' });
     });
