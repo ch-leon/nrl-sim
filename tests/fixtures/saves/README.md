@@ -45,7 +45,7 @@ playtest evidence, and no production competition entry is activated.
 
 ## Format 32 League and Open Cup migration sources
 
-The seven files in `league-career/` are immutable headless captures from
+The first seven files listed below are immutable headless captures from
 `8d7d9c5dbaaae3d06eb42018f48e18a0b461a159` with `SAVE_VERSION = 32`.
 Dedicated migration tests use these snapshots. The older generic soak corpus
 uses the JSON files at the top level.
@@ -81,3 +81,43 @@ snapshot passed `structuralPolicyProblem()` in its isolated namespace.
 | `v32-uk-active.json` | 399,850 |
 | `v32-uk-next-season-choice.json` | 543,561 |
 | `v32-dev-open-cup.json` | 517,522 |
+
+The six additional League snapshots use the same baseline revision, packs, seed,
+and production QA run. In an archived checkout of that revision, the QA runner
+called its existing snapshot callback with a clone of `getState()` immediately
+before `advanceWeekAsTapped()` in season 1 at weeks 6, 7, and 19. The calendar
+had completed 5, 6, and 18 intervals respectively. The original named snapshots
+and QA report reproduced byte for byte with the extra captures enabled.
+
+Each additional snapshot passed baseline `checkState()`,
+`leagueCareerStateProblem()`, `migrateState()`, `importSave()`, and `loadSlot()`.
+Migration, import, and slot load reported zero repairs, returned the original
+parsed state, and left the slot bytes intact.
+
+| File under `league-career/` | Bytes |
+| --- | ---: |
+| `v32-au-week-6.json` | 429,217 |
+| `v32-au-week-7.json` | 437,555 |
+| `v32-au-week-19.json` | 504,337 |
+| `v32-uk-week-6.json` | 425,476 |
+| `v32-uk-week-7.json` | 433,680 |
+| `v32-uk-week-19.json` | 499,653 |
+
+The matching Week 6 live records in `league-career/live-matches/` are the raw
+slot sidecar bytes from the same baseline revision. For each pack, load the
+exact Week 6 snapshot in a normal slot, register the production QA systems,
+save the interval start, and call `advanceWeek()`. The scheduled League match
+holds the week and the baseline writes its live record at kick-off (tick 0).
+
+To construct the held-save export, parse the corresponding Week 6 snapshot and
+sidecar, add the sidecar as the top-level `nrlLiveMatch` field, and serialise
+with two-space indentation. Both file pairs reproduced the bytes of the
+baseline `exportSave()` while the week was held. Baseline `installImportedSave()`
+and `loadSlot()` preserved the two exact source strings and loaded with zero
+repairs. Advancing from the loaded interval start reopened the original fixture
+with its original seed.
+
+| File under `league-career/live-matches/` | Bytes |
+| --- | ---: |
+| `v32-au-week-6.json` | 282 |
+| `v32-uk-week-6.json` | 278 |

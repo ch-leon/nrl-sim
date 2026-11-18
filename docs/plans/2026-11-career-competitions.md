@@ -92,6 +92,15 @@ event phases, event simulation rules and actual reward values must still be
 specified before their dependent behaviour is enabled. Use existing finance and
 progression owners; numerical tuning and the wider design are not claimed complete.
 
+**Open Cup implementation decisions, 18 November:** Leon confirmed free entry
+from season start through Week 6, closing before Week 7; matches use Weeks
+7/10/13/16/19. Missing registration means no entry that year. The extra cash
+schedule 1M/1M/2M/3M/5M, reputation and trophy are approved starting values for
+testing. Ordinary match income stays separate. Execute the
+[reward foundation](2026-11-18-open-cup-rewards.md), then
+[normal entry and UI](2026-11-18-open-cup-entry.md), with independent review and
+the repository's CI/QA gates. These decisions do not claim runtime delivery.
+
 ## Historical specification and delivery context — 10–11 November
 
 This file preserves the original 10 November concept. It was developed into the

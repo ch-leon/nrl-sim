@@ -280,6 +280,14 @@ two entrants means no event or title reward. Decline is free before draw;
 withdrawal after draw resolves unplayed ties under a displayed forfeit policy,
 without match XP, gate or appearance income. Already played outcomes stand.
 
+On 18 November Leon confirmed free registration from season start through Week 6,
+with the deadline before Week 7 and cup dates 7/10/13/16/19. Missing registration
+means sitting out that year's cup. The 1M/1M/2M/3M/5M cash schedule, reputation
+and trophy below are approved as initial values to test, not validated balance.
+The [entry plan](../plans/2026-11-18-open-cup-entry.md) and
+[reward plan](../plans/2026-11-18-open-cup-rewards.md) track implementation;
+this decision does not itself activate entry or rewards in normal careers.
+
 The first cut retains existing Nines lineup/injury rules. Reject ineligible
 rosters before match construction; do not use the cheap rival generator to
 manufacture missing actual players. The later Rising Stars event registers 13 fit
@@ -287,9 +295,9 @@ players with at least seven aged ≤21, five youth starters and two youth bench
 players. Voluntary replacements preserve five youth on field; injury/sin-bin
 exceptions and free withdrawal are explicit. An all-youth squad is legal.
 
-| Event | Extra reward proposal | Activation / prerequisite |
+| Event | Extra reward policy or proposal | Activation / prerequisite |
 | --- | --- | --- |
-| Open Cup | Actual round wins: 1M / 1M / 2M / 3M / 5M; win reputation and a title honour | Cash needs #559/#576. M is finance's division match-base payment, not legacy weekly wages. Byes pay zero. |
+| Open Cup | Approved for initial testing: actual round wins 1M / 1M / 2M / 3M / 5M; win reputation and a title honour | #559 ordinary income is implemented; #576 extra settlement and normal cup entry remain in progress. M is finance's division match-base payment. Byes pay zero. |
 | Sponsor Shield | First title +5% annual base-cap capacity; repeated titles cash/honours | #557/#560/#577; next-season activation, unique club-career reward key. Proposed earned limit 10%; no automatic second 5%. |
 | Rising Stars | Academy-labelled cash, scout report on a real unsigned prospect | #539/#544/#545 and #580; no gifted superstar or raised ceiling. |
 | Champions Series | Published played-game cash, title/finalist cash and honour | #581 later; no award for unplayed third game or a missing opponent. |
