@@ -41,9 +41,8 @@ interface Played {
   refusals: Set<string>;
 }
 
-/** Current-default witnesses after normal back-door movement: seed 17 offers
- * the tap-go override; seed 61 offers take-two in this six-minute match. */
-const PENALTY_SEEDS = [17, 61];
+/** Current-default witnesses after wide pre-catch back-door movement: seed 1 offers take-two, seed 50 tap-go. */
+const PENALTY_SEEDS = [1, 50];
 
 /** Play with the home coach making `call` whenever he may (as a player at the tray does: a tap, in on the next tick). */
 function play(seed: number, call: CoachCall | null, minutes = 6, side: 'home' | 'away' = 'home'): Played {
@@ -294,9 +293,12 @@ describe('five more calls (#396): each does what it says', () => {
   it('Offload: more offloads, and some spilled', () => {
     let withCall = 0;
     let without = 0;
-    for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
-      withCall += play(seed, 'offload').events.filter((e) => e.kind === 'offload' && e.side === 'home').length;
-      without += play(seed, null).events.filter((e) => e.kind === 'offload' && e.side === 'home').length;
+    // The original seeds 1–8 are tied after the wide back-door geometry; use a fixed contiguous cohort.
+    for (let seed = 1; seed <= 32; seed++) {
+      const called = play(seed, 'offload').events.filter((e) => e.kind === 'offload' && e.side === 'home').length;
+      const plain = play(seed, null).events.filter((e) => e.kind === 'offload' && e.side === 'home').length;
+      withCall += called;
+      without += plain;
     }
     expect(withCall).toBeGreaterThan(without);
   });
