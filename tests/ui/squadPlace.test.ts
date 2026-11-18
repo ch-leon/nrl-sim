@@ -77,21 +77,21 @@ describe('AUTO PICK’s toast (#614)', () => {
   });
 });
 
-describe('the player page’s columns (#614)', () => {
-  it('keep their scroll through CAPTAIN and Rename; a sale preview cancels without changing the player', () => {
+describe('the player page’s tab (#614)', () => {
+  it('keeps its scroll through CAPTAIN and Rename; a sale preview cancels without changing the player', () => {
     const id = getState().lineup.starters[3]!;
     openPlayerPage(getState().squad.find((p) => p.id === id)!, { kind: 'squad' });
     const page = q('[data-player-page]');
-    const cols = (): Scroller[] => page.children;
-    const scrolled = [27, 150, 20]; // the card, the stats and traits, the jobs and deals
-    const scroll = (): void => cols().forEach((c, i) => { c.scrollTop = scrolled[i]!; });
-    expect(cols().map((c) => c.className.split(' ').pop())).toEqual(['nrl-player-card', 'nrl-player-about', 'nrl-player-side']);
+    // SuperCOOKED 35–37: the header, the tabs, then the tab's page, which scrolls on its own.
+    const panel = (): Scroller => page.querySelector('.nrl-player-panel') as Scroller;
+    q('[data-player-tab="deal"]').click();
+    expect(panel().getAttribute('data-player-panel')).toBe('deal');
     for (const redraw of ['[data-player-role="captain"]', '[data-rename-open]']) {
-      const before = cols();
-      scroll();
+      const before = panel();
+      before.scrollTop = 150;
       q(redraw).click();
-      expect(cols()[0], redraw).not.toBe(before[0]); // drawn again
-      expect(cols().map((c) => c.scrollTop), redraw).toEqual(scrolled);
+      expect(panel(), redraw).not.toBe(before); // drawn again
+      expect(panel().scrollTop, redraw).toBe(150);
     }
     expect(getState().lineup.captain).toBe(id);
     expect(q('[data-player-action="sell"]').textContent).toMatch(/^Sell \+/);
@@ -99,7 +99,7 @@ describe('the player page’s columns (#614)', () => {
     q('[data-player-action="sell"]').click();
     expect(page.words()).toContain('Deal unchanged');
     expect(page.classList.contains('nrl-player-sale')).toBe(true);
-    expect(page.querySelector('.nrl-player-side')).toBeNull();
+    expect(page.querySelector('.nrl-player-panel')).toBeNull();
     q('[data-sale-cancel]').click();
     expect(getState()).toEqual(beforeSale);
     expect(page.querySelector('[data-player-rename]')).not.toBeNull();
@@ -110,7 +110,9 @@ describe('player sale and history routes', () => {
   it('explicitly confirms an offer and returns once to the opening screen', () => {
     const id = getState().lineup.starters[3]!; const back = vi.fn();
     openPlayerPage(getState().squad.find(p => p.id === id)!, { kind: 'squad' }, { onClose: back });
+    q('[data-player-tab="record"]').click(); // club history is on the Record tab (SuperCOOKED Phase 1)
     expect(q('[data-club-history]').words()).toContain(getState().clubName);
+    q('[data-player-tab="deal"]').click(); // the deals are on the Deal tab
     q('[data-player-action="sell"]').click();
     const confirm = q('[data-sale-confirm]'); confirm.click(); confirm.click();
     expect(getState().squad.some(p => p.id === id)).toBe(false);
@@ -120,9 +122,11 @@ describe('player sale and history routes', () => {
   it('shows club history in rival and unsigned player pages', () => {
     const rival = getState().league.clubs.find(c => c.squad)!;
     openPlayerPage(rival.squad![0]!, { kind: 'rival', club: rival });
+    q('[data-player-tab="record"]').click();
     expect(q('[data-club-history]').words()).toContain(rival.name);
     closeModal();
     openPlayerPage(getState().freeAgents[0]!, { kind: 'freeAgent' });
+    q('[data-player-tab="record"]').click();
     expect(q('[data-club-history]').words()).toContain('No recorded club spells.');
   });
 });
