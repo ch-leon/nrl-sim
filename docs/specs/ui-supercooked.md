@@ -225,6 +225,11 @@ Each row: mockup → current source → what changes. Anything not listed keeps 
 - **`21-building-popup`** → `screens/build.ts` (facility popup): name + ✕, level as three bars, **Now / Next level** boxes side by side (the effect values), upkeep line "on the salary cap", **Upgrade to Ln · $X**, then Move and Demolish.
 - **`22-build`** → `screens/build.ts`: All / Training / Club; tiles show name, price (accent), one plain line of what it does, footprint and upkeep on the cap. Built: "BUILT · Ln · tap it on the grounds". One-only already built: amber "ONE ONLY · ALREADY BUILT".
 - **`23-league`** → `screens/fixtures.ts` and the ladder: ladder with last-5 form as lettered dots (W green, L amber), your row highlighted, dashed accent line under the finals cut; right column **next opponent card** (home/away, their stars, ladder spot, record, last meeting), then your run of fixtures.
+- **Built in Phase 3** (what the code has decides what shows):
+  - No facility has upkeep, so the cards and tiles show none. The building card keeps "No recurring upkeep", and the Build tiles say "one-off cost".
+  - CASH is a small word before the money, and the week stays "WK 2/27 · S1": the season stays on show, and the dock's tabs keep their room.
+  - The next-opponent card opens the full preview (the NEXT row still does too). On a phone on its side it is one line, their name and when.
+  - The ladder keeps its W and L columns, and its form column hides under 760px wide, as before.
 
 ### Office (Phase 4)
 
