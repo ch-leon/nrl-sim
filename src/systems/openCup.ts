@@ -1,7 +1,7 @@
 // Pure Open Cup sporting operations (#575). Calendar/match finalisation owns
 // the actual games; reward settlement owns money, XP and honours.
 import {
-  competitionFixtureId, competitionInstanceId, createCompetitionInstance,
+  competitionFixtureId, competitionInstanceId, createCompetitionInstance, isOpenCupDefinitionId,
   validateCompetitionDefinition, validateCompetitions,
   type CompetitionDefinition, type CompetitionFixture, type CompetitionInstance, type CompetitionResult,
 } from '../data/competition';
@@ -144,7 +144,7 @@ export function openCupByes(instance: CompetitionInstance): string[] {
 
 /** Only our named cup uses this persisted draw algorithm; other knockout formats
  * retain their own definition and future progression owners. */
-export const isOpenCupInstance = (instance: CompetitionInstance): boolean => instance.definition.id === 'open-cup' || instance.definition.id.endsWith(':open-cup');
+export const isOpenCupInstance = (instance: CompetitionInstance): boolean => isOpenCupDefinitionId(instance.definition.id);
 
 /** Apply only after the match's bounded golden point. This never changes scores or state. */
 export function openCupResult(instance: CompetitionInstance, fixtureId: string,
@@ -165,10 +165,14 @@ export function openCupResult(instance: CompetitionInstance, fixtureId: string,
   return { ...score, winnerId: score.homeScore > score.awayScore ? fixture.homeId : fixture.awayId, decider: forfeit ? 'forfeit' : 'score' };
 }
 
-function outcome(instance: CompetitionInstance, fixture: CompetitionFixture, kind: OpenCupOutcome['kind']): OpenCupOutcome {
+export function openCupOutcomeId(instanceId: string, fixtureId: string, clubId: string, kind: OpenCupOutcome['kind']): string {
+  return JSON.stringify([instanceId, fixtureId, clubId, kind]);
+}
+
+export function openCupFixtureOutcome(instance: CompetitionInstance, fixture: CompetitionFixture, kind: OpenCupOutcome['kind']): OpenCupOutcome {
   const clubId = fixture.result!.winnerId!;
   return {
-    id: JSON.stringify([instance.id, fixture.id, clubId, kind]), kind, competitionId: instance.id,
+    id: openCupOutcomeId(instance.id, fixture.id, clubId, kind), kind, competitionId: instance.id,
     fixtureId: fixture.id, season: instance.season, stageId: fixture.stageId, round: fixture.round, clubId,
   };
 }
@@ -219,10 +223,10 @@ export function openCupProblem(instance: CompetitionInstance): string | null {
  * receipts. Re-reading them cannot pay cash, grant XP or invent another title. */
 export function openCupSportingOutcomes(instance: CompetitionInstance): OpenCupOutcome[] {
   inspectDraw(instance);
-  const outcomes = instance.fixtures.filter(f => f.status === 'completed').map(f => outcome(instance, f, 'round-win'));
+  const outcomes = instance.fixtures.filter(f => f.status === 'completed').map(f => openCupFixtureOutcome(instance, f, 'round-win'));
   if (instance.status === 'completed') {
     const final = instance.fixtures.find(f => f.round === instance.definition.stages[0]!.rounds)!;
-    outcomes.push(outcome(instance, final, 'title'));
+    outcomes.push(openCupFixtureOutcome(instance, final, 'title'));
   }
   return outcomes;
 }
@@ -237,12 +241,12 @@ export function advanceOpenCup(instance: CompetitionInstance): OpenCupAdvance {
     return { instance: instance.status === status ? instance : { ...instance, status }, outcomes: [] };
   }
   const { round, winners, actual } = progress;
-  const outcomes = actual.map(f => outcome(instance, f, 'round-win'));
+  const outcomes = actual.map(f => openCupFixtureOutcome(instance, f, 'round-win'));
   const finalRound = instance.definition.stages[0]!.rounds;
   const next: CompetitionInstance = round === finalRound
     ? { ...instance, status: 'completed', winnerId: winners[0]!, fixtures: [...instance.fixtures] }
     : { ...instance, status: 'active', fixtures: [...instance.fixtures, ...roundFixtures(instance, winners, round + 1)] };
-  if (round === finalRound) outcomes.push(outcome(instance, actual[0]!, 'title'));
+  if (round === finalRound) outcomes.push(openCupFixtureOutcome(instance, actual[0]!, 'title'));
   assertInstance(next);
   return { instance: next, outcomes };
 }
