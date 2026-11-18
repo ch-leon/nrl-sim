@@ -5,9 +5,14 @@
 // extension, which draws it (ios/App/BigCoachWidgets/ClubWidget.swift).
 //
 // Everything counts in game rounds and only changes when you play: there is no date,
-// no time and no wall clock anywhere in it (§6, nothing timed). The words are the
-// game's own: the next match is labelled as the Next match card labels it, the clock
-// line is the HUD's, an injury counts down the way the weekly injury hook recovers it.
+// no time and no wall clock anywhere in it (§6, nothing timed). Where the game has
+// words, these are them: the next match's label and the no-match line are the Next
+// match card's (fixtures.ts), the clock line is the HUD's (seasonWeekLabel). A sacked
+// coach gets no special line, as the club screen's next-match chip has none.
+// Not the game's own: the short labels pick the fixture list's ("R7", "SF") and the
+// HUD chip's ("W5"); "rounds" until an injured man is back is the weekly injury hook's
+// recovery applied to his weeks out, where the Squad screen shows the raw weeks
+// ("out 3 wk"), so the two differ when the club has a medical bay or physio centre.
 //
 // The shape is the Swift side's ClubSnapshot (ios/App/Shared/ClubSnapshot.swift),
 // field for field. Change one, change both, and bump CLUB_SNAPSHOT_VERSION when an old
@@ -82,14 +87,12 @@ function roundShort(round: number): string {
 
 /** What the Next match card says when there is no next match (fixtures.ts nextMatchCard). */
 function noMatchText(s: GameState): string {
-  if (s.sacked) return 'You have been sacked';
   const view = leagueSeasonView(s);
   if (view) return view.choiceRequired ? 'Choose a league before playing' : `${view.currentLabel} · no scheduled club match`;
   return s.week > SEASON_ROUNDS ? 'No more matches this season' : 'No match this week';
 }
 
 function nextMatch(s: GameState): ClubSnapshot['next'] {
-  if (s.sacked) return null;
   const p = nextMatchPreview(s);
   if (!p) return null;
   const stage = p.label ?? (p.stage === 'Trial' ? `Pre-season trial ${p.round + 2}` : p.stage === 'Round' ? `Round ${p.round}` : p.stage);
@@ -107,7 +110,7 @@ function injured(s: GameState): ClubSnapshot['injured'] {
   const out = s.squad
     .filter((p) => !p.departed && !p.junior && p.injuredWeeks > 0)
     .map((p) => ({ p, overall: overallRating(p) }))
-    .sort((a, b) => b.overall - a.overall || a.p.injuredWeeks - b.p.injuredWeeks || a.p.name.localeCompare(b.p.name));
+    .sort((a, b) => b.overall - a.overall || a.p.injuredWeeks - b.p.injuredWeeks || (a.p.id < b.p.id ? -1 : a.p.id > b.p.id ? 1 : 0));
   const best = out[0];
   if (!best) return null;
   return {

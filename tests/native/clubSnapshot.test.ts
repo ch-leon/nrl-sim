@@ -8,7 +8,8 @@ import { clearSeasonHooks, clearTickHooks } from '../../src/core/time';
 import { SEASON_ROUNDS, WEEKS_PER_SEASON } from '../../src/config';
 import { overallRating, starsForOverall } from '../../src/data/player';
 import { initLeague, PLAYER_ID } from '../../src/systems/fixtures';
-import { applyInjuries } from '../../src/systems/training';
+import { applyInjuries, weeksUntilFit } from '../../src/systems/training';
+import { nextMatchChip } from '../../src/ui/hud';
 import { clubSnapshot, CLUB_SNAPSHOT_VERSION } from '../../src/native/clubSnapshot';
 import { competitions, progress } from '../data/leagueCareerFixtures';
 
@@ -82,7 +83,6 @@ describe('clubSnapshot', () => {
     const snap = clubSnapshot(s)!;
     expect(snap.next).toBeNull();
     expect(snap.noMatch).toBe('No more matches this season');
-    expect(clubSnapshot({ ...career(5), sacked: { season: 1, reason: 'x' } })).toMatchObject({ next: null, noMatch: 'You have been sacked' });
   });
 
   it('uses a League career\'s stage label and calendar week', () => {
@@ -130,6 +130,32 @@ describe('clubSnapshot', () => {
       }
       expect(said).toBe(advances);
     }
+  });
+
+  it('shows a sacked coach what the club screen shows him: the next match, no special line', () => {
+    const s = career(5);
+    const sacked = { ...s, sacked: { season: 1, reason: 'Missed every objective' } };
+    expect(nextMatchChip(sacked)).not.toBeNull();
+    expect(clubSnapshot(sacked)).toEqual(clubSnapshot(s));
+  });
+
+  it('weeksUntilFit is 0 for a fit man and never less than 1 for an injured one', () => {
+    const bays = [facility('medicalBay', 3), facility('physioCentre')];
+    expect(weeksUntilFit(0, [])).toBe(0);
+    expect(weeksUntilFit(0, bays)).toBe(0);
+    expect(weeksUntilFit(-1, [])).toBe(0);
+    expect(weeksUntilFit(1, bays)).toBe(1);
+    expect(weeksUntilFit(5, bays)).toBe(1);
+    expect(weeksUntilFit(6, bays)).toBe(2);
+  });
+
+  it('breaks a tie between equal injured players by id, not by name', () => {
+    const s = career(4);
+    const [a, b] = [s.squad[0]!, s.squad[1]!];
+    const twin = { ...b, stats: { ...a.stats }, position: a.position, injuredWeeks: 2, id: 'aaa', name: 'Zed' };
+    const other = { ...a, injuredWeeks: 2, id: 'zzz', name: 'Abe' };
+    const t = { ...s, squad: [other, twin, ...s.squad.slice(2)] };
+    expect(clubSnapshot(t)!.injured!.name).toBe('Zed');
   });
 
   it('totals banked points only while the coach spends them himself', () => {

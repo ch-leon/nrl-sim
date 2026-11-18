@@ -12,6 +12,11 @@
 // hook), so a burst is folded into one write, after it: a microtask, not a timer. A write is
 // skipped when the snapshot is the one last written. With no career there is nothing to
 // write, and the widget keeps asking you to open the game.
+//
+// Known gap: deleting a save (the title screen's Delete, save.ts deleteSlot/clearSave)
+// changes no state and emits nothing, so the widget keeps the deleted club until another
+// career is loaded or started. Hooking it would mean an event in save.ts, code the web
+// and Android bundles would carry, so it is left (docs/ios-test-build.md, Widgets).
 
 import type { Events } from '../core/events';
 import type { GameState } from '../core/state';
@@ -54,10 +59,15 @@ export function installClubWidgets(deps: ClubWidgetsDeps): () => void {
     }
     if (json === last) return;
     last = json;
-    deps.native.writeSnapshot({ json }).catch(() => {
-      // Not written (no App Group on this install): try again on the next change.
+    // The plugin resolves { written: false } when it could not store it (no App Group on
+    // this install, or JSON this build cannot decode); a rejection is the same. Either
+    // way forget it, so the next change tries again.
+    const forget = (): void => {
       if (last === json) last = null;
-    });
+    };
+    deps.native.writeSnapshot({ json }).then((r) => {
+      if (r?.written !== true) forget();
+    }, forget);
   };
   const schedule = (): void => {
     if (scheduled || stopped) return;

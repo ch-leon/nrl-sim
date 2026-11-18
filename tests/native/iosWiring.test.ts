@@ -3,6 +3,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { startIosNative, type IosGame } from '../../src/native/ios';
 import type { LiveMatchNative } from '../../src/native/liveMatch';
+import type { ClubWidgetsNative } from '../../src/native/clubWidgets';
+import { createNewGame, loadState } from '../../src/core/state';
 import { bus, type Events } from '../../src/core/events';
 import { sideSheet } from '../../src/match/balance/measure';
 import type { Fixture } from '../../src/core/state';
@@ -50,5 +52,22 @@ describe('startIosNative', () => {
     bus.emit('match:started', kickOff);
     expect(calls).toEqual(['start', 'end']);
     expect(warn).toHaveBeenCalledOnce();
+  });
+
+  it('starts the club widgets too: the loaded career is written once, a new one on load', async () => {
+    const jsons: string[] = [];
+    const widgets: ClubWidgetsNative = { writeSnapshot: async ({ json }) => (jsons.push(json), { written: true }) };
+    loadState(createNewGame('Wired FC', 5));
+    stop = startIosNative({ scene: { getScene: () => null } }, stubNative([]), widgets);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(jsons.map((j) => (JSON.parse(j) as { club: { name: string } }).club.name)).toEqual(['Wired FC']);
+    loadState(createNewGame('Rewired FC', 6));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(jsons).toHaveLength(2);
+    stop();
+    stop = null;
+    loadState(createNewGame('Stopped FC', 7));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(jsons).toHaveLength(2);
   });
 });

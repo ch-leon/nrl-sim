@@ -86,10 +86,26 @@ enum ClubLines {
         return "\(s.points) \(s.points == 1 ? "point" : "points") to spend"
     }
 
-    /// "4.5★".
+    /// "4.5", "4".
+    static func starCount(_ i: ClubSnapshot.Injured) -> String {
+        i.stars.rounded(.down) == i.stars ? String(Int(i.stars)) : String(format: "%.1f", i.stars)
+    }
+
+    /// "4.5★" on screen.
     static func stars(_ i: ClubSnapshot.Injured) -> String {
-        let whole = i.stars.rounded(.down) == i.stars
-        return (whole ? String(Int(i.stars)) : String(format: "%.1f", i.stars)) + "★"
+        starCount(i) + "★"
+    }
+
+    /// What VoiceOver reads for the injured row: "Walker, 4.5 stars, back in 2 rounds. 1 more out".
+    static func injuredSpoken(_ i: ClubSnapshot.Injured) -> String {
+        let more = i.others > 0 ? ". \(i.others) more out" : ""
+        return "\(i.name), \(starCount(i)) \(i.stars == 1 ? "star" : "stars"), back in \(i.rounds) \(i.rounds == 1 ? "round" : "rounds")\(more)"
+    }
+
+    /// What VoiceOver reads for the next match: "Next match: Round 7, Brisbane, away".
+    static func matchSpoken(_ s: ClubSnapshot) -> String {
+        guard let n = s.next else { return s.noMatch ?? "No match this week" }
+        return "Next match: \(n.stage), \(n.opponent), \(n.venue)"
     }
 }
 
@@ -135,20 +151,20 @@ struct RectangularClubView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
             if let s = snapshot {
-                Text(ClubLines.match(s))
-                    .font(.headline)
-                    .widgetAccentable()
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                RectangularMatchLine(snapshot: s)
                 if let i = s.injured {
                     Label(ClubLines.injured(i), systemImage: "cross.case.fill")
                         .font(.caption)
                         .lineLimit(1)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(ClubLines.injuredSpoken(i))
                 }
                 if let p = ClubLines.points(s) {
                     Label(p, systemImage: "arrow.up.circle.fill")
                         .font(.caption)
                         .lineLimit(1)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(p)
                 }
                 if s.injured == nil && s.points == 0 {
                     Text(s.when)
@@ -162,6 +178,39 @@ struct RectangularClubView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// The rectangular widget's match line: the short stage ("R7", "W5") so the opponent
+/// always fits; when space runs out the venue gives way first, then the stage, never
+/// the opponent.
+struct RectangularMatchLine: View {
+    let snapshot: ClubSnapshot
+
+    var body: some View {
+        Group {
+            if let n = snapshot.next {
+                HStack(spacing: 4) {
+                    Text("\(n.stageShort) v")
+                        .lineLimit(1)
+                        .layoutPriority(1)
+                    Text(n.opponentShort)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .layoutPriority(2)
+                    Text("· \(n.venue)")
+                        .lineLimit(1)
+                        .layoutPriority(0)
+                }
+            } else {
+                Text(snapshot.noMatch ?? "No match this week")
+                    .lineLimit(2)
+            }
+        }
+        .font(.headline)
+        .widgetAccentable()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(ClubLines.matchSpoken(snapshot))
     }
 }
 
@@ -211,6 +260,8 @@ struct NextMatchBlock: View {
                     .lineLimit(3)
             }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(ClubLines.matchSpoken(snapshot))
     }
 }
 
@@ -237,6 +288,8 @@ struct InjuredLine: View {
                     .lineLimit(1)
             }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(ClubLines.injuredSpoken(injured))
     }
 }
 
@@ -253,6 +306,8 @@ struct PointsLine: View {
                 .foregroundColor(BrandColor.text)
                 .lineLimit(1)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(text)
     }
 }
 

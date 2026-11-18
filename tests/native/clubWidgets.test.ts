@@ -2,22 +2,25 @@
 // (docs/specs/ios.md §3 (b) and (c), Phase 5), against a fake plugin and a real bus.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { bus } from '../../src/core/events';
-import { createNewGame, getState, setState, type GameState } from '../../src/core/state';
+import { createNewGame, getState, loadState, setState, type GameState } from '../../src/core/state';
 import { clearSeasonHooks, clearTickHooks } from '../../src/core/time';
 import { initLeague } from '../../src/systems/fixtures';
 import { installClubWidgets, type ClubWidgetsNative } from '../../src/native/clubWidgets';
 import type { ClubSnapshot } from '../../src/native/clubSnapshot';
 
 const tick = (): Promise<void> => new Promise((r) => queueMicrotask(r));
-const flush = async (): Promise<void> => { await tick(); await tick(); };
+const flush = async (): Promise<void> => { for (let i = 0; i < 5; i++) await tick(); };
 
-function setup(opts: { career?: boolean; reject?: boolean } = {}) {
+type Answer = 'ok' | 'reject' | 'refuse';
+
+function setup(opts: { career?: boolean; reject?: boolean; answer?: Answer } = {}) {
   const written: ClubSnapshot[] = [];
-  let reject = opts.reject ?? false;
+  let answer: Answer = opts.answer ?? (opts.reject ? 'reject' : 'ok');
   const native: ClubWidgetsNative = {
     writeSnapshot: ({ json }) => {
       written.push(JSON.parse(json) as ClubSnapshot);
-      return reject ? Promise.reject(new Error('no App Group')) : Promise.resolve({ written: true });
+      // The Swift plugin never rejects: it answers { written: false } without the App Group.
+      return answer === 'reject' ? Promise.reject(new Error('no App Group')) : Promise.resolve({ written: answer === 'ok' });
     },
   };
   let career: GameState | null = null;
@@ -29,7 +32,7 @@ function setup(opts: { career?: boolean; reject?: boolean } = {}) {
   }
   const read = (): GameState | null => (career ? getState() : null);
   const stop = installClubWidgets({ bus, native, read });
-  return { written, stop, setReject: (v: boolean) => { reject = v; } };
+  return { written, stop, setReject: (v: boolean) => { answer = v ? 'reject' : 'ok'; }, setAnswer: (v: Answer) => { answer = v; } };
 }
 
 let stops: (() => void)[] = [];
@@ -100,5 +103,87 @@ describe('installClubWidgets', () => {
     setState({ week: 9 });
     await flush();
     expect(a.written).toHaveLength(1);
+  });
+
+  it('treats { written: false } (no App Group, or a snapshot Swift could not decode) as not written, and retries', async () => {
+    const a = setup({ answer: 'refuse' }); stops.push(a.stop);
+    await flush();
+    expect(a.written).toHaveLength(1);
+    setState({ money: getState().money + 1 });
+    await flush();
+    expect(a.written).toHaveLength(2);
+    a.setAnswer('ok');
+    setState({ money: getState().money + 1 });
+    await flush();
+    expect(a.written).toHaveLength(3);
+    setState({ money: getState().money + 1 });
+    await flush();
+    expect(a.written).toHaveLength(3);
+  });
+
+  it('writes a club rename and a colour change', async () => {
+    const a = setup(); stops.push(a.stop);
+    await flush();
+    setState({ clubName: 'Renamed FC' });
+    await flush();
+    expect(a.written[a.written.length - 1]!.club.name).toBe('Renamed FC');
+    const league = getState().league;
+    setState({ league: { ...league, clubs: league.clubs.map((c) => (c.id === 'player' ? { ...c, colors: ['#123456', '#fedcba'] as [string, string] } : c)) } });
+    await flush();
+    expect(a.written[a.written.length - 1]!.club.colors).toEqual(['#123456', '#fedcba']);
+    expect(a.written).toHaveLength(3);
+  });
+
+  it('writes the career loaded in place of another (Continue, or switching slot)', async () => {
+    const a = setup(); stops.push(a.stop);
+    await flush();
+    const other = createNewGame('Other Slot RLFC', 99);
+    loadState(other);
+    initLeague(getState());
+    await flush();
+    expect(a.written[a.written.length - 1]!.club.name).toBe('Other Slot RLFC');
+  });
+});
+
+describe('installClubWidgets, one event at a time', () => {
+  /** A career whose snapshot changes without a state:changed, so each event is tested alone. */
+  function quiet() {
+    setState(createNewGame('Quiet FC', 3));
+    initLeague(getState());
+    let s: GameState = { ...getState(), preseason: 0, week: 3 };
+    const written: ClubSnapshot[] = [];
+    const stop = installClubWidgets({
+      bus,
+      native: { writeSnapshot: ({ json }) => (written.push(JSON.parse(json) as ClubSnapshot), Promise.resolve({ written: true })) },
+      read: () => s,
+    });
+    stops.push(stop);
+    return { written, set: (week: number) => { s = { ...s, week }; } };
+  }
+
+  it('week:advanced alone writes the new week', async () => {
+    const q = quiet();
+    await flush();
+    q.set(4);
+    bus.emit('week:advanced', { week: 4, season: 1 });
+    await flush();
+    expect(q.written.map((w) => w.week)).toEqual([3, 4]);
+  });
+
+  it('match:committed alone writes the new state', async () => {
+    const q = quiet();
+    await flush();
+    q.set(5);
+    bus.emit('match:committed', { fixture: getState().league.fixtures[0]!, result: {} as never });
+    await flush();
+    expect(q.written.map((w) => w.week)).toEqual([3, 5]);
+  });
+
+  it('a change with no event writes nothing (nothing polls)', async () => {
+    const q = quiet();
+    await flush();
+    q.set(6);
+    await flush();
+    expect(q.written.map((w) => w.week)).toEqual([3]);
   });
 });
