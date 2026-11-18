@@ -37,6 +37,7 @@ import { REPORT_CSS } from '../../../src/ui/screens/matchReport';
 import { CSS } from '../../../src/ui/dom';
 import { COACH_CALLS } from '../../../src/match/league/calls';
 import { REPLAY_OFFER_MS } from '../../../src/match/view/replay';
+import { nextSpeed, type PlaybackSpeed } from '../../../src/match/view/livePlayback';
 import { toastWaits } from '../../../src/ui/toasts';
 
 const raw = (glob: Record<string, unknown>): string => Object.values(glob)[0] as string;
@@ -69,7 +70,8 @@ describe('the half-time sheet waits (#341)', () => {
   });
   it('sits above every match control and the toasts, under a dialog', () => {
     const card = zIndex(OVERLAY_CSS, '.nrl-mo-plan, .nrl-mo-sheet');
-    for (const sel of ['.nrl-mo-scoreboard', '.nrl-mo-statsheet', '.nrl-mo-strip', '.nrl-mo-full', '.nrl-mo-bar', '.nrl-mo-tray', '.nrl-mo-banner']) {
+    // The commentary line is in the bottom bar now (SuperCOOKED 40): the bar's z-index is its.
+    for (const sel of ['.nrl-mo-scoreboard', '.nrl-mo-tackle', '.nrl-mo-statsheet', '.nrl-mo-full', '.nrl-mo-bar', '.nrl-mo-tray', '.nrl-mo-banner']) {
       expect(card, sel).toBeGreaterThan(zIndex(OVERLAY_CSS, sel));
     }
     expect(card).toBeGreaterThan(zIndex(OVERLAY_CSS, '.nrl-mo-replay, .nrl-mo-replay-tag'));
@@ -119,8 +121,9 @@ describe('Replay try chip (#348 M5, the try-replay e2e)', () => {
 });
 
 describe('match screen readability (#348, Broadcast Quiet 3m)', () => {
-  it('M3: the speed playing now is a yellow circle in the pill', () => {
-    expect(rule(OVERLAY_CSS, '.nrl-mo-controls .nrl-btn.nrl-mo-speed[aria-pressed="true"], .nrl-mo-controls .nrl-btn.nrl-mo-speed[aria-pressed="true"]:hover:not(:disabled), .nrl-mo-controls .nrl-btn.nrl-mo-speed[aria-pressed="true"]:active:not(:disabled)')).toContain('background: var(--nrl-accent)');
+  it('M3, SuperCOOKED 40: the speed playing now is on one filled button, and a tap moves it on', () => {
+    expect(rule(OVERLAY_CSS, '.nrl-mo-controls .nrl-btn.nrl-mo-speed, .nrl-mo-controls .nrl-btn.nrl-mo-speed:active:not(:disabled)')).toContain('background: var(--nrl-raised)');
+    expect([1, 2, 4, 8].map((s) => nextSpeed(s as PlaybackSpeed))).toEqual([2, 4, 8, 1]);
   });
   it('M3: SKIP in the pill takes two taps; Save & exit stays in the pause sheet', () => {
     const scene = readFileSync('src/scenes/MatchScene.ts', 'utf8');
@@ -214,7 +217,8 @@ describe('match screen readability (#348, Broadcast Quiet 3m)', () => {
     expect(readFileSync('src/scenes/MatchScene.ts', 'utf8')).not.toContain('COACH ▾');
   });
   it('the log: one line, nothing, or the full log on the right', () => {
-    expect(rule(OVERLAY_CSS, '.nrl-mo-strip')).toContain('width: min(560px');
+    // SuperCOOKED 40: the line takes the bottom bar's room between COACH and the controls.
+    expect(rule(OVERLAY_CSS, '.nrl-mo-strip')).toContain('flex: 1 1 auto');
     expect(rule(OVERLAY_CSS, '.nrl-mo-strip')).toContain('min-height: 40px');
     // #433: a long name wraps to a second line; anything past that still ends in an ellipsis.
     expect(rule(OVERLAY_CSS, '.nrl-mo-strip-text')).toContain('text-overflow: ellipsis');
@@ -228,16 +232,17 @@ describe('match screen readability (#348, Broadcast Quiet 3m)', () => {
     expect(full).toContain('right: calc(12px');
     expect(full).toContain('width: min(330px');
     expect(OVERLAY_CSS).toContain('.nrl-match-overlay:not([data-log="full"]) .nrl-mo-full');
-    expect(OVERLAY_CSS).toContain('.nrl-match-overlay:not([data-log="line"]) .nrl-mo-strip');
   });
   it('the log mode is kept between matches (full comes back as the line), and blocked storage is no error', () => {
     const box = new Map<string, string>();
     const store = { getItem: (k: string) => box.get(k) ?? null, setItem: (k: string, v: string) => void box.set(k, v) };
     expect(readLogMode(store)).toBe('line');
-    saveLogMode('hidden', store);
-    expect(box.get(LOG_MODE_KEY)).toBe('hidden');
-    expect(readLogMode(store)).toBe('hidden');
     saveLogMode('full', store);
+    expect(box.get(LOG_MODE_KEY)).toBe('line');
+    // SuperCOOKED 40: the LOG on/off switch went; a 'hidden' kept from before it reads as the line, and is not written again.
+    box.set(LOG_MODE_KEY, 'hidden');
+    expect(readLogMode(store)).toBe('line');
+    saveLogMode('line', store);
     expect(box.get(LOG_MODE_KEY)).toBe('line');
     const blocked = {
       getItem: (): string | null => {
@@ -248,7 +253,7 @@ describe('match screen readability (#348, Broadcast Quiet 3m)', () => {
       },
     };
     expect(readLogMode(blocked)).toBe('line');
-    expect(() => saveLogMode('hidden', blocked)).not.toThrow();
+    expect(() => saveLogMode('line', blocked)).not.toThrow();
     expect(readLogMode(null)).toBe('line');
   });
   it('M6: every refusal the sim gives has a short caption', () => {
