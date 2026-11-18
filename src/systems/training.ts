@@ -219,6 +219,21 @@ export function applyTraining(state: GameState): GameState {
   return getState();
 }
 
+/** The injured weeks each week's advance takes off (applyInjuries): 1, plus the medical bay's level, plus 1 for a physio centre. */
+export function injuryRecoveryPerWeek(facilities: readonly PlacedFacility[]): number {
+  const medicalBay = facilities.find((f) => f.defId === 'medicalBay');
+  const physio = facilities.find((f) => f.defId === 'physioCentre');
+  let recovery = 1;
+  if (medicalBay) recovery += medicalBay.level;
+  if (physio) recovery += 1;
+  return recovery;
+}
+
+/** Week advances until a player `injuredWeeks` out is fit, at today's recovery (0 when fit). */
+export function weeksUntilFit(injuredWeeks: number, facilities: readonly PlacedFacility[]): number {
+  return injuredWeeks <= 0 ? 0 : Math.ceil(injuredWeeks / injuryRecoveryPerWeek(facilities));
+}
+
 /**
  * Tick hook order 20: decrement injuredWeeks for injured players.
  * Base recovery = 1 week/tick. A built medicalBay adds its `level` extra weeks;
@@ -226,12 +241,7 @@ export function applyTraining(state: GameState): GameState {
  * injuredWeeks = max(0, injuredWeeks − recovery).
  */
 export function applyInjuries(state: GameState): GameState {
-  const medicalBay = state.facilities.find((f) => f.defId === 'medicalBay');
-  const physio = state.facilities.find((f) => f.defId === 'physioCentre');
-  let recovery = 1;
-  if (medicalBay) recovery += medicalBay.level;
-  if (physio) recovery += 1;
-
+  const recovery = injuryRecoveryPerWeek(state.facilities);
   let changed = false;
   const squad = state.squad.map((p) => {
     if (p.injuredWeeks <= 0) return p;
