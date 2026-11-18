@@ -725,14 +725,14 @@ export const TUTORIAL_CSS = `
   inset: 0;
   pointer-events: none; /* only the bubble takes taps */
   z-index: 200;         /* above the dock (55) and modals (100) */
-  font-family: var(--nrl-f-body, 'IBM Plex Sans', sans-serif);
+  font-family: var(--nrl-f-body, 'Inter', sans-serif);
 }
 .nrl-tutorial-cutout {
   position: fixed;
   pointer-events: none;
-  border: 2px solid #f4d03f;
+  border: 2px solid var(--nrl-accent, #ff6b1a);
   border-radius: 12px;
-  box-shadow: 0 0 0 4px rgba(244, 208, 63, 0.25), 0 0 18px 2px rgba(244, 208, 63, 0.45);
+  box-shadow: 0 0 0 4px rgba(255, 107, 26, 0.25), 0 0 18px 2px rgba(255, 107, 26, 0.45);
   z-index: 200;
 }
 /* #337 U1: never over a match, live or at full time. */
@@ -744,10 +744,10 @@ body.nrl-match-active .nrl-tutorial, .nrl-tutorial[hidden] { display: none; }
   bottom: calc(var(--nrl-nav-h, 5rem) + 12px); /* clear of the dock (its height includes the home bar) */
   transform: translateX(-50%);
   max-width: min(90vw, 320px);
-  background: rgba(14, 22, 48, 0.97);
+  background: rgba(5, 7, 13, 0.97);
   color: #fff;
   border-radius: 14px;
-  border-left: 4px solid #f4d03f;
+  border-left: 4px solid var(--nrl-accent, #ff6b1a);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
   padding: 12px 14px;
   z-index: 201;
@@ -772,7 +772,7 @@ body.nrl-match-active .nrl-tutorial, .nrl-tutorial[hidden] { display: none; }
   font-size: 0.875rem;
   line-height: 1.45;
   margin-bottom: 10px;
-  color: #c9d1ea;
+  color: var(--nrl-text-2, #c8cdd8);
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
@@ -826,9 +826,9 @@ body.nrl-match-active .nrl-tutorial, .nrl-tutorial[hidden] { display: none; }
   margin-right: auto;
   padding: 0 8px;
   border-radius: 6px;
-  background: var(--nrl-button, #1f2b55);
-  color: var(--nrl-accent, #f4d03f);
-  font-family: var(--nrl-f-label, 'Barlow Condensed', sans-serif);
+  background: var(--nrl-button, #1a2540);
+  color: var(--nrl-accent, #ff6b1a);
+  font-family: var(--nrl-f-label, 'Oswald', sans-serif);
   font-size: 0.8125rem;
   font-weight: 700;
   letter-spacing: 0.06em;

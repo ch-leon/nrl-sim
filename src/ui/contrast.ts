@@ -1,5 +1,5 @@
 // src/ui/contrast.ts — the theme's text against its backgrounds, checked against
-// WCAG AA (#371). Every text colour the Broadcast Quiet tokens put on a surface is
+// WCAG AA (#371). Every text colour the theme's tokens (SuperCOOKED, ui-supercooked.md §2) put on a surface is
 // listed here once; tests/ui/contrast.test.ts runs them all, so a later theme change
 // that drops a pair under 4.5:1 fails CI rather than quietly going out. Pure: no DOM.
 import { COLOR_TOKENS, type ColorToken } from './tokens';
@@ -22,9 +22,10 @@ const INKS: readonly ColorToken[] = ['text', 'text2', 'muted', 'accent', 'pos', 
 /** Every text/background pair the theme uses. */
 export const TEXT_PAIRS: readonly TextPair[] = [
   ...INKS.flatMap((text) => SURFACES.map((on) => ({ text, on, where: `${text} words on ${on}` }))),
-  { text: 'onAccent', on: 'accent', where: 'the yellow primary button, the selected chip, the clock box' },
+  { text: 'onAccent', on: 'accent', where: 'the orange primary button, a screen switch\'s selected tab, the clock box' },
+  { text: 'onAccent', on: 'text', where: 'a selected tab inside a sheet (white, navy words)' },
   { text: 'onAccent', on: 'neg', where: 'an armed Sell or Release' },
-  { text: 'text', on: 'win', where: 'the WIN BY tag and a W in the form guide' },
+  { text: 'onAccent', on: 'win', where: 'the WIN BY tag and a W in the form guide (navy on the green)' },
   { text: 'text', on: 'out', where: 'the DEBT badge and an L in the form guide' },
   { text: 'text', on: 'injured', where: 'an injured tile' },
 ];

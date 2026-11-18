@@ -407,7 +407,7 @@ export async function runPortrait(browser) {
     await setMode('line');
     await page.locator('.nrl-mo-log-toggle').hover();
     const bg = await page.evaluate(() => getComputedStyle(document.querySelector('.nrl-mo-log-toggle .nrl-mo-switch')).backgroundColor);
-    if (bg !== 'rgb(244, 208, 63)') problems.push(`the LOG switch's on fill is ${bg} under hover, want rgb(244, 208, 63)`);
+    if (bg !== 'rgb(255, 107, 26)') problems.push(`the LOG switch's on fill is ${bg} under hover, want rgb(255, 107, 26) (the accent)`);
     else rec.notes.push('LOG switch keeps its fill under hover');
     return problems;
   });

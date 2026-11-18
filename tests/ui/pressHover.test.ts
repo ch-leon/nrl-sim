@@ -93,7 +93,7 @@ describe('hover is for a mouse (#604)', () => {
 describe('a press under the finger (#604)', () => {
   it('.nrl-btn shrinks to --nrl-press on its hover fill, eases in and snaps back', () => {
     const press = rule(CSS, '.nrl-btn:active:not(:disabled)');
-    expect(press).toContain('background: #283669;');
+    expect(press).toContain('background: var(--nrl-raised-hover);');
     expect(press).toContain('transform: scale(var(--nrl-press));');
     expect(press).toContain('transition: background-color var(--nrl-dur-press) ease, transform var(--nrl-dur-press) var(--nrl-ease-out);');
     // At rest only the fill eases, so the scale snaps back on release (a box measured after a tap is whole).
@@ -101,9 +101,9 @@ describe('a press under the finger (#604)', () => {
     for (const { file, text } of SOURCES) expect(text, file).not.toContain('translateY(1px)');
   });
 
-  it('the primary takes its hover yellow; armed and selected keep their colours pressed', () => {
-    expect(rule(CSS, '.nrl-btn.nrl-btn-primary:active:not(:disabled)')).toContain('background: #f7da5e');
-    expect(CSS).toContain('.nrl-btn.nrl-btn-armed:active:not(:disabled) { background: var(--nrl-neg)');
+  it('the primary takes its hover orange; armed and selected keep their colours pressed', () => {
+    expect(rule(CSS, '.nrl-btn.nrl-btn-primary:active:not(:disabled)')).toContain('background: var(--nrl-accent-hover)');
+    expect(CSS).toContain('.nrl-btn.nrl-btn-armed:active:not(:disabled) {\n  background: rgba(255, 138, 61, 0.16); color: var(--nrl-neg)');
     expect(CSS).toContain('.nrl-seg > .nrl-btn[aria-pressed="true"]:active:not(:disabled)');
     expect(CSS).toContain('.nrl-dock-tabs > .nrl-btn[aria-current="page"]:active:not(:disabled)');
     expect(OVERLAY_CSS).toContain('.nrl-btn.nrl-mo-tray-call[data-called]:active {');
@@ -160,7 +160,7 @@ describe('controls, not content (#604)', () => {
     expect(TITLE_CSS.startsWith(`\n${MOTION_CSS}`)).toBe(true);
     expect(MOTION_CSS).toContain('--nrl-press: 0.97;');
     expect(MOTION_CSS).toContain('--nrl-press: 1;');
-    expect(TITLE_CSS).toContain('@media (hover: hover) and (pointer: fine) { .nrl-title-btn:hover { background: #283669; } }');
+    expect(TITLE_CSS).toContain('@media (hover: hover) and (pointer: fine) { .nrl-title-btn:hover { background: #233050; } }');
     expect(rule(TITLE_CSS, '.nrl-title-btn:active:not(:disabled)')).toContain('transform: scale(var(--nrl-press));');
     expect(rule(TITLE_CSS, '.nrl-title :is(button, label)')).toContain('user-select: none;');
     // #613's disabled look still comes after the yellow it must beat.

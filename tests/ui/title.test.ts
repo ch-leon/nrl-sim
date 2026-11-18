@@ -386,8 +386,8 @@ describe('Start while the town list loads (#613)', () => {
     }
   });
 
-  it('a disabled title button takes the raised fill, muted text and no pointer, over the yellow', () => {
-    const rule = '.nrl-title-btn:disabled, .nrl-title-btn:disabled:hover { background: #1b264a; color: #9aa6c7; cursor: default;';
+  it('a disabled title button takes the raised fill, muted text and no pointer, over the orange', () => {
+    const rule = '.nrl-title-btn:disabled, .nrl-title-btn:disabled:hover { background: #1a2540; color: #8f98ab; cursor: default;';
     expect(TITLE_CSS).toContain(rule);
     // Later in the sheet than the yellow rule of equal weight (.nrl-title-btn-go:hover), so it wins.
     expect(TITLE_CSS.indexOf(rule)).toBeGreaterThan(TITLE_CSS.indexOf('.nrl-title-btn-go, .nrl-title-btn-go:hover {'));

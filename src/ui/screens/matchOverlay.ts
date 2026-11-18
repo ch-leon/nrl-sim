@@ -1979,7 +1979,7 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 .nrl-mo-strip {
   position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(78px + var(--nrl-safe-b)); z-index: 14;
   width: min(560px, calc(100vw - 32px)); min-height: 40px; display: flex; align-items: stretch; margin: 0; padding: 0; border: 0;
-  border-radius: 8px; overflow: hidden; background: rgba(14, 22, 48, 0.95); color: var(--nrl-text); box-shadow: var(--nrl-shadow-chip);
+  border-radius: 8px; overflow: hidden; background: rgba(5, 7, 13, 0.95); color: var(--nrl-text); box-shadow: var(--nrl-shadow-chip);
   font: inherit; text-align: left; cursor: pointer; pointer-events: auto;
 }
 /* Pressed, it shrinks about where it is centred (#604): the scale goes after the centring, not instead of it. */

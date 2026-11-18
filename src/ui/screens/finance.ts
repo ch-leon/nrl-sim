@@ -632,8 +632,8 @@ button.nrl-finance-contracts {
   flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px;
   font-family: var(--nrl-f-body);
 }
-@media (hover: hover) and (pointer: fine) { button.nrl-finance-contracts:hover { background: #22305c; } }
-button.nrl-finance-contracts:active { background: #22305c; }
+@media (hover: hover) and (pointer: fine) { button.nrl-finance-contracts:hover { background: var(--nrl-raised-hover); } }
+button.nrl-finance-contracts:active { background: var(--nrl-raised-hover); }
 button.nrl-finance-contracts:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
 .nrl-finance-contracts-text { font-size: 0.75rem; color: var(--nrl-muted); }
 .nrl-finance-contracts-due .nrl-finance-contracts-text { color: var(--nrl-accent); }

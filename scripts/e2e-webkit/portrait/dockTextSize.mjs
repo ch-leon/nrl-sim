@@ -32,7 +32,7 @@ const DOCK_STATES = [
  * narrow window, the tabs not on one row under PLAY WEEK), anything overlapping, off screen or
  * in the unsafe bands, a label clipped or under 12px (`cut`: ellipsized allowed, and noted), a
  * tab under 44×44, PLAY WEEK under 44px or its label not whole, the open tab (`marked`) without
- * its fill and its 3px bar, or a bar that doesn't read in greyscale (3:1 against the fill,
+ * its fill and its 2px bar (SuperCOOKED §4), or a bar that doesn't read in greyscale (3:1 against the fill,
  * WCAG 1.4.11). Runs in the page.
  */
 function dockProblems(page, marked, safe, cut = false) {
@@ -99,7 +99,7 @@ function dockProblems(page, marked, safe, cut = false) {
       const b = want, label = b.querySelector('.nrl-nav-label');
       const bar = getComputedStyle(label, '::after');
       const fill = getComputedStyle(b).backgroundColor;
-      if (bar.content === 'none' || bar.height !== '3px') out.push(`${name(b)} has no 3px bar (${bar.content} ${bar.height})`);
+      if (bar.content === 'none' || bar.height !== '2px') out.push(`${name(b)} has no 2px bar (${bar.content} ${bar.height})`);
       if (/rgba\(0, 0, 0, 0\)|transparent/.test(fill)) out.push(`${name(b)} has no fill`);
       // The bar is in the label's bottom padding: the label's box ends inside the tab.
       if (label.getBoundingClientRect().bottom > b.getBoundingClientRect().bottom + 0.5) out.push(`${name(b)}'s bar sits below the tab`);

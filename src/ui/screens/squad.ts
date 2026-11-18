@@ -38,7 +38,7 @@ const SQUAD_TABS: readonly { id: SquadTab; label: string; title: string }[] = [
  */
 export function squadTabs(selected: SquadTab): HTMLElement {
   const open: Record<SquadTab, () => void> = { squad: openSquadScreen, lineup: openLineupScreen, recruit: openRecruitScreen };
-  return segmented(SQUAD_TABS, selected, (id) => open[id](), { class: 'nrl-sq-tabs', label: 'Squad' }).el;
+  return segmented(SQUAD_TABS, selected, (id) => open[id](), { class: 'nrl-sq-tabs', label: 'Squad', main: true }).el;
 }
 
 // ── Sorting ─────────────────────────────────────────────────────────────────

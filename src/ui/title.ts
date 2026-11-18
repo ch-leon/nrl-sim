@@ -23,7 +23,8 @@ import { LOOKS, drawPlayerFrame } from '../art/match/players';
 import { encodeCanvas } from '../art/portrait';
 import { PLAYER_ID } from '../systems/fixtures';
 import { BRAND, type Brand } from '../brand';
-import { COLOR_TOKENS } from './tokens';
+import { COLOR_TOKENS as C } from './tokens';
+import { fillParentLine, fillWordmark } from './wordmark';
 import { commercialEnabled } from '../commercial/flags';
 import { openLoginDialog, openPaywall } from './screens/paywall';
 import { listenForPress, MOTION_CSS } from './dom';
@@ -67,63 +68,73 @@ ${MOTION_CSS}
   display: flex; flex-direction: column; align-items: center; box-sizing: border-box;
   padding: calc(12px + var(--nrl-safe-t, env(safe-area-inset-top, 0px))) calc(12px + var(--nrl-safe-r, env(safe-area-inset-right, 0px)))
     calc(24px + var(--nrl-safe-b, env(safe-area-inset-bottom, 0px))) calc(12px + var(--nrl-safe-l, env(safe-area-inset-left, 0px)));
-  background: radial-gradient(ellipse at 50% 120%, #1b3a2a 0%, #0e1630 60%) #0e1630; color: #fff;
-  font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 0.875rem; }
+  background: ${C.ink}; color: ${C.text};
+  font-family: 'Inter', system-ui, sans-serif; font-size: 0.875rem; }
 .nrl-title * { box-sizing: border-box; }
 /* Controls, as in the game's sheet (#604): no browser tap box, no long-press selection or callout, no double-tap zoom. */
 .nrl-title, .nrl-title * { -webkit-tap-highlight-color: transparent; }
 .nrl-title :is(button, label) { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
 .nrl-title-main { margin: auto 0; width: 100%; max-width: 880px; display: flex; flex-direction: column; gap: 14px; }
-.nrl-title h1 { margin: 0; text-align: center; font-family: 'Barlow Condensed', 'Arial Narrow', sans-serif; font-style: italic;
-  font-weight: 700; font-size: 3rem; letter-spacing: 0.06em; line-height: 1; }
-.nrl-title h1::after { content: 'Club manager'; display: block; margin-top: 6px; font-style: normal; font-size: 0.8125rem;
-  font-weight: 600; letter-spacing: 0.24em; text-transform: uppercase; color: #f4d03f; }
+.nrl-title h1 { margin: 0; text-align: center; font-family: 'Archivo Black', 'Arial Black', sans-serif;
+  font-weight: 400; font-size: 2.5rem; letter-spacing: -0.03em; line-height: 0.95; text-transform: uppercase; }
+/* The wordmark (SuperCOOKED §2): the title text in Archivo Black, its last word in the accent. */
+.nrl-title h1 .nrl-wordmark-accent { color: ${C.accent}; }
+.nrl-title h1::after { content: 'Club manager'; display: block; margin-top: 6px; font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.75rem; font-weight: 500; letter-spacing: 0.34em; text-transform: uppercase; color: ${C.text2}; }
 .nrl-title-logo { display: block; margin: 0 auto; max-width: min(70vw, 360px); max-height: 72px; object-fit: contain; }
-.nrl-title-parent { margin: -8px 0 0; text-align: center; font-size: 0.75rem; letter-spacing: 0.08em; color: ${COLOR_TOKENS.muted}; }
+.nrl-title-parent { margin: -10px 0 0; line-height: 1.2; text-align: center; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.625rem;
+  letter-spacing: 0.2em; text-transform: uppercase; color: ${C.muted}; }
+/* "A SUPERCOOKED GAME": SUPER in Archivo Black, COOKED in the accent. */
+.nrl-title-parent :is(.nrl-parent-lead, .nrl-wordmark-accent) { font-family: 'Archivo Black', 'Arial Black', sans-serif; font-weight: 400;
+  font-size: 0.875rem; letter-spacing: 0; color: ${C.text}; }
+.nrl-title-parent .nrl-wordmark-accent { color: ${C.accent}; }
+.nrl-title-parent .nrl-parent-a { margin-right: 0.4em; }
+.nrl-title-parent .nrl-parent-z { margin-left: 0.4em; }
 .nrl-title-slots { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: 10px; }
-.nrl-title-card { border-radius: 14px; background: rgba(27, 38, 74, 0.95); padding: 12px 14px;
-  display: flex; flex-direction: column; gap: 4px; min-width: 0; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); }
-.nrl-title-slotno { font-family: 'Barlow Condensed', sans-serif; font-size: 0.8125rem; font-weight: 600; color: #9aa6c7;
+.nrl-title-card { border-radius: 12px; background: ${C.panel}; padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 4px; min-width: 0; box-shadow: inset 0 0 0 1px ${C.line}, 0 4px 14px rgba(0, 0, 0, 0.35); }
+.nrl-title-slotno { font-family: 'Oswald', 'Arial Narrow', sans-serif; font-size: 0.8125rem; font-weight: 600; line-height: 1.2; color: ${C.muted};
   letter-spacing: 0.08em; text-transform: uppercase; }
-.nrl-title-club { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 1.375rem; line-height: 1.1; overflow-wrap: anywhere; }
-.nrl-title-card[data-empty] .nrl-title-club { color: #9aa6c7; font-weight: 600; }
-.nrl-title-when { font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; color: #c9d1ea; min-height: 1.2em; }
-.nrl-title-warn { font-size: 0.75rem; color: #f0a39b; }
+.nrl-title-club { font-family: 'Oswald', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 1.375rem; line-height: 1.1; overflow-wrap: anywhere; }
+.nrl-title-card[data-empty] .nrl-title-club { color: ${C.muted}; font-weight: 600; }
+.nrl-title-when { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.75rem; color: ${C.text2}; min-height: 1.2em; }
+.nrl-title-warn { font-size: 0.75rem; color: ${C.neg}; }
 .nrl-title-actions { margin-top: auto; padding-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
-.nrl-title-btn { min-height: 44px; padding: 0 14px; font-family: 'Barlow Condensed', sans-serif; font-size: 1rem; font-weight: 700;
+.nrl-title-btn { min-height: 44px; padding: 0 14px; font-family: 'Oswald', 'Arial Narrow', sans-serif; font-size: 1rem; font-weight: 700;
   letter-spacing: 0.04em; text-transform: uppercase; color: #fff; cursor: pointer;
-  background: #1f2b55; border: 0; border-radius: 10px; flex: 1 1 0; white-space: nowrap;
+  background: ${C.button}; border: 0; border-radius: 10px; flex: 1 1 0; white-space: nowrap;
   transition: background-color var(--nrl-dur-press) ease; }
 /* Hover for a mouse only; a press takes the same fill and shrinks a little (#604), and snaps back. */
-@media (hover: hover) and (pointer: fine) { .nrl-title-btn:hover { background: #283669; } }
-.nrl-title-btn:active:not(:disabled) { background: #283669; transform: scale(var(--nrl-press));
+@media (hover: hover) and (pointer: fine) { .nrl-title-btn:hover { background: #233050; } }
+.nrl-title-btn:active:not(:disabled) { background: #233050; transform: scale(var(--nrl-press));
   transition: background-color var(--nrl-dur-press) ease, transform var(--nrl-dur-press) var(--nrl-ease-out); }
-.nrl-title-btn:focus-visible { outline: 2px solid #f4d03f; outline-offset: 2px; }
-.nrl-title-btn-go, .nrl-title-btn-go:hover { background: #f4d03f; color: #0e1630; flex-basis: 100%; }
-.nrl-title-btn-go:active:not(:disabled) { background: #f7da5e; }
+.nrl-title-btn:focus-visible { outline: 2px solid ${C.accent}; outline-offset: 2px; }
+.nrl-title-btn-go, .nrl-title-btn-go:hover { background: ${C.accent}; color: ${C.onAccent}; flex-basis: 100%; }
+.nrl-title-btn-go:active:not(:disabled) { background: #ff8540; }
 /* A slot's own Continue or New game when another slot holds the screen's one yellow (#613). */
 .nrl-title-btn-row { flex-basis: 100%; }
 /* Disabled stays visible and its label says why (#613). Two lines fit the narrow Start column. */
-.nrl-title-btn:disabled, .nrl-title-btn:disabled:hover { background: #1b264a; color: #9aa6c7; cursor: default;
+.nrl-title-btn:disabled, .nrl-title-btn:disabled:hover { background: ${C.raised}; color: ${C.muted}; cursor: default;
   white-space: normal; line-height: 1; }
 .nrl-title-btn-small { font-size: 0.875rem; padding: 0 8px; }
-.nrl-title-btn[data-nrl-delete-1], .nrl-title-btn[data-nrl-delete-2], .nrl-title-btn[data-nrl-delete-3] { color: #f0a39b; }
-.nrl-title-btn[data-armed], .nrl-title-btn[data-armed]:active:not(:disabled) { background: #5a2430; color: #fff; }
+.nrl-title-btn[data-nrl-delete-1], .nrl-title-btn[data-nrl-delete-2], .nrl-title-btn[data-nrl-delete-3] { color: ${C.neg}; }
+.nrl-title-btn[data-armed], .nrl-title-btn[data-armed]:active:not(:disabled) { background: rgba(255, 138, 61, 0.16); color: ${C.neg};
+  box-shadow: inset 0 0 0 1px rgba(255, 138, 61, 0.6); }
 .nrl-title-foot { display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .nrl-title-foot .nrl-title-btn { flex: 0 0 auto; }
-.nrl-title-notice { color: #f0a39b; font-size: 0.8125rem; max-width: 360px; text-align: center; }
+.nrl-title-notice { color: ${C.neg}; font-size: 0.8125rem; max-width: 360px; text-align: center; }
 .nrl-title-build { position: fixed; right: calc(8px + var(--nrl-safe-r, env(safe-area-inset-right, 0px)));
-  bottom: calc(4px + var(--nrl-safe-b, env(safe-area-inset-bottom, 0px))); pointer-events: none; color: #9aa6c7;
-  font-family: 'IBM Plex Mono', monospace; font-size: 0.6875rem; }
+  bottom: calc(4px + var(--nrl-safe-b, env(safe-area-inset-bottom, 0px))); pointer-events: none; color: ${C.muted};
+  font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.6875rem; }
 .nrl-title-head { display: flex; align-items: center; gap: 12px; }
 .nrl-title-head .nrl-title-btn { flex: 0 0 auto; }
-.nrl-title-head h2 { margin: 0; font-family: 'Barlow Condensed', sans-serif; font-size: 1.375rem; font-weight: 700;
-  letter-spacing: 0.02em; text-transform: uppercase; flex: 1; min-width: 0; }
+.nrl-title-head h2 { margin: 0; font-family: 'Archivo Black', 'Arial Black', sans-serif; font-size: 1.25rem; font-weight: 400;
+  letter-spacing: -0.02em; text-transform: uppercase; flex: 1; min-width: 0; }
 .nrl-title-setup { display: grid; grid-template-columns: 9rem minmax(0, 1fr); grid-template-areas: "kit form" "veteran form" "start form"; grid-template-rows: min-content min-content 1fr;
-  gap: 10px 16px; align-items: start; padding: 14px; border-radius: 16px; background: rgba(14, 22, 48, 0.97);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4); }
+  gap: 10px 16px; align-items: start; padding: 14px; border-radius: 16px; background: ${C.navy};
+  box-shadow: inset 0 0 0 1px ${C.line}, 0 6px 20px rgba(0, 0, 0, 0.4); }
 .nrl-title-kit { grid-area: kit; margin: 0; display: flex; flex-direction: column; align-items: center; gap: 6px;
-  padding: 10px 6px; border-radius: 10px; background: #141d3a; text-align: center; font-size: 0.75rem; color: #9aa6c7; }
+  padding: 10px 6px; border-radius: 12px; background: ${C.panel}; text-align: center; font-size: 0.75rem; color: ${C.muted}; }
 .nrl-title-kit img { width: 84px; height: 90px; image-rendering: pixelated; }
 .nrl-title-form { grid-area: form; display: flex; flex-direction: column; gap: 8px; min-width: 0;
   max-height: calc(100dvh - 110px - var(--nrl-safe-t, env(safe-area-inset-top, 0px)) - var(--nrl-safe-b, env(safe-area-inset-bottom, 0px))); }
@@ -136,28 +147,28 @@ ${MOTION_CSS}
 .nrl-title-veteran input { width: 20px; height: 20px; flex: 0 0 auto; }
 .nrl-title-go { grid-area: start; display: flex; flex-direction: column; gap: 6px; }
 .nrl-title-go .nrl-title-btn { flex: 0 0 auto; }
-.nrl-title-confirm { font-size: 0.8125rem; color: #f4d03f; }
+.nrl-title-confirm { font-size: 0.8125rem; color: ${C.accent}; }
 .nrl-title-field { display: flex; align-items: center; gap: 10px; }
-.nrl-title-field > span { flex: 0 0 5.5rem; font-family: 'Barlow Condensed', sans-serif; font-size: 0.8125rem; font-weight: 600;
-  letter-spacing: 0.08em; text-transform: uppercase; color: #9aa6c7; text-align: right; }
+.nrl-title-field > span { flex: 0 0 5.5rem; font-family: 'Oswald', 'Arial Narrow', sans-serif; font-size: 0.8125rem; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase; color: ${C.muted}; text-align: right; }
 .nrl-title-swatches { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
 .nrl-title-swatches .nrl-title-btn { flex: 0 0 auto; }
 .nrl-title-swatch { width: 32px; height: 32px; padding: 0; border: 2px solid rgba(255, 255, 255, 0.15); border-radius: 8px; cursor: pointer; }
-.nrl-title-swatch[aria-pressed="true"] { border-color: #0e1630; box-shadow: 0 0 0 2px #f4d03f; }
+.nrl-title-swatch[aria-pressed="true"] { border-color: ${C.navy}; box-shadow: 0 0 0 2px ${C.text}; }
 .nrl-title-swatch:disabled { opacity: 0.25; cursor: default; }
 .nrl-title-swatch:active:not(:disabled) { transform: scale(var(--nrl-press)); transition: transform var(--nrl-dur-press) var(--nrl-ease-out); }
-.nrl-title-pick { background: #1b264a; }
-.nrl-title-difficulty-copy { margin: 0; font-size: 0.8125rem; line-height: 1.3; color: #c9d1ea; }
-.nrl-title-difficulty-hint { color: #f4d03f; }
-.nrl-title-pick[aria-pressed="true"], .nrl-title-pick[aria-pressed="true"]:hover, .nrl-title-pick[aria-pressed="true"]:active:not(:disabled) { background: #f4d03f; color: #0e1630; }
+.nrl-title-pick { background: ${C.raised}; }
+.nrl-title-difficulty-copy { margin: 0; font-size: 0.8125rem; line-height: 1.3; color: ${C.text2}; }
+.nrl-title-difficulty-hint { color: ${C.accent}; }
+.nrl-title-pick[aria-pressed="true"], .nrl-title-pick[aria-pressed="true"]:hover, .nrl-title-pick[aria-pressed="true"]:active:not(:disabled) { background: ${C.text}; color: ${C.onAccent}; }
 .nrl-title-input { min-height: 44px; padding: 0 12px; font: inherit; font-size: 1rem; flex: 1; min-width: 0; color: #fff;
-  background: #1b264a; border: 2px solid #26325c; border-radius: 10px; }
-.nrl-title-input:focus { outline: none; border-color: #f4d03f; }
+  background: ${C.raised}; border: 2px solid ${C.line}; border-radius: 10px; }
+.nrl-title-input:focus { outline: none; border-color: ${C.accent}; }
 /* A name box and, while the name won't do, why (#616): the rename field's rule and words. */
 .nrl-title-entry { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .nrl-title-entry > .nrl-title-input { flex: 0 0 auto; }
-.nrl-title-input[aria-invalid="true"] { border-color: #f0a39b; }
-.nrl-title-why { font-size: 0.6875rem; line-height: 1.2; color: #f0a39b; }
+.nrl-title-input[aria-invalid="true"] { border-color: ${C.neg}; }
+.nrl-title-why { font-size: 0.6875rem; line-height: 1.2; color: ${C.neg}; }
 .nrl-title-why:empty { display: none; }
 @media (pointer: coarse) { .nrl-title-swatch { width: 44px; height: 44px; } }
 @media (max-height: 500px) and (min-width: 521px) {
@@ -176,7 +187,12 @@ ${MOTION_CSS}
   .nrl-title h1 { font-size: 2.125rem; }
   .nrl-title h1::after { margin-top: 4px; font-size: 0.6875rem; }
   .nrl-title-logo { max-height: 48px; }
-  .nrl-title-parent { margin-top: -6px; font-size: 0.6875rem; }
+  .nrl-title-parent { margin-top: -6px; font-size: 0.625rem; }
+  .nrl-title-parent :is(.nrl-parent-lead, .nrl-wordmark-accent) { font-size: 0.75rem; }
+  /* A phone on its side: CLUB MANAGER and the parent line share one line, so the slots and Import
+     keep the room they had before the parent line showed (SuperCOOKED §2). */
+  .nrl-title-main:has(.nrl-title-parent) h1::after { content: none; }
+  .nrl-title-parent::before { content: 'Club manager ·'; margin-right: 0.6em; letter-spacing: 0.3em; color: ${C.text2}; }
   .nrl-title-main { gap: 10px; }
   .nrl-title-build { position: static; align-self: flex-end; margin-top: 8px; }
 }
@@ -243,8 +259,8 @@ function mkButton(label: string, dataAttr: string, cls = ''): HTMLButtonElement 
 }
 
 /**
- * The title's heading (#363): the brand's logo (its title text today, or an image
- * from public/), then the parent-brand line when the brand shows it.
+ * The title's heading (#363): the brand's logo (the wordmark, or an image from
+ * public/), then the parent-brand line when the brand shows it.
  */
 export function titleHeading(brand: Brand = BRAND): HTMLElement[] {
   const h1 = mk('h1', 'nrl-title-name');
@@ -254,11 +270,14 @@ export function titleHeading(brand: Brand = BRAND): HTMLElement[] {
     img.setAttribute('alt', brand.name);
     h1.appendChild(img);
   } else {
-    h1.textContent = brand.titleText;
+    // The wordmark (SuperCOOKED §2): text, its last word in the accent; named whole for a screen reader.
+    fillWordmark(h1, brand);
+    h1.setAttribute('aria-label', brand.titleText);
   }
   const out: HTMLElement[] = [h1];
   if (brand.parentBrand.show) {
-    const line = mk('p', 'nrl-title-parent', `a ${brand.parentBrand.name} game`);
+    // "A SUPERCOOKED GAME", COOKED in the accent.
+    const line = fillParentLine(mk('p', 'nrl-title-parent'), brand);
     line.setAttribute('data-nrl-parent-brand', '');
     out.push(line);
   }

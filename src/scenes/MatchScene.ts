@@ -164,7 +164,7 @@ const BALL_WOBBLE_RATE = 1.3;
 /** Smallest turn the ball is drawn at (radians). */
 const BALL_TURN_STEP = Math.PI / 12;
 /** The in-match labels (name tag, "Kick-off…") in the HUD's label face (Broadcast Quiet). */
-const MATCH_LABEL_FONT = '"Barlow Condensed", "Arial Narrow", sans-serif';
+const MATCH_LABEL_FONT = '"Oswald", "Arial Narrow", sans-serif';
 /** On screen while a live match waits for its art to be painted or uploaded (N10.5). */
 export const KICK_OFF_TEXT = 'Kick-off…';
 
@@ -499,7 +499,7 @@ export class MatchScene extends Phaser.Scene {
         fontSize: '15px',
         fontStyle: 'bold',
         color: '#ffffff',
-        backgroundColor: 'rgba(14,22,48,0.85)',
+        backgroundColor: 'rgba(5,7,13,0.85)',
         padding: { x: 5, y: 1 },
         resolution: 2,
       })
@@ -768,7 +768,7 @@ export class MatchScene extends Phaser.Scene {
       const letter = side === 'home' ? letters[0] : letters[1];
       for (const actor of this.players[side]) {
         const text = this.add
-          .text(0, 0, letter, { fontFamily: MATCH_LABEL_FONT, fontSize: '12px', fontStyle: 'bold', color: '#ffffff', backgroundColor: 'rgba(14,22,48,0.7)', padding: { x: 3, y: 0 }, resolution: 2 })
+          .text(0, 0, letter, { fontFamily: MATCH_LABEL_FONT, fontSize: '12px', fontStyle: 'bold', color: '#ffffff', backgroundColor: 'rgba(5,7,13,0.7)', padding: { x: 3, y: 0 }, resolution: 2 })
           .setOrigin(0.5, 1)
           .setDepth(DEPTH_TAG - 1);
         this.letters.push({ actor, text });

@@ -1,0 +1,87 @@
+/* src/ui/fonts.css — the UI's four typefaces (SuperCOOKED, docs/specs/ui-supercooked.md §2), self-hosted
+   from the @fontsource packages' latin files (Vite bundles them, so an installed copy works offline). The
+   faces are declared here rather than through @fontsource's own CSS for one descriptor, size-adjust:
+   every layout in the game was measured with Barlow Condensed and IBM Plex Sans (the 44px rows, the dock's
+   five tabs at Larger text, the 667×375 headers), and the new faces set wider at the same font-size.
+   Oswald is set at 88%, so a label keeps Barlow Condensed's width and cap height (14% wider unadjusted, and
+   its line 1.48 tall against 1.2); Inter at 95%, Plex Sans's width (5% wider unadjusted). JetBrains Mono
+   has Plex Mono's advance and Archivo Black is new (its sizes are set where it is used), so neither moves.
+   WebKit honours size-adjust; it does not honour ascent-override, so the line height is left alone. */
+
+@font-face {
+  font-family: 'Oswald';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 500;
+  size-adjust: 88%;
+  src: url(../../node_modules/@fontsource/oswald/files/oswald-latin-500-normal.woff2) format('woff2'), url(../../node_modules/@fontsource/oswald/files/oswald-latin-500-normal.woff) format('woff');
+}
+
+@font-face {
+  font-family: 'Oswald';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  size-adjust: 88%;
+  src: url(../../node_modules/@fontsource/oswald/files/oswald-latin-600-normal.woff2) format('woff2'), url(../../node_modules/@fontsource/oswald/files/oswald-latin-600-normal.woff) format('woff');
+}
+
+@font-face {
+  font-family: 'Oswald';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  size-adjust: 88%;
+  src: url(../../node_modules/@fontsource/oswald/files/oswald-latin-700-normal.woff2) format('woff2'), url(../../node_modules/@fontsource/oswald/files/oswald-latin-700-normal.woff) format('woff');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  size-adjust: 95%;
+  src: url(../../node_modules/@fontsource/inter/files/inter-latin-400-normal.woff2) format('woff2'), url(../../node_modules/@fontsource/inter/files/inter-latin-400-normal.woff) format('woff');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 500;
+  size-adjust: 95%;
+  src: url(../../node_modules/@fontsource/inter/files/inter-latin-500-normal.woff2) format('woff2'), url(../../node_modules/@fontsource/inter/files/inter-latin-500-normal.woff) format('woff');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  size-adjust: 95%;
+  src: url(../../node_modules/@fontsource/inter/files/inter-latin-600-normal.woff2) format('woff2'), url(../../node_modules/@fontsource/inter/files/inter-latin-600-normal.woff) format('woff');
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 500;
+  src: url(../../node_modules/@fontsource/jetbrains-mono/files/jetbrains-mono-latin-500-normal.woff2) format('woff2'), url(../../node_modules/@fontsource/jetbrains-mono/files/jetbrains-mono-latin-500-normal.woff) format('woff');
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url(../../node_modules/@fontsource/jetbrains-mono/files/jetbrains-mono-latin-700-normal.woff2) format('woff2'), url(../../node_modules/@fontsource/jetbrains-mono/files/jetbrains-mono-latin-700-normal.woff) format('woff');
+}
+
+@font-face {
+  font-family: 'Archivo Black';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url(../../node_modules/@fontsource/archivo-black/files/archivo-black-latin-400-normal.woff2) format('woff2'), url(../../node_modules/@fontsource/archivo-black/files/archivo-black-latin-400-normal.woff) format('woff');
+}

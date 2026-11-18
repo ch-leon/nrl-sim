@@ -64,11 +64,11 @@ describe('renaming the game is one file (dry run)', () => {
       createElement: (tag: string) => ({
         tagName: tag, textContent: '', attrs: {} as Record<string, string>,
         setAttribute(k: string, v: string) { this.attrs[k] = v; },
-        appendChild() { /* unused for a text logo */ },
+        appendChild() { /* the wordmark's parts; its name is the label */ },
       }),
     };
     try {
-      expect(titleHeading()[0]!.textContent).toBe('FOOTY MANAGER');
+      expect((titleHeading()[0] as unknown as { attrs: Record<string, string> }).attrs['aria-label']).toBe('FOOTY MANAGER');
     } finally {
       g.document = real;
     }

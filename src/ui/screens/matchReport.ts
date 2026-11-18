@@ -551,7 +551,7 @@ export const REPORT_CSS = `
   padding: 2px 10px; border-radius: 6px; font-family: var(--nrl-f-label); font-size: 0.875rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
   background: var(--nrl-line); color: var(--nrl-text-2);
 }
-.nrl-rp-tag[data-kind="win"] { background: var(--nrl-win); color: #fff; }
+.nrl-rp-tag[data-kind="win"] { background: var(--nrl-win); color: var(--nrl-on-accent); }
 .nrl-ft-score { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
 .nrl-ft-pts { font-family: var(--nrl-f-num); font-size: 2.625rem; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
 .nrl-ft-vs { font-family: var(--nrl-f-label); font-size: 1.375rem; font-weight: 600; color: var(--nrl-text-2); }
