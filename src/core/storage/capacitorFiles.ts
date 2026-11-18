@@ -35,6 +35,7 @@ export function capacitorFiles(): NativeFiles {
         throw err;
       }
     },
+    exists: (name) => exists(at(name), dir),
     async read(name) {
       const { data } = await Filesystem.readFile({ path: at(name), directory: dir, encoding: Encoding.UTF8 });
       return typeof data === 'string' ? data : await data.text();
@@ -57,16 +58,19 @@ export function capacitorFiles(): NativeFiles {
 
 /**
  * Write `text` to a temporary file named `name` and open the iOS share sheet on it
- * (Save to Files, AirDrop, Mail…). Resolves once the sheet closes; a cancel resolves
- * too. Rejects when the file could not be written or the sheet failed.
+ * (Save to Files, AirDrop, Mail…). Resolves once the sheet closes: true when the
+ * player shared it, false when they cancelled. Rejects when the file could not be
+ * written or the sheet failed.
  */
-export async function shareTextFile(name: string, text: string): Promise<void> {
+export async function shareTextFile(name: string, text: string): Promise<boolean> {
   const path = `${SHARE_DIR}/${name}`;
   const { uri } = await Filesystem.writeFile({ path, directory: Directory.Cache, data: text, encoding: Encoding.UTF8, recursive: true });
   try {
     await Share.share({ title: name, files: [uri] });
+    return true;
   } catch (err) {
-    if (!/cancel/i.test(err instanceof Error ? err.message : String(err))) throw err;
+    if (/cancel/i.test(err instanceof Error ? err.message : String(err))) return false;
+    throw err;
   } finally {
     try { await Filesystem.deleteFile({ path, directory: Directory.Cache }); } catch { /* the cache is cleared in time anyway */ }
   }

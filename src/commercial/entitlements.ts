@@ -10,6 +10,8 @@
 // before it asks for the service, so no key below is ever written.
 
 import { commercialEnabled } from './flags';
+import { browserStorage, type StorageLike } from '../core/storage/local';
+import { ENTITLEMENTS_CACHE_KEY, ENTITLEMENTS_STUB_KEY } from '../core/storageKeys';
 
 export type Tier = 'demo' | 'standard' | 'allPlatforms';
 export type Platform = 'web' | 'ios' | 'android' | 'steam';
@@ -51,13 +53,10 @@ export function entitlementsFor(tier: Tier, source: Entitlements['source'], now 
 
 // ── Storage ─────────────────────────────────────────────────────────────────
 
-/** localStorage when the page has one (a blocked one reads as none). */
-export function commercialStorage(): Storage | null {
-  try {
-    return typeof localStorage === 'undefined' ? null : localStorage;
-  } catch {
-    return null;
-  }
+/** The storage layer's localStorage when the page has one (a blocked one reads as none);
+ *  in the iOS app it is mirrored to a native file (src/core/storage/nativeMirror.ts). */
+export function commercialStorage(): StorageLike | null {
+  return browserStorage();
 }
 
 function readKey(key: string): string | null {
@@ -92,7 +91,7 @@ export interface EntitlementProvider {
 }
 
 /** The dev-only key the stub keeps its tier in. */
-export const STUB_KEY = 'nrl-sim-entitlements-stub';
+export const STUB_KEY = ENTITLEMENTS_STUB_KEY;
 
 const TIERS: readonly Tier[] = ['demo', 'standard', 'allPlatforms'];
 
@@ -136,7 +135,7 @@ export class LocalStubProvider implements EntitlementProvider {
 // ── Service ─────────────────────────────────────────────────────────────────
 
 /** The last good answer, kept across reloads so an offline start is not re-locked. */
-export const CACHE_KEY = 'nrl-sim-entitlements-cache';
+export const CACHE_KEY = ENTITLEMENTS_CACHE_KEY;
 
 function readCache(): Entitlements | null {
   const raw = readKey(CACHE_KEY);

@@ -743,7 +743,7 @@ export function downloadOriginalSave(slot: number, recoveryIndex?: number): void
   try {
     const raw = recoveryIndex === undefined ? exportOriginalSave(slot) : exportRecoverySaves(slot)[recoveryIndex] ?? null;
     if (raw === null || typeof document === 'undefined') return;
-    deliverFile(`career-slot-${slot}-${recoveryIndex === undefined ? 'original' : `recovery-${recoveryIndex + 1}`}.json`, raw, shareFailed);
+    deliverFile(`career-slot-${slot}-${recoveryIndex === undefined ? 'original' : `recovery-${recoveryIndex + 1}`}.json`, raw, { onShareFailed: shareFailed });
   } catch {
     bus.emit('ui:notify', { text: 'Could not read the original save. It has been kept; try again when storage is available.', kind: 'danger' });
   }
@@ -975,8 +975,11 @@ export function downloadSave(state: GameState): void {
     bus.emit('ui:notify', {text: 'Could not verify the saved week and its match for export. The recovery data has been kept.', kind: 'danger'});
     return;
   }
-  deliverFile(exportFilename(file.state), file.text, shareFailed);
-  if (file.notice) bus.emit('ui:notify', { text: file.notice, kind: 'info' });
+  const notice = file.notice;
+  deliverFile(exportFilename(file.state), file.text, {
+    onShareFailed: shareFailed,
+    ...(notice ? { onDelivered: () => bus.emit('ui:notify', { text: notice, kind: 'info' }) } : {}),
+  });
 }
 
 /** Browser: open a file picker and resolve with the chosen file's text (null if
@@ -999,8 +1002,10 @@ export function pickSaveFile(): Promise<string | null> {
 /** Browser: download the career's names file (#398). No-op outside a browser. */
 export function downloadNames(state: GameState): void {
   if (typeof document === 'undefined' || typeof Blob === 'undefined') return;
-  deliverFile(exportNamesFilename(state), exportNames(state), shareFailed);
-  bus.emit('ui:notify', { text: 'Names exported.', kind: 'success' });
+  deliverFile(exportNamesFilename(state), exportNames(state), {
+    onShareFailed: shareFailed,
+    onDelivered: () => bus.emit('ui:notify', { text: 'Names exported.', kind: 'success' }),
+  });
 }
 
 /**

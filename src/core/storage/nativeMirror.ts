@@ -2,36 +2,44 @@
 // (docs/specs/ios.md Phase 2, docs/specs/commercial-saves.md "Native mirror").
 //
 // iOS may clear a web view's localStorage (Capacitor's docs call it transient). So in
-// the iOS app, localStorage stays the working copy and every write and delete made
-// through the storage layer (browserStorage(), local.ts) is also applied to one native
-// file per key. At launch, before the game reads a save, a key that has a native file
-// but is missing from localStorage is put back. Web and Android never get here.
+// the iOS app, localStorage stays the working copy and every write and delete of a
+// mirrored key (isMirroredKey) made through the storage layer (browserStorage(),
+// local.ts) is also applied to one native file per key. At launch, before the game
+// reads a save, the two sides are synced: a key missing from localStorage is put back
+// from its native copy, and a key whose native copy differs is rewritten from
+// localStorage. Web and Android never get here.
 //
 // Pure: the native side is the small NativeFiles interface (capacitorFiles.ts is the
 // Capacitor one, loaded lazily; tests use a Map). No timers: every native write is
-// started by the storage write that caused it.
+// started by the storage write (or the boot sync) that caused it.
 //
 // The rules:
-//  - Restore only fills gaps. It never overwrites a key localStorage already has.
-//  - A delete removes the native files too, so a deleted save cannot come back.
+//  - localStorage wins. The boot sync only fills gaps from native; it never
+//    overwrites a key localStorage has, and rewrites any native copy that differs.
+//  - A delete cannot come back. It writes a `.gone` marker before removing anything;
+//    the boot sync treats a marked key as deleted and finishes the removal. The next
+//    write of that key clears the marker.
 //  - One key's native writes run one at a time, in order; while one runs, later
 //    ones for that key collapse to the latest, so the last write wins.
 //  - A native failure is logged and dropped. It never throws into the game, never
-//    blocks a localStorage write, and a failed restore leaves boot with what
-//    localStorage has.
-//  - No torn files. A value is written to `<name>.tmp`, renamed to `<name>.ready`
-//    once complete, then the old `<name>` is removed and `.ready` renamed over it.
-//    A `.ready` file is always complete and always newer than `<name>`, so restore
-//    prefers it; a `.tmp` is never read. (This holds whether or not the platform's
-//    rename overwrites, since the target is always removed first.)
+//    blocks a localStorage write, and a failed sync leaves boot with localStorage.
+//  - No torn files, and the only good copy is never removed. A value is written to
+//    `.tmp`, renamed to `.ready` once complete, then `.ready` replaces the file.
+//    `.ready` is always complete and newer than the file, so the sync prefers it; a
+//    `.tmp` is never read. A `.ready` left with no file (a write cut short) is first
+//    promoted to the file, never deleted.
 
-import { DEV_TEST_PREFIX, IOS_INSTALL_HINT_KEY, LIVE_MATCH_PREFIX } from '../storageKeys';
+import {
+  COMMERCIAL_FIRST_RUN_KEY, DEVICE_ID_KEY, ENTITLEMENTS_CACHE_KEY, ENTITLEMENTS_STUB_KEY, IOS_INSTALL_HINT_KEY, LABS_KEY,
+  LEGACY_SAVE_KEY, LIVE_MATCH_PREFIX, LOG_MODE_KEY, SAVE_META_PREFIX, SAVE_SLOT_PREFIX, recoveryKey,
+} from '../storageKeys';
 import type { StorageLike } from './local';
 
 /** The native side: flat files in one private directory. Every call may reject. */
 export interface NativeFiles {
   /** Every file name in the directory ([] when it does not exist yet). */
   list(): Promise<string[]>;
+  exists(name: string): Promise<boolean>;
   read(name: string): Promise<string>;
   /** Create or replace the file (and the directory if missing). */
   write(name: string, text: string): Promise<void>;
@@ -41,29 +49,48 @@ export interface NativeFiles {
 }
 
 const FINAL = '.txt';
-const READY = '.txt.ready';
-const TMP = '.txt.tmp';
+const SUFFIXES = { ready: '.ready', tmp: '.tmp', gone: '.gone' } as const;
+type Part = 'final' | keyof typeof SUFFIXES;
 
 /** The file a key lives in: the key URI-encoded (no `/`, `:` or `%` in a file name), then `.txt`. */
 export function fileForKey(key: string): string {
   return encodeURIComponent(key) + FINAL;
 }
 
-/** The key a mirror file holds, and whether it is the newer `.ready` copy. Null for anything else (`.tmp`, strangers). */
-export function keyForFile(name: string): { key: string; ready: boolean } | null {
-  const ready = name.endsWith(READY);
-  if (!ready && (name.endsWith(TMP) || !name.endsWith(FINAL))) return null;
+/** The key a mirror file belongs to, and which of its files it is. Null for strangers. */
+export function keyForFile(name: string): { key: string; part: Part } | null {
+  let part: Part = 'final';
+  let base = name;
+  for (const [p, suffix] of Object.entries(SUFFIXES) as Array<[Part, string]>) {
+    if (name.endsWith(FINAL + suffix)) { part = p; base = name.slice(0, -suffix.length); break; }
+  }
+  if (!base.endsWith(FINAL)) return null;
   try {
-    return { key: decodeURIComponent(name.slice(0, -(ready ? READY : FINAL).length)), ready };
+    return { key: decodeURIComponent(base.slice(0, -FINAL.length)), part };
   } catch {
     return null;
   }
 }
 
-/** The game's own keys (storageKeys.ts): the ones a first launch copies to native. Analytics and the like are not. */
-export function isGameKey(key: string): boolean {
-  return key.startsWith('nrl-sim-') || key.startsWith(DEV_TEST_PREFIX) || key.startsWith(LIVE_MATCH_PREFIX)
-    || key === IOS_INSTALL_HINT_KEY;
+// ── Which keys are mirrored ─────────────────────────────────────────────────
+//
+// The career and what the player chose, by name from storageKeys.ts. Not mirrored:
+// the playtest career's keys (DEV_TEST_*: a developer's scratch career), and the
+// corrupt-save copy (CORRUPT_SAVE_KEY: keepCorrupt writes it once only; restoring an
+// old one would stop a newer one being kept). Nor anything not the game's (analytics).
+
+const MIRRORED_KEYS: ReadonlySet<string> = new Set([
+  LEGACY_SAVE_KEY, DEVICE_ID_KEY, LABS_KEY, IOS_INSTALL_HINT_KEY, LOG_MODE_KEY,
+  ENTITLEMENTS_CACHE_KEY, ENTITLEMENTS_STUB_KEY, COMMERCIAL_FIRST_RUN_KEY,
+]);
+const RECOVERY_PREFIX = recoveryKey(0).slice(0, -1);
+const MIRRORED_PER_SLOT = [SAVE_SLOT_PREFIX, SAVE_META_PREFIX, LIVE_MATCH_PREFIX, RECOVERY_PREFIX];
+
+/** Does the native mirror keep this key? */
+export function isMirroredKey(key: string): boolean {
+  if (MIRRORED_KEYS.has(key)) return true;
+  const prefix = MIRRORED_PER_SLOT.find((p) => key.startsWith(p));
+  return prefix !== undefined && /^[1-9]\d*$/.test(key.slice(prefix.length));
 }
 
 type Op = { kind: 'set'; value: string } | { kind: 'remove' };
@@ -75,8 +102,6 @@ export class NativeMirror {
   private readonly next = new Map<string, Op>();
   private readonly running = new Set<string>();
   private idleWaiters: Array<() => void> = [];
-  /** Keys known to have a native file (from restore, then every write and delete). */
-  private readonly known = new Set<string>();
 
   constructor(private readonly files: NativeFiles, private readonly log: Log = warn) {}
 
@@ -97,58 +122,57 @@ export class NativeMirror {
   }
 
   /**
-   * Put back every key that has a native copy but is missing from `storage`.
-   * Never overwrites a key `storage` has; never throws. Returns the keys restored.
+   * The boot sync, over the mirrored keys only. `keys` is every key `storage` holds.
+   *  - A key `storage` lacks is restored from its native copy, unless it is marked
+   *    deleted (then the removal is finished).
+   *  - A key `storage` has is queued for a native rewrite when its copy differs or is
+   *    missing (localStorage wins). The rewrites are not awaited.
+   * The native reads run in parallel. Never throws. Returns the keys restored.
    */
-  async restore(storage: StorageLike): Promise<string[]> {
+  async sync(storage: StorageLike, keys: readonly string[]): Promise<string[]> {
     let names: string[];
     try {
       names = await this.files.list();
     } catch (err) {
       this.log('native saves not listed, playing on with this device\'s storage', err);
-      return [];
+      names = [];
     }
-    const found = new Map<string, { ready?: string; final?: string }>();
+    const found = new Map<string, Partial<Record<Part, string>>>();
     for (const name of names) {
       const parsed = keyForFile(name);
-      if (!parsed) continue;
+      if (!parsed || !isMirroredKey(parsed.key)) continue;
       const entry = found.get(parsed.key) ?? {};
-      if (parsed.ready) entry.ready = name; else entry.final = name;
+      entry[parsed.part] = name;
       found.set(parsed.key, entry);
     }
+    const all = new Set([...found.keys(), ...keys.filter(isMirroredKey)]);
     const restored: string[] = [];
-    for (const [key, entry] of found) {
-      this.known.add(key);
+    const reads = [...all].map(async (key) => {
+      const entry = found.get(key) ?? {};
+      let current: string | null;
       try {
-        if (storage.getItem(key) !== null) continue; // only fill gaps
+        current = storage.getItem(key);
       } catch (err) {
-        this.log('storage unreadable, nothing restored', err);
-        return restored;
+        this.log(`storage unreadable, ${key} not synced`, err);
+        return;
       }
-      const text = await this.readFirst([entry.ready, entry.final]);
-      if (text === null) continue;
-      try {
-        storage.setItem(key, text);
-        restored.push(key);
-      } catch (err) {
-        this.log(`native copy of ${key} not restored`, err);
+      if (current === null) {
+        if (entry.gone) { this.remove(key); return; } // deleted: finish the removal
+        const text = await this.readFirst([entry.ready, entry.final]);
+        if (text === null) return;
+        try {
+          storage.setItem(key, text);
+          restored.push(key);
+        } catch (err) {
+          this.log(`native copy of ${key} not restored`, err);
+        }
+        return;
       }
-    }
+      const native = entry.gone ? null : await this.readFirst([entry.ready, entry.final]);
+      if (native !== current) this.set(key, current); // missing, stale or marked: localStorage wins
+    });
+    await Promise.all(reads);
     return restored;
-  }
-
-  /**
-   * Copy `keys` that have no native file yet (a game key written before the mirror
-   * existed, such as a career last played on an older build). Reads each value from
-   * `storage` now; a later write to the same key replaces it. Never throws.
-   */
-  seed(storage: StorageLike, keys: readonly string[]): void {
-    for (const key of keys) {
-      if (this.known.has(key) || this.next.has(key) || this.running.has(key)) continue;
-      let value: string | null = null;
-      try { value = storage.getItem(key); } catch { /* unreadable: skip */ }
-      if (value !== null) this.set(key, value);
-    }
   }
 
   private async readFirst(names: Array<string | undefined>): Promise<string | null> {
@@ -192,37 +216,54 @@ export class NativeMirror {
 
   private async write(key: string, value: string): Promise<void> {
     const final = fileForKey(key);
-    const ready = final + '.ready';
-    const tmp = final + '.tmp';
+    const ready = final + SUFFIXES.ready;
+    const gone = final + SUFFIXES.gone;
+    const tmp = final + SUFFIXES.tmp;
+    // A delete cut short: finish it, then this write starts the key afresh.
+    if (await this.files.exists(gone)) {
+      await this.files.remove(ready);
+      await this.files.remove(final);
+      await this.files.remove(gone);
+    }
     await this.files.write(tmp, value);
-    await this.files.remove(ready);
-    await this.files.rename(tmp, ready);
-    this.known.add(key);
-    await this.files.remove(final);
+    // A `.ready` is the newest complete copy. With no file beside it, it is the only
+    // one: promote it rather than lose it. With a file beside it, the file is good.
+    if (await this.files.exists(ready)) {
+      if (await this.files.exists(final)) await this.files.remove(ready);
+      else await this.files.rename(ready, final);
+    }
+    await this.files.rename(tmp, ready); // the new value, complete
+    await this.files.remove(final); // `.ready` now holds the newest copy
     await this.files.rename(ready, final);
   }
 
   private async erase(key: string): Promise<void> {
     const final = fileForKey(key);
-    // `.ready` first: it is the copy restore prefers, so it must never outlive `final`.
-    await this.files.remove(final + '.ready');
+    let marked: unknown = null;
+    try {
+      await this.files.write(final + SUFFIXES.gone, '');
+    } catch (err) {
+      marked = err; // remove the copies anyway; report once they are gone
+    }
+    // `.ready` first: it is the copy the sync prefers, so it must never outlive the file.
+    await this.files.remove(final + SUFFIXES.ready);
     await this.files.remove(final);
-    this.known.delete(key);
-    await this.files.remove(final + '.tmp');
+    await this.files.remove(final + SUFFIXES.tmp);
+    if (marked) throw marked;
   }
 }
 
-/** `base` with every write and delete also sent to `mirror`, after `base` took it. Reads are `base`'s. */
+/** `base` with every write and delete of a mirrored key also sent to `mirror`, after `base` took it. */
 export function mirroredStorage(base: StorageLike, mirror: NativeMirror): StorageLike {
   return {
     getItem: (key) => base.getItem(key),
     setItem: (key, value) => {
       base.setItem(key, value); // throws (storage full): nothing mirrored, as nothing changed
-      mirror.set(key, value);
+      if (isMirroredKey(key)) mirror.set(key, value);
     },
     removeItem: (key) => {
       base.removeItem(key);
-      mirror.remove(key);
+      if (isMirroredKey(key)) mirror.remove(key);
     },
   };
 }
@@ -234,7 +275,7 @@ export interface MirrorBoot {
   ios: boolean;
   /** The web view's storage, or null where there is none. */
   storage: StorageLike | null;
-  /** Every key in `storage` now (localStorage.key(i)); used once, to seed keys with no native copy. */
+  /** Every key in `storage` now (localStorage.key(i)), for the boot sync. */
   keys: () => string[];
   /** The native side, loaded only when `ios` (a dynamic import, so the web bundle never carries it). */
   loadFiles: () => Promise<NativeFiles>;
@@ -245,25 +286,24 @@ export interface MirrorBoot {
 
 /**
  * At launch, before any save is read: off the iOS app, do nothing ('inactive').
- * In it, load the native side, restore the gaps, then route the storage layer
+ * In it, load the native side, run the boot sync, then route the storage layer
  * through the mirror ('active'). If the native side cannot load, boot goes on with
  * what localStorage has and nothing is mirrored ('failed'). Never throws.
  */
-export async function startNativeMirror(boot: MirrorBoot): Promise<MirrorStart> {
-  if (!boot.ios || !boot.storage) return 'inactive';
+export async function startNativeMirror(boot: MirrorBoot): Promise<{ start: MirrorStart; mirror?: NativeMirror }> {
+  if (!boot.ios || !boot.storage) return { start: 'inactive' };
   const log = boot.log ?? warn;
   let files: NativeFiles;
   try {
     files = await boot.loadFiles();
   } catch (err) {
     log('native save mirror unavailable, saves kept in the web view only', err);
-    return 'failed';
+    return { start: 'failed' };
   }
   const mirror = new NativeMirror(files, log);
-  await mirror.restore(boot.storage);
-  boot.install(mirroredStorage(boot.storage, mirror));
   let keys: string[] = [];
-  try { keys = boot.keys().filter(isGameKey); } catch { /* unenumerable: nothing seeded */ }
-  mirror.seed(boot.storage, keys);
-  return 'active';
+  try { keys = boot.keys(); } catch { /* unenumerable: restore only */ }
+  await mirror.sync(boot.storage, keys);
+  boot.install(mirroredStorage(boot.storage, mirror));
+  return { start: 'active', mirror };
 }
