@@ -92,8 +92,7 @@ describe('motion tokens (#597)', () => {
   it('a colour change eases on the keyword; movement on a curve token', () => {
     expect(CSS).toContain('transition: background-color var(--nrl-dur-press) ease, transform var(--nrl-dur-press) var(--nrl-ease-out);');
     expect(CSS).toContain('transition: color var(--nrl-dur-fast) ease;');
-    expect(OVERLAY_CSS).toContain('transition: background-color var(--nrl-dur-fast) ease;');
-    expect(OVERLAY_CSS).toContain('transition: transform var(--nrl-dur-fast) var(--nrl-ease-in-out);');
+    // The match's LOG switch (its knob and fill transitions) went with SuperCOOKED 40's bottom bar.
     expect(CSS).toContain('.nrl-toast-in { animation: nrl-toast-in var(--nrl-dur-fast) var(--nrl-ease-out); }');
     expect(CSS).toContain('transform: translateY(calc(var(--nrl-rise) / -3));');
     expect(OVERLAY_CSS).toContain('.nrl-mo-banner-in { animation: nrl-mo-in-left var(--nrl-dur-fast) var(--nrl-ease-out) both; }');

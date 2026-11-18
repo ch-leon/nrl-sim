@@ -340,8 +340,11 @@ export function statTable(rows: readonly StatRow[], heads: readonly [string, str
   return table;
 }
 
-/** The commentary's three states (spec "Interactions & state"): one line, nothing, or the full log on the right. */
-export type LogMode = 'line' | 'hidden' | 'full';
+/**
+ * The commentary's two states (SuperCOOKED 40): its line in the bottom bar, or the full log on the right.
+ * The LOG on/off switch went with the bar; a stored 'hidden' (before it went) reads as the line.
+ */
+export type LogMode = 'line' | 'full';
 
 /** Where the log mode is kept between matches (the prototype's key). */
 export const LOG_MODE_KEY = 'nrlsim.logMode';
@@ -358,19 +361,18 @@ function localStore(): ModeStore | null {
 
 /** The log mode a match opens with: the last one picked, 'line' the first time (a full log reopens as the line). */
 export function readLogMode(store: ModeStore | null = localStore()): LogMode {
-  try {
-    return store?.getItem(LOG_MODE_KEY) === 'hidden' ? 'hidden' : 'line';
-  } catch {
-    return 'line';
-  }
+  // Whatever is stored ('hidden' from before the switch went, or blocked storage), a match opens on the line.
+  void store;
+  return 'line';
 }
 
-/** Keep the log mode for the next match; 'full' is kept as 'line'. Never throws. */
+/** Keep the log mode for the next match: always the line ('full' comes back as it; 'hidden' is no longer written). Never throws. */
 export function saveLogMode(mode: LogMode, store: ModeStore | null = localStore()): void {
+  void mode;
   try {
-    store?.setItem(LOG_MODE_KEY, mode === 'hidden' ? 'hidden' : 'line');
+    store?.setItem(LOG_MODE_KEY, 'line');
   } catch {
-    // A private window or full storage: the mode lasts this match.
+    // A private window or full storage: nothing to keep.
   }
 }
 
@@ -883,6 +885,11 @@ export interface PlanCardOptions {
   lines?: string[];
   /** The other side's plan, on the right ("Larrikins play Direct · Rush"). */
   tendency?: string;
+  /**
+   * The other side, for the header's "v Larrikins" and the tendency card (SuperCOOKED 42): its name, its
+   * plan in words, and, with the Analyst hired, the plan it steps to when behind. Shown in place of `tendency`.
+   */
+  opponent?: { name: string; plan: string; behind?: string | null };
   /** The set plays the side took in, read-only ("Plays: Block play · Cut-out", #326): the three can't change mid-match. */
   plays?: string | undefined;
   /** The primary: "Start 2nd half ▸", "Golden point ▸"; "Continue ▸" by default. */
@@ -918,7 +925,7 @@ export function showPlanCard(o: PlanCardOptions): PlanCardHandle {
       if (on) seg.set(on);
       for (const [p, b] of seg.buttons) b.toggleAttribute('data-active', p === on);
     }
-    hint.textContent = `${PRESET_LABEL[explained]}: ${TACTIC_BLURB[explained]}`;
+    hint.replaceChildren(el('b', { class: 'nrl-mo-plan-hint-name', text: `${PRESET_LABEL[explained]}:` }), ` ${TACTIC_BLURB[explained]}`);
   };
   const row = (label: string, presets: readonly (AttackPreset | DefencePreset)[], pick: (p: AttackPreset | DefencePreset) => Partial<TeamTactics>): HTMLElement[] => {
     const seg = segmented<AttackPreset | DefencePreset>(
@@ -947,23 +954,35 @@ export function showPlanCard(o: PlanCardOptions): PlanCardHandle {
   };
   const go = button(o.go ?? 'Continue ▸', close, { class: 'nrl-btn-primary nrl-mo-plan-go' });
   const summary = o.summary ?? (o.lines ?? []).join(' · ');
+  // SuperCOOKED 42: the head, score and "v Them" over the read; how they play in a card on the right.
+  const tendency = o.opponent
+    ? el('div', { class: 'nrl-mo-plan-tend', attrs: { 'data-plan-tendency': '' } },
+      el('span', { class: 'nrl-mo-plan-tend-label', text: `${o.opponent.name} play` }),
+      el('span', { class: 'nrl-mo-plan-tend-plan', text: o.opponent.plan }),
+      ...(o.opponent.behind ? [el('span', { class: 'nrl-mo-plan-tend-behind', text: `Behind: ${o.opponent.behind}`, attrs: { title: 'The Analyst: the plan they go to when they trail' } })] : []))
+    : o.tendency ? el('div', { class: 'nrl-mo-plan-tend', attrs: { 'data-plan-tendency': '' } }, el('span', { class: 'nrl-mo-plan-tend-plan', text: o.tendency })) : null;
   const sheet = el(
     'div',
     { class: 'nrl-mo-plan-sheet' },
     el('span', { class: 'nrl-mo-plan-grab', attrs: { 'aria-hidden': 'true' } }),
     el('div', { class: 'nrl-mo-plan-top' },
-      el('span', { class: 'nrl-mo-plan-head', text: o.head }),
-      ...(o.score ? [el('span', { class: 'nrl-mo-plan-score', text: o.score })] : []),
-      ...(summary ? [el('span', { class: 'nrl-mo-plan-line', text: summary })] : []),
-      ...(o.tendency ? [el('span', { class: 'nrl-mo-plan-tend', text: o.tendency })] : []),
-      ...(o.plays ? [el('span', { class: 'nrl-mo-plan-plays', attrs: { 'data-plan-plays': '' }, text: o.plays })] : []),
+      el('div', { class: 'nrl-mo-plan-read' },
+        el('div', { class: 'nrl-mo-plan-title' },
+          el('span', { class: 'nrl-mo-plan-head', text: o.head }),
+          ...(o.score ? [el('span', { class: 'nrl-mo-plan-score', text: o.score })] : []),
+          ...(o.opponent ? [el('span', { class: 'nrl-mo-plan-vs', text: `v ${o.opponent.name}` })] : [])),
+        ...(summary ? [el('span', { class: 'nrl-mo-plan-line', text: summary })] : [])),
+      ...(tendency ? [tendency] : []),
     ),
     ...(o.numbers ? [el('div', { class: 'nrl-mo-working', attrs: { 'data-working': '' }, text: `What’s working · half-time guide: ${o.numbers.map(n => `${n.label} ${n.count} ${n.arrow} (aim ${n.label === 'Errors' ? '≤' : '≥'}${n.target})`).join(' · ')}` })] : []),
     el('div', { class: 'nrl-mo-plan-rows' },
       ...row('Attack', ATTACK_PRESETS, (p) => ({ attack: p as AttackPreset })),
       ...row('Defence', DEFENCE_PRESETS, (p) => ({ defence: p as DefencePreset })),
     ),
-    el('div', { class: 'nrl-mo-plan-foot' }, hint, go),
+    el('div', { class: 'nrl-mo-plan-foot' },
+      el('div', { class: 'nrl-mo-plan-say' }, hint,
+        ...(o.plays ? [el('span', { class: 'nrl-mo-plan-plays', attrs: { 'data-plan-plays': '' }, text: o.plays })] : [])),
+      go),
   );
   const wrap = el('div', { class: 'nrl-mo-plan', attrs: { role: 'dialog', 'aria-label': o.head } }, sheet);
   render();
@@ -1056,6 +1075,17 @@ export function tackleLabel(count: number): string {
   return count === SET_TACKLES - 1 ? `LAST TACKLE · ${SET_TACKLES}/${SET_TACKLES}` : `TACKLE ${count + 1}/${SET_TACKLES}`;
 }
 
+/** Whose ball it is, for the chip (SuperCOOKED 40): "Your ball", "Their ball", or a side's code where neither is the coach's. */
+export interface BallWords {
+  label: string;
+  mine: boolean;
+}
+
+/** The chip's words with whose ball: "YOUR BALL · TACKLE 2/5". */
+export function ballLabel(count: number, ball: BallWords | null | undefined): string {
+  return ball ? `${ball.label} · ${tackleLabel(count)}` : tackleLabel(count);
+}
+
 /** The parts of the chip's element the overlay writes. */
 export type TackleChipEl = Pick<HTMLElement, 'hidden' | 'textContent'> & { classList: Pick<DOMTokenList, 'toggle'> };
 
@@ -1068,6 +1098,7 @@ export type TackleChipEl = Pick<HTMLElement, 'hidden' | 'textContent'> & { class
 export class TackleChip {
   private text = '';
   private last = false;
+  private theirs: boolean | null = null;
   private hidden = true;
   private over = false;
 
@@ -1075,14 +1106,16 @@ export class TackleChip {
     el.hidden = true;
   }
 
-  /** Completed tackles in the set on screen, or null to hide it (a replay). */
-  show(count: number | null): void {
+  /** Completed tackles in the set on screen, or null to hide it (a replay); `ball`, whose set it is. */
+  show(count: number | null, ball?: BallWords | null): void {
     const hidden = count === null || this.over;
     if (!hidden) {
-      const text = tackleLabel(count!);
+      const text = ballLabel(count!, ball);
       const last = count === SET_TACKLES - 1;
       if (text !== this.text) this.el.textContent = this.text = text;
       if (last !== this.last) this.el.classList.toggle('nrl-mo-tackle-last', (this.last = last));
+      const theirs = ball ? !ball.mine : null;
+      if (ball && theirs !== this.theirs) this.el.classList.toggle('nrl-mo-tackle-theirs', (this.theirs = theirs) === true);
     }
     if (hidden !== this.hidden) this.el.hidden = this.hidden = hidden;
   }
@@ -1119,8 +1152,8 @@ export class HeldText {
 export interface MatchOverlayHandle {
   /** Remove the overlay and unsubscribe all bus handlers. Idempotent. */
   destroy(): void;
-  /** Completed tackles before this play, or null while there is no meaningful count. */
-  setTackle?(count: number | null): void;
+  /** Completed tackles before this play, or null while there is no meaningful count; `side`, whose set it is. */
+  setTackle?(count: number | null, side?: 'home' | 'away'): void;
   /** The live sim's running clock (match seconds and half), finer than the events' whole minutes. */
   setClock(matchSeconds: number, half: 1 | 2 | 'gp'): void;
   /**
@@ -1142,11 +1175,11 @@ export interface MatchOverlayHandle {
   setScore(home: number, away: number): void;
   /** Put the score bug back on the score the events have accumulated. */
   showLiveScore(): void;
-  /** A place in the bottom row for the scene's controls: COACH, the Plan chip, the speed pill. */
+  /** A place in the bottom bar for the scene's controls: COACH, the Plan chip, pause / speed / skip. */
   slot?(name: 'coach' | 'plan' | 'speed'): HTMLElement;
   /** The coach's call just went in (its name, for the log if the commentary has no line for it). */
   noteCall?(label: string): void;
-  /** The coach tray is open: the commentary line steps aside and the speed pill shows only the speed. */
+  /** The coach tray is open: the Replay chip and the call tag step out from over it. */
   setTrayOpen?(on: boolean): void;
   /** Possession so far [home, away] in percent (the half-time sheet's summary). */
   possession?(): [number, number];
@@ -1219,21 +1252,29 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
 
   const root = el('div', { class: 'nrl-match-overlay' });
 
-  // ── Score bug (3m): stripe, code, score per side; the clock; possession under it. Tap: the stats.
+  // ── Score bar (SuperCOOKED 40): top centre; a stripe at each outer end, the codes, the scores, the clock
+  // between them over the half; the momentum line under it. Tap: the stats.
   const teamCell = (side: 'home' | 'away', code: string, colour: string): { cell: HTMLElement; pts: HTMLElement } => {
     const mine = opts.mine === side;
     const stripe = el('span', { class: 'nrl-mo-stripe' });
     stripe.style.background = colour;
     const pts = el('span', { class: 'nrl-mo-pts', text: '0' });
-    const cell = el('span', { class: mine ? 'nrl-mo-team nrl-mo-mine' : 'nrl-mo-team', attrs: { 'data-side': side } }, stripe, el('span', { class: 'nrl-mo-code', text: mine ? `${code} ★` : code }), pts);
+    const codeEl = el('span', { class: 'nrl-mo-code', text: mine ? `${code} ★` : code });
+    // The away side mirrors the home: its score next to the clock, its stripe at the far end.
+    const cell = el('span', { class: mine ? 'nrl-mo-team nrl-mo-mine' : 'nrl-mo-team', attrs: { 'data-side': side } },
+      ...(side === 'home' ? [stripe, codeEl, pts] : [pts, codeEl, stripe]));
     if (mine) cell.title = 'Your club';
     return { cell, pts };
   };
   const homeCell = teamCell('home', codes[0], worn.home);
   const awayCell = teamCell('away', codes[1], worn.away);
   const clockEl = el('span', { class: 'nrl-mo-clock', text: opts.halfMinutes ? formatClockSeconds(0, 2 * halfMinutes) : formatClock(0) });
-  const tackleEl = el('span', { class: 'nrl-mo-tackle' });
+  // The ball chip (SuperCOOKED 40): under the score bar, whose ball and the tackle count.
+  const tackleEl = el('div', { class: 'nrl-mo-tackle', attrs: { role: 'status' } });
   const tackle = new TackleChip(tackleEl);
+  const ballWords = (side: 'home' | 'away'): BallWords => (opts.mine
+    ? { label: side === opts.mine ? 'Your ball' : 'Their ball', mine: side === opts.mine }
+    : { label: `${codes[side === 'home' ? 0 : 1]} ball`, mine: side === 'home' });
   const halfEl = el('span', { class: 'nrl-mo-half', text: '1H' });
   // The score in words, for a screen reader (and the e2e's read of it).
   const scoreEl = el('span', { class: 'nrl-mo-score nrl-mo-sr', text: '0 – 0' });
@@ -1244,7 +1285,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   const board = el(
     'button',
     { class: 'nrl-mo-scoreboard', attrs: { type: 'button', 'aria-expanded': 'false', 'aria-controls': 'nrl-mo-stats', title: 'Match stats' } },
-    el('span', { class: 'nrl-mo-bug' }, homeCell.cell, awayCell.cell, el('span', { class: 'nrl-mo-clockbox' }, clockEl, halfEl), tackleEl),
+    el('span', { class: 'nrl-mo-bug' }, homeCell.cell, el('span', { class: 'nrl-mo-clockbox' }, clockEl, halfEl), awayCell.cell),
     momentum.row,
     scoreEl,
   );
@@ -1325,14 +1366,14 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
     if (statsOpen) renderStats();
   });
 
-  // ── Commentary (3m): one line above the bottom row, the full log on the right, or nothing.
+  // ── Commentary (SuperCOOKED 40): its latest line in the bottom bar, a red dot before it; a tap opens the full log on the right.
   const stripText = el('span', { class: 'nrl-mo-strip-text nrl-mo-line-wait', text: TICKER_WAIT_TEXT });
   const strip = el(
     'button',
     { class: 'nrl-mo-strip', attrs: { type: 'button', 'aria-controls': 'nrl-mo-log' } },
-    el('span', { class: 'nrl-mo-strip-live', text: 'LIVE' }),
+    el('span', { class: 'nrl-mo-strip-live' }, el('span', { class: 'nrl-mo-sr', text: 'Live: ' })),
     stripText,
-    el('span', { class: 'nrl-mo-strip-more', text: 'FULL LOG ▴' }),
+    el('span', { class: 'nrl-mo-strip-more', text: 'Log ▴' }),
   );
   strip.addEventListener('click', () => setMode('full'));
   // A long typed name wraps (the CSS) and, on a narrow window, draws smaller until the
@@ -1398,20 +1439,14 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
     feed,
   );
 
-  // ── Bottom row (3m): COACH · LOG · Plan · … · the speed pill. The scene fills its slots.
-  const logToggle = el(
-    'button',
-    { class: 'nrl-mo-log-toggle', attrs: { type: 'button', 'aria-pressed': 'true', 'aria-label': 'Commentary line' } },
-    el('span', { class: 'nrl-mo-switch', attrs: { 'aria-hidden': 'true' } }, el('i')),
-    el('span', { class: 'nrl-mo-log-label', text: 'LOG' }),
-  );
-  logToggle.addEventListener('click', () => setMode(mode === 'hidden' ? 'line' : 'hidden'));
+  // ── The bottom bar (SuperCOOKED 40): one ink bar, COACH · the commentary line · Plan · pause / speed / skip.
+  // The scene fills its slots. The LOG on/off switch went with it (the spec): the line is always there.
   const slots = {
     coach: el('div', { class: 'nrl-mo-slot nrl-mo-slot-coach' }),
     plan: el('div', { class: 'nrl-mo-slot nrl-mo-slot-plan' }),
     speed: el('div', { class: 'nrl-mo-slot nrl-mo-slot-speed' }),
   };
-  const bar = el('div', { class: 'nrl-mo-bar' }, slots.coach, logToggle, slots.plan, el('span', { class: 'nrl-mo-bar-gap' }), slots.speed);
+  const bar = el('div', { class: 'nrl-mo-bar' }, slots.coach, strip, slots.plan, el('span', { class: 'nrl-mo-bar-div', attrs: { 'aria-hidden': 'true' } }), slots.speed);
 
   // ── Key-moment banner (3n): under the score bug, whatever the log mode.
   const bannerHead = el('span', { class: 'nrl-mo-banner-head' });
@@ -1420,7 +1455,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   const banner = el('div', { class: 'nrl-mo-banner', attrs: { role: 'status', 'aria-live': 'polite' } }, bannerHead, el('span', { class: 'nrl-mo-banner-text' }, bannerWho, bannerSub));
   banner.hidden = true;
 
-  root.append(board, statsSheet, strip, full, banner, bar);
+  root.append(board, tackleEl, statsSheet, full, banner, bar);
   mount(root);
 
   let mode: LogMode = readLogMode();
@@ -1428,7 +1463,6 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
     mode = m;
     root.dataset.log = m;
     root.classList.toggle('nrl-mo-full-on', m === 'full');
-    logToggle.setAttribute('aria-pressed', String(m !== 'hidden'));
     strip.setAttribute('aria-expanded', String(m === 'full'));
     if (m === 'full') feed.scrollTop = 0;
     saveLogMode(m);
@@ -1442,7 +1476,10 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   const placeBoard = (): void => {
     boardFrame = 0;
     const b = board.getBoundingClientRect();
-    document.documentElement.style.setProperty(BOARD_VAR, `${Math.ceil(b.bottom)}px`);
+    // What hangs under the bar (the banner, the replay chip, the stats, the toasts) goes under the ball chip too.
+    document.documentElement.style.setProperty(SCORE_FOOT_VAR, `${Math.ceil(b.bottom)}px`);
+    const chip = tackleEl.hidden ? null : tackleEl.getBoundingClientRect();
+    document.documentElement.style.setProperty(BOARD_VAR, `${Math.ceil(Math.max(b.bottom, chip && chip.height > 0 ? chip.bottom : 0))}px`);
     // The open full log sits beside the score bug where there is room, else under it, so the
     // tackle count stays in view: a narrow phone, the notch's insets or a larger text size.
     // Its resting left edge from layout: the slide-in's transform is not where it settles.
@@ -1682,6 +1719,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       clearReplayOffer();
       replayTag?.remove();
       document.documentElement.style.removeProperty(BOARD_VAR);
+      document.documentElement.style.removeProperty(SCORE_FOOT_VAR);
       if (boardFrame) cancelAnimationFrame(boardFrame);
       boardObserver?.disconnect();
       if (fitFrame) cancelAnimationFrame(fitFrame);
@@ -1714,8 +1752,11 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       calls = { made: { ...made }, paid: { ...paid } };
       if (statsOpen) renderStats();
     },
-    setTackle(count: number | null): void {
-      tackle.show(finalClock === null ? count : null);
+    setTackle(count: number | null, side?: 'home' | 'away'): void {
+      const wasHidden = tackleEl.hidden;
+      tackle.show(finalClock === null ? count : null, side ? ballWords(side) : null);
+      // The chip came or went: what hangs under it moves with it.
+      if (tackleEl.hidden !== wasHidden) scheduleBoard();
     },
     setClock(matchSeconds: number, half: 1 | 2 | 'gp'): void {
       liveClock = true;
@@ -1880,6 +1921,8 @@ function weatherWord(w: WeatherKind): string {
 const OVERLAY_STYLE_ID = 'nrl-match-overlay-styles';
 /** The score bug's foot (px from the top), on <html>, for what hangs under it: the banner, the replay chip, the stats, the toasts. */
 const BOARD_VAR = '--nrl-mo-board';
+/** The score bar's own foot, for the ball chip under it (BOARD_VAR is the chip's foot while it shows). */
+const SCORE_FOOT_VAR = '--nrl-mo-score-foot';
 /** Body class set while a match overlay is mounted (see header). */
 export const MATCH_ACTIVE_CLASS = 'nrl-match-active';
 /** Body class added at full-time (alongside MATCH_ACTIVE_CLASS) until exit. */
@@ -1903,30 +1946,47 @@ export const OVERLAY_CSS = `
 /* Match mode (live AND full time, until Back to Club): the dock steps aside. */
 body.nrl-match-active .nrl-dock-wrap { display: none; }
 .nrl-mo-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-/* Score bug (3m): per side a stripe in the colour it wears on the pitch, its code, its score; then the clock. */
+/* Score bar (SuperCOOKED 40): top centre on ink; per side a stripe at the outer end in the colour it wears on the
+   pitch, its code, its score in an Archivo box; the clock between, over the half. Centred by its margins, not a
+   transform, so the press's scale (#604) has nothing to replace. */
 .nrl-mo-scoreboard {
-  position: fixed; top: calc(12px + var(--nrl-safe-t)); left: calc(16px + var(--nrl-safe-l)); z-index: 15;
-  pointer-events: auto; cursor: pointer; display: flex; flex-direction: column; margin: 0; padding: 0; border: 0;
-  border-radius: 8px; overflow: hidden; background: var(--nrl-navy); color: var(--nrl-text); box-shadow: var(--nrl-shadow-chip);
+  position: fixed; top: calc(12px + var(--nrl-safe-t)); left: 0; right: 0; z-index: 15; width: max-content; max-width: calc(100vw - 24px);
+  pointer-events: auto; cursor: pointer; display: flex; flex-direction: column; margin: 0 auto; padding: 0; border: 0;
+  border-radius: 12px; overflow: hidden; background: var(--nrl-ink); color: var(--nrl-text); box-shadow: inset 0 0 0 1px var(--nrl-line), 0 4px 14px rgba(0, 0, 0, 0.35);
   font: inherit; text-align: left;
 }
 .nrl-mo-scoreboard:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
-.nrl-mo-scoreboard[aria-expanded="true"]::after { content: ''; position: absolute; inset: 0; border-radius: 8px; box-shadow: inset 0 0 0 2px var(--nrl-accent); pointer-events: none; }
-.nrl-mo-tackle { display: flex; align-items: center; justify-content: center; box-sizing: content-box; min-width: 17ch; padding: 0 8px; font: 700 0.8125rem var(--nrl-f-label); line-height: 1.2; letter-spacing: 0.04em; white-space: nowrap; }
-.nrl-mo-tackle[hidden] { display: none; }
+.nrl-mo-scoreboard[aria-expanded="true"]::after { content: ''; position: absolute; inset: 0; border-radius: 12px; box-shadow: inset 0 0 0 2px var(--nrl-accent); pointer-events: none; }
+/* The ball chip (40): under the score bar, a dot and whose ball, then the tackle; on the last tackle it goes orange.
+   One width, room for the longest it says ("Their ball · last tackle · 5/5"), so a new count never moves it. */
+.nrl-mo-tackle {
+  position: fixed; top: calc(var(--nrl-mo-score-foot, 66px) + 6px); left: 0; right: 0; z-index: 15; width: 18.5em; max-width: calc(100vw - 24px); margin: 0 auto;
+  display: flex; align-items: center; justify-content: center; gap: 8px; height: 24px; padding: 0 12px; box-sizing: border-box; border-radius: 12px; pointer-events: none;
+  background: rgba(5, 7, 13, 0.85); color: var(--nrl-text); font: 700 0.75rem var(--nrl-f-label); letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap;
+}
+.nrl-mo-tackle::before { content: ''; flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; background: var(--nrl-accent); }
+.nrl-mo-tackle-theirs::before { background: var(--nrl-pos); }
+.nrl-mo-tackle[hidden], .nrl-mo-tray-open .nrl-mo-tackle { display: none; }
 @media (orientation: portrait) { .nrl-mo-tackle { display: none; } }
 .nrl-mo-tackle-last { background: var(--nrl-accent); color: var(--nrl-on-accent); }
-.nrl-mo-bug { display: flex; height: 44px; }
+.nrl-mo-tackle-last::before { background: var(--nrl-on-accent); }
+.nrl-mo-bug { display: flex; height: 48px; }
+/* A phone on its side (390 tall or less): the bar and the chip close up, so a full tray fits under them unscrolled (#396). */
+@media (max-height: 400px) {
+  .nrl-mo-bug { height: 44px; }
+  .nrl-mo-tackle { top: calc(var(--nrl-mo-score-foot, 62px) + 4px); height: 22px; }
+}
 .nrl-mo-team { display: flex; align-items: stretch; }
 .nrl-mo-stripe { flex: 0 0 6px; width: 6px; }
-.nrl-mo-code { display: flex; align-items: center; padding: 0 10px; font-family: var(--nrl-f-label); font-size: 1.1875rem; font-weight: 700; letter-spacing: 0.02em; white-space: nowrap; }
+.nrl-mo-code { display: flex; align-items: center; padding: 0 10px 0 12px; font-family: var(--nrl-f-label); font-size: 1.125rem; font-weight: 700; letter-spacing: 0.06em; white-space: nowrap; }
+.nrl-mo-team[data-side="away"] .nrl-mo-code { padding: 0 12px 0 10px; }
 .nrl-mo-pts {
-  display: flex; align-items: center; justify-content: center; min-width: 36px; padding: 0 2px; box-sizing: border-box;
-  background: var(--nrl-raised); font-family: var(--nrl-f-num); font-size: 1.25rem; font-weight: 600; font-variant-numeric: tabular-nums;
+  display: flex; align-items: center; justify-content: center; min-width: 44px; padding: 0 12px; box-sizing: border-box;
+  background: var(--nrl-panel); font-family: var(--nrl-f-display); font-size: 1.625rem; font-variant-numeric: tabular-nums;
 }
-.nrl-mo-clockbox { display: flex; align-items: center; gap: 6px; padding: 0 10px; background: var(--nrl-accent); color: var(--nrl-on-accent); }
-.nrl-mo-clock { font-family: var(--nrl-f-num); font-size: 1rem; font-weight: 600; font-variant-numeric: tabular-nums; }
-.nrl-mo-half { font-family: var(--nrl-f-label); font-size: 0.9375rem; font-weight: 700; min-width: 1.3em; }
+.nrl-mo-clockbox { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 0 12px; color: var(--nrl-text); }
+.nrl-mo-clock { font-family: var(--nrl-f-num); font-size: 0.9375rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.nrl-mo-half { font-family: var(--nrl-f-num); font-size: 0.5625rem; letter-spacing: 0.14em; color: var(--nrl-muted); }
 /* The momentum line (#366), the team-colour split under the bug: home above the middle, away below. */
 .nrl-mo-momentum-row { display: flex; align-items: center; background: var(--nrl-panel); }
 .nrl-mo-momentum { display: block; flex: 1 1 auto; min-width: 0; height: 8px; }
@@ -1953,10 +2013,10 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 /* The stats, opened from the score bug: the report's stat column (3t). Asked for, so over the banner.
    dvh follows Safari's toolbars, so the last rows stay above COACH and LOG; the vh line is the fallback (#609). */
 .nrl-mo-statsheet {
-  position: fixed; top: calc(var(--nrl-mo-board, 60px) + 6px); left: calc(16px + var(--nrl-safe-l)); z-index: 19;
+  position: fixed; top: calc(var(--nrl-mo-board, 60px) + 6px); left: 0; right: 0; margin: 0 auto; z-index: 19;
   width: min(340px, calc(100vw - 32px)); max-height: calc(100vh - var(--nrl-mo-board, 60px) - 94px);
   max-height: calc(100dvh - var(--nrl-mo-board, 60px) - 94px); overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box;
-  padding: 8px 12px 10px; border-radius: 14px; background: var(--nrl-sheet); box-shadow: var(--nrl-shadow-tray); pointer-events: auto;
+  padding: 8px 12px 10px; border-radius: 14px; background: var(--nrl-ink); box-shadow: inset 0 0 0 1px var(--nrl-line), var(--nrl-shadow-tray); pointer-events: auto;
 }
 .nrl-mo-statsheet[hidden] { display: none; }
 .nrl-mo-full-on .nrl-mo-statsheet { width: min(340px, calc(100vw - 32px - 342px)); }
@@ -1975,21 +2035,19 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 .nrl-mo-stat-bar { display: flex; height: 4px; border-radius: 2px; overflow: hidden; background: var(--nrl-line); }
 .nrl-mo-stat-bar > i { display: block; height: 100%; }
 .nrl-mo-stat-bar > i:last-child { flex: 1 1 auto; }
-/* The commentary line (log = line): above the bottom row, centred; tap it for the full log. */
+/* The commentary line (SuperCOOKED 40): in the bottom bar between COACH and the controls, a red dot, the line, LOG ▴. Tap it for the full log. */
 .nrl-mo-strip {
-  position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(78px + var(--nrl-safe-b)); z-index: 14;
-  width: min(560px, calc(100vw - 32px)); min-height: 40px; display: flex; align-items: stretch; margin: 0; padding: 0; border: 0;
-  border-radius: 8px; overflow: hidden; background: rgba(5, 7, 13, 0.95); color: var(--nrl-text); box-shadow: var(--nrl-shadow-chip);
+  flex: 1 1 auto; min-width: 0; height: 46px; min-height: 40px; display: flex; align-items: center; gap: 10px; margin: 0; padding: 0 12px; border: 0;
+  border-radius: 10px; overflow: hidden; background: var(--nrl-panel); color: var(--nrl-text);
   font: inherit; text-align: left; cursor: pointer; pointer-events: auto;
 }
-/* Pressed, it shrinks about where it is centred (#604): the scale goes after the centring, not instead of it. */
-.nrl-mo-strip:active { transform: translateX(-50%) scale(var(--nrl-press)); transition: transform var(--nrl-dur-press) var(--nrl-ease-out); }
+.nrl-mo-strip:active { transform: scale(var(--nrl-press)); transition: transform var(--nrl-dur-press) var(--nrl-ease-out); }
 .nrl-mo-strip:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
-.nrl-mo-strip-live { display: flex; align-items: center; padding: 0 10px; background: var(--nrl-accent); color: var(--nrl-on-accent); font-family: var(--nrl-f-label); font-size: 0.875rem; font-weight: 700; letter-spacing: 0.06em; }
-/* #433: a long typed name wraps onto a second line (the strip grows up, clear of the
-   bottom row) instead of running over FULL LOG. A third line still ends in an ellipsis. */
+.nrl-mo-strip-live { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; background: var(--nrl-alert); }
+/* #433: a long typed name wraps onto a second line inside the bar instead of running over LOG ▴.
+   A third line still ends in an ellipsis. */
 .nrl-mo-strip-text {
-  flex: 1 1 auto; min-width: 0; align-self: center; padding: 4px 12px; font-size: 0.875rem; line-height: 1.25;
+  flex: 1 1 auto; min-width: 0; align-self: center; padding: 0; font-size: 0.875rem; line-height: 1.2;
   white-space: normal; overflow: hidden; text-overflow: ellipsis; overflow-wrap: anywhere;
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
 }
@@ -1997,19 +2055,18 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 @media (max-width: 520px) {
   .nrl-mo-strip-text { -webkit-line-clamp: 3; }
 }
-.nrl-mo-strip-more { display: flex; align-items: center; padding: 0 12px; border-left: 1px solid var(--nrl-line); font-family: var(--nrl-f-label); font-size: 0.875rem; font-weight: 700; color: var(--nrl-text-2); white-space: nowrap; }
+.nrl-mo-strip-more { flex: 0 0 auto; font-family: var(--nrl-f-label); font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--nrl-muted); white-space: nowrap; }
 .nrl-mo-line-wait { font-style: italic; opacity: 0.75; }
-/* Log = full: the log on the right, filtered; log = hidden: neither. */
+/* Log = full: the log on the right, filtered; the line stays in the bar, its way back. */
 .nrl-mo-full {
   position: fixed; top: calc(12px + var(--nrl-safe-t)); right: calc(12px + var(--nrl-safe-r)); bottom: calc(80px + var(--nrl-safe-b)); z-index: 18;
   width: min(330px, calc(100vw - 24px)); box-sizing: border-box; padding: 10px 12px; border-radius: 14px;
-  background: var(--nrl-sheet); box-shadow: var(--nrl-shadow-tray); display: flex; flex-direction: column; gap: 6px; pointer-events: auto;
+  background: var(--nrl-ink); box-shadow: inset 0 0 0 1px var(--nrl-line), var(--nrl-shadow-tray); display: flex; flex-direction: column; gap: 6px; pointer-events: auto;
   animation: nrl-mo-in-right var(--nrl-dur-sheet) var(--nrl-ease-out);
 }
-.nrl-mo-full-under .nrl-mo-full { top: calc(var(--nrl-mo-board, 60px) + 6px); }
-.nrl-match-overlay:not([data-log="full"]) .nrl-mo-full,
-.nrl-match-overlay:not([data-log="line"]) .nrl-mo-strip,
-.nrl-mo-tray-open .nrl-mo-strip, .nrl-mo-stats-on .nrl-mo-strip { display: none; }
+/* Under the score bar: beside the ball chip, not under it, so a short phone keeps four lines of log (the chip is centred, the log on the right). */
+.nrl-mo-full-under .nrl-mo-full { top: calc(var(--nrl-mo-score-foot, 60px) + 6px); }
+.nrl-match-overlay:not([data-log="full"]) .nrl-mo-full { display: none; }
 .nrl-mo-full-head { display: flex; align-items: center; justify-content: space-between; }
 .nrl-mo-full-title { font-family: var(--nrl-f-label); font-size: 1rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--nrl-accent); }
 .nrl-btn.nrl-mo-full-x { position: relative; width: 36px; min-width: 36px; height: 36px; min-height: 36px; padding: 0; border-radius: 8px; font-family: var(--nrl-f-body); font-size: 0.875rem; }
@@ -2029,38 +2086,33 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 .nrl-mo-log-empty { display: none; padding: 5px 0; border-top: 1px solid var(--nrl-button); font-size: 0.75rem; line-height: 1.35; color: var(--nrl-muted); }
 .nrl-mo-full[data-filter="scoring"]:not(:has(.nrl-mo-line[data-kind~="score"])) .nrl-mo-log-empty[data-for="scoring"],
 .nrl-mo-full[data-filter="calls"]:not(:has(.nrl-mo-line[data-kind~="call"])) .nrl-mo-log-empty[data-for="calls"] { display: block; }
-/* Bottom row (3m): COACH · LOG · Plan · … · the speed pill. It never shifts. */
+/* The bottom bar (SuperCOOKED 40): one ink bar, COACH · the commentary line · Plan · pause / speed / skip. It never shifts. */
 .nrl-mo-bar {
-  position: fixed; left: calc(16px + var(--nrl-safe-l)); right: calc(16px + var(--nrl-safe-r)); bottom: calc(12px + var(--nrl-safe-b)); z-index: 20;
-  display: flex; align-items: center; gap: 8px; pointer-events: none;
+  position: fixed; left: calc(12px + var(--nrl-safe-l)); right: calc(12px + var(--nrl-safe-r)); bottom: calc(12px + var(--nrl-safe-b)); z-index: 20;
+  height: 60px; box-sizing: border-box; display: flex; align-items: center; gap: 8px; padding: 0 8px; border-radius: 16px;
+  background: rgba(5, 7, 13, 0.95); box-shadow: inset 0 0 0 1px var(--nrl-line); pointer-events: auto;
 }
-.nrl-mo-slot { display: flex; align-items: center; gap: 8px; }
+.nrl-mo-slot { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; }
 .nrl-mo-slot:empty { display: none; }
-.nrl-mo-bar-gap { flex: 1 1 auto; }
-.nrl-mo-log-toggle, .nrl-mo-coach {
-  pointer-events: auto; height: 56px; display: flex; align-items: center; margin: 0; border: 0; border-radius: 14px;
-  background: var(--nrl-navy); color: var(--nrl-text); box-shadow: var(--nrl-shadow-chip); cursor: pointer;
-  font-family: var(--nrl-f-label); font-weight: 700; letter-spacing: 0.04em; white-space: nowrap;
+.nrl-mo-bar-div { flex: 0 0 auto; width: 1px; height: 28px; background: var(--nrl-line); }
+.nrl-mo-coach {
+  pointer-events: auto; height: 46px; display: flex; align-items: center; margin: 0; border: 0; border-radius: 10px;
+  background: var(--nrl-accent); color: var(--nrl-on-accent); cursor: pointer;
+  font-family: var(--nrl-f-label); font-weight: 700; letter-spacing: 0.06em; white-space: nowrap;
 }
-.nrl-mo-log-toggle:focus-visible, .nrl-mo-coach:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
-.nrl-mo-log-toggle { gap: 8px; padding: 0 14px; font-size: 1rem; }
-.nrl-mo-log-toggle[aria-pressed="false"] { color: var(--nrl-text-2); }
-.nrl-mo-switch { width: 28px; height: 16px; border-radius: 8px; background: var(--nrl-line); display: flex; align-items: center; padding: 0 2px; box-sizing: border-box; transition: background-color var(--nrl-dur-fast) ease; }
-.nrl-mo-switch > i { width: 12px; height: 12px; border-radius: 6px; background: #fff; transition: transform var(--nrl-dur-fast) var(--nrl-ease-in-out); }
-.nrl-mo-log-toggle[aria-pressed="true"] .nrl-mo-switch { background: var(--nrl-accent); }
-.nrl-mo-log-toggle[aria-pressed="true"] .nrl-mo-switch > i { transform: translateX(12px); }
-/* COACH (MatchScene): its badge says how many calls are on, or why none ("THEIR BALL"). The badge is one
-   width, its text centred (#608): room for the longest it shows ("TAKE THE TWO"), so COACH keeps its width
-   and LOG beside it stays put as the text changes. Anything longer would end in an ellipsis. */
-.nrl-mo-coach { gap: 10px; padding: 0 8px 0 16px; font-size: 1.1875rem; }
+.nrl-mo-coach:focus-visible { outline: 2px solid var(--nrl-text); outline-offset: 2px; }
+/* COACH (MatchScene, 40): orange, its badge in navy says how many calls are on, or why none ("THEIR BALL"). The badge
+   is one width, its text centred (#608): room for the longest it shows ("TAKE THE TWO"), so COACH keeps its width
+   and the line beside it stays put as the text changes. Anything longer would end in an ellipsis. */
+.nrl-mo-coach { gap: 10px; padding: 0 7px 0 16px; font-size: 1.125rem; }
 .nrl-mo-coach-label { position: relative; }
 .nrl-mo-coach-badge {
-  box-sizing: border-box; width: 6.8em; height: 36px; padding: 0 6px; border-radius: 8px; font-size: 0.9375rem; line-height: 36px; text-align: center; text-transform: uppercase;
+  box-sizing: border-box; width: 6.8em; height: 32px; padding: 0 6px; border-radius: 8px; font-size: 0.8125rem; line-height: 32px; letter-spacing: 0.02em; text-align: center; text-transform: uppercase;
   overflow: hidden; text-overflow: ellipsis;
-  background: var(--nrl-raised); color: var(--nrl-muted);
+  background: var(--nrl-navy); color: var(--nrl-muted);
 }
-.nrl-mo-coach-badge[data-state="on"] { background: var(--nrl-accent); color: var(--nrl-on-accent); }
-.nrl-mo-coach-badge[data-state="made"] { color: var(--nrl-accent); }
+.nrl-mo-coach-badge[data-state="on"] { color: var(--nrl-accent); }
+.nrl-mo-coach-badge[data-state="made"] { color: var(--nrl-text); }
 /* A moment a held call suits (#639): the badge swells once. */
 .nrl-mo-coach-badge[data-pulse] { animation: nrl-mo-coach-pulse var(--nrl-dur-sheet) var(--nrl-ease-out) 3; }
 /* A ring that spreads and fades, three beats on the motion tokens (#597): nothing moves or scales, so reduced motion keeps it. */
@@ -2069,37 +2121,45 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 .nrl-mo-coach-badge[data-parts] { display: flex; flex-direction: column; justify-content: center; align-items: center; line-height: 1.1; }
 .nrl-mo-coach-badge[data-parts] > span { font-size: 0.8em; }
 .nrl-mo-coach-badge[data-parts] .nrl-mo-badge-sep { display: none; }
-/* Open (3o): the ring, and ▾ after COACH. The badge keeps its room unseen and ▾ sits in it, on the same
+/* Open (41): the ring, and ▾ after COACH. The badge keeps its room unseen and ▾ sits in it, on the same
    padding, so the button is the width it was shut (#608). */
-.nrl-mo-coach[aria-expanded="true"] { background: var(--nrl-button); box-shadow: inset 0 0 0 2px var(--nrl-accent); }
+.nrl-mo-coach[aria-expanded="true"] { box-shadow: inset 0 0 0 2px var(--nrl-on-accent), 0 0 0 2px var(--nrl-accent); }
 .nrl-mo-coach[aria-expanded="true"] .nrl-mo-coach-badge { visibility: hidden; }
 .nrl-mo-coach[aria-expanded="true"] .nrl-mo-coach-label::after { content: '▾'; position: absolute; left: 100%; margin-left: 0.3em; }
-/* The coach tray (3o): only the calls on now; the match keeps playing. #396: at most five rows
-   (six buttons), as tiles two a line (three on a short wide phone), so it never scrolls. */
+/* The coach tray (41): only the calls on now; the match keeps playing. #396: at most five rows
+   (six buttons), as tiles two a line (three on a short wide phone), so it never scrolls. Open, it says
+   whose ball and the tackle in its own head, and the ball chip steps aside (41 has none), so the tray
+   has the room down to the score bar. */
 .nrl-mo-tray {
-  position: fixed; left: calc(16px + var(--nrl-safe-l)); bottom: calc(80px + var(--nrl-safe-b)); z-index: 21;
-  width: min(360px, calc(100vw - 32px)); max-height: calc(100vh - 88px - var(--nrl-mo-board, 60px));
-  max-height: calc(100dvh - 88px - var(--nrl-mo-board, 60px)); overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box;
-  display: flex; flex-direction: column; gap: 6px; padding: 8px 12px; border-radius: 14px; background: var(--nrl-navy); box-shadow: var(--nrl-shadow-tray);
+  position: fixed; left: calc(12px + var(--nrl-safe-l)); bottom: calc(80px + var(--nrl-safe-b)); z-index: 21;
+  width: min(440px, calc(100vw - 24px)); max-height: calc(100vh - 88px - var(--nrl-mo-score-foot, 60px));
+  max-height: calc(100dvh - 88px - var(--nrl-mo-score-foot, 60px)); overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box;
+  display: flex; flex-direction: column; gap: 6px; padding: 8px 12px; border-radius: 16px; background: var(--nrl-ink);
+  box-shadow: inset 0 0 0 1px var(--nrl-line), 0 6px 20px rgba(0, 0, 0, 0.45);
   pointer-events: auto; animation: nrl-sheet-up var(--nrl-dur-sheet) var(--nrl-ease-out);
 }
 .nrl-mo-tray[hidden] { display: none; }
+@media (max-height: 400px) { .nrl-mo-tray { padding: 6px 12px; } }
 /* Its rows changed while it was open (#608): they dip and come back, so the change reads before a tap lands. */
 .nrl-mo-tray[data-changed] .nrl-mo-tray-list, .nrl-mo-tray[data-changed] .nrl-mo-tray-plays { animation: nrl-mo-tray-changed var(--nrl-dur-fast) var(--nrl-ease-out); }
 @keyframes nrl-mo-tray-changed { from { opacity: 0.6; } }
 /* The tray and the full log side by side: the log gives way on a narrow phone (667px) rather than sit under the tray. */
-.nrl-mo-tray-open .nrl-mo-full { width: min(330px, calc(100vw - 32px - 360px - 8px - var(--nrl-safe-l) - var(--nrl-safe-r))); }
+.nrl-mo-tray-open .nrl-mo-full { width: min(330px, calc(100vw - 32px - 440px - 8px - var(--nrl-safe-l) - var(--nrl-safe-r))); }
 .nrl-mo-tray-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-flow: row dense; gap: 6px; }
 /* A pair (#396: Shift ◀ ▶, Take the two / Tap and go) is one row: two tiles that stay together. */
 .nrl-mo-tray-pair { grid-column: span 2; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
-.nrl-mo-tray-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.nrl-mo-tray-title { font-family: var(--nrl-f-label); line-height: 1.2; font-size: 0.875rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-accent); }
-.nrl-mo-tray-note { font-size: 0.75rem; color: var(--nrl-muted); }
+.nrl-mo-tray-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.nrl-mo-tray-who { display: flex; align-items: center; gap: 0; font-family: var(--nrl-f-label); line-height: 1.2; font-size: 0.875rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap; }
+.nrl-mo-tray-who::before { content: ''; flex: 0 0 auto; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--nrl-accent); }
+.nrl-mo-tray-who[data-theirs]::before { background: var(--nrl-pos); }
+.nrl-mo-tray-title { color: var(--nrl-text); }
+.nrl-mo-tray-tackle { color: var(--nrl-text); }
+.nrl-mo-tray-note { min-width: 0; font-size: 0.75rem; color: var(--nrl-muted); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nrl-btn.nrl-mo-tray-call {
-  min-width: 0; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 1px; height: 44px; padding: 0 10px;
-  border-radius: 8px; text-transform: none; letter-spacing: 0; text-align: left; overflow: hidden;
+  position: relative; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; height: 44px; padding: 0 12px;
+  border-radius: 12px; background: var(--nrl-panel); box-shadow: inset 0 0 0 1px #2c3757; text-transform: none; letter-spacing: 0; text-align: left; overflow: hidden;
 }
-.nrl-mo-tray-call b { max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: var(--nrl-f-label); font-size: 0.9375rem; font-weight: 700; line-height: 1.1; }
+.nrl-mo-tray-call b { max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: var(--nrl-f-label); font-size: 1rem; font-weight: 700; line-height: 1.1; letter-spacing: 0.04em; text-transform: uppercase; }
 .nrl-mo-tray-call span {
   max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
   font-family: var(--nrl-f-body); font-size: 0.75rem; font-weight: 400; line-height: 1.2; color: var(--nrl-text-2);
@@ -2125,9 +2185,14 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
    tiles, three a line at every size, so it is one line of 44px tiles under a small label. */
 .nrl-mo-tray-plays { display: flex; flex-direction: column; gap: 2px; }
 .nrl-mo-tray-plays[hidden] { display: none; }
-.nrl-mo-tray-plays-label { font-family: var(--nrl-f-label); font-size: 0.6875rem; font-weight: 700; line-height: 1.2; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-accent); }
+.nrl-mo-tray-plays-label { font-family: var(--nrl-f-num); font-size: 0.5625rem; font-weight: 700; line-height: 1.2; letter-spacing: 0.14em; text-transform: uppercase; color: var(--nrl-accent); }
 .nrl-mo-tray-plays-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-.nrl-btn.nrl-mo-tray-call.nrl-mo-tray-play { padding: 0 8px; }
+/* A set play (41): an orange edge, so it reads as the playbook's, in line with the calls. */
+.nrl-btn.nrl-mo-tray-call.nrl-mo-tray-play { padding: 0 8px; box-shadow: inset 0 0 0 1px var(--nrl-accent); }
+/* A tall screen (a tablet) has room for the mockup's 64px tiles; a phone on its side keeps 44 so the tray never scrolls (#396). */
+@media (min-height: 560px) {
+  html:not([data-text-size]) .nrl-btn.nrl-mo-tray-call { height: 64px; }
+}
 /* Under the plays the footer keeps to one line, so the tray fits a 375-tall phone unscrolled. */
 .nrl-mo-tray-plays:not([hidden]) ~ .nrl-mo-tray-foot { flex-shrink: 0; -webkit-line-clamp: 1; }
 /* A short wide phone (956×330): three tiles a line in a wider tray, so six fit in two. */
@@ -2186,84 +2251,72 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
   .nrl-btn.nrl-mo-tray-call { height: auto; min-height: 44px; padding: 3px 8px; }
   .nrl-mo-tray-call span { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 }
-/* The speed pill (MatchScene): pause, the speeds (the one playing a yellow circle), SKIP. */
+/* Pause / speed / skip (MatchScene, 40): at the bar's right end. Speed is one button that shows the speed
+   playing and moves it on a tap; every button a 44×44 target (#389). */
 .nrl-mo-controls {
-  pointer-events: auto; height: 56px; display: flex; align-items: center; gap: 2px; padding: 0 6px; box-sizing: border-box;
-  border-radius: 28px; background: var(--nrl-navy); box-shadow: var(--nrl-shadow-chip);
+  pointer-events: auto; height: 46px; display: flex; align-items: center; gap: 2px; padding: 0; box-sizing: border-box;
 }
-/* Every button a 44×44 target (#389: the speeds were 40 wide, 36 on a narrow phone and 34 at Larger text). */
 .nrl-mo-controls .nrl-btn {
-  width: 44px; min-width: 44px; height: 44px; min-height: 44px; padding: 0; border-radius: 22px; background: transparent;
-  color: var(--nrl-text-2); font-size: 1.0625rem; font-weight: 700; letter-spacing: 0; text-transform: none;
-  transition-property: none; /* #604: the yellow circle and its digit change in the same frame */
+  width: 44px; min-width: 44px; height: 44px; min-height: 44px; padding: 0 10px; border-radius: 10px; background: transparent;
+  color: var(--nrl-text-2); font-family: var(--nrl-f-num); font-size: 0.875rem; font-weight: 700; letter-spacing: 0; text-transform: none;
+  transition-property: none; /* #604: the fill and its digit change in the same frame */
 }
 @media (hover: hover) and (pointer: fine) { .nrl-mo-controls .nrl-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.06); } }
 .nrl-mo-controls .nrl-btn:active:not(:disabled) { background: rgba(255, 255, 255, 0.06); transition-property: transform; }
-.nrl-mo-controls .nrl-btn.nrl-mo-pause { width: 44px; color: var(--nrl-text); font-size: 0.8125rem; }
-.nrl-mo-controls .nrl-btn.nrl-mo-speed[aria-pressed="true"], .nrl-mo-controls .nrl-btn.nrl-mo-speed[aria-pressed="true"]:hover:not(:disabled), .nrl-mo-controls .nrl-btn.nrl-mo-speed[aria-pressed="true"]:active:not(:disabled) { background: var(--nrl-accent); color: var(--nrl-on-accent); }
-.nrl-mo-pill-div { width: 1px; height: 28px; margin: 0 4px; background: var(--nrl-line); }
-.nrl-mo-controls .nrl-btn.nrl-mo-skip { width: auto; padding: 0 12px; color: var(--nrl-text); letter-spacing: 0.06em; text-transform: uppercase; }
+.nrl-mo-controls .nrl-btn.nrl-mo-pause { width: 44px; padding: 0; font-size: 0.8125rem; }
+.nrl-mo-controls .nrl-btn.nrl-mo-speed, .nrl-mo-controls .nrl-btn.nrl-mo-speed:active:not(:disabled) { width: auto; background: var(--nrl-raised); color: var(--nrl-text); }
+.nrl-mo-controls .nrl-btn.nrl-mo-skip { width: auto; padding: 0 10px; color: var(--nrl-text-2); font-family: var(--nrl-f-label); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
 .nrl-mo-controls .nrl-btn.nrl-mo-skip[data-armed] { color: var(--nrl-accent); }
-.nrl-mo-tray-open .nrl-mo-controls .nrl-mo-speed:not([aria-pressed="true"]), .nrl-mo-tray-open .nrl-mo-pill-div { display: none; }
 /* The Plan chip after a try (N11): opens the plan sheet. */
-.nrl-btn.nrl-mo-planchip { height: 56px; min-height: 56px; padding: 0 16px; border-radius: 14px; background: var(--nrl-navy); color: var(--nrl-accent); font-size: 1.1875rem; box-shadow: var(--nrl-shadow-chip); }
+.nrl-btn.nrl-mo-planchip { height: 46px; min-height: 46px; padding: 0 14px; border-radius: 10px; background: var(--nrl-raised); color: var(--nrl-accent); font-size: 1.0625rem; }
 .nrl-mo-planchip[hidden] { display: none; }
+/* A narrow phone (667): COACH and the controls close up; the line gives way first. */
 @media (max-width: 720px) {
-  .nrl-mo-controls .nrl-btn.nrl-mo-skip { padding: 0 8px; }
-  /* The speeds keep 44 (#389): while the Plan chip is up after a try, the pill shows only the speed
-     playing, as with the coach tray open, so the row stays one line with the longest badge. */
-  .nrl-mo-bar:has(.nrl-mo-planchip:not([hidden])) .nrl-mo-controls .nrl-mo-speed:not([aria-pressed="true"]),
-  .nrl-mo-bar:has(.nrl-mo-planchip:not([hidden])) .nrl-mo-pill-div { display: none; }
+  .nrl-mo-bar { gap: 6px; padding: 0 6px; }
   .nrl-mo-coach { padding: 0 6px 0 12px; gap: 8px; }
-  .nrl-mo-log-toggle { padding: 0 12px; }
+  .nrl-mo-controls .nrl-btn.nrl-mo-skip { padding: 0 6px; }
+  .nrl-mo-strip { padding: 0 10px; gap: 8px; }
+  .nrl-mo-strip-more { display: none; }
 }
-/* Large and Larger text (#371) on a narrow phone: the row keeps to one line with the Plan chip up,
-   on tighter padding; at Larger a smaller LOG switch and coach badge too (the speeds keep 44, #389). */
+/* Large and Larger text (#371) on a narrow phone: tighter still, and at Larger a smaller coach badge (the controls keep 44, #389). */
 @media (max-width: 720px) {
-  html[data-text-size] .nrl-mo-bar, html[data-text-size] .nrl-mo-slot { gap: 6px; }
+  html[data-text-size] .nrl-mo-bar, html[data-text-size] .nrl-mo-slot { gap: 4px; }
   html[data-text-size] .nrl-mo-coach { padding: 0 4px 0 10px; gap: 6px; }
-  html[data-text-size] .nrl-mo-log-toggle { padding: 0 8px; gap: 6px; }
   html[data-text-size] .nrl-btn.nrl-mo-planchip { padding: 0 10px; }
-  html[data-text-size] .nrl-mo-controls { padding: 0 4px; }
-  html[data-text-size] .nrl-mo-controls .nrl-btn.nrl-mo-skip { padding: 0 6px; }
-  html[data-text-size] .nrl-mo-pill-div { margin: 0 2px; }
-  html[data-text-size="larger"] .nrl-mo-coach-badge { font-size: 0.875rem; }
-  html[data-text-size="larger"] .nrl-mo-switch { width: 22px; height: 14px; }
-  html[data-text-size="larger"] .nrl-mo-switch > i { width: 10px; height: 10px; }
-  html[data-text-size="larger"] .nrl-mo-log-toggle[aria-pressed="true"] .nrl-mo-switch > i { transform: translateX(8px); }
+  html[data-text-size="larger"] .nrl-mo-coach-badge { font-size: 0.75rem; }
 }
 /* Key-moment banner (3n): under the score bug, about three seconds; never blocks taps. */
 .nrl-mo-banner {
-  position: fixed; top: calc(var(--nrl-mo-board, 60px) + 6px); left: calc(16px + var(--nrl-safe-l)); z-index: 17;
-  height: 56px; max-width: calc(100vw - 32px); display: flex; border-radius: 8px; overflow: hidden;
-  background: var(--nrl-navy); color: var(--nrl-text); box-shadow: var(--nrl-shadow-tray); pointer-events: none;
+  position: fixed; top: calc(var(--nrl-mo-board, 60px) + 12px); left: 0; right: 0; z-index: 17; width: max-content; margin: 0 auto;
+  height: 52px; max-width: calc(100vw - 32px); display: flex; border-radius: 12px; overflow: hidden;
+  background: var(--nrl-ink); color: var(--nrl-text); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4); pointer-events: none;
 }
 .nrl-mo-banner[hidden] { display: none; }
 .nrl-mo-banner-head {
   display: flex; align-items: center; padding: 0 16px; background: var(--nrl-accent); color: var(--nrl-on-accent);
-  font-family: var(--nrl-f-label); font-size: 2.125rem; font-weight: 700; font-style: italic; white-space: nowrap;
+  font-family: var(--nrl-f-display); font-size: 1.875rem; letter-spacing: -0.03em; text-transform: uppercase; white-space: nowrap;
 }
-.nrl-mo-banner-long .nrl-mo-banner-head { font-size: 1.625rem; }
+.nrl-mo-banner-long .nrl-mo-banner-head { font-size: 1.375rem; }
 .nrl-mo-banner[data-tone="miss"] .nrl-mo-banner-head { background: var(--nrl-raised); color: var(--nrl-muted); }
 .nrl-mo-banner[data-tone="bin"] .nrl-mo-banner-head { background: var(--nrl-neg); }
-.nrl-mo-banner-text { display: flex; flex-direction: column; justify-content: center; gap: 2px; min-width: 0; padding: 0 16px; }
-.nrl-mo-banner-who { font-family: var(--nrl-f-label); font-size: 1.25rem; font-weight: 700; line-height: 1; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.nrl-mo-banner-sub { font-family: var(--nrl-f-label); font-size: 0.875rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--nrl-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nrl-mo-banner-text { display: flex; flex-direction: column; justify-content: center; gap: 1px; min-width: 0; padding: 0 16px 0 12px; }
+.nrl-mo-banner-who { font-family: var(--nrl-f-label); font-size: 1.1875rem; font-weight: 700; line-height: 1.1; letter-spacing: 0.02em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nrl-mo-banner-sub { font-family: var(--nrl-f-num); font-size: 0.6875rem; color: var(--nrl-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nrl-mo-banner-extra { color: var(--nrl-accent); }
 .nrl-mo-banner-in { animation: nrl-mo-in-left var(--nrl-dur-fast) var(--nrl-ease-out) both; }
 /* Points: the scoring side's box flashes. Colour only, nothing moves, so it plays under reduced motion too (#597). */
 .nrl-mo-scored { animation: nrl-mo-scored 1.2s ease-out; }
-@keyframes nrl-mo-scored { 0%, 35% { background: var(--nrl-accent); color: var(--nrl-on-accent); } 100% { background: var(--nrl-raised); } }
+@keyframes nrl-mo-scored { 0%, 35% { background: var(--nrl-accent); color: var(--nrl-on-accent); } 100% { background: var(--nrl-panel); } }
 /* Sideways by the shared travel (#597); the tray, the cards and the sheets rise on dom.ts's nrl-sheet-up. */
 @keyframes nrl-mo-in-left { from { opacity: 0; transform: translateX(calc(var(--nrl-rise) * -1)); } to { opacity: 1; transform: none; } }
 @keyframes nrl-mo-in-right { from { opacity: 0; transform: translateX(var(--nrl-rise)); } to { opacity: 1; transform: none; } }
 /* Replay (N15.5, #348 M5): a small chip under the banner, its seconds left beside it. Never
    centred with a transform: the press's scale (.nrl-btn:active, #604) would replace it. */
 .nrl-mo-replay, .nrl-mo-replay-tag {
-  position: fixed; left: calc(16px + var(--nrl-safe-l)); top: calc(var(--nrl-mo-board, 60px) + 70px);
+  position: fixed; left: calc(16px + var(--nrl-safe-l)); top: calc(var(--nrl-mo-board, 60px) + 72px);
   z-index: 26; pointer-events: auto; min-height: 44px;
 }
-.nrl-btn.nrl-mo-replay { display: inline-flex; align-items: center; gap: 8px; padding: 0 8px 0 14px; border-radius: 12px; background: var(--nrl-navy); box-shadow: var(--nrl-shadow-chip); }
+.nrl-btn.nrl-mo-replay { display: inline-flex; align-items: center; gap: 8px; padding: 0 8px 0 14px; border-radius: 12px; background: var(--nrl-ink); box-shadow: inset 0 0 0 1px var(--nrl-line), var(--nrl-shadow-chip); }
 .nrl-mo-replay[hidden] { display: none; }
 /* Never over the open coach tray (#348): it waits, hidden, for the tray to shut. */
 .nrl-mo-tray-open .nrl-mo-replay { display: none; }
@@ -2277,7 +2330,7 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
   font-family: var(--nrl-f-label); font-size: 1.0625rem; font-weight: 700; letter-spacing: 0.08em;
 }
 /* Full time: the full-time card (matchReport.ts) takes over; the controls and the commentary go. */
-.nrl-mo-final .nrl-mo-bar, .nrl-mo-final .nrl-mo-strip, .nrl-mo-final .nrl-mo-full { display: none; }
+.nrl-mo-final .nrl-mo-bar, .nrl-mo-final .nrl-mo-full, .nrl-mo-final .nrl-mo-tackle { display: none; }
 /* The plan sheet (3r) and the pause sheet: over the dimmed field, above every match control
    and the toasts, under a dialog. The plan sheet waits for its primary (#341). */
 .nrl-mo-plan, .nrl-mo-sheet { position: fixed; inset: 0; z-index: 65; display: flex; pointer-events: auto; background: rgba(5, 9, 22, 0.5); }
@@ -2285,29 +2338,38 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 ${PLAN_FIT_CSS}
 .nrl-mo-working { font-size: 0.8125rem; flex: 0 0 auto; }
 .nrl-mo-plan-sheet {
-  width: 100%; max-width: 1180px; min-height: min(296px, 100%); max-height: 100%; overflow: hidden; box-sizing: border-box;
+  width: calc(100% - 24px - var(--nrl-safe-l) - var(--nrl-safe-r)); max-width: 1180px; min-height: min(296px, 100%); max-height: 100%; overflow: hidden; box-sizing: border-box;
   display: flex; flex-direction: column; gap: 10px;
-  padding: 10px calc(24px + var(--nrl-safe-r)) calc(16px + var(--nrl-safe-b)) calc(24px + var(--nrl-safe-l));
-  border-radius: 22px 22px 0 0; background: var(--nrl-navy); box-shadow: var(--nrl-shadow-modal); animation: nrl-sheet-up var(--nrl-dur-sheet) var(--nrl-ease-out);
+  padding: 12px 20px calc(14px + var(--nrl-safe-b));
+  border-radius: 22px 22px 0 0; background: var(--nrl-navy); box-shadow: inset 0 0 0 1px var(--nrl-line), 0 -8px 30px rgba(0, 0, 0, 0.4); animation: nrl-sheet-up var(--nrl-dur-sheet) var(--nrl-ease-out);
 }
 .nrl-mo-plan-grab { flex: 0 0 auto; align-self: center; width: 40px; height: 4px; border-radius: 2px; background: var(--nrl-line); }
-.nrl-mo-plan-top { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; }
-.nrl-mo-plan-head { font-family: var(--nrl-f-label); font-size: 1.5rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--nrl-accent); }
-.nrl-mo-plan-score { font-family: var(--nrl-f-num); font-size: 1.25rem; font-weight: 600; font-variant-numeric: tabular-nums; }
-.nrl-mo-plan-line { font-size: 0.8125rem; color: var(--nrl-text-2); }
-.nrl-mo-plan-tend { margin-left: auto; font-size: 0.75rem; color: var(--nrl-muted); }
-.nrl-mo-plan-plays { flex-basis: 100%; font-size: 0.75rem; color: var(--nrl-text-2); }
+/* 42: the read on the left (Archivo head and score, "v Them", the line), the tendency card on the right. */
+.nrl-mo-plan-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.nrl-mo-plan-read { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.nrl-mo-plan-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 14px; }
+.nrl-mo-plan-head { font-family: var(--nrl-f-display); font-size: 1.625rem; line-height: 1; letter-spacing: -0.02em; text-transform: uppercase; color: var(--nrl-text); }
+.nrl-mo-plan-score { font-family: var(--nrl-f-display); font-size: 1.625rem; line-height: 1; letter-spacing: -0.02em; color: var(--nrl-text-2); font-variant-numeric: tabular-nums; }
+.nrl-mo-plan-vs { font-size: 0.875rem; color: var(--nrl-muted); }
+.nrl-mo-plan-line { font-size: 0.9375rem; line-height: 1.35; color: #e6e9ef; }
+.nrl-mo-plan-tend { flex: 0 0 auto; max-width: 45%; display: flex; flex-direction: column; gap: 3px; padding: 8px 12px; border-radius: 12px; background: var(--nrl-panel); box-shadow: inset 0 0 0 1px var(--nrl-line); }
+.nrl-mo-plan-tend-label { font-family: var(--nrl-f-num); font-size: 0.625rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--nrl-muted); }
+.nrl-mo-plan-tend-plan { font-family: var(--nrl-f-label); font-size: 0.875rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--nrl-text); }
+.nrl-mo-plan-tend-behind { font-size: 0.75rem; color: var(--nrl-text-2); }
+.nrl-mo-plan-plays { font-size: 0.75rem; color: var(--nrl-muted); }
 .nrl-mo-plan-top, .nrl-mo-plan-grab { flex: 0 0 auto; }
 /* On a short screen the rows scroll and the foot with the primary stays put (#341). */
 .nrl-mo-plan-rows { flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: grid; grid-template-columns: 72px minmax(0, 1fr); align-items: center; gap: 8px 12px; }
-.nrl-mo-plan-label { font-family: var(--nrl-f-label); font-size: 0.875rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); }
+.nrl-mo-plan-label { font-family: var(--nrl-f-num); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--nrl-muted); }
 .nrl-mo-plan .nrl-seg { display: flex; gap: 4px; padding: 4px; overflow: visible; }
-.nrl-mo-plan .nrl-seg > .nrl-btn { flex: 1 1 0; min-width: 0; height: 40px; min-height: 40px; padding: 0 6px; font-size: 1.0625rem; font-weight: 600; letter-spacing: 0.02em; text-transform: none; }
+.nrl-mo-plan .nrl-seg > .nrl-btn { flex: 1 1 0; min-width: 0; height: 40px; min-height: 40px; padding: 0 6px; font-size: 0.9375rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
 .nrl-mo-plan .nrl-seg > .nrl-btn[aria-pressed="true"] { font-weight: 700; }
 @media (pointer: coarse) { .nrl-mo-plan .nrl-seg > .nrl-btn { height: 44px; min-height: 44px; } }
 .nrl-mo-plan-foot { flex: 0 0 auto; display: flex; align-items: center; gap: 12px; margin-top: auto; padding-top: 4px; }
-.nrl-mo-plan-hint { flex: 1 1 auto; min-width: 0; font-size: 0.8125rem; line-height: 1.4; color: var(--nrl-text-2); }
-.nrl-btn.nrl-mo-plan-go { flex: 0 0 auto; height: 48px; padding: 0 24px; font-size: 1.1875rem; }
+.nrl-mo-plan-say { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.nrl-mo-plan-hint { min-width: 0; font-size: 0.8125rem; line-height: 1.4; color: #e6e9ef; }
+.nrl-mo-plan-hint-name { font-family: var(--nrl-f-label); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.nrl-btn.nrl-mo-plan-go { flex: 0 0 auto; height: 50px; padding: 0 22px; border-radius: 10px; font-size: 1.125rem; }
 .nrl-mo-sheet { align-items: center; justify-content: center; }
 .nrl-mo-sheet-card {
   position: relative; width: min(340px, calc(100vw - 32px)); max-height: calc(100% - 24px); overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box;
