@@ -1966,7 +1966,7 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 }
 .nrl-mo-tackle::before { content: ''; flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; background: var(--nrl-accent); }
 .nrl-mo-tackle-theirs::before { background: var(--nrl-pos); }
-.nrl-mo-tackle[hidden] { display: none; }
+.nrl-mo-tackle[hidden], .nrl-mo-tray-open .nrl-mo-tackle { display: none; }
 @media (orientation: portrait) { .nrl-mo-tackle { display: none; } }
 .nrl-mo-tackle-last { background: var(--nrl-accent); color: var(--nrl-on-accent); }
 .nrl-mo-tackle-last::before { background: var(--nrl-on-accent); }
@@ -2127,12 +2127,13 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 .nrl-mo-coach[aria-expanded="true"] .nrl-mo-coach-badge { visibility: hidden; }
 .nrl-mo-coach[aria-expanded="true"] .nrl-mo-coach-label::after { content: '▾'; position: absolute; left: 100%; margin-left: 0.3em; }
 /* The coach tray (41): only the calls on now; the match keeps playing. #396: at most five rows
-   (six buttons), as tiles two a line (three on a short wide phone), so it never scrolls, and never
-   over the ball chip (its height stops at the chip's foot). */
+   (six buttons), as tiles two a line (three on a short wide phone), so it never scrolls. Open, it says
+   whose ball and the tackle in its own head, and the ball chip steps aside (41 has none), so the tray
+   has the room down to the score bar. */
 .nrl-mo-tray {
   position: fixed; left: calc(12px + var(--nrl-safe-l)); bottom: calc(80px + var(--nrl-safe-b)); z-index: 21;
-  width: min(440px, calc(100vw - 24px)); max-height: calc(100vh - 88px - var(--nrl-mo-board, 60px));
-  max-height: calc(100dvh - 88px - var(--nrl-mo-board, 60px)); overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box;
+  width: min(440px, calc(100vw - 24px)); max-height: calc(100vh - 88px - var(--nrl-mo-score-foot, 60px));
+  max-height: calc(100dvh - 88px - var(--nrl-mo-score-foot, 60px)); overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box;
   display: flex; flex-direction: column; gap: 6px; padding: 8px 12px; border-radius: 16px; background: var(--nrl-ink);
   box-shadow: inset 0 0 0 1px var(--nrl-line), 0 6px 20px rgba(0, 0, 0, 0.45);
   pointer-events: auto; animation: nrl-sheet-up var(--nrl-dur-sheet) var(--nrl-ease-out);
