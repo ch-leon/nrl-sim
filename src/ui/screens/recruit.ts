@@ -168,6 +168,11 @@ html[data-text-size] .nrl-recruit { --nrl-recruit-cols: 30px minmax(0, 1fr) 2.6r
 .nrl-recruit-groups > .nrl-btn { padding: 0 11px; font-size: 0.875rem; white-space: nowrap; }
 @media (max-width: 760px) { .nrl-recruit-groups > .nrl-btn { padding: 0 8px; font-size: 0.8125rem; } }
 .nrl-recruit-more { padding: 8px 0; }
+/* 956×330: the column heads (decorative; each cell says what it is) give their line to a fourth row. */
+@media (max-height: 340px) {
+  .nrl-recruit .nrl-grid-head { display: none; }
+  .nrl-recruit .nrl-screen-head { margin-bottom: 0; }
+}
 /* Written in caps already, so a sum keeps its small k ("NEED $18k"). */
 .nrl-row .nrl-row-action { min-height: 36px; min-width: 0; width: 100%; padding: 0 6px; border-radius: 8px; font-size: 0.875rem; text-transform: none; }
 /* #389: a finger's height on a touch screen; the row is 44 tall already. */

@@ -333,6 +333,11 @@ export const SQUAD_CSS = `
   .nrl-squad .nrl-squad-list { --nrl-squad-cols: 30px minmax(7rem, 1fr) 2.4rem 4.6rem repeat(4, 2.2rem) 4rem 3rem; column-gap: 4px; }
   .nrl-squad-list > .nrl-row, .nrl-squad-group { column-gap: 4px; }
 }
+/* 956×330 (Safari's toolbars up): a slimmer group head, so four rows still show under it. */
+@media (max-height: 340px) {
+  .nrl-squad-group { min-height: 18px; padding: 1px 4px; }
+  .nrl-squad .nrl-screen-head { margin-bottom: 2px; }
+}
 html[data-text-size] .nrl-squad .nrl-squad-list { --nrl-squad-cols: 30px minmax(6rem, 1fr) 2.6rem 4.2rem repeat(4, 2.3rem) 4rem 3rem; }
 @media (max-width: 760px) {
   html[data-text-size] .nrl-squad-list > .nrl-row, html[data-text-size] .nrl-squad-group { column-gap: 3px; }

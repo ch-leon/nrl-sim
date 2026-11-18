@@ -268,6 +268,7 @@ export function openLineupScreen(): void {
 
   const sub = el('div', { class: 'nrl-screen-sub' });
   const field = el('div', { class: 'nrl-lineup-field' });
+  hintScroll(field); // on a short screen (956×330) the fullback's lane runs under the sheet's foot
   const side = el('div', { class: 'nrl-lineup-side' });
 
   // An injury or a ban keeps the man out of the side: red (#339). A hint is neutral.
