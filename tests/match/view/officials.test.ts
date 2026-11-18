@@ -36,8 +36,7 @@ function playMatch(seed: number, halfMinutes = 7, maxTick = 30_000): Snapshot[] 
 }
 
 describe('the referee (#642)', () => {
-  // Wide pre-catch geometry (#722 revision 9) removes seed 11's penalty signal;
-  // seed 2 supplies both current try and penalty signals. Seed 3 stays first for other fixtures.
+  // Seed 2 supplies both try and penalty signals. Keep seed 3 first for the other fixtures.
   const matches = [3, 2].map((seed) => playMatch(seed));
 
   it('is a pure function of the snapshot', () => {
