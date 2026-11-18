@@ -113,6 +113,9 @@ export function leagueCareerStateProblem(state: GameState): LeagueStateProblem |
     if (!progress || !c.world || state.boardLoan?.owed !== 0)
       return { reason: 'invalid', message: 'Missing League career or outstanding board debt.' };
     if (state.version !== SAVE_VERSION) return { reason: 'unsupported', message: 'This League career format is unsupported.' };
+    const offer = c.openCupEntry?.current;
+    if (offer?.lifecycle === 'drawn' && state.week < offer.deadline)
+      return { reason: 'invalid', message: 'The Open Cup draw was published before registration closed.' };
     const invalid = strictStateProblem(state);
     if (invalid) return { reason: 'invalid', message: invalid };
     const unsupported = runtimeProblem(state);

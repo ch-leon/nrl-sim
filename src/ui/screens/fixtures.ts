@@ -32,6 +32,7 @@ import { playerRivalContext, rivalSheet, rivalStyle } from '../../systems/rivalR
 import { hasStaff } from '../../systems/staff';
 import { styleLine, whenBehindLine } from '../tacticsBlurbs';
 import { shortName } from './matchReport';
+import { buildOpenCupCard } from './openCupEntry';
 
 // ── Pure view helpers (unit-tested) ───────────────────────────────────────────
 
@@ -363,7 +364,8 @@ function openLeagueScreen(key: 'fixtures' | 'ladder', opts: LeagueScreenOptions)
           heading.append(choose);
         }
       }
-      cols[0]!.el.prepend(heading);
+      const cup = buildOpenCupCard(state, () => sheet.querySelector('[data-open-cup-details]'));
+      cols[0]!.el.prepend(heading, ...(cup ? [cup] : []));
     }
     sheet.replaceChildren(...cols.map((c) => c.el));
   };

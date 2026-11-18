@@ -8,6 +8,15 @@ import { AU_PACK } from '../../src/content/au';
 import { competitions, progress, clubIds, profile } from './leagueCareerFixtures';
 
 const context = { pack: 'au', season: 1, week: 5, clubIds, clubId: 'player' };
+// These miniature five-slot calendars isolate League progression from the full
+// regional cup. Their active snapshots cannot be published as current careers.
+function validProgress(c: ReturnType<typeof competitions>, cursor: typeof context) {
+  if (c.leagueCareer?.phase === 'active') {
+    expect(validateCompetitions(c,cursor)).toBe('missing Open Cup entry');
+    return validateLeagueCareer(c.leagueCareer,c,cursor);
+  }
+  return validateCompetitions(c,cursor);
+}
 function closed() {
   const c = competitions(); const close = leagueCloseFacts(c.world!, c.instances, 1);
   c.leagueCareer = { ...progress(), phase: 'next-season-choice', close, accepted: {allocationPolicy: 'adjacent-vacancy-v1', movements: [], season: 1, startInterval: 0, leagueId: profile.startingDivisionId, ...entrySnapshots(c, 1, profile.startingDivisionId), receiptId: leagueEntryReceiptId(c.world!.profile.id, 1, 'player', profile.startingDivisionId)} };
@@ -26,7 +35,7 @@ describe('strict League career progression metadata', () => {
     const old=closed();const c=competitions(2,false);c.instances=[...old.instances,...c.instances];
     c.leagueCareer={...progress(),phase:'active',close:old.leagueCareer!.close!,accepted:{...old.leagueCareer!.accepted!,
       season:2,startInterval:5,...entrySnapshots(c, 2, profile.startingDivisionId), receiptId:leagueEntryReceiptId(profile.id,2,'player',profile.startingDivisionId)}};
-    const cursor={...context,season:2,week:1};expect(validateCompetitions(c,cursor)).toBeNull();
+    const cursor={...context,season:2,week:1};expect(validProgress(c, cursor)).toBeNull();
     c.leagueCareer.accepted!.startInterval=6;c.calendar!.elapsedIntervals=6;
     expect(validateCompetitions(c,cursor)).toBe('league career close');
     c.leagueCareer.accepted!.startInterval=5;c.calendar!.elapsedIntervals=5;
@@ -37,9 +46,9 @@ describe('strict League career progression metadata', () => {
   });
   it('validates initial, active and source-year closed states independently of runtime admission', () => {
     const c = competitions(1, false); c.leagueCareer = progress();
-    expect(validateCompetitions(c, {...context, week: 1})).toBeNull();
+    expect(validProgress(c, {...context, week: 1})).toBeNull();
     c.leagueCareer.phase = 'active'; c.leagueCareer.accepted = closed().leagueCareer!.accepted!;
-    expect(validateCompetitions(c, {...context, week: 1})).toBeNull();
+    expect(validProgress(c, {...context, week: 1})).toBeNull();
     expect(validateCompetitions(closed(), context)).toBeNull();
     const old = competitions(); expect(validateCompetitions(old, {...context, season: 2, week: 1})).toBeNull();
     expect(validateCompetitions(old, context)).toBe('competition calendar season');
@@ -82,7 +91,7 @@ describe('strict League career progression metadata', () => {
     const current = competitions(2, false); current.instances = [...c.instances, ...current.instances];
     current.leagueCareer = {...progress(), phase: 'active', access: [...progress().access, {leagueId: profile.divisions[1]!.id, earnedFrom: leagueTitleEvidence(old, profile.startingDivisionId, profile.divisions[1]!.id)!}], close: c.leagueCareer!.close!,
       accepted: {allocationPolicy: 'adjacent-vacancy-v1', movements: [], season: 2, startInterval: 5, leagueId: profile.startingDivisionId, ...entrySnapshots(current, 2, profile.startingDivisionId), receiptId: leagueEntryReceiptId(profile.id, 2, 'player', profile.startingDivisionId)} };
-    expect(validateCompetitions(current, {...context, season: 2, week: 1})).toBeNull();
+    expect(validProgress(current, {...context, season: 2, week: 1})).toBeNull();
     old.fixtures[2]!.status = 'cancelled'; delete old.fixtures[2]!.result;
     expect(validateLeagueCareer(current.leagueCareer, current, {...context, season: 2, week: 1})).not.toBeNull();
   });
@@ -93,7 +102,7 @@ describe('strict League career progression metadata', () => {
       {leagueId: profile.divisions[1]!.id, earnedFrom: leagueTitleEvidence(old.instances[0]!, profile.startingDivisionId, profile.divisions[1]!.id)!}],
       close: leagueCloseFacts(previous.world!, previous.instances, 2), accepted: {allocationPolicy: 'adjacent-vacancy-v1', movements: [], season: 3, startInterval: 10, leagueId: profile.startingDivisionId,
         ...entrySnapshots(current, 3, profile.startingDivisionId), receiptId: leagueEntryReceiptId(profile.id, 3, 'player', profile.startingDivisionId)} };
-    expect(validateCompetitions(current, {...context, season: 3, week: 1})).toBeNull();
+    expect(validProgress(current, {...context, season: 3, week: 1})).toBeNull();
     current.leagueCareer.access[1]!.earnedFrom!.result.winnerId = 'missing';
     expect(validateCompetitions(current, {...context, season: 3, week: 1})).not.toBeNull();
   });
@@ -137,7 +146,7 @@ describe('strict League career progression metadata', () => {
     }
     c.leagueCareer!.access.push({leagueId: profile.divisions[1]!.id, earnedFrom: title});
     const cursor = {...context, season, week: season === 1 ? 5 : 1};
-    expect(validateCompetitions(c, cursor)).toBeNull();
+    expect(validProgress(c, cursor)).toBeNull();
     title.instanceId = title.instanceId.replace(':i0', ':i99');
     title.finalFixtureId = title.finalFixtureId.replace(':i0', ':i99');
     expect(validateCompetitions(c, cursor)).toBe('league career title source');
@@ -160,7 +169,7 @@ describe('strict League career progression metadata', () => {
     const c = competitions(1, false); c.leagueCareer = {...progress(), phase: 'active', accepted: closed().leagueCareer!.accepted!};
     expect(validateCompetitions(c, {...context, week: 3})).toBe('league career phase');
     c.calendar!.elapsedIntervals = 2;
-    expect(validateCompetitions(c, {...context, week: 3})).toBeNull();
+    expect(validProgress(c, {...context, week: 3})).toBeNull();
   });
 
   it.each(['swapped definitions', 'swapped instance pointers', 'initial wrong field', 'false first-year movement'] as const)('rejects %s', fault => {
@@ -194,7 +203,7 @@ describe('strict League career progression metadata', () => {
     c.leagueCareer = {...progress(), phase: 'active', close: leagueCloseFacts(previous.world!, previous.instances, 1), accepted: {
       season: 2, startInterval: 5, leagueId: profile.startingDivisionId, allocationPolicy: 'adjacent-vacancy-v1', movements: [],
       ...entrySnapshots(c, 2, profile.startingDivisionId), receiptId: leagueEntryReceiptId(profile.id, 2, 'player', profile.startingDivisionId)}};
-    const cursor = {...context, season: 2, week: 1}; expect(validateCompetitions(c, cursor)).toBeNull();
+    const cursor = {...context, season: 2, week: 1}; expect(validProgress(c, cursor)).toBeNull();
     c.leagueCareer.accepted!.movements.push({clubId: 'player', fromLeagueId: profile.startingDivisionId, toLeagueId: profile.divisions[1]!.id});
     expect(validateCompetitions(c, cursor)).toBe('league career allocation');
     c.leagueCareer.accepted!.movements = [];
@@ -215,7 +224,7 @@ describe('strict League career progression metadata', () => {
       {leagueId: target, earnedFrom: leagueTitleEvidence(previous.instances[0]!, profile.startingDivisionId, target)!}],
       accepted: {season: 2, startInterval: 5, leagueId: target, allocationPolicy: allocation.policy, movements: allocation.movements,
         ...entrySnapshots(c, 2, target, allocation.movements), receiptId: leagueEntryReceiptId(profile.id, 2, 'player', target)}};
-    expect(validateCompetitions(c, {...context, season: 2, week: 1})).toBeNull();
+    expect(validProgress(c, {...context, season: 2, week: 1})).toBeNull();
   });
 
 });
