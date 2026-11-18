@@ -23,6 +23,7 @@ import { platformFromEnv } from './src/platform';
 // The iPhone app is the same native build with NRL_PLATFORM=ios (docs/ios-test-build.md);
 // src/platform.ts reads which one it is from __NRL_PLATFORM__.
 const native = process.env.NRL_NATIVE === '1';
+// NRL_PLATFORM without NRL_NATIVE=1 throws, by design: a web build can't be labelled an app.
 const platform = platformFromEnv(process.env);
 const matchPreview = resolveMatchPreview(process.env.NRL_MATCH_PREVIEW_LENGTH);
 const base = native ? '/' : (process.env.BASE_PATH ?? '/');
