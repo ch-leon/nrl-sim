@@ -1,6 +1,6 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav } from '../common.mjs';
+import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, squadMenu, reachProblems } from '../common.mjs';
 
 // ── Landscape screens (#336, #344, #347, #343, #351) ─────────────────────────
 // Every nav screen and the main popups on a phone held sideways. Each must show
@@ -23,8 +23,8 @@ export const SCREEN_RUNS = (process.env.E2E_SCREEN_SIZES ?? '844x390@47,0,47,21 
 
 /** Screens reached from the dock: what shows its content, and what must stay on screen. */
 const NAV_SCREENS = [
-  { id: 'squad', box: '.nrl-screen-region', rows: '.nrl-grid-body > .nrl-row', primary: ['[data-focus-menu]'], more: '.nrl-grid-body' },
-  { id: 'lineup', box: '.nrl-screen-region', rows: '.nrl-lineup-list > *', card: '.nrl-lineup-field', primary: ['[data-auto-pick]'], more: '.nrl-lineup-list' },
+  { id: 'squad', box: '.nrl-screen-region', rows: '.nrl-grid-body > .nrl-row', primary: ['[data-squad-more]', '[data-sort-menu]'], more: '.nrl-grid-body' },
+  { id: 'lineup', box: '.nrl-screen-region', rows: '.nrl-lineup-field .nrl-pcard', card: '.nrl-lineup-field', primary: ['[data-auto-pick]', '[data-swap-start]', '[data-squad-more]'], more: '.nrl-lineup-field' },
   { id: 'recruit', box: '.nrl-screen-region', rows: '.nrl-grid-body > .nrl-row', primary: ['.nrl-grid-body > :first-child .nrl-row-action'] },
   { id: 'fixtures', box: '.nrl-screen-region', rows: '.nrl-fixture-row', primary: ['[data-next-row]'] },
   { id: 'ladder', box: '.nrl-screen-region', rows: '.nrl-ladder-table tbody tr', more: '.nrl-ladder-scroll' },
@@ -522,8 +522,9 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
     await want('grounds → SQUAD', dockTab('squad'), 'squad', true);
     await want('SQUAD → LEAGUE', dockTab('fixtures'), 'fixtures', false);
     await want('LEAGUE → SQUAD', dockTab('squad'), 'squad', false);
-    await want('Squad → Lineup', '.nrl-sq-tabs [data-seg="lineup"]', 'lineup', false);
-    await want('Lineup → Recruit', '.nrl-sq-tabs [data-seg="recruit"]', 'recruit', false);
+    await want('Squad → List', '[data-squad-view="list"]', 'squad', false);
+    await want('List → Pitch', '[data-squad-view="pitch"]', 'lineup', false);
+    await want('Pitch → Recruit', '.nrl-sq-tabs [data-seg="recruit"]', 'recruit', false);
     await tap('.nrl-nav [data-nav-more]');
     await page.waitForSelector('.nrl-nav-sheet:not([hidden])');
     await page.waitForTimeout(250);
@@ -559,7 +560,7 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
     await textSize(size);
     await step(`fit-lineup-${size}`, async () => {
       await openNav(page, 'lineup');
-      await tap('[data-plan]');
+      await squadMenu(page, '[data-plan]');
       await page.waitForSelector('.nrl-lineup-plan');
       const out = await readoutProblems();
       if (await page.locator('.nrl-lineup-plan [data-fit]').count() !== 8) out.push('missing fit buttons');
@@ -588,19 +589,23 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
     await tap('.nrl-screen-region [data-player-open] .nrl-row-name');
     await page.waitForSelector('[data-player-page]');
     // No ✕ (Broadcast Quiet): ◂ SQUAD is its one way out.
-    return check(rec, { box: '.nrl-player-modal', rows: '.nrl-player-stats .nrl-statrow', card: '.nrl-player-stats', exit: '.nrl-player-modal [data-back]',
-      primary: ['[data-player-action="renew"]', '[data-player-action="sell"]', '[data-player-action="release"]'] }, null);
+    // SuperCOOKED 35–37: Stats first; the deals on the Deal tab.
+    const out = await check(rec, { box: '.nrl-player-modal', rows: '.nrl-player-stats .nrl-statrow', card: '.nrl-player-stats', exit: '.nrl-player-modal [data-back]',
+      primary: ['[data-player-tab="traits"]', '[data-player-tab="deal"]', '[data-player-tab="record"]'] }, null);
+    await tap('[data-player-tab="deal"]');
+    return [...(out ?? []), ...await reachProblems(page, '.nrl-player-modal', ['[data-player-action="renew"]', '[data-player-action="release"]'])];
   });
   // #538: the temporary Potential line also fits a phone on its side, without a redesign.
   await step('popup-player-potential-667x375', async () => {
     await page.setViewportSize({ width: 667, height: 375 });
     await page.waitForTimeout(250);
+    await tap('[data-player-tab="record"]'); // Potential is on the Record tab (Leon, 18 Nov)
     return page.evaluate(() => {
       const line = document.querySelector('[data-potential]');
       if (!line || !/^Potential: ★*(?:½)?$/.test(line.textContent)) return ['missing plain Potential star line'];
       line.scrollIntoView({ block: 'nearest' });
       const r = line.getBoundingClientRect();
-      const col = document.querySelector('.nrl-player-about').getBoundingClientRect();
+      const col = document.querySelector('.nrl-player-panel').getBoundingClientRect();
       const out = [];
       if (r.left < 0 || r.right > innerWidth || r.height < 10 || r.top < 0 || r.bottom > innerHeight
         || r.top < col.top - 1 || r.bottom > col.bottom + 1 || line.scrollWidth > line.clientWidth + 1) out.push('Potential line clipped at 667x375');

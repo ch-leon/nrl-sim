@@ -1,6 +1,6 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, skipFromPill } from '../common.mjs';
+import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, skipFromPill, squadMenu } from '../common.mjs';
 
 /**
  * The phone play-test's guards (Wave 4 prompt 09, #399), at 667×375 (the narrowest
@@ -63,7 +63,7 @@ export async function runPlaytest(browser, W = 667, H = 375) {
   });
   await step('lineup', async () => {
     await openNav(page, 'lineup');
-    await page.waitForSelector('.nrl-lineup-row');
+    await page.waitForSelector('.nrl-lineup-field .nrl-pcard');
   });
   // #466: the legacy id renders the new name and offload explanation at both
   // requested text sizes. These screenshots are kept by the match CI artifact.
@@ -102,7 +102,7 @@ export async function runPlaytest(browser, W = 667, H = 375) {
     await textSize(size);
     await openNav(page, 'lineup');
     await step(`plan-sheet-${size}`, async () => {
-      await page.locator('.nrl-screen-tools [data-plan]').tap();
+      await squadMenu(page, '[data-plan]');
       await page.locator('.nrl-lineup-tac [data-tactic="grind"]').tap();
       return tightProblems('.nrl-lineup-plan');
     });
@@ -151,7 +151,7 @@ export async function runPlaytest(browser, W = 667, H = 375) {
     await textSize(m === 1 ? 'normal' : 'large');
     // Start Balanced so selecting Tight at half-time records a real change.
     await openNav(page, 'lineup');
-    await page.locator('.nrl-screen-tools [data-plan]').tap();
+    await squadMenu(page, '[data-plan]');
     await page.locator('.nrl-lineup-tac [data-tactic="balanced"]').tap();
     await page.locator('.nrl-lineup-plan [data-plan-done]').tap();
     await step(`half-time-match-${m}`, async (rec) => {

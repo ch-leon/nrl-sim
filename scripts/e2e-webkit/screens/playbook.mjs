@@ -98,13 +98,15 @@ export async function runPlaybook(browser, sizes = [[667, 375], [844, 390]]) {
       await page.locator('[data-play-take="block-play"][aria-pressed="true"]').waitFor();
       await check('playbook-owned', '[data-playbook]', '.nrl-pb-scroll', ['[data-play-take="block-play"]', '[data-play-buy="inside-ball"]']);
 
-      // The Lineup's Plays button opens its own sheet with the block play ticked.
+      // The Plays item in the Squad header's ⋯ (SuperCOOKED Phase 1) opens its own sheet with the block play ticked.
       await page.locator(SHEET_EXIT).tap();
       await openNav(page, 'lineup');
-      const playsBtn = page.locator('[data-plays]');
+      await check('lineup', '.nrl-lineup', null, ['[data-squad-more]', '[data-swap-start]', '[data-auto-pick]']);
+      await page.locator('[data-squad-more]').tap();
+      const playsBtn = page.locator('.nrl-squad-more-tray [data-plays]');
       await playsBtn.waitFor();
       if (!/Block play/.test(await playsBtn.textContent())) throw new Error(`the Plays button reads "${await playsBtn.textContent()}"`);
-      await check('lineup', '.nrl-lineup', null, ['[data-plays]', '[data-plan]', '[data-auto-pick]']);
+      await check('lineup-more', '.nrl-squad-more-tray', null, ['.nrl-squad-more-tray [data-plays]', '.nrl-squad-more-tray [data-plan]', '.nrl-squad-more-tray [data-focus]']);
       await playsBtn.tap();
       await page.locator('[data-plays-sheet] [data-play="block-play"][aria-pressed="true"]').waitFor();
       if (await page.locator('[data-plays-sheet] [data-tactic]').count()) throw new Error('the Plays sheet holds the plan’s presets');
