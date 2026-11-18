@@ -178,7 +178,7 @@ export function __blockCalendarResults(block: boolean): void {
 }
 
 /** The sole structural result commit. Duplicate/stale/cancelled deliveries are no-ops. */
-export function finaliseCalendarFixture(state: GameState, bridge: Fixture, score: { homeScore: number; awayScore: number }, forfeit = false): GameState {
+export function finaliseCalendarFixture(state: GameState, bridge: Fixture, score: { homeScore: number; awayScore: number }, forfeit = false, fulfilment?: {kind: 'open-cup-withdrawal'; offerId: string}): GameState {
   if (blockCalendarResults) throw new Error('Invalid result transition: result commit failed');
   if (!hasStructuralCalendar(state) || structuralAdvanceProblem(state) || ![score.homeScore, score.awayScore].every(n => Number.isSafeInteger(n) && n >= 0)) return state;
   const context = calendarFixtureContext(state, bridge);
@@ -194,6 +194,15 @@ export function finaliseCalendarFixture(state: GameState, bridge: Fixture, score
   const updated = progressInstance({ ...instance, stageId: fixture.stageId,
     fixtures: instance.fixtures.map(f => f.id === fixture.id ? { ...f, status: 'completed', result } : f) });
   const competitions = { ...state.competitions!, instances: state.competitions!.instances.map(i => i.id === instance.id ? updated : i) };
+  if (fulfilment) {
+    const entry = competitions.openCupEntry, offer = entry?.current;
+    if (!entry || !offer || offer.offerId !== fulfilment.offerId || offer.instanceId !== instance.id || !offer.withdrawal
+      || offer.withdrawal.fulfilled || offer.withdrawal.requestSlot > state.week || fixture.slot !== state.week
+      || ![fixture.homeId,fixture.awayId].includes(state.clubId) || result.decider !== 'forfeit' || result.winnerId === state.clubId)
+      throw Error('Invalid Open Cup withdrawal fulfilment.');
+    competitions.openCupEntry = {...entry,current:{...offer,withdrawal:{...offer.withdrawal,
+      fulfilled:{fixtureId:fixture.id,slot:state.week,result:{...result}}}}};
+  }
   const problem = validateCompetitions(competitions, { pack: state.pack ?? 'au', season: state.season, week: state.week, clubIds: state.league.clubs.map(c => c.id) });
   if (problem) throw new Error(`Invalid result transition: ${problem}`);
   const stage = instance.definition.stages.find(s => s.id === fixture.stageId)!;
@@ -325,6 +334,8 @@ function withdrawUnresolved(state: GameState): GameState {
  * that is still to be played is not a leftover forfeit.
  */
 export function settleStructuralCalendar(state: GameState, week: number): GameState {
+  if (state.competitions?.openCupEntry && !isPlayableLeagueCareer(state))
+    throw new CompetitionRewardError('The normal Cup interval contains invalid or unsettled evidence.');
   let next = recoverUnfinishableCompetitions(state);
   for (const ref of currentCalendarFixtures(next)) {
     const live = currentCalendarFixtures(next).find(item => item.instance.id === ref.instance.id && item.fixture.id === ref.fixture.id);

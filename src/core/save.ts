@@ -1,9 +1,10 @@
 import { leagueCareerStateProblem } from '../systems/leagueEntryValidation';
 import { migrateObservedProtection } from '../systems/cap';
 import { initialPlayerPopulation, installPlayerHistory } from '../systems/playerCareer';
+import { createOpenCupOffer } from '../systems/openCupEntry';
 import { prepareOpenCup } from '../systems/openCupCareer';
 import { prepareDivisionFinals } from '../systems/divisionCareer';
-import { hasExecutableCupRewards, reconcileMatchIncome } from '../systems/matchIncome';
+import { hasExecutableCupRewards, reconcileMatchEffects, reconcileMatchIncome } from '../systems/matchIncome';
 import { currentRound } from './season';
 import { careerNamespace } from './storage/local';
 import { DEV_TEST_PREFIX } from './storageKeys';
@@ -23,7 +24,7 @@ import { currentCalendarFixtures, fixtureBridge, hasStructuralCalendar, recoverU
 // comes from src/core/storageKeys.ts, frozen whatever the game is called.
 
 import type { Fixture, GameState } from './state';
-import { validateInput, validateCurrent, REPAIR_NOTICE, type SaveRepair } from './saveValidation';
+import { hasV33Fields, validateInput, validateCurrent, REPAIR_NOTICE, type SaveRepair } from './saveValidation';
 import { emptyFinance, getState, SAVE_VERSION, setState, stateInstallation } from './state';
 import { fromLegacy, isTraitId, type TraitInstance } from '../data/traits';
 import { withRivalSquads } from '../systems/rivals';
@@ -330,6 +331,7 @@ export const MIGRATIONS: readonly MigrationStep[] = [
   { from: 28, to: 29, run: old => ({ ...old, matchIncome: [] }) },
   // v31 adds optional progression; no historical titles or entry are inferred.
   { from: 30, to: 31, run: old => ({ ...old }) },
+  { from: 32, to: 33, run: old => ({...old, competitionRewards: []}) },
   // v32 snapshots the agreement observed under v31 ID-only protection.
   // Already recorded exact terms keep their provenance, including queued terms.
   { from: 31, to: 32, run: old => {
@@ -379,18 +381,21 @@ function migrateChecked(raw: unknown): MigrateResult {
       message: `This save is from a newer version of ${BRAND.name} (save v${version}, this game supports v${SAVE_VERSION}). Update the game to load it.`,
     };
   }
-  const competitions = cur.competitions;
-  if (competitions && typeof competitions === 'object' && 'leagueCareer' in competitions) {
-    const state = cur as unknown as GameState;
-    const problem = leagueCareerStateProblem(state);
-    return problem ? { ok: false, outcome: problem.reason === 'unsupported' ? 'unsupported' : 'unrecoverable',
-      reason: 'corrupt', message: problem.message }
-      : { ok: true, outcome: 'valid', state, repairs: [] };
-  }
   // Pre-finance careers are kept and are not converted. v28 and later migrate.
   if (version <= LAST_PRE_FINANCE_VERSION) {
     return { ok: false, outcome: 'unrecoverable', reason: 'corrupt',
       message: `This save is from an older version of ${BRAND.name} (save v${version}). Please start a new career. Your original save has been kept.` };
+  }
+  if (version <= 32 && hasV33Fields(cur))
+    return {ok:false, outcome:'unrecoverable', reason:'corrupt', message:'The save contains Open Cup data from a later format.'};
+  const competitions = cur.competitions;
+  if (competitions && typeof competitions === 'object' && 'leagueCareer' in competitions) {
+    let state = cur as unknown as GameState;
+    if (version === 32) state = createOpenCupOffer({...structuredClone(state),version:SAVE_VERSION,competitionRewards:[]});
+    const problem = leagueCareerStateProblem(state);
+    return problem ? { ok: false, outcome: problem.reason === 'unsupported' ? 'unsupported' : 'unrecoverable',
+      reason: 'corrupt', message: problem.message }
+      : { ok: true, outcome: 'valid', state, repairs: [] };
   }
   const inputProblem = validateInput(cur, version);
   if (inputProblem) return { ok: false, outcome: 'unrecoverable', reason: 'corrupt', message: inputProblem };
@@ -484,7 +489,7 @@ export function writeSlot(slot: number, state: GameState, expectedOriginal?: str
 }
 
 function persistSlot(store: LocalSaveStore | null, slot: number, state: GameState, expectedOriginal: string | null | undefined,
-  options: {parkedMatch?: string; verifyPayload?: boolean; current?: () => boolean}): boolean {
+  options: {parkedMatch?: string | null; verifyPayload?: boolean; current?: () => boolean}): boolean {
   if (savesLocked) return false;
   if (!store) {
     console.warn('nrl-sim: no storage available, save skipped');
@@ -508,7 +513,7 @@ function persistSlot(store: LocalSaveStore | null, slot: number, state: GameStat
     const facts = { saveVersion: state.version, club: String(state.clubName), season: state.season, week: state.week };
     const meta = nextMeta(store.storedMeta(slot), payload, facts, store.deviceId(), Date.now());
     if (options.current && !options.current()) return false;
-    store.write(slot, payload, meta, options.parkedMatch, options.verifyPayload, options.current);
+    store.write(slot, payload, meta, options.parkedMatch, options.verifyPayload, options.current, expectedOriginal);
     approveOriginal(store, slot, payload, false);
   } catch (err) {
     console.warn('nrl-sim: save failed', err);
@@ -640,7 +645,8 @@ function persistIfChanged(state: GameState, verifyPayload = false): boolean {
     const slot = activeSlot;
     const namespace = careerNamespace();
     const installation = stateInstallation();
-    const current = (): boolean => activeSlot === slot && careerNamespace() === namespace
+    const source = installation ? getState() : undefined;
+    const current = (): boolean => (!source || getState() === source) && activeSlot === slot && careerNamespace() === namespace
       && stateInstallation() === installation && getStore() === store;
     const original = store.read(slot);
     if (!current()) return false;
@@ -690,6 +696,16 @@ export function captureSlot(slot: number): { result: LoadResult; raw: string | n
   }
 }
 
+function recoveryCandidate(state: GameState, loading: boolean): GameState {
+  if (state.competitions?.leagueCareer) return state;
+  const paid = hasExecutableCupRewards(state) || state.competitionRewards.length > 0;
+  if (paid && (!hasStructuralCalendar(state) || careerNamespace() !== DEV_TEST_PREFIX))
+    throw Error('Executable competition rewards require an activated League cup or the isolated developer calendar.');
+  const recovered = recoverUnfinishableCompetitions(state);
+  if (paid) return reconcileMatchEffects(recovered);
+  return loading ? reconcileMatchIncome(recovered) : recovered;
+}
+
 function classifySlot(store: LocalSaveStore, slot: number, raw: string | null): LoadResult {
   if (raw === null) return { status: 'empty' };
   const res = parseSave(raw);
@@ -698,7 +714,9 @@ function classifySlot(store: LocalSaveStore, slot: number, raw: string | null): 
     return { status: 'corrupt', outcome: 'unrecoverable', message: structuralPolicyProblem(res.state) ?? 'Competition prototypes require the isolated developer career.' };
   // An offered, qualified or entered competition can never finish on this calendar.
   // Close it here so a save that would freeze the week loads ready to advance.
-  const state = res.state.competitions?.leagueCareer ? res.state : reconcileMatchIncome(recoverUnfinishableCompetitions(res.state));
+  let state: GameState;
+  try { state = recoveryCandidate(res.state,true); }
+  catch (error) { return {status:'corrupt',outcome:'unrecoverable',message:error instanceof Error ? error.message : 'Invalid competition rewards.'}; }
   // A repaired state must not reach trusted memory until its exact source is
   // retained and verified by #522's preservation path. Persisting comes later.
   if (res.repairs.length) {
@@ -1073,10 +1091,17 @@ export function installImportedSave(text: string, slot: number): ImportResult {
     const policy = structuralPolicyProblem(res.state);
     if (policy) return { ok: false, message: policy };
   }
-  const recovered = res.state.competitions?.leagueCareer ? res.state : recoverUnfinishableCompetitions(res.state);
+  let recovered: GameState;
+  try { recovered = recoveryCandidate(res.state,false); }
+  catch (error) { return {ok:false,message:error instanceof Error ? error.message : 'Invalid competition rewards.'}; }
   const installed = recovered === res.state ? res : { ...res, state: recovered };
+  const store = getStore(), installation = stateInstallation(), namespace = careerNamespace(), sourceSlot = activeSlot;
+  const source = installation ? getState() : undefined;
+  const current = () => getStore() === store && stateInstallation() === installation && careerNamespace() === namespace
+    && activeSlot === sourceSlot && (!source || getState() === source);
   const {result: destinationStatus, raw: expectedOriginal} = captureSlot(slot);
   if (destinationStatus.status !== 'empty' && destinationStatus.status !== 'ok') return { ok: false, message: 'Destination needs recovery before replacement.' };
+  if (!current()) return { ok: false, message: 'The career changed during import.' };
   // Repaired/historical imports retain both the exact incoming file (including
   // its match envelope) and the occupied destination before any installation.
   if (res.repairs.length || JSON.parse(peeled.text).version !== SAVE_VERSION) {
@@ -1089,9 +1114,12 @@ export function installImportedSave(text: string, slot: number): ImportResult {
       if (destination !== null) store.keepCorrupt(destination, slot);
     } catch { return { ok: false, message: 'Could not preserve originals. Import was not installed.' }; }
   }
-  if (installed.state.competitions?.leagueCareer && peeled.live) {
-    return persistSlot(getStore(), slot, installed.state, expectedOriginal, {parkedMatch: JSON.stringify(peeled.live)}) ? installed
-      : { ok: false, message: 'Could not save the League career and its parked match. Check storage and retry the import.' };
+  const verify = !!installed.state.competitions?.leagueCareer || hasExecutableCupRewards(installed.state) || installed.state.competitionRewards.length > 0;
+  if (verify) {
+    const options = {verifyPayload: true, current, parkedMatch: peeled.live ? JSON.stringify(peeled.live) : null};
+    if (!persistSlot(store,slot,installed.state,expectedOriginal,options))
+      return {ok: false, message: 'Could not save the career and its match. Check storage and retry the import.'};
+    return installed;
   }
   if (!writeSlot(slot, installed.state, expectedOriginal)) return { ok: false, message: '' };
   if (peeled.live) {

@@ -1,3 +1,5 @@
+import { createOpenCupOffer } from '../../src/systems/openCupEntry';
+import { __setStorage } from '../../src/core/save';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createNewGame, getState, loadState, type GameState } from '../../src/core/state';
 import { validateCurrent } from '../../src/core/saveValidation';
@@ -48,6 +50,10 @@ function accept(s: GameState, id?: string) {
 // close owners. The regional integration cases below play the actual matches.
 function settleWithTitle(active: GameState, win: boolean, bottomClubId?: string): GameState {
   let s = structuredClone(active);
+  // This main-league-only fixture skips from opening day to the finals.
+  // Model a migrated season with its cup registration window already missed.
+  delete s.competitions!.openCupEntry;
+  s = createOpenCupOffer({...s, week: 7});
   const c = s.competitions!;
   const current = () => s.competitions!.instances.filter(i => i.season === s.season);
   const play = (f: typeof c.instances[number]['fixtures'][number], winner: string) => {
@@ -83,7 +89,7 @@ function settleWithTitle(active: GameState, win: boolean, bottomClubId?: string)
   expect(closed.competitions!.leagueCareer!.phase).toBe('next-season-choice');
   return closed;
 }
-afterEach(() => { bus.clear(); clearHeldWeek(); clearTickHooks(); clearSeasonHooks(); selectPack('au'); setCareerNamespace(null); });
+afterEach(() => { __setStorage(null); bus.clear(); clearHeldWeek(); clearTickHooks(); clearSeasonHooks(); selectPack('au'); setCareerNamespace(null); });
 describe('League entry quotes and atomic candidates', () => {
   it('freezes a full first-season choice without allocating people, dice or a new draw', async () => {
     const s = await initial();
@@ -407,6 +413,8 @@ describe('League entry quotes and atomic candidates', () => {
 
   it.each(['au', 'uk'] as const)('plays two complete %s calendars and admits the third with the registered systems', async region => {
     const s = await initial(region);
+    const bytes = new Map<string,string>();
+    __setStorage({getItem:k => bytes.get(k) ?? null,setItem:(k,v)=>{bytes.set(k,v);},removeItem:k=>{bytes.delete(k);}});
     loadState(accept(s));
     registerAllSystems();
     for (const season of [1, 2]) {

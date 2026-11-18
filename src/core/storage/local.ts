@@ -91,19 +91,26 @@ export class LocalSaveStore implements SyncSaveStore {
   }
 
   /** Throws when the payload was not stored (storage full or blocked); nothing else is touched then. */
-  write(slot: number, payload: string, meta: SaveMeta, parkedMatch?: string, verifyPayload = false, current?: () => boolean): void {
+  write(slot: number, payload: string, meta: SaveMeta, parkedMatch?: string | null, verifyPayload = false, current?: () => boolean, expectedOriginal?: string | null): void {
     const key = slotKey(slot);
     const previous = slot === 1 || verifyPayload ? this.storage.getItem(key) : null;
     const legacy = slot === 1 ? this.storage.getItem(LEGACY_SAVE_KEY) : null;
+    const matchKey = liveMatchKey(slot);
+    const ownsSidecar = (): boolean => parkedMatch === undefined || this.storage.getItem(matchKey) === parkedMatch;
     const writePayload = (): void => {
+      if (verifyPayload && expectedOriginal !== undefined && this.read(slot) !== expectedOriginal)
+        throw new Error('The destination changed before saving');
       if (current && !current()) throw new Error('The destination changed before saving');
       this.storage.setItem(key, payload);
       if (!verifyPayload) return;
       try {
-        if (this.storage.getItem(key) !== payload) throw new Error('Settled career was not stored');
+        if (this.storage.getItem(key) !== payload || !ownsSidecar() || (current && !current())) throw new Error('Settled career was not stored');
       } catch (error) {
-        if (previous === null) this.storage.removeItem(key);
-        else this.storage.setItem(key, previous);
+        // A replacement sidecar belongs to the other writer's career.
+        if (ownsSidecar()) {
+          if (previous === null) this.storage.removeItem(key);
+          else this.storage.setItem(key, previous);
+        }
         throw error;
       }
     };
@@ -112,15 +119,19 @@ export class LocalSaveStore implements SyncSaveStore {
     } else {
       // Install the small record first. If the larger checkpoint hits quota,
       // restore the exact original record before reporting the import failure.
-      const key = liveMatchKey(slot);
-      const old = this.storage.getItem(key);
-      this.storage.setItem(key, parkedMatch);
+      const old = this.storage.getItem(matchKey);
       try {
-        if (this.storage.getItem(key) !== parkedMatch) throw new Error('Parked match was not stored');
+        if (parkedMatch === null) this.storage.removeItem(matchKey);
+        else this.storage.setItem(matchKey, parkedMatch);
+        if (!ownsSidecar()) throw new Error('Parked match was not stored');
         writePayload();
       } catch (error) {
-        if (old === null) this.storage.removeItem(key);
-        else this.storage.setItem(key, old);
+        // Restore our staged sidecar, or a failed sidecar write while the old
+        // career is still present. Leave a competing replacement pair together.
+        if (ownsSidecar() || this.storage.getItem(key) === previous) {
+          if (old === null) this.storage.removeItem(matchKey);
+          else this.storage.setItem(matchKey, old);
+        }
         throw error;
       }
     }

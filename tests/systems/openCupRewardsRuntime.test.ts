@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { advanceUntil } from '../../src/core/advance';
 import { bus, type Events } from '../../src/core/events';
-import { exportSave, loadSlot, pendingLeagueSaveProblem, retryPendingLeagueSave, saveIfChanged, setActiveSlot } from '../../src/core/save';
+import { exportSave, importSave, installImportedSave, loadSlot, pendingLeagueSaveProblem, retryPendingLeagueSave, saveIfChanged, setActiveSlot } from '../../src/core/save';
 import { getState, loadState, setState, type Fixture, type GameState } from '../../src/core/state';
 import { setCareerNamespace } from '../../src/core/storage/local';
 import { DEV_TEST_PREFIX, liveMatchKey, slotKey } from '../../src/core/storageKeys';
@@ -482,5 +482,43 @@ describe('paid developer Open Cup results', () => {
     bus.emit('match:finished', {fixture:current, result:playerWin(current)});
     expect(getState().week).toBe(20);
     expect(getState().competitionRewards).toHaveLength(1);
+  });
+});
+
+describe('isolated developer accepted-result recovery',()=>{
+  function acceptedPending() {
+    const state=paidWeek(1);
+    const fixture=getCurrentFixture(state,state.clubId)!;
+    const pending=freezeMatchEffects(state,fixture);
+    const {homeScore,awayScore}=playerWin(fixture);
+    const settled=finaliseCalendarFixture(state,fixture,{homeScore,awayScore});
+    return {accepted:{...pending,competitions:settled.competitions!},settled};
+  }
+  it('inspects without paying, recovers both ledgers on load/import, and never awards twice',()=>{
+    const {accepted,settled}=acceptedPending(), original=JSON.stringify(accepted);
+    bytes.set(saveKey,original);
+    const inspected=importSave(original);expect(inspected.ok && inspected.state.competitionRewards[0]?.status).toBe('pending');
+    const loaded=loadSlot();if(loaded.status!=='ok') throw Error('DEV load refused');
+    expect(loaded.state).toEqual(settled);expect(bytes.get(saveKey)).toBe(original);
+    const imported=installImportedSave(original,2);if(!imported.ok) throw Error(imported.message);
+    expect(imported.state).toEqual(settled);
+    expect(loadSlot(2)).toMatchObject({status:'ok',state:settled});
+    const reimport=installImportedSave(JSON.stringify(imported.state),2);
+    expect(reimport.ok && reimport.state).toEqual(settled);
+    setCareerNamespace(null);
+    expect(installImportedSave(original,2).ok).toBe(false);
+  });
+  it.each(['overflow','missing promise'] as const)('preserves source, installed career and occupied destination on %s',fault=>{
+    const {accepted,settled}=acceptedPending(), broken=clone(accepted);
+    if(fault==='overflow') broken.money=Number.MAX_SAFE_INTEGER;else broken.competitionRewards=[];
+    const file=JSON.stringify(broken), destination=DEV_TEST_PREFIX+slotKey(2), sidecar=DEV_TEST_PREFIX+liveMatchKey(2);
+    const original=JSON.stringify(getState()); const installed=getState();
+    bytes.set(saveKey,file);bytes.set(destination,original);bytes.set(sidecar,'saved match');
+    expect(loadSlot().status).toBe('corrupt');
+    expect(installImportedSave(file,2).ok).toBe(false);
+    expect(bytes.get(saveKey)).toBe(file);expect(bytes.get(destination)).toBe(original);
+    expect(bytes.get(sidecar)).toBe('saved match');expect(getState()).toBe(installed);
+    const retry=installImportedSave(JSON.stringify(accepted),2);
+    expect(retry.ok && retry.state).toEqual(settled);
   });
 });

@@ -37,6 +37,7 @@ import { bus } from '../core/events';
 import { strengthChanges, applySeasonReputation } from './league';
 import { rolloverRivalPopulation, withRivalSquads } from './rivals';
 import { currentCalendarFixtures, finaliseCalendarFixture, fixtureBridge, hasStructuralCalendar, resolveCalendarForfeits, sameFixtureIdentity } from './competitionCalendar';
+import { closeOpenCupRegistration, resolveOpenCupWithdrawal } from './openCupEntry';
 import { prepareOpenCup } from './openCupCareer';
 import { prepareDivisionFinals } from './divisionCareer';
 
@@ -653,8 +654,8 @@ export function registerFixturesSystem(): void {
   // (a2) Generate this week's finals bracket ties before rivals/player match.
   registerTickHook('fixtures-finals', TICK_ORDER.match - 2, (ctx: TickContext) => {
     if (hasStructuralCalendar(getState())) {
-      const next = prepareOpenCup(prepareDivisionFinals(getState()));
-      if (next !== getState()) setState({ competitions: next.competitions! });
+      const next = resolveOpenCupWithdrawal(prepareOpenCup(prepareDivisionFinals(getState())));
+      if (next !== getState()) commitMatchState(next);
       return;
     }
     if (!isFinalsRound(ctx.week)) return;
@@ -733,7 +734,7 @@ export function registerFixturesSystem(): void {
   // for saves made before this hook existed.
   registerTickHook('fixtures-finals-next', TICK_ORDER.ladder + 1, (ctx: TickContext) => {
     if (hasStructuralCalendar(getState())) {
-      const next = prepareOpenCup(prepareDivisionFinals(getState()));
+      const next = prepareOpenCup(closeOpenCupRegistration(prepareDivisionFinals(getState())));
       if (next !== getState()) setState({ competitions: next.competitions! });
       return;
     }

@@ -1,5 +1,6 @@
 // Competition metadata only (#570). The existing match/time systems remain
 // authoritative until the calendar and result-lifecycle work wires this in.
+import { validateOpenCupEntry, type OpenCupEntryState } from './openCupEntry';
 import { validateLeagueCareer, type LeagueProgress } from './leagueCareer';
 import type { MatchRules } from '../content/pack';
 import { validateCompetitionCalendar, type CompetitionCalendar } from './competitionCalendar';
@@ -98,6 +99,7 @@ export interface CompetitionInstance {
   winnerId?: string;
 }
 export interface CompetitionCareerState {
+  openCupEntry?: OpenCupEntryState;
   schemaVersion: 1;
   instances: CompetitionInstance[];
   calendar?: CompetitionCalendar;
@@ -367,7 +369,7 @@ export function completedCompetition(instance: CompetitionInstance): string | nu
 
 /** Returns the first invalid field; callers retain the entire rejected input. */
 export function validateCompetitions(v: unknown, context: { pack: string; season: number; week?: number; clubIds: readonly string[]; clubId?: string }): string | null {
-  if (!record(v) || !keys(v, ['schemaVersion', 'instances', 'calendar', 'world', 'leagueCareer']) || v.schemaVersion !== 1 || !Array.isArray(v.instances)) return 'competitions';
+  if (!record(v) || !keys(v, ['schemaVersion', 'instances', 'calendar', 'world', 'leagueCareer', 'openCupEntry']) || v.schemaVersion !== 1 || !Array.isArray(v.instances)) return 'competitions';
   const clubIds = new Set(context.clubIds);
   const instanceIds = new Set<string>();
   const fixtureIds = new Set<string>();
@@ -455,5 +457,6 @@ export function validateCompetitions(v: unknown, context: { pack: string; season
     const progress = validateLeagueCareer(v.leagueCareer, v as unknown as CompetitionCareerState, context);
     if (progress) return progress;
   }
-  return null;
+  try { return validateOpenCupEntry(v.openCupEntry, v as unknown as CompetitionCareerState, context); }
+  catch { return 'Open Cup offer terms'; }
 }

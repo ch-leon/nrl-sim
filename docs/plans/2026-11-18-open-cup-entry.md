@@ -53,6 +53,8 @@ starting the presentation checkpoint, then review the whole feature for release.
 
 No cap entitlement, contract repricing, forced release, assignment, small-sided format, equipment, invitation chain or unrelated UI redesign belongs in this slice. Existing retained capacity and sporting-division income remain unchanged.
 
+Rebalancing constraint: the initial supported prize table is a versioned promise. Before changing its test values, add support for a new frozen table version while continuing to validate existing offers and historical receipts against their saved supported version. Editing the version-one validation constants in place would invalidate existing careers and is not an acceptable balance change.
+
 ## Saved contract and API boundaries
 
 Create `src/data/openCupEntry.ts` for the plain saved types and structural validation. Add an optional, explicitly versioned `openCupEntry` field to `CompetitionCareerState`; normal activation requires it, while old inert/prototype sporting snapshots remain distinct.
@@ -74,11 +76,16 @@ function closeOpenCupRegistration(state: GameState): GameState;
 function requestOpenCupWithdrawal(state: GameState, selection: OpenCupWithdrawal): OpenCupEntryResult;
 function resolveOpenCupWithdrawal(state: GameState): GameState;
 // systems/openCupEntryCommit.ts
-function confirmOpenCupChoice(selection: OpenCupChoice): OpenCupEntryConfirmationResult;
-function confirmOpenCupWithdrawal(selection: OpenCupWithdrawal): OpenCupEntryConfirmationResult;
+function captureOpenCupEntryPreview():
+  | { ok: true; preview: OpenCupEntryPreview & OwnedSelection }
+  | OpenCupEntryRefusal;
+function confirmOpenCupChoice(selection: OpenCupChoice & OwnedSelection): OpenCupEntryConfirmationResult;
+function confirmOpenCupWithdrawal(selection: OpenCupWithdrawal & OwnedSelection): OpenCupEntryConfirmationResult;
 ```
 
 `OpenCupChoice` carries `offerId`, `choice: 'enter' | 'decline'` and `previewKey`. `OpenCupWithdrawal` carries `offerId` and `previewKey`. Preview keys cover the source state and saved offer; confirmation re-previews before mutation. Result unions follow `leagueEntry.ts`, distinguishing stale, unavailable, invalid, held, quarantine and storage refusals.
+
+Public dialogs capture their preview through `captureOpenCupEntryPreview()` and retain its opaque `owner` by reference when confirming. It binds the source state object, installation, slot and namespace at preview time. A byte-identical career loaded into another destination is still a stale preview. Pure `previewOpenCupEntry(state)` and selection operations remain independent of storage. The owner is transient and is never written into a save.
 
 Preview displays dates, eligibility, current decision, fee, reward rules and possible commitment. It neither generates a draw nor creates a fixture/prize promise. At draw, the saved definition contains the foundation's explicit supported executable policies; unsupported/mixed execution metadata remains rejected.
 
@@ -169,6 +176,8 @@ Both current and previous season activation records must remain provable while t
 - [ ] Verify normal result callbacks atomically expose score, wallet, reputation, receipts and trophy. Financial failure quarantines the owned interval and preserves checkpoint/sidecar; no cancellation fallback, payout notification or stale callback may turn failure into a result.
 - [ ] Extend the foundation's verified interval-start and completed-week persistence to normal cup-enabled League intervals. Include AI-only cup weeks and headless advancement with no watched-match retirement callback; they still use the existing pending-save owner and exact readback. A failed initial write runs no hooks and counts no elapsed week. Recheck installation, source, slot and namespace before starting work. This activates the same protection for normal cup play rather than introducing a second save mechanism.
 - [ ] Run `npx vitest run tests/core/leagueCareerMigration.test.ts tests/core/save.test.ts tests/core/saveRecovery.test.ts tests/systems/leagueCareerCallbacks.test.ts tests/systems/competitionRewards.test.ts`.
+
+Backend checkpoint evidence (not released): normal entry, deadline closure, withdrawal and save 33 migration passed independent spec review after four reproduced fixes: preview-time destination ownership; verified removal of an absent imported sidecar; supported historical FIN-04 prize bases after fixture pruning; and rollback that preserves a competing replacement career/match pair. The final 58-file affected run passed 1,378 tests; the full regression suite passed 5,058 tests across 375 files, and TypeScript passed. The production build also passed before the final storage-only review corrections. Claude approved the backend after five added regression tests covered no-op withdrawal quarantine, invalid fulfilment targets, same-week withdrawal and reload, elimination/completion refusals, and catalogue changes across annual entry. The added two-file suite passed all 42 tests in both implementer and root runs; TypeScript and diff checks passed. Presentation and release gates remain outstanding.
 
 ## Task 5 — Entry, reports and trophy history
 

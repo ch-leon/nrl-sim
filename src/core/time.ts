@@ -176,6 +176,14 @@ function ownsInterval(interval: LeagueInterval): boolean {
   return leagueInterval === interval && interval.installation === stateInstallation();
 }
 
+export function leagueIntervalInProgress(): boolean {
+  return !!leagueInterval && ownsInterval(leagueInterval);
+}
+
+function verifiedCupInterval(interval: LeagueInterval): boolean {
+  return interval.kind === 'paid-cup-dev' || !!interval.source.competitions?.openCupEntry;
+}
+
 /** A hook that changes the state before settlement must never displace its checkpoint. */
 export function leagueIntervalSaveHeld(): boolean {
   return !!leagueInterval && ownsInterval(leagueInterval) && !leagueInterval.published && getState() !== leagueInterval.source;
@@ -183,7 +191,7 @@ export function leagueIntervalSaveHeld(): boolean {
 
 /** Export the original paid interval even while synchronous hooks are still running. */
 export function activePaidCupCheckpoint(): IntervalCheckpoint | undefined {
-  return leagueInterval?.kind === 'paid-cup-dev' && ownsInterval(leagueInterval) && !leagueInterval.published ? leagueInterval : undefined;
+  return leagueInterval && verifiedCupInterval(leagueInterval) && ownsInterval(leagueInterval) && !leagueInterval.published ? leagueInterval : undefined;
 }
 
 function failLeagueInterval(interval: LeagueInterval, reason: string, error?: unknown): void {
@@ -228,7 +236,7 @@ export function advanceWeek(): void {
       ? 'paid-cup-dev' : undefined;
   const interval: LeagueInterval | undefined = kind ? {...checkpoint, kind, installation, published: false} : undefined;
   leagueInterval = interval;
-  if (interval?.kind === 'paid-cup-dev') {
+  if (interval && verifiedCupInterval(interval)) {
     let saved = false;
     try { saved = saveIfChanged(checkpoint.source, true); }
     catch (error) { console.error('nrl-sim: could not confirm the interval checkpoint', error); }
@@ -372,9 +380,9 @@ function finishLeagueInterval(interval: LeagueInterval, settled: GameState): voi
   // Once published, a failed storage write leaves the old checkpoint and its match together.
   interval.published = true;
   const current = (): boolean => ownsInterval(interval);
-  if (final || interval.afterSaved) {
+  if (final || interval.afterSaved || verifiedCupInterval(interval)) {
     try {
-      if (interval.afterSaved) saveSettledLeagueMatch(getState(), interval, interval.afterSaved);
+      if (interval.afterSaved || verifiedCupInterval(interval)) saveSettledLeagueMatch(getState(), interval, interval.afterSaved ?? (() => {}));
       else saveIfChanged(getState());
     } catch (error) {
       console.error('nrl-sim: could not persist the settled League interval', error);

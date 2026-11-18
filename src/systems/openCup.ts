@@ -5,6 +5,7 @@ import {
   validateCompetitionDefinition, validateCompetitions,
   type CompetitionDefinition, type CompetitionFixture, type CompetitionInstance, type CompetitionResult,
 } from '../data/competition';
+import { openCupField } from '../data/openCupField';
 import { cyrb53 } from '../utils/hash';
 import { makeRng } from '../utils/rng';
 
@@ -115,8 +116,7 @@ export function drawOpenCup(entry: OpenCupEntry): OpenCupDraw {
   if (!clubIds.every(id => typeof id === 'string' && id.trim().length > 0) || new Set(clubIds).size !== clubIds.length) throw new Error('Invalid Open Cup entrants');
   const candidates = clubIds.filter(id => enterPlayer || id !== playerId).slice().sort();
   if (candidates.length > definition.maxEntrants) throw new Error('Too many Open Cup entrants');
-  const rng = makeRng((seed ^ seedFor(['open-cup-draw-v1', definition.id, definition.version, season, ordinal])) >>> 0);
-  const entrants = rng.shuffle(candidates);
+  const { entrants, tieOrder } = openCupField(definition, season, ordinal, seed, candidates);
   // A declined instance is the saved no-event receipt, not a one-club champion.
   if (entrants.length < 2) {
     const instance: CompetitionInstance = {
@@ -128,7 +128,7 @@ export function drawOpenCup(entry: OpenCupEntry): OpenCupDraw {
     return { instance, held: false, playerEntered: false, byes: [] };
   }
   const instance = createCompetitionInstance(definition, season, ordinal, entrants);
-  instance.tieOrder = rng.shuffle(entrants);
+  instance.tieOrder = tieOrder;
   const draw = layout(instance);
   instance.status = 'scheduled'; instance.stageId = definition.stages[0]!.id;
   instance.fixtures = roundFixtures(instance, draw.field, draw.openingRound);
