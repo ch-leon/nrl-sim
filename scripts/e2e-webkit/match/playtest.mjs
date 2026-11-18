@@ -1,6 +1,6 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, skipFromPill } from '../common.mjs';
+import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, skipFromPill, setMatchSpeed } from '../common.mjs';
 
 /**
  * The phone play-test's guards (Wave 4 prompt 09, #399), at 667×375 (the narrowest
@@ -162,7 +162,7 @@ export async function runPlaytest(browser, W = 667, H = 375) {
         if (await ask.count()) await ask.first().tap();
       }
       await page.waitForSelector('.nrl-mo-controls', { timeout: 20000 });
-      await page.locator('.nrl-mo-controls [data-speed="8"]').tap();
+      await setMatchSpeed(page, 8);
       // The card, or the second half under way without it. A half at ×8 is about a minute; room for a slow runner.
       const seen = await page.waitForFunction(() => {
         if (document.querySelector('.nrl-mo-plan')) return 'card';

@@ -181,6 +181,17 @@ export async function skipFromPill(page) {
   }
 }
 
+/**
+ * The match's one speed button (SuperCOOKED 40) to `speed`: it shows the speed playing and each tap
+ * moves it on (1× → 2× → 4× → 8× → 1×), so tap until it reads the one wanted.
+ */
+export async function setMatchSpeed(page, speed) {
+  const b = page.locator('.nrl-mo-controls .nrl-mo-speed');
+  for (let i = 0; i < 4 && (await b.getAttribute('data-speed')) !== String(speed); i++) await b.tap();
+  const now = await b.getAttribute('data-speed');
+  if (now !== String(speed)) throw new Error(`the speed button reads ×${now}, not ×${speed}`);
+}
+
 /** Play a real match through the phone controls, then wait for its held week. */
 export async function playPhoneWeek(page, onResult = async () => {}) {
   const before = await page.evaluate(() => { const s = window.__nrlState(); return `${s.season}:${s.week}:${s.preseason}`; });

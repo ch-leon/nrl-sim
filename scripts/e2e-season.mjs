@@ -129,6 +129,12 @@ const NAV_VIA = { lineup: ['squad', '.nrl-sq-tabs [data-seg="lineup"]'], recruit
  * inside the sheet that holds it, or OFFICE then its tile. A tab tapped while its
  * own sheet is open closes it (the dock is a toggle), so an open sheet is left as is.
  */
+/** The match's one speed button (SuperCOOKED 40) to `speed`: each tap moves it on, 1× → 2× → 4× → 8× → 1×. */
+const matchSpeed = async (speed) => {
+  const b = page.locator('.nrl-mo-controls .nrl-mo-speed');
+  for (let i = 0; i < 4 && (await b.getAttribute('data-speed')) !== String(speed); i++) await press(b);
+  if ((await b.getAttribute('data-speed')) !== String(speed)) throw new Error(`the speed button reads ×${await b.getAttribute('data-speed')}, not ×${speed}`);
+};
 const navTo = async (id) => {
   if (await sheetOpen(id)) return;
   if (NAV_VIA[id]) {
@@ -781,7 +787,7 @@ async function play() {
     if (!liveOn) return 'skipped: no live-match setting';
     await tapAdvanceWeek();
     await page.waitForSelector('.nrl-mo-controls', { timeout: 15000 });
-    await press(page.locator('.nrl-mo-controls [data-speed="8"]'));
+    await matchSpeed(8);
     await wait(6000);
     const clock = (await page.locator('.nrl-mo-clock').textContent())?.trim();
     if (!clock || clock === '00:00') throw new Error(`the live match clock did not move (${clock})`);
@@ -941,7 +947,7 @@ async function play() {
     // At ×8 the calls on offer switch with possession every second or so and are never still
     // long enough for a locator click: call at ×1, opening the tray and tapping its first row
     // inside the page, then go back to ×8.
-    await press(page.locator('.nrl-mo-controls [data-speed="1"]'));
+    await matchSpeed(1);
     // A call that lands names itself on the badge at once (MatchScene.makeCall), lights its tile
     // and shuts the tray a moment later (#608); one refused (the play moved on) rebuilds the rows,
     // and a tap inside 300ms of the rows changing makes no call: read it in the same task.
@@ -975,7 +981,7 @@ async function play() {
     if (!call.lit) throw new Error(`${call.call} was made but its tile was not lit`);
     if (!trayClosed) throw new Error(`the tray stayed open after ${call.call} was made`);
     rec.notes.push(`called ${call.call}; badge reads "${call.badge}"${refused.length ? ` (${refused.length} refused first)` : ''}${empty ? `; ${empty} looks at an empty tray` : ''}`);
-    await press(page.locator('.nrl-mo-controls [data-speed="8"]'));
+    await matchSpeed(8);
   });
   // N11: the half-time card comes up by itself and waits for Continue (#341); change the attack and play on.
   await step('half-time-plan', async (rec) => {
