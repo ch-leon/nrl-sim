@@ -1,7 +1,7 @@
 import { pollMatchPlay } from '../../e2e-match-play.mjs';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log } from '../common.mjs';
+import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, setMatchSpeed } from '../common.mjs';
 
 /** The plays the club takes in: wide launch rules (second-man: any but your 20, tackles 1–4), so one is on most sets. */
 const PLAYS = ['second-man', 'block-play', 'cut-out-winger'];
@@ -14,7 +14,8 @@ const SHORT = { 'second-man': 'Second man', 'block-play': 'Block play', 'cut-out
  * keep, #326 risk 4): the head (title, note), the list of call tiles, the footer.
  * Nothing else is in the tray: no Plays section, hidden or not.
  */
-const TODAY_TRAY = 'div.nrl-mo-tray.nrl-mo-calls[div.nrl-mo-tray-head[span.nrl-mo-tray-title,span.nrl-mo-tray-note],div.nrl-mo-tray-list,div.nrl-mo-tray-foot]';
+// SuperCOOKED 41: the title and the tackle sit together, a dot before them.
+const TODAY_TRAY = 'div.nrl-mo-tray.nrl-mo-calls[div.nrl-mo-tray-head[span.nrl-mo-tray-who[span.nrl-mo-tray-title,span.nrl-mo-tray-tackle],span.nrl-mo-tray-note],div.nrl-mo-tray-list,div.nrl-mo-tray-foot]';
 
 /**
  * Set plays on the match screen (#326, phase 3): the coach tray's Plays section at
@@ -144,7 +145,7 @@ export async function runMatchPlays(browser, sizes = [[844, 390], [667, 375], [5
         }
         await page.waitForSelector('.nrl-mo-controls', { timeout: 30000 });
         await page.locator('.nrl-mo-bar [data-coach]').waitFor({ timeout: 30000 });
-        await page.locator('.nrl-mo-controls [data-speed="4"]').tap();
+        await setMatchSpeed(page, 4);
         const atkUnlocked = await page.evaluate(() => [...window.__nrlGame.scene.getScene('Match').unlocked]);
         const sheetPlays = await page.evaluate(() => { const sc = window.__nrlGame.scene.getScene('Match'); return [...sc.playback.playsOf(sc.callSide)]; });
         if (sheetPlays.join(',') !== (withPlays ? PLAYS.join(',') : '')) problems.push(`the match's plays are [${sheetPlays.join(',')}]`);
@@ -224,7 +225,8 @@ export async function runMatchPlays(browser, sizes = [[844, 390], [667, 375], [5
             badge.setAttribute('data-parts', '');
           }
           const rect = (sel) => { const e = document.querySelector(sel); if (!e) return null; const r = e.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom }; };
-          const parts = [['COACH', rect('.nrl-mo-bar [data-coach]')], ['LOG', rect('.nrl-mo-log-toggle')], ['speed pill', rect('.nrl-mo-controls')]];
+          // SuperCOOKED 40: the commentary line sits beside COACH where the LOG switch was.
+          const parts = [['COACH', rect('.nrl-mo-bar [data-coach]')], ['LOG', rect('.nrl-mo-strip')], ['speed pill', rect('.nrl-mo-controls')]];
           const out = [];
           // The speed pill runs past the edge at 568 wide just after a speed tap (it shows every speed for a
           // moment), with or without plays: only COACH and LOG, which the badge can push, must be on screen.
@@ -236,7 +238,7 @@ export async function runMatchPlays(browser, sizes = [[844, 390], [667, 375], [5
           if (longest && innerWidth <= 720 && coach() > todayW + 1) out.push(`COACH is ${Math.round(coach())}px wide with "${longest}", ${Math.round(todayW)}px with today's longest badge`);
           // One width whatever it reads (#608): LOG's left edge does not move with the badge's text,
           // and the longest label the badge shows is whole.
-          const logLeft = () => document.querySelector('.nrl-mo-log-toggle').getBoundingClientRect().left;
+          const logLeft = () => document.querySelector('.nrl-mo-strip').getBoundingClientRect().left;
           const edges = [[longest ?? 'Gang tackle', logLeft()]];
           badge.removeAttribute('data-parts');
           for (const text of ['Their ball', 'No calls', '1 call', 'Take the two']) {
@@ -252,7 +254,7 @@ export async function runMatchPlays(browser, sizes = [[844, 390], [667, 375], [5
         await page.screenshot({ path: join(OUT, `bar-${tag}-${w}x${h}.png`) });
         await openTray();
         // Open, the badge keeps its room unseen (#608): LOG is where it was with the tray shut.
-        const openLeft = await page.evaluate(() => document.querySelector('.nrl-mo-log-toggle').getBoundingClientRect().left);
+        const openLeft = await page.evaluate(() => document.querySelector('.nrl-mo-strip').getBoundingClientRect().left);
         if (Math.abs(openLeft - bar.logLeft) > 0.5) problems.push(`bottom row: LOG's left edge is ${openLeft.toFixed(1)}px with the tray open, ${bar.logLeft.toFixed(1)}px with it shut`);
 
         // Defending: no plays. The same care: read again until it is still their ball in the read.
@@ -290,9 +292,13 @@ export async function runMatchPlays(browser, sizes = [[844, 390], [667, 375], [5
             const play = await waitMatchState(() => {
               const b = document.querySelector('[data-tray-plays]:not([hidden]) [data-play]:not([disabled])');
               if (!b) return null;
+              // The tackle from the open tray's head (" · tackle 2", SuperCOOKED 41: the ball chip steps aside under
+              // the tray), else from the chip ("Your ball · tackle 2/5").
+              const head = document.querySelector('.nrl-mo-calls:not([hidden]) .nrl-mo-tray-tackle')?.textContent.trim() ?? '';
               const chip = document.querySelector('.nrl-mo-tackle');
               const shown = chip && !chip.hidden && getComputedStyle(chip).display !== 'none';
-              if (shown && !/^TACKLE [123]\//.test(chip.textContent.trim())) return null;
+              if (head) { if (!/tackle [123]$/i.test(head)) return null; }
+              else if (shown && !/(^|· )TACKLE [123]\//i.test(chip.textContent.trim())) return null;
               b.click();
               return b.hasAttribute('data-called') ? b.dataset.play : null;
             }, null, 'a callable early-tackle set play');
