@@ -9,9 +9,9 @@ event catalogue live in the
 This file owns the implementation boundaries and prototype configuration. The
 selectable League career shipped on 18 November through [PR #719](https://github.com/ch-leon/nrl-sim/pull/719).
 See the [league release evidence](../status/2026-11-league-selection.md). The normal
-optional Open Cup implementation is now under final presentation and release
-verification; [its evidence record](../status/2026-11-open-cup.md) separates reviewed
-code from released behaviour. Other events and wider balance remain open.
+optional Open Cup is implemented in [PR #736](https://github.com/ch-leon/nrl-sim/pull/736);
+[its evidence record](../status/2026-11-open-cup.md) separates local verification
+from the PR release gates. Other events and wider balance remain open.
 
 The user authorised execution on 11 November. The numerical settings below are
 the initial prototype, not measured balance or a promise about the final game.
@@ -321,7 +321,7 @@ exceptions and free withdrawal are explicit. An all-youth squad is legal.
 
 | Event | Extra reward policy or proposal | Activation / prerequisite |
 | --- | --- | --- |
-| Open Cup | Initial test policy: played wins 1M / 1M / 2M / 3M / 5M; +1 reputation per win, +2 more and the registered-squad honour for a played-final title | Normal entry and atomic #576 settlement implemented; presentation/release verification in the Open Cup evidence record. No cap entitlement or special XP reward. |
+| Open Cup | Initial test policy: played wins 1M / 1M / 2M / 3M / 5M; +1 reputation per win, +2 more and the registered-squad honour for a played-final title | Normal entry, atomic #576 settlement and receipt-backed presentation implemented in PR #736; release gates in the evidence record. No cap entitlement or special XP reward. |
 | Sponsor Shield | First title +5% annual base-cap capacity; repeated titles cash/honours | #557/#560/#577; next-season activation, unique club-career reward key. Proposed earned limit 10%; no automatic second 5%. |
 | Rising Stars | Academy-labelled cash, scout report on a real unsigned prospect | #539/#544/#545 and #580; no gifted superstar or raised ceiling. |
 | Champions Series | Published played-game cash, title/finalist cash and honour | #581 later; no award for unplayed third game or a missing opponent. |

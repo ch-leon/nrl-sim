@@ -8,8 +8,9 @@ shipped through [PR #719](https://github.com/ch-leon/nrl-sim/pull/719), merged a
 `a448210c`. The live League career includes permanent title unlocks, deliberate
 annual entry and retained club cap capacity. [Release evidence](../status/2026-11-league-selection.md)
 records independent review, CI/full QA and public confirmation/reload verification.
-The normal optional Open Cup backend is implemented and independently reviewed;
-presentation and release verification remain in the [Open Cup evidence record](../status/2026-11-open-cup.md).
+The normal optional Open Cup, prizes and receipt-backed views are implemented in
+[PR #736](https://github.com/ch-leon/nrl-sim/pull/736). The [Open Cup evidence record](../status/2026-11-open-cup.md)
+records local verification and the required PR release gates.
 Its initial prize values are for testing, with wider #582 balance still open. Assignments [#708](https://github.com/ch-leon/nrl-sim/issues/708),
 the watched/coached individual challenge [#710](https://github.com/ch-leon/nrl-sim/issues/710),
 the distinct small-sided event [#711](https://github.com/ch-leon/nrl-sim/issues/711)
@@ -375,7 +376,7 @@ No delivery dates or owners are invented.
 
 | Slice | Scope | Done when |
 | --- | --- | --- |
-| A — Choose a league and a cup | League selection shipped in #719; Open Cup entry/rewards are in presentation and release verification; wider integrated balance remains | Win an entry league, unlock a harder one, deliberately stay or move next year, and complete or decline a cup without breaking finances, people or history. |
+| A — Choose a league and a cup | League selection shipped in #719; Open Cup entry/rewards/views implemented in #736; wider integrated balance remains | Win an entry league, unlock a harder one, deliberately stay or move next year, and complete or decline a cup without breaking finances, people or history. |
 | B — Send players away | Assignment reservations, absence/return, lineup integration and one training/community opportunity | A player leaves, a reserve covers an overlapping club fixture, the player returns once with the correct result, and reload/skip cannot duplicate effects. |
 | C — Watch and coach a challenge | Big Mick's-style individual event, distinct venue, coaching decisions, personal award and a supported club reward | Complete a meaningful animated contest, see the effect of coaching, return with earned rewards and unlock a further goal; auto-coach and recovery work. |
 | D — Play a different team event | Beach or floodlit fives, selected travelling group, dedicated rules, recurring opponents and a short invitation chain | The event plays visibly differently from Nines, its absence/calendar costs matter, and success opens a correctly saved next opportunity. |

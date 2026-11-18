@@ -430,6 +430,7 @@ export async function runOpenCupEntry(browser) {
       await openCup(page);
       assert(offer(await state(page)).resolution === 'legacy-window-missed' && !await page.locator(action('enter')).count(), 'Late migration reopened registration');
       assert((await page.locator(DIALOG).innerText()).includes('window had already closed'), 'Migration did not explain why entry is unavailable');
+      assert(!await page.locator('[data-open-cup-terms]').count(), 'Late migration advertised a cup that was never drawn');
       await shot('late');
     }),
     record('phone-text-and-portrait', async (page, report, shot) => {
@@ -498,6 +499,7 @@ export async function runOpenCupEntry(browser) {
       report.result = result;
       report.paidCupPrize = prize?.delta ?? 0;
     } });
+    assert(report.result, 'The actual Cup playback case did not play a match');
   });
 
   for (const size of ['large', 'larger']) {

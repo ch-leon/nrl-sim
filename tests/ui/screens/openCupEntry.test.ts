@@ -2,9 +2,10 @@ import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { bus } from '../../../src/core/events';
 import { __setStorage, __unlockSaves, installImportedSave, loadSlot, setActiveSlot } from '../../../src/core/save';
-import { getState, loadState } from '../../../src/core/state';
+import { getState, loadState, type GameState } from '../../../src/core/state';
 import { slotKey } from '../../../src/core/storageKeys';
 import { leagueSeasonView } from '../../../src/systems/leagueSeasonView';
+import { drawOpenCup, isOpenCupInstance } from '../../../src/systems/openCup';
 import { advanceWeek, clearHeldWeek, clearSeasonHooks, clearTickHooks, withFastForward } from '../../../src/core/time';
 import { registerAllSystems } from '../../../src/qa/soak';
 import { closeModal, closeScreen } from '../../../src/ui/dom';
@@ -14,12 +15,28 @@ import { stubDocument, StubNode } from '../stubDom';
 
 let bytes: Map<string, string>;
 let storageFails: boolean;
-function install(fixture = 'au-week-6', slot = 1) {
-  const input = readFileSync(new URL(`../../fixtures/saves/league-career/v32-${fixture}.json`, import.meta.url), 'utf8');
+function fixtureBytes(name: string): string {
+  return readFileSync(new URL(`../../fixtures/saves/league-career/v32-${name}.json`, import.meta.url), 'utf8');
+}
+
+function installRaw(input: string, slot = 1): void {
   const installed = installImportedSave(input, slot);
   if (!installed.ok) throw Error(installed.message);
   setActiveSlot(slot);
   loadState(installed.state);
+}
+
+const install = (name = 'au-week-6') => installRaw(fixtureBytes(name));
+
+function installLegacyCup(entrants: number): void {
+  const source = JSON.parse(fixtureBytes('au-week-7')) as GameState;
+  const prototype = JSON.parse(fixtureBytes('dev-open-cup')) as GameState;
+  // Use the saved inert rules and the production draw to derive a v32 example.
+  const definition = prototype.competitions!.instances.find(isOpenCupInstance)!.definition;
+  const clubIds = source.league.clubs.filter(c => c.id !== source.clubId).slice(0, entrants).map(c => c.id);
+  const { instance } = drawOpenCup({ definition, clubIds, season: source.season, seed: 2, currentSlot: 1 });
+  source.competitions!.instances.push(instance);
+  installRaw(JSON.stringify(source));
 }
 
 const dialog = () => openOpenCupEntry() as unknown as StubNode;
@@ -145,8 +162,28 @@ describe('Open Cup entry', () => {
     install('au-week-7');
     const d = dialog();
     expect(d.words()).toMatch(/window had already closed.*next season/i);
+    expect(d.querySelector('[data-open-cup-terms]')).toBeNull();
     expect(action(d, 'enter')).toBeNull();
     expect(d.querySelector('[data-open-cup-bracket]')).toBeNull();
+  });
+
+  it('shows a migrated undrawn cup as having no ties', () => {
+    installLegacyCup(0);
+    expect(offer().resolution).toBe('legacy-cup');
+    const bracket = dialog().querySelector('[data-open-cup-bracket]');
+    expect(bracket?.words()).toContain('No ties were drawn for this cup.');
+    expect(bracket?.querySelectorAll('.nrl-cup-round')).toHaveLength(0);
+  });
+
+  it('starts a migrated four-club bracket at the semi-finals', () => {
+    installLegacyCup(4);
+    expect(offer().resolution).toBe('legacy-cup');
+    const d = dialog();
+    const bracket = d.querySelector('[data-open-cup-bracket]');
+    expect(bracket?.querySelectorAll('.nrl-cup-round')).toHaveLength(2);
+    expect(bracket?.words()).toMatch(/Semi-finals.*Week 16.*Final.*Week 19/);
+    expect(bracket?.words()).not.toMatch(/Week (7|10|13)\b/);
+    expect(d.querySelector('[data-open-cup-terms]')).toBeNull();
   });
 
   it('offers no cup choices before the first league is accepted', () => {

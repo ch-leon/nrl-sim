@@ -29,8 +29,8 @@ live gameplay change; work still open below has not shipped.
   recurring opponents and connected rewards. Gear is later. The
   [updated plan](../plans/2026-11-career-competitions.md) separates the delivery
   slices: league choice and unlocks are shipped. The first normal Open Cup adds
-  seasonal registration and cash/reputation/trophies; its backend is reviewed and
-  presentation/release verification is in progress ([evidence](../status/2026-11-open-cup.md)).
+  seasonal registration and cash/reputation/trophies in [PR #736](https://github.com/ch-leon/nrl-sim/pull/736)
+  ([evidence and release gates](../status/2026-11-open-cup.md)).
   Assignments, challenges, other formats and their rewards remain later work.
   Earlier structural execution context follows:
   [#569](https://github.com/ch-leon/nrl-sim/issues/569) publishes the
@@ -68,8 +68,8 @@ live gameplay change; work still open below has not shipped.
   when moving down. [Merged PR #719](https://github.com/ch-leon/nrl-sim/pull/719)
   passed independent Claude review, all CI/WebKit gates and full QA; the public
   confirmation/reload flow was verified. [Release evidence](../status/2026-11-league-selection.md)
-  Optional cup registration and cash/reputation/honours are the current reviewed
-  implementation slice, with the UI and release proof still outstanding.
+  Optional cup registration, cash/reputation/honours and entry/report/trophy views
+  are implemented in [PR #736](https://github.com/ch-leon/nrl-sim/pull/736). Its review and release gates are recorded there.
   Assignments, watched individual challenges, distinct small-sided events,
   future capacity rewards and wider career balance remain subsequent work.
   The approved product direction is recorded in

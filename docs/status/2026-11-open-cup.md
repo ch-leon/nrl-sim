@@ -6,10 +6,10 @@ catalogue, future cap entitlements or #582 balance work.
 
 ## Current status
 
-The backend is implemented and independently reviewed at `92512cdd`. Entry, report
-and trophy presentation has passed independent spec review and is under Claude
-review and browser verification. Whole-feature PR CI/full QA and release remain
-outstanding.
+Implemented in [PR #736](https://github.com/ch-leon/nrl-sim/pull/736), including the independently reviewed backend at
+`92512cdd` and the spec- and Claude-approved entry/report/trophy presentation.
+The PR owns the final CI, full QA, checker and deployment receipts. Local proof
+below does not substitute for those gates, and the PR stays draft until they pass.
 Latest main through `c3848962` is integrated, including manual point spending.
 TypeScript and the 184-test training/matchday/save-validation/normal-cup integration
 run passed after that merge.
@@ -55,13 +55,15 @@ records their source and construction. Derived corruption/inert-cup cases are
 labelled separately. Backend season journeys use explicitly labelled controlled
 scores through the existing result hooks; they are not visual playthrough evidence.
 
-The presentation implementation passed **87 affected tests** and TypeScript.
+The final presentation implementation passed **89 affected tests** and TypeScript.
 Independent spec review passed **71 tests** across entry, reports, history and
 season views after fixing entry terms, neutral gate labels, dialog focus return,
 actual repeated report opens, and reduced/empty historic brackets.
 
-The complete local regression suite passed **5,081 tests across 376 files**. The
-production build passed. Native WebKit passed **all 10 journeys**, with **zero page
+The complete local regression suite passed **5,081 tests across 376 files** before
+two additional historic-bracket regressions. The final entry suite passed all ten
+tests independently, including both additions and the missed-window copy fix.
+The production build passed. Native WebKit passed **all 10 journeys**, with **zero page
 errors**, including public AU/UK creation, change/reload, deadline draw, controlled
 played title and annual offer, withdrawal after a win, decline/expiry, the genuine
 old Week-7 save, desktop, phone text sizes and the existing portrait rotate cover.
@@ -77,9 +79,14 @@ trophy. This is functional proof, not a win-rate or multi-season balance conclus
 The new browser section is registered in the required `screens` WebKit shard;
 its screenshots and report are CI artifacts, never committed assets.
 
-## Remaining release proof
+## Release gates
 
-- Claude review of entry, bracket, receipt-backed reports and trophy history.
-- Independent review of the frozen browser evidence and final checker approval.
-- PR `check`, all four WebKit shards and aggregate, and full QA on the final head.
-- Release/deployment verification, live build link and Notion readback.
+[PR #736](https://github.com/ch-leon/nrl-sim/pull/736) records the final head, independent checker verdict,
+`check`, all four `webkit` shards and aggregate, and the full QA run. Only after
+those pass can the change merge under AGENTS.md. The PR also records deployment
+verification and the public play-test link. Its `e2e-webkit-screens` artifact owns
+the screenshots and JSON report; they are not committed to the repository.
+
+Notion's canonical competition page is reconciled with the actual delivered scope
+and release evidence after these gates, preserving wider balance and later events
+as open work.

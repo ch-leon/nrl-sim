@@ -36,9 +36,10 @@ starting the presentation checkpoint, then review the whole feature for release.
 ## Checkpoint status
 
 - Tasks 1–4: implemented at `92512cdd`, independent spec and Claude approved.
-- Task 5: entry, report and trophy UI implemented and spec-approved; Claude and
-  complete browser verification in progress.
-- Task 6: whole-feature browser/CI/full QA and release documentation outstanding.
+- Task 5: entry, report and trophy UI spec- and Claude-approved; all ten local
+  WebKit journeys passed. Final legacy-copy/test hardening is included in PR #736.
+- Task 6: local whole-feature proof and documentation recorded; [PR #736](https://github.com/ch-leon/nrl-sim/pull/736)
+  owns final CI/full QA, checker and deployment receipts.
 - Latest main through `c3848962` merged cleanly; TypeScript and 184 integration
   tests passed with manual point spending retained.
 
@@ -189,7 +190,7 @@ Both current and previous season activation records must remain provable while t
 - [ ] Extend the foundation's verified interval-start and completed-week persistence to normal cup-enabled League intervals. Include AI-only cup weeks and headless advancement with no watched-match retirement callback; they still use the existing pending-save owner and exact readback. A failed initial write runs no hooks and counts no elapsed week. Recheck installation, source, slot and namespace before starting work. This activates the same protection for normal cup play rather than introducing a second save mechanism.
 - [ ] Run `npx vitest run tests/core/leagueCareerMigration.test.ts tests/core/save.test.ts tests/core/saveRecovery.test.ts tests/systems/leagueCareerCallbacks.test.ts tests/systems/competitionRewards.test.ts`.
 
-Backend checkpoint evidence (not released): normal entry, deadline closure, withdrawal and save 33 migration passed independent spec review after four reproduced fixes: preview-time destination ownership; verified removal of an absent imported sidecar; supported historical FIN-04 prize bases after fixture pruning; and rollback that preserves a competing replacement career/match pair. The final 58-file affected run passed 1,378 tests; the full regression suite passed 5,058 tests across 375 files, and TypeScript passed. The production build also passed before the final storage-only review corrections. Claude approved the backend after five added regression tests covered no-op withdrawal quarantine, invalid fulfilment targets, same-week withdrawal and reload, elimination/completion refusals, and catalogue changes across annual entry. The added two-file suite passed all 42 tests in both implementer and root runs; TypeScript and diff checks passed. Presentation and release gates remain outstanding.
+Backend checkpoint evidence (not released): normal entry, deadline closure, withdrawal and save 33 migration passed independent spec review after four reproduced fixes: preview-time destination ownership; verified removal of an absent imported sidecar; supported historical FIN-04 prize bases after fixture pruning; and rollback that preserves a competing replacement career/match pair. The final 58-file affected run passed 1,378 tests; the full regression suite passed 5,058 tests across 375 files, and TypeScript passed. The production build also passed before the final storage-only review corrections. Claude approved the backend after five added regression tests covered no-op withdrawal quarantine, invalid fulfilment targets, same-week withdrawal and reload, elimination/completion refusals, and catalogue changes across annual entry. The added two-file suite passed all 42 tests in both implementer and root runs; TypeScript and diff checks passed. Presentation was subsequently implemented and reviewed; final release gates are recorded in PR #736.
 
 ## Task 5 — Entry, reports and trophy history
 

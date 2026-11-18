@@ -201,7 +201,7 @@ export function openOpenCupEntry(findOpener?: () => HTMLElement | null): HTMLEle
       el('h3', { text: cupStatus(state, offer, cup) }),
       el('p', { text: statusDetail(state, offer, cup) })),
     ...(cup ? [bracket(state, cup)] : []),
-    ...(offer.resolution === 'legacy-cup' ? [] : [terms(offer)]));
+    ...(offer.lifecycle === 'unavailable' ? [] : [terms(offer)]));
     if (offer.canChoose) {
       actions.append(makeAction('Decline cup', 'decline', false, offer.choice === 'decline'),
         makeAction('Enter cup', 'enter', true, offer.choice === 'enter'));
