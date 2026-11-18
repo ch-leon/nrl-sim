@@ -14,8 +14,10 @@ import { BOARD, GRID_W, GRID_H } from '../config';
 import { BENCH, isRotation } from '../match/league/bench';
 import { isAttackPreset, isDefencePreset } from '../match/league/presets';
 import { LINEUP_SLOTS, resolveLineup } from '../systems/lineup';
-import { validateCompetitions } from '../data/competition';
-import { validateLeagueHistory } from '../data/leagueCareer';
+import { competitionRewardsProblem } from '../data/competitionRewards';
+import { competitionInstanceId, validateCompetitions } from '../data/competition';
+import { FINANCE_TIERS, tierForRank } from '../data/financeRules';
+import { canonicalLeagueJson, validateLeagueHistory } from '../data/leagueCareer';
 
 export interface SaveRepair { field: string; problem: string; repair: string; rationale: string; notification: string }
 export const REPAIR_NOTICE = 'Career lineup repaired. The original save has been kept in recovery.';
@@ -161,6 +163,59 @@ export function isActiveModifier(v: unknown): v is ActiveModifier {
     && (v.subjectName === undefined || typeof v.subjectName === 'string');
 }
 
+/** The published normal career may contain scheduled kickoff promises, but
+ * accepted results already include both the ordinary and prize settlements. */
+function settledCupProblem(state: GameState): string | null {
+  const c = state.competitions;
+  if (!c?.leagueCareer) return null;
+  const template = c.openCupEntry?.current.definition;
+  const rewards = new Map(state.competitionRewards.map(r => [r.fixtureId,r]));
+  const ordinary = new Map(state.matchIncome.map(r => [r.fixture.id,r]));
+  for (const instance of c.instances) {
+    if (!instance.definition.rewards.some(p => p.execution)) continue;
+    for (const f of instance.fixtures) {
+      if (ordinary.has(f.id) !== rewards.has(f.id)) return 'unpaired League cup promises';
+    }
+  }
+  const divisions = c.world!.divisions;
+  const base = (season: number, clubId: string): number | undefined => {
+    const division = divisions.find(d => c.instances.some(i =>
+      i.id === competitionInstanceId(c.world!.profile.id + ':' + d.id,season,0) && i.entrantIds.includes(clubId)));
+    return division && FINANCE_TIERS[tierForRank(division.rank)].matchBase;
+  };
+  for (const reward of rewards.values()) {
+    const instance = c.instances.find(i => i.id === reward.instanceId);
+    if (!instance) {
+      const final = template?.stages[0];
+      if (!template || !final || !Object.values(FINANCE_TIERS).some(tier => tier.matchBase === reward.matchBase)
+        || reward.season >= state.season-1 || reward.status !== 'settled'
+        || !reward.receipts.some(r => r.kind === 'honour') || reward.definitionId !== template.id
+        || reward.definitionVersion !== template.version || reward.definitionName !== template.name
+        || reward.instanceId !== competitionInstanceId(template.id,reward.season,0)
+        || reward.stageId !== final.id || reward.round !== final.rounds || reward.slot !== final.slotIds?.[final.rounds-1]
+        || canonicalLeagueJson(reward.policies.map(p=>p.policy)) !== canonicalLeagueJson(template.rewards.filter(p=>p.round === final.rounds)))
+        return 'unsupported reward history';
+      continue;
+    }
+    const fixture = instance.fixtures.find(f => f.id === reward.fixtureId)!;
+    const income = ordinary.get(fixture.id);
+    if (!income || ((fixture.status === 'completed' || fixture.status === 'cancelled') && (reward.status !== 'settled' || !income.receipt)))
+      return 'unsettled League competition reward';
+    const home = base(instance.season,fixture.homeId), away = base(instance.season,fixture.awayId);
+    if (!home || !away || reward.matchBase !== (fixture.neutral ? Math.min(home,away) : home)) return 'League cup sporting match base';
+  }
+  return null;
+}
+
+export function hasV33Fields(v: Record<string, unknown>): boolean {
+  if ('competitionRewards' in v) return true;
+  if (record(v.league) && Array.isArray(v.league.clubs) && v.league.clubs.some(c => record(c) && 'reputation' in c)) return true;
+  const c = v.competitions;
+  return record(c) && ('openCupEntry' in c || Array.isArray(c.instances) && c.instances.some(i =>
+    record(i) && record(i.definition) && Array.isArray(i.definition.rewards) && i.definition.rewards.some(p =>
+      record(p) && ['execution','basis','squad'].some(key => key in p))));
+}
+
 /** Validate structures a migration reads before it can spread/map/dereference
  * them. Required fields are version-aware; optional fields are checked if present.
  * Does not select a pack or pull the lazy UK chunk into the synchronous boundary.
@@ -201,6 +256,7 @@ export function validateInput(v: Record<string, unknown>, version: number): stri
   const clubs = new Set<string>();
   for (const c of v.league.clubs) {
     if (!record(c) || !text(c.id) || clubs.has(c.id) || !text(c.name) || !range(c.strength, 1, 100) || !Array.isArray(c.colors) || c.colors.length !== 2 || !c.colors.every(x => typeof x === 'string' && /^#[0-9a-f]{6}$/i.test(x))) return fail('league.clubs');
+    if ('reputation' in c && (c.id === 'player' || !range(c.reputation, 1, 100))) return fail('rival reputation');
     if (c.home !== undefined && !validHome(c.home)) return fail('club home');
     clubs.add(c.id);
     // Pre-v8 catalogues had no rival squads. A missing current roster must not
@@ -250,6 +306,13 @@ export function validateInput(v: Record<string, unknown>, version: number): stri
   if (version >= 18 && (!record(v.boardLoan) || !range(v.boardLoan.owed, 0))) return fail('boardLoan');
   if (version >= 19 && (!Array.isArray(v.staff) || !v.staff.every(s => record(s) && oneOf(s.role, ['assistantCoach', 'analyst', 'welfare', 'attackCoach']) && text(s.name) && range(s.wage, 0) && integer(s.hiredSeason, 1) && (s.speciality === undefined || oneOf(s.speciality, ['direct', 'width', 'kicking', 'razzle']))) || !unique(v.staff.map(s => s.role)))) return fail('staff');
   if (version >= 29 && !validMatchIncome(v.matchIncome, { season: v.season as number, league: v.league as unknown as GameState['league'], competitions: v.competitions as GameState['competitions'] })) return fail('match income');
+  if (version >= 33) {
+    const state = v as unknown as GameState;
+    const problem = competitionRewardsProblem(v.competitionRewards, state);
+    if (problem) return fail(problem);
+    const admission = settledCupProblem(state);
+    if (admission) return fail(admission);
+  }
   if (record(v.competitions) && v.competitions.leagueCareer !== undefined) {
     const problem = validateLeagueHistory(v as unknown as GameState);
     if (problem) return fail(problem);

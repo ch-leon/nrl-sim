@@ -11,6 +11,7 @@ import type { LeagueFields } from '../data/divisions';
 import { savedTrialDefinitions } from '../data/leagueSchedule';
 import { leagueCareerStateProblem } from './leagueEntryValidation';
 import { entryQuote } from './leagueEntryQuote';
+import { createOpenCupOffer } from './openCupEntry';
 import { annualLeagueEntry } from './leagueAnnualEntry';
 import { generateLeagueObjectives } from './board';
 import { activePack } from '../content';
@@ -113,7 +114,7 @@ export function acceptLeagueEntry(state: GameState, selection: LeagueEntrySelect
     const entry = p.phase === 'initial-choice'
       ? { state: { ...source, competitions: { ...c, leagueCareer: { ...progress, phase: 'active' as const, accepted } } }, notices: [] }
       : annualLeagueEntry(source, fields, accepted);
-    const candidate = { ...entry.state, objectives: generateLeagueObjectives(entry.state, p.fieldIds) };
+    const candidate = createOpenCupOffer({ ...entry.state, objectives: generateLeagueObjectives(entry.state, p.fieldIds) });
     const problem = leagueCareerStateProblem(candidate);
     if (problem) return refusal(problem.reason, problem.message);
     return { ok: true, state: candidate, notices: entry.notices };
