@@ -20,6 +20,9 @@ import { PWA_MANIFEST, brandIndexHtml } from '../src/brandBuild';
 
 // No Node types in the tsconfig: files come in as text through Vite's ?raw glob.
 const INDEX_HTML = Object.values(import.meta.glob('../index.html', { query: '?raw', import: 'default', eager: true }))[0] as string;
+// The iPhone app's launch colour and name (docs/specs/ios.md §2), written by gen-icons and by hand.
+const IOS_LAUNCH_COLOR = Object.values(import.meta.glob('../ios/App/App/Assets.xcassets/LaunchBackground.colorset/Contents.json', { query: '?raw', import: 'default', eager: true }))[0] as string;
+const IOS_INFO_PLIST = Object.values(import.meta.glob('../ios/App/App/Info.plist', { query: '?raw', import: 'default', eager: true }))[0] as string;
 const OLD_SAVE = Object.values(import.meta.glob('./fixtures/saves/v19-mid-season.json', { query: '?raw', import: 'default', eager: true }))[0] as string;
 
 /** Hex SHA-256 of some bytes (Web Crypto: no Node types needed). */
@@ -146,6 +149,13 @@ describe('each consumer reads BRAND', () => {
 
   it("the Android WebView's background is the app's colour (#622)", () => {
     expect(config.backgroundColor).toBe(BRAND.colors.app);
+  });
+
+  it("the iPhone launch screen is the app's colour, and the app is named for the brand", () => {
+    const { red, green, blue } = JSON.parse(IOS_LAUNCH_COLOR).colors[0].color.components as Record<string, string>;
+    const hex = `#${[red, green, blue].map((c) => parseInt(c, 16).toString(16).padStart(2, '0')).join('')}`;
+    expect(hex).toBe(BRAND.colors.app);
+    expect(IOS_INFO_PLIST).toMatch(new RegExp(`<key>CFBundleDisplayName</key>\\s*<string>${BRAND.name}</string>`));
   });
 
   it('index.html has placeholders, and the build fills in the brand', () => {

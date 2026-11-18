@@ -95,4 +95,11 @@ describe('the country and storefront seams (#364)', () => {
     expect(getStorefront({ DEV: true, search: '?store=web' })).toBe('web');
     expect(getStorefront({ DEV: true, search: '?store=playstation' })).toBe('ios');
   });
+
+  it('a native app follows its own store; the web keeps the rehearsal (docs/specs/ios.md §2)', () => {
+    expect(getStorefront({ platform: 'ios' })).toBe('ios');
+    expect(getStorefront({ platform: 'android' })).toBe('android');
+    expect(getStorefront({ platform: 'web' })).toBe('ios');
+    expect(getStorefront({ DEV: true, search: '?store=web', platform: 'ios' })).toBe('web');
+  });
 });
