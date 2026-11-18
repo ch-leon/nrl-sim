@@ -22,6 +22,7 @@ import { fitnessPct, moraleWord, openPlayerPage, positionLabel, squadNumbers } f
 import { contractActionView } from '../../systems/cap';
 import { contractsEndingSoon, endsInTag } from '../../systems/contracts';
 import { fmtMoney } from '../../utils/money';
+import { campAbsenceText, campAvailability } from './playerAssignments';
 
 // ── Squad's segments ────────────────────────────────────────────────────────
 
@@ -143,6 +144,7 @@ export function openSquadScreen(): void {
       return;
     }
     const numbers = squadNumbers(s);
+    const camp = campAvailability(s);
     // The dock's red dot leads here (#369): the same dot on each of those rows, its weeks in TO.
     const ending = new Set(contractsEndingSoon(s).map((p) => p.id));
     for (const p of sortSquad(s.squad.map(p => contractActionView(s, p)), sortKey)) {
@@ -150,16 +152,23 @@ export function openSquadScreen(): void {
       const fit = fitnessPct(p);
       const expiring = p.contractWeeks <= MORALE.EXPIRING_WEEKS && !p.deal?.renewal;
       const unhappy = p.morale < 50;
-      list.appendChild(tableRow(p, [
+      const absence = campAbsenceText(camp, p.id);
+      const row = tableRow(p, [
         el('span', { class: 'nrl-num nrl-squad-no', text: no ? String(no) : '–', attrs: { title: no ? (no <= 9 ? 'Starting this week' : 'On the bench this week') : 'Not in the side this week' } }),
-        whoCell(p.name, availabilityNote(p), traitChips(p), ending.has(p.id) ? `contract ${endsInTag(p)}` : undefined),
+        whoCell(p.name, absence && camp ? `Camp · Back W${camp.rules.returnWeek}` : availabilityNote(p), traitChips(p), ending.has(p.id) ? `contract ${endsInTag(p)}` : undefined),
         el('span', { class: 'nrl-row-pos', text: posShort(p.position), attrs: { title: positionLabel(p.position) } }),
         el('span', { class: 'nrl-num nrl-row-ovr', text: ratingText(overallRating(p)), attrs: { title: 'Overall rating' } }),
         fitnessCell(fit, p.injuredWeeks > 0, p.injuredWeeks > 0 ? `Injured: out ${p.injuredWeeks} wk` : `Fitness ${fit}%: 100 less his injury risk (${p.injuryRisk})`),
         el('span', { class: `nrl-num nrl-row-dim${expiring ? ' nrl-row-attn' : ''}`, text: `${p.contractWeeks} wk`, attrs: { title: p.deal?.renewal ? `Renewal queued from season ${p.deal.renewal.startSeason}` : expiring ? 'Contract running down' : 'Weeks left on his contract' } }),
         el('span', { class: 'nrl-num nrl-row-dim nrl-sq-wide', text: fmtMoney(p.wage), attrs: { title: 'Weekly wage' } }),
         el('span', { class: `nrl-sq-wide ${unhappy ? 'nrl-row-bad' : 'nrl-row-dim'}`, text: moraleWord(p.morale), attrs: { title: `Morale ${p.morale}` } }),
-      ], () => openPlayerPage(p, { kind: 'squad' })));
+      ], () => openPlayerPage(p, { kind: 'squad' }));
+      if (absence) {
+        row.setAttribute('data-camp-absence', p.id);
+        row.setAttribute('aria-label', `${p.name}, ${absence}. Open player page.`);
+        row.title = absence;
+      }
+      list.append(row);
     }
     fitChips(list);
     fitted = list.clientWidth;

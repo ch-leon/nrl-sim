@@ -1,3 +1,4 @@
+import { awaitingCampReplay } from '../systems/parkedLeagueFixture';
 import { leagueCareerStateProblem } from '../systems/leagueEntryValidation';
 import { migrateObservedProtection } from '../systems/cap';
 import { initialPlayerPopulation, installPlayerHistory } from '../systems/playerCareer';
@@ -332,6 +333,8 @@ export const MIGRATIONS: readonly MigrationStep[] = [
   // v31 adds optional progression; no historical titles or entry are inferred.
   { from: 30, to: 31, run: old => ({ ...old }) },
   { from: 32, to: 33, run: old => ({...old, competitionRewards: []}) },
+  // Absence of assignment records means the club has never booked a place.
+  { from: 33, to: 34, run: old => old },
   // v32 snapshots the agreement observed under v31 ID-only protection.
   // Already recorded exact terms keep their provenance, including queued terms.
   { from: 31, to: 32, run: old => {
@@ -389,9 +392,12 @@ function migrateChecked(raw: unknown): MigrateResult {
   if (version <= 32 && hasV33Fields(cur))
     return {ok:false, outcome:'unrecoverable', reason:'corrupt', message:'The save contains Open Cup data from a later format.'};
   const competitions = cur.competitions;
+  if (version <= 33 && ('assignments' in cur || competitions && typeof competitions === 'object' && 'assignments' in competitions))
+    return {ok:false,outcome:'unrecoverable',reason:'corrupt',message:'The save contains assignment data from a later format.'};
   if (competitions && typeof competitions === 'object' && 'leagueCareer' in competitions) {
     let state = cur as unknown as GameState;
     if (version === 32) state = createOpenCupOffer({...structuredClone(state),version:SAVE_VERSION,competitionRewards:[]});
+    if (version === 33) state = {...state,version:SAVE_VERSION};
     const problem = leagueCareerStateProblem(state);
     return problem ? { ok: false, outcome: problem.reason === 'unsupported' ? 'unsupported' : 'unrecoverable',
       reason: 'corrupt', message: problem.message }
@@ -623,6 +629,7 @@ export function retryPendingLeagueSave(): string | null {
  */
 export function saveIfChanged(state: GameState, verifyPayload = false): boolean {
   if (weekHeld() || leagueIntervalSaveHeld() || failedIntervalProblem() || slotImported || savesLocked) return false;
+  if (stateInstallation() && awaitingCampReplay(getState())) return false;
   const pending = currentPendingSave();
   if (pending) {
     if (pending.saving || !sameDestination(pending)) return false;
@@ -669,6 +676,7 @@ function persistIfChanged(state: GameState, verifyPayload = false): boolean {
  */
 export function save(state: GameState): void {
   if (weekHeld() || leagueIntervalSaveHeld() || failedIntervalProblem() || slotImported || savesLocked) return;
+  if (stateInstallation() && awaitingCampReplay(getState())) return;
   if (currentPendingSave()) { saveIfChanged(state); return; }
   if (writeSlot(activeSlot, state)) lastSaved = state;
 }
@@ -858,6 +866,7 @@ interface SaveExport { text: string; state: GameState; notice?: string }
 function saveExport(state: GameState): SaveExport {
   const checkpoint = currentPendingSave() ?? failedIntervalCheckpoint() ?? activePaidCupCheckpoint();
   if (checkpoint) return recoveryExport(checkpoint);
+  if (awaitingCampReplay(state)) return recoveryExport({source:state,slot:getActiveSlot(),namespace:careerNamespace()});
   const snap = heldWeekSnapshot();
   const live = snap ? readLiveMatch() : null;
   const payload = live ? { ...snap, [LIVE_MATCH_EXPORT_FIELD]: live } : (snap ?? state);

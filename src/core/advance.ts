@@ -16,6 +16,7 @@ import { bus } from './events';
 import { pendingLeagueSaveProblem, retryPendingLeagueSave } from './save';
 import { getState, stateInstallation, type GameState } from './state';
 import { advanceWeek, failedIntervalProblem, weekHeld, withFastForward } from './time';
+import { projectCampDeparture } from '../systems/playerAssignments';
 import { isPlayableLeagueCareer, structuralAdvanceProblem } from '../systems/competitionCalendar';
 import { getCurrentFixture, PLAYER_ID } from '../systems/fixtures';
 import { fitSquadCount, playerMatchPending } from '../systems/matchday';
@@ -165,8 +166,9 @@ async function runUntil(target: AdvanceTarget, frame: () => Promise<void>): Prom
       if (demoBlocked(before)) return { weeksPlayed, stop: { kind: 'demo', text: DEMO_ENDED_TEXT } };
 
       // Forfeit risk is checked before the tick, the only point it can be avoided.
+      const camp = before.competitions?.assignments?.find(r => r.season === before.season && r.clubId === before.clubId && r.status === 'booked' && r.rules.departureWeek === before.week);
       const pre = forfeitRisk({
-        fitCount: fitSquadCount(before.squad),
+        fitCount: camp?.booking ? projectCampDeparture(before,camp.booking).fitCount : fitSquadCount(before.squad),
         playerFixturePending: playerFixturePending(),
       });
       if (pre) return { weeksPlayed, stop: pre };
