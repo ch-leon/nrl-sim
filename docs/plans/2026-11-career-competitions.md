@@ -25,7 +25,7 @@ careers keep their format. [Release and verification](../status/2026-11-league-s
 The Open Cup entry, prizes and receipt-backed views are implemented in [PR #736](https://github.com/ch-leon/nrl-sim/pull/736).
 [Open Cup evidence and release gates](../status/2026-11-open-cup.md).
 The first assignment is now the approved [Skills Camp](../specs/player-assignments.md),
-under [#708](https://github.com/ch-leon/nrl-sim/issues/708) and its
+implemented in [PR #742](https://github.com/ch-leon/nrl-sim/pull/742) under #708 and its
 [implementation plan](2026-11-19-player-assignments.md). Book in Weeks 1–4, send one
 player away for the opening league match in Week 5, and welcome him back before
 Week 6. One free annual place and 70 base XP are the accepted starting values for
@@ -52,7 +52,7 @@ testing. Later assignment families, special events and gear remain separate slic
 | Slice | Deliverable | Done when |
 | --- | --- | --- |
 | A | Selectable league career and Open Cup — league selection shipped in #719; cup entry/rewards/views implemented in #736 | Win, unlock, choose to stay or move, and finish/decline a cup with valid people, finances and next-season setup. |
-| B | Player assignments — Skills Camp in implementation/review | Send a player away, cover an overlapping fixture, and receive the player and recorded outcome once. |
+| B | Player assignments — Skills Camp implemented in PR #742 | Send a player away, cover an overlapping fixture, and receive the player and recorded outcome once. |
 | C | Watched/coached individual challenge | Coach animated rounds, earn a personal and supported club reward, and reveal a next opportunity. |
 | D | Distinct small-sided event and invitation chain | A beach or floodlit event changes play and squad decisions, with a saved route to a later challenge. |
 | E | Wider catalogue and endgame | Add Shield/youth/Champions Series and further events, each with its own decision and bounded rewards. |
@@ -93,7 +93,7 @@ opportunity/history presentation (#578) and integrated career balance (#562/#582
 [#708 assignments](https://github.com/ch-leon/nrl-sim/issues/708),
 [#710 watched/coached individual challenge](https://github.com/ch-leon/nrl-sim/issues/710)
 and [#711 distinct small-sided event](https://github.com/ch-leon/nrl-sim/issues/711)
-are separate slices: #708 is in implementation; #710/#711 remain planned.
+are separate slices: #708 is implemented in PR #742; #710/#711 remain planned.
 #579–#581 retain the Shield/youth/Champions content, with ordering chosen against
 those prerequisites. The first camp's eligibility, training substitution, return,
 cancellation and disposal rules are specified. Future assignment families and

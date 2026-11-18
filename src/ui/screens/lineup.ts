@@ -20,6 +20,7 @@ import { bus } from '../../core/events';
 import { overallRating } from '../../data/player';
 import { BENCH, ROTATIONS, type Rotation } from '../../match/league/bench';
 import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL, type AttackPreset, type DefencePreset } from '../../match/league/presets';
+import { PLAN_SHEET_CSS } from '../planSheet';
 import { renderPlanFit, PLAN_FIT_CSS } from '../planFit';
 import { TACTIC_BLURB, styleLine } from '../tacticsBlurbs';
 import { nextFixture } from '../../systems/league';
@@ -328,6 +329,7 @@ ${PLAN_FIT_CSS}
   .nrl-dialog-region .nrl-modal.nrl-lineup-plan-modal { padding: 8px 14px 12px; }
   .nrl-lineup-plan .nrl-seg > .nrl-btn { font-size: 0.9375rem; padding: 0 4px; }
 }
+${PLAN_SHEET_CSS}
 `;
 
 const surname = (name: string): string => name.trim().split(/\s+/).pop() ?? name;
@@ -707,7 +709,8 @@ export function openLineupScreen(): void {
 
   // The plan sheet (N11, #342): over the screen so the field and the list keep their height.
   // The bench rotation is part of the plan: how hard the four are used.
-  const done = button('Done', () => closeModal(), { class: 'nrl-btn-primary' });
+  // SuperCOOKED §6: "Save plan" (each pick is kept as it is tapped; this puts the sheet away).
+  const done = button('Save plan', () => closeModal(), { class: 'nrl-btn-primary' });
   done.setAttribute('data-plan-done', '');
   const plan = el('div', { class: 'nrl-lineup nrl-lineup-plan' },
     el('span', { class: 'nrl-lineup-plan-grab', attrs: { 'aria-hidden': 'true' } }),

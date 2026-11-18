@@ -12,6 +12,7 @@
 // when asked.
 
 import type { Platform } from './entitlements';
+import { APP_PLATFORM, type AppPlatform } from '../platform';
 
 /** Where the game is bought. The same four as the entitlement platforms. */
 export type Storefront = Platform;
@@ -106,10 +107,13 @@ export interface StorefrontEnv {
   DEV?: boolean;
   search?: string;
   language?: string;
+  /** The build's platform (src/platform.ts); absent reads as the web. */
+  platform?: AppPlatform;
 }
 
 function pageEnv(): StorefrontEnv {
   return {
+    platform: APP_PLATFORM,
     DEV: import.meta.env.DEV,
     search: typeof location === 'undefined' ? '' : location.search,
     language: typeof navigator === 'undefined' ? '' : navigator.language,
@@ -134,15 +138,17 @@ export function getStorefrontCountry(env: StorefrontEnv = pageEnv()): CountryCod
 }
 
 /**
- * The storefront the paywall follows. Native builds will report their own store.
- * The web build has no checkout of its own yet, so until it does the paywall
- * rehearses the App Store's rules, the ones that differ most by country. A dev
- * build takes `?store=web|ios|android|steam`.
+ * The storefront the paywall follows. A native app follows its own store: the App
+ * Store in the iPhone app, Google Play in the Android app. The web build has no
+ * checkout of its own yet, so until it does the paywall rehearses the App Store's
+ * rules, the ones that differ most by country. A dev build takes
+ * `?store=web|ios|android|steam`.
  */
 export function getStorefront(env: StorefrontEnv = pageEnv()): Storefront {
   if (env.DEV) {
     const q = new URLSearchParams(env.search ?? '').get('store') as Storefront | null;
     if (q && STOREFRONTS.includes(q)) return q;
   }
+  if (env.platform === 'ios' || env.platform === 'android') return env.platform;
   return 'ios';
 }

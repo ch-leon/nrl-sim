@@ -91,7 +91,8 @@ export async function runLabsControls(browser) {
       if (!Object.keys(localStorage).filter((k) => k.startsWith('nrl-live-match-')).some((k) => JSON.parse(localStorage.getItem(k)).controls?.length)) throw new Error('attacking swipe was not recorded');
       return true;
     }, null, { timeout: 20000 });
-    if (await page.locator('.nrl-mo-speed:visible').count() !== 4) throw new Error('a speed choice is hidden');
+    // One speed button (SuperCOOKED 40): it shows the speed playing and moves it on a tap.
+    if (await page.locator('.nrl-mo-speed:visible').count() !== 1) throw new Error('the speed button is hidden');
     // The tackle count stays up through passes, kicks and dead time (Leon on iPhone: it
     // flashed). 15 s of live play at 844×390, read every 100 ms.
     await page.setViewportSize({ width: 844, height: 390 });
@@ -160,22 +161,32 @@ export async function runLabsControls(browser) {
         await page.waitForTimeout(100);
         await page.locator('.nrl-mo-bar [data-coach]').tap();
         await page.waitForTimeout(200); // Let the tray's entrance animation finish for the capture.
+        // The tray open (SuperCOOKED 41): it says whose ball and the tackle in its own head, and the ball chip
+        // steps aside, so the full tray has the room down to the score bar and must not scroll.
         const problems = await page.evaluate(() => {
+          const problems = [];
+          const tray = document.querySelector('.nrl-mo-tray');
+          if (tray.scrollHeight > tray.clientHeight + 1) problems.push('full coach tray scrolls');
+          if (getComputedStyle(document.querySelector('.nrl-mo-tackle')).display !== 'none') problems.push('the ball chip shows over the open tray');
+          return problems;
+        });
+        await page.screenshot({ path: join(OUT, `tray-${width}x${height}-${size}.png`) });
+        await page.locator('.nrl-mo-bar [data-coach]').tap();
+        await page.waitForTimeout(100);
+        // The tray shut: the chip is back, on screen, whole, and clear of the score bar, the bottom bar and the Labs badge.
+        problems.push(...await page.evaluate(() => {
           const el = document.querySelector('.nrl-mo-tackle'), r = el.getBoundingClientRect();
           const problems = [];
           if (el.hidden || !el.textContent.includes('LAST TACKLE')) problems.push('last tackle missing');
           if (r.left < 0 || r.top < 0 || r.right > innerWidth || r.bottom > innerHeight || el.scrollWidth > el.clientWidth) problems.push('count clipped');
-          const tray = document.querySelector('.nrl-mo-tray');
-          if (tray.scrollHeight > tray.clientHeight + 1) problems.push('full coach tray scrolls');
           const intersects = (b) => r.left < b.right && r.right > b.left && r.top < b.bottom && r.bottom > b.top;
-          for (const sel of ['.nrl-mo-team', '.nrl-mo-clockbox', '.nrl-mo-bar', '.nrl-mo-tray:not([hidden])', '.nrl-mo-calls', '.nrl-mo-skip', '.nrl-labs-badge']) {
+          for (const sel of ['.nrl-mo-team', '.nrl-mo-clockbox', '.nrl-mo-bar', '.nrl-mo-calls:not([hidden])', '.nrl-mo-skip', '.nrl-labs-badge']) {
             for (const other of document.querySelectorAll(sel)) if (intersects(other.getBoundingClientRect())) problems.push(`count overlaps ${sel}`);
           }
           return problems;
-        });
+        }));
         if (problems.length) throw new Error(`${width}x${height} ${size}: ${problems.join(', ')}`);
         await page.screenshot({ path: join(OUT, `tackle-${width}x${height}-${size}.png`) });
-        await page.locator('.nrl-mo-bar [data-coach]').tap();
       }
     }
     await page.setViewportSize({ width: 667, height: 375 });

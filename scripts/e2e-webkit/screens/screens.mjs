@@ -274,7 +274,7 @@ function toastReport(page, avoid, safe, tappable = true) {
  */
 const CLUB_AVOID = ['.nrl-dock', '.nrl-hud-menu:not([hidden])', '.nrl-nav-sheet:not([hidden])', '[data-decisions-chip]:not([hidden])', '.nrl-board-chip:not([hidden])', '.nrl-screen-x', '.nrl-screen-head', '.nrl-news-head'];
 /** …and in a match: the score bug, the stats, the commentary line or full log, and every control. */
-const MATCH_AVOID = ['.nrl-mo-scoreboard', '.nrl-mo-statsheet', '.nrl-mo-strip', '.nrl-mo-full', '.nrl-mo-log-toggle', '.nrl-mo-bar [data-coach]', '.nrl-mo-controls', '.nrl-mo-calls', '.nrl-mo-replay'];
+const MATCH_AVOID = ['.nrl-mo-scoreboard', '.nrl-mo-statsheet', '.nrl-mo-strip', '.nrl-mo-full', '.nrl-mo-tackle', '.nrl-mo-bar [data-coach]', '.nrl-mo-controls', '.nrl-mo-calls', '.nrl-mo-replay'];
 /** The burst the check fires: a problem, a routine stop, good news, a confirmation. */
 const TOAST_BURST = [
   { text: 'Kai Smith injured — out 3w', kind: 'danger' },
@@ -863,8 +863,7 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
   // and the lane gives way to the Replay try chip.
   await step('match-toast', async (rec) => {
     const out = [];
-    // The log's three modes (3m): the LOG switch brings the line back, the line opens the full log.
-    if (await page.locator('.nrl-match-overlay[data-log="hidden"]').count()) await page.locator('.nrl-mo-log-toggle').tap();
+    // The log (SuperCOOKED 40): the line in the bottom bar opens the full log.
     if (await page.locator('.nrl-match-overlay[data-log="line"]').count()) await page.locator('.nrl-mo-strip').tap();
     if (!(await page.locator('.nrl-match-overlay[data-log="full"]').count())) out.push('the full log did not open from the commentary line');
     await page.waitForTimeout(300);

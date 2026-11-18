@@ -2,8 +2,8 @@
 
 19 November 2026. Issue [#708](https://github.com/ch-leon/nrl-sim/issues/708).
 Baseline `6b1cfa76145f8b399c4ce2c97e194fdfabcacdb7`. This is an implementation
-candidate; final independent review, PR checks, full QA and deployment remain
-release gates. The [specification](../specs/player-assignments.md) and
+candidate in [PR #742](https://github.com/ch-leon/nrl-sim/pull/742); that PR records
+final independent review, required checks, full QA and deployment verification. The [specification](../specs/player-assignments.md) and
 [plan](../plans/2026-11-19-player-assignments.md) define the approved scope.
 
 ## Approved first opportunity
@@ -22,7 +22,7 @@ actual development and return share one durable interval settlement.
 
 ## Evidence collected
 
-- The complete local Vitest suite passed: 385 files, 5,149 tests. TypeScript and
+- Before integration with the latest match UI and iPhone shell, the complete local Vitest suite passed: 385 files, 5,149 tests. TypeScript and
   the production build also passed. These local checks supplement the required
   exact-head PR and QA workflows below.
 - Claude reviewed the design, then the selection/progression foundation. Its

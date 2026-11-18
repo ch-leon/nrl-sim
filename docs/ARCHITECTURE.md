@@ -118,6 +118,7 @@ src/
   main.ts                  # boot Phaser, register scenes and systems, wire the UI
   config.ts                # game constants (§3); league values come from the content pack
   brand.ts, brandBuild.ts  # the game's name, colours and logo; what the build writes (#363)
+  platform.ts              # web, Android app or iPhone app, fixed at build time (docs/specs/ios.md)
   content/                 # the league/locale content pack (pack.ts, au.ts; #361)
   commercial/              # demo gate, entitlements, paywall rules; behind the off-by-default
                            #   `commercial` flag (flags.ts, #362)
@@ -176,6 +177,8 @@ tests/                     # Vitest specs mirroring src/; tests/qa/ (corpus, soa
                            #   tests/fixtures/saves/ (the save corpus, §4)
 docs/specs/                # per-ticket technical specs
 docs/hub/                  # project hub: overview, features, roadmap
+android/, ios/             # the Capacitor app shells (capacitor.config.ts): the Android test
+                           #   APK and the iPhone app (docs/android-test-build.md, ios-test-build.md)
 ```
 
 ## 3. Constants (src/config.ts)

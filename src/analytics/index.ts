@@ -22,8 +22,7 @@ import { labsBlocksAnalytics } from '../labs/flags';
 import { analyticsSetup, type AnalyticsEnv, type AnalyticsPage, type AnalyticsSetup } from './config';
 import { sanitizeException, EXCEPTION_BURST_MAX, EXCEPTION_WINDOW_MS, type SafeException } from './exceptions';
 import { sanitize, type EventContext, type EventName, type EventProps } from './events';
-
-declare const __NRL_NATIVE__: boolean | undefined;
+import { APP_PLATFORM } from '../platform';
 
 /** What the SDK chunk hands back (posthogClient.ts). */
 export interface AnalyticsClient {
@@ -51,7 +50,7 @@ let lastPush: boolean | null = null;
 let lastTab: { tab: string; at: number } | null = null;
 
 function context(): EventContext {
-  return { app_build: buildLabel(), platform: typeof __NRL_NATIVE__ === 'boolean' && __NRL_NATIVE__ ? 'android' : 'web' };
+  return { app_build: buildLabel(), platform: APP_PLATFORM };
 }
 
 function send(name: EventName, props: Record<string, string | boolean>): void {
