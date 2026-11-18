@@ -11,13 +11,13 @@ import type { Fixture } from '../../src/core/state';
 
 type Call = [string, unknown?];
 
-function setup(opts: { reject?: boolean } = {}) {
+function setup(opts: { reject?: boolean; started?: boolean } = {}) {
   const bus = new EventEmitter();
   const calls: Call[] = [];
   const answer = <T>(v: T): Promise<T> => (opts.reject ? Promise.reject(new Error('Live Activities are off')) : Promise.resolve(v));
   const native: LiveMatchNative = {
     isAvailable: () => answer({ available: true }),
-    startMatch: (o) => (calls.push(['start', o]), answer({ started: true })),
+    startMatch: (o) => (calls.push(['start', o]), answer({ started: opts.started ?? true })),
     updateMatch: (o) => (calls.push(['update', o]), answer(undefined)),
     endMatch: () => (calls.push(['end']), answer(undefined)),
   };
@@ -101,13 +101,27 @@ describe('installLiveMatch', () => {
     expect(a.calls.map((c) => c[0])).toEqual(['start', 'end', 'start']);
   });
 
-  it('stays quiet when the plugin refuses (Live Activities switched off)', async () => {
+  it('stays quiet when the plugin refuses (Live Activities switched off): nothing after the start', async () => {
     const a = setup({ reject: true });
     a.bus.emit('match:started', started({ planSide: 'home' }));
     a.bus.emit('match:event', mkEvent(1, 'try', home.clubId, { player: 'X' }));
     await tick();
     a.leaveMatch();
     await tick();
-    expect(a.calls.map((c) => c[0])).toEqual(['start', 'update', 'end']);
+    expect(a.calls.map((c) => c[0])).toEqual(['start']);
+  });
+
+  it('sends nothing more once the start comes back not started', async () => {
+    const a = setup({ started: false });
+    a.bus.emit('match:started', started({ planSide: 'home' }));
+    await tick();
+    a.bus.emit('match:event', mkEvent(1, 'try', home.clubId, { player: 'X' }));
+    a.bus.emit('match:event', mkEvent(5, 'full-time', home.clubId));
+    await tick();
+    a.leaveMatch();
+    expect(a.calls.map((c) => c[0])).toEqual(['start']);
+    // The next match tries again.
+    a.bus.emit('match:started', started({ planSide: 'home' }));
+    expect(a.calls.map((c) => c[0])).toEqual(['start', 'start']);
   });
 });

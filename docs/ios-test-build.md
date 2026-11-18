@@ -39,14 +39,19 @@ Run `npx cap sync ios` after every `build:ios`, as `npx cap sync android` follow
 
 ### In the Simulator (no phone, no Apple ID)
 
-Pick an iPhone simulator in Xcode's toolbar and press **Run**, or from the command line:
+Pick an iPhone simulator in Xcode's toolbar and press **Run**. The Simulator needs no
+signing team. To check the project compiles, without a simulator, this is the command
+Phase 1 was verified with:
 
 ```bash
 xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug \
-  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
+  -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
 ```
 
-The Simulator needs no signing team.
+**The app has not run in the Simulator yet.** On Leon's Mac, Xcode 27.2 needs a newer
+CoreSimulator than is installed, so no simulator boots until someone with the admin
+password runs `sudo xcodebuild -runFirstLaunch` (or opens Xcode and accepts "Install
+additional components").
 
 ## Run it on Leon's iPhone (by hand)
 
@@ -65,7 +70,10 @@ Every 7 days: a free-signed install stops opening after 7 days. Plug in and pres
 **Run** again. Saves should survive this as long as the app is not deleted (the spec
 lists this as unproven; check it on the first re-install).
 
-Free Apple ID limits: 3 devices, 3 free-signed apps per phone, 10 app ids. Do not
+Free Apple ID limits, per Apple's
+[membership comparison](https://developer.apple.com/support/compare-memberships/) as
+summarised in [the spec](specs/ios.md) §1: 3 devices, 3 free-signed apps per phone,
+10 app ids. Do not
 add Push, In-App Purchase, iCloud or any other capability in Signing & Capabilities:
 they need the paid account and would stop the free team signing the app.
 
@@ -83,18 +91,24 @@ turns out they do not, the backstop is Capacitor's app `pause` event (`@capacito
 
 ## What the iPhone build does differently
 
+What the project is set up to do. Nobody has seen the app run yet (see the Simulator note
+above), so the behaviour marked *not yet checked* is intended, not observed.
+
 - **Landscape only, iPhone only.** Portrait is not in the app's supported orientations
   (`Info.plist`), so the phone never turns the game upright and the rotate card never
   shows. The project targets iPhone only (no iPad) and iOS 16.2 or newer.
 - **Full screen.** No status bar (`Info.plist`, `GameViewController.swift`, and SystemBars
-  `hidden: true` in `capacitor.config.ts`, which also dims the home bar). The home bar dims while you play and comes back on a touch near it; a swipe up from the bottom
-  edge, where the match's bottom bar sits, needs a second swipe to leave the app.
-  The notch / Dynamic Island insets reach the game as `env(safe-area-inset-*)`, read into
-  `--nrl-safe-*` as on the web.
-- **No bounce.** The web view does not rubber-band (`ios.scrollEnabled: false` in
-  `capacitor.config.ts`).
+  `hidden: true` in `capacitor.config.ts`, which also asks iOS to dim the home bar).
+  `GameViewController` asks iOS to hold back the swipe up from the bottom edge, where
+  the match's bottom bar sits. *Not yet checked:* the home bar dimming and coming back
+  on a touch, and a swipe at the bottom edge needing a second swipe to leave the app.
+- **Safe areas.** The notch / Dynamic Island insets should reach the game as
+  `env(safe-area-inset-*)`, read into `--nrl-safe-*` as on the web. *Not yet checked.*
+- **No bounce.** `ios.scrollEnabled: false` in `capacitor.config.ts` turns off the web
+  view's rubber-band scrolling. *Not yet checked.*
 - **No service worker, no "Add to Home Screen" hint.** As on Android, the app ships its
-  own build, and it is already installed (`src/fx/pwa.ts`).
+  own build, and it is already installed (`src/fx/pwa.ts`; the hint's rule is unit-tested,
+  the app itself *not yet checked*).
 - **Reports itself as `ios`.** Analytics context, the entitlement platform and the
   paywall's storefront (the App Store) follow `src/platform.ts`.
 - **Icon and launch screen** come from the brand (`scripts/gen-icons.mjs`): the 1024px
@@ -104,8 +118,8 @@ turns out they do not, the backstop is Capacitor's app `pause` event (`@capacito
   Android test build.
 - **Obfuscated** the same way as the APK's JavaScript (see
   [the Android doc's note](android-test-build.md#a-note-on-obfuscation-not-real-protection)).
-- **60 frames a second.** iOS web views cap drawing at 60 even on 120Hz phones; the sim
-  steps at 20Hz, so this is fine.
+- **60 frames a second, expected.** The spec notes iOS web views cap drawing at 60 even
+  on 120Hz phones; the sim steps at 20Hz, so that would be fine. *Not yet checked.*
 
 ## Lock screen and Dynamic Island
 
@@ -115,7 +129,8 @@ screen and, on phones that have one, in the Dynamic Island.
 **What it shows.** Both clubs' codes with yours starred (as the match's score bug does),
 the score, the half and the match minute *as of the last update* ("2nd half 4'"), one
 line for the last big moment ("TRY, Walker (BRI) 3'"), and a state: LIVE, PAUSED · TAP
-TO RETURN, HALF-TIME or FULL TIME. The island's compact form is the captain on the left
+TO RETURN, HALF-TIME (GOLDEN POINT NEXT before a drawn final's golden point) or FULL
+TIME. The island's compact form is the captain on the left
 and the score on the right; the expanded form matches the lock screen; the minimal form is
 the captain alone. Colours are the SuperCOOKED tokens; text is
 the system font for now (the brand fonts ship as woff2, which a widget extension cannot load).
@@ -134,11 +149,13 @@ and at full time, and that the full-time pose's thin raised arms still read.
 
 **When it changes.** It starts at kick-off of a match you are in, and updates on tries,
 conversions, penalty goals, field goals, big hits, sin bins, half-time, the second half's
-kick-off, golden point and full time. Nothing on it ticks by itself. Skip to full time
+kick-off, the break before golden point and its kick-off, and full time. Nothing on it
+ticks by itself. Skip to full time
 sends one update, the final score. Only full time lights the screen (an alert); every
 other update is silent. When the app goes to the background the match stops, so the
-activity says PAUSED until you come back. Tapping it opens the app (the `bigcoach://`
-link), which resumes the match where it was. Full time stays on it until you leave the
+activity should say PAUSED until you come back. Tapping it opens the app (the
+`bigcoach://` link), which is expected to resume the match where it was, as any return to
+the app does. None of this has been seen on a phone or in the Simulator yet. Full time stays on it until you leave the
 match; Back to club, Save & exit, or any other way out of the match ends it at once. An
 activity left over from a run that was killed is ended at the next launch. With Live
 Activities switched off for the app (Settings > Big Coach > Live Activities), nothing
@@ -168,8 +185,8 @@ register the group for the Personal Team, let it. Do not add Push Notifications.
 2. Start a match. Score a try or wait for one.
 3. Lock the phone, or swipe home: the lock screen (and the island) show the score,
    the minute and PAUSED · TAP TO RETURN.
-4. Tap it: the app opens on the match, which plays on; go away again at half-time and
-   it says HALF-TIME.
+4. Tap it: the app should open on the match, which should play on; go away again at
+   half-time and it should say HALF-TIME.
 5. Play or Skip to full time: the screen lights once, FULL TIME with the result.
 6. Back to club (or Save & exit mid-match): the activity is gone.
 7. Settings > Big Coach > Live Activities off, play a match: nothing shows, nothing breaks.
@@ -186,6 +203,8 @@ The Simulator cannot check these. They are Leon's to try on the phone:
 - Sound, and that the ring/silent switch mutes it; whether other apps' music keeps playing.
 - Sound coming back after a phone call.
 - The real notch / Dynamic Island insets in landscape.
+- The home bar dimming, and the bottom-edge swipe needing a second swipe.
+- The frame rate on a 120Hz phone.
 - A cold start in airplane mode.
 - Saves surviving the 7-day re-install.
 - Saving when the app is sent to the background (see Saves).

@@ -32,7 +32,8 @@ struct MatchActivityAttributes: ActivityAttributes {
     }
 
     /// Live while the match plays. Paused is set by the plugin when the app goes to the
-    /// background (the match stops then), and cleared when it comes back.
+    /// background (the match stops then), and cleared when it comes back. Half-time is
+    /// also the break before golden point (half == .golden).
     enum MatchState: String, Codable, Hashable {
         case live
         case paused
@@ -58,6 +59,7 @@ struct MatchActivityAttributes: ActivityAttributes {
     var awayColor: String
 
     /// Where a tap on the lock screen or the island goes. The scheme is in the app's
-    /// Info.plist; the app opens where it was, and a match in progress resumes by itself.
+    /// Info.plist. Expected (not yet seen on a phone): the app opens where it was, and a
+    /// match in progress resumes as it does after any return to the app.
     static let openURL = URL(string: "bigcoach://match")!
 }
