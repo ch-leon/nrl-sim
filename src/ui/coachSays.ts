@@ -5,7 +5,7 @@ import { worstObjective } from '../systems/board';
 import { isFieldable, LINEUP_SLOTS } from '../systems/lineup';
 import { BENCH } from '../match/league/bench';
 import { isScreenOpen } from '../systems/unlocks';
-import { nextFixture } from '../systems/league';
+import { leagueSeasonView, nextSeasonFixture } from '../systems/leagueSeasonView';
 import { decisionViews } from './decisions';
 import { runwayLevel } from './hud';
 
@@ -20,6 +20,8 @@ export interface CoachSuggestion {
 
 /** First match wins; slot order breaks ties, with no state writes or dice. */
 export function coachSays(state: GameState, ctx: CoachContext): CoachSuggestion {
+  const league = leagueSeasonView(state);
+  if (league?.choiceRequired && !state.sacked) return { text: 'Choose your league before the next season can begin.', screen: 'ladder' };
   if (ctx.decisions > 0) {
     const card = decisionViews(state)[0];
     if (card) return { text: `Answer the ${card.title} card before we play.`, screen: 'news' };
@@ -49,7 +51,7 @@ export function coachSays(state: GameState, ctx: CoachContext): CoachSuggestion 
   if (!trainingBuilt && state.money >= FACILITY_CATALOG.trainingPaddock.cost) {
     return { text: 'Get a Training Paddock down.', screen: 'build' };
   }
-  const fixture = nextFixture(state.league.fixtures, state.week, 'player');
+  const fixture = nextSeasonFixture(state);
   const opponent = fixture && state.league.clubs.find((c) => c.id === (fixture.homeId === 'player' ? fixture.awayId : fixture.homeId));
-  return { text: opponent ? `${opponent.name} next. Play the week when you're ready.` : "Play the week when you're ready.", screen: null };
+  return { text: opponent ? `${opponent.name} next${league?.next ? ` · ${league.next.dateLabel} · ${league.next.stageLabel}` : ''}. Play the week when you're ready.` : "Play the week when you're ready.", screen: null };
 }

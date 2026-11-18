@@ -27,7 +27,7 @@ import { currentRound } from '../core/season';
 import { makeRng, type Rng } from '../utils/rng';
 import { rollWeather } from '../sim/weather';
 import { topTryScorer } from './stats';
-import { registerTickHook, registerSeasonHook, resumeWeek, TICK_ORDER, type TickContext } from '../core/time';
+import { registerTickHook, registerSeasonHook, TICK_ORDER, type TickContext } from '../core/time';
 import { applyRivalResults, canUseWorker, playRivalJob, playRivalJobsInWorker, rivalJobs } from './rivalRound';
 import { applyBoardReview } from './board';
 import { SEASON_ROUNDS, FINALS_WEEKS, WEEKS_PER_SEASON, DEFAULT_PLAYER_COLORS } from '../config';
@@ -510,15 +510,20 @@ function cheapSimRoundAll(state: GameState, round: number, rng: Rng): GameState 
 export function recordPremiership(state: GameState): GameState {
   const gf = roundFixtures(state, GF_ROUND).find((f) => f.result);
   const premier = gf ? knockoutWinner(gf) : undefined;
-  const playerPos = ladderPosition(state, PLAYER_ID);
-  const playerPremiership = premier === PLAYER_ID;
+  return recordSeasonHonours(state, {season: state.season - 1, clubId: PLAYER_ID,
+    ladderPosition: ladderPosition(state, PLAYER_ID), championId: premier});
+}
 
-  const row = state.league.ladder.find((r) => r.clubId === PLAYER_ID);
-  const top = topTryScorer(state.squad, state.season - 1);
+/** Shared explicit-year sporting bookkeeping; no payouts, rollover or RNG. */
+export function recordSeasonHonours(state: GameState, facts: {season: number; clubId: string; ladderPosition: number; championId?: string | undefined}): GameState {
+  if (state.history.some(h => h.season === facts.season)) return state;
+  const playerPremiership = facts.championId === facts.clubId;
+  const row = state.league.ladder.find((r) => r.clubId === facts.clubId);
+  const top = topTryScorer(state.squad, facts.season);
   const history = [
     ...state.history,
     {
-      season: state.season - 1, ladderPosition: playerPos, premiership: playerPremiership,
+      season: facts.season, ladderPosition: facts.ladderPosition, premiership: playerPremiership,
       ...(row ? {
         wins: row.wins, losses: row.losses, draws: row.draws,
         pointsFor: row.pointsFor, pointsAgainst: row.pointsAgainst,
@@ -685,20 +690,25 @@ export function registerFixturesSystem(): void {
         commitMatchState(next);
       };
       if (ctx.hold && canUseWorker() && jobs.length > 0) {
-        ctx.hold();
-        // The week always resumes, even if landing the results throws.
-        void playRivalJobsInWorker(jobs)
-          .then(land)
-          .catch((err: unknown) => {
-            // Never leave the round unplayed: play it here (fixtures already landed are skipped).
-            console.error('rival round failed to land; playing it on the main thread', err);
-            try {
-              land(jobs.map(playRivalJob));
-            } catch (again: unknown) {
-              console.error('rival round failed to land again', again);
-            }
-          })
-          .finally(resumeWeek);
+        const release = ctx.hold();
+        // A rejected worker computation hasn't touched the career. Only that
+        // failure is safe to retry in a League interval: landing may throw
+        // after a result or a payment has already reached the live state.
+        const playLocally = (error: unknown): void => {
+          if (!release.current()) return;
+          console.error('rival round failed to land; playing it on the main thread', error);
+          release.applyResult(() => land(jobs.map(playRivalJob)));
+        };
+        const worker = playRivalJobsInWorker(jobs);
+        if (release.fail) {
+          void worker.then(results => release.applyResult(() => land(results)), playLocally)
+            .catch(release.fail).finally(release);
+        } else {
+          void worker.then(results => { if (release.current()) land(results); }).catch(error => {
+            try { playLocally(error); }
+            catch (again) { console.error('rival round failed to land again', again); }
+          }).finally(release);
+        }
         return;
       }
       land(jobs.map(playRivalJob));

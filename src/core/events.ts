@@ -55,6 +55,7 @@ export interface LiveMatchData {
 export interface Events {
   'state:changed': GameState;
   'week:advanced': { week: number; season: number };
+  'week:blocked': { week: number; season: number; reason: string };
   'season:ended': { season: number; ladderPosition: number; premiership: boolean };
   'money:changed': { delta: number; reason: string; balance: number; booked?: boolean; stamp?: { season: number; week: number } };
   'facility:placed': PlacedFacility;
@@ -111,6 +112,26 @@ type Handler<K extends EventName> = (payload: Events[K]) => void;
 
 export class EventEmitter {
   private listeners = new Map<EventName, Set<Handler<EventName>>>();
+  private watchedLeagueMatches = new WeakMap<Fixture, () => boolean>();
+  private leagueWork?: {current: () => boolean; retired: symbol} | undefined;
+
+  /** Full-time comes from playback outside the tick. Its original subscribers
+   * can finish after settlement, but never against a replacement installation. */
+  bindLeaguePlayback(fixture: Fixture, current: () => boolean): void {
+    this.watchedLeagueMatches.set(fixture, current);
+  }
+
+  /** A League result publishes several changes synchronously. If a subscriber
+   * installs another career, finish that subscriber (and the new career's
+   * nested events), then unwind the old producer before it publishes again. */
+  runLeagueWork(current: () => boolean, work: () => void): void {
+    const previous = this.leagueWork;
+    const scope = {current, retired: Symbol('retired League interval')};
+    this.leagueWork = scope;
+    try { if (current()) work(); }
+    catch (error) { if (error !== scope.retired) throw error; }
+    finally { this.leagueWork = previous; }
+  }
 
   /** Subscribe; returns an unsubscribe closure. */
   on<K extends EventName>(k: K, fn: Handler<K>): () => void {
@@ -132,8 +153,26 @@ export class EventEmitter {
   emit<K extends EventName>(k: K, payload: Events[K]): void {
     const set = this.listeners.get(k);
     if (!set) return;
+    const scope = this.leagueWork?.current() ? this.leagueWork : undefined;
+    const playback = k === 'match:finished' ? this.watchedLeagueMatches.get((payload as Events['match:finished']).fixture) : undefined;
     for (const fn of [...set]) {
+      if (playback && !playback()) return;
       (fn as Handler<K>)(payload);
+      if (scope && !scope.current()) throw scope.retired;
+    }
+  }
+
+  /** A committed League interval must reach every observer, including its waiting advance. */
+  emitSettled<K extends 'state:changed' | 'season:ended' | 'board:sacked' | 'week:advanced' | 'week:blocked'>(
+    k: K, payload: Events[K], current: () => boolean,
+  ): void {
+    for (const fn of [...(this.listeners.get(k) ?? [])]) {
+      if (!current()) return;
+      try { (fn as Handler<K>)(payload); }
+      catch (error) {
+        if (this.leagueWork && error === this.leagueWork.retired) return;
+        console.error(`nrl-sim: ${k} observer failed`, error);
+      }
     }
   }
 

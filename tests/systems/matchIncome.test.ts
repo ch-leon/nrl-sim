@@ -1,6 +1,6 @@
 import { withoutPopulationMetadata } from '../helpers/playerCareer';
 import { FinanceLedger, initFinanceLedger } from '../../src/ui/screens/finance';
-import { registerFinanceSystem } from '../../src/systems/economy';
+import { homeGate, registerFinanceSystem, sponsorIncome } from '../../src/systems/economy';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createNewGame, getState, loadState, type Fixture, type GameState } from '../../src/core/state';
 import { initLeague, applyResult } from '../../src/systems/fixtures';
@@ -11,6 +11,7 @@ import { setCareerNamespace } from '../../src/core/storage/local';
 import { DEV_TEST_PREFIX } from '../../src/core/storageKeys';
 import { createCompetitionInstance, competitionFixtureId } from '../../src/data/competition';
 import { cupDefinition } from '../fixtures/competition';
+import { competitions, progress } from '../data/leagueCareerFixtures';
 import { activateStructuralCalendar, fixtureBridge, finaliseCalendarFixture } from '../../src/systems/competitionCalendar';
 
 function career(home = true, round = 1): { s: GameState; f: Fixture } {
@@ -141,5 +142,95 @@ describe('receipt-backed ordinary match income', () => {
     const win = next.competitions!.instances[0]!.fixtures[0]!.result!.winnerId === s.clubId;
     expect(next.money - active.money).toBe(10_000 + (win ? 800 : 0));
     expect(finaliseCalendarFixture(next, bridge, { homeScore: 10, awayScore: 10 })).toBe(next);
+  });
+});
+
+// An income-calculation snapshot. League admission/receipt validation owns the
+// full active-career invariants and is covered separately.
+function crossDivisionFixture({ home, neutral = false, trial = false, marked = true }:
+  { home: 'player' | 'rival'; neutral?: boolean; trial?: boolean; marked?: boolean }) {
+  const { s } = career();
+  const c = competitions(1, false);
+  const rival = c.instances[1]!.entrantIds[0]!;
+  const entrants = home === 'player' ? [s.clubId, rival] : [rival, s.clubId];
+  const def = cupDefinition();
+  const instance = createCompetitionInstance(trial
+    ? { ...def, maxEntrants: 2, format: { kind: 'exhibition' }, stages: [{ id: 'trial', name: 'Trial', kind: 'exhibition', rounds: 1 }], rewards: [] }
+    : def, s.season, 0, entrants);
+  const actual = { id: competitionFixtureId(instance.id, 0), competitionId: instance.id,
+    stageId: instance.definition.stages[0]!.id, round: 1, slot: 1, homeId: entrants[0]!, awayId: entrants[1]!,
+    status: 'scheduled' as const, neutral };
+  instance.fixtures = [actual];
+  instance.status = 'scheduled';
+  const state: GameState = { ...s, capAccount: freshCapAccount('premier'),
+    league: { ...s.league, clubs: s.league.clubs.map(club => ({ ...club, capAccount: freshCapAccount('premier') })) },
+    facilities: [{ id: 's', defId: 'sponsorBoard', level: 1, x: 0, y: 0 }, { id: 'g', defId: 'grandstand', level: 1, x: 6, y: 0 }],
+    competitions: { ...c, instances: [...c.instances, instance], ...(marked ? { leagueCareer: { ...progress(), phase: 'active' } } : {}) },
+  };
+  return { state, fixture: fixtureBridge({ instance, fixture: actual }), rival };
+}
+
+function settleCrossDivisionFixture(state: GameState, f: Fixture): GameState {
+  const competitions = state.competitions!;
+  return reconcileMatchIncome({ ...state, competitions: { ...competitions, instances: competitions.instances.map(instance =>
+    instance.id !== f.competitionId ? instance : { ...instance, fixtures: instance.fixtures.map(fixture =>
+      fixture.id !== f.id ? fixture : { ...fixture, status: 'completed',
+        result: { homeScore: 0, awayScore: 10, winnerId: f.awayId, decider: 'score' } }) }) } });
+}
+
+describe('ordinary match income in selectable League careers', () => {
+  it.each([
+    { home: 'player', neutral: false, trial: false, base: 8_000, playerGate: 5_200, playerCash: 13_440, rivalCash: 8_800 },
+    { home: 'rival', neutral: false, trial: false, base: 12_000, playerGate: 0, playerCash: 13_560, rivalCash: 18_000 },
+    { home: 'rival', neutral: true, trial: false, base: 8_000, playerGate: 2_000, playerCash: 11_040, rivalCash: 10_000 },
+    { home: 'rival', neutral: false, trial: true, base: 12_000, playerGate: 0, playerCash: 3_000, rivalCash: 3_000 },
+  ] as const)('uses sporting M of $base for home=$home neutral=$neutral trial=$trial', (example) => {
+    const { state, fixture, rival } = crossDivisionFixture(example);
+    expect(homeGate(state, fixture).receipts).toBe(example.playerGate);
+    const frozen = freezeMatchIncome(state, fixture);
+    expect(frozen.matchIncome[0]!.matchBase).toBe(example.base);
+    const settled = settleCrossDivisionFixture(frozen, fixture);
+    expect(settled.money - state.money).toBe(example.playerCash);
+    expect(settled.league.clubs.find(c => c.id === rival)!.cash! - state.league.clubs.find(c => c.id === rival)!.cash!).toBe(example.rivalCash);
+    expect(settled.matchIncome[0]!.receipt![example.home === 'player' ? 'home' : 'away'].home)
+      .toBe(homeGate(state, fixture).receipts);
+  });
+
+  it('quotes a Local Sponsor Board using the sporting division despite Premier capacity', () => {
+    const { state, fixture } = crossDivisionFixture({ home: 'player' });
+    const settled = settleCrossDivisionFixture(freezeMatchIncome(state, fixture), fixture);
+    expect(sponsorIncome(state)).toBe(240);
+    expect(settled.matchIncome[0]!.receipt!.home.sponsor).toBe(sponsorIncome(state));
+  });
+
+  it('keeps unmarked DEV sporting snapshots on the previous cash basis', () => {
+    const { state, fixture } = crossDivisionFixture({ home: 'player', marked: false });
+    expect(sponsorIncome(state)).toBe(540);
+    expect(homeGate(state, fixture).receipts).toBe(11_700);
+    expect(freezeMatchIncome(state, fixture).matchIncome[0]!.matchBase).toBe(18_000);
+  });
+
+  it('settles an existing frozen promise unchanged after the income basis changes', () => {
+    const { state, fixture } = crossDivisionFixture({ home: 'player', marked: false });
+    const frozen = freezeMatchIncome(state, fixture);
+    const changed: GameState = { ...frozen, facilities: [],
+      competitions: { ...frozen.competitions!, leagueCareer: { ...progress(), phase: 'active' } } };
+    expect(freezeMatchIncome(changed, fixture)).toBe(changed);
+    const originalReceipt = settleCrossDivisionFixture(frozen, fixture).matchIncome[0]!.receipt;
+    const settled = settleCrossDivisionFixture(changed, fixture);
+    expect(settled.matchIncome[0]!.receipt).toEqual(originalReceipt);
+    expect(settled.money - changed.money).toBe(30_240);
+    expect(validMatchIncome(settled.matchIncome, settled)).toBe(true);
+    const reloaded = JSON.parse(JSON.stringify(settled)) as GameState;
+    expect(reconcileMatchIncome(reloaded)).toBe(reloaded);
+  });
+
+  it('refuses to freeze cash for an unassigned host in a marked career', () => {
+    const { state, fixture } = crossDivisionFixture({ home: 'rival' });
+    const world = state.competitions!.world!;
+    const incomplete: GameState = { ...state, competitions: { ...state.competitions!,
+      world: { ...world, divisions: world.divisions.filter(d => d.rank !== 1) } } };
+    expect(() => freezeMatchIncome(incomplete, fixture)).toThrow(/division/);
+    expect(incomplete.matchIncome).toHaveLength(0);
   });
 });

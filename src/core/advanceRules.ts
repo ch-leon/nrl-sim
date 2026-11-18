@@ -18,7 +18,7 @@ export type AdvanceTarget =
  * Why a multi-advance halted. `target` means it finished normally; the others
  * are the "needs attention" stops.
  */
-export type StopKind = 'forfeit' | 'injury' | 'contract' | 'bankruptcy' | 'decision' | 'target';
+export type StopKind = 'forfeit' | 'injury' | 'contract' | 'bankruptcy' | 'decision' | 'choice-required' | 'target';
 
 export interface StopReason {
   kind: StopKind;
@@ -205,6 +205,7 @@ export interface RunProgress {
   week: number;
   startSeason: number;
   season: number;
+  seasonClosed?: boolean;
 }
 
 /**
@@ -219,7 +220,7 @@ export function targetReached(target: AdvanceTarget, p: RunProgress): boolean {
     case 'finals':
       return p.weeksPlayed > 0 && p.week === FINALS_START_WEEK;
     case 'seasonEnd':
-      return p.season !== p.startSeason;
+      return p.season !== p.startSeason || p.seasonClosed === true;
   }
 }
 

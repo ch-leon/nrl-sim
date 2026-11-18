@@ -1,3 +1,4 @@
+import { careerActionClock } from '../../core/season';
 // src/ui/screens/contracts.ts — Contracts screen (GitHub #40, part of #49), under
 // Finance (its "contracts end … VIEW ▸" tile). A sheet in the Broadcast Quiet
 // look: "◂ FINANCE", a summary line, and one table row a player, soonest to end
@@ -12,7 +13,7 @@ import { bus } from '../../core/events';
 import { getState, type Player } from '../../core/state';
 import { overallRating } from '../../data/player';
 import { releasePlayer } from '../../systems/freeagency';
-import { releaseTerms, renewalAsk } from '../../systems/cap';
+import { activeSalary, releaseTerms, renewalAsk } from '../../systems/cap';
 import { contractRows, renewEarly, renewalRefusal } from '../../systems/contracts';
 import { quotePlayerSale } from '../../systems/playerTransfers';
 import { saleConfirmation } from '../saleConfirmation';
@@ -111,7 +112,7 @@ const gone = new Map<string, GoneRow>();
 
 function render(sub: HTMLElement, tbody: HTMLElement, saleHost: HTMLElement): void {
   const s = getState();
-  sub.textContent = contractsSummary(s.squad, s.season);
+  sub.textContent = contractsSummary(contractRows(s), careerActionClock(s).season) + (careerActionClock(s).structural ? ` · season ${careerActionClock(s).season}` : '');
   const rows: HTMLElement[] = [];
   const rerender = (): void => render(sub, tbody, saleHost);
   atRest = null;
@@ -129,7 +130,7 @@ function render(sub: HTMLElement, tbody: HTMLElement, saleHost: HTMLElement): vo
     const weeks = p.contractWeeks;
     const ask = renewalAsk(p, hasStaff(s, 'welfare'));
     const queued = p.deal?.renewal;
-    const start = queued?.startSeason ?? (p.deal && p.deal.endSeason >= s.season ? p.deal.endSeason + 1 : s.season);
+    const start = queued?.startSeason ?? (p.deal && p.deal.endSeason >= careerActionClock(s).season ? p.deal.endSeason + 1 : careerActionClock(s).season);
     const changed = p.deal && ask.salary !== p.deal.salary ? ` ${ask.why}.` : '';
     const blocked = renewalRefusal(s, p);
     const meta = queued
@@ -166,7 +167,7 @@ function render(sub: HTMLElement, tbody: HTMLElement, saleHost: HTMLElement): vo
       renew.title = `No fee. From season ${start} at ${fmtMoney(ask.salary)} a season.${changed}`;
     }
     renew.setAttribute('data-contract-renew', p.id);
-    const terms = releaseTerms(p, s.season, s.week);
+    const terms = releaseTerms(p, careerActionClock(s).season, careerActionClock(s).week, careerActionClock(s).duration);
     const releaseArmed = armed === `release:${p.id}`;
     const releaseLabel = `RELEASE ${fmtShort(terms.payout)}`;
     const release = button(releaseArmed ? 'REALLY RELEASE?' : releaseLabel, () => {
@@ -175,7 +176,10 @@ function render(sub: HTMLElement, tbody: HTMLElement, saleHost: HTMLElement): vo
       arm(g.armed);
       if (g.run) {
         const res = releasePlayer(getState(), p.id);
-        if (res.ok) gone.set(p.id, { text: `${p.name} · released`, done: 'RELEASED ✓' });
+        if (res.ok) {
+          const expired = getState().freeAgents.find(x => x.id === p.id)?.clubHistory?.spells.slice(-1)[0]?.departure === 'expiry';
+          gone.set(p.id, { text: `${p.name} · ${expired ? 'contract expired' : 'released'}`, done: expired ? 'EXPIRED ✓' : 'RELEASED ✓' });
+        }
         act(res);
       }
       rerender();
@@ -208,7 +212,7 @@ function render(sub: HTMLElement, tbody: HTMLElement, saleHost: HTMLElement): vo
       el('td', { text: p.position }),
       el('td', { class: 'nrl-num', text: String(Math.round(overallRating(p))) }),
       el('td', { class: `nrl-num${weeks <= EXPIRY_WINDOW_WEEKS && !queued ? ' nrl-contract-soon' : ''}`, text: `${weeks} wk${weeks === 1 ? '' : 's'}` }),
-      el('td', { class: 'nrl-num', text: fmtMoney(p.deal?.salary ?? 0), attrs: { title: 'Annual salary on the cap' } }),
+      el('td', { class: 'nrl-num', text: fmtMoney(careerActionClock(s).structural ? activeSalary(p, careerActionClock(s).season) : p.deal?.salary ?? 0), attrs: { title: 'Annual salary on the cap' } }),
       el('td', {}, el('div', { class: 'nrl-contract-actions' }, renew, release, sell)),
     ));
   }

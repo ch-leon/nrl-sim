@@ -10,7 +10,14 @@ export const FINANCE_TIERS = {
   championship: { annualCap: 450_000, matchBase: 12_000 },
   premier: { annualCap: 600_000, matchBase: 18_000 },
 } as const;
+export const DIVISION_TIERS = ['local', 'championship', 'premier'] as const;
 export const FINANCE_STARTING_CASH = { easy: 90_000, normal: 60_000, hard: 45_000 } as const;
+
+export function tierForRank(rank: number): FinanceTier {
+  const tier = DIVISION_TIERS[rank];
+  if (!tier) throw new Error('Invalid division rank');
+  return tier;
+}
 
 function finite(n: number, min: number, max: number, label: string): void {
   if (!Number.isFinite(n) || n < min || n > max) throw new Error(`Invalid ${label}`);

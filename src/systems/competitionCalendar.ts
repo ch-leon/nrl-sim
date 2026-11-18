@@ -1,6 +1,7 @@
 import { freezeMatchIncome, reconcileMatchIncome } from './matchIncome';
-// Structural calendar/result adapter. Production offers and finance remain gated.
-import type { Fixture, GameState, LadderRow } from '../core/state';
+// Regional calendar and results for League careers and isolated competition prototypes.
+import { stateInstallation, type Fixture, type GameState, type LadderRow } from '../core/state';
+import { leagueCareerStateProblem } from './leagueEntryValidation';
 import { careerNamespace } from '../core/storage/local';
 import { DEV_TEST_PREFIX } from '../core/storageKeys';
 import { NINES } from '../match/league/rules';
@@ -9,6 +10,7 @@ import { BENCH } from '../match/league/bench';
 import { standingsOrder, completedCompetition, validateCompetitions, type CompetitionFixture, type CompetitionInstance, type CompetitionResult, type CompetitionStatus } from '../data/competition';
 import type { CompetitionCalendarSlot } from '../data/competitionCalendar';
 import { isOpenCupInstance, openCupProblem } from './openCup';
+import { validateInput } from '../core/saveValidation';
 
 export const hasStructuralCalendar = (state: Pick<GameState, 'competitions'>): boolean => state.competitions?.calendar?.mode === 'structural';
 export const structuralRuntimeAllowed = (): boolean => careerNamespace() === DEV_TEST_PREFIX;
@@ -32,6 +34,14 @@ function openCupScheduleProblem(state: GameState, instance: CompetitionInstance)
   return null;
 }
 
+export function competitionRulesProblem(definition: CompetitionInstance['definition']): string | null {
+  if (definition.eligibility.kind !== 'open') return 'This competition eligibility policy is not enabled yet.';
+  if (definition.lineup.onField !== ON_FIELD || definition.lineup.benchSize !== BENCH.size
+    || definition.lineup.minSquad !== SQUAD_MIN || definition.lineup.maxSquad !== SQUAD_CAP) return 'This competition lineup policy is not enabled yet.';
+  if (Object.entries(definition.matchRules).some(([key, value]) => NINES[key as keyof typeof NINES] !== value)) return 'This competition rules snapshot needs a supported match engine.';
+  return null;
+}
+
 /** Loaded active snapshots must pass the same support gate as fresh activation. */
 export function structuralPolicyProblem(state: GameState): string | null {
   for (const instance of state.competitions?.instances ?? []) {
@@ -43,23 +53,49 @@ export function structuralPolicyProblem(state: GameState): string | null {
       if (schedule) return schedule;
     }
     if (instance.season !== state.season || !['entered', 'scheduled', 'active'].includes(instance.status)) continue;
-    const definition = instance.definition;
-    if (definition.eligibility.kind !== 'open') return 'This competition eligibility policy is not enabled yet.';
-    if (definition.lineup.onField !== ON_FIELD || definition.lineup.benchSize !== BENCH.size
-      || definition.lineup.minSquad !== SQUAD_MIN || definition.lineup.maxSquad !== SQUAD_CAP) return 'This competition lineup policy is not enabled yet.';
-    if (Object.entries(definition.matchRules).some(([key, value]) => NINES[key as keyof typeof NINES] !== value)) return 'This competition rules snapshot needs a supported match engine.';
+    const problem = competitionRulesProblem(instance.definition);
+    if (problem) return problem;
   }
   return null;
 }
 
+// A new installation or entry receipt must prove its complete saved world once.
+// Match hooks keep that receipt while applying individual results to the calendar.
+const admitted = new WeakMap<object, {installation: number; world: unknown}>();
+
+function normalLeagueProblem(state: GameState): string | null {
+  const progress = state.competitions?.leagueCareer;
+  if (!progress || typeof progress !== 'object' || careerNamespace() !== null) return 'This League career is unsupported.';
+  const cached = admitted.get(progress);
+  if (cached?.installation === stateInstallation() && cached.world === state.competitions!.world) return null;
+  const problem = leagueCareerStateProblem(state);
+  if (problem) return problem.message;
+  admitted.set(progress, {installation: stateInstallation(), world: state.competitions!.world});
+  return null;
+}
+
 export function structuralAdvanceProblem(state: GameState): string | null {
+  if (state.competitions && 'leagueCareer' in state.competitions) {
+    if (!structuralRuntimeAllowed()) {
+      const problem = normalLeagueProblem(state);
+      if (problem) return problem;
+    }
+    if (!isPlayableLeagueCareer(state)) return 'The League career progression snapshot is invalid or unsupported.';
+    if (state.competitions.leagueCareer!.phase !== 'active') return 'A league choice is required before time can advance.';
+  }
   if (!hasStructuralCalendar(state)) return null;
-  if (!structuralRuntimeAllowed()) return 'Competition prototypes require the isolated developer career.';
+  if (!state.competitions?.leagueCareer && !structuralRuntimeAllowed()) return 'Competition prototypes require the isolated developer career.';
   if (state.competitions!.calendar!.status !== 'active') return 'The competition prototype is waiting for next-season setup.';
   const policy = structuralPolicyProblem(state); if (policy) return policy;
   if (state.competitions!.instances.some(i => i.season === state.season && i.fixtures.some(f => f.slot === state.week && f.status === 'pending')))
     return 'The competition prototype is waiting for this stage or selection.';
   return null;
+}
+
+/** Check the live lifecycle shape during interval settlement. */
+export function isPlayableLeagueCareer(state: GameState): boolean {
+  return !!state.competitions?.leagueCareer && state.boardLoan?.owed === 0
+    && !validateInput(state as unknown as Record<string, unknown>, state.version);
 }
 
 /** Activation is an explicit local developer operation, never an imported flag. */

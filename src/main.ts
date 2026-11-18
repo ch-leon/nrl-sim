@@ -6,14 +6,14 @@ import { BootScene } from './scenes/BootScene';
 import { GroundsScene } from './scenes/GroundsScene';
 import { MatchScene } from './scenes/MatchScene';
 import { bus, type Events } from './core/events';
-import { createNewGame, getState, loadState, type GameState } from './core/state';
+import { createNewGame, getState, loadState, stateInstallation, type GameState } from './core/state';
 import { enableAutosave, getActiveSlot, getSlotSummaries, hasSave, loadSlot, save, setActiveSlot } from './core/save';
-import { showTitleFlow } from './ui/title';
-import { showExpansionIntro } from './ui/expansionIntro';
+import { showLeagueLoading, showTitleFlow, type TitleChoice } from './ui/title';
+import { EXPANSION_INTRO_HINT, showExpansionIntro } from './ui/expansionIntro';
 import { expansionIntroLines } from './ui/expansionCopy';
 import { generateObjectives } from './systems/board';
-import { advanceWeek } from './core/time';
-import { advanceInProgress, advanceUntil } from './core/advance';
+import { advanceWeek, weekHeld } from './core/time';
+import { advanceInProgress, advanceUntil, nextFrame } from './core/advance';
 import { advanceFromClub, createHud } from './ui/hud';
 import { initWeekSummary } from './ui/weekSummary';
 import { initMatchArtAhead, warmMatchArt } from './scenes/matchArtAhead';
@@ -26,7 +26,7 @@ import { uiScreenLockReason } from './labs/screenOverride';
 import { registerTrainingSystem } from './systems/training';
 import { registerEconomySystem, registerFinanceSystem } from './systems/economy';
 import { registerFreeAgencySystem } from './systems/freeagency';
-import { coachsOfficeLevel, registerPlayerMatchSystem } from './systems/matchday';
+import { coachsOfficeLevel, playerMatchPending, registerPlayerMatchSystem } from './systems/matchday';
 import { registerAgingSystem } from './systems/aging';
 import { registerMoraleSystem } from './systems/morale';
 import { registerYouthSystem } from './systems/youth';
@@ -49,6 +49,8 @@ import { openKitDesigner, syncKitDesign } from './ui/screens/kit';
 import { openSquadScreen } from './ui/screens/squad';
 import { openLineupScreen } from './ui/screens/lineup';
 import { openRecruitScreen } from './ui/screens/recruit';
+import { leagueChoiceRequired } from './systems/leagueSeasonView';
+import { openLeagueSelection } from './ui/screens/leagueSelection';
 import { openFixturesScreen } from './ui/screens/fixtures';
 import { initSeasonEndFeedback, openHistoryScreen } from './ui/screens/history';
 import { financeSummary, initFinanceLedger, openFinanceScreen } from './ui/screens/finance';
@@ -127,7 +129,7 @@ async function boot(): Promise<void> {
   });
   initToasts(uiRoot, { advancing: advanceInProgress });
   initUndo(); // a match starting ends the 5-second Undo (#370)
-  initSeasonEndFeedback();
+  initSeasonEndFeedback({onChooseLeague});
   initFinanceLedger();
   initNewsInbox();
   warmMatchArt(); // the match ground painted in the art worker while the title is up (N10.5)
@@ -143,31 +145,45 @@ async function boot(): Promise<void> {
     // Its save gone (site data cleared): build it again rather than start a stray new game.
     if (!hasSave(1)) playtest.fresh = true;
   }
-  let choice = playtest
-    ? (playtest.fresh ? { mode: 'new' as const, clubName: PLAYTEST_CLUB, coachName: PLAYTEST_COACH, seed: PLAYTEST_SEED, difficulty: 'normal' as const } : { mode: 'continue' as const })
+  let choice: TitleChoice = playtest
+    ? (playtest.fresh ? { mode: 'new' as const, careerMode: 'classic', clubName: PLAYTEST_CLUB, coachName: PLAYTEST_COACH, seed: PLAYTEST_SEED, difficulty: 'normal' as const } : { mode: 'continue' as const })
     : await showTitleFlow(uiRoot);
   // Rejection is not an empty career: stay at recovery instead of installing defaults.
   let loaded = loadSlot();
-  while ((choice.mode === 'continue' || playtest?.fresh) && loaded.status !== 'ok' && loaded.status !== 'empty') {
-    choice = await showTitleFlow(uiRoot);
-    loaded = loadSlot();
-  }
-  let freshGame = choice.mode !== 'continue' && !playtest;
-  if (choice.mode === 'continue') {
-    const saved = loaded.status === 'ok' ? loaded.state : null;
-    if (saved) { await preparePack(saved.pack ?? 'au'); loadState(saved); }
-    else {
-      freshGame = true;
-      // Continue on an empty slot still starts fresh: drop a match record left behind.
-      clearLiveMatch();
-      await preparePack(packForCountry(choice.home?.country));
-      createNewGame(choice.clubName ?? 'Cavehole Crushers', choice.seed, { difficulty: choice.difficulty, coachName: choice.coachName, openAll: choice.openAll, home: choice.home, groundName: choice.groundName });
+  let freshGame = false;
+  for (;;) {
+    if ((choice.mode === 'continue' || playtest?.fresh) && loaded.status !== 'ok' && loaded.status !== 'empty') {
+      choice = await showTitleFlow(uiRoot, loaded.message);
+      loaded = loadSlot();
+      continue;
     }
-  } else {
-    // New Game must not resume a match that belonged to the save this slot had.
+    if (choice.mode === 'continue' && loaded.status === 'ok') {
+      await preparePack(loaded.state.pack ?? 'au');
+      loadState(loaded.state);
+      break;
+    }
+    freshGame = !playtest;
+    const clubName = choice.clubName ?? 'Cavehole Crushers';
+    if (choice.mode === 'new' && choice.careerMode === 'league') {
+      const loading = showLeagueLoading(uiRoot);
+      let failure: string | undefined;
+      try {
+        await nextFrame();
+        const { startLeagueCareer } = await import('./systems/leagueCareerSetup');
+        const result = await startLeagueCareer({...choice, clubName, seed: choice.seed ?? Date.now() >>> 0}, choice.destination);
+        if (!result.ok) failure = result.message;
+      } catch {
+        failure = 'The League career could not be opened. Check your storage and try again.';
+      } finally { loading.remove(); }
+      if (!failure) break;
+      choice = await showTitleFlow(uiRoot, failure);
+      loaded = loadSlot();
+      continue;
+    }
     clearLiveMatch();
     await preparePack(packForCountry(choice.home?.country));
-    createNewGame(choice.clubName ?? 'Cavehole Crushers', choice.seed, { difficulty: choice.difficulty, coachName: choice.coachName, openAll: choice.openAll, home: choice.home, groundName: choice.groundName });
+    createNewGame(clubName, choice.seed, choice);
+    break;
   }
   if (getState().league.clubs.length === 0) initLeague(getState(), choice.colors);
   if (playtest?.fresh) {
@@ -183,7 +199,7 @@ async function boot(): Promise<void> {
   // page is idle, and any failure leaves the game as it was (src/analytics/index.ts).
   initGameAnalytics(getState(), freshGame);
   void startAnalytics();
-  if (freshGame) {
+  if (freshGame && !getState().competitions?.leagueCareer) {
     for (const text of expansionIntroLines(getState(), generateObjectives(getState())).slice(0, 2)) {
       bus.emit('ui:notify', { text, kind: 'info', quiet: true, from: 'coach' });
     }
@@ -254,6 +270,7 @@ async function boot(): Promise<void> {
   };
   const runwayWeeks = (s: GameState): number | null => financeSummary(s).runwayWeeks;
   createHud({
+    onChooseLeague,
     onAdvanceWeek: advanceOneWeek,
     onAdvanceUntil: (t) => {
       commitUndo();
@@ -267,7 +284,7 @@ async function boot(): Promise<void> {
     runwayWeeks,
   });
   // #368: the weekly summary, from the club as it stands now; its Play Week is the dock's.
-  initWeekSummary({ onAdvance: () => advanceFromClub(advanceOneWeek), runwayWeeks });
+  initWeekSummary({ onAdvance: () => advanceFromClub(advanceOneWeek, onChooseLeague), runwayWeeks });
 
   // Grounds → Match handoff: for the classic engine state/ladder are already
   // applied by the matchday tick hook before this fires and the Match scene is
@@ -298,7 +315,7 @@ async function boot(): Promise<void> {
     },
   });
   nav.registerScreen('squad', 'Squad', () => openSquadScreen(), { holds: ['lineup', 'recruit'] });
-  nav.registerScreen('fixtures', 'League', () => openFixturesScreen(), { holds: ['ladder'] });
+  nav.registerScreen('fixtures', 'League', () => openFixturesScreen({onChooseLeague}), { holds: ['ladder'] });
   nav.registerScreen('build', 'Build', () => openBuildScreen());
   nav.registerScreen('lineup', 'Lineup', () => openLineupScreen(), { hidden: true }); // the coach's nine (#69)
   nav.registerScreen('recruit', 'Recruit', () => openRecruitScreen(), { hidden: true });
@@ -378,7 +395,7 @@ async function boot(): Promise<void> {
   refreshSquadDot();
 
   setTutorialScreens((id) => nav.open(id)); // each step opens its own screen (#337)
-  startTutorial(); // self-guards on settings.tutorialDone
+  if (!getState().competitions?.leagueCareer) startTutorial();
   initFirstVisitHints(); // a line atop Lineup, News, Finance and Contracts the first time each opens (#370)
   initPwa({ holdIosHint: whenTutorialDone }); // the install hint waits for the tutorial (#337 U4)
 
@@ -389,13 +406,40 @@ async function boot(): Promise<void> {
   const fixture = getCurrentFixture(getState(), getState().clubId);
   // Identity is deliberately checked by matchday after the week-start path can
   // rebuild the fixture. Do not discard an incompatible sidecar during boot.
+  if (getState().sacked) return;
+  if (leagueChoiceRequired(getState())) {
+    onChooseLeague();
+    return;
+  }
   if (pending && fixture && !fixture.result && pending.season === getState().season
     && pending.week === getState().week && pending.round === fixture.round
     && pending.homeId === fixture.homeId && pending.awayId === fixture.awayId) {
     const resume = (): void => void setTimeout(() => advanceWeek(), 0);
     if (g.isBooted) resume();
     else g.events.once(Phaser.Core.Events.READY, resume);
-  } else if (pending) clearLiveMatch();
+  } else {
+    if (pending) clearLiveMatch();
+    if (getState().competitions?.leagueCareer) void startLeagueGuidance();
+  }
+
+  function onChooseLeague(): HTMLElement {
+    const state = getState();
+    if (state.sacked || weekHeld() || playerMatchPending() || !leagueChoiceRequired(state)) return uiRoot;
+    const first = state.competitions!.leagueCareer!.phase === 'initial-choice';
+    return openLeagueSelection({onConfirmed: () => { if (first) void startLeagueGuidance(); }});
+  }
+
+  async function startLeagueGuidance(): Promise<void> {
+    const state = getState();
+    if (state.sacked || weekHeld() || playerMatchPending() || leagueChoiceRequired(state)) return;
+    const installation = stateInstallation();
+    if (state.season === 1 && !state.settings.hintsSeen?.includes(EXPANSION_INTRO_HINT)) {
+      for (const text of expansionIntroLines(state, state.objectives).slice(0,2))
+        bus.emit('ui:notify', { text, kind: 'info', quiet: true, from: 'coach' });
+      await showExpansionIntro();
+    }
+    if (stateInstallation() === installation && !getState().sacked && !weekHeld()) startTutorial();
+  }
 }
 
 void boot();

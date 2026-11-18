@@ -118,6 +118,11 @@ tie use the host tier; in a neutral tie use the lower entrant tier. Both clubs
 use that published M. Snapshot applicable facility levels at kickoff, before
 any result is accepted.
 
+In selectable League careers, the sporting tier is the club's current saved
+division, not its retained salary-cap tier. Retaining capacity after a downward
+move does not upgrade lower-division match payments. Existing kickoff promises
+and settled receipts keep their frozen amounts.
+
 | Actual fixture | Base per club | Venue extra | Performance | Facility extras |
 | --- | --- | --- | --- | --- |
 | League, cup, final or series | 1M | Host 0.5M; away zero | Winner 0.1M; draw 0.05M each | As below |
@@ -172,6 +177,12 @@ a preview/confirmation, not an unrestricted refundable capacity loan.
 ## 5. Purchased and earned capacity
 
 `cap = current division base × (1 + 0.05 × purchased level + earned allowance)`.
+For selectable League careers, the 18 November 2026 decision replaces the current
+division base with the club's highest attained base-cap tier. Higher entry can
+raise it; easier entry/allocation never reduces it, for player and AI clubs.
+Preserve the existing percentages and lawful exact-term protection; downward
+movement itself grants no new protection. Existing legacy careers retain their
+current rules. Ordinary fixture income still uses the sporting division above.
 No compounding. Three bought levels mean +15%. Current first-Shield entitlement
 adds +5%; reserve a second +5% for a separately designed later achievement.
 Thus initially available maximum is +20%, future combined ceiling +25%.

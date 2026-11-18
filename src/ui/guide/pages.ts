@@ -19,6 +19,8 @@ import { ATTACK_COACHES, ATTACK_SPECIALITIES, STAFF } from '../../systems/staff'
 import { playsOfFamily } from '../../data/plays';
 import { PLAYS } from '../../match/league/plays';
 import { sponsorReturn } from '../../systems/economy';
+import { matchIncomeTier } from '../../systems/matchIncome';
+import { leagueSeasonView } from '../../systems/leagueSeasonView';
 import { officeUnlockLine } from '../coachCallsText';
 
 const percent = (x: number): string => `${Math.round(x * 100)}%`;
@@ -27,7 +29,7 @@ const IQ = activePack().vocab.iqStat;
 const IQ_INLINE = inlineIqStat(activePack());
 
 /** The club the page is read for; null before a game is loaded (the Guide's text then quotes a new club). */
-function clubNow(): Pick<GameState, 'reputation' | 'facilities'> | null {
+function clubNow(): GameState | null {
   try {
     return getState();
   } catch {
@@ -37,12 +39,13 @@ function clubNow(): Pick<GameState, 'reputation' | 'facilities'> | null {
 
 /**
  * The Money page's Sponsor Board line (N12): the rule, then what the club's own
- * board pays at today's reputation (or what a new one would), the number the
- * weekly tick pays (economy.sponsorReturn). Worked out each time the page is shown.
+ * board pays at its current sporting tier (or what a new one would). Worked
+ * out each time the page is shown using the same basis as match income.
  */
-export function sponsorBullet(club: (Pick<GameState, 'reputation' | 'facilities'> & Partial<Pick<GameState, 'capAccount'>>) | null = clubNow()): string {
+export function sponsorBullet(club: GameState | (Pick<GameState, 'reputation' | 'facilities'> & Partial<Pick<GameState, 'capAccount'>>) | null = clubNow()): string {
   const level = (club?.facilities ?? []).reduce((m, f) => (f.defId === 'sponsorBoard' ? Math.max(m, f.level) : m), 0);
-  const amount = fmtMoney(sponsorReturn(level || 1, 0, club?.capAccount?.tier ?? 'premier'));
+  const tier = club && 'clubId' in club ? matchIncomeTier(club) : club?.capAccount?.tier ?? 'premier';
+  const amount = fmtMoney(sponsorReturn(level || 1, 0, tier));
   return `A Sponsor Board pays 3% / 9% / 18% of match base at levels 1 / 2 / 3 on played non-trial matches. ${level ? `Yours (level ${level}) pays` : 'A new one would pay'} ${amount} per eligible match. No income while idle.`;
 }
 
@@ -339,3 +342,41 @@ export const CLUB_PAGES: readonly GuidePage[] = [
     ],
   },
 ];
+
+/** Saved season facts replace legacy timing/rewards only for an opted-in League career. */
+export function guidePageForCareer(page: GuidePage, state: GameState | null = clubNow()): GuidePage {
+  const view = state ? leagueSeasonView(state) : null;
+  if (!view || !state) return page;
+  const definition = view.instance.definition;
+  const dates = definition.stages.map(stage => `${stage.name}: ${stage.slotIds?.length ? `weeks ${stage.slotIds.join(', ')}` : 'dates not recorded'}`).join(' · ');
+  const rules = definition.matchRules;
+  const tie = definition.drawnKnockout === 'higher-seed' ? 'the higher seed advances' : 'the saved tie draw decides who advances';
+  const rewards = 'No extra title cash, board grant or salary-cap prize is paid in this career. Ordinary played-match income still applies.';
+  if (page.id === 'week') return { ...page, sections: [
+    { text: `This saved year has ${view.calendar.slots.length} weeks, including trials, competition dates and quiet weeks. Play Week advances one calendar interval: training, recovery and any scheduled matches, followed by an autosave. Quiet weeks still count toward the year and contracts; they earn no match income. Salaries sit on the cap and are not weekly cash deductions.` },
+    { heading: 'Your dates', text: dates },
+    { heading: 'Choosing next season', text: 'Choose a league before play begins. At the end of the full calendar, review the completed year and deliberately choose any earned league. Time stays paused at that choice; confirming runs ageing, contracts and the new schedule once. League choice never lowers the club’s attained capacity.' },
+    ...page.sections.slice(1),
+  ] };
+  if (page.id === 'events') return { ...page, sections: [{ text: 'Decision-card events and optional competition offers are not enabled in this League career. Your saved fixtures are the competitions you actually entered; no event cash or season-end trip is promised.' }] };
+  if (page.id === 'money') return { ...page, sections: page.sections.map(section => section.heading === 'Coming in'
+    ? { ...section, bullets: [...section.bullets!.slice(0, 2), sponsorBullet(state), rewards,
+      'Match payments follow the chosen sporting division, even when the club retains a higher salary-cap capacity. Choosing an easier league does not reduce that capacity.'] } : section) };
+  if (page.id === 'ladder') return { ...page, sections: [
+    { text: `${view.division.name}: ${view.fieldSize} clubs, ${view.regularRounds} regular rounds. ${definition.standings!.win} points for a win, ${definition.standings!.draw} for a draw and ${definition.standings!.loss} for a loss. Ties use ${definition.standings!.tieBreakers.map(t => t.replace(/-/g, ' ')).join(', ')} in that order.` },
+    { heading: 'Finals and dates', text: `${view.finalsSize ? `Top ${view.finalsSize} qualify for finals.` : 'No finals this season.'} ${dates}. A tied knockout plays ${rules.goldenPointMinutes} minutes of golden point; if still tied, ${tie}.` },
+    { heading: 'Permanent league access', text: `${view.goal} A minor premiership is a separate honour. A cancelled, withdrawn or missing final does not award a title. There is no automatic promotion or relegation.` },
+    { heading: 'Rewards and the board', text: `${rewards} The board’s saved objectives use this league’s field. Results affect reputation and patience; missing an objective costs one patience, a clean sweep earns one back, and zero means dismissal.` },
+    { heading: 'Your current objectives', bullets: state.objectives.map(o => o.text) },
+    page.sections[page.sections.length - 1]!,
+  ] };
+  if (page.id === 'nines') return { ...page, sections: page.sections.map((section, index) => index === 0
+    ? { text: `This competition’s saved rules: ${definition.lineup.onField} a side, ${definition.lineup.benchSize} on the bench, two halves of ${rules.halfMinutes} minutes. The clock stops after a try until the restart; after the siren, play continues until the ball is dead. At half-time players recover ${Math.round(rules.halfTimeLegsBack * 100)}% of lost legs. A drawn knockout plays ${rules.goldenPointMinutes} minutes of golden point; if still tied, ${tie}.` }
+    : section.heading === 'Sets and scoring' ? { ...section, bullets: [section.bullets![0]!,
+      `A try is ${rules.tryPoints} points, or ${rules.bonusTryPoints} in the bonus zone. Conversions are ${rules.conversionPoints}-point drop kicks, taken by your named goal-kicker when on the field, otherwise your best-kicking half. Field goals score ${rules.fieldGoalPoints}.`] }
+    : section.heading === 'The bonus zone' ? { ...section, text: `The marked in-goal area between the posts is the bonus zone: a try grounded there is worth ${rules.bonusTryPoints} points.` } : section) };
+  if (page.id === 'squad') return { ...page, sections: page.sections.map(section => section.heading === 'Contracts'
+    ? { ...section, bullets: ['While choosing next season, signing and renewal quotes cover that upcoming year. During play, remaining time follows the saved calendar. Existing signed terms and queued renewals survive league choice; new promises must fit the club’s retained salary-cap capacity.', ...section.bullets!.slice(1)] }
+    : section.heading === 'Staff' ? { ...section, bullets: ['Staff stay until you let them go. Displayed wages are not weekly cash deductions.', ...section.bullets!.slice(1)] } : section) };
+  return page;
+}

@@ -1,5 +1,6 @@
+import { careerActionClock } from '../core/season';
 import { getState } from '../core/state';
-import { activeSalary } from '../systems/cap';
+import { activeSalary, contractActionView } from '../systems/cap';
 import { confirmPlayerSale, quotePlayerSale, type SaleOffer } from '../systems/playerTransfers';
 import { fmtMoney } from '../utils/money';
 import { button, el } from './dom';
@@ -22,7 +23,8 @@ export function saleConfirmation(playerId: string, actions: { onCancel(): void; 
     if (actions.back) footer.append(actions.back);
     if (preview.ok) {
       const { offer, buyerCommitments } = preview;
-      const p = state.squad.find(x => x.id === playerId)!;
+      const clock = careerActionClock(state);
+      const p = contractActionView(state, state.squad.find(x => x.id === playerId)!);
       const buyer = state.league.clubs.find(c => c.id === offer.buyerId)!;
       const key = (label: string, value: string, attr: string): HTMLElement => el('div', { class: 'nrl-sale-key' },
         el('span', { class: 'nrl-sale-label', text: label }),
@@ -35,7 +37,7 @@ export function saleConfirmation(playerId: string, actions: { onCancel(): void; 
       const renewal = next ? ` · renewal ${fmtMoney(next.salary)}/season, S${next.startSeason}${next.endSeason === next.startSeason ? '' : `–${next.endSeason}`}` : '';
       summary.append(el('p', { class: 'nrl-sale-contract', attrs: { 'data-sale-contract': '' },
         text: `Deal unchanged: ${fmtMoney(p.deal!.salary)}/season to S${p.deal!.endSeason}${renewal}.` }));
-      details.append(el('p', { text: `Your cap freed: ${fmtMoney(activeSalary(p, state.season))} this season; ${fmtMoney(activeSalary(p, state.season + 1))} next season.` }));
+      details.append(el('p', { text: `Your cap freed: ${fmtMoney(activeSalary(p, clock.season))} ${clock.structural ? `S${clock.season}` : 'this season'}; ${fmtMoney(activeSalary(p, clock.season + 1))} ${clock.structural ? `S${clock.season + 1}` : 'next season'}.` }));
       details.append(el('p', { text: `Buyer cap after transfer: ${buyerCommitments.map(row => `S${row.season} ${fmtMoney(row.used)} / ${fmtMoney(row.cap)}`).join(' · ')}. All covered seasons fit.` }));
       const confirm = button('Confirm sale', () => {
         if (finished || token !== generation) return;
