@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- **iPhone app, Phase 1 (the shell):** the game now builds as an iPhone app, **Big Coach**, from the same code as the website and the Android test build. Landscape only, iPhone only, full screen with no status bar, the home bar dimmed while you play, no page bounce, the ball icon and a navy launch screen. Leon runs it on his own iPhone from Xcode with a free Apple ID (re-run every 7 days). Analytics and the store rules now know the iPhone app from the website and Android. [docs/ios-test-build.md](../ios-test-build.md) · [spec](../specs/ios.md)
+
 - **SuperCOOKED look, Phase 0 (Foundations):** the game is now **Big Coach** ("a SuperCOOKED game"): the SuperCOOKED palette (navy and ink, one orange primary a screen, green good / amber watch / red bad), self-hosted Oswald, Inter, JetBrains Mono and Archivo Black, the text wordmark on the title and the rotate card, an ink dock and toasts, white selected tabs inside sheets, and PLAY WEEK turning navy while a sheet has its own primary. Adds the shared parts later phases build screens from (status pill, stars, stat tile, player card, confirm dialog, empty state, locked tile). Layout and behaviour are unchanged ([docs/specs/ui-supercooked.md](../specs/ui-supercooked.md)).
 
 - **League career is live.** Start in Local in Australia or the UK. A finals title unlocks the next league permanently. At season review, choose where to play next year. Moving down preserves the club’s salary-cap capacity, and each match pays at the chosen division’s rate. Existing Classic careers keep their format. [Merged PR #719](https://github.com/ch-leon/nrl-sim/pull/719) · [Verification](../status/2026-11-league-selection.md)
