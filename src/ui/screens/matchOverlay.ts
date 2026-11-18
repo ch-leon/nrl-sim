@@ -883,6 +883,11 @@ export interface PlanCardOptions {
   lines?: string[];
   /** The other side's plan, on the right ("Larrikins play Direct · Rush"). */
   tendency?: string;
+  /**
+   * The other side, for the header's "v Larrikins" and the tendency card (SuperCOOKED 42): its name, its
+   * plan in words, and, with the Analyst hired, the plan it steps to when behind. Shown in place of `tendency`.
+   */
+  opponent?: { name: string; plan: string; behind?: string | null };
   /** The set plays the side took in, read-only ("Plays: Block play · Cut-out", #326): the three can't change mid-match. */
   plays?: string | undefined;
   /** The primary: "Start 2nd half ▸", "Golden point ▸"; "Continue ▸" by default. */
@@ -918,7 +923,7 @@ export function showPlanCard(o: PlanCardOptions): PlanCardHandle {
       if (on) seg.set(on);
       for (const [p, b] of seg.buttons) b.toggleAttribute('data-active', p === on);
     }
-    hint.textContent = `${PRESET_LABEL[explained]}: ${TACTIC_BLURB[explained]}`;
+    hint.replaceChildren(el('b', { class: 'nrl-mo-plan-hint-name', text: `${PRESET_LABEL[explained]}:` }), ` ${TACTIC_BLURB[explained]}`);
   };
   const row = (label: string, presets: readonly (AttackPreset | DefencePreset)[], pick: (p: AttackPreset | DefencePreset) => Partial<TeamTactics>): HTMLElement[] => {
     const seg = segmented<AttackPreset | DefencePreset>(
@@ -947,23 +952,35 @@ export function showPlanCard(o: PlanCardOptions): PlanCardHandle {
   };
   const go = button(o.go ?? 'Continue ▸', close, { class: 'nrl-btn-primary nrl-mo-plan-go' });
   const summary = o.summary ?? (o.lines ?? []).join(' · ');
+  // SuperCOOKED 42: the head, score and "v Them" over the read; how they play in a card on the right.
+  const tendency = o.opponent
+    ? el('div', { class: 'nrl-mo-plan-tend', attrs: { 'data-plan-tendency': '' } },
+      el('span', { class: 'nrl-mo-plan-tend-label', text: `${o.opponent.name} play` }),
+      el('span', { class: 'nrl-mo-plan-tend-plan', text: o.opponent.plan }),
+      ...(o.opponent.behind ? [el('span', { class: 'nrl-mo-plan-tend-behind', text: `Behind: ${o.opponent.behind}`, attrs: { title: 'The Analyst: the plan they go to when they trail' } })] : []))
+    : o.tendency ? el('div', { class: 'nrl-mo-plan-tend', attrs: { 'data-plan-tendency': '' } }, el('span', { class: 'nrl-mo-plan-tend-plan', text: o.tendency })) : null;
   const sheet = el(
     'div',
     { class: 'nrl-mo-plan-sheet' },
     el('span', { class: 'nrl-mo-plan-grab', attrs: { 'aria-hidden': 'true' } }),
     el('div', { class: 'nrl-mo-plan-top' },
-      el('span', { class: 'nrl-mo-plan-head', text: o.head }),
-      ...(o.score ? [el('span', { class: 'nrl-mo-plan-score', text: o.score })] : []),
-      ...(summary ? [el('span', { class: 'nrl-mo-plan-line', text: summary })] : []),
-      ...(o.tendency ? [el('span', { class: 'nrl-mo-plan-tend', text: o.tendency })] : []),
-      ...(o.plays ? [el('span', { class: 'nrl-mo-plan-plays', attrs: { 'data-plan-plays': '' }, text: o.plays })] : []),
+      el('div', { class: 'nrl-mo-plan-read' },
+        el('div', { class: 'nrl-mo-plan-title' },
+          el('span', { class: 'nrl-mo-plan-head', text: o.head }),
+          ...(o.score ? [el('span', { class: 'nrl-mo-plan-score', text: o.score })] : []),
+          ...(o.opponent ? [el('span', { class: 'nrl-mo-plan-vs', text: `v ${o.opponent.name}` })] : [])),
+        ...(summary ? [el('span', { class: 'nrl-mo-plan-line', text: summary })] : [])),
+      ...(tendency ? [tendency] : []),
     ),
     ...(o.numbers ? [el('div', { class: 'nrl-mo-working', attrs: { 'data-working': '' }, text: `What’s working · half-time guide: ${o.numbers.map(n => `${n.label} ${n.count} ${n.arrow} (aim ${n.label === 'Errors' ? '≤' : '≥'}${n.target})`).join(' · ')}` })] : []),
     el('div', { class: 'nrl-mo-plan-rows' },
       ...row('Attack', ATTACK_PRESETS, (p) => ({ attack: p as AttackPreset })),
       ...row('Defence', DEFENCE_PRESETS, (p) => ({ defence: p as DefencePreset })),
     ),
-    el('div', { class: 'nrl-mo-plan-foot' }, hint, go),
+    el('div', { class: 'nrl-mo-plan-foot' },
+      el('div', { class: 'nrl-mo-plan-say' }, hint,
+        ...(o.plays ? [el('span', { class: 'nrl-mo-plan-plays', attrs: { 'data-plan-plays': '' }, text: o.plays })] : [])),
+      go),
   );
   const wrap = el('div', { class: 'nrl-mo-plan', attrs: { role: 'dialog', 'aria-label': o.head } }, sheet);
   render();
@@ -2285,29 +2302,38 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 ${PLAN_FIT_CSS}
 .nrl-mo-working { font-size: 0.8125rem; flex: 0 0 auto; }
 .nrl-mo-plan-sheet {
-  width: 100%; max-width: 1180px; min-height: min(296px, 100%); max-height: 100%; overflow: hidden; box-sizing: border-box;
+  width: calc(100% - 24px - var(--nrl-safe-l) - var(--nrl-safe-r)); max-width: 1180px; min-height: min(296px, 100%); max-height: 100%; overflow: hidden; box-sizing: border-box;
   display: flex; flex-direction: column; gap: 10px;
-  padding: 10px calc(24px + var(--nrl-safe-r)) calc(16px + var(--nrl-safe-b)) calc(24px + var(--nrl-safe-l));
-  border-radius: 22px 22px 0 0; background: var(--nrl-navy); box-shadow: var(--nrl-shadow-modal); animation: nrl-sheet-up var(--nrl-dur-sheet) var(--nrl-ease-out);
+  padding: 12px 20px calc(14px + var(--nrl-safe-b));
+  border-radius: 22px 22px 0 0; background: var(--nrl-navy); box-shadow: inset 0 0 0 1px var(--nrl-line), 0 -8px 30px rgba(0, 0, 0, 0.4); animation: nrl-sheet-up var(--nrl-dur-sheet) var(--nrl-ease-out);
 }
 .nrl-mo-plan-grab { flex: 0 0 auto; align-self: center; width: 40px; height: 4px; border-radius: 2px; background: var(--nrl-line); }
-.nrl-mo-plan-top { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; }
-.nrl-mo-plan-head { font-family: var(--nrl-f-label); font-size: 1.5rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--nrl-accent); }
-.nrl-mo-plan-score { font-family: var(--nrl-f-num); font-size: 1.25rem; font-weight: 600; font-variant-numeric: tabular-nums; }
-.nrl-mo-plan-line { font-size: 0.8125rem; color: var(--nrl-text-2); }
-.nrl-mo-plan-tend { margin-left: auto; font-size: 0.75rem; color: var(--nrl-muted); }
-.nrl-mo-plan-plays { flex-basis: 100%; font-size: 0.75rem; color: var(--nrl-text-2); }
+/* 42: the read on the left (Archivo head and score, "v Them", the line), the tendency card on the right. */
+.nrl-mo-plan-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.nrl-mo-plan-read { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.nrl-mo-plan-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 14px; }
+.nrl-mo-plan-head { font-family: var(--nrl-f-display); font-size: 1.625rem; line-height: 1; letter-spacing: -0.02em; text-transform: uppercase; color: var(--nrl-text); }
+.nrl-mo-plan-score { font-family: var(--nrl-f-display); font-size: 1.625rem; line-height: 1; letter-spacing: -0.02em; color: var(--nrl-text-2); font-variant-numeric: tabular-nums; }
+.nrl-mo-plan-vs { font-size: 0.875rem; color: var(--nrl-muted); }
+.nrl-mo-plan-line { font-size: 0.9375rem; line-height: 1.35; color: #e6e9ef; }
+.nrl-mo-plan-tend { flex: 0 0 auto; max-width: 45%; display: flex; flex-direction: column; gap: 3px; padding: 8px 12px; border-radius: 12px; background: var(--nrl-panel); box-shadow: inset 0 0 0 1px var(--nrl-line); }
+.nrl-mo-plan-tend-label { font-family: var(--nrl-f-num); font-size: 0.625rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--nrl-muted); }
+.nrl-mo-plan-tend-plan { font-family: var(--nrl-f-label); font-size: 0.875rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--nrl-text); }
+.nrl-mo-plan-tend-behind { font-size: 0.75rem; color: var(--nrl-text-2); }
+.nrl-mo-plan-plays { font-size: 0.75rem; color: var(--nrl-muted); }
 .nrl-mo-plan-top, .nrl-mo-plan-grab { flex: 0 0 auto; }
 /* On a short screen the rows scroll and the foot with the primary stays put (#341). */
 .nrl-mo-plan-rows { flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: grid; grid-template-columns: 72px minmax(0, 1fr); align-items: center; gap: 8px 12px; }
-.nrl-mo-plan-label { font-family: var(--nrl-f-label); font-size: 0.875rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); }
+.nrl-mo-plan-label { font-family: var(--nrl-f-num); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--nrl-muted); }
 .nrl-mo-plan .nrl-seg { display: flex; gap: 4px; padding: 4px; overflow: visible; }
-.nrl-mo-plan .nrl-seg > .nrl-btn { flex: 1 1 0; min-width: 0; height: 40px; min-height: 40px; padding: 0 6px; font-size: 1.0625rem; font-weight: 600; letter-spacing: 0.02em; text-transform: none; }
+.nrl-mo-plan .nrl-seg > .nrl-btn { flex: 1 1 0; min-width: 0; height: 40px; min-height: 40px; padding: 0 6px; font-size: 0.9375rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
 .nrl-mo-plan .nrl-seg > .nrl-btn[aria-pressed="true"] { font-weight: 700; }
 @media (pointer: coarse) { .nrl-mo-plan .nrl-seg > .nrl-btn { height: 44px; min-height: 44px; } }
 .nrl-mo-plan-foot { flex: 0 0 auto; display: flex; align-items: center; gap: 12px; margin-top: auto; padding-top: 4px; }
-.nrl-mo-plan-hint { flex: 1 1 auto; min-width: 0; font-size: 0.8125rem; line-height: 1.4; color: var(--nrl-text-2); }
-.nrl-btn.nrl-mo-plan-go { flex: 0 0 auto; height: 48px; padding: 0 24px; font-size: 1.1875rem; }
+.nrl-mo-plan-say { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.nrl-mo-plan-hint { min-width: 0; font-size: 0.8125rem; line-height: 1.4; color: #e6e9ef; }
+.nrl-mo-plan-hint-name { font-family: var(--nrl-f-label); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.nrl-btn.nrl-mo-plan-go { flex: 0 0 auto; height: 50px; padding: 0 22px; border-radius: 10px; font-size: 1.125rem; }
 .nrl-mo-sheet { align-items: center; justify-content: center; }
 .nrl-mo-sheet-card {
   position: relative; width: min(340px, calc(100vw - 32px)); max-height: calc(100% - 24px); overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box;

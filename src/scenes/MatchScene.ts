@@ -32,7 +32,8 @@ import { isDerbyFixture } from '../systems/derby';
 import { SKIP_ARMED_LABEL, SKIP_ARMED_SAY, SKIP_ARM_MS, SKIP_LABEL, TRAY_CALLED_MS, callForRole, callsLockedHint, callsUnlockLine, coachBadge, cssHex, lockedNote, matchSettingsOpener, mountMatchOverlay, renderCoachBadge, showMatchSheet, showPlanCard, skipTap, trayCallsOn, trayHidden, trayPlayEls, trayPlays, trayPlaysKey, trayPlaysOn, trayTap, TRAY_CAP, TRAY_CAP_WITH_PLAYS, trayRowEls, trayRows, trayWithLocked, type MatchOverlayHandle, type PlanCardHandle, type TrayPlay } from '../ui/screens/matchOverlay';
 import { PLAYS_BY_ID, type PlayId } from '../data/plays';
 import { setFullTimeExit, shortName } from '../ui/screens/matchReport';
-import { styleLine } from '../ui/tacticsBlurbs';
+import { styleLine, whenBehindLine } from '../ui/tacticsBlurbs';
+import { hasStaff } from '../systems/staff';
 import { halfTimePlaysLine } from '../ui/playbookText';
 import {
   LivePlayback,
@@ -1583,6 +1584,15 @@ export class MatchScene extends Phaser.Scene {
     return `${lead} · ${side === 'home' ? ph : pa}% possession · legs ${legs(side)}% v ${legs(other)}%${calls}`;
   }
 
+  /** The Analyst is on the staff (the half-time sheet then says where the other side goes when behind). The lab has no game: no. */
+  private analystHired(): boolean {
+    try {
+      return hasStaff(getState(), 'analyst');
+    } catch {
+      return false;
+    }
+  }
+
   private openPlanCard(head: string): void {
     const pb = this.playback;
     const side = this.planSide;
@@ -1597,8 +1607,12 @@ export class MatchScene extends Phaser.Scene {
       head,
       score: `${s.home}–${s.away}`,
       summary: this.planSummary(pb, side),
-      // How the other side plays (the ladder shows it too, N11).
-      tendency: `${shortName(other === 'home' ? this.home.name : this.away.name)} play ${styleLine(pb.planFor(other))}`,
+      // How the other side plays (the ladder shows it too, N11); with the Analyst, where they go when behind (§7 #3).
+      opponent: {
+        name: shortName(other === 'home' ? this.home.name : this.away.name),
+        plan: styleLine(pb.planFor(other)),
+        behind: this.analystHired() ? whenBehindLine(pb.planFor(other)) : null,
+      },
       // The plays taken in (#326), read-only: a change would re-shape a resumed match's sheet.
       plays: halfTimePlaysLine((side === 'home' ? this.home : this.away).plays) ?? undefined,
       go: head === 'Half-time' ? 'Start 2nd half ▸' : head === 'Golden point' ? 'Golden point ▸' : 'Continue ▸',
