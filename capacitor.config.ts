@@ -19,6 +19,15 @@ const config: CapacitorConfig = {
   // white (#622). A literal because the Capacitor CLI loads this file without the app's
   // TypeScript; tests/brand.test.ts pins it to the brand.
   backgroundColor: '#05070d',
+  // The Android app links no Capacitor plugins. @capacitor/filesystem and @capacitor/share
+  // are for the iOS app's save mirror and share-sheet export (docs/specs/ios.md Phase 2);
+  // without this allowlist `cap sync android` would link every plugin in package.json and
+  // change the Android project and APK (rule: Android stays as it is). The CLI reads
+  // `android.includePlugins` over the package.json scan (@capacitor/cli dist/plugin.js,
+  // getIncludedPluginPackages). An Android plugin later must be named here.
+  android: {
+    includePlugins: [],
+  },
   plugins: {
     SystemBars: {
       // Full screen: no status bar or nav bar (a swipe from the edge shows them for a moment).

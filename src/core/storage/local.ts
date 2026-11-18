@@ -26,11 +26,34 @@ export interface StorageLike {
  * it throws (storage blocked).
  */
 export function browserStorage(): StorageLike | null {
+  if (mirrored) return mirrored;
   try {
     return typeof localStorage === 'undefined' ? null : localStorage;
   } catch {
     return null;
   }
+}
+
+// In the iOS app, localStorage with every write and delete also kept in a native
+// file (nativeMirror.ts). Installed once at boot, before any save is read, and the
+// same object from then on (prefixedStorage keys its views by identity). Never set
+// on the web or Android.
+let mirrored: StorageLike | null = null;
+
+/** Hand out `storage` from browserStorage() from now on (null: localStorage again). */
+export function setMirroredStorage(storage: StorageLike | null): void {
+  mirrored = storage;
+}
+
+/** Every key in the browser's localStorage (for the mirror's first copy). [] when there is none. */
+export function browserStorageKeys(): string[] {
+  if (typeof localStorage === 'undefined') return [];
+  const keys: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key !== null) keys.push(key);
+  }
+  return keys;
 }
 
 // ── The career namespace (Developer settings' playtest career, #519) ─────────

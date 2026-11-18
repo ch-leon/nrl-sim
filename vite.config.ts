@@ -112,7 +112,10 @@ export default defineConfig(({ command }) => ({
         // UK is fetched only for UK careers, including on installed AU builds.
         // The analytics SDK (#450) only when the build has a token and the title is done;
         // offline it simply stays off.
-        globIgnores: ['**/uk-*.js', '**/posthogClient-*.js'],
+        // The iOS app's Capacitor plugins (src/core/storage/capacitorFiles.ts and the
+        // plugins' `web-*` fallbacks it pulls in) load only in the iOS app, which has no
+        // service worker, so the web precache stays as it was.
+        globIgnores: ['**/uk-*.js', '**/posthogClient-*.js', '**/capacitorFiles-*.js', '**/web-*.js'],
         maximumFileSizeToCacheInBytes: 6_000_000,
       },
       devOptions: { enabled: false },

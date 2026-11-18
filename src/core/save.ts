@@ -36,6 +36,7 @@ import { cleanName } from '../data/names';
 import { allPlayers, renameClubsPatch, renamePlayersPatch, validClubColors, type ClubEdit } from '../systems/rename';
 import { browserStorage, inCareerNamespace, LocalSaveStore, type StorageLike } from './storage/local';
 import { nextMeta } from './storage/meta';
+import { deliverFile } from './storage/native';
 import type { SaveMeta, SlotListing } from './storage/types';
 
 export { slotKey } from './storageKeys';
@@ -742,14 +743,7 @@ export function downloadOriginalSave(slot: number, recoveryIndex?: number): void
   try {
     const raw = recoveryIndex === undefined ? exportOriginalSave(slot) : exportRecoverySaves(slot)[recoveryIndex] ?? null;
     if (raw === null || typeof document === 'undefined') return;
-    const url = URL.createObjectURL(new Blob([raw], { type: 'application/json' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `career-slot-${slot}-${recoveryIndex === undefined ? 'original' : `recovery-${recoveryIndex + 1}`}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    deliverFile(`career-slot-${slot}-${recoveryIndex === undefined ? 'original' : `recovery-${recoveryIndex + 1}`}.json`, raw, shareFailed);
   } catch {
     bus.emit('ui:notify', { text: 'Could not read the original save. It has been kept; try again when storage is available.', kind: 'danger' });
   }
@@ -963,7 +957,11 @@ export const EXPORT_HELD_FAILED_TEXT = "Couldn't export: this week is mid-match 
 /** What Export says when the file is the kick-off save plus the parked match. */
 export const EXPORT_HELD_TEXT = 'Exported the save from the start of this week, with the match to resume. A change made since kick-off is kept if you finish the match.';
 
-/** Browser: download the state as a JSON file. No-op outside a browser. */
+/** What an export says when the iOS share sheet would not open (storage/native.ts). */
+export const SHARE_FAILED_TEXT = "Couldn't open the share sheet to export. Your save is unchanged; try again.";
+const shareFailed = (): void => bus.emit('ui:notify', { text: SHARE_FAILED_TEXT, kind: 'danger' });
+
+/** Browser: download the state as a JSON file (the iOS app: the share sheet). No-op outside a browser. */
 export function downloadSave(state: GameState): void {
   if (weekHeld() && !heldWeekSnapshot()) {
     bus.emit('ui:notify', { text: EXPORT_HELD_FAILED_TEXT, kind: 'danger' });
@@ -977,14 +975,7 @@ export function downloadSave(state: GameState): void {
     bus.emit('ui:notify', {text: 'Could not verify the saved week and its match for export. The recovery data has been kept.', kind: 'danger'});
     return;
   }
-  const url = URL.createObjectURL(new Blob([file.text], { type: 'application/json' }));
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = exportFilename(file.state);
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  deliverFile(exportFilename(file.state), file.text, shareFailed);
   if (file.notice) bus.emit('ui:notify', { text: file.notice, kind: 'info' });
 }
 
@@ -1008,14 +999,7 @@ export function pickSaveFile(): Promise<string | null> {
 /** Browser: download the career's names file (#398). No-op outside a browser. */
 export function downloadNames(state: GameState): void {
   if (typeof document === 'undefined' || typeof Blob === 'undefined') return;
-  const url = URL.createObjectURL(new Blob([exportNames(state)], { type: 'application/json' }));
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = exportNamesFilename(state);
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  deliverFile(exportNamesFilename(state), exportNames(state), shareFailed);
   bus.emit('ui:notify', { text: 'Names exported.', kind: 'success' });
 }
 
