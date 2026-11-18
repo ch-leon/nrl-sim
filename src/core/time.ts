@@ -9,6 +9,8 @@
 // await, no setTimeout — so pipeline order is exact and no hook can observe a
 // later hook's mutation.
 
+import type { RunningCamp } from '../data/playerAssignments';
+import { completeCamp, currentSkillsCamp, departForCamp } from '../systems/playerAssignments';
 import { getState, setState, resetForNewSeason, stateInstallation, type GameState } from './state';
 import { bus } from './events';
 import { WEEKS_PER_SEASON } from '../config';
@@ -167,6 +169,7 @@ interface LeagueInterval extends IntervalCheckpoint {
   kind: 'league' | 'paid-cup-dev';
   installation: number;
   published: boolean;
+  runningCamp?: RunningCamp;
   afterSaved?: () => void;
 }
 
@@ -178,6 +181,15 @@ function ownsInterval(interval: LeagueInterval): boolean {
 
 export function leagueIntervalInProgress(): boolean {
   return !!leagueInterval && ownsInterval(leagueInterval);
+}
+
+/** Only the authenticated Week 5 owner may inspect a partially advanced assignment. */
+export function runningCampContext(state: GameState): RunningCamp | undefined {
+  const interval = leagueInterval;
+  if (!interval?.runningCamp || !ownsInterval(interval) || interval.published || interval.slot !== getActiveSlot() || interval.namespace !== careerNamespace()
+    || interval.source.season !== state.season || interval.source.week !== state.week || interval.source.clubId !== state.clubId
+    || interval.source.pack !== state.pack) return undefined;
+  return interval.runningCamp;
 }
 
 function verifiedCupInterval(interval: LeagueInterval): boolean {
@@ -295,6 +307,14 @@ export function advanceWeek(): void {
   const ctx: TickContext = {week, season, fastForward: fastForwardFlag, ...(canHold ? {hold} : {})};
 
   runIntervalWork(interval, () => {
+    if (interval?.kind === 'league' && verifiedCupInterval(interval)) {
+      const departed = departForCamp(checkpoint.source);
+      if (departed !== checkpoint.source) {
+        interval.runningCamp = {record:structuredClone(currentSkillsCamp(departed)!)};
+        setState(departed);
+        if (!ownsInterval(interval)) return;
+      }
+    }
     const entries = sortedEntries(tickHooks).filter((entry) => !inTrials(getState()) || entry.trials);
     for (let i = 0; i < entries.length; i++) {
       entries[i]!.fn(ctx);
@@ -364,8 +384,9 @@ function finishLeagueInterval(interval: LeagueInterval, settled: GameState): voi
   const competitions = settled.competitions!;
   const calendar = competitions.calendar!;
   const final = week >= calendar.slots.length;
-  const next = final ? closeLeagueSeason(settled) : {...settled, week: week + 1,
+  const advanced = final ? closeLeagueSeason(settled) : {...settled, week: week + 1,
     competitions: {...competitions, calendar: {...calendar, elapsedIntervals: calendar.elapsedIntervals + 1}}};
+  const next = interval.runningCamp ? completeCamp(advanced) : advanced;
   if (final && next === settled) {
     failLeagueInterval(interval, 'The settled final interval could not be closed. Reload the saved interval to recover.');
     return;

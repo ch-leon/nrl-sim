@@ -6,6 +6,8 @@
 // applyTraining runs strictly before applyInjuries so an injured player trains at
 // ×0.3 THIS week and recovers AFTER.
 
+import { awaitingCampReplay } from './parkedLeagueFixture';
+import { awayPlayerIds } from './playerAssignments';
 import { getState, setState, type GameState, type Player, type PlacedFacility, type PlayerStats, type TrainingFocus } from '../core/state';
 import { FACILITY_CATALOG, levelMult, type FacilityDef, type FacilityDefId } from '../data/facility';
 import { STAT_MAX, PROGRESSION } from '../config';
@@ -53,7 +55,7 @@ export function facilityXpMultiplier(facilities: readonly PlacedFacility[]): num
  * Trait multiplier: workhorse ×1.2 at level I (×1.32 II, ×1.44 III) and
  * youngGun ×1.3 stack multiplicatively; all other traits ×1.0.
  */
-export function traitMult(player: Player): number {
+export function traitMult(player: Pick<Player,'traits'>): number {
   let m = 1;
   const work = traitBoost(player.traits, 'workhorse');
   if (work > 0) m *= 1 + 0.2 * work;
@@ -74,12 +76,17 @@ const clamp = (n: number): number => Math.max(STAT_FLOOR, Math.min(STAT_MAX, n))
  * it as `byHand`), when they bank for spendPoint. The persona harness sets `manual`
  * so a playtester can spend those points itself.
  */
-let spendMode: 'auto' | 'manual' = 'auto';
-export function setSpendMode(mode: 'auto' | 'manual'): void {
+export type LevelPointSpendMode = 'auto' | 'manual';
+
+let spendMode: LevelPointSpendMode = 'auto';
+export function setSpendMode(mode: LevelPointSpendMode): void {
   spendMode = mode;
 }
+export function levelPointSpendMode(byHand = false): LevelPointSpendMode {
+  return spendMode === 'manual' || byHand ? 'manual' : 'auto';
+}
 function spendIfAuto(player: Player, focus: TrainingFocus, byHand = false): Player {
-  return spendMode === 'manual' || byHand ? player : spendByFocus(player, focus);
+  return levelPointSpendMode(byHand) === 'manual' ? player : spendByFocus(player, focus);
 }
 
 // ── The squad's training focus (N11) ─────────────────────────────────────────
@@ -115,7 +122,7 @@ export function weakestStat(squad: readonly Player[]): keyof PlayerStats {
 }
 
 /** Award XP and bank level points, without spending or changing stats. No RNG. */
-export function awardXp(player: Player, baseXp: number, facilities: readonly PlacedFacility[] = []): Player {
+export function awardXp<P extends Pick<Player,'age'|'traits'|'xp'|'level'|'unspentPoints'>>(player: P, baseXp: number, facilities: readonly PlacedFacility[] = []): P {
   let xp = (player.xp ?? 0) + Math.max(0, baseXp) * ageMod(player.age) * traitMult(player) * facilityXpMultiplier(facilities);
   const levels = Math.floor(xp / PROGRESSION.XP_PER_LEVEL);
   xp -= levels * PROGRESSION.XP_PER_LEVEL;
@@ -124,7 +131,7 @@ export function awardXp(player: Player, baseXp: number, facilities: readonly Pla
 }
 
 /** Reusable #540 “spend by focus” rule. Ties follow shown-stat order. */
-export function spendByFocus(player: Player, focus: TrainingFocus = 'balanced'): Player {
+export function spendByFocus<P extends Pick<Player,'position'|'stats'|'ceilings'|'unspentPoints'>>(player: P, focus: TrainingFocus = 'balanced'): P {
   const stats = { ...player.stats };
   let points = player.unspentPoints ?? 0;
   const keys = shownStats(player.position);
@@ -171,6 +178,7 @@ export function setSpendPointsMyself(on: boolean): void {
 /** The coach spends one of a squad player's banked points (the player page's +). Returns whether it was spent. */
 export function spendSquadPoint(playerId: string, stat: keyof PlayerStats): boolean {
   const s = getState();
+  if (awaitingCampReplay(s)) return false;
   const at = s.squad.findIndex((p) => p.id === playerId);
   if (at < 0) return false;
   const next = spendPoint(s.squad[at]!, stat);
@@ -189,9 +197,11 @@ export function trainPlayer(player: Player, _facilities: PlacedFacility[] = [], 
   return next;
 }
 
-/** A small weekly XP trickle even without buildings; injury still slows training. */
-export function trainWeek(player: Player, facilities: PlacedFacility[], focus: TrainingFocus = 'balanced', byHand = false): Player {
+/** Weekly XP and decline. An away assignment can substitute for the XP and point spending. */
+export function trainWeek(player: Player, facilities: PlacedFacility[], focus: TrainingFocus = 'balanced',
+  byHand = false, options: { skipXp?: boolean } = {}): Player {
   const declined = { ...player, stats: trainPlayer(player) };
+  if (options.skipXp) return declined;
   return spendIfAuto(awardXp(declined, PROGRESSION.WEEKLY_XP * injuryMult(player), facilities), focus, byHand);
 }
 
@@ -214,7 +224,8 @@ export function applyMatchXp(squad: readonly Player[], own: TeamSheet, result: M
 
 /** Weekly hook (10), before injury recovery (20). */
 export function applyTraining(state: GameState): GameState {
-  const squad = state.squad.map(p => trainWeek(p, state.facilities, state.training?.focus ?? 'balanced', state.settings.spendPointsMyself === true));
+  const away = awayPlayerIds(state);
+  const squad = state.squad.map(p => trainWeek(p, state.facilities, state.training?.focus ?? 'balanced', state.settings.spendPointsMyself === true, {skipXp:away.has(p.id)}));
   setState({ squad });
   return getState();
 }
@@ -225,12 +236,14 @@ export function applyTraining(state: GameState): GameState {
  * a built physioCentre adds 1 extra. Deterministic (no RNG).
  * injuredWeeks = max(0, injuredWeeks − recovery).
  */
+export function injuryRecoveryPerWeek(facilities: readonly PlacedFacility[]): number {
+  const medicalBay = facilities.find(f => f.defId === 'medicalBay');
+  const physio = facilities.some(f => f.defId === 'physioCentre');
+  return 1 + (medicalBay?.level ?? 0) + Number(physio);
+}
+
 export function applyInjuries(state: GameState): GameState {
-  const medicalBay = state.facilities.find((f) => f.defId === 'medicalBay');
-  const physio = state.facilities.find((f) => f.defId === 'physioCentre');
-  let recovery = 1;
-  if (medicalBay) recovery += medicalBay.level;
-  if (physio) recovery += 1;
+  const recovery = injuryRecoveryPerWeek(state.facilities);
 
   let changed = false;
   const squad = state.squad.map((p) => {

@@ -13,7 +13,7 @@ import { rollTraits, type TraitQuality } from '../../data/traits';
 import { usesHabitCounters, type RivalPlanContext } from './ai';
 import { rivalTactics } from './presets';
 import { BENCH } from './bench';
-import { LINEUP_SLOTS, statsAt, type Selection } from '../../systems/lineup';
+import { isSelectable, LINEUP_SLOTS, statsAt, type LineupAvailability, type Selection } from '../../systems/lineup';
 
 const clampStat = (n: number): number => Math.max(1, Math.min(STAT_MAX, n));
 
@@ -87,7 +87,7 @@ function toRosterEntry(p: Player): RosterEntry {
 }
 
 /**
- * Build a TeamSheet from a squad. Excludes injured and suspended players,
+ * Build a TeamSheet from a squad. Excludes injured, suspended and away players,
  * uses the best ON_FIELD by overall rating, and applies a morale modifier. If
  * fewer than ON_FIELD fit players are available, uses all fit players; throws
  * if zero.
@@ -99,20 +99,34 @@ function toRosterEntry(p: Player): RosterEntry {
  * The aggregates come from those stats.
  */
 export function teamSheetFromSquad(
-  players: Player[],
+  players: readonly Player[],
   clubId: string,
   name: string,
   colors: [string, string],
   selection?: Selection,
+  away?: LineupAvailability,
 ): TeamSheet {
-  const fit = players.filter((p) => p.injuredWeeks <= 0 && (p.suspendedWeeks ?? 0) <= 0);
+  const fit = players.filter((p) => isSelectable(p, away));
   if (fit.length === 0) throw new Error('no fit players');
 
   const ranked = [...fit].sort((a, b) => overallRating(b) - overallRating(a));
-  const picked = selection ? selection.starters.flatMap((p, slot) => (p ? [{ ...p, position: LINEUP_SLOTS[slot]!, stats: statsAt(p, LINEUP_SLOTS[slot]!) }] : [])) : [];
+  const remaining = new Map(fit.map((p) => [p.id, p] as const));
+  // Take each selected ID at most once, using the eligible squad's player record.
+  const take = (id: string | undefined): Player | undefined => {
+    if (id === undefined) return undefined;
+    const p = remaining.get(id);
+    remaining.delete(id);
+    return p;
+  };
+  const picked = selection ? LINEUP_SLOTS.flatMap((position, slot) => {
+    const p = take(selection.starters[slot]?.id);
+    return p ? [{ ...p, position, stats: statsAt(p, position) }] : [];
+  }) : [];
   const best = picked.length > 0 ? picked : ranked.slice(0, ON_FIELD);
   // The next best fit players make the interchange bench (the live sim rotates them on).
-  const bench = selection && picked.length > 0 ? selection.bench : ranked.slice(ON_FIELD, ON_FIELD + BENCH.size);
+  const bench = selection && picked.length > 0
+    ? selection.bench.flatMap((p) => take(p.id) ?? []).slice(0, BENCH.size)
+    : ranked.slice(ON_FIELD, ON_FIELD + BENCH.size);
 
   const attackRaw = mean(best.map((p) => (p.stats.speed + p.stats.handling + p.stats.footyIQ) / 3));
   const defenseRaw = mean(best.map((p) => (p.stats.strength + p.stats.stamina) / 2));

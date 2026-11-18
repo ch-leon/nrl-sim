@@ -15,9 +15,13 @@ import { careerActionClock, type CareerActionClock } from '../core/season';
 //
 // Pure-ish around getState/setState; no DOM, no Phaser.
 
+import { rosterIntervalProblem } from './playerAssignmentCommit';
+import { campDisposalProblem } from './playerAssignments';
+import { careerNamespace } from '../core/storage/local';
+import { getActiveSlot } from '../core/save';
 import { weekHeld } from '../core/time';
 import { bus } from '../core/events';
-import { getState, setState, type GameState, type Lineup, type PlacedFacility, type Player } from '../core/state';
+import { getState, setState, stateInstallation, type GameState, type Lineup, type PlacedFacility, type Player } from '../core/state';
 import { FACILITY_CATALOG } from '../data/facility';
 import { fmtMoney } from '../utils/money';
 import { demolishFacility, validatePlacement } from '../world/placement';
@@ -123,13 +127,19 @@ export function offerSign(
   opts: { stamp?: CareerActionClock; text?: string; shortlistIndex?: number; lineup?: { before: Lineup; after: Lineup } } = {},
 ): void {
   const stamp = opts.stamp ?? careerActionClock(getState());
+  const slot = getActiveSlot(), namespace = careerNamespace(), installation = stateInstallation();
+  const canRevert = (s: GameState): boolean => installation === stateInstallation() && slot === getActiveSlot()
+    && namespace === careerNamespace() && !rosterIntervalProblem(s)
+    && !campDisposalProblem(s,signed.id) && (!stamp.structural || careerActionClock(s).key === stamp.key)
+    && s.squad.some(p => p.id === signed.id && JSON.stringify(p) === JSON.stringify(signed)) && !s.freeAgents.some(p => p.id === signed.id);
   offerUndo({
     kind: 'sign',
     text: opts.text ?? `Signed ${signed.name}`,
     expiresAt: now + UNDO_MS,
-    canRevert: (s) => (!stamp.structural || careerActionClock(s).key === stamp.key) && s.squad.some((p) => p.id === signed.id && JSON.stringify(p) === JSON.stringify(signed)) && !s.freeAgents.some((p) => p.id === signed.id),
+    canRevert,
     revert: () => {
       const s = getState();
+      if (!canRevert(s)) return;
       const refundStamp = stamp.structural ? stamp : careerActionClock(s);
       const pool = [...s.freeAgents];
       pool.splice(Math.min(poolIndex, pool.length), 0, asWas);

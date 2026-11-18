@@ -15,6 +15,8 @@ import { BENCH, isRotation } from '../match/league/bench';
 import { isAttackPreset, isDefencePreset } from '../match/league/presets';
 import { LINEUP_SLOTS, resolveLineup } from '../systems/lineup';
 import { competitionRewardsProblem } from '../data/competitionRewards';
+import type { RunningCamp } from '../data/playerAssignments';
+import { assignmentOwnerProblem } from '../systems/assignmentEvidence';
 import { competitionInstanceId, validateCompetitions } from '../data/competition';
 import { FINANCE_TIERS, tierForRank } from '../data/financeRules';
 import { canonicalLeagueJson, validateLeagueHistory } from '../data/leagueCareer';
@@ -221,7 +223,7 @@ export function hasV33Fields(v: Record<string, unknown>): boolean {
  * Does not select a pack or pull the lazy UK chunk into the synchronous boundary.
  * These persisted season limits are AU 24+3 and UK 22+3 (content/au.ts, uk.ts).
  */
-export function validateInput(v: Record<string, unknown>, version: number): string | null {
+export function validateInput(v: Record<string, unknown>, version: number, runningCamp?: RunningCamp): string | null {
   const fail = (field: string): string => `Invalid save data: ${field}.`;
   // JSON can decode 1e400 as Infinity. Include optional nested numeric fields,
   // not only required scalars, before any migration uses or defaults them.
@@ -267,10 +269,11 @@ export function validateInput(v: Record<string, unknown>, version: number): stri
   if (clubs.size && !clubs.has('player')) return fail('player club reference');
   if (v.competitions !== undefined) {
     if (version < 25) return fail('competition metadata version');
+    if (record(v.competitions) && 'assignments' in v.competitions && version < 34) return fail('assignment version');
     if (record(v.competitions) && v.competitions.calendar !== undefined && version < 26) return fail('competition calendar version');
     if (record(v.competitions) && v.competitions.leagueCareer !== undefined && version < 31) return fail('league career version');
     if (record(v.competitions) && v.competitions.world !== undefined && version < 27) return fail('division world version');
-    const problem = validateCompetitions(v.competitions, { pack: v.pack === 'uk' ? 'uk' : 'au', season: v.season as number, week: v.week as number, clubIds: [...clubs], clubId: v.clubId as string });
+    const problem = validateCompetitions(v.competitions, { pack: v.pack === 'uk' ? 'uk' : 'au', season: v.season as number, week: v.week as number, clubIds: [...clubs], clubId: v.clubId as string, ...(runningCamp ? {runningCamp} : {}) });
     if (problem) return fail(problem);
   }
   if (version >= 30) {
@@ -296,6 +299,8 @@ export function validateInput(v: Record<string, unknown>, version: number): stri
   for (const key of ['coachCalls', 'liveRivals', 'keyMoments', 'weekSummary', 'teamLetters', 'spendPointsMyself']) if (v.settings[key] !== undefined && typeof v.settings[key] !== 'boolean') return fail(`settings.${key}`);
   if ((v.settings.playbackSpeed !== undefined && !oneOf(v.settings.playbackSpeed, [1, 2, 4, 8])) || (v.settings.textSize !== undefined && !oneOf(v.settings.textSize, ['normal', 'large', 'larger'])) || (v.settings.hintsSeen !== undefined && !strings(v.settings.hintsSeen))) return fail('settings preferences');
   if (!Array.isArray(v.history) || !v.history.every(record)) return fail('history');
+  const assignmentProblem = assignmentOwnerProblem(v as unknown as GameState);
+  if (assignmentProblem) return fail(assignmentProblem);
 
   if (version >= 5 && (!range(v.boardPatience, 0, BOARD.MAX_PATIENCE) || !Array.isArray(v.objectives) || !v.objectives.every(record))) return fail('board');
   if (version >= 7 && (!record(v.eventDeck) || !integer(v.eventDeck.rng, 0, 0xffffffff) || !Array.isArray(v.eventDeck.pending) || !v.eventDeck.pending.every(record) || !Array.isArray(v.eventDeck.modifiers) || !v.eventDeck.modifiers.every(isActiveModifier) || !record(v.eventDeck.cooldowns) || !integer(v.eventDeck.lastDrawn))) return fail('eventDeck');
@@ -334,8 +339,8 @@ export function validateInput(v: Record<string, unknown>, version: number): stri
 }
 
 export type ValidationResult = { ok: true; state: GameState; repairs: SaveRepair[] } | { ok: false; message: string };
-export function validateCurrent(v: Record<string, unknown>): ValidationResult {
-  const problem = validateInput(v, SAVE_VERSION);
+export function validateCurrent(v: Record<string, unknown>, runningCamp?: RunningCamp): ValidationResult {
+  const problem = validateInput(v, SAVE_VERSION, runningCamp);
   if (problem) return { ok: false, message: problem };
   const bad = (field: string): ValidationResult => ({ ok: false, message: `Invalid save data: ${field}.` });
   const tactics = (t: unknown): boolean => record(t) && isAttackPreset(t.attack as string) && isDefencePreset(t.defence as string);
