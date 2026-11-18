@@ -41,8 +41,9 @@ export function closeLeagueSeason(state: GameState): GameState {
   next = {...next, reputation: board.reputation, boardPatience: board.patience, objectives: board.objectives,
     ...(board.sacked && !state.sacked ? {sacked: {season: state.season, reason: sackingReason(board)}} : {})};
   const review = buildCompletedSeasonReview({season: state.season, reputation: state.reputation}, next);
-  return {...next, history: next.history.map(h => h.season === state.season ? {...h, league: leagueHistoryFacts(close, instance, own.leagueId, state.clubId), review} : h),
+  const closed: GameState = {...next, history: next.history.map(h => h.season === state.season ? {...h, league: leagueHistoryFacts(close, instance, own.leagueId, state.clubId), review} : h),
     competitions: {...c, leagueCareer: {...progress, phase: 'next-season-choice', close,
       access: leagueAccessFromClose(progress, close, c.world, c.instances)},
     calendar: {...calendar, status: 'awaiting-next-season', elapsedIntervals: close.endingInterval}}};
+  return validateInput(closed as unknown as Record<string, unknown>, closed.version) ? state : closed;
 }

@@ -14,7 +14,7 @@ import { bus } from './events';
 import { WEEKS_PER_SEASON } from '../config';
 import { inTrials } from './season';
 import { demoStops } from '../commercial/demo';
-import { hasStructuralCalendar, settleStructuralCalendar, structuralAdvanceProblem, structuralSeasonResolved } from '../systems/competitionCalendar';
+import { hasStructuralCalendar, isPlayableLeagueCareer, settleStructuralCalendar, structuralAdvanceProblem, structuralSeasonResolved } from '../systems/competitionCalendar';
 import { closeLeagueSeason } from '../systems/leagueCareer';
 import { saveIfChanged } from './save';
 
@@ -166,7 +166,8 @@ export function advanceWeek(): void {
   // Also refuse inactive or malformed League markers before any interval work.
   if (structuralAdvanceProblem(getState())) return;
   if (demoStops()) return; // the demo's last week is played (#362; never with the commercial flag off)
-  const { week, season } = getState();
+  const { week, season, competitions } = getState();
+  const markedInterval = competitions?.leagueCareer !== undefined;
   const tokens = new Set<WeekRelease>();
   const identity = {};
   const installation = stateInstallation();
@@ -182,7 +183,7 @@ export function advanceWeek(): void {
       if (tokens.size > 0) return;
       const h = held!; held = null;
       for (const entry of h.rest) entry.fn(h.ctx);
-      finishWeek(h.ctx.week);
+      finishWeek(h.ctx.week, markedInterval);
     }, {current: () => sameHold() && !structuralAdvanceProblem(getState())});
     tokens.add(release); return release;
   } } : {}) };
@@ -197,7 +198,7 @@ export function advanceWeek(): void {
       return;
     }
   }
-  finishWeek(week);
+  finishWeek(week, markedInterval);
 }
 
 /** A held week (coach calls #73; N9.2): the hooks still to run, and how many holds are still out. */
@@ -236,36 +237,49 @@ export function clearHeldWeek(): void {
   failedInterval = null;
 }
 
-function finishWeek(week: number): void {
+const INVALID_SETTLED_INTERVAL = 'The settled interval is invalid. Reload the saved interval to recover.';
+
+function finishWeek(week: number, markedInterval: boolean): void {
   const s = getState();
   if (hasStructuralCalendar(s)) {
     // A result that never landed, or a competition that can never finish, is closed
     // and logged. The interval still ends, so a later advance is not held forever.
     const settled = settleStructuralCalendar(s, week);
-    if (settled !== s) setState(settled);
-    const now = getState();
-    const calendar = now.competitions!.calendar!;
-    if (now.competitions!.leagueCareer) {
+    const competitions = settled.competitions!;
+    const calendar = competitions.calendar!;
+    if (markedInterval || competitions.leagueCareer) {
       if (week >= calendar.slots.length) {
-        const closed = closeLeagueSeason(now);
-        if (closed === now) {blockInterval('The settled final interval could not be closed. Reload the saved interval to recover.'); return;}
+        const closed = closeLeagueSeason(settled);
+        if (closed === settled) {blockInterval('The settled final interval could not be closed. Reload the saved interval to recover.'); return;}
         // The live gate is installed first: a failed persistence attempt cannot replay this interval.
         setState(closed);
         saveIfChanged(getState());
-        if (!now.sacked && closed.sacked) bus.emit('board:sacked', closed.sacked);
+        if (!settled.sacked && closed.sacked) bus.emit('board:sacked', closed.sacked);
         const outcome = readSeasonOutcome();
-        bus.emit('season:ended', {season: now.season, ...outcome});
-      } else setState({week: week + 1, competitions: {...now.competitions!, calendar: {...calendar, elapsedIntervals: calendar.elapsedIntervals + 1}}});
+        bus.emit('season:ended', {season: settled.season, ...outcome});
+      } else {
+        const next = {...settled, week: week + 1,
+          competitions: {...competitions, calendar: {...calendar, elapsedIntervals: calendar.elapsedIntervals + 1}}};
+        if (competitions.leagueCareer?.phase !== 'active' || !isPlayableLeagueCareer(next)) {
+          blockInterval(INVALID_SETTLED_INTERVAL);
+          return;
+        }
+        setState(next);
+      }
       const post = getState(); bus.emit('week:advanced', {week: post.week, season: post.season});
       return;
     }
-    setState({ competitions: { ...now.competitions!, calendar: { ...calendar, elapsedIntervals: calendar.elapsedIntervals + 1 } } });
-    if (week >= calendar.slots.length || structuralSeasonResolved(getState())) rollSeasonOver();
+    if (settled !== s) setState(settled);
+    const now = getState();
+    const currentCalendar = now.competitions!.calendar!;
+    setState({ competitions: { ...now.competitions!, calendar: { ...currentCalendar, elapsedIntervals: currentCalendar.elapsedIntervals + 1 } } });
+    if (week >= currentCalendar.slots.length || structuralSeasonResolved(getState())) rollSeasonOver();
     else setState({ week: week + 1 });
     const post = getState();
     bus.emit('week:advanced', { week: post.week, season: post.season });
     return;
   }
+  if (markedInterval) {blockInterval(INVALID_SETTLED_INTERVAL); return;}
   if (inTrials(s)) {
     setState({ preseason: s.preseason === 1 ? 2 : 0 });
     bus.emit('week:advanced', { week: s.week, season: s.season });

@@ -4,7 +4,7 @@ import { closeLeagueSeason } from '../../src/systems/leagueCareer';
 import { competitionLadder, finaliseCalendarFixture } from '../../src/systems/competitionCalendar';
 import { leagueEntryReceiptId } from '../../src/data/leagueCareer';
 import { competitions, progress, profile, clubIds } from '../data/leagueCareerFixtures';
-import { advanceWeek, advanceWeeks, clearHeldWeek, clearSeasonHooks, clearTickHooks, registerTickHook, resumeWeek, weekHeld } from '../../src/core/time';
+import { advanceWeek, advanceWeeks, clearHeldWeek, clearSeasonHooks, clearTickHooks, failedIntervalProblem, registerTickHook, resumeWeek, weekHeld, type WeekRelease } from '../../src/core/time';
 import { setCareerNamespace } from '../../src/core/storage/local';
 import { DEV_TEST_PREFIX } from '../../src/core/storageKeys';
 import { bus } from '../../src/core/events';
@@ -17,8 +17,9 @@ import { validateLeagueHistory } from '../../src/data/leagueCareer';
 import { buildAnnualReviewAdditions, snapshotBeforeRollover } from '../../src/systems/stats';
 import { freshCapAccount } from '../../src/systems/cap';
 import { AU_CAREER_PROFILE } from '../../src/content/career/au';
-import { setupStructuralDivisionCareer } from '../../src/systems/divisionCareer';
+import { buildDivisionTrials, setupStructuralDivisionCareer } from '../../src/systems/divisionCareer';
 import { competitionFixtureId } from '../../src/data/competition';
+import * as leagueSelection from '../../src/systems/leagueSelection';
 
 export function closingState(): GameState {
   createNewGame('League close', 573);
@@ -153,6 +154,14 @@ describe('pure League season close', () => {
     const debt = {...s, boardLoan: {owed: 1}}; expect(closeLeagueSeason(debt)).toBe(debt);
     createNewGame('Legacy', 8); expect(closeLeagueSeason(getState())).toBe(getState());
   });
+  it('refuses to return a close that fails validation', () => {
+    const s = closingState();
+    const original = JSON.stringify(s);
+    expect(validateInput(s as unknown as Record<string, unknown>, s.version)).toBeNull();
+    vi.spyOn(leagueSelection, 'leagueAccessFromClose').mockReturnValue([]);
+    expect(closeLeagueSeason(s) === s).toBe(true);
+    expect(JSON.stringify(s)).toBe(original);
+  });
   it.each(['forfeit', 'withdrawn'] as const)('records official %s finals correctly', kind => {
     const s = closingState(); const league = s.competitions!.instances[0]!; const final = league.fixtures[2]!;
     if (kind === 'forfeit') final.result!.decider = 'forfeit';
@@ -190,6 +199,83 @@ describe('League interval gate', () => {
     expect(run.stop.kind).toBe('stopped');expect(run.weeksPlayed).toBe(0);advanceWeek();expect(ticks).toBe(1);
     listeners.get('visibilitychange')!();listeners.get('pagehide')!();save(getState());expect(saveIfChanged(getState())).toBe(false);off();
     expect(bytes.get(DEV_TEST_PREFIX+slotKey(1))).toBe(original);
+  });
+  it.each(['ordinary', 'held'] as const)('quarantines invalid post-hook state after a mid-season interval (%s)', async kind => {
+    setCareerNamespace(DEV_TEST_PREFIX);
+    __unlockSaves();
+    const bytes = new Map<string, string>();
+    __setStorage({ getItem: k => bytes.get(k) ?? null, setItem: (k, v) => { bytes.set(k, v); }, removeItem: k => { bytes.delete(k); } });
+    const listeners = new Map<string, () => void>();
+    const target = {
+      addEventListener: (name: string, fn: () => void) => { listeners.set(name, fn); },
+      removeEventListener: (name: string) => { listeners.delete(name); },
+    };
+    const off = enableAutosave({ doc: { ...target, visibilityState: 'hidden' }, win: target });
+    try {
+      const s = closingState();
+      s.week = 2;
+      const schedule = competitions(1, false);
+      schedule.calendar!.elapsedIntervals = 1;
+      schedule.leagueCareer = s.competitions!.leagueCareer!;
+      const trial = buildDivisionTrials({ ...schedule.world!, instances: schedule.instances }, profile, 1, 573)
+        .find(i => i.fixtures[0]?.slot === 2 && !i.entrantIds.includes(s.clubId))!;
+      schedule.instances.push(trial);
+      s.competitions = schedule;
+      s.league.ladder = competitionLadder(schedule.instances[0]!);
+      expect(validateInput(s as unknown as Record<string, unknown>, s.version)).toBeNull();
+      setState(s);
+      expect(saveIfChanged(getState())).toBe(true);
+      const key = DEV_TEST_PREFIX + slotKey(1);
+      const original = bytes.get(key);
+      expect(original).toBe(JSON.stringify(getState()));
+      const blocked = vi.fn();
+      const advanced = vi.fn();
+      bus.on('week:blocked', blocked);
+      bus.on('week:advanced', advanced);
+      let release: WeekRelease | undefined;
+      let afterHook: GameState | undefined;
+      if (kind === 'held') registerTickHook('hold-interval', 40, ctx => { release = ctx.hold!(); });
+      const fault = vi.fn(() => {
+        setState({ boardLoan: { owed: 1 } });
+        afterHook = getState();
+      });
+      registerTickHook('unexpected-debt', kind === 'held' ? 50 : 40, fault);
+
+      const advancing = advanceUntil({ kind: 'weeks', weeks: 1 });
+      if (kind === 'held') {
+        expect(weekHeld()).toBe(true);
+        expect(release?.current()).toBe(true);
+        expect(fault).not.toHaveBeenCalled();
+        release!();
+      }
+      const run = await advancing;
+      expect(run).toMatchObject({ weeksPlayed: 0, stop: { kind: 'stopped' } });
+      const problem = failedIntervalProblem();
+      expect(problem).not.toBeNull();
+      expect(blocked).toHaveBeenCalledTimes(1);
+      expect(blocked).toHaveBeenCalledWith({ season: 1, week: 2, reason: problem });
+      expect(advanced).not.toHaveBeenCalled();
+      expect(weekHeld()).toBe(false);
+      expect(getState()).toBe(afterHook);
+      expect(getState()).toMatchObject({ week: 2, competitions: { calendar: { elapsedIntervals: 1 } } });
+      expect(bytes.get(key)).toBe(original);
+
+      save(getState());
+      expect(saveIfChanged(getState())).toBe(false);
+      listeners.get('pagehide')!();
+      listeners.get('visibilitychange')!();
+      expect(bytes.get(key)).toBe(original);
+
+      advanceWeek();
+      advanceWeeks(2);
+      release?.();
+      expect(await advanceUntil({ kind: 'weeks', weeks: 1 })).toEqual(run);
+      expect(fault).toHaveBeenCalledTimes(1);
+      expect(blocked).toHaveBeenCalledTimes(1);
+      expect(advanced).not.toHaveBeenCalled();
+    } finally {
+      off();
+    }
   });
   it('requires a bound release for a marked hold; bare legacy resume cannot consume it', () => {
     setCareerNamespace(DEV_TEST_PREFIX);setState(closingState());let release!:()=>void;
