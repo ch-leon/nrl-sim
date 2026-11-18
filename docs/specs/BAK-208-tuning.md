@@ -1914,7 +1914,7 @@ gameplay change for live-match recovery.
 | `shapes.backDoor.callerDepth` / `.callerWidth` | 4 / 6 m | Half behind the setup anchor and toward his own side of it. |
 | `shapes.backDoor.leadDepth` / `.leadWidth` | 3 / 4 m | Forward inside the half's lane during setup. |
 | `shapes.backDoor.supportDepth` / `.supportWidth` | 6 / 0 m | Fullback behind the setup anchor, inside the lead. |
-| `shapes.backDoor.leadAheadM` | 2 m | Lead's finish ahead of the actual caller; fixed at second launch until catch. |
+| `shapes.backDoor.leadAheadM` | 2 m | Lead's target ahead of the half from the heel. The target follows the first pass and half's run, then holds at second launch through the catch. |
 | `shapes.backDoor.trailDepthM` | 3 m | Supporting fullback's run behind the actual caller, subject to ordinary passing eligibility. |
 | `shapes.backDoor.leadClearM` | 0.5 m | Real lead must be this far ahead of the backwards pass corridor before flight metadata calls it back-door. |
 

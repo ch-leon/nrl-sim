@@ -349,20 +349,16 @@ an initial review default, subject to browser and standard-harness comparison.
 
 ### Ordinary back-door support (#649, next shape slice)
 
-**UNFINISHED candidate, not a completed or current-main feature.** Controlled
-geometry/lifecycle fixtures pass, but the bounded default lab seeds 1–6 have not
-produced a genuine back-door passage. A slower lead can remain behind the run-on
-half when the ordinary pass is decided. Natural lead readiness before that run-on
-is the remaining blocker; pass odds, eligibility thresholds and outcomes have not
-been changed to manufacture a witness. This slice remains an open draft.
-
 `shapes.backDoor.on:1` adds one ordinary structure without changing the existing
 spread/pod/edge weights. A reachable free half, forward lead and fullback prepare
 during contact/PTB under the same 12/7 m reach limits. Their exact identities and
 lateral origin are chosen once; no player is moved into place. The fullback stays
-inside and behind the half, with the forward between their lanes. An actual DH
-pass to that half activates the supporting runs. Another committed recipient,
-manual/coach input or scripted play cancels the option without a redraw.
+inside and behind the half, with the forward between their lanes. As the ball is
+heeled back, the lead starts toward his target ahead of the half with ordinary
+acceleration, sprint and fatigue. This gives him time to move forward before the
+half runs onto the first pass. The fullback's supporting run starts on an actual
+DH pass to that half. A pass to another recipient, manual/coach input or scripted
+play cancels the option without a redraw.
 
 The half keeps his ordinary carrier line and engagement decision. His support
 must really be behind him, available and in the usual passing window to be
@@ -380,6 +376,9 @@ it. Actor/flight metadata is copied on snapshot reads; reads never recruit a
 recipient or consume dice. With `shapes.backDoor.on:0`, the prior three-structure
 simulation and RNG stream remain exact. This gameplay slice uses recovery engine
 revision 7; its weights and authored metres are listed in the tuning reference.
+
+Default Lab seed 5 shows the heel at tick 4291, DH pass to the home half at 4301,
+the half's back-door pass behind the forward at 4322 and the fullback catch at 4330.
 
 ### 5.2 Defence presets
 

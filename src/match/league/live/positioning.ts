@@ -388,6 +388,13 @@ export abstract class LivePositioning extends LiveContact {
         p.wantsSprint = flight!.via === 'kick';
       } else if (p === this.dummyHalf(atk) && (ph.kind === 'tackle' || ph.kind === 'ruck')) {
         p.target = this.dummyHalfSpot();
+      } else if (shape?.kind === 'back-door' && ph.kind === 'ruck' && ph.stage === 'dh'
+        && p.slot === shape.backDoor!.lead.slot) {
+        // Start the lead on the heel, before the half runs onto the pass. The
+        // DH's retreat to collect the ball must not turn the lead back with him.
+        const caller = this.at(atk, shape.backDoor!.caller.slot);
+        p.target = clampToGround(backDoorTarget(shape, p.slot, caller.body.pos)!, 1);
+        p.wantsSprint = true;
       } else if (ph.kind === 'ruck' && ph.stage === 'dh' && !this.locked(p) && !this.anticipatingGrubber(p)) {
         // The ball is heeled: the backline comes onto it, so the first receiver
         // hits the pass at pace instead of standing flat-footed. The forwards

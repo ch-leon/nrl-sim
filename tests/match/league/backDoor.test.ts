@@ -1,8 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { Runner } from '../../../src/match/core/engine';
+import type { ContactPlayer, Snapshot } from '../../../src/match/core/snapshot';
+import { DEFAULT_AWAY, DEFAULT_HOME, labSheet } from '../../../src/match/lab/sheets';
 import { LiveSim } from '../../../src/match/league/live';
+import { LEGS_ENERGY } from '../../../src/match/league/fatigue';
 import { sideSheet } from '../../../src/match/balance/measure';
 import { applyTuning } from '../../../src/match/league/tuning';
-import { backDoorTarget, behindLead, packetSlots, shapeTarget } from '../../../src/match/league/attackingShapes';
+import { SHAPES, backDoorTarget, behindLead, packetSlots, shapeTarget } from '../../../src/match/league/attackingShapes';
 import { LIVE } from '../../../src/match/league/live/knobs';
 
 const restores: (()=>void)[]=[];
@@ -27,6 +31,11 @@ class BackDoorSim extends LiveSim {
   choose() { this.prepareAttackShape(); return this.snapshot(); }
   targets() { this.assignTargets(); return this.players.map(p=>({...p.target})); }
   man(i:number) { return this.players[i]!; }
+  readyToHeel() {
+    if (this.phase.kind !== 'ruck') throw new Error('ruck');
+    this.phase.stage = 'ptb';
+    this.phase.t0 = this.tick - LIVE.ptbTicks + 1;
+  }
   dh() { if(this.phase.kind==='ruck') {this.phase.stage='dh';this.phase.heldAt=100;} this.ball={kind:'held',by:6};this.players[6]!.pose='dummyHalf'; }
   ruckAt(tick:number) {this.tick=tick;if(this.phase.kind==='ruck')this.stepRuck(this.phase);this.prepareAttackShape();return this.snapshot();}
   cancel() {this.cancelRuckDecision();this.prepareAttackShape();}
@@ -83,13 +92,36 @@ describe('ordinary back-door option (#649)',()=>{
   });
 
   it('respects the actual early DH commitment and ends an alternative or cancelled choice without a reroll',()=>{
-    const sim=new BackDoorSim();sim.choose();sim.dh();sim.queue=[0,.999];
-    const called=sim.ruckAt(102);expect(called.passCall?.to.slot).toBe(4);
-    const released=sim.ruckAt(106);expect(released.ball.flight?.receiver?.slot).toBe(4);expect(released.attackShape?.kind).toBe('back-door');
-    const other=new BackDoorSim();other.choose();other.dh();other.queue=[.999,.999];
-    const alternative=other.ruckAt(106);expect(alternative.ball.flight?.receiver?.slot).toBe(7);expect(alternative.attackShape).toBeUndefined();
-    const cancelled=new BackDoorSim();cancelled.choose();const draws=cancelled.draws;cancelled.cancel();
-    expect(cancelled.choose().attackShape).toBeUndefined();expect(cancelled.draws).toBe(draws);
+    for (const dir of [-1, 1] as const) {
+      const sim=new BackDoorSim(dir);sim.choose();sim.dh();sim.queue=[0,.999];
+      const called=sim.ruckAt(102);expect(called.passCall?.to.slot).toBe(4);
+      const released=sim.ruckAt(106);expect(released.ball.flight?.receiver?.slot).toBe(4);expect(released.attackShape?.kind).toBe('back-door');
+      const other=new BackDoorSim(dir);other.choose();other.dh();other.queue=[.999,.999];
+      const alternative=other.ruckAt(106);expect(alternative.ball.flight?.receiver?.slot).toBe(7);expect(alternative.attackShape).toBeUndefined();
+      const cancelled=new BackDoorSim(dir);cancelled.choose();const draws=cancelled.draws;cancelled.cancel();
+      expect(cancelled.choose().attackShape).toBeUndefined();expect(cancelled.draws).toBe(draws);
+    }
+  });
+
+  it('moves the lead ahead of the half on the heel before DH release in both directions', () => {
+    for (const dir of [-1, 1] as const) {
+      const sim = new BackDoorSim(dir), caller = sim.man(4), lead = sim.man(7);
+      lead.body.pos.x = caller.body.pos.x;
+      const beforeHeel = lead.body.pos.x;
+      expect(sim.choose().attackShape?.backDoor?.lead.slot).toBe(7);
+      sim.readyToHeel();
+      sim.queue = [.999, 0, .999]; // legal PTB, ordinary weighted choice, no dart
+      sim.step();
+      expect(sim.snapshot().ball.flight?.via).toBe('roll');
+      const releaseTick = sim.tick + LIVE.rollTicks + LIVE.dhHoldTicks;
+      while (sim.tick < releaseTick - 1) sim.step();
+      expect(sim.snapshot().passCall?.to.slot).toBe(4);
+      expect((lead.body.pos.x - beforeHeel) * dir).toBeGreaterThan(0);
+      expect((lead.body.pos.x - caller.body.pos.x) * dir).toBeGreaterThanOrEqual(SHAPES.backDoor.leadClearM);
+      expect(lead.body.vel.x * dir).toBeGreaterThan(0);
+      sim.step();
+      expect(sim.snapshot().ball.flight).toMatchObject({ via: 'pass', receiver: { side: 'home', slot: 4 } });
+    }
   });
 
   it('uses the ordinary decision and pass, keeps the lead finish through second catch, then releases',()=>{
@@ -115,6 +147,56 @@ describe('ordinary back-door option (#649)',()=>{
       if(change==='identity')p.key='replacement';if(change==='locked')p.lockUntil=200;if(change==='sub')p.subFor=0;if(change==='bin')p.binUntilS=1000;
       expect(s.choose().attackShape).toBeUndefined();
     }
+  });
+
+  it('runs the natural seed 5 Lab passage from heel to fullback catch', () => {
+    const runner = new Runner(seed => new LiveSim(
+      { ...labSheet(DEFAULT_HOME), rotation: 'standard' },
+      { ...labSheet(DEFAULT_AWAY), rotation: 'standard' },
+      seed, { energy: LEGS_ENERGY.fresh, weather: 'clear', calls: [] },
+    ), 5);
+    const at = (tick: number): Snapshot => {
+      while (!runner.finished && runner.tick < tick) runner.step();
+      expect(runner.tick).toBe(tick);
+      return runner.cur;
+    };
+    const player = (snap: Snapshot, ref: ContactPlayer) => {
+      const p = snap.players.find(p => p.side === ref.side && p.slot === ref.slot);
+      expect(p?.who).toBe(ref.who);
+      return p!;
+    };
+    runner.seek(4291);
+    const heel = runner.cur;
+    expect(heel.ball.flight?.via).toBe('roll');
+    const shape = heel.attackShape!;
+    expect(shape.kind).toBe('back-door');
+    const { caller, lead, support } = shape.backDoor!;
+    const called = at(4297);
+    expect(called.passCall?.to).toEqual(caller);
+    const ready = at(4300);
+    expect((player(ready, lead).x - player(heel, lead).x) * shape.dir).toBeGreaterThan(0);
+    expect((player(ready, lead).x - player(ready, caller).x) * shape.dir).toBeGreaterThan(SHAPES.backDoor.leadClearM);
+    expect(at(4301).ball.flight).toMatchObject({ via: 'pass', receiver: caller });
+    expect(at(4309).ball.holder).toEqual({ side: caller.side, slot: caller.slot });
+    const before = at(4321), launched = at(4322), flight = launched.ball.flight!;
+    expect(flight).toMatchObject({ via: 'pass', startedTick: 4322, source: { player: caller }, receiver: support, backDoor: { lead } });
+    expect(behindLead(flight.from, flight.to, player(before, lead), shape.dir)).toBe(true);
+    runner.update(1000);
+    expect(runner.cur).toBe(launched);
+    const edited = runner.current.snapshot();
+    edited.ball.flight!.backDoor!.lead.who = 'changed';
+    edited.attackShape!.backDoor!.caller.who = 'changed';
+    edited.attackShape!.backDoor!.lead.slot = 8;
+    edited.attackShape!.backDoor!.support.side = 'away';
+    expect(runner.current.snapshot()).toEqual(launched);
+    const caught = at(flight.arrivesTick);
+    expect(caught.ball.holder).toEqual({ side: support.side, slot: support.slot });
+    expect(caught.attackShape?.backDoor).toEqual(shape.backDoor);
+    expect(at(caught.tick + 1).attackShape).toBeUndefined();
+    runner.seek(heel.tick);
+    expect(runner.cur).toEqual(heel);
+    expect(at(launched.tick)).toEqual(launched);
+    expect(at(caught.tick)).toEqual(caught);
   });
 
   it('off preserves the preceding ordinary-shapes event and RNG fingerprint exactly',async()=>{
