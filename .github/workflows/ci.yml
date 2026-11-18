@@ -96,9 +96,9 @@ jobs:
     # has no WebKit for it ("Playwright does not support webkit on ubuntu26.04-x64").
     # Go back to ubuntu-latest once playwright-core is on a version that does.
     runs-on: ubuntu-24.04
-    # Cold WebKit dependency installs can take 13 minutes before layout/playthrough checks begin.
-    # Keep the complete checks running on slower runners; no per-check timeouts are relaxed.
-    timeout-minutes: 30
+    # Cold WebKit dependency installs can take 20+ minutes before layout/playthrough checks begin.
+    # Leave time for the complete checks on slower runners; no per-check timeouts are relaxed.
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
