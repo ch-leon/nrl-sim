@@ -10,6 +10,7 @@
 // before it asks for the service, so no key below is ever written.
 
 import { commercialEnabled } from './flags';
+import { APP_PLATFORM } from '../platform';
 
 export type Tier = 'demo' | 'standard' | 'allPlatforms';
 export type Platform = 'web' | 'ios' | 'android' | 'steam';
@@ -24,8 +25,8 @@ export interface Entitlements {
   checkedAt: number;
 }
 
-/** The platform this build runs on. The web build is the only one so far. */
-export const PLATFORM: Platform = 'web';
+/** The platform this build runs on: web, or the Android or iPhone app (src/platform.ts). */
+export const PLATFORM: Platform = APP_PLATFORM;
 
 /**
  * DECISION (Leon): cross-buy. false: standard unlocks the platform it was bought
