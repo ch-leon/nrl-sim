@@ -10,7 +10,8 @@ import { FACILITY_CATALOG, facilityUpkeep } from '../data/facility';
 import { closedGatesFlag, EVENT_CARDS } from '../data/events';
 import { careerActionClock, currentRound, inTrials } from '../core/season';
 import { registerSeasonHook, registerTickHook, TICK_ORDER } from '../core/time';
-import { hasStructuralCalendar } from './competitionCalendar';
+import { leagueClubResults, leagueSeasonView } from './leagueSeasonView';
+import { competitionLadder, hasStructuralCalendar } from './competitionCalendar';
 import { staffWages } from './staff';
 import { BOARD_LOAN, BOARD_LOAN_REPAID, warnForWeeks, notifyContractWarning } from './contracts';
 import { FINANCE_TIERS, matchCashQuote, type FinanceLevel, type FinanceTier } from '../data/financeRules';
@@ -138,12 +139,26 @@ export interface GateEstimate {
  */
 export function homeGate(state: GameState, fixture: Fixture): GateEstimate {
   const base = ECON.ATTEND_BASE + state.reputation * ECON.ATTEND_PER_REP;
-  const form = 1 + ECON.FORM_SWING * recentForm(state, fixture.round);
+  const view = leagueSeasonView(state);
+  const saved = view?.fixtures.find(f => f.instance.id === fixture.competitionId && f.fixture.id === fixture.id);
+  const slot = saved?.slot ?? fixture.slot ?? state.week;
+  const formValue = view ? leagueClubResults(view, state.clubId).filter(f => f.slot !== null && f.slot < slot)
+    .slice(-ECON.FORM_GAMES).reduce((n, f) => n + (f.result === 'W' ? 1 : f.result === 'L' ? -1 : 0), 0) / ECON.FORM_GAMES
+    : recentForm(state, fixture.round);
+  const form = 1 + ECON.FORM_SWING * formValue;
   const opponent = fixture.homeId === state.clubId ? fixture.awayId : fixture.homeId;
-  const occasion = fixture.round > SEASON_ROUNDS ? ECON.FINALS_MULT : topEight(state, opponent) ? ECON.BIG_MATCH_MULT : 1;
+  // Crowd appeal follows the saved sporting field before this date. Its cash
+  // quote below is fixed independently of form, standings and attendance.
+  const priorLadder = view ? competitionLadder({ ...view.instance, fixtures: view.fixtures
+    .filter(f => f.instance.id === view.instance.id && f.status === 'completed' && f.slot !== null && f.slot < slot)
+    .map(f => f.fixture) }) : [];
+  const opponentPlace = priorLadder.findIndex(r => r.clubId === opponent && r.played > 0);
+  const bigMatch = view ? opponentPlace >= 0 && opponentPlace < view.finalsSize : topEight(state, opponent);
+  const final = view ? saved?.stageKind === 'knockout' || saved?.stageKind === 'series' : fixture.round > SEASON_ROUNDS;
+  const occasion = final ? ECON.FINALS_MULT : bigMatch ? ECON.BIG_MATCH_MULT : 1;
   const demand = Math.round(base * form * occasion);
   const capacity = groundCapacity(state);
-  const closed = state.eventDeck.flags.includes(closedGatesFlag(state.season, fixture.round));
+  const closed = state.eventDeck.flags.includes(closedGatesFlag(state.season, view ? slot : fixture.round));
   const attendance = closed ? 0 : Math.min(capacity, demand);
   // Crowd presentation is independent of the fixed venue payment. Never multiply
   // attendance by ticket prices or apply a hidden difficulty modifier to cash.

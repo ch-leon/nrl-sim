@@ -350,7 +350,7 @@ function closeWithMatch(node: HTMLElement, also?: () => void): void {
  * week has finished (the rest of the round is played after the whistle); the gate
  * is this home week's, as the books took it.
  */
-export function showFullTime(r: MatchReport, result: MatchResult, fixture: { round: number; homeId: string; awayId: string }, opts: ReportOpts = {}): HTMLElement {
+export function showFullTime(r: MatchReport, result: MatchResult, fixture: Fixture, opts: ReportOpts = {}): HTMLElement {
   injectOverlayStyles();
   ensureReportStyles();
   document.querySelector('.nrl-mo-ft')?.remove();
@@ -366,14 +366,22 @@ export function showFullTime(r: MatchReport, result: MatchResult, fixture: { rou
   // What the match did to the club: only what can be said for sure.
   const chips = el('div', { class: 'nrl-ft-chips' });
   if (r.note) chips.append(chip(r.note));
-  if (mine && fixture.homeId === PLAYER_ID) {
+  if (mine) {
     let gate = 0;
+    let gateLabel = 'Gate';
     try {
-      gate = gateReceipts(getState());
+      const state = getState();
+      if (state.competitions?.leagueCareer) {
+        const instance = state.competitions.instances.find(i => i.id === fixture.competitionId);
+        const paid = instance && state.matchIncome.find(r => r.season === instance.season && sameFixtureIdentity(r.fixture, fixture));
+        const quote = fixture.homeId === state.clubId ? paid?.receipt?.home : paid?.receipt?.away;
+        gate = quote?.home ?? 0;
+        if (paid?.neutral) gateLabel = 'Shared gate';
+      } else if (fixture.homeId === PLAYER_ID) gate = gateReceipts(state);
     } catch {
       gate = 0; // no game loaded
     }
-    if (gate > 0) chips.append(chip('Gate ', el('b', { text: `+${fmtMoney(gate)}` })));
+    if (gate > 0) chips.append(chip(`${gateLabel} `, el('b', { text: `+${fmtMoney(gate)}` })));
   }
   const hurt = mine ? result.injuries.filter((i) => i.teamId === mine.id) : [];
   for (const i of hurt.slice(0, 2)) chips.append(el('span', { class: 'nrl-ft-chip nrl-ft-chip-neg', text: injuryChip(i.playerName, i.weeks) }));

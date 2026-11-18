@@ -531,7 +531,7 @@ export function openLineupScreen(): void {
     const league = leagueSeasonView(s);
     const next = league ? nextSeasonFixture(s) : nextFixture(s.league.fixtures, s.week, PLAYER_ID);
     const opp = next ? s.league.clubs.find((c) => c.id === (next.homeId === PLAYER_ID ? next.awayId : next.homeId)) : undefined;
-    planSub.textContent = next && opp ? `${league?.next ? `${league.next.dateLabel} · ${league.next.stageLabel}` : roundLabel(next.round)} · v ${opp.name} · ${next.homeId === PLAYER_ID ? 'home' : 'away'}` : league?.choiceRequired ? 'Choose a league before the next match' : 'Before kick-off';
+    planSub.textContent = next && opp ? `${league?.next ? `${league.next.dateLabel} · ${league.next.stageLabel}` : roundLabel(next.round)} · v ${opp.name} · ${league?.next?.fixture.neutral ? 'neutral' : next.homeId === PLAYER_ID ? 'home' : 'away'}` : league?.choiceRequired ? 'Choose a league before the next match' : 'Before kick-off';
     oppLine.hidden = !opp;
     if (opp) {
       oppLine.textContent = `${opp.name} play ${styleLine(rivalStyle(opp, playerRivalContext(s)))}`;
