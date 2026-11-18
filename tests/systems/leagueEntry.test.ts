@@ -46,7 +46,7 @@ function accept(s: GameState, id?: string) {
 }
 // Controlled sporting results, using the production bracket, standings and
 // close owners. The regional integration cases below play the actual matches.
-function settleWithTitle(active: GameState, win: boolean): GameState {
+function settleWithTitle(active: GameState, win: boolean, bottomClubId?: string): GameState {
   let s = structuredClone(active);
   const c = s.competitions!;
   const current = () => s.competitions!.instances.filter(i => i.season === s.season);
@@ -59,7 +59,8 @@ function settleWithTitle(active: GameState, win: boolean): GameState {
       i.status = 'withdrawn'; for (const f of i.fixtures) f.status = 'cancelled';
       continue;
     }
-    for (const f of i.fixtures) play(f, f.awayId === s.clubId ? s.clubId : f.homeId);
+    for (const f of i.fixtures) play(f, f.homeId === bottomClubId ? f.awayId : f.awayId === bottomClubId ? f.homeId
+      : f.awayId === s.clubId ? s.clubId : f.homeId);
     i.status = 'active';
   }
   for (let round = 1; round <= 2; round++) {
@@ -197,12 +198,6 @@ describe('League entry quotes and atomic candidates', () => {
     const middle = closed.competitions!.world!.divisions[1]!.id;
     const next = accept(closed, middle);
     expect(leagueCareerStateProblem(next)).toBeNull();
-    // Old AI entries are not a complete history: a higher retained tier is
-    // permissible when the current receipt has no claim about this club.
-    const unknownAiHistory = structuredClone(next);
-    const untouchedId = unknownAiHistory.competitions!.leagueCareer!.initialFields[closed.competitions!.world!.divisions[0]!.id]!.find(id => id !== next.clubId)!;
-    unknownAiHistory.league.clubs.find(c => c.id === untouchedId)!.capAccount!.tier = 'premier';
-    expect(leagueCareerStateProblem(unknownAiHistory)).toBeNull();
     const invented = structuredClone(next);
     invented.capAccount.tier = 'premier';
     const receipt = invented.competitions!.leagueCareer!.accepted!;
@@ -221,6 +216,46 @@ describe('League entry quotes and atomic candidates', () => {
     ai.competitions!.leagueCareer!.accepted!.quote.commitments[1] = { ...lower, previousTier: 'championship' };
     ai.competitions!.leagueCareer!.accepted!.annualChanges!.commitments[1] = lower;
     expect(leagueCareerStateProblem(ai)).not.toBeNull();
+  });
+
+  it('requires exact AI attainment while every prior season remains observable', async () => {
+    const first = accept(await initial());
+    const [local, middle] = first.competitions!.world!.divisions.map(d => d.id) as [string, string];
+    const second = accept(settleWithTitle(first, true), middle);
+    const third = accept(settleWithTitle(second, false), local);
+    for (const source of [second, third]) {
+      const invented = structuredClone(source);
+      const receipt = invented.competitions!.leagueCareer!.accepted!;
+      const untouchedId = invented.competitions!.leagueCareer!.initialFields[local]!.find(id => id !== source.clubId
+        && !receipt.movements.some(m => m.clubId === id))!;
+      invented.league.clubs.find(c => c.id === untouchedId)!.capAccount!.tier = 'premier';
+      expect(leagueCareerStateProblem(invented)).not.toBeNull();
+    }
+    // This rival legitimately reaches Championship now; its quoted prior
+    // capacity must still be Local while S1 and S2 membership remain known.
+    const forgedPrevious = structuredClone(third);
+    const quote = forgedPrevious.competitions!.leagueCareer!.accepted!.quote.commitments.find(q => q.clubId !== third.clubId)!;
+    expect(quote).toMatchObject({ previousTier: 'local', tier: 'championship' });
+    quote.previousTier = 'championship';
+    expect(leagueCareerStateProblem(forgedPrevious)).not.toBeNull();
+  });
+
+  it('retains genuine AI attainment after its higher-league season has been pruned', async () => {
+    const first = accept(await initial());
+    const [local, middle] = first.competitions!.world!.divisions.map(d => d.id) as [string, string];
+    const second = accept(settleWithTitle(first, true), middle);
+    const third = accept(settleWithTitle(second, false), local);
+    const promoted = third.competitions!.leagueCareer!.accepted!.movements.find(m => m.clubId !== third.clubId)!.clubId;
+    expect(third.competitions!.leagueCareer!.initialFields[local]).toContain(promoted);
+    expect(third.league.clubs.find(c => c.id === promoted)!.capAccount!.tier).toBe('championship');
+    const fourth = accept(settleWithTitle(third, true, promoted), middle);
+    expect(fourth.competitions!.leagueCareer!.accepted!.movements).toContainEqual({ clubId: promoted, fromLeagueId: middle, toLeagueId: local });
+    const fifth = accept(settleWithTitle(fourth, false), middle);
+    expect(fifth.competitions!.instances.some(i => i.season === 3)).toBe(false);
+    const retainedLeagues = fifth.competitions!.instances.filter(i => i.definition.format.kind === 'league' && i.entrantIds.includes(promoted));
+    expect(retainedLeagues.every(i => i.definition.id.endsWith(`:${local}`))).toBe(true);
+    expect(fifth.league.clubs.find(c => c.id === promoted)!.capAccount!.tier).toBe('championship');
+    expect(leagueCareerStateProblem(fifth)).toBeNull();
   });
 
   it('restricts frozen strengths to the integer range produced by real squads', async () => {

@@ -78,20 +78,24 @@ function capacityProblem(state: GameState): string | null {
     const account = player ? state.capAccount : club.capAccount;
     if (!account) return 'A club is missing its financial account.';
     const initialRank = divisions.find(d => progress.initialFields[d.id]!.includes(club.id))!.rank;
+    const priorInstances = c.instances.filter(i => i.season < state.season && i.definition.format.kind === 'league' && i.entrantIds.includes(club.id));
     const priorRanks = player
       ? state.history.filter(h => h.season < state.season).map(h => rank(h.league!.leagueId))
-      : c.instances.filter(i => i.season < state.season && i.definition.format.kind === 'league' && i.entrantIds.includes(club.id))
-        .map(i => divisions.find(d => i.definition.id === `${c.world!.profile.id}:${d.id}`)!.rank);
+      : priorInstances.map(i => divisions.find(d => i.definition.id === `${c.world!.profile.id}:${d.id}`)!.rank);
+    // Initial membership supplies S1 even after that draw is pruned. Only
+    // missing later years make an AI club's higher attained tier unknowable.
+    const observedYears = new Set([1, ...priorInstances.map(i => i.season)]);
+    const completeHistory = player || Array.from({ length: state.season - 1 }, (_, i) => i + 1).every(year => observedYears.has(year));
     const previousRank = Math.max(initialRank, ...priorRanks);
     const currentRank = divisions.find(d => c.instances.find(i => i.id === d.instanceId)!.entrantIds.includes(club.id))!.rank;
     const attainedRank = Math.max(previousRank, currentRank);
     const actualRank = DIVISION_TIERS.indexOf(account.tier);
-    if ((player || state.season === 1) ? actualRank !== attainedRank : actualRank < attainedRank)
+    if (completeHistory ? actualRank !== attainedRank : actualRank < attainedRank)
       return 'Club capacity differs from its observed League attainment.';
     const quote = progress.accepted?.quote.commitments.find(q => q.clubId === club.id);
     if (quote) {
       const quotedPrevious = DIVISION_TIERS.indexOf(quote.previousTier);
-      if ((player || state.season === 1) ? quotedPrevious !== previousRank : quotedPrevious < previousRank)
+      if (completeHistory ? quotedPrevious !== previousRank : quotedPrevious < previousRank)
         return 'The entry capacity differs from the club prior League attainment.';
     }
   }
