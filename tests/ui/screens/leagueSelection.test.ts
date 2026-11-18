@@ -66,7 +66,7 @@ beforeEach(() => {
     ...local, leagueId: middle!.id, leagueName: middle!.name, rank: 1, eligible: false, previewKey: 'championship-v1',
     requirement: { leagueId: local.leagueId, leagueName: local.leagueName }, fieldIds: ['rival-b'],
     strength: { min: 62, mean: 62, max: 62 },
-    quote: { definitionInstanceId: middle!.instanceId, opponents: [{ clubId: 'rival-b', strength: 62 }], commitments: [] },
+    quote: { definitionInstanceId: middle!.instanceId, opponents: [{ clubId: 'rival-b', strength: 62 }], commitments: local.quote.commitments },
   };
   premier = {
     ...championship, leagueId: upper!.id, leagueName: upper!.name, rank: 2, previewKey: 'premier-v1',
@@ -122,6 +122,52 @@ describe('League selection dialog', () => {
     closeModal();
     expect(JSON.stringify(getState())).toBe(original);
     expect(choice(open(), local.leagueId).getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it.each(['championship', 'premier'])('shows hypothetical club finances for locked initial %s without adding the club to its field', league => {
+    const target = league === 'championship' ? championship : premier;
+    const dialog = open();
+    choice(dialog, target.leagueId).click();
+
+    expect(part(dialog, 'finance').words()).toContain('Hypothetical cap and commitments if eligible');
+    expect(part(dialog, 'finance').words()).toMatch(/Annual cap.*\$495,000/);
+    expect(part(dialog, 'finance').words()).toMatch(/Season 1.*\$499,000.*Season 2.*\$80,000/);
+    expect(part(dialog, 'field').words()).not.toContain('Seabirds');
+    expect(part(dialog, 'confirm').getAttribute('aria-disabled')).toBe('true');
+  });
+
+  it('describes a saved season without finals without promising a title or adjacent unlock', () => {
+    const definition = structuredClone(local.definition);
+    if (definition.format.kind !== 'league') throw new Error('Expected league fixture');
+    definition.format.finalsSize = 0;
+    definition.stages = definition.stages.filter(stage => stage.kind !== 'knockout');
+    local = { ...local, definition };
+    const dialog = open();
+
+    expect(part(dialog, 'format').words()).toContain('No finals');
+    expect(part(dialog, 'rewards').words()).toContain('Minor premiership');
+    expect(part(dialog, 'rewards').words()).toContain('No finals are scheduled, so no league title can be earned.');
+    expect(part(dialog, 'rewards').words()).toContain('Championship cannot be unlocked through this season');
+    expect(part(dialog, 'rewards').words()).not.toContain('finals winner earns');
+    expect(part(dialog, 'rewards').words()).not.toContain('unlocks Championship permanently');
+    expect(part(dialog, 'confirm').getAttribute('aria-disabled')).toBe('false');
+  });
+
+  it('uses the saved source definition for locked reasons even when that league preview is unavailable', () => {
+    const source = state.competitions!.instances.find(instance => instance.id === state.competitions!.world!.divisions[0]!.instanceId)!;
+    if (source.definition.format.kind !== 'league') throw new Error('Expected league fixture');
+    source.definition.format.finalsSize = 0;
+    source.definition.stages = source.definition.stages.filter(stage => stage.kind !== 'knockout');
+    loadState(state);
+    preview.mockImplementation((_, id) => id === local.leagueId
+      ? { ok: false, reason: 'invalid', message: 'Signed commitments exceed available club capacity.' }
+      : { ok: true, preview: id === championship.leagueId ? championship : premier });
+    const dialog = open();
+    choice(dialog, championship.leagueId).click();
+
+    expect(part(dialog, 'selection-status').textContent).toContain('Local League has no finals scheduled');
+    expect(part(dialog, 'selection-status').textContent).toContain('cannot unlock this league');
+    expect(part(dialog, 'selection-status').textContent).not.toContain('Win the Local League finals title');
   });
 
   it('shows the permanent annual unlock and AI movement and asks again after a stale preview', () => {

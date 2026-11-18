@@ -1,5 +1,6 @@
 import { getState, type GameState } from '../../core/state';
 import { annualCapQuote, FINANCE_TIERS, tierForRank } from '../../data/financeRules';
+import type { CompetitionDefinition } from '../../data/competition';
 import type { LeagueMovement } from '../../data/leagueCareer';
 import type { ClubCommitmentQuote } from '../../data/leagueEntryReceipt';
 import { previewLeagueEntry, type LeagueEntryPreview, type LeaguePreviewResult } from '../../systems/leagueEntry';
@@ -78,7 +79,7 @@ export function openLeagueSelection(options: LeagueSelectionOptions = {}): HTMLE
       return;
     }
     renderPreview(detail, selected, snapshot, previews);
-    const reason = selected.eligible ? '' : lockedReason(selected);
+    const reason = selected.eligible ? '' : lockedReason(selected, snapshot);
     status.textContent = [message, reason].filter(Boolean).join(' ');
   }
 
@@ -165,8 +166,20 @@ export function openLeagueSelection(options: LeagueSelectionOptions = {}): HTMLE
   return backdrop;
 }
 
-function lockedReason(preview: LeagueEntryPreview): string {
-  return preview.requirement ? `Win the ${preview.requirement.leagueName} finals title to unlock this league.` : 'This league is locked.';
+function hasFinals(definition: CompetitionDefinition): boolean {
+  return definition.format.kind === 'league' && definition.format.finalsSize > 0
+    && definition.stages.some(stage => stage.kind === 'knockout' && stage.rounds > 0);
+}
+
+function lockedReason(preview: LeagueEntryPreview, state: GameState): string {
+  if (!preview.requirement) return 'This league is locked.';
+  const { leagueId, leagueName } = preview.requirement;
+  const source = state.competitions?.world?.divisions.find(division => division.id === leagueId);
+  const definition = state.competitions?.instances.find(instance => instance.id === source?.instanceId)?.definition;
+  if (!definition) return `A ${leagueName} finals title is required. Its saved season format is unavailable.`;
+  return hasFinals(definition)
+    ? `Win the ${leagueName} finals title to unlock this league.`
+    : `${leagueName} has no finals scheduled, so this season cannot unlock this league. A minor premiership does not grant access.`;
 }
 
 function renderPreview(detail: HTMLElement, preview: LeagueEntryPreview, state: GameState, previews: LeagueEntryPreview[]): void {
@@ -184,10 +197,10 @@ function renderPreview(detail: HTMLElement, preview: LeagueEntryPreview, state: 
   if (phase === 'next-season-choice') {
     detail.append(el('p', { class: 'nrl-league-note', text: 'This preview uses squads and signed deals before the annual changes. Training, retirements and recruitment can change squad strength.' }));
   }
-  const financials = preview.fieldIds.includes(state.clubId) ? preview.quote.commitments.find(c => c.clubId === state.clubId) : undefined;
+  const financials = preview.quote.commitments.find(c => c.clubId === state.clubId);
   const movements = preview.movements.filter(m => m.clubId !== state.clubId);
   const grid = el('div', { class: 'nrl-league-grid' }, formatPanel(preview), fieldPanel(preview, state, clubName));
-  if (financials) grid.append(financePanel(financials));
+  if (financials) grid.append(financePanel(financials, !preview.eligible));
   grid.append(rewardPanel(preview, unlock));
   if (movements.length) grid.append(movementPanel(movements, clubName, leagueName));
   detail.append(grid);
@@ -244,7 +257,7 @@ function fieldPanel(preview: LeagueEntryPreview, state: GameState, clubName: (id
   const caption = eligible ? 'Proposed field' : phase === 'initial-choice' ? `Current ${leagueName} clubs` : 'Field if eligible';
   return panel(caption, 'field',
     el('p', { class: 'nrl-league-note', text: listed
-      ? 'Strength compares squads. Finals titles determine access.'
+      ? `Strength compares squads.${hasFinals(preview.definition) ? ' Finals titles determine access.' : ''}`
       : 'Strength of the current clubs in this league.' }),
     ...(listed ? [el('p', { class: 'nrl-league-club-strength' },
       el('span', { text: `${state.clubName} · your club` }),
@@ -255,10 +268,11 @@ function fieldPanel(preview: LeagueEntryPreview, state: GameState, clubName: (id
   );
 }
 
-function financePanel(quote: ClubCommitmentQuote): HTMLElement {
+function financePanel(quote: ClubCommitmentQuote, hypothetical: boolean): HTMLElement {
   const currentCap = annualCapQuote(quote.previousTier, quote.purchasedLevel, quote.earnedBasisPoints);
   const increasing = quote.cap > currentCap;
   return panel('Your club’s salary cap', 'finance',
+    ...(hypothetical ? [el('p', { class: 'nrl-league-note', text: 'Hypothetical cap and commitments if eligible. Your club has not entered this league.' })] : []),
     el('p', { class: 'nrl-league-note', text: 'Your club keeps its salary cap when moving down.' }),
     el('ul', { class: 'nrl-league-rows' },
       line('Annual base cap', fmtMoney(quote.baseCap), true),
@@ -278,12 +292,18 @@ function financePanel(quote: ClubCommitmentQuote): HTMLElement {
 
 function rewardPanel(preview: LeagueEntryPreview, unlock: LeagueEntryPreview | undefined): HTMLElement {
   const matchBase = FINANCE_TIERS[tierForRank(preview.rank)].matchBase;
+  const finals = hasFinals(preview.definition);
+  const regular = preview.definition.stages.some(stage => stage.kind === 'league' && stage.rounds > 0);
   return panel('Match income and honours', 'rewards',
     el('p', { text: `Ordinary match payments use this league’s ${fmtMoney(matchBase)} match base. The payout depends on match type, venue, result and facilities.` }),
-    el('p', { text: 'Minor premiership goes to the club leading the regular-season table. The finals winner earns the league title. There is no extra title cash or salary-cap prize.' }),
+    ...(regular ? [el('p', { text: 'Minor premiership goes to the club leading the regular-season table. A minor premiership does not unlock another league.' })] : []),
+    el('p', { text: finals
+      ? 'The finals winner earns the league title. There is no extra title cash or salary-cap prize.'
+      : 'No finals are scheduled, so no league title can be earned.' }),
     ...(unlock ? [el('p', { text: unlock.evidence
       ? `${unlock.leagueName} is already unlocked permanently.`
-      : `Winning this league’s finals title unlocks ${unlock.leagueName} permanently.` })] : []),
+      : finals ? `Winning this league’s finals title unlocks ${unlock.leagueName} permanently.`
+        : `${unlock.leagueName} cannot be unlocked through this season because no finals title is available.` })] : []),
   );
 }
 
