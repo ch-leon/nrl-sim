@@ -145,8 +145,8 @@ const LINEUP_CSS = `
 /* #422: a tile drawn lower than a finger (40px on the pitch, 36 on the bench on a short phone) is tapped over a
    44px band: its hit area reaches into the gaps round it, never as far as the next tile's. */
 .nrl-lineup-tile::after { content: ''; position: absolute; left: 0; right: 0; top: min(0px, calc(50% - 22px)); bottom: min(0px, calc(50% - 22px)); }
-@media (hover: hover) and (pointer: fine) { .nrl-lineup-tile:hover { background: #22305c; } }
-.nrl-lineup-tile:active { background: #22305c; }
+@media (hover: hover) and (pointer: fine) { .nrl-lineup-tile:hover { background: var(--nrl-raised-hover); } }
+.nrl-lineup-tile:active { background: var(--nrl-raised-hover); }
 .nrl-lineup-tile:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 1px; }
 .nrl-lineup-tile[data-selected] { box-shadow: 0 0 0 2px var(--nrl-accent); z-index: 2; }
 .nrl-lineup-tile[data-empty] { background: rgba(232, 224, 200, 0.12); }
@@ -205,8 +205,8 @@ const LINEUP_CSS = `
 }
 /* N14 (#263): 44px rows on a touch screen (the list scrolls; the field is unchanged). */
 @media (pointer: coarse) { .nrl-lineup-row { min-height: 44px; } }
-@media (hover: hover) and (pointer: fine) { .nrl-lineup-row:hover { background: #22305c; } }
-.nrl-lineup-row:active { background: #22305c; }
+@media (hover: hover) and (pointer: fine) { .nrl-lineup-row:hover { background: var(--nrl-raised-hover); } }
+.nrl-lineup-row:active { background: var(--nrl-raised-hover); }
 .nrl-lineup-row:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: -2px; }
 .nrl-lineup-row[data-selected] { background: var(--nrl-me); }
 .nrl-lineup-row[data-injured], .nrl-lineup-row[data-banned] { opacity: 0.55; cursor: default; }
@@ -309,7 +309,7 @@ ${PLAN_FIT_CSS}
 .nrl-lineup-play { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 4px 10px; border: 0; border-radius: 10px; background: var(--nrl-button); color: var(--nrl-text); text-align: left; cursor: pointer; min-width: 0; font: inherit; }
 .nrl-lineup-play[aria-pressed="true"] { background: var(--nrl-me); }
 /* Pressed (#604): a button's pressed fill, so it shows under reduced motion too (dom.ts adds the scale). */
-.nrl-lineup-play:not([aria-pressed="true"]):active { background: #283669; }
+.nrl-lineup-play:not([aria-pressed="true"]):active { background: var(--nrl-raised-hover); }
 .nrl-lineup-play[data-full] { opacity: 0.55; }
 .nrl-lineup-play:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: -2px; }
 .nrl-lineup-play-tick { flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--nrl-line); display: flex; align-items: center; justify-content: center; font-family: var(--nrl-f-num); font-size: 0.875rem; font-weight: 700; box-sizing: border-box; }

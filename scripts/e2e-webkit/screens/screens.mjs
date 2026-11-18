@@ -262,7 +262,7 @@ function toastReport(page, avoid, safe, tappable = true) {
     return {
       problems: [...new Set(out)], shown: shown.length, queued: all.length - 1,
       text: t.querySelector('.nrl-toast-text')?.textContent ?? '', kind, more: t.querySelector('.nrl-toast-more')?.textContent ?? '',
-      bg: getComputedStyle(t).backgroundColor, lane: lane?.dataset.lane ?? '',
+      bg: getComputedStyle(t).backgroundColor, bar: getComputedStyle(t).borderLeftColor, lane: lane?.dataset.lane ?? '',
     };
   }, [avoid, safe, tappable]);
 }
@@ -282,8 +282,9 @@ const TOAST_BURST = [
   { text: 'Signed Jack Taufa', kind: 'success' },
   { text: 'Advanced 4 weeks.', kind: 'info' },
 ];
-/** Each kind's fill (Broadcast Quiet's tokens: info on the navy sheet, success green, danger red; src/ui/dom.ts). */
-const TOAST_BG = { 'nrl-toast-danger': 'rgb(122, 42, 36)', 'nrl-toast-info': 'rgba(14, 22, 48, 0.97)', 'nrl-toast-success': 'rgb(29, 90, 51)' };
+/** Every toast is ink; its left bar is its kind (SuperCOOKED §4: info muted, success green, danger red; src/ui/dom.ts). */
+const TOAST_FILL = 'rgba(5, 7, 13, 0.97)';
+const TOAST_BAR = { 'nrl-toast-danger': 'rgb(255, 59, 31)', 'nrl-toast-info': 'rgb(143, 152, 171)', 'nrl-toast-success': 'rgb(20, 195, 142)' };
 
 export async function runScreens(browser, { w: W, h: H, safe }) {
   const tag = `${W}x${H}${safe.l || safe.r || safe.b || safe.t ? '-safe' : ''}`;
@@ -386,7 +387,8 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
       out.push(...r.problems);
       if (r.text !== want.text) out.push(`toast ${i + 1} reads "${r.text}", want "${want.text}"`);
       if (r.kind !== `nrl-toast-${want.kind}`) out.push(`toast ${i + 1} ("${want.text}") is ${r.kind || 'unclassed'}, want nrl-toast-${want.kind}`);
-      if (r.bg !== TOAST_BG[`nrl-toast-${want.kind}`]) out.push(`toast ${i + 1} is ${r.bg}, want ${TOAST_BG[`nrl-toast-${want.kind}`]} for ${want.kind}`);
+      if (r.bg !== TOAST_FILL) out.push(`toast ${i + 1} is ${r.bg}, want ${TOAST_FILL}`);
+      if (r.bar !== TOAST_BAR[`nrl-toast-${want.kind}`]) out.push(`toast ${i + 1}'s bar is ${r.bar}, want ${TOAST_BAR[`nrl-toast-${want.kind}`]} for ${want.kind}`);
       const more = TOAST_BURST.length - 1 - i;
       if (r.more !== (more ? `+${more}` : '')) out.push(`toast ${i + 1}'s counter reads "${r.more}", want "${more ? `+${more}` : ''}"`);
       if (r.lane !== 'dock') out.push(`toast ${i + 1} is in the ${r.lane} lane, not the dock's`);

@@ -745,9 +745,9 @@ export const LEAGUE_CSS = `
 .nrl-ladder-table td.nrl-ladder-pos { text-align: left; color: var(--nrl-muted); }
 .nrl-ladder-table td.nrl-ladder-diff { color: var(--nrl-text-2); }
 .nrl-ladder-table td.nrl-ladder-pts { font-weight: 600; }
-/* The club's row: starred, #24346b, bold; rounded like the mock's highlight. */
+/* The club's row: starred, the --nrl-me fill, bold; rounded like the mock's highlight. */
 .nrl-ladder-table tr[data-player] td { background: var(--nrl-me); font-weight: 700; }
-.nrl-ladder-table tr[data-player] td:first-child { border-radius: 6px 0 0 6px; }
+.nrl-ladder-table tr[data-player] td:first-child { border-radius: 6px 0 0 6px; box-shadow: inset 3px 0 0 var(--nrl-accent); } /* your row's accent bar (SuperCOOKED §2) */
 .nrl-ladder-table tr[data-player] td:last-child { border-radius: 0 6px 6px 0; }
 /* The finals cut-off: a dashed line under the last place that makes it. */
 .nrl-ladder-table tr[data-cut] td { border-bottom: 1px dashed var(--nrl-accent); }
@@ -787,12 +787,12 @@ export const LEAGUE_CSS = `
   font-size: 0.625rem;
   color: #fff;
 }
-.nrl-form-W { background: var(--nrl-win); }
+.nrl-form-W { background: var(--nrl-win); color: var(--nrl-on-accent); } /* navy on the green (SuperCOOKED §2) */
 .nrl-form-D { background: var(--nrl-line); }
 .nrl-form-L { background: var(--nrl-out); }
 .nrl-form-empty { color: var(--nrl-muted); }
 
-/* The club's fixtures: 38px rows on #141d3a, the result in Mono. */
+/* The club's fixtures: 38px rows on the panel fill, the result in Mono. */
 .nrl-fixtures-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 24px; margin-bottom: 4px; flex: 0 0 auto; }
 .nrl-btn.nrl-fixtures-toggle { min-height: 28px; padding: 0 10px; border-radius: 8px; font-size: 0.8125rem; letter-spacing: 0.06em; position: relative; }
 .nrl-btn.nrl-fixtures-toggle::after { content: ''; position: absolute; inset: -8px 0; } /* a 44px hit area */
@@ -813,9 +813,9 @@ export const LEAGUE_CSS = `
   border: 0;
   box-sizing: border-box;
 }
-button.nrl-fixture-row { pointer-events: auto; cursor: pointer; width: 100%; box-shadow: inset 0 0 0 1px rgba(244, 208, 63, 0.35); }
-@media (hover: hover) and (pointer: fine) { button.nrl-fixture-row:hover { background: #1a2550; } }
-button.nrl-fixture-row:active { background: #1a2550; }
+button.nrl-fixture-row { pointer-events: auto; cursor: pointer; width: 100%; box-shadow: inset 0 0 0 1px rgba(255, 107, 26, 0.35); }
+@media (hover: hover) and (pointer: fine) { button.nrl-fixture-row:hover { background: var(--nrl-raised-hover); } }
+button.nrl-fixture-row:active { background: var(--nrl-raised-hover); }
 button.nrl-fixture-row:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 1px; }
 @media (pointer: coarse) { button.nrl-fixture-row { height: 44px; } }
 .nrl-fixture-rd { width: 24px; flex: 0 0 auto; font-family: var(--nrl-f-label); font-size: 0.875rem; font-weight: 600; color: var(--nrl-muted); }
@@ -831,7 +831,7 @@ button.nrl-fixture-row:focus-visible { outline: 2px solid var(--nrl-accent); out
 .nrl-fixtures-round { margin-top: 6px; flex: 0 0 auto; }
 .nrl-fixtures-round[data-current] { color: var(--nrl-accent); }
 .nrl-fixture { flex: 0 0 auto; font-size: 0.75rem; color: var(--nrl-text-2); padding: 3px 8px; border-radius: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.nrl-fixture[data-player] { background: var(--nrl-me); color: var(--nrl-text); font-weight: 600; }
+.nrl-fixture[data-player] { background: var(--nrl-me); box-shadow: inset 3px 0 0 var(--nrl-accent); color: var(--nrl-text); font-weight: 600; }
 /* A narrow phone: the ladder takes a little more of the width. */
 @media (max-width: 700px) { .nrl-screen.nrl-league { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 12px; } }
 

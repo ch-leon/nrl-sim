@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
 // #363's guard: the game's name lives in src/brand.ts only. A player-visible
-// "NRL Sim" / "NRL SIM" (or "NRLSim") anywhere else in src/**/*.ts, index.html or
+// "Big Coach" / "BIG COACH" (or "BigCoach"), or the old "NRL Sim", anywhere else in src/**/*.ts, index.html or
 // vite.config.ts fails CI. Comments are fine, and so are the lower-case nrl- CSS
 // classes and nrl-sim- storage keys (the pattern is case-sensitive). docs/ and
 // tests are not scanned.
@@ -13,7 +13,8 @@ const SOURCES: [string, string][] = [
   ...raw(import.meta.glob('../src/**/*.ts', { query: '?raw', import: 'default', eager: true })),
   ...raw(import.meta.glob(['../index.html', '../vite.config.ts'], { query: '?raw', import: 'default', eager: true })),
 ];
-const NAME = /NRL ?Sim|NRL ?SIM/;
+// The game's name (Big Coach, SuperCOOKED §2), and its old one so neither creeps back in.
+const NAME = /NRL ?Sim|NRL ?SIM|Big ?Coach|BIG ?COACH/;
 
 /** The source with its comments blanked: block comments, `//` line comments (not `://` in URLs) and HTML comments. */
 function stripComments(src: string): string {

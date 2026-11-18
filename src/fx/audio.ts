@@ -1433,7 +1433,7 @@ function ensureAudioStyles(): void {
   .nrl-settings-pair > .nrl-btn { padding: 0 4px; letter-spacing: 0.02em; white-space: normal; line-height: 1.05; }
 }
 /* A switch a finger can hit (N14, #263; X3): 52×44, the 28×16 track and its knob drawn in its background
-   (the match LOG toggle's look: yellow on, #26325c off). */
+   (the match LOG toggle's look: the accent on, the line colour off). */
 .nrl-switch {
   -webkit-appearance: none;
   appearance: none;
@@ -1445,21 +1445,21 @@ function ensureAudioStyles(): void {
   pointer-events: auto;
   background:
     radial-gradient(circle, #fff 5px, transparent 5.5px) no-repeat 13px 50% / 16px 16px,
-    linear-gradient(#26325c, #26325c) no-repeat 50% 50% / 32px 18px;
+    linear-gradient(var(--nrl-line), var(--nrl-line)) no-repeat 50% 50% / 32px 18px;
   border-radius: 10px;
 }
 .nrl-switch:checked {
   background:
-    radial-gradient(circle, #0e1630 5px, transparent 5.5px) no-repeat 25px 50% / 16px 16px,
-    linear-gradient(#f4d03f, #f4d03f) no-repeat 50% 50% / 32px 18px;
+    radial-gradient(circle, var(--nrl-on-accent) 5px, transparent 5.5px) no-repeat 25px 50% / 16px 16px,
+    linear-gradient(var(--nrl-accent), var(--nrl-accent)) no-repeat 50% 50% / 32px 18px;
 }
-.nrl-switch:focus-visible { outline: 2px solid #f4d03f; outline-offset: -2px; }
+.nrl-switch:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: -2px; }
 /* The volume slider (#349 E1), 44px tall to take a thumb. */
 .nrl-audio-slider { -webkit-appearance: none; appearance: none; flex: 1 1 auto; min-width: 120px; height: 44px; margin: 0; background: transparent; pointer-events: auto; }
-.nrl-audio-slider::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: #26325c; }
-.nrl-audio-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; margin-top: -8px; border-radius: 11px; background: #f4d03f; }
-.nrl-audio-slider::-moz-range-track { height: 6px; border-radius: 3px; background: #26325c; }
-.nrl-audio-slider::-moz-range-thumb { width: 22px; height: 22px; border: 0; border-radius: 11px; background: #f4d03f; }
+.nrl-audio-slider::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: var(--nrl-line); }
+.nrl-audio-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; margin-top: -8px; border-radius: 11px; background: var(--nrl-accent); }
+.nrl-audio-slider::-moz-range-track { height: 6px; border-radius: 3px; background: var(--nrl-line); }
+.nrl-audio-slider::-moz-range-thumb { width: 22px; height: 22px; border: 0; border-radius: 11px; background: var(--nrl-accent); }
 `;
   document.head.appendChild(style);
 }

@@ -14,8 +14,8 @@ import config from '../capacitor.config';
 import { PWA_MANIFEST, brandIndexHtml } from '../src/brandBuild';
 
 // #363: the game's name, short name, colours and logo live in src/brand.ts, and every
-// place a player sees them reads from there. Today's values are the game as it was,
-// so nothing on screen changes; tests/brandRename.test.ts renames it and watches
+// place a player sees them reads from there. Today's values are SuperCOOKED's Big Coach
+// (docs/specs/ui-supercooked.md §2); tests/brandRename.test.ts renames it and watches
 // every consumer follow.
 
 // No Node types in the tsconfig: files come in as text through Vite's ?raw glob.
@@ -58,58 +58,65 @@ afterEach(() => { g.document = realDocument; });
 
 const withBrand = (over: Partial<Brand>): Brand => ({ ...BRAND, ...over });
 
-describe('BRAND today (players see no change)', () => {
+describe('BRAND today (Big Coach, SuperCOOKED §2)', () => {
   it("keeps the game's current name, short name and title text", () => {
-    expect(BRAND.name).toBe('NRL Sim');
-    expect(BRAND.shortName).toBe('NRLSim');
-    expect(BRAND.titleText).toBe('NRL SIM');
-    expect(BRAND.parentBrand).toEqual({ name: 'SuperCOOKED', show: false });
+    expect(BRAND.name).toBe('Big Coach');
+    expect(BRAND.shortName).toBe('BigCoach');
+    expect(BRAND.titleText).toBe('BIG COACH');
+    expect(BRAND.parentBrand).toEqual({ name: 'SuperCOOKED', show: true });
     expect(BRAND.logo).toEqual({ kind: 'text' });
-    expect(BRAND.exportSlug).toBe('nrl-sim');
+    expect(BRAND.exportSlug).toBe('big-coach');
     expect(BRAND.supportUrl).toBeUndefined();
   });
 
   it("points its colours at the theme's tokens instead of copying them", () => {
-    expect(BRAND.colors.background).toBe(COLOR_TOKENS.navy);
+    expect(BRAND.colors.background).toBe(COLOR_TOKENS.ink); // no navy flash on a cold start
     expect(BRAND.colors.primary).toBe(COLOR_TOKENS.accent);
     expect(BRAND.colors.onPrimary).toBe(COLOR_TOKENS.onAccent);
     expect(BRAND.colors.text).toBe(COLOR_TOKENS.text);
     // Only what the theme has no token for is the brand's own: the ball's colour. The
-    // installed app's colour is the page's navy (#622).
-    expect(BRAND.colors.app).toBe(COLOR_TOKENS.navy);
+    // installed app's colour is ink, the title's and the loading screen's (#622, SuperCOOKED §2).
+    expect(BRAND.colors.app).toBe(COLOR_TOKENS.ink);
+    expect(BRAND.colors.app).toBe('#05070d');
     expect(BRAND.colors.iconBall).toBe('#e8e4d8');
   });
 
-  it("the UI stylesheet's tokens are the same values as before the move", () => {
-    expect(CSS).toContain('--nrl-navy: #0e1630;');
-    expect(CSS).toContain('--nrl-accent: #f4d03f;');
-    expect(CSS).toContain('--nrl-on-accent: #0e1630;');
-    expect(CSS).toContain('--nrl-sheet: rgba(14, 22, 48, 0.97);');
-    expect(CSS).toContain('--nrl-text-2: #c9d1ea;');
-    expect(CSS).toContain('--nrl-fit-bad: #d9534f;');
+  it("the UI stylesheet's tokens are SuperCOOKED's values (§2)", () => {
+    expect(CSS).toContain('--nrl-ink: #05070d;');
+    expect(CSS).toContain('--nrl-navy: #0b1220;');
+    expect(CSS).toContain('--nrl-accent: #ff6b1a;');
+    expect(CSS).toContain('--nrl-on-accent: #0b1220;');
+    expect(CSS).toContain('--nrl-sheet: rgba(11, 18, 32, 0.98);');
+    expect(CSS).toContain('--nrl-text-2: #c8cdd8;');
+    expect(CSS).toContain('--nrl-fit-bad: #ff3b1f;');
     expect(CSS).not.toContain('${');
     expect(CSS).not.toContain('undefined');
   });
 });
 
 describe('each consumer reads BRAND', () => {
-  it("the title heading is the brand's title text", () => {
+  it("the title heading is the brand's title text, as the wordmark (its last word in the accent)", () => {
     stubDocument();
-    const out = titleHeading() as unknown as StubEl[];
-    expect(out).toHaveLength(1);
-    expect(out[0]!.tagName).toBe('h1');
-    expect(out[0]!.attrs.class).toBe('nrl-title-name');
-    expect(out[0]!.textContent).toBe('NRL SIM');
-    expect(titleHeading(withBrand({ titleText: 'OTHER GAME' }))[0]!.textContent).toBe('OTHER GAME');
+    const text = (e: StubEl): string => e.children.map((c) => c.textContent).join('');
+    const [h1] = titleHeading() as unknown as StubEl[];
+    expect(h1!.tagName).toBe('h1');
+    expect(h1!.attrs.class).toBe('nrl-title-name');
+    expect(h1!.attrs['aria-label']).toBe('BIG COACH');
+    expect(text(h1!)).toBe('BIG COACH');
+    expect(h1!.children.map((c) => [c.attrs.class, c.textContent])).toEqual([['nrl-wordmark-lead', 'BIG '], ['nrl-wordmark-accent', 'COACH']]);
+    const [other] = titleHeading(withBrand({ titleText: 'OTHER GAME' })) as unknown as StubEl[];
+    expect(text(other!)).toBe('OTHER GAME');
+    expect(other!.attrs['aria-label']).toBe('OTHER GAME');
   });
 
-  it('parentBrand.show toggles the "a SuperCOOKED game" line', () => {
+  it('parentBrand.show toggles the "a SuperCOOKED game" line, COOKED in the accent', () => {
     stubDocument();
-    expect(titleHeading()).toHaveLength(1);
-    const shown = titleHeading(withBrand({ parentBrand: { name: 'SuperCOOKED', show: true } })) as unknown as StubEl[];
+    const shown = titleHeading() as unknown as StubEl[];
     expect(shown).toHaveLength(2);
-    expect(shown[1]!.textContent).toBe('a SuperCOOKED game');
+    expect(shown[1]!.children.map((c) => c.textContent).join('')).toBe('a SuperCOOKED game');
+    expect(shown[1]!.children.find((c) => c.attrs.class === 'nrl-wordmark-accent')?.textContent).toBe('COOKED');
     expect(shown[1]!.attrs['data-nrl-parent-brand']).toBe('');
+    expect(titleHeading(withBrand({ parentBrand: { name: 'SuperCOOKED', show: false } }))).toHaveLength(1);
   });
 
   it('an image logo draws an <img> from public/ in the heading, named for screen readers', () => {
@@ -119,11 +126,11 @@ describe('each consumer reads BRAND', () => {
     const img = h1!.children[0]!;
     expect(img.tagName).toBe('img');
     expect(img.attrs.src).toBe('/brand/logo.png');
-    expect(img.attrs.alt).toBe('NRL Sim');
+    expect(img.attrs.alt).toBe('Big Coach');
   });
 
   it("the rotate message names the game, with the brand's name", () => {
-    expect(rotateText()).toBe('In NRL Sim, the game plays in landscape. Turn your phone sideways to carry on.');
+    expect(rotateText()).toBe('In Big Coach, the game plays in landscape. Turn your phone sideways to carry on.');
     expect(rotateText(withBrand({ name: 'Other Game' }))).toMatch(/^In Other Game, the game plays in landscape\./);
   });
 
@@ -134,7 +141,7 @@ describe('each consumer reads BRAND', () => {
     expect(PWA_MANIFEST.background_color).toBe(BRAND.colors.app);
     expect(PWA_MANIFEST.orientation).toBe('landscape');
     // Today's values, as main shipped them.
-    expect([PWA_MANIFEST.name, PWA_MANIFEST.short_name, PWA_MANIFEST.theme_color]).toEqual(['NRL Sim', 'NRLSim', '#0e1630']);
+    expect([PWA_MANIFEST.name, PWA_MANIFEST.short_name, PWA_MANIFEST.theme_color]).toEqual(['Big Coach', 'BigCoach', '#05070d']);
   });
 
   it("the Android WebView's background is the app's colour (#622)", () => {
@@ -143,13 +150,13 @@ describe('each consumer reads BRAND', () => {
 
   it('index.html has placeholders, and the build fills in the brand', () => {
     const raw = INDEX_HTML;
-    expect(raw).not.toMatch(/NRL ?Sim/i);
+    expect(raw).not.toMatch(/NRL ?Sim|Big ?Coach/i);
     const html = brandIndexHtml(raw);
     expect(html).not.toContain('%BRAND_');
-    expect(html).toContain('<title>NRL Sim</title>');
-    expect(html).toContain('<meta name="apple-mobile-web-app-title" content="NRL Sim" />');
-    expect(html).toContain('<meta name="theme-color" content="#0e1630" />');
-    expect(html).toContain('background: #0e1630;');
+    expect(html).toContain('<title>Big Coach</title>');
+    expect(html).toContain('<meta name="apple-mobile-web-app-title" content="Big Coach" />');
+    expect(html).toContain('<meta name="theme-color" content="#05070d" />');
+    expect(html).toContain('background: #05070d;');
     expect(html).toContain('<meta name="color-scheme" content="dark" />');
     expect(html).toContain('<meta name="mobile-web-app-capable" content="yes" />');
     // A name with markup in it is escaped, and an unknown placeholder fails the build.
@@ -161,7 +168,7 @@ describe('each consumer reads BRAND', () => {
     const home = kitFromColors(['#f4d03f', '#1a1a2e'], 'a');
     const away = kitFromColors(['#2e6fd8', '#ffffff'], 'b');
     const texts = panelsFor(home, away).map((p) => p.text);
-    expect(texts).toContain('NRL SIM');
+    expect(texts).toContain('BIG COACH');
     expect(brandSign()).toBe(BRAND.titleText);
   });
 
@@ -183,9 +190,9 @@ describe('each consumer reads BRAND', () => {
 });
 
 describe('export file name and import', () => {
-  it("leads the export file name with the brand's slug, as before", () => {
+  it("leads the export file name with the brand's slug", () => {
     const s = createNewGame('Cavehole Crushers', 1);
-    expect(exportFilename(s)).toBe(`nrl-sim-cavehole-crushers-s${s.season}w${s.week}.json`);
+    expect(exportFilename(s)).toBe(`big-coach-cavehole-crushers-s${s.season}w${s.week}.json`);
     expect(exportFilename(s).startsWith(`${BRAND.exportSlug}-`)).toBe(true);
   });
 
@@ -213,12 +220,13 @@ describe('export file name and import', () => {
 
 /**
  * SHA-256 of the RGBA pixels scripts/gen-icons.mjs draws. Until #622 these were the
- * pre-#363 bytes on the old navy-black field (eef08fbf…, c13d4c91…); the ball and its
- * shape are unchanged and only the field colour moved to the page's navy.
+ * pre-#363 bytes on the old navy-black field (eef08fbf…, c13d4c91…); then the page's
+ * navy (9775c3f3…, 12b94087…). The ball and its shape are unchanged; SuperCOOKED (§2)
+ * moved only the field colour, to ink.
  */
 const MAIN_ICON_SHA = {
-  192: '9775c3f3ad1a7ca83be17f5ee068e8eabf518eda2a3061c34e35d9085ff7decc',
-  512: '12b94087fed0fcfc3f8f5aad61e9ca034d57c159aa93305eb322ff29aee30919',
+  192: 'b19c4b640d2ef79d7124fb6cf28a6ccd52a3466a4ffd1a0fb88ea19e346a646f',
+  512: '48022b62a351e42fe5cb11155522589aa5592281e4dc7a15cd247f09722d65e5',
 } as const;
 
 describe('icons', () => {
@@ -230,7 +238,7 @@ describe('icons', () => {
   it("draw the brand's colours and letters", () => {
     const at = (px: Uint8Array, size: number, x: number, y: number): number[] => [...px.subarray((y * size + x) * 4, (y * size + x) * 4 + 3)];
     const plain = renderIcon(192, BRAND);
-    expect(at(plain, 192, 0, 0)).toEqual([0x0e, 0x16, 0x30]); // field
+    expect(at(plain, 192, 0, 0)).toEqual([0x05, 0x07, 0x0d]); // field (ink)
     expect(at(plain, 192, 70, 96)).toEqual([0xe8, 0xe4, 0xd8]); // ball
     const lettered = renderIcon(192, withBrand({ iconLetters: 'FM', colors: { ...BRAND.colors, app: '#102030' } }));
     expect(at(lettered, 192, 0, 0)).toEqual([0x10, 0x20, 0x30]);

@@ -10,6 +10,7 @@
 
 import { BRAND, type Brand } from '../brand';
 import { COLOR_TOKENS as C } from './tokens';
+import { fillWordmark } from './wordmark';
 
 /** A touch device held upright. Shared by the CSS and the JS. */
 export const PORTRAIT_QUERY = '(orientation: portrait) and (pointer: coarse)';
@@ -75,22 +76,28 @@ function ensureRotateStyles(): void {
   html.${ROTATE_ON_CLASS} .nrl-rotate {
     display: flex; position: fixed; inset: 0; z-index: 10000;
     align-items: center; justify-content: center; padding: 1.5rem;
-    background: ${C.navy}; font-family: "IBM Plex Sans", system-ui, sans-serif;
+    background: ${C.ink}; font-family: "Inter", system-ui, sans-serif;
   }
 }
+/* SuperCOOKED's rotate card (01-more-shared-parts): ink, a 1px edge, the phone outline in white,
+   the title in Oswald, the line, and the wordmark at its foot. */
 .nrl-rotate-card {
-  background: ${C.panel}; color: ${C.text}; border-radius: 18px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4); padding: 24px 22px; max-width: 18rem;
+  background: ${C.ink}; color: ${C.text}; border-radius: 16px; border: 1px solid ${C.line};
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45); padding: 20px 22px; max-width: 18rem;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
   text-align: center; line-height: 1.45;
 }
 .nrl-rotate-phone {
-  width: 2.2rem; height: 3.6rem; margin: 0 auto 1rem; border: 3px solid ${C.accent};
-  border-radius: 0.45rem; background: ${C.button};
+  width: 1.75rem; height: 2.75rem; margin: 0 auto 0.5rem; border: 2px solid ${C.text};
+  border-radius: 6px; box-sizing: border-box;
   animation: nrl-rotate-turn 2.4s ease-in-out infinite;
 }
-.nrl-rotate-title { font-family: "Barlow Condensed", sans-serif; font-weight: 700; font-size: 1.375rem;
-  letter-spacing: 0.04em; text-transform: uppercase; margin: 0 0 6px; }
-.nrl-rotate-text { margin: 0; font-size: 0.875rem; color: ${C.text2}; }
+.nrl-rotate-title { font-family: "Oswald", "Arial Narrow", sans-serif; font-weight: 700; font-size: 0.9375rem;
+  letter-spacing: 0.06em; text-transform: uppercase; margin: 0; }
+.nrl-rotate-text { margin: 0; font-size: 0.8125rem; color: ${C.text2}; }
+.nrl-rotate-mark { margin: 4px 0 0; font-family: "Archivo Black", "Arial Black", sans-serif; font-size: 0.75rem;
+  letter-spacing: -0.02em; text-transform: uppercase; }
+.nrl-rotate-mark .nrl-wordmark-accent { color: ${C.accent}; }
 @keyframes nrl-rotate-turn {
   0%, 20% { transform: rotate(0deg); }
   50%, 80% { transform: rotate(-90deg); }
@@ -132,6 +139,11 @@ export function initLandscapeGuard(opts: LandscapeGuardOpts): LandscapeGuard {
   text.className = 'nrl-rotate-text';
   text.textContent = rotateText();
   card.firstElementChild?.append(text);
+  // The wordmark at the card's foot (SuperCOOKED §4); the card's label already names it.
+  const mark = fillWordmark(document.createElement('p'), BRAND);
+  mark.className = 'nrl-rotate-mark';
+  mark.setAttribute('aria-hidden', 'true');
+  card.firstElementChild?.append(mark);
   document.body.appendChild(card);
 
   const coarse = window.matchMedia('(pointer: coarse)');

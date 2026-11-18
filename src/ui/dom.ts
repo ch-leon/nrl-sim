@@ -278,17 +278,20 @@ export interface Segmented<T extends string> {
 }
 
 /**
- * The sub-navigation inside a sheet: a #1b264a track of choices, the selected
- * one yellow. `onPick` runs on a tap of an unselected item (and of the selected
- * one with `repeat: true`); the caller re-renders and calls set().
+ * The sub-navigation inside a sheet: a panel track of choices, the selected one
+ * white with navy words (SuperCOOKED §3.8), or orange with `main: true` for a
+ * screen's main switch (Squad / Recruit). `onPick` runs on a tap of an unselected
+ * item (and of the selected one with `repeat: true`); the caller re-renders and
+ * calls set().
  */
 export function segmented<T extends string>(
   items: readonly SegItem<T>[],
   selected: T | null,
   onPick: (id: T) => void,
-  opts: { class?: string; label?: string; repeat?: boolean } = {},
+  opts: { class?: string; label?: string; repeat?: boolean; main?: boolean } = {},
 ): Segmented<T> {
-  const track = el('div', { class: opts.class ? `nrl-seg ${opts.class}` : 'nrl-seg', attrs: { role: 'group' } });
+  const cls = ['nrl-seg', ...(opts.main ? ['nrl-seg-main'] : []), ...(opts.class ? [opts.class] : [])].join(' ');
+  const track = el('div', { class: cls, attrs: { role: 'group' } });
   if (opts.label) track.setAttribute('aria-label', opts.label);
   const buttons = new Map<T, HTMLButtonElement>();
   let current = selected;
@@ -668,6 +671,13 @@ export function listenForPress(): void {
   document.addEventListener('touchstart', () => {}, { passive: true });
 }
 
+/**
+ * Hover and press fills (SuperCOOKED): a raised control a shade lighter, the orange a shade
+ * lighter. The stylesheet below writes them as --nrl-raised-hover / --nrl-accent-hover; the
+ * title, whose sheet is up before this one, reads them from here.
+ */
+export const HOVER_FILL = { raised: '#233050', accent: '#ff8540' } as const;
+
 /** Motion (#597): every entrance and transition in src/ui takes its time, curve and travel from these. */
 const MOTION_TOKENS = `--nrl-dur-press: 120ms;
   --nrl-dur-fast: 150ms;
@@ -684,9 +694,11 @@ const REDUCED_MOTION = '@media (prefers-reduced-motion: reduce) { :root { --nrl-
 export const MOTION_CSS = `:root { ${MOTION_TOKENS} }
 ${REDUCED_MOTION}`;
 
-// Broadcast Quiet (docs/specs/ui-broadcast-quiet.md): navy sheets over the
-// grounds, Barlow Condensed caps for labels and buttons, IBM Plex Sans for body
-// text, IBM Plex Mono for every number, one yellow primary a screen. Every
+// SuperCOOKED (docs/specs/ui-supercooked.md; the layout rules are still Broadcast
+// Quiet's, docs/specs/ui-broadcast-quiet.md): navy sheets over the grounds, an ink
+// dock, Oswald caps for labels and buttons, Inter for body text, JetBrains Mono for
+// money, the clock and small numbers, Archivo Black for titles and big numbers, one
+// orange primary a screen. Every
 // interactive/visible element opts back into pointer-events (the #ui-root
 // container is pointer-events:none). Font sizes are rem, 1rem = 16px at Normal:
 // Settings › Text size scales the root (index.html, ui/textSize.ts, #371), so a new
@@ -699,7 +711,8 @@ export const CSS = `
   --nrl-safe-r: env(safe-area-inset-right, 0px);
   --nrl-safe-b: env(safe-area-inset-bottom, 0px);
   --nrl-safe-l: env(safe-area-inset-left, 0px);
-  /* Broadcast Quiet tokens (docs/specs/ui-broadcast-quiet.md); the colours are tokens.ts's. */
+  /* SuperCOOKED tokens (docs/specs/ui-supercooked.md §2); the colours are tokens.ts's. */
+  --nrl-ink: ${T.ink};
   --nrl-navy: ${T.navy};
   --nrl-panel: ${T.panel};
   --nrl-raised: ${T.raised};
@@ -724,12 +737,21 @@ export const CSS = `
   --nrl-fit-bad: ${T.fitBad};
   --nrl-home: ${T.home};
   --nrl-away: ${T.away};
+  --nrl-star-empty: ${T.starEmpty};
+  /* A dialog's and a player card's edge, a shade up from --nrl-line. */
+  --nrl-line-2: #2c3757;
+  /* Hover and press fills: a raised control a shade lighter, the orange a shade lighter. */
+  --nrl-raised-hover: ${HOVER_FILL.raised};
+  --nrl-accent-hover: ${HOVER_FILL.accent};
+  /* The outline button's 1px edge. */
+  --nrl-outline: rgba(255, 255, 255, 0.3);
   --nrl-shadow-chip: 0 4px 14px rgba(0, 0, 0, 0.35);
   --nrl-shadow-tray: 0 6px 20px rgba(0, 0, 0, 0.4);
-  --nrl-shadow-modal: 0 12px 40px rgba(0, 0, 0, 0.4);
-  --nrl-f-label: 'Barlow Condensed', 'Arial Narrow', system-ui, sans-serif;
-  --nrl-f-body: 'IBM Plex Sans', system-ui, sans-serif;
-  --nrl-f-num: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  --nrl-shadow-modal: 0 12px 40px rgba(0, 0, 0, 0.45);
+  --nrl-f-label: 'Oswald', 'Arial Narrow', system-ui, sans-serif;
+  --nrl-f-body: 'Inter', system-ui, sans-serif;
+  --nrl-f-num: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  --nrl-f-display: 'Archivo Black', 'Arial Black', system-ui, sans-serif;
   ${MOTION_TOKENS}
 }
 ${REDUCED_MOTION}
@@ -743,18 +765,21 @@ ${REDUCED_MOTION}
    here; rem, so it still follows Settings › Text size. The match lab's panel is a dense desk tool
    and keeps its small fields. */
 #ui-root :is(input:is([type="text"], [type="search"], [type="number"]), input:not([type]), textarea, select):not(.nrl-lab *) { font-size: max(1rem, 16px); }
-/* Every number in Plex Mono: money, scores, ratings, the clock. */
-.nrl-num { font-family: var(--nrl-f-num); font-weight: 600; font-variant-numeric: tabular-nums; }
+/* Money, the clock, ratings and small numbers in JetBrains Mono (SuperCOOKED §3.4). */
+.nrl-num { font-family: var(--nrl-f-num); font-weight: 500; font-variant-numeric: tabular-nums; }
+/* Titles, scores, a stat tile's number, the finish: Archivo Black in caps. */
+.nrl-display { font-family: var(--nrl-f-display); font-weight: 400; text-transform: uppercase; letter-spacing: -0.02em; }
 /* A raised tile inside a sheet. */
 .nrl-panel {
   pointer-events: auto;
   background: var(--nrl-raised);
   color: var(--nrl-text);
-  border-radius: 10px;
+  border-radius: 14px;
   padding: 8px 10px;
 }
-/* Buttons: secondary by default (#1f2b55, white); one yellow primary a screen
-   (.nrl-btn-primary); destructive keeps the secondary fill with a red label. */
+/* Buttons (SuperCOOKED §4): secondary by default (raised, white); one orange primary a
+   screen (.nrl-btn-primary); outline (.nrl-btn-outline, a 1px white edge at 30%);
+   destructive keeps the secondary fill with an amber label, never orange. */
 .nrl-btn {
   pointer-events: auto;
   cursor: pointer;
@@ -781,9 +806,9 @@ ${REDUCED_MOTION}
    :active: the control's hover fill, and a button or a small tile shrinks to --nrl-press (1
    under reduced motion). It eases in and snaps back on release, so a control measured just
    after a tap is its whole size. Each hover rule below has its :active twin. */
-@media (hover: hover) and (pointer: fine) { .nrl-btn:hover:not(:disabled) { background: #283669; } }
+@media (hover: hover) and (pointer: fine) { .nrl-btn:hover:not(:disabled) { background: var(--nrl-raised-hover); } }
 .nrl-btn:active:not(:disabled) {
-  background: #283669;
+  background: var(--nrl-raised-hover);
   transform: scale(var(--nrl-press));
   transition: background-color var(--nrl-dur-press) ease, transform var(--nrl-dur-press) var(--nrl-ease-out);
 }
@@ -804,33 +829,54 @@ ${REDUCED_MOTION}
 }
 .nrl-btn:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
 .nrl-btn.nrl-btn-primary { background: var(--nrl-accent); color: var(--nrl-on-accent); }
-@media (hover: hover) and (pointer: fine) { .nrl-btn.nrl-btn-primary:hover:not(:disabled) { background: #f7da5e; } }
-.nrl-btn.nrl-btn-primary:active:not(:disabled) { background: #f7da5e; }
+@media (hover: hover) and (pointer: fine) { .nrl-btn.nrl-btn-primary:hover:not(:disabled) { background: var(--nrl-accent-hover); } }
+.nrl-btn.nrl-btn-primary:active:not(:disabled) { background: var(--nrl-accent-hover); }
+.nrl-btn.nrl-btn-outline { background: transparent; box-shadow: inset 0 0 0 1px var(--nrl-outline); }
+@media (hover: hover) and (pointer: fine) { .nrl-btn.nrl-btn-outline:hover:not(:disabled) { background: rgba(255, 255, 255, 0.06); } }
+.nrl-btn.nrl-btn-outline:active:not(:disabled) { background: rgba(255, 255, 255, 0.06); }
 .nrl-btn.nrl-btn-danger { background: var(--nrl-button); color: var(--nrl-neg); }
-@media (hover: hover) and (pointer: fine) { .nrl-btn.nrl-btn-danger:hover:not(:disabled) { background: #283669; } }
-.nrl-btn.nrl-btn-danger:active:not(:disabled) { background: #283669; }
-/* Armed (#612): a two-tap Sell or Release asking again is solid red, on every screen that asks. */
-.nrl-btn.nrl-btn-armed, .nrl-btn.nrl-btn-armed:hover:not(:disabled), .nrl-btn.nrl-btn-armed:active:not(:disabled) { background: var(--nrl-neg); color: var(--nrl-on-accent); }
-/* Disabled stays visible and says why (the reason is the label or the title). */
-.nrl-btn:disabled { cursor: default; opacity: 0.55; }
-.nrl-btn.nrl-btn-primary:disabled { background: var(--nrl-raised); color: var(--nrl-muted); opacity: 1; }
-/* One selected-chip look everywhere (sorts, filters, tabs, presets): yellow, navy text.
+@media (hover: hover) and (pointer: fine) { .nrl-btn.nrl-btn-danger:hover:not(:disabled) { background: var(--nrl-raised-hover); } }
+.nrl-btn.nrl-btn-danger:active:not(:disabled) { background: var(--nrl-raised-hover); }
+/* Armed (#612): a two-tap Sell or Release asking again, on every screen that asks: still amber on
+   navy (destructive is never orange, SuperCOOKED §3.3), now with the amber tint and edge of a pill. */
+.nrl-btn.nrl-btn-armed, .nrl-btn.nrl-btn-armed:hover:not(:disabled), .nrl-btn.nrl-btn-armed:active:not(:disabled) {
+  background: rgba(255, 138, 61, 0.16); color: var(--nrl-neg); box-shadow: inset 0 0 0 1px rgba(255, 138, 61, 0.6);
+}
+/* Disabled stays visible and says why (SuperCOOKED §3.2): the control drops to half, the reason is
+   the label, the title or a .nrl-btn-why line in amber. A primary keeps its orange at 45%; one that
+   carries its reason inside (.nrl-btn-why) takes the raised fill instead, so the amber line reads. */
+.nrl-btn:disabled { cursor: default; opacity: 0.5; }
+.nrl-btn.nrl-btn-primary:disabled { opacity: 0.45; }
+.nrl-btn.nrl-btn-primary:disabled:has(.nrl-btn-why:not([hidden])) { background: var(--nrl-raised); color: var(--nrl-text-2); opacity: 1; }
+.nrl-btn-why { font-family: var(--nrl-f-body); font-size: 0.6875rem; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--nrl-neg); }
+.nrl-btn-why[hidden] { display: none; }
+/* The reason under a disabled control, as its own line (SuperCOOKED §3.2). */
+.nrl-why { font-size: 0.75rem; font-weight: 600; line-height: 1.3; color: var(--nrl-neg); }
+/* One selected-chip look everywhere (sorts, filters, tabs inside a sheet, presets): white, navy
+   text (SuperCOOKED §3.8). Orange only for a screen's main switch (.nrl-seg-main, below).
    The selection wins over hover (a mouse) and over a press. */
 .nrl-btn.nrl-sort-active, .nrl-btn.nrl-sort-active:hover:not(:disabled), .nrl-btn.nrl-sort-active:active:not(:disabled),
 .nrl-btn[data-active], .nrl-btn[data-active]:hover:not(:disabled), .nrl-btn[data-active]:active:not(:disabled),
 .nrl-seg > .nrl-btn[aria-pressed="true"], .nrl-seg > .nrl-btn[aria-pressed="true"]:hover:not(:disabled), .nrl-seg > .nrl-btn[aria-pressed="true"]:active:not(:disabled),
 .nrl-seg > .nrl-btn[aria-selected="true"], .nrl-seg > .nrl-btn[aria-selected="true"]:hover:not(:disabled), .nrl-seg > .nrl-btn[aria-selected="true"]:active:not(:disabled) {
+  background: var(--nrl-text);
+  color: var(--nrl-on-accent);
+}
+.nrl-seg.nrl-seg-main > .nrl-btn:is([aria-pressed="true"], [aria-selected="true"]),
+.nrl-seg.nrl-seg-main > .nrl-btn:is([aria-pressed="true"], [aria-selected="true"]):hover:not(:disabled),
+.nrl-seg.nrl-seg-main > .nrl-btn:is([aria-pressed="true"], [aria-selected="true"]):active:not(:disabled) {
   background: var(--nrl-accent);
   color: var(--nrl-on-accent);
 }
-/* Segmented control: the sub-navigation inside a sheet. */
+/* Segmented control: the sub-navigation inside a sheet. A panel track with a 1px edge. */
 .nrl-seg {
   pointer-events: auto;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   padding: 3px;
-  background: var(--nrl-raised);
+  background: var(--nrl-panel);
+  box-shadow: inset 0 0 0 1px var(--nrl-line);
   border-radius: 10px;
   flex: 0 0 auto;
   max-width: 100%;
@@ -850,19 +896,22 @@ ${REDUCED_MOTION}
   padding: 0 14px;
   border-radius: 8px;
   background: transparent;
-  color: var(--nrl-text);
+  color: var(--nrl-text-2);
   font-size: 1rem;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   /* #604: the pill and the label change in the same frame (a fading pill left navy text on navy). */
   transition-property: none;
 }
 @media (hover: hover) and (pointer: fine) { .nrl-seg > .nrl-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.06); } }
 .nrl-seg > .nrl-btn:active:not(:disabled) { background: rgba(255, 255, 255, 0.06); transition-property: transform; }
+.nrl-seg > .nrl-btn:is([aria-pressed="true"], [aria-selected="true"]) { font-weight: 700; }
 @media (pointer: coarse) { .nrl-seg > .nrl-btn { min-height: 44px; } }
-/* A small caps label (column heads, section titles). */
+/* A small caps label (column heads, section titles). Oswald's own line is 1.3 even at its 88% (fonts.css);
+   1.2 is the line Barlow Condensed gave these, so a heading row keeps its height. */
 .nrl-label {
   font-family: var(--nrl-f-label);
+  line-height: 1.2;
   font-weight: 600;
   font-size: 0.8125rem;
   letter-spacing: 0.08em;
@@ -873,6 +922,8 @@ ${REDUCED_MOTION}
 .nrl-neg { color: var(--nrl-neg); }
 .nrl-attn { color: var(--nrl-accent); }
 .nrl-muted { color: var(--nrl-muted); }
+/* Your row in a table or list: the raised fill and a 3px accent bar inset on its left (SuperCOOKED §2). */
+.nrl-me { background: var(--nrl-me); box-shadow: inset 3px 0 0 var(--nrl-accent); }
 /* A name that may be 24 letters with no space (#616): it breaks inside its box, never past it. */
 .nrl-name-wrap { min-width: 0; overflow-wrap: anywhere; }
 
@@ -895,8 +946,9 @@ ${REDUCED_MOTION}
   gap: 2px;
   padding: 0 8px 0 14px;
   border-radius: 16px;
-  background: var(--nrl-sheet);
-  box-shadow: var(--nrl-shadow-chip);
+  /* Ink (SuperCOOKED §4): darker than the sheets above it, with the sheets' 1px edge. */
+  background: rgba(5, 7, 13, 0.97);
+  box-shadow: inset 0 0 0 1px var(--nrl-line), var(--nrl-shadow-chip);
   color: var(--nrl-text);
   box-sizing: border-box;
 }
@@ -916,14 +968,14 @@ ${REDUCED_MOTION}
 }
 button.nrl-dock-statusbox { cursor: pointer; }
 button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; border-radius: 8px; }
-.nrl-dock-money { font-family: var(--nrl-f-num); font-size: 0.9375rem; font-weight: 600; line-height: 1.2; white-space: nowrap; transition: color var(--nrl-dur-fast) ease; }
-.nrl-dock-week { font-family: var(--nrl-f-label); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.06em; color: var(--nrl-muted); white-space: nowrap; }
+.nrl-dock-money { font-family: var(--nrl-f-num); font-size: 0.9375rem; font-weight: 700; line-height: 1.2; white-space: nowrap; transition: color var(--nrl-dur-fast) ease; }
+.nrl-dock-week { font-family: var(--nrl-f-num); font-size: 0.625rem; font-weight: 500; letter-spacing: 0.06em; color: var(--nrl-muted); white-space: nowrap; }
 /* #351 H2: under 20 weeks of runway the money goes amber, under 8 red; N12.5 in debt is red with its tag. */
 .nrl-dock-money.nrl-money-low { color: var(--nrl-fit-ok); }
 .nrl-dock-money.nrl-money-short, .nrl-dock-money.nrl-money-negative { color: var(--nrl-neg); }
 .nrl-dock-money.nrl-flash-up { color: var(--nrl-pos); }
 .nrl-dock-money.nrl-flash-down { color: var(--nrl-neg); }
-.nrl-hud-debt { margin-left: 4px; padding: 0 4px; border-radius: 4px; font-family: var(--nrl-f-label); font-size: 0.6875rem; letter-spacing: 0.06em; text-transform: uppercase; background: var(--nrl-out); color: #fff; vertical-align: 1px; }
+.nrl-hud-debt { margin-left: 4px; padding: 0 4px; border-radius: 6px; font-family: var(--nrl-f-label); font-size: 0.6875rem; letter-spacing: 0.06em; text-transform: uppercase; background: var(--nrl-out); color: #fff; vertical-align: 1px; }
 .nrl-dock-divider { width: 1px; height: 36px; background: var(--nrl-line); margin-right: 6px; flex: 0 0 auto; }
 /* Short of room (#344), PLAY WEEK's sub-line gives way first (its flex-shrink, below), then the
    tabs, whose labels ellipsize down to 44px. PLAY WEEK itself never goes under its label. */
@@ -945,18 +997,22 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
   align-items: center;
   gap: 6px;
   overflow: hidden;
+  /* The open tab's fill, label colour and bar change in the same frame (as .nrl-seg's, #604): a fading
+     fill showed the orange label and bar on no fill for its first frames. A press still shrinks. */
+  transition-property: none;
 }
 @media (hover: hover) and (pointer: fine) { .nrl-dock-tabs > .nrl-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.05); } }
 .nrl-dock-tabs > .nrl-btn:active:not(:disabled) { background: rgba(255, 255, 255, 0.05); }
 /* The open sheet's tab (aria-current); the marker wins over hover and a press. */
 .nrl-dock-tabs > .nrl-btn[aria-current="page"], .nrl-dock-tabs > .nrl-btn[aria-current="page"]:hover:not(:disabled), .nrl-dock-tabs > .nrl-btn[aria-current="page"]:active:not(:disabled),
 .nrl-dock-tabs > .nrl-btn[aria-expanded="true"], .nrl-dock-tabs > .nrl-btn[aria-expanded="true"]:hover:not(:disabled), .nrl-dock-tabs > .nrl-btn[aria-expanded="true"]:active:not(:disabled) {
-  background: var(--nrl-button);
+  background: var(--nrl-raised);
   color: var(--nrl-accent);
   font-weight: 700;
 }
-/* #344: and a 3px bar under its label, a shape that still reads without the colour (WCAG 1.4.1).
-   The label ellipsizes, so the bar sits in its 5px of bottom padding (the margin takes it back). */
+/* #344: and a 2px accent bar under its label (SuperCOOKED §4), a shape that still reads without the
+   colour (WCAG 1.4.1). The label ellipsizes, so the bar sits in its 5px of bottom padding (the margin
+   takes it back). */
 .nrl-nav-label { position: relative; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-bottom: 5px; margin-bottom: -5px; }
 .nrl-dock-tabs > .nrl-btn[aria-current="page"] .nrl-nav-label::after, .nrl-dock-tabs > .nrl-btn[aria-expanded="true"] .nrl-nav-label::after {
   content: '';
@@ -964,8 +1020,8 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
   left: 0;
   right: 0;
   bottom: 0;
-  height: 3px;
-  border-radius: 2px;
+  height: 2px;
+  border-radius: 1px;
   background: var(--nrl-accent);
 }
 /* ▴'s room (#607): a closed tab holds the width its label gains with ▴, so opening a sheet never
@@ -979,7 +1035,7 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
 .nrl-dock-spacer { flex: 1 1 auto; min-width: 4px; }
 .nrl-dock-play { position: relative; display: flex; align-items: stretch; flex: 0 100 auto; height: 50px; }
 .nrl-dock-play:empty { display: none; }
-.nrl-dock-play-group { display: flex; align-items: stretch; border-radius: 12px; overflow: hidden; background: var(--nrl-accent); color: var(--nrl-on-accent); }
+.nrl-dock-play-group { display: flex; align-items: stretch; border-radius: 10px; overflow: hidden; background: var(--nrl-accent); color: var(--nrl-on-accent); }
 .nrl-dock-play-group > .nrl-btn {
   min-height: 50px;
   border-radius: 0;
@@ -987,14 +1043,19 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
   color: var(--nrl-on-accent);
 }
 @media (hover: hover) and (pointer: fine) { .nrl-dock-play-group > .nrl-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.18); } }
-/* The yellow is the group's, so PLAY WEEK pressed shrinks the whole of it (#604); its buttons only take the fill. */
+/* The orange is the group's, so PLAY WEEK pressed shrinks the whole of it (#604); its buttons only take the fill. */
 .nrl-dock-play-group > .nrl-btn:active:not(:disabled) { background: rgba(255, 255, 255, 0.18); transform: none; }
 .nrl-dock-play-group:has(> .nrl-dock-advance:active:not(:disabled)) {
   transform: scale(var(--nrl-press));
   transition: transform var(--nrl-dur-press) var(--nrl-ease-out);
 }
-/* Navy inside the yellow: the accent ring was yellow on yellow, and the group's overflow cut it off. */
+/* Navy inside the orange: the accent ring was orange on orange, and the group's overflow cut it off. */
 .nrl-dock-play-group > .nrl-btn:focus-visible { outline-color: var(--nrl-on-accent); outline-offset: -4px; }
+/* One orange button a screen (SuperCOOKED §3.1): while an open sheet or dialog has its own primary,
+   PLAY WEEK turns navy (raised, white) until it closes. It still plays the week. */
+#ui-root:has(> :is(.nrl-screen-region, .nrl-modal-backdrop) .nrl-btn-primary:not(:disabled):not([hidden])) .nrl-dock-play-group { background: var(--nrl-raised); color: var(--nrl-text); }
+#ui-root:has(> :is(.nrl-screen-region, .nrl-modal-backdrop) .nrl-btn-primary:not(:disabled):not([hidden])) .nrl-dock-play-group > .nrl-btn { color: var(--nrl-text); }
+#ui-root:has(> :is(.nrl-screen-region, .nrl-modal-backdrop) .nrl-btn-primary:not(:disabled):not([hidden])) .nrl-dock-play-group > .nrl-btn:focus-visible { outline-color: var(--nrl-accent); }
 .nrl-dock-advance { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: 0 16px; max-width: 15rem; }
 .nrl-dock-advance-label { font-family: var(--nrl-f-label); font-size: 1.1875rem; font-weight: 700; letter-spacing: 0.04em; line-height: 1; white-space: nowrap; }
 /* One line (#344): it may break anywhere, so its narrowest is a letter and PLAY WEEK's narrowest is its
@@ -1016,8 +1077,8 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
 }
 .nrl-dock-advance-sub:empty, .nrl-dock-advance-sub[hidden] { display: none; }
 /* 44 wide, a finger's width on every phone (#371, from #381's check: it was 40, and 34 at 667). */
-.nrl-btn.nrl-hud-menu-toggle { width: 44px; min-width: 44px; padding: 0; font-size: 0.875rem; border-left: 1px solid rgba(14, 22, 48, 0.25); }
-.nrl-btn.nrl-hud-stop { width: auto; padding: 0 14px; border-left: 1px solid rgba(14, 22, 48, 0.25); font-size: 1rem; }
+.nrl-btn.nrl-hud-menu-toggle { width: 44px; min-width: 44px; padding: 0; font-size: 0.875rem; border-left: 1px solid rgba(11, 18, 32, 0.25); }
+.nrl-btn.nrl-hud-stop { width: auto; padding: 0 14px; border-left: 1px solid rgba(11, 18, 32, 0.25); font-size: 1rem; }
 .nrl-hud-stop[hidden], .nrl-hud-menu-toggle[hidden] { display: none; }
 /* N10.2: while a multi-week advance runs the button is a progress line, not a faded button. */
 .nrl-dock-play-group > .nrl-btn.nrl-hud-progress:disabled { opacity: 1; cursor: default; }
@@ -1049,7 +1110,7 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
   padding: 6px;
   background: var(--nrl-navy);
   border-radius: 12px;
-  box-shadow: var(--nrl-shadow-tray);
+  box-shadow: inset 0 0 0 1px var(--nrl-line), var(--nrl-shadow-tray);
   /* #606: out of the ▾ under its bottom right corner. It is shown by taking [hidden] off, which
      starts the entrance again each time; closing is a cut. */
   transform-origin: bottom right;
@@ -1125,7 +1186,7 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
   pointer-events: auto;
   position: fixed;
   inset: 0;
-  background: rgba(5, 9, 22, 0.35);
+  background: rgba(5, 7, 13, 0.35);
   z-index: 54;
   animation: nrl-fade-in var(--nrl-dur-sheet) var(--nrl-ease-out); /* #606: in with its sheet */
 }
@@ -1151,7 +1212,7 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
   padding: 10px 12px;
   background: var(--nrl-sheet);
   border-radius: 16px;
-  box-shadow: var(--nrl-shadow-tray);
+  box-shadow: inset 0 0 0 1px var(--nrl-line), var(--nrl-shadow-tray);
   z-index: 56;
   animation: nrl-sheet-up var(--nrl-dur-sheet) var(--nrl-ease-out);
 }
@@ -1163,15 +1224,16 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
   justify-content: center;
   gap: 2px;
   padding: 0 12px;
-  background: var(--nrl-raised);
-  border-radius: 10px;
+  background: var(--nrl-panel);
+  box-shadow: inset 0 0 0 1px var(--nrl-line);
+  border-radius: 14px;
   text-align: left;
   text-transform: none;
   letter-spacing: 0;
   overflow: hidden;
 }
-@media (hover: hover) and (pointer: fine) { .nrl-nav-sheet > .nrl-btn:hover:not(:disabled) { background: #22305c; } }
-.nrl-nav-sheet > .nrl-btn:active:not(:disabled) { background: #22305c; }
+@media (hover: hover) and (pointer: fine) { .nrl-nav-sheet > .nrl-btn:hover:not(:disabled) { background: var(--nrl-raised-hover); } }
+.nrl-nav-sheet > .nrl-btn:active:not(:disabled) { background: var(--nrl-raised-hover); }
 .nrl-nav-sheet > .nrl-btn[aria-current="page"] { box-shadow: inset 0 0 0 2px var(--nrl-accent); }
 /* #344: the tab's bar, under an open tile's name too. */
 .nrl-nav-sheet > .nrl-btn[aria-current="page"] .nrl-office-name { position: relative; padding-bottom: 5px; }
@@ -1181,8 +1243,8 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
   left: 0;
   right: 0;
   bottom: 0;
-  height: 3px;
-  border-radius: 2px;
+  height: 2px;
+  border-radius: 1px;
   background: var(--nrl-accent);
 }
 .nrl-office-name { font-family: var(--nrl-f-label); font-size: 1.125rem; font-weight: 700; letter-spacing: 0.02em; color: var(--nrl-text); }
@@ -1219,9 +1281,9 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
   gap: 10px;
   padding: 0 6px 0 14px;
   border: 0;
-  border-radius: 12px;
-  background: rgba(14, 22, 48, 0.95);
-  box-shadow: var(--nrl-shadow-chip);
+  border-radius: 16px;
+  background: rgba(5, 7, 13, 0.95);
+  box-shadow: inset 0 0 0 1px var(--nrl-line), var(--nrl-shadow-chip);
   color: var(--nrl-text);
   font: inherit;
   box-sizing: border-box;
@@ -1242,7 +1304,7 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
   pointer-events: auto;
   position: fixed;
   inset: 0;
-  background: rgba(5, 9, 22, 0.55);
+  background: rgba(5, 7, 13, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1254,7 +1316,7 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
   background: var(--nrl-navy);
   color: var(--nrl-text);
   border-radius: 18px;
-  box-shadow: var(--nrl-shadow-modal);
+  box-shadow: inset 0 0 0 1px var(--nrl-line-2), var(--nrl-shadow-modal);
   padding: 14px 16px;
   max-width: min(90vw, 480px);
   max-height: 85vh;
@@ -1273,8 +1335,8 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
 .nrl-modal-backdrop:not(.nrl-screen-backdrop):not([data-swap]):not([data-cut]) > .nrl-modal { animation: nrl-pop-in var(--nrl-dur-fast) var(--nrl-ease-out); }
 @keyframes nrl-fade-in { from { opacity: 0; } }
 @keyframes nrl-pop-in { from { transform: scale(var(--nrl-pop)); } }
-.nrl-modal h2 { font-family: var(--nrl-f-label); font-size: 1.375rem; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; line-height: 1.15; }
-.nrl-modal h3 { font-family: var(--nrl-f-label); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); }
+.nrl-modal h2 { font-family: var(--nrl-f-display); font-size: 1.125rem; font-weight: 400; letter-spacing: -0.02em; text-transform: uppercase; line-height: 1.15; }
+.nrl-modal h3 { font-family: var(--nrl-f-label); line-height: 1.2; font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); }
 
 /* ── Sheets (the layering rule above openScreen in dom.ts) ───────────────
    A screen is a navy sheet above the dock: top 12, sides 12, bottom 88 on a
@@ -1304,7 +1366,7 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
   max-height: none;
   border-radius: 16px;
   background: var(--nrl-sheet);
-  box-shadow: var(--nrl-shadow-tray);
+  box-shadow: inset 0 0 0 1px var(--nrl-line), var(--nrl-shadow-tray);
   padding: 10px 14px;
 }
 /* A region dialog (#203): above the sheets, the dock still whole and tappable below it. */
@@ -1312,7 +1374,7 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
   top: var(--nrl-hud-h, 0px);
   bottom: calc(var(--nrl-nav-h, 0px) + var(--nrl-toast-lift, 0px));
   padding: calc(12px + var(--nrl-safe-t)) calc(12px + var(--nrl-safe-r)) 12px calc(12px + var(--nrl-safe-l));
-  background: rgba(5, 9, 22, 0.35);
+  background: rgba(5, 7, 13, 0.35);
 }
 .nrl-dialog-region .nrl-modal {
   /* Fit inside the region rather than the viewport. */
@@ -1336,7 +1398,7 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
 /* Player of the Match (#203): a card, not a wall; taps beside it reach Back to Club. */
 .nrl-potm-backdrop { pointer-events: none; background: transparent; }
 .nrl-potm-backdrop .nrl-modal { pointer-events: auto; }
-/* The ✕: 36×36 on #1f2b55, top-right of a dialog (sheets close from the dock). */
+/* The ✕: 36×36 on the raised fill, top-right of a dialog (sheets close from the dock). */
 .nrl-screen-x {
   position: absolute;
   top: 10px;
@@ -1365,7 +1427,7 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
   background: var(--nrl-sheet);
   color: var(--nrl-text);
   border-radius: 16px;
-  box-shadow: var(--nrl-shadow-tray);
+  box-shadow: inset 0 0 0 1px var(--nrl-line), var(--nrl-shadow-tray);
   padding: 10px 14px;
   overflow: hidden;
   box-sizing: border-box;
@@ -1383,10 +1445,10 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
 /* Centred, not on the baseline (#413): a line that wraps to two stays inside the 44px row (one sits within a pixel of where the baseline put it). */
 .nrl-screen-titles { flex: 0 1 auto; display: flex; align-items: center; gap: 10px; }
 .nrl-screen-title {
-  font-family: var(--nrl-f-label);
-  font-weight: 700;
-  font-size: 1.375rem;
-  letter-spacing: 0.02em;
+  font-family: var(--nrl-f-display);
+  font-weight: 400;
+  font-size: 1.125rem;
+  letter-spacing: -0.02em;
   text-transform: uppercase;
   line-height: 1.1;
   color: var(--nrl-text);
@@ -1426,7 +1488,7 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
 .nrl-screen-tools::-webkit-scrollbar { display: none; }
 .nrl-screen-tools > * { flex: 0 0 auto; }
 .nrl-screen-tools > :first-child { margin-left: auto; }
-.nrl-screen-label { color: var(--nrl-muted); font-family: var(--nrl-f-label); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+.nrl-screen-label { color: var(--nrl-muted); line-height: 1.2; font-family: var(--nrl-f-label); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
 .nrl-screen-body {
   flex: 1 1 auto;
   min-height: 0;
@@ -1451,7 +1513,11 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
   padding: 24px;
   text-align: center;
 }
-/* A table in a sheet: Barlow column heads, 1px #1f2b55 row rules, numbers in Mono. */
+/* An empty state (SuperCOOKED §4, parts.ts emptyState): a title in caps and one line. */
+.nrl-empty { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 16px; border-radius: 12px; background: var(--nrl-panel); box-shadow: inset 0 0 0 1px var(--nrl-line); text-align: center; }
+.nrl-empty-title { font-family: var(--nrl-f-label); font-size: 0.9375rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--nrl-text); }
+.nrl-empty-line { font-size: 0.75rem; line-height: 1.4; color: var(--nrl-muted); }
+/* A table in a sheet: Oswald column heads, 1px row rules, numbers in Mono. */
 .nrl-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
 .nrl-table th {
   font-family: var(--nrl-f-label);
@@ -1468,7 +1534,7 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
   background: var(--nrl-navy);
   z-index: 1;
 }
-.nrl-table td { padding: 0 6px; height: 30px; border-top: 1px solid var(--nrl-button); white-space: nowrap; }
+.nrl-table td { padding: 0 6px; height: 30px; border-top: 1px solid var(--nrl-line); white-space: nowrap; }
 .nrl-table td.nrl-num, .nrl-table th.nrl-num { text-align: right; }
 /* Back to the screen this one opened from: "◂ SQUAD". */
 .nrl-btn.nrl-back { min-height: 36px; padding: 0 10px; font-size: 0.875rem; border-radius: 8px; }
@@ -1512,9 +1578,9 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
   max-height: 100%;
   box-sizing: border-box;
   padding: 8px 12px;
-  border-radius: 10px;
+  border-radius: 12px;
   border-left: 4px solid var(--nrl-muted);
-  box-shadow: var(--nrl-shadow-chip);
+  box-shadow: inset 0 0 0 1px var(--nrl-line), var(--nrl-shadow-chip);
   font-family: var(--nrl-f-body);
   font-size: 0.8125rem;
   font-weight: 500;
@@ -1523,12 +1589,17 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
 .nrl-toast:first-child { display: flex; }
 .nrl-toast-text { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .nrl-toast-long .nrl-toast-text { -webkit-line-clamp: 4; }
-.nrl-toast-more { flex: 0 0 auto; padding: 0 6px; border-radius: 6px; background: var(--nrl-button); color: var(--nrl-text-2); font-family: var(--nrl-f-num); font-size: 0.75rem; }
+.nrl-toast-more { flex: 0 0 auto; padding: 0 6px; border-radius: 6px; background: var(--nrl-raised); color: var(--nrl-text-2); font-family: var(--nrl-f-num); font-size: 0.75rem; }
 .nrl-toast-more:empty { display: none; }
-/* Red is for real problems only; routine stops and confirmations are neutral; good news is green with a gold edge. */
-.nrl-toast-info { background: rgba(14, 22, 48, 0.97); color: var(--nrl-text); border-left-color: var(--nrl-muted); }
-.nrl-toast-success { background: #1d5a33; color: #fff; border-left-color: var(--nrl-accent); }
-.nrl-toast-danger { background: #7a2a24; color: #fff; border-left-color: var(--nrl-alert); }
+/* SuperCOOKED §4: every toast is ink; its left bar's colour is its kind (info muted, good green,
+   alert red). Red is for real problems only; routine stops and confirmations are neutral. */
+.nrl-toast:is(.nrl-toast-info, .nrl-toast-success, .nrl-toast-danger) { background: rgba(5, 7, 13, 0.97); color: var(--nrl-text); }
+.nrl-toast-info { border-left-color: var(--nrl-muted); }
+.nrl-toast-success { border-left-color: var(--nrl-pos); }
+.nrl-toast-danger { border-left-color: var(--nrl-alert); }
+/* A line in the coach's voice: his tag, then the line in italics. */
+.nrl-toast-coach { flex: 0 0 auto; align-self: flex-start; margin-top: 1px; padding: 1px 6px; border-radius: 6px; background: var(--nrl-text-2); color: var(--nrl-on-accent); font-family: var(--nrl-f-label); font-size: 0.625rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.nrl-toast[data-from="coach"] .nrl-toast-text { font-style: italic; color: #e6e9ef; }
 .nrl-toast-danger .nrl-toast-text::before { content: '! '; font-weight: 700; }
 .nrl-toast-in { animation: nrl-toast-in var(--nrl-dur-fast) var(--nrl-ease-out); }
 @keyframes nrl-toast-in { from { opacity: 0; transform: translateY(calc(var(--nrl-rise) / -3)); } }
@@ -1544,10 +1615,10 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
   align-items: center;
   gap: 10px;
   max-width: min(94vw, 460px);
-  background: rgba(14, 22, 48, 0.97);
+  background: rgba(5, 7, 13, 0.97);
   color: var(--nrl-text);
   border-radius: 12px;
-  box-shadow: var(--nrl-shadow-chip);
+  box-shadow: inset 0 0 0 1px var(--nrl-line), var(--nrl-shadow-chip);
   padding: 4px 4px 4px 14px;
   font-family: var(--nrl-f-label);
   font-weight: 700;
@@ -1631,7 +1702,7 @@ body:has(.nrl-update-toast) .nrl-hub-chips { max-width: calc(100vw - 32px - 310p
 /* ── A decision card (#75, #338, #346): the story, its deadline, a row per choice ── */
 .nrl-event-card { margin: 0 0 8px; }
 .nrl-event-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 12px; padding-right: 44px; }
-.nrl-event-title { font-family: var(--nrl-f-label); font-size: 1.375rem; font-weight: 700; letter-spacing: 0.02em; line-height: 1.15; }
+.nrl-event-title { font-family: var(--nrl-f-display); font-size: 1.125rem; font-weight: 400; letter-spacing: -0.02em; text-transform: uppercase; line-height: 1.15; }
 /* The deadline wraps (#345: it was cut off at "…or it's "Ban the t"). */
 .nrl-event-meta { font-size: 0.75rem; color: var(--nrl-accent); line-height: 1.3; overflow-wrap: anywhere; }
 .nrl-event-text { margin: 6px 0 10px; overflow-wrap: anywhere; line-height: 1.45; font-size: 0.875rem; color: var(--nrl-text-2); }
@@ -1652,8 +1723,8 @@ body:has(.nrl-update-toast) .nrl-hub-chips { max-width: calc(100vw - 32px - 310p
   white-space: normal;
   min-height: 48px;
 }
-@media (hover: hover) and (pointer: fine) { .nrl-btn.nrl-event-choice:hover:not(:disabled) { background: #22305c; } }
-.nrl-btn.nrl-event-choice:active:not(:disabled) { background: #22305c; }
+@media (hover: hover) and (pointer: fine) { .nrl-btn.nrl-event-choice:hover:not(:disabled) { background: var(--nrl-raised-hover); } }
+.nrl-btn.nrl-event-choice:active:not(:disabled) { background: var(--nrl-raised-hover); }
 .nrl-event-choice-label { font-family: var(--nrl-f-label); font-size: 1.0625rem; font-weight: 700; letter-spacing: 0.02em; line-height: 1.2; color: var(--nrl-text); }
 .nrl-event-choice-hint { font-family: var(--nrl-f-body); font-size: 0.75rem; font-weight: 400; line-height: 1.35; color: var(--nrl-text-2); }
 /* #346: a risk is its own line, marked so it never reads as a sure cost. */
@@ -1676,7 +1747,7 @@ body:has(.nrl-update-toast) .nrl-hub-chips { max-width: calc(100vw - 32px - 310p
 .nrl-ask-due .nrl-ask-note { color: var(--nrl-accent); }
 /* Short landscape phones: the choices side by side, so all of them show with their hints. */
 @media (max-height: 500px) {
-  .nrl-event-title { font-size: 1.25rem; }
+  .nrl-event-title { font-size: 1rem; }
   .nrl-event-text { margin: 4px 0 8px; font-size: 0.8125rem; line-height: 1.35; }
   .nrl-event-choices { flex-direction: row; align-items: stretch; }
   .nrl-btn.nrl-event-choice { flex: 1 1 0; min-width: 0; width: auto; justify-content: flex-start; }
@@ -1749,23 +1820,27 @@ body:has(.nrl-update-toast) .nrl-hub-chips { max-width: calc(100vw - 32px - 310p
   gap: 12px;
   width: max-content;
   max-width: min(94vw, 600px);
-  min-height: 52px;
+  min-height: 56px;
   box-sizing: border-box;
-  background: rgba(14, 22, 48, 0.95);
+  background: rgba(5, 7, 13, 0.97);
   color: var(--nrl-text);
-  border-radius: 12px;
-  box-shadow: var(--nrl-shadow-chip);
-  padding: 4px 4px 4px 14px;
+  border-radius: 16px;
+  box-shadow: inset 0 0 0 1px var(--nrl-line), var(--nrl-shadow-chip);
+  padding: 4px 6px 4px 14px;
   font-size: 0.8125rem;
 }
 .nrl-placebar[hidden] { display: none; }
 .nrl-placebar-text { flex: 1 1 auto; line-height: 1.35; }
-.nrl-placebar-text b { font-family: var(--nrl-f-label); font-size: 0.9375rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--nrl-accent); margin-right: 6px; }
+.nrl-placebar-text { color: var(--nrl-text-2); }
+.nrl-placebar-text b { font-family: var(--nrl-f-label); font-size: 0.9375rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--nrl-text); margin-right: 6px; }
 .nrl-placebar-cancel { flex: 0 0 auto; }
 /* Build here · $cost, with the reason underneath when the spot is bad (#395). */
 .nrl-btn.nrl-placebar-go { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-height: 44px; line-height: 1.15; white-space: nowrap; }
 .nrl-placebar-go-why { font-family: var(--nrl-f-body); font-size: 0.6875rem; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--nrl-neg); }
 .nrl-placebar-go-why[hidden] { display: none; }
+/* Disabled with its reason inside (SuperCOOKED §3.2): the raised fill so the amber line reads; the label dims. */
+.nrl-btn.nrl-btn-primary.nrl-placebar-go:disabled { background: var(--nrl-raised); color: var(--nrl-text-2); opacity: 1; }
+.nrl-btn.nrl-placebar-go:disabled .nrl-placebar-go-label { opacity: 0.55; }
 /* The bar spans the top while placing; the HUD's top chips (board, decisions) wait under it. */
 body:has(.nrl-placebar:not([hidden])) .nrl-decisions-chip { visibility: hidden; }
 
@@ -1793,7 +1868,7 @@ body:has(.nrl-placebar:not([hidden])) .nrl-decisions-chip { visibility: hidden; 
   border-radius: 10px;
   cursor: pointer;
 }
-.nrl-kit-swatch[aria-pressed="true"] { border-color: var(--nrl-navy); box-shadow: 0 0 0 2px var(--nrl-accent); }
+.nrl-kit-swatch[aria-pressed="true"] { border-color: var(--nrl-navy); box-shadow: 0 0 0 2px var(--nrl-text); }
 .nrl-kit-actions { display: flex; flex-wrap: wrap; gap: 8px; flex: 0 0 auto; }
 .nrl-kit-actions .nrl-btn { flex: 1 1 auto; }
 /* 956×330: smaller figures, so the preview and Save fit beside the controls. */

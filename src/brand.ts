@@ -6,7 +6,7 @@
 // the not-affiliated line in Settings (#398).
 // Renaming the game is a change to this file and a rebuild.
 //
-// The colours point at the Broadcast Quiet tokens (src/ui/tokens.ts); the brand adds
+// The colours point at the theme's tokens (src/ui/tokens.ts); the brand adds
 // only what the theme has no token for. No storage key is ever derived from the
 // brand: the keys are frozen in src/core/storageKeys.ts so a rename loses no career.
 // No DOM, no Phaser: vite.config.ts and the icon script import this file.
@@ -31,7 +31,7 @@ export interface Brand {
   colors: {
     /** The page behind the game: index.html's background and theme-color. */
     background: string;
-    /** The brand's yellow: the one primary action a screen, the title's subtitle. */
+    /** The brand's accent (the orange): the one primary action a screen, the wordmark's last word. */
     primary: string;
     /** Text on `primary`. */
     onPrimary: string;
@@ -57,24 +57,26 @@ export interface Brand {
 }
 
 export const BRAND: Brand = {
-  name: 'NRL Sim', // DECISION (Leon): game name
-  shortName: 'NRLSim', // DECISION (Leon): game name
-  titleText: 'NRL SIM', // DECISION (Leon): game name
-  parentBrand: { name: 'SuperCOOKED', show: false }, // DECISION (Leon): game name (show the line once it's chosen)
+  name: 'Big Coach', // DECISION (Leon): game name (docs/specs/ui-supercooked.md §2)
+  shortName: 'BigCoach',
+  titleText: 'BIG COACH',
+  parentBrand: { name: 'SuperCOOKED', show: true },
   colors: {
-    background: COLOR_TOKENS.navy,
+    // Ink, as the title and the loading screen are, so a cold start shows no navy
+    // before the first frame (SuperCOOKED §2; Leon, 18 Nov).
+    background: COLOR_TOKENS.ink,
     primary: COLOR_TOKENS.accent,
     onPrimary: COLOR_TOKENS.onAccent,
     text: COLOR_TOKENS.text,
-    // The installed app is the page's navy, not the pre-theme navy-black it kept
-    // before (#622): one colour from the launcher to the first frame. The theme has
+    // The installed app is ink, the title's and the loading screen's field (SuperCOOKED
+    // §2), so the launcher's colour runs on into the first frame (#622). The theme has
     // no token for the ball's leather, so that one is the brand's own.
-    app: COLOR_TOKENS.navy,
+    app: COLOR_TOKENS.ink,
     iconBall: '#e8e4d8',
   },
-  logo: { kind: 'text' }, // DECISION (Leon): game name (logo art)
+  logo: { kind: 'text' }, // the wordmark is text: BIG in white, COACH in the accent (ui/parts.ts wordmark)
   iconLetters: '', // DECISION (Leon): game name
-  exportSlug: 'nrl-sim', // DECISION (Leon): game name
+  exportSlug: 'big-coach',
   supportUrl: undefined,
   disclaimer: 'Not affiliated with or endorsed by the NRL, its clubs or players.',
 };

@@ -1979,7 +1979,7 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 .nrl-mo-strip {
   position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(78px + var(--nrl-safe-b)); z-index: 14;
   width: min(560px, calc(100vw - 32px)); min-height: 40px; display: flex; align-items: stretch; margin: 0; padding: 0; border: 0;
-  border-radius: 8px; overflow: hidden; background: rgba(14, 22, 48, 0.95); color: var(--nrl-text); box-shadow: var(--nrl-shadow-chip);
+  border-radius: 8px; overflow: hidden; background: rgba(5, 7, 13, 0.95); color: var(--nrl-text); box-shadow: var(--nrl-shadow-chip);
   font: inherit; text-align: left; cursor: pointer; pointer-events: auto;
 }
 /* Pressed, it shrinks about where it is centred (#604): the scale goes after the centring, not instead of it. */
@@ -2093,7 +2093,7 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 /* A pair (#396: Shift ◀ ▶, Take the two / Tap and go) is one row: two tiles that stay together. */
 .nrl-mo-tray-pair { grid-column: span 2; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 .nrl-mo-tray-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.nrl-mo-tray-title { font-family: var(--nrl-f-label); font-size: 0.875rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-accent); }
+.nrl-mo-tray-title { font-family: var(--nrl-f-label); line-height: 1.2; font-size: 0.875rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-accent); }
 .nrl-mo-tray-note { font-size: 0.75rem; color: var(--nrl-muted); }
 .nrl-btn.nrl-mo-tray-call {
   min-width: 0; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 1px; height: 44px; padding: 0 10px;
@@ -2110,7 +2110,7 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 /* A locked call (the Coach's Office hasn't unlocked it): greyed, outlined rather than filled, its level as a
    small tag. aria-disabled, not disabled, so a tap can say what unlocks it; it never makes the call. */
 .nrl-btn.nrl-mo-tray-call.nrl-mo-tray-locked, .nrl-btn.nrl-mo-tray-call.nrl-mo-tray-locked:hover, .nrl-btn.nrl-mo-tray-call.nrl-mo-tray-locked:active { background: transparent; box-shadow: inset 0 0 0 1px var(--nrl-line); color: var(--nrl-muted); cursor: default; }
-.nrl-mo-tray-locked span { color: var(--nrl-muted); font-family: var(--nrl-f-label); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; font-size: 0.6875rem; }
+.nrl-mo-tray-locked span { color: var(--nrl-muted); font-family: var(--nrl-f-label); line-height: 1.2; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; font-size: 0.6875rem; }
 /* #432: at Large and Larger the tray grows wider, so each caption still fits on one
    line inside the 44px tile (Normal is untouched). A short phone is already three
    a line across the screen, so there the caption draws a little smaller — still

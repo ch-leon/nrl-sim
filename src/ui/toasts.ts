@@ -420,6 +420,11 @@ export function initToasts(root: HTMLElement, opts: { advancing?: () => boolean 
   const build = (n: Notice): Element => {
     const more = el('span', { class: 'nrl-toast-more', attrs: { 'aria-hidden': 'true' } });
     const toast = el('div', { class: `nrl-toast nrl-toast-${n.kind}` }, el('span', { class: 'nrl-toast-text', text: n.text }), more);
+    // A line in the coach's voice wears his tag, and reads in italics (SuperCOOKED §4).
+    if (n.from === 'coach') {
+      toast.setAttribute('data-from', 'coach');
+      toast.prepend(el('span', { class: 'nrl-toast-coach', text: 'Coach', attrs: { 'aria-hidden': 'true' } }));
+    }
     // The install hint is narrowed beside PLAY WEEK. At Larger text that column is
     // two lines too short, so it may wrap further (#434) and the sheet lifts with it.
     if (isLongInfo(n)) toast.classList.add('nrl-toast-long');

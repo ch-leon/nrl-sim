@@ -53,8 +53,8 @@ function ensureCoachStyles(): void {
 .nrl-coach-line { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 0.8125rem; line-height: 1.3; }
 .nrl-coach-face { width: 32px; height: 32px; flex: 0 0 32px; image-rendering: pixelated; }
 .nrl-coach-copy { min-width: 0; overflow-wrap: anywhere; }
-.nrl-coach-name { color: var(--nrl-accent, #f4d03f); margin-right: 0.5em; }
-.nrl-coach-text { color: var(--nrl-text-2, #c9d1ea); }
+.nrl-coach-name { color: var(--nrl-accent, #ff6b1a); margin-right: 0.5em; }
+.nrl-coach-text { color: var(--nrl-text-2, #c8cdd8); }
 .nrl-event-card > .nrl-coach-line { margin: 6px 0; }
 /* The existing summary body scrolls; its two actions stay outside that scroll. */
 .nrl-summary-modal .nrl-modal-scroll:has(.nrl-summary) { display: flex; flex-direction: column; overflow: hidden; }
