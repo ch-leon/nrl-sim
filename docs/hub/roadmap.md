@@ -1,6 +1,6 @@
 # Roadmap
 
-Last updated: 2026-11-18
+Last updated: 2026-11-19
 
 Status checked against GitHub on 7 Nov 2026. Merged tooling is not the same as a
 live gameplay change; work still open below has not shipped.
@@ -28,16 +28,20 @@ live gameplay change; work still open below has not shipped.
   club fixtures, watched/coached individual challenges, playful beach/fives events,
   recurring opponents and connected rewards. Gear is later. The
   [updated plan](../plans/2026-11-career-competitions.md) separates the delivery
-  slices: league choice and unlocks are shipped; seasonal event windows,
-  assignments, challenges, other formats and their rewards remain later work.
+  slices: league choice and unlocks are shipped. The first normal Open Cup adds
+  seasonal registration and cash/reputation/trophies; its backend is reviewed and
+  presentation/release verification is in progress ([evidence](../status/2026-11-open-cup.md)).
+  Assignments, challenges, other formats and their rewards remain later work.
   Earlier structural execution context follows:
   [#569](https://github.com/ch-leon/nrl-sim/issues/569) publishes the
   [technical contract](../specs/career-competitions.md) against current main;
   [delivery status](../status/2026-11-career.md) records evidence and dependencies.
   #536–#539 and #545 have merged, clearing structural state/calendar/division
   work. Remaining annual-cap finance tasks #560–#562 and progression tuning
-  #547 stay open; paid rewards and release balance retain those prerequisites.
-  The state/calendar foundation, isolated AU/UK regional setup and Open Cup are
+  #547 stay open. Wider balance and future capacity rewards retain their own
+  prerequisites; the first cup cash uses implemented FIN-04 fixture income.
+  The state/calendar foundation, isolated AU/UK regional setup and original
+  isolated Open Cup sporting prototype are
   merged through [PR #591](https://github.com/ch-leon/nrl-sim/pull/591).   The finance
   model is approved for initial testing: [contract](../specs/finance-prototype.md),
   executable quotes and opening inventory ([PR #595](https://github.com/ch-leon/nrl-sim/pull/595)).
@@ -64,8 +68,10 @@ live gameplay change; work still open below has not shipped.
   when moving down. [Merged PR #719](https://github.com/ch-leon/nrl-sim/pull/719)
   passed independent Claude review, all CI/WebKit gates and full QA; the public
   confirmation/reload flow was verified. [Release evidence](../status/2026-11-league-selection.md)
-  Optional cup registration/rewards, assignments, watched individual challenges,
-  distinct small-sided events and wider career balance remain subsequent work.
+  Optional cup registration and cash/reputation/honours are the current reviewed
+  implementation slice, with the UI and release proof still outstanding.
+  Assignments, watched individual challenges, distinct small-sided events,
+  future capacity rewards and wider career balance remain subsequent work.
   The approved product direction is recorded in
   [PR #709](https://github.com/ch-leon/nrl-sim/pull/709).
 - **Expansive attack still under par** ([issue #322](https://github.com/ch-leon/nrl-sim/issues/322), open).

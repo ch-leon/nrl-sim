@@ -22,8 +22,9 @@ and league selection [#719](https://github.com/ch-leon/nrl-sim/pull/719). League
 selection is live: a finals title earns permanent access, the coach chooses each
 season, and moving down retains club salary-cap capacity. Existing Classic
 careers keep their format. [Release and verification](../status/2026-11-league-selection.md).
-The Open Cup's normal entry/reward integration remains unfinished within Slice A;
-assignments, special events and gear remain later slices.
+The Open Cup backend is implemented and independently reviewed; presentation and
+release checks are in progress within Slice A. [Open Cup evidence](../status/2026-11-open-cup.md).
+Assignments, special events and gear remain later slices.
 
 ### Changes that govern future implementation
 
@@ -45,7 +46,7 @@ assignments, special events and gear remain later slices.
 
 | Slice | Deliverable | Done when |
 | --- | --- | --- |
-| A | Selectable league career and Open Cup — league selection shipped in #719; cup entry/rewards remain | Win, unlock, choose to stay or move, and finish/decline a cup with valid people, finances and next-season setup. |
+| A | Selectable league career and Open Cup — league selection shipped in #719; cup entry/rewards are in presentation and release verification | Win, unlock, choose to stay or move, and finish/decline a cup with valid people, finances and next-season setup. |
 | B | Player assignments | Send a player away, cover an overlapping fixture, and receive the player and recorded outcome once. |
 | C | Watched/coached individual challenge | Coach animated rounds, earn a personal and supported club reward, and reveal a next opportunity. |
 | D | Distinct small-sided event and invitation chain | A beach or floodlit event changes play and squad decisions, with a saved route to a later challenge. |
@@ -80,9 +81,10 @@ creates a deterministic vacancy chain using the saved completed standings.
 The 25-slot calendar and separated close/accept phases are shipped parameters,
 not a general balance or future-event pacing approval.
 
-Remaining scoped work includes normal optional cup offers/registration and
-reward/cap integration (#576/#577), wider opportunity/history presentation
-(#578), and integrated career balance/foundation validation (#562/#582).
+Annual registration and #576 atomic cash/reputation/honours are implemented.
+The #578 entry/report/history presentation is in progress. Future
+entitlement records and #577 capacity effects remain separate, alongside wider
+opportunity/history presentation (#578) and integrated career balance (#562/#582).
 [#708 assignments](https://github.com/ch-leon/nrl-sim/issues/708),
 [#710 watched/coached individual challenge](https://github.com/ch-leon/nrl-sim/issues/710)
 and [#711 distinct small-sided event](https://github.com/ch-leon/nrl-sim/issues/711)
@@ -96,10 +98,15 @@ progression owners; numerical tuning and the wider design are not claimed comple
 from season start through Week 6, closing before Week 7; matches use Weeks
 7/10/13/16/19. Missing registration means no entry that year. The extra cash
 schedule 1M/1M/2M/3M/5M, reputation and trophy are approved starting values for
-testing. Ordinary match income stays separate. Execute the
-[reward foundation](2026-11-18-open-cup-rewards.md), then
-[normal entry and UI](2026-11-18-open-cup-entry.md), with independent review and
-the repository's CI/QA gates. These decisions do not claim runtime delivery.
+testing. Played wins add +1 reputation each, with +2 more and the saved full
+registered-squad honour for a played-final title. Ordinary income stays separate;
+M follows the host sporting division or lower entrant base at a neutral final.
+Byes, cancellations and forfeits pay no cup prize. Withdrawal queues the next
+actual tie on its date; the AI bracket continues. Retained capacity is unchanged.
+The [reward foundation](2026-11-18-open-cup-rewards.md) and
+[normal entry and UI](2026-11-18-open-cup-entry.md) will ship together using
+save version 33. The [evidence record](../status/2026-11-open-cup.md) tracks review,
+presentation and the required CI/QA gates; implementation is not yet release proof.
 
 ## Historical specification and delivery context — 10–11 November
 

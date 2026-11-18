@@ -8,8 +8,10 @@ event catalogue live in the
 [Notion specification](https://app.notion.com/p/4150870d4c44810c880ae3395086e9d0).
 This file owns the implementation boundaries and prototype configuration. The
 selectable League career shipped on 18 November through [PR #719](https://github.com/ch-leon/nrl-sim/pull/719).
-See the [release evidence](../status/2026-11-league-selection.md). This does not
-claim optional competitions, reward effects or wider balance are complete.
+See the [league release evidence](../status/2026-11-league-selection.md). The normal
+optional Open Cup implementation is now under final presentation and release
+verification; [its evidence record](../status/2026-11-open-cup.md) separates reviewed
+code from released behaviour. Other events and wider balance remain open.
 
 The user authorised execution on 11 November. The numerical settings below are
 the initial prototype, not measured balance or a promise about the final game.
@@ -26,7 +28,8 @@ rewards. Gear remains a later expansion. The [plan](../plans/2026-11-career-comp
 records the revised delivery sequence.
 
 The 16 November amendment defined product intent. The league-selection portion
-subsequently shipped in #719; optional events and assignments remain later work.
+subsequently shipped in #719. The optional Open Cup is the current implementation
+slice; other events and assignments remain later work.
 The audited baseline and structural configuration below remain historical evidence
 of v1. Existing stable identities, snapshots, once-only results/rewards, persistent
 people, finite outcomes and calendar ownership remain required.
@@ -123,8 +126,10 @@ an entered event's match rules, eligibility or promised prize. It records a
 stable instance ID, season, entrant club IDs, lifecycle/stage and fixture records.
 An optional schedule assignment can be filled later. Lifecycle transitions are
 validated operations, not screen-owned object edits. Offered/qualified events
-can be entered or declined; scheduled/active events can complete or withdraw;
-completed/declined/withdrawn events cannot be re-entered in that season.
+can be entered or declined. Open Cup choices can change while registration is
+open; the deadline freezes participation. After its draw, withdrawal queues a
+forfeit of the next actual tie, leaving the rest of the competition active.
+Completed, eliminated or withdrawn participation cannot restart that season.
 
 A fixture records its own immutable ID, parent competition-instance ID, stage,
 round, home/away club IDs, optional assigned calendar slot and status. Store the
@@ -242,10 +247,11 @@ exact allocation, cap and persistence invariants.
 | 24, 25 | Division semi-finals, grand final | 0–2 |
 | 26–28 | Later Champions Series only | 0–3; stop on two wins |
 
-In the shipped League career, cup windows remain quiet: there is no player or AI
-Open Cup registration in this mode and no new title cash/cap prize. The following
-cup-inclusive counts describe the reusable structural prototype, not enabled
-League content.
+The normal Open Cup implementation uses these saved cup windows for both player
+and AI participation. Declining or missing registration leaves the player free
+on those dates while the AI bracket continues. Release verification is tracked
+in the [Open Cup evidence record](../status/2026-11-open-cup.md). No capacity prize
+is introduced.
 
 Every slot 1–25 appears once in the initial template. A finalist without an
 opening cup bye can play 14 + 2 + 5 + 2 = **23 matches across 25 intervals**.
@@ -274,19 +280,37 @@ change when adapting legacy league finals.
 
 ## 6. Event eligibility, withdrawal and prizes
 
-The Open Cup admits all willing clubs in the current regional world. For 24
-entrants, draw a 32-slot bracket with eight byes and no bye-v-bye tie. Fewer than
-two entrants means no event or title reward. Decline is free before draw;
-withdrawal after draw resolves unplayed ties under a displayed forfeit policy,
-without match XP, gate or appearance income. Already played outcomes stand.
+Each accepted League season offers free Open Cup registration through Week 6.
+Change enter/decline until registration closes before Week 7. Missing the deadline
+means sitting out that year. The deterministic draw includes all 23 other regional
+clubs and adds the player only if entered. A 24-club field uses a 32-slot bracket
+with eight byes and no bye-v-bye tie; the 23-AI field has 22 actual ties. The saved
+draw is revealed only after closure. Cup dates are Weeks 7/10/13/16/19.
 
-On 18 November Leon confirmed free registration from season start through Week 6,
-with the deadline before Week 7 and cup dates 7/10/13/16/19. Missing registration
-means sitting out that year's cup. The 1M/1M/2M/3M/5M cash schedule, reputation
-and trophy below are approved as initial values to test, not validated balance.
-The [entry plan](../plans/2026-11-18-open-cup-entry.md) and
-[reward plan](../plans/2026-11-18-open-cup-rewards.md) track implementation;
-this decision does not itself activate entry or rewards in normal careers.
+After draw, withdrawal queues a forfeit of the next actual player tie on its date,
+including after an opening bye. It does not immediately play that future fixture.
+The AI bracket continues; prior results and earned rewards stand. The forfeit
+adds no match XP, ordinary income or cup prize. Entry returns as a fresh unanswered
+offer after next season's league acceptance.
+
+Leon approved 1M/1M/2M/3M/5M for actual played round wins, +1 reputation per played
+win and +2 more for a played-final title, subject to existing reputation bounds.
+These are initial test values, not accepted long-term balance. M is the saved
+FIN-04 match base from the host's sporting division; a neutral final uses the lower
+entrant base. Retained salary-cap capacity does not affect M. For a Local-based
+tie, the cash values are $8k/$8k/$16k/$24k/$40k, separate from ordinary income.
+Byes, cancellations and forfeits earn no cup prize. A played final records a title
+honour with the entire registered squad at that final, including reserves; later
+transfers and retirement do not rewrite it. A forfeited final still decides the
+sporting champion but grants no title cash, reputation or honour.
+
+Save version 33 stores the offer, activation and atomic reward receipts. Existing
+saves before the deadline can receive an offer; those already past it, or with an
+inert current-season cup, wait until next year without retroactive draws or prizes.
+The [entry plan](../plans/2026-11-18-open-cup-entry.md),
+[reward plan](../plans/2026-11-18-open-cup-rewards.md) and
+[evidence record](../status/2026-11-open-cup.md) track implementation and release.
+Future rebalancing must preserve supported saved prize-table versions.
 
 The first cut retains existing Nines lineup/injury rules. Reject ineligible
 rosters before match construction; do not use the cheap rival generator to
@@ -297,14 +321,14 @@ exceptions and free withdrawal are explicit. An all-youth squad is legal.
 
 | Event | Extra reward policy or proposal | Activation / prerequisite |
 | --- | --- | --- |
-| Open Cup | Approved for initial testing: actual round wins 1M / 1M / 2M / 3M / 5M; win reputation and a title honour | #559 ordinary income is implemented; #576 extra settlement and normal cup entry remain in progress. M is finance's division match-base payment. Byes pay zero. |
+| Open Cup | Initial test policy: played wins 1M / 1M / 2M / 3M / 5M; +1 reputation per win, +2 more and the registered-squad honour for a played-final title | Normal entry and atomic #576 settlement implemented; presentation/release verification in the Open Cup evidence record. No cap entitlement or special XP reward. |
 | Sponsor Shield | First title +5% annual base-cap capacity; repeated titles cash/honours | #557/#560/#577; next-season activation, unique club-career reward key. Proposed earned limit 10%; no automatic second 5%. |
 | Rising Stars | Academy-labelled cash, scout report on a real unsigned prospect | #539/#544/#545 and #580; no gifted superstar or raised ceiling. |
 | Champions Series | Published played-game cash, title/finalist cash and honour | #581 later; no award for unplayed third game or a missing opponent. |
 
 Ordinary fixture income and extra prize income are different award kinds.
-Neutral gate allocation and the division basis of M must be snapshotted and
-agreed with finance; neither club may receive a duplicated full gate. Reward IDs
+Neutral gate allocation and the division basis of M use the saved FIN-04 promise;
+neither club receives a duplicated full gate. Reward IDs
 include instance, season, recipient, stage and kind. A first-title entitlement
 uses an additional persistent career-wide key, so changing division/name cannot
 grant it again. Effect receipts and entitlement activation are replay-safe.
@@ -378,8 +402,9 @@ checks when those formats are enabled.
 Run repository-required TypeScript/Vitest/build, PR CI/WebKit and QA gates. A
 reviewer using a different tool checks the issue's completion criteria and diff;
 a same-tool subagent inspection is useful but does not replace that requirement.
-Observe a losing season, cup run, league unlock and deliberate next-season choice on a phone before enabling the
-overlapping-competition prototype by default. Merge still follows AGENTS.md.
+Observe losing seasons, cup runs, league unlocks and deliberate next-season choices
+on a phone. Initial Open Cup release proof does not replace wider #582 balance
+acceptance or enable overlapping player assignments. Merge follows AGENTS.md.
 
 ## 9. Extension rule
 

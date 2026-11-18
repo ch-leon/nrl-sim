@@ -33,6 +33,18 @@ is superseded by that stricter feature-aware rule. Preserve all old-format
 exclusions and failure/recovery proofs. Review the completed backend before
 starting the presentation checkpoint, then review the whole feature for release.
 
+## Checkpoint status
+
+- Tasks 1–4: implemented at `92512cdd`, independent spec and Claude approved.
+- Task 5: entry, report and trophy UI implemented and spec-approved; Claude and
+  complete browser verification in progress.
+- Task 6: whole-feature browser/CI/full QA and release documentation outstanding.
+- Latest main through `c3848962` merged cleanly; TypeScript and 184 integration
+  tests passed with manual point spending retained.
+
+The task lists below preserve the original acceptance checklist; current proof
+and release status live in [the evidence record](../status/2026-11-open-cup.md).
+
 ## Published product contract
 
 | Topic | Initial supported behaviour |
