@@ -20,16 +20,31 @@ const cup = s => s.competitions.instances.find(i => i.id === offer(s).instanceId
 const assert = (value, message) => { if (!value) throw new Error(message); };
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
-async function skipIntro(page) {
-  await page.locator('[data-expansion-work]').tap({ timeout: 1200 }).catch(() => {});
-  await page.locator('.nrl-tutorial-skip').tap({ timeout: 1200 }).catch(() => {});
+async function finishGuidance(page, source, press = 'tap') {
+  // Use the pre-install settings. The expansion intro marks itself as seen as it opens.
+  if (source.season === 1 && !source.settings.hintsSeen?.includes('expansion-intro')) {
+    const intro = page.locator('[data-expansion-intro]');
+    await intro.locator('[data-expansion-work]')[press]();
+    await intro.waitFor({ state: 'detached' });
+  }
+  if (!source.settings.tutorialDone) {
+    const tutorial = page.locator('.nrl-tutorial');
+    await tutorial.locator('.nrl-tutorial-skip')[press]();
+    await tutorial.waitFor({ state: 'detached' });
+  }
+}
+
+async function continueCareer(page, raw, press = 'tap') {
+  await page.locator('[data-nrl-continue-1]')[press]();
+  await page.waitForFunction(() => !!window.__nrlState?.()?.competitions?.leagueCareer);
+  await finishGuidance(page, JSON.parse(raw), press);
 }
 
 async function resume(page) {
+  const raw = await saved(page);
+  assert(raw, 'The career was not saved before reload');
   await page.reload();
-  await page.locator('[data-nrl-continue-1]').tap();
-  await page.waitForFunction(() => !!window.__nrlState?.()?.competitions?.leagueCareer);
-  await skipIntro(page);
+  await continueCareer(page, raw);
 }
 
 async function startCareer(page, town, pack) {
@@ -44,7 +59,7 @@ async function startCareer(page, town, pack) {
   assert(!initial.competitions.openCupEntry && !await page.locator(CARD).count(), 'An offer appeared before league confirmation');
   await page.locator(CONFIRM).tap();
   await page.locator(CHOOSER).waitFor({ state: 'detached' });
-  await skipIntro(page);
+  await finishGuidance(page, initial);
   assert(!await page.locator(DIALOG).count(), 'League acceptance forced a cup popup');
   const active = await state(page);
   assert(offer(active).choice === 'unanswered' && !cup(active), 'League acceptance did not open a fresh unanswered offer');
@@ -177,16 +192,47 @@ async function advanceTo(page, week) {
 }
 
 async function readAtScrollPosition(locator, scrollClass) {
-  await locator.scrollIntoViewIfNeeded();
-  assert(await locator.evaluate((el, parent) => {
+  const observation = await locator.evaluate(async (el, parent) => {
     const container = el.closest(parent);
-    if (!container) return false;
-    const rect = el.getBoundingClientRect();
-    const clip = container.getBoundingClientRect();
-    const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
-    return el.contains(hit) && rect.top >= clip.top - 1 && rect.bottom <= clip.bottom + 1
-      && rect.left >= clip.left - 1 && rect.right <= clip.right + 1;
-  }, scrollClass), 'Content is clipped after scrolling');
+    const overflow = container && getComputedStyle(container).overflowY;
+    if (!container || !['auto', 'scroll'].includes(overflow)) return { ok: false, overflow };
+
+    await document.fonts.ready;
+    const frame = () => new Promise(resolve => requestAnimationFrame(resolve));
+    const bounds = () => {
+      const row = el.getBoundingClientRect();
+      const panel = container.getBoundingClientRect();
+      const inside = row.top >= panel.top - 1 && row.bottom <= panel.bottom + 1
+        && row.left >= panel.left - 1 && row.right <= panel.right + 1;
+      return { row, panel, inside };
+    };
+    const read = () => {
+      const { row, panel, inside } = bounds();
+      const hit = document.elementFromPoint((row.left + row.right) / 2, (row.top + row.bottom) / 2);
+      return {
+        ok: inside && el.contains(hit),
+        row: row.toJSON(), panel: panel.toJSON(), hit: hit?.tagName,
+        scrollTop: container.scrollTop, clientHeight: container.clientHeight, scrollHeight: container.scrollHeight,
+      };
+    };
+    // A returning club toast can lift History after WebKit calculates visibility.
+    // Scroll only the content panel and check the painted target across frames.
+    let observed;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const { row, panel, inside } = bounds();
+      if (!inside) container.scrollTop += (row.top + row.bottom - panel.top - panel.bottom) / 2;
+      await frame();
+      await frame();
+      observed = read();
+      if (observed.ok) {
+        await frame();
+        observed = read();
+        if (observed.ok) return observed;
+      }
+    }
+    return observed;
+  }, scrollClass);
+  assert(observation.ok, `Content is clipped after scrolling ${scrollClass}: ${JSON.stringify(observation)}`);
 }
 
 async function setTextSize(page, size) {
@@ -230,7 +276,19 @@ async function openReportTwice(page, live, shot) {
   return receipt.delta;
 }
 
-async function inspectTrophy(page, shot) {
+async function holdInstallNotice(page) {
+  // Raise the production install notice after History opens, at the point it
+  // collided with the first read on CI. Its actual lane layout lifts the sheet.
+  const text = 'Tap Share → Add to Home Screen to install';
+  await page.evaluate(message => window.__nrlNotify({ text: message, kind: 'info', ms: 8000 }), text);
+  await page.waitForFunction(message => {
+    const shown = document.querySelector('.nrl-toast-lane:not([hidden]) .nrl-toast:first-child .nrl-toast-text');
+    const lift = parseFloat(document.documentElement.style.getPropertyValue('--nrl-toast-lift'));
+    return shown?.textContent === message && lift > 0;
+  }, text);
+}
+
+async function inspectTrophy(page, shot, { installNotice = false } = {}) {
   const won = await state(page);
   const final = won.competitionRewards.find(r => r.status === 'settled' && r.receipts.some(r => r.clubId === won.clubId && r.kind === 'honour'));
   const honour = final?.receipts.find(r => r.clubId === won.clubId && r.kind === 'honour');
@@ -245,6 +303,7 @@ async function inspectTrophy(page, shot) {
     const names = await trophy.locator('[data-trophy-player-id]').allTextContents();
     assert(same(names, honour.squad.players.map(p => p.name)), 'History changed a name or omitted a reserve');
     if (i === 0) {
+      if (installNotice) await holdInstallNotice(page);
       const problems = await reachProblems(page, '.nrl-history', ['.nrl-history [data-seg="trophies"]']);
       assert(!problems.length, problems.join('; '));
       await readAtScrollPosition(trophy.locator('[data-trophy-player-id]').last(), '.nrl-history-body');
@@ -255,14 +314,12 @@ async function inspectTrophy(page, shot) {
   assert(same(await state(page), won) && await saved(page) === bytes, 'Reopening History changed the wallet or ledger');
 }
 
-async function installSave(page, raw) {
+async function installSave(page, raw, press = 'tap') {
   await page.addInitScript(([key, value]) => {
     if (!localStorage.getItem(key)) localStorage.setItem(key, value);
   }, [SAVE, raw]);
   await page.goto(BASE);
-  await page.locator('[data-nrl-continue-1]').tap();
-  await page.waitForFunction(() => !!window.__nrlState?.()?.competitions?.leagueCareer);
-  await skipIntro(page);
+  await continueCareer(page, raw, press);
 }
 
 export async function runOpenCupEntry(browser) {
@@ -464,11 +521,7 @@ export async function runOpenCupEntry(browser) {
     record('desktop', async (page, report, shot) => {
       report.evidence = 'public AU save, 1280×800 desktop pointer';
       assert(openAu, 'AU public save is unavailable');
-      await page.addInitScript(([key, raw]) => localStorage.setItem(key, raw), [SAVE, openAu]);
-      await page.goto(BASE);
-      await page.locator('[data-nrl-continue-1]').click();
-      await page.locator('[data-expansion-work]').click({ timeout: 1200 }).catch(() => {});
-      await page.locator('.nrl-tutorial-skip').click({ timeout: 1200 }).catch(() => {});
+      await installSave(page, openAu, 'click');
       await page.locator('.nrl-nav [data-screen="fixtures"]').click();
       await page.locator(DETAILS).click();
       await inspectOffer(page);
@@ -504,12 +557,12 @@ export async function runOpenCupEntry(browser) {
 
   for (const size of ['large', 'larger']) {
     await record(`phone-prizes-${size}`, async (page, report, shot) => {
-      report.evidence = `controlled final through production playback, report and trophy with ${size} text`;
+      report.evidence = `controlled final through production playback and ${size} text report; trophy scroll with a controlled production install notice`;
       assert(beforeFinalAu, 'AU final-ready save is unavailable');
       await installSave(page, beforeFinalAu);
       await setTextSize(page, size);
       await advanceOne(page, { onResult: live => openReportTwice(page, live, shot) });
-      await inspectTrophy(page, shot);
+      await inspectTrophy(page, shot, { installNotice: true });
     });
   }
 
