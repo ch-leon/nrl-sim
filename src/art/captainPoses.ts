@@ -7,13 +7,12 @@
 // 28 points tall, and cropped to one common canvas so the figure keeps its feet on the same
 // row and does not jump when the pose swaps.
 import { PixelBuffer, shade } from './pixel';
-import { buildKit, type Kit } from './match/kit';
+import { buildKit, OUTLINE, type Kit } from './match/kit';
 import { drawLivePlayer } from './match/livePlayer';
 import { appearanceFor, ballPixels, stand, WIDTH, PAINT_H, type Appearance } from './prototype/player';
 import { body, contactPainter, type Point } from './prototype/tackle';
 import { tiltedHead } from './prototype/contact';
 import { bentContactArm, fitLegs } from './match/limbs';
-import { OUTLINE } from './match/kit';
 import { COLOR_TOKENS } from '../ui/tokens';
 
 export type CaptainPose = 'carry' | 'try' | 'tackle' | 'fulltime';
@@ -43,18 +42,46 @@ export const BALL_PANEL_COLORS: readonly number[] = [0xe7dfc7, 0xffffff];
 function drawFulltime(look: Appearance, kit: Kit): PixelBuffer {
   const out = new PixelBuffer(WIDTH, PAINT_H);
   const brush = contactPainter(out);
-  const p = fitLegs(body([19, 27], [19, 20], [12, 3], [23, 31], [24, 35], [16, 31], [15, 35]));
+  // Standing a little lower than the carry (knees bent) so there is room above the head for the ball.
+  const p = fitLegs(body([19, 29], [19, 22], [12, 5], [23, 32], [24, 35], [16, 32], [15, 35]));
   brush.legs(p, look, kit);
   brush.torso(p, look, kit);
   out.blit(tiltedHead(look, kit, 'front', false, 0), Math.round(p.head[0] - 6), Math.round(p.head[1] - 6));
-  // Both arms up and out in a V, hands under the ball held aloft. The sim's contact-arm helper only
-  // reaches head height, so these are two bent strokes in the skin colour (the far arm a shade darker).
+  const frame = stand(out);
+  // Both arms straight up and out in a V, hands at the ball's sides, the ball held clear above the head
+  // with a gap of two rows. The sim's contact-arm helper only reaches head height, so these are two bent
+  // strokes in the skin colour, kept out at the sides so they do not run into the hair. Drawn on the
+  // finished frame (`stand` puts the paint two rows down), so the ball can sit on its top row.
   const arm = (path: readonly Point[], color: number) => {
-    for (let i = 0; i + 1 < path.length; i++) for (const dx of [0, 1]) out.line(path[i]![0] + dx, path[i]![1], path[i + 1]![0] + dx, path[i + 1]![1], color);
+    for (let i = 0; i + 1 < path.length; i++) for (const dx of [0, 1]) frame.line(path[i]![0] + dx, path[i]![1], path[i + 1]![0] + dx, path[i + 1]![1], color);
   };
-  arm([[13, 22], [5, 14], [9, 7], [14, 3]], shade(look.skin, 0.7));
-  out.blit(ballPixels(), 15, 0);
-  arm([[24, 22], [32, 14], [28, 7], [23, 3]], look.skin);
+  arm([[13, 24], [5, 17], [8, 9], [13, 4]], shade(look.skin, 0.85));
+  arm([[24, 24], [32, 17], [29, 9], [24, 4]], look.skin);
+  frame.blit(ballPixels(), 14, 0);
+  frame.outline(OUTLINE);
+  return frame;
+}
+
+/**
+ * Carrying: standing square-on, the ball held in both hands across the stomach, between the chest
+ * and the hips, the far arm over the top of it and the near arm round its side. (The live sprite's
+ * carry frame has the ball hanging at the hip, which reads as a fist or part of a leg at icon size.)
+ */
+function drawCarry(look: Appearance, kit: Kit): PixelBuffer {
+  const out = new PixelBuffer(WIDTH, PAINT_H);
+  const brush = contactPainter(out);
+  const p = fitLegs(body([19, 28], [19, 21], [12, 4], [23, 32], [24, 35], [16, 32], [15, 35]));
+  const arm = (start: Point, target: Point, dark: boolean, bend: number) => {
+    const a = bentContactArm(start, target, bend);
+    brush.arm(a.shoulder, a.elbow, a.hand, look, dark);
+  };
+  const ball: Point = [15, 22];
+  brush.legs(p, look, kit);
+  brush.torso(p, look, kit);
+  out.blit(tiltedHead(look, kit, 'front', false, 0), Math.round(p.head[0] - 6), Math.round(p.head[1] - 6));
+  arm([p.shoulder[0] - 3, p.shoulder[1] + 1], [ball[0] + 2, ball[1] + 1], true, -1);
+  out.blit(ballPixels(), ball[0], ball[1]);
+  arm([p.shoulder[0] + 3, p.shoulder[1] + 1], [ball[0] + 8, ball[1] + 3], false, 1);
   out.outline(OUTLINE);
   return stand(out);
 }
@@ -86,7 +113,7 @@ function drawTackled(look: Appearance, kit: Kit): PixelBuffer {
 /** One pose at its natural 44x42 sprite frame (feet on the sprite's baseline). */
 export function captainFrame(pose: CaptainPose, look: Appearance = CAPTAIN_LOOK, kit: Kit = brandKit()): PixelBuffer {
   switch (pose) {
-    case 'carry': return drawLivePlayer(look, kit, 'carry', 0, 'front', true, -1);
+    case 'carry': return drawCarry(look, kit);
     case 'try': return drawLivePlayer(look, kit, 'dive', 3, 'front', true, -1);
     case 'tackle': return drawTackled(look, kit);
     case 'fulltime': return drawFulltime(look, kit);

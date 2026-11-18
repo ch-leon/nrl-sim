@@ -6,7 +6,7 @@
 // Zero dependencies beyond the repo's own art code and the shared PNG encoder. Pixel art stays
 // crisp: every scale is an integer nearest-neighbour enlargement of the art pixels, no smoothing.
 //
-//   --out <dir>        where to write (default: the scratchpad's phase4/captain-poses)
+//   --out <dir>        where to write (default: nrl-captain-poses in the system temp folder)
 //   --scales a,b,c     integer art-pixel enlargements, one file each (default 2,4,8)
 //   --imageset         write <dir>/Captain<Pose>.imageset/{Contents.json, PNG} for an asset
 //                      catalog instead of flat files
@@ -21,10 +21,11 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
 import { captainPoses, CAPTAIN_POSES } from '../src/art/captainPoses';
 import { enlarge } from './ios-captain.mjs';
 
-const DEFAULT_OUT = '/private/tmp/claude-501/-Users-leoncreed-baker-Documents-Cavehole-NRL-Sim--claude-worktrees-six-again-repo-access-6fbfe5/eca463fa-55fb-43be-a546-1d5323d53cb8/scratchpad/phase4/captain-poses';
+const DEFAULT_OUT = join(tmpdir(), 'nrl-captain-poses');
 const args = process.argv.slice(2);
 const flag = name => args.includes(name);
 const value = (name, fallback) => { const i = args.indexOf(name); return i >= 0 && args[i + 1] ? args[i + 1] : fallback; };

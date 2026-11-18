@@ -20,7 +20,7 @@ struct MatchLiveActivity: Widget {
             return DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
                     VStack(alignment: .leading, spacing: 4) {
-                        CaptainIcon(pose: s.pose, multiple: 2)
+                        CaptainIcon(pose: s.pose, large: true)
                         TeamTag(code: a.homeCode, colour: Color(hex: a.homeColor), mine: a.mine == .home)
                     }
                 }
@@ -63,7 +63,7 @@ struct MatchLockScreenView: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
-            CaptainIcon(pose: state.pose, multiple: 2)
+            CaptainIcon(pose: state.pose, large: true)
             details
         }
         .padding(.horizontal, 16)
@@ -173,31 +173,56 @@ extension MatchActivityAttributes.Pose {
     }
 }
 
-/// The captain, drawn from Assets.xcassets: 80 px declared 3x, so 80/3 points tall at one
-/// times. Pixel art: `multiple` is a whole number, so every art pixel stays a whole number
-/// of screen pixels on a 3x screen; no smoothing, no antialiasing. The pose changes only when an
-/// update carries a new one; the system's own content transition shows the change (a plain fade).
+/// How big the captain is drawn, as a pure function of the screen's scale, so pixel art stays crisp.
+///
+/// The pictures are the game's art pixels enlarged x2 (80 x 82 image pixels for 40 x 41 art
+/// pixels). A picture is sharp when every art pixel covers a whole number of device pixels, so the
+/// size in points is `art pixels x device pixels per art pixel / screen scale`, with that
+/// whole number chosen per scale:
+///   3x screen: small 2 device pixels per art pixel = 26.7 x 27.3 pt (80 x 82 px); large 4 = 53.3 x 54.7 pt (160 x 164 px).
+///   2x screen: small 2 = 40 x 41 pt (80 x 82 px); large 3 = 60 x 61.5 pt (120 x 123 px).
+/// Small is what the island's compact and minimal slots take (about 27 pt tall on the phones that
+/// have an island, all 3x); large is the expanded island and the lock screen, where there is room.
+enum CaptainSize {
+    /// The art's canvas in art pixels (the PNGs are twice this; tests/native/iosCaptainAssets.test.ts pins it).
+    static let artWidth = 40
+    static let artHeight = 41
+
+    /// Device pixels one art pixel covers: 2 when small, one more than the scale when large (3x gives 4, 2x gives 3).
+    static func devicePixelsPerArtPixel(scale: CGFloat, large: Bool) -> Int {
+        let whole = max(2, Int(scale.rounded()))
+        return large ? whole + 1 : 2
+    }
+
+    static func points(scale: CGFloat, large: Bool) -> CGSize {
+        let k = CGFloat(devicePixelsPerArtPixel(scale: scale, large: large))
+        let s = max(2, scale.rounded())
+        return CGSize(width: CGFloat(artWidth) * k / s, height: CGFloat(artHeight) * k / s)
+    }
+}
+
+/// The captain, drawn from Assets.xcassets (80 x 82 px declared 3x) at CaptainSize's size.
+/// No smoothing, no antialiasing. The pose changes only when an update carries a new one; the
+/// system's own content transition shows the change (a plain fade).
 struct CaptainIcon: View {
     let pose: MatchActivityAttributes.Pose
-    let multiple: Int
-
-    /// One times: the image's own size in points (80 px at 3x).
-    static let unit: CGFloat = 80.0 / 3.0
+    let large: Bool
+    @Environment(\.displayScale) private var displayScale
 
     var body: some View {
-        let side = Self.unit * CGFloat(multiple)
+        let size = CaptainSize.points(scale: displayScale, large: large)
         Image(pose.imageName)
             .resizable()
             .interpolation(.none)
             .antialiased(false)
-            .frame(width: side, height: side)
+            .frame(width: size.width, height: size.height)
             .accessibilityLabel(pose.label)
             .id(pose)
             .transition(.opacity)
     }
 }
 
-/// The captain for the compact and minimal islands: at one times, and in a 28-point circle
+/// The captain for the compact and minimal islands: small, and in a 28-point circle
 /// where the system gives the reduced-width layout.
 struct CaptainBadge: View {
     let pose: MatchActivityAttributes.Pose
@@ -206,7 +231,7 @@ struct CaptainBadge: View {
         if #available(iOS 27.0, *) {
             TightBadge(pose: pose)
         } else {
-            CaptainIcon(pose: pose, multiple: 1)
+            CaptainIcon(pose: pose, large: false)
         }
     }
 }
@@ -218,12 +243,12 @@ private struct TightBadge: View {
 
     var body: some View {
         if limited {
-            CaptainIcon(pose: pose, multiple: 1)
+            CaptainIcon(pose: pose, large: false)
                 .frame(width: 28, height: 28)
                 .background(BrandColor.ink)
                 .clipShape(Circle())
         } else {
-            CaptainIcon(pose: pose, multiple: 1)
+            CaptainIcon(pose: pose, large: false)
         }
     }
 }

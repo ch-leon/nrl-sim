@@ -36,14 +36,22 @@ describe('iOS captain assets', () => {
 
   it('holds nothing else (no stale pose left behind)', () => {
     const onDisk: string[] = [];
-    for (const e of readdirSync(IOS_CAPTAIN_CATALOG, { withFileTypes: true })) {
-      if (e.isDirectory()) for (const f of readdirSync(join(IOS_CAPTAIN_CATALOG, e.name))) onDisk.push(`${e.name}/${f}`);
+    // Dotfiles (.DS_Store and the like) are the system's, not ours.
+    for (const e of readdirSync(IOS_CAPTAIN_CATALOG, { withFileTypes: true }).filter((d) => !d.name.startsWith('.'))) {
+      if (e.isDirectory()) for (const f of readdirSync(join(IOS_CAPTAIN_CATALOG, e.name)).filter((n) => !n.startsWith('.'))) onDisk.push(`${e.name}/${f}`);
       else onDisk.push(e.name);
     }
     expect(onDisk.sort()).toEqual([...fresh.keys()].sort());
   });
 
-  it('every pose is its pixels enlarged x2, declared 3x: 80 px, about 26.7 points', () => {
+  it('the Swift sizing knows the canvas (CaptainSize.artWidth and artHeight in MatchLiveActivity.swift)', () => {
+    const swift = readFileSync(join(IOS_CAPTAIN_CATALOG, '..', 'MatchLiveActivity.swift'), 'utf8');
+    const { w, h } = captainPoses().carry;
+    expect(swift).toContain(`static let artWidth = ${w}\n`);
+    expect(swift).toContain(`static let artHeight = ${h}\n`);
+  });
+
+  it('every pose is its pixels enlarged x2, declared 3x: 80 px wide, about 26.7 points', () => {
     const poses = captainPoses();
     for (const pose of CAPTAIN_POSES) {
       const name = 'Captain' + pose[0]!.toUpperCase() + pose.slice(1);

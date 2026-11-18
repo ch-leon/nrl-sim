@@ -129,7 +129,7 @@ game's own pixel art (`src/art/captainPoses.ts`) by `npm run build:ios`, kept in
 `ios/App/BigCoachWidgets/Assets.xcassets`; a test fails if they fall out of date. On
 phones whose island is squeezed (iOS 27's reduced-width layout) it shows the icon alone in
 a small circle, with no score. On the phone, look at: whether the figure is crisp at real
-size (hard pixel edges, no blur or shimmer), that the pose changes after a try, a big hit
+size (hard pixel edges, no blur or shimmer, on a 3x phone and, for the lock screen, a 2x one), that the pose changes after a try, a big hit
 and at full time, and that the full-time pose's thin raised arms still read.
 
 **When it changes.** It starts at kick-off of a match you are in, and updates on tries,
