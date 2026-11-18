@@ -6,6 +6,7 @@
   "scripts": {
     "predev": "vite-node scripts/gen-icons.mjs",
     "dev": "vite",
+    "gen:captain-poses": "vite-node scripts/gen-captain-poses.mjs --",
     "prebuild": "vite-node scripts/gen-icons.mjs",
     "build": "tsc --noEmit && vite build",
     "build:match-preview": "node scripts/build-match-preview.mjs",
