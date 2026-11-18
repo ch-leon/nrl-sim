@@ -6,13 +6,12 @@ import { weekHeld } from '../core/time';
 import { activePack } from '../content';
 import { DEFAULT_PLAYER_COLORS } from '../config';
 import { autoPick } from './lineup';
-import { createDivisionWorld, type RegionalCareerProfile, type DivisionSchedule } from '../data/divisions';
+import { buildDivisionTrialFixtures, createDivisionWorld, divisionTrialDefinitionId, type RegionalCareerProfile, type DivisionSchedule } from '../data/divisions';
 import { divisionForClub } from '../data/competitionDivisions';
-import { createCompetitionInstance, competitionFixtureId, validateCompetitions, type CompetitionFixture, type CompetitionInstance } from '../data/competition';
+import { competitionFixtureId, validateCompetitions, type CompetitionDefinition, type CompetitionFixture, type CompetitionInstance } from '../data/competition';
 import { activateStructuralCalendar, competitionLadder, hasStructuralCalendar, structuralRuntimeAllowed } from './competitionCalendar';
 import { hashString } from './rivals';
 import { freshCapAccount, tierForRank } from './cap';
-import { makeRng } from '../utils/rng';
 import { structuralOpenCup } from './openCupCareer';
 
 export function currentDivision(state: Pick<GameState, 'clubId' | 'competitions'>, clubId: string = state.clubId): ReturnType<typeof divisionForClub> {
@@ -30,22 +29,16 @@ export function buildDivisionTrials(world: DivisionSchedule, profile: RegionalCa
   const trials: CompetitionInstance[] = [];
   for (const division of world.divisions) {
     const league = world.instances.find(i => i.id === division.instanceId)!;
-    const ids = makeRng((seed ^ hashString(season === 1 ? `${division.id}:trials` : `${world.profile.id}:${division.id}:trials:s${season}`)) >>> 0).shuffle(league.entrantIds);
-    const half = ids.length / 2;
-    for (let round = 0; round < 2; round++) for (let i = 0; i < half; i++) {
-      const homeId = round === 0 ? ids[i]! : ids[half + i]!;
-      const awayId = round === 0 ? ids[half + i]! : ids[(i + 1) % half]!;
-      const definition = { ...league.definition, id: `${world.profile.id}:trials`, name: 'Preseason trial',
+    const definitionAt = (slot: number): CompetitionDefinition => {
+      const definition = { ...league.definition, id: divisionTrialDefinitionId(world.profile.id), name: 'Preseason trial',
         format: { kind: 'exhibition' as const }, minEntrants: 2, maxEntrants: 2,
-        stages: [{ id: 'trial', name: 'Trial', kind: 'exhibition' as const, rounds: 1, slotIds: [profile.trialSlots[round]!] }],
+        stages: [{ id: 'trial', name: 'Trial', kind: 'exhibition' as const, rounds: 1, slotIds: [slot] }],
         venues: { rounds: 'home-away' as const, final: 'same-as-rounds' as const } };
       delete definition.standings;
-      const instance = createCompetitionInstance(definition, season, trials.length, [homeId, awayId]);
-      instance.status = 'scheduled'; instance.stageId = 'trial';
-      instance.fixtures = [{ id: competitionFixtureId(instance.id, 0), competitionId: instance.id, stageId: 'trial', round: 1,
-        slot: profile.trialSlots[round]!, homeId, awayId, neutral: false, status: 'scheduled' }];
-      trials.push(instance);
-    }
+      return definition;
+    };
+    trials.push(...buildDivisionTrialFixtures(world.profile.id, division.id, league, seed, trials.length,
+      [definitionAt(profile.trialSlots[0]), definitionAt(profile.trialSlots[1])]));
   }
   return trials;
 }

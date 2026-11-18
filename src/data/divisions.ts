@@ -213,15 +213,52 @@ export function buildDivisionSchedule(profile: RegionalCareerProfile, pack: Cont
     throw new Error('Invalid division fields or season');
   const divisions: DivisionMetadata[] = [];
   const instances = [...profile.divisions].sort((a, b) => a.rank - b.rank).map(division => {
-    const instance = createCompetitionInstance(divisionDefinition(profile, division, pack), season, 0, fields[division.id]!);
-    instance.tieOrder = makeRng(streamSeed(seed, profile.id, `${division.id}:standings${season === 1 ? '' : `:s${season}`}`)).shuffle(instance.entrantIds);
-    instance.status = 'scheduled'; instance.stageId = 'regular';
-    instance.fixtures = divisionPairings(instance.entrantIds, division.regularRounds, streamSeed(seed, profile.id, `${division.id}:fixtures${season === 1 ? '' : `:s${season}`}`)).map((f, index) => ({
-      ...f, id: competitionFixtureId(instance.id, index), competitionId: instance.id, stageId: 'regular', neutral: false,
-      status: 'scheduled', slot: division.regularSlots[f.round - 1]!,
-    }));
+    const instance = buildDivisionLeague(profile.id, division.id, divisionDefinition(profile, division, pack), season, fields[division.id]!, seed);
     divisions.push({ id: division.id, name: division.name, rank: division.rank, ratingMean: division.ratingMean, instanceId: instance.id });
     return instance;
   });
   return { profile: { id: profile.id, version: profile.version, pack: profile.pack, startingDivisionId: profile.startingDivisionId }, divisions, instances };
+}
+
+/** Draw regular rounds from authored or saved stage dates. Finals are drawn once results exist. */
+export function buildDivisionLeague(profileId: string, divisionId: string, definition: CompetitionDefinition, season: number,
+  entrantIds: readonly string[], seed: number): CompetitionInstance {
+  const instance = createCompetitionInstance(definition, season, 0, entrantIds);
+  const stage = instance.definition.stages[0]!;
+  if (stage.kind !== 'league' || !stage.slotIds) throw new Error('Missing dated division league stage');
+  const year = season === 1 ? '' : `:s${season}`;
+  instance.tieOrder = makeRng(streamSeed(seed, profileId, `${divisionId}:standings${year}`)).shuffle(instance.entrantIds);
+  instance.status = 'scheduled'; instance.stageId = stage.id;
+  instance.fixtures = divisionPairings(instance.entrantIds, stage.rounds, streamSeed(seed, profileId, `${divisionId}:fixtures${year}`)).map((f, index) => ({
+    ...f, id: competitionFixtureId(instance.id, index), competitionId: instance.id, stageId: stage.id, neutral: definition.venues.rounds === 'neutral',
+    status: 'scheduled', slot: stage.slotIds![f.round - 1]!,
+  }));
+  return instance;
+}
+
+export function divisionTrialDefinitionId(profileId: string): string {
+  return `${profileId}:trials`;
+}
+
+/** Two trial dates using the existing draw, with one home game per club. */
+export function buildDivisionTrialFixtures(profileId: string, divisionId: string, league: CompetitionInstance, seed: number,
+  firstOrdinal: number, definitions: readonly [CompetitionDefinition, CompetitionDefinition]): CompetitionInstance[] {
+  const season = league.season;
+  const label = season === 1 ? `${divisionId}:trials` : `${profileId}:${divisionId}:trials:s${season}`;
+  const ids = makeRng((seed ^ hashString(label)) >>> 0).shuffle(league.entrantIds);
+  const half = ids.length / 2;
+  const trials: CompetitionInstance[] = [];
+  for (const [round, definition] of definitions.entries()) {
+    const stage = definition.stages[0]!;
+    for (let i = 0; i < half; i++) {
+      const homeId = round === 0 ? ids[i]! : ids[half + i]!;
+      const awayId = round === 0 ? ids[half + i]! : ids[(i + 1) % half]!;
+      const instance = createCompetitionInstance(definition, season, firstOrdinal + trials.length, [homeId, awayId]);
+      instance.status = 'scheduled'; instance.stageId = stage.id;
+      instance.fixtures = [{ id: competitionFixtureId(instance.id, 0), competitionId: instance.id, stageId: stage.id, round: 1,
+        slot: stage.slotIds![0]!, homeId, awayId, neutral: definition.venues.rounds === 'neutral', status: 'scheduled' }];
+      trials.push(instance);
+    }
+  }
+  return trials;
 }
