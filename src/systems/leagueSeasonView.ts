@@ -71,7 +71,8 @@ export function leagueSeasonView(state: LeagueReadState) {
   const currentFixtures = fixtures.filter(f => f.slot === week);
   const currentSlot = calendar.slots.find(s => s.id === week);
   const currentLabel = currentSlot?.kind === 'rest' ? 'Rest week'
-    : currentFixtures.find(f => f.status !== 'cancelled' && f.instance.status !== 'withdrawn'
+    : currentFixtures.find(f => ['scheduled', 'completed'].includes(f.status)
+      && ['scheduled', 'active', 'completed'].includes(f.instance.status)
       && (f.fixture.homeId === clubId || f.fixture.awayId === clubId))?.stageLabel
       ?? (currentSlot?.kind === 'preseason' ? 'Pre-season' : 'No club fixture');
   const finalsSize = instance.definition.format.kind === 'league' ? instance.definition.format.finalsSize : 0;
