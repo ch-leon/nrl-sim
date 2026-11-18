@@ -138,7 +138,7 @@ embedded in the app). The app's side is the `LiveMatch` plugin
 (`ios/App/App/LiveActivity/LiveMatchPlugin.swift`), driven from the game by
 `src/native/liveMatch.ts` (iPhone build only). The shape both share is
 `ios/App/Shared/MatchActivityAttributes.swift`. Both targets are in the App Group
-`group.au.com.supercooked.bigrugbycoach.dev`, unused until the club widgets (Phase 5).
+`group.au.com.supercooked.bigrugbycoach.dev`, which the club widgets use (see Widgets).
 The three folders are synchronised with the disk: a Swift file or an asset catalogue
 dropped into one is in its target at the next build, with no project edit. The target
 was added by `scripts/ios/add-widget-target.rb`. `BrandColors.swift` is generated from
@@ -167,6 +167,65 @@ Live Activities (the spec's "Still unproven"). Nothing paid is used: no push, no
 frequent-updates key, no stale date, no timed dismissal. If the phone refuses, the
 game carries on without it, and the Simulator is the fallback until the paid account.
 
+## Widgets
+
+Phase 5 of the spec: a **Big Coach** widget for the lock screen and the home screen.
+
+**What it shows.** Your next match as the game words it ("Round 7 v Brisbane · away",
+"Pre-season trial 1", "Semi final", a League career's "Week 5 · League · round 3"), or
+what the game says when there is none ("No more matches this season"). The best player
+you have out injured and how many rounds until he is back ("Walker back in 2 rounds"),
+when someone is. The level points banked across the squad ("3 points to spend"), when
+there are any; points only bank while Settings has you spending them yourself. The home
+screen sizes add your club's name, his stars and how many others are out, and the
+week and season. Before the game has written anything (a fresh install, or no App
+Group) it says "Open Big Coach to pick up your season". Tapping it opens the game
+(`bigcoach://club`), where you left it.
+
+**Counts are in game rounds, and only change when you play.** The widget shows the
+snapshot the game last wrote and nothing else: no dates, no times, nothing that counts
+down by itself. The game writes a new one when a career loads or starts, the week
+advances, a match is committed, points are spent, or an injury comes or goes, and only
+when something on the widget changed. A round is one week's advance (a pre-season trial
+or a rest week counts as one), the same weeks the game's own "out 3 wk" counts; the
+injury count uses the club's medical bay and physio centre as they are today. If you
+build one mid-injury, the count drops faster from the next advance.
+
+**Sizes.** Lock screen: rectangular (the match, the injury, the points) and inline (the
+match, short: "R7 v Brisbane · away"); these take the lock screen's own tint. Home
+screen: small and medium, on the SuperCOOKED ink with the accent on the match's stage.
+
+**Add it.** Lock screen: touch and hold the lock screen, **Customise**, **Lock Screen**,
+tap the widget area under the clock (or the line above it for inline), pick **Big
+Coach**. Home screen: touch and hold an empty spot, **+** (or **Edit**, **Add Widget**),
+search **Big Coach**, pick small or medium, **Add Widget**. Open the game once first so
+there is a snapshot to show.
+
+**Where it lives.** `ios/App/BigCoachWidgets/ClubWidget.swift` (kind `BigCoachClub`) in
+the same extension as the Live Activity. The app's side is the `ClubWidgets` plugin
+(`ios/App/App/LiveActivity/ClubWidgetsPlugin.swift`, method `writeSnapshot`), which
+stores the JSON in the App Group's defaults (key `clubSnapshot`) and asks WidgetKit to
+reload. The game side is `src/native/clubSnapshot.ts` (the snapshot) and
+`src/native/clubWidgets.ts` (when to write it), iPhone build only. The shape both share
+is `ios/App/Shared/ClubSnapshot.swift`.
+
+**Try it.**
+
+1. `npm run build:ios && npx cap sync ios`, then Run from Xcode.
+2. Open a career. Add the widget to the lock screen and the home screen.
+3. Check it against the club: the next match's round, opponent and home or away.
+4. Advance a week: the widget moves on to the next match. An injured man's rounds
+   drop by one (or more with a medical bay).
+5. Turn on spending points yourself (Settings), advance until someone levels up: "N
+   points to spend" shows; spend them all and the line goes.
+6. Close the app for a while (or a day): the widget has not changed.
+
+**Unproven on a free Apple ID.** The widget needs the App Group shared between the app
+and the extension. Free accounts can use App Groups, but whether Xcode registers this
+one for a Personal Team, and the extension can read what the app wrote, is unproven on
+the phone. If it cannot, the widget only ever shows "Open Big Coach to pick up your
+season" and the game is unaffected.
+
 ## What only the phone can show
 
 The Simulator cannot check these. They are Leon's to try on the phone:
@@ -179,3 +238,5 @@ The Simulator cannot check these. They are Leon's to try on the phone:
 - Saving when the app is sent to the background (see Saves).
 - The Live Activity on a free-signed phone at all, and on the lock screen and the
   Dynamic Island (see Lock screen and Dynamic Island).
+- The club widget reading the App Group on a free-signed phone, how it looks in each
+  size, and that it updates after a week's advance (see Widgets).
