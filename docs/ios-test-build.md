@@ -129,18 +129,21 @@ screen and, on phones that have one, in the Dynamic Island.
 **What it shows.** Both clubs' codes with yours starred (as the match's score bug does),
 the score, the half and the match minute *as of the last update* ("2nd half 4'"), one
 line for the last big moment ("TRY, Walker (BRI) 3'"), and a state: LIVE, PAUSED · TAP
-TO RETURN, HALF-TIME or FULL TIME. The island's compact form is a ball on the left (the
+TO RETURN, HALF-TIME (GOLDEN POINT NEXT before a drawn final's golden point) or FULL
+TIME. The island's compact form is a ball on the left (the
 captain's poses come in Phase 4) and the score on the right; the expanded form matches
 the lock screen; the minimal form is the ball. Colours are the SuperCOOKED tokens; text is
 the system font for now (the brand fonts ship as woff2, which a widget extension cannot load).
 
 **When it changes.** It starts at kick-off of a match you are in, and updates on tries,
 conversions, penalty goals, field goals, big hits, sin bins, half-time, the second half's
-kick-off, golden point and full time. Nothing on it ticks by itself. Skip to full time
+kick-off, the break before golden point and its kick-off, and full time. Nothing on it
+ticks by itself. Skip to full time
 sends one update, the final score. Only full time lights the screen (an alert); every
 other update is silent. When the app goes to the background the match stops, so the
-activity says PAUSED until you come back. Tapping it opens the app (the `bigcoach://`
-link), which resumes the match where it was. Full time stays on it until you leave the
+activity should say PAUSED until you come back. Tapping it opens the app (the
+`bigcoach://` link), which is expected to resume the match where it was, as any return to
+the app does. None of this has been seen on a phone or in the Simulator yet. Full time stays on it until you leave the
 match; Back to club, Save & exit, or any other way out of the match ends it at once. An
 activity left over from a run that was killed is ended at the next launch. With Live
 Activities switched off for the app (Settings > Big Coach > Live Activities), nothing
@@ -170,8 +173,8 @@ register the group for the Personal Team, let it. Do not add Push Notifications.
 2. Start a match. Score a try or wait for one.
 3. Lock the phone, or swipe home: the lock screen (and the island) show the score,
    the minute and PAUSED · TAP TO RETURN.
-4. Tap it: the app opens on the match, which plays on; go away again at half-time and
-   it says HALF-TIME.
+4. Tap it: the app should open on the match, which should play on; go away again at
+   half-time and it should say HALF-TIME.
 5. Play or Skip to full time: the screen lights once, FULL TIME with the result.
 6. Back to club (or Save & exit mid-match): the activity is gone.
 7. Settings > Big Coach > Live Activities off, play a match: nothing shows, nothing breaks.
