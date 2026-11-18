@@ -51,7 +51,8 @@ function drawFields(state: GameState, leagueId: string) {
   const c = state.competitions!;
   if (c.leagueCareer!.phase === 'next-season-choice')
     return allocateLeagueFields(c.world!, c.leagueCareer!.close!, state.clubId, leagueId, c.instances);
-  return { policy: 'adjacent-vacancy-v1' as const, fields: c.leagueCareer!.initialFields, movements: [] };
+  const fields = Object.fromEntries(c.world!.divisions.map(d => [d.id, c.instances.find(i => i.id === d.instanceId)!.entrantIds]));
+  return { policy: 'adjacent-vacancy-v1' as const, fields, movements: [] };
 }
 
 export function previewLeagueEntry(state: GameState, leagueId: string): LeaguePreviewResult {

@@ -53,7 +53,7 @@ export function validEntrySnapshots(receipt: LeagueEntryReceipt, world: Competit
   const accounts = [playerId, ...receipt.movements.map(m => m.clubId).filter(id => id !== playerId)];
   const validSide = (opps: unknown, clubs: unknown): boolean => Array.isArray(opps) && opps.length === opponents.length
     && opps.every((o, i) => exact(o, ['clubId', 'strength']) && o.clubId === opponents[i]
-      && typeof o.strength === 'number' && Number.isFinite(o.strength) && o.strength >= 1 && o.strength <= 100)
+      && typeof o.strength === 'number' && Number.isInteger(o.strength) && o.strength >= 30 && o.strength <= 90)
     && Array.isArray(clubs) && clubs.length === accounts.length && clubs.every((c, i) => {
       const rank = world.divisions.find(d => instances.find(l => l.id === d.instanceId)?.entrantIds.includes(accounts[i]!))?.rank;
       return rank !== undefined && validCommitment(c, receipt.season, rank) && c.clubId === accounts[i];

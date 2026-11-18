@@ -2,6 +2,8 @@ import { SAVE_VERSION, type GameState } from '../core/state';
 import { careerActionClock } from '../core/season';
 import { validateCurrent, validateInput } from '../core/saveValidation';
 import { canonicalLeagueJson } from '../data/leagueCareer';
+import { competitionFixtureId } from '../data/competition';
+import { DIVISION_TIERS } from '../data/financeRules';
 import { savedTrialDefinitions } from '../data/leagueSchedule';
 import { MARKET_SHORTLIST_SIZE } from './playerCareer';
 import { juniorCount } from './youth';
@@ -41,6 +43,14 @@ function runtimeProblem(state: GameState): string | null {
       return 'This League reward or venue policy is unsupported.';
     const first = d.stages[0]!;
     if (d.format.kind === 'league') {
+      const size = i.entrantIds.length;
+      if (size < 2 || size % 2 !== 0 || first.rounds < size - 1 || first.rounds > 2 * (size - 1))
+        return 'This League field size or round count is unsupported.';
+      // Finals append at fixtures.length. Validate the namespace as a set so
+      // reordering saved fixtures cannot reserve a future bracket identity.
+      const fixtureIds = new Set(i.fixtures.map(f => f.id));
+      if (i.fixtures.some((_, ordinal) => !fixtureIds.has(competitionFixtureId(i.id, ordinal))))
+        return 'This League fixture identity sequence is unsupported.';
       const finals = d.stages[1];
       if (first.kind !== 'league' || (d.format.finalsSize ? d.stages.length !== 2 || finals?.kind !== 'knockout'
         || finals.rounds !== Math.log2(d.format.finalsSize) || d.venues.final !== 'neutral' || d.drawnKnockout !== 'seeded-draw' : d.stages.length !== 1))
@@ -53,6 +63,37 @@ function runtimeProblem(state: GameState): string | null {
       || d.venues.final !== 'same-as-rounds') return 'This League trial layout is unsupported.';
     if (initial && (i.status !== 'scheduled' || i.fixtures.some(f => f.status !== 'scheduled')))
       return 'The opening League fixtures have already changed.';
+  }
+  return null;
+}
+
+/** Player history is complete; AI history only retains the recent draws. */
+function capacityProblem(state: GameState): string | null {
+  const c = state.competitions!;
+  const progress = c.leagueCareer!;
+  const divisions = c.world!.divisions;
+  const rank = (leagueId: string) => divisions.find(d => d.id === leagueId)!.rank;
+  for (const club of state.league.clubs) {
+    const player = club.id === state.clubId;
+    const account = player ? state.capAccount : club.capAccount;
+    if (!account) return 'A club is missing its financial account.';
+    const initialRank = divisions.find(d => progress.initialFields[d.id]!.includes(club.id))!.rank;
+    const priorRanks = player
+      ? state.history.filter(h => h.season < state.season).map(h => rank(h.league!.leagueId))
+      : c.instances.filter(i => i.season < state.season && i.definition.format.kind === 'league' && i.entrantIds.includes(club.id))
+        .map(i => divisions.find(d => i.definition.id === `${c.world!.profile.id}:${d.id}`)!.rank);
+    const previousRank = Math.max(initialRank, ...priorRanks);
+    const currentRank = divisions.find(d => c.instances.find(i => i.id === d.instanceId)!.entrantIds.includes(club.id))!.rank;
+    const attainedRank = Math.max(previousRank, currentRank);
+    const actualRank = DIVISION_TIERS.indexOf(account.tier);
+    if ((player || state.season === 1) ? actualRank !== attainedRank : actualRank < attainedRank)
+      return 'Club capacity differs from its observed League attainment.';
+    const quote = progress.accepted?.quote.commitments.find(q => q.clubId === club.id);
+    if (quote) {
+      const quotedPrevious = DIVISION_TIERS.indexOf(quote.previousTier);
+      if ((player || state.season === 1) ? quotedPrevious !== previousRank : quotedPrevious < previousRank)
+        return 'The entry capacity differs from the club prior League attainment.';
+    }
   }
   return null;
 }
@@ -85,6 +126,8 @@ export function leagueCareerStateProblem(state: GameState): LeagueStateProblem |
     savedTrialDefinitions(c.world.profile.id, leagues, c.instances.filter(i => i.season === state.season), c.calendar!.slots);
     if (state.playerPopulation.lastAcademyIntakeSeason !== state.season || state.playerPopulation.lastMarketIntakeSeason !== state.season)
       return { reason: 'invalid', message: 'League population intake is out of sequence.' };
+    const capacity = capacityProblem(state);
+    if (capacity) return { reason: 'invalid', message: capacity };
     const receipt = progress.accepted;
     if (receipt) {
       const capacity = receipt.annualChanges?.commitments ?? receipt.quote.commitments;

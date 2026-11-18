@@ -5,6 +5,7 @@ import { setCareerNamespace } from '../../src/core/storage/local';
 import { DEV_TEST_PREFIX } from '../../src/core/storageKeys';
 import { advanceUntil } from '../../src/core/advance';
 import { publishedCap, freezeSignedTerms, capRoomFor } from '../../src/systems/cap';
+import { leagueCareerStateProblem } from '../../src/systems/leagueEntryValidation';
 import { leagueCommitmentPreview } from '../../src/systems/leagueSelection';
 import { closeLeagueSeason } from '../../src/systems/leagueCareer';
 import { prepareDivisionFinals } from '../../src/systems/divisionCareer';
@@ -132,6 +133,112 @@ describe('League entry quotes and atomic candidates', () => {
     const opted = structuredClone(setupStructuralDivisionCareer(AU_CAREER_PROFILE, 573));
     opted.competitions!.leagueCareer = marked;
     expect(previewLeagueEntry(opted, id)).toMatchObject({ ok: false, reason: 'unsupported' });
+  });
+
+  it('refuses unsupported round counts and fixture IDs reserved for future finals', async () => {
+    const s = await initial();
+    const id = s.competitions!.world!.profile.startingDivisionId;
+    const minimum = structuredClone(s);
+    const supported = minimum.competitions!.instances[0]!;
+    supported.definition.stages[0]!.rounds = 7;
+    supported.definition.stages[0]!.slotIds = supported.definition.stages[0]!.slotIds!.slice(0, 7);
+    supported.fixtures = supported.fixtures.filter(f => f.round <= 7);
+    expect(acceptLeagueEntry(minimum, preview(minimum)).ok).toBe(true);
+    const short = structuredClone(s);
+    const league = short.competitions!.instances[0]!;
+    league.definition.stages[0]!.rounds = 6;
+    league.definition.stages[0]!.slotIds = league.definition.stages[0]!.slotIds!.slice(0, 6);
+    league.fixtures = league.fixtures.filter(f => f.round <= 6);
+    expect(previewLeagueEntry(short, id)).toMatchObject({ ok: false, reason: 'unsupported' });
+    const collision = structuredClone(s);
+    const draw = collision.competitions!.instances[0]!;
+    draw.fixtures[0]!.id = `${draw.id}:f${draw.fixtures.length}`;
+    expect(previewLeagueEntry(collision, id)).toMatchObject({ ok: false, reason: 'unsupported' });
+  });
+
+  it('preserves reordered saved membership and fixtures when confirming the opening draw', async () => {
+    const s = await initial();
+    const c = s.competitions!;
+    c.leagueCareer!.initialFields = Object.fromEntries(Object.entries(c.leagueCareer!.initialFields).map(([id, ids]) => [id, [...ids].reverse()]));
+    for (const i of c.instances) i.fixtures.reverse();
+    c.instances.reverse();
+    const bytes = JSON.stringify(s);
+    const current = c.instances.find(i => i.id === c.world!.divisions[0]!.instanceId)!;
+    const p = preview(s);
+    expect(p.fieldIds).toEqual(current.entrantIds);
+    expect(p.quote.opponents.map(o => o.clubId)).toEqual(current.entrantIds.filter(id => id !== s.clubId));
+    const started = accept(s);
+    expect(JSON.stringify(started.competitions!.instances)).toBe(JSON.stringify(c.instances));
+    expect(JSON.stringify(started.competitions!.leagueCareer!.initialFields)).toBe(JSON.stringify(c.leagueCareer!.initialFields));
+    expect(JSON.stringify(s)).toBe(bytes);
+  });
+
+  it('admits signed integer cash but rejects fractional and unsafe player cash before entry', async () => {
+    const s = await initial();
+    const id = s.competitions!.world!.profile.startingDivisionId;
+    for (const money of [s.money + 0.5, Number.MAX_SAFE_INTEGER + 1, Number.MIN_SAFE_INTEGER - 1]) {
+      expect(previewLeagueEntry({ ...s, money }, id)).toMatchObject({ ok: false });
+    }
+    expect(accept({ ...s, money: -100 }).money).toBe(-100);
+  });
+
+  it('requires opening capacity to match every club initial league', async () => {
+    const s = await initial();
+    const player = structuredClone(s); player.capAccount.tier = 'premier';
+    expect(leagueCareerStateProblem(player)).not.toBeNull();
+    const rival = structuredClone(s);
+    const id = rival.competitions!.leagueCareer!.initialFields[rival.competitions!.world!.divisions[0]!.id]!.find(id => id !== rival.clubId)!;
+    rival.league.clubs.find(c => c.id === id)!.capAccount!.tier = 'premier';
+    expect(leagueCareerStateProblem(rival)).not.toBeNull();
+  });
+
+  it('rejects invented player attainment and AI capacity below retained evidence after annual entry', async () => {
+    const closed = settleWithTitle(accept(await initial()), true);
+    const middle = closed.competitions!.world!.divisions[1]!.id;
+    const next = accept(closed, middle);
+    expect(leagueCareerStateProblem(next)).toBeNull();
+    // Old AI entries are not a complete history: a higher retained tier is
+    // permissible when the current receipt has no claim about this club.
+    const unknownAiHistory = structuredClone(next);
+    const untouchedId = unknownAiHistory.competitions!.leagueCareer!.initialFields[closed.competitions!.world!.divisions[0]!.id]!.find(id => id !== next.clubId)!;
+    unknownAiHistory.league.clubs.find(c => c.id === untouchedId)!.capAccount!.tier = 'premier';
+    expect(leagueCareerStateProblem(unknownAiHistory)).toBeNull();
+    const invented = structuredClone(next);
+    invented.capAccount.tier = 'premier';
+    const receipt = invented.competitions!.leagueCareer!.accepted!;
+    const forged = { clubId: invented.clubId, ...leagueCommitmentPreview(invented.squad, invented.capAccount, 2, 1) };
+    receipt.quote.commitments[0] = forged;
+    receipt.annualChanges!.commitments[0] = forged;
+    expect(leagueCareerStateProblem(invented)).not.toBeNull();
+    const prior = structuredClone(next);
+    prior.competitions!.leagueCareer!.accepted!.quote.commitments[0]!.previousTier = 'championship';
+    expect(leagueCareerStateProblem(prior)).not.toBeNull();
+    const ai = structuredClone(next);
+    const moved = ai.competitions!.leagueCareer!.accepted!.movements.find(m => m.clubId !== ai.clubId)!;
+    const rival = ai.league.clubs.find(c => c.id === moved.clubId)!;
+    rival.capAccount!.tier = 'local';
+    const lower = { clubId: rival.id, ...leagueCommitmentPreview(rival.squad!, rival.capAccount!, 2, 0) };
+    ai.competitions!.leagueCareer!.accepted!.quote.commitments[1] = { ...lower, previousTier: 'championship' };
+    ai.competitions!.leagueCareer!.accepted!.annualChanges!.commitments[1] = lower;
+    expect(leagueCareerStateProblem(ai)).not.toBeNull();
+  });
+
+  it('restricts frozen strengths to the integer range produced by real squads', async () => {
+    const first = accept(await initial());
+    const second = accept(settleWithTitle(first, false));
+    for (const source of [first, second]) for (const side of ['quote', 'annualChanges'] as const) {
+      if (!source.competitions!.leagueCareer!.accepted![side]) continue;
+      for (const strength of [1.5, 29, 90.5, 91]) {
+        const broken = structuredClone(source);
+        broken.competitions!.leagueCareer!.accepted![side]!.opponents[0]!.strength = strength;
+        expect(leagueCareerStateProblem(broken)).not.toBeNull();
+      }
+      for (const strength of [30, 90]) {
+        const valid = structuredClone(source);
+        valid.competitions!.leagueCareer!.accepted![side]!.opponents[0]!.strength = strength;
+        expect(leagueCareerStateProblem(valid)).toBeNull();
+      }
+    }
   });
 
   it('reports the board dismissal when a completed career is also at its choice gate', async () => {

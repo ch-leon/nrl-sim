@@ -16,7 +16,7 @@ export function entryQuote(state: GameState, season: number, leagueId: string, f
     const club = state.league.clubs.find(c => c.id === id)!;
     const players = id === state.clubId ? state.squad : club.squad;
     const account = id === state.clubId ? state.capAccount : club.capAccount;
-    if (!players || !account || (id !== state.clubId && !Number.isSafeInteger(club.cash)))
+    if (!players || !account || !Number.isSafeInteger(id === state.clubId ? state.money : club.cash))
       throw new Error('A club is missing its roster or financial account.');
     const from = divisionForClub(world, state.competitions!.instances, id)!.division;
     if (tierCap(account.tier) < tierCap(tierForRank(from.rank))) throw new Error('Club capacity is below its current division.');
