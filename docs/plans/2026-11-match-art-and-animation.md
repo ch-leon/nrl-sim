@@ -55,7 +55,43 @@ Seed 5 has a real half-to-fullback pass at tick 4322, but its lead remains 0.90 
 behind the half. One through-running/sprint adjustment did not establish physical
 readiness; no odds, weights or geometry threshold was relaxed. Resume with the
 lead's readiness **before dummy-half run-on**, then prove ordinary play and
-validate. No further agent work is scheduled while usage is paused.
+validate. No further agent work was scheduled during that pause.
+
+## Resumed back-door support — 18 November 2026
+
+Leon resumed agent work. The candidate integrates current main, including the
+SuperCOOKED UI handoff documents. Starting the forward's run as the ball is heeled
+fixes the readiness problem with seven positioning lines and no new tuning
+values, receiver preference, pass odds or defender-deception bonus. Gameplay
+source is frozen at `a9a9c35` while its checks run.
+
+Default Lab seed 5 now supplies the real passage: heel 4291, DH-to-half pass
+4301/catch 4309, half-to-fullback pass behind the forward 4322/catch 4330. The
+forward is 1.29 m ahead at launch; the shape ends at 4331. Focused coverage steps
+the lead through readiness in both directions, preserves ordinary alternatives
+and cancellation, checks snapshot isolation and pause/seek replay, and retains
+the exact preceding simulation/RNG fingerprint when the feature is off.
+
+Separate agents handle fixture maintenance, production browser footage and the
+standard on/off harness comparison. The main agent reviews the code and visual
+evidence. The [published comparison](https://github.com/ch-leon/nrl-sim/blob/8de8313c8990ffb0e8caa84d51814e95af8e00aa/runs/20261118-031501-back-door-on-off-standard/report.md)
+contains all 13 standard scenarios with ON as baseline and OFF as the variant.
+The six preset rows use 100 seeds in both orientations (200 tracked games per
+setting); their raw win rates remain below 45% with both settings, with draws
+reported separately. Expansive versus Balanced is 36.5% wins / 20.5% draws ON and
+37.5% / 20.0% OFF. Several match-count targets also remain low in both arms.
+This does not complete #649's balance acceptance or prove parity; no defaults
+were retuned. PR #722 stays open and unmerged for Leon. Separate QA workflow,
+different-tool review and physical-phone sign-off remain release checks.
+
+Production Chromium confirms the actual default-team launch/catch metadata and
+repeats both snapshots and rendered actor positions/textures after pause/seek at
+4301, 4309, 4322 and 4330. The 844×390 layout has no horizontal overflow and the
+passage raises no page errors. The reproduction link is
+`/#lab?seed=5&tick=4291`, using the Lab's default teams.
+The PR records the final test/CI outcome and normal-speed clip. Hash and
+live-match fixtures follow the changed simulation without weakening the UI-read
+RNG parity, penalty-choice or capped loss-reason assertions.
 
 Status: stages 1–4 presentation and the first stage-5 pass are implemented in
 five linked PRs. Leon reviewed the clip and approved merging on 17 November
