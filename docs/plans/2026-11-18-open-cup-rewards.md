@@ -48,7 +48,7 @@ No new currency, XP award, trait, sponsor, equipment, invitation, earned-cap act
 | `src/core/save.ts`, `src/core/saveValidation.ts`, `src/systems/leagueEntryValidation.ts` | Separate marked/unmarked v32→33 empty-ledger migrations, exact old-format admission, full validation and load/import/recovery reconciliation. |
 | `src/systems/matchIncome.ts` | Compose prize and ordinary reconciliation and extend existing atomic commit/notifications. |
 | `src/systems/competitionCalendar.ts` | Freeze before accepting a result; reconcile its existing completed-result candidate; propagate typed financial errors past cancellation recovery. |
-| `src/core/time.ts`, `src/systems/matchday.ts`, `src/systems/fixtures.ts`, `src/core/save.ts` | Narrow paid-developer interval checkpoint/failure/durable-sidecar handling; kickoff patches, callback/worker catches and retry. |
+| `src/core/time.ts`, `src/systems/matchday.ts`, `src/systems/fixtures.ts`, `src/core/save.ts`, `src/core/storage/local.ts` | Narrow paid-developer interval checkpoint/failure/durable-sidecar handling; kickoff patches, callback/worker catches, verified pending writes and retry. |
 | `src/systems/economy.ts` | Developer reconciliation fallback. League close/admission remain strict and cannot repair or execute rewards. |
 | `docs/specs/career-competitions.md`, `docs/hub/features.md`, `docs/hub/roadmap.md` | Describe delivered dormant foundation and remaining activation questions accurately. |
 
@@ -102,6 +102,19 @@ Validation proves the promise policy list matches the complete executable saved 
 
 Before Task 1, the root agent reviews this plan and obtains Claude plan review, recording resolved feedback. Then execute the authorised foundation using subagent-driven development; do not ask again for permission. Keep normal activation in its separately reviewed entry/UI checkpoint; the user-confirmed window and test rewards are recorded above.
 
+Checkpoint evidence (feature branch, not released): the corrected foundation and
+entry plans passed Claude review. Task 1's data contract passed independent spec
+and Claude review at `be2df76f` with 181 focused tests. Task 2's settlement,
+honours and retention passed both reviews at `5acce13d` with 249 affected tests
+and TypeScript. The existing AU/UK world hashes remain unchanged after separately
+asserting the additive empty reward ledger. Task 3 passed independent spec and
+Claude runtime review; the spec review caught and verified fixes for checkpoint
+notification failure and destination switching during unsaved-edit persistence.
+The runtime/storage recheck passed 51 tests, with 142 tests in the broader affected
+set. Claude requested additional non-default-slot readback coverage and explicit
+post-migration advancement, which are included in the next checks. Migration,
+normal entry/UI and whole-feature release gates remain outstanding.
+
 ### Task 1 — Explicit policy and saved data contract
 
 **Files:** `src/data/competition.ts`, new `src/data/competitionRewards.ts`; tests `tests/core/competitionState.test.ts` and new `tests/data/competitionRewards.test.ts`.
@@ -142,12 +155,20 @@ Before Task 1, the root agent reviews this plan and obtains Claude plan review, 
 - [ ] For this paid-developer context, wrap synchronous hooks/cheap rivals/calendar-forfeit settlement and supply `release.fail` to watched/worker/live-rival paths. On `CompetitionRewardError`, verify installation ownership, clear only this interval's held tokens/context, then call existing `blockInterval(reason, checkpoint)`. Invalidate stale callbacks and stop remaining hooks/season advance. Keep the original durable checkpoint and existing parked sidecar; a failed result candidate creates no receipts, notifications, cancellation or withdrawal. Earlier interval work may exist in quarantined memory, but cannot replace the durable checkpoint or be exported as a settled career.
 - [ ] In `src/systems/matchday.ts`, use the guarded `release.applyResult`/`release.fail` branch for paid developer matches; never clear the watched sidecar before successful interval persistence. In player-worker and `src/systems/fixtures.ts` live-rival catch/finally paths, financial landing failure must block and invalidate releases before `finally(release)`; never fall back to forfeiting or rerun an already-landed financial callback as a worker-computation retry. Cheap rival failures are caught by the interval owner.
 - [ ] After normal developer structural finishing succeeds, use `src/core/save.ts`'s existing `saveSettledLeagueMatch(state, checkpoint, retireMatch)` and `retryPendingLeagueSave()` owner for this checkpoint. These APIs already accept `IntervalCheckpoint`; do not add another pending-save store. Retire the watched sidecar only after the whole completed interval is durably written/read back. Quota/readback failure keeps checkpoint+sidecar export and blocks further advance. Financial failure retry is a full reload from the saved checkpoint plus sidecar (or deterministic headless replay when none exists), not reusing partially advanced memory.
+- [ ] Implementation inspection found that `LocalSaveStore.write()` verifies a supplied sidecar but not the career payload. Add a narrow verified-write option used by the existing pending-save owner: read back the exact new career bytes before approving the source, retiring the sidecar/legacy source or queuing new metadata. On a failed readback, restore the old slot and paired sidecar where applicable and retain the pending checkpoint. Test an actual post-write mismatch/exception, including non-default slots. Keep ordinary writes unchanged by default; later cup confirmations/imports reuse this option rather than inventing another save owner.
 - [ ] Add real paid-developer integration tests in `tests/systems/openCupCareer.test.ts` for watched, fast-forward Worker, live-rival, cheap-rival and settle-forfeit paths. Inject typed financial failure in each and assert blocked state, cleared owned holds, preserved checkpoint/export/sidecar, no forfeit replacement, no failed-award notifications, stale callback no-op, then one successful commit after reload/replay. Also test grouped player/rival failure, save quota/readback retry and installation replacement. Keep normal League callback tests as unchanged-behaviour regressions, not evidence for developer protection.
 - [ ] Run `npx vitest run tests/systems/matchIncome.test.ts tests/systems/competitionCalendar.test.ts tests/systems/openCupCareer.test.ts tests/systems/competitionRewards.test.ts`.
 - [ ] Add separate cancelled-final and forfeited-final tests: saved promises resolve settled with an empty eligible-receipt set, no trophy or reputation, and no fake final cash. Repeated reconciliation and season close cannot leave these promises pending.
 - [ ] Require green cases for watched completion, skip/fast-forward, cheap rivals, repeated worker delivery, a bye, cancellation, played-score tie with seeded winner, unplayed forfeit, reduced cup field, player decline with AI winner and simultaneous independent rival outcomes. Assert no extra interval, ladder/stat/XP replay or cap change.
 
 ### Task 4 — Save 33, recovery and rollover
+
+Delivery batching: execute this with the companion entry plan's Tasks 1–4 in
+one backend checkpoint, using the final version-33 schema. The interim blanket
+normal-reward rejection is replaced by strict activation-backed admission in
+that checkpoint; unactivated/foreign executable cups still reject. No interim
+format is released. All migration, recovery and old-field exclusion requirements
+below remain required.
 
 **Files:** `src/core/state.ts`, `src/core/save.ts`, `src/core/saveValidation.ts`, `src/systems/leagueEntryValidation.ts`; new `tests/core/competitionRewardsMigration.test.ts`, existing `tests/systems/leagueCareer.test.ts`, `tests/systems/openCupCareer.test.ts`, `tests/systems/leagueCareerSetup.test.ts` and `tests/systems/leagueCareerCallbacks.test.ts`.
 

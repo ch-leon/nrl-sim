@@ -1,7 +1,9 @@
 import { leagueCareerStateProblem } from '../systems/leagueEntryValidation';
 import { migrateObservedProtection } from '../systems/cap';
 import { initialPlayerPopulation, installPlayerHistory } from '../systems/playerCareer';
-import { reconcileMatchIncome } from '../systems/matchIncome';
+import { prepareOpenCup } from '../systems/openCupCareer';
+import { prepareDivisionFinals } from '../systems/divisionCareer';
+import { hasExecutableCupRewards, reconcileMatchIncome } from '../systems/matchIncome';
 import { currentRound } from './season';
 import { careerNamespace } from './storage/local';
 import { DEV_TEST_PREFIX } from './storageKeys';
@@ -28,7 +30,7 @@ import { withRivalSquads } from '../systems/rivals';
 import { autoPick } from '../systems/lineup';
 import { DEFAULT_TACTICS } from '../match/league/presets';
 import { bus } from './events';
-import { registerTickHook, TICK_ORDER, unregisterTickHook, weekHeld, leagueIntervalSaveHeld, failedIntervalProblem, failedIntervalCheckpoint, type IntervalCheckpoint } from './time';
+import { registerTickHook, TICK_ORDER, unregisterTickHook, weekHeld, activePaidCupCheckpoint, leagueIntervalSaveHeld, failedIntervalProblem, failedIntervalCheckpoint, type IntervalCheckpoint } from './time';
 import { clearLiveMatch, isLiveMatchRecord, LIVE_MATCH_EXPORT_FIELD, peelLiveMatchExport, readLiveMatch, writeLiveMatch } from '../systems/liveMatchRecord';
 import { CORRUPT_SAVE_KEY, LEGACY_SAVE_KEY, liveMatchKey, slotKey } from './storageKeys';
 import { BRAND } from '../brand';
@@ -477,13 +479,13 @@ export function getSlotSummaries(): SlotSummary[] {
 // ── save / load / clear ──────────────────────────────────────────────────────
 
 /** Write `state` to `slot`. Returns false (after warning + ui:notify) on failure. */
-export function writeSlot(slot: number, state: GameState, expectedOriginal?: string | null): boolean {
-  return persistSlot(slot, state, expectedOriginal);
+export function writeSlot(slot: number, state: GameState, expectedOriginal?: string | null, verifyPayload = false): boolean {
+  return persistSlot(getStore(), slot, state, expectedOriginal, {verifyPayload});
 }
 
-function persistSlot(slot: number, state: GameState, expectedOriginal?: string | null, parkedMatch?: string): boolean {
+function persistSlot(store: LocalSaveStore | null, slot: number, state: GameState, expectedOriginal: string | null | undefined,
+  options: {parkedMatch?: string; verifyPayload?: boolean; current?: () => boolean}): boolean {
   if (savesLocked) return false;
-  const store = getStore();
   if (!store) {
     console.warn('nrl-sim: no storage available, save skipped');
     bus.emit('ui:notify', { text: 'Save failed: storage unavailable', kind: 'danger' });
@@ -491,6 +493,7 @@ function persistSlot(slot: number, state: GameState, expectedOriginal?: string |
   }
   try {
     const original = store.read(slot);
+    if (options.current && !options.current()) return false;
     if (expectedOriginal !== undefined && expectedOriginal !== original) return false;
     if (original !== null) {
       const approved = approvedOriginals.get(store)?.get(slot);
@@ -503,7 +506,9 @@ function persistSlot(slot: number, state: GameState, expectedOriginal?: string |
     }
     const payload = JSON.stringify(state);
     const facts = { saveVersion: state.version, club: String(state.clubName), season: state.season, week: state.week };
-    store.write(slot, payload, nextMeta(store.storedMeta(slot), payload, facts, store.deviceId(), Date.now()), parkedMatch);
+    const meta = nextMeta(store.storedMeta(slot), payload, facts, store.deviceId(), Date.now());
+    if (options.current && !options.current()) return false;
+    store.write(slot, payload, meta, options.parkedMatch, options.verifyPayload, options.current);
     approveOriginal(store, slot, payload, false);
   } catch (err) {
     console.warn('nrl-sim: save failed', err);
@@ -611,30 +616,39 @@ export function retryPendingLeagueSave(): string | null {
  * to the playtest career leaves an unchanged career's keys untouched). False when
  * a save was needed and did not land.
  */
-export function saveIfChanged(state: GameState): boolean {
+export function saveIfChanged(state: GameState, verifyPayload = false): boolean {
   if (weekHeld() || leagueIntervalSaveHeld() || failedIntervalProblem() || slotImported || savesLocked) return false;
   const pending = currentPendingSave();
   if (pending) {
     if (pending.saving || !sameDestination(pending)) return false;
     pending.saving = true;
     try {
-      if (!persistIfChanged(pending.state) || currentPendingSave() !== pending || !sameDestination(pending)) return false;
+      if (!persistIfChanged(pending.state, true) || currentPendingSave() !== pending || !sameDestination(pending)) return false;
       lastSaved = pending.state;
       pendingLeagueSave = undefined;
       pending.retireMatch();
       if (pending.state === state) return true;
     } finally { pending.saving = false; }
   }
-  return persistIfChanged(state);
+  return persistIfChanged(state, verifyPayload);
 }
 
-function persistIfChanged(state: GameState): boolean {
+function persistIfChanged(state: GameState, verifyPayload = false): boolean {
   const store = getStore();
   if (!store) return false;
   try {
-    if (store.read(activeSlot) === JSON.stringify(state)) return true;
-  } catch { return false; } // An unreadable slot cannot safely be replaced.
-  return writeSlot(activeSlot, state) ? (lastSaved = state, true) : false;
+    const slot = activeSlot;
+    const namespace = careerNamespace();
+    const installation = stateInstallation();
+    const current = (): boolean => activeSlot === slot && careerNamespace() === namespace
+      && stateInstallation() === installation && getStore() === store;
+    const original = store.read(slot);
+    if (!current()) return false;
+    if (original !== JSON.stringify(state) && !persistSlot(store, slot, state, original, {verifyPayload, current})) return false;
+    if (!current()) return false;
+    lastSaved = state;
+    return true;
+  } catch { return false; } // An unreadable or replaced slot cannot safely be used.
 }
 
 /**
@@ -824,7 +838,7 @@ export function exportSave(state: GameState): string {
 interface SaveExport { text: string; state: GameState; notice?: string }
 
 function saveExport(state: GameState): SaveExport {
-  const checkpoint = currentPendingSave() ?? failedIntervalCheckpoint();
+  const checkpoint = currentPendingSave() ?? failedIntervalCheckpoint() ?? activePaidCupCheckpoint();
   if (checkpoint) return recoveryExport(checkpoint);
   const snap = heldWeekSnapshot();
   const live = snap ? readLiveMatch() : null;
@@ -844,8 +858,12 @@ function recoveryExport(checkpoint: IntervalCheckpoint): SaveExport {
   const rawMatch = store.storage.getItem(liveMatchKey(checkpoint.slot));
   if (rawMatch === null) return {text: original, state: saved, notice: 'Exported the saved checkpoint from the start of the week.'};
   const live: unknown = JSON.parse(rawMatch);
+  // The kickoff hook may have drawn a due round from the checkpoint's previous
+  // scores. Recreate its fixture identities without changing the exported bytes.
+  const kickoff = checkpoint.namespace === DEV_TEST_PREFIX && !saved.competitions?.leagueCareer && hasExecutableCupRewards(saved)
+    ? prepareOpenCup(prepareDivisionFinals(saved)) : saved;
   if (!isLiveMatchRecord(live) || live.season !== saved.season || live.week !== saved.week ||
-    !currentCalendarFixtures(saved).some(({instance, fixture}) =>
+    !currentCalendarFixtures(kickoff).some(({instance, fixture}) =>
       live.competitionId === instance.id && live.fixtureId === fixture.id && live.slot === fixture.slot &&
       live.round === fixture.round && live.homeId === fixture.homeId && live.awayId === fixture.awayId &&
       (fixture.homeId === saved.clubId || fixture.awayId === saved.clubId)))
@@ -965,7 +983,7 @@ export const EXPORT_HELD_TEXT = 'Exported the save from the start of this week, 
 
 /** Browser: download the state as a JSON file. No-op outside a browser. */
 export function downloadSave(state: GameState): void {
-  if (weekHeld() && !heldWeekSnapshot()) {
+  if (weekHeld() && !activePaidCupCheckpoint() && !heldWeekSnapshot()) {
     bus.emit('ui:notify', { text: EXPORT_HELD_FAILED_TEXT, kind: 'danger' });
     return;
   }
@@ -973,7 +991,7 @@ export function downloadSave(state: GameState): void {
   let file: SaveExport;
   try { file = saveExport(state); }
   catch (error) {
-    if (!failedIntervalProblem() && !pendingLeagueSaveProblem()) throw error;
+    if (!failedIntervalProblem() && !pendingLeagueSaveProblem() && !activePaidCupCheckpoint()) throw error;
     bus.emit('ui:notify', {text: 'Could not verify the saved week and its match for export. The recovery data has been kept.', kind: 'danger'});
     return;
   }
@@ -1072,7 +1090,7 @@ export function installImportedSave(text: string, slot: number): ImportResult {
     } catch { return { ok: false, message: 'Could not preserve originals. Import was not installed.' }; }
   }
   if (installed.state.competitions?.leagueCareer && peeled.live) {
-    return persistSlot(slot, installed.state, expectedOriginal, JSON.stringify(peeled.live)) ? installed
+    return persistSlot(getStore(), slot, installed.state, expectedOriginal, {parkedMatch: JSON.stringify(peeled.live)}) ? installed
       : { ok: false, message: 'Could not save the League career and its parked match. Check storage and retry the import.' };
   }
   if (!writeSlot(slot, installed.state, expectedOriginal)) return { ok: false, message: '' };

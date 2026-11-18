@@ -1,5 +1,5 @@
 import { installPlayerHistory } from './playerCareer';
-import { freezeMatchIncome, reconcileMatchIncome, matchIncomePatch, commitMatchState } from './matchIncome';
+import { freezeMatchEffects, reconcileMatchEffects, matchIncomePatch, commitMatchState } from './matchIncome';
 // src/systems/fixtures.ts — season fixtures, ladder, rival cheap-sim and finals
 // for the 16-club league (BAK-184, WU-7). Pure TypeScript, no Phaser.
 //
@@ -204,15 +204,15 @@ export function stampFixtureResult(
   result: { homeScore: number; awayScore: number },
 ): GameState {
   if (hasStructuralCalendar(state)) return finaliseCalendarFixture(state, fixture, result);
-  if (state.league.fixtures.some(f => sameFixtureIdentity(f, fixture) && f.result)) return reconcileMatchIncome(state);
+  if (state.league.fixtures.some(f => sameFixtureIdentity(f, fixture) && f.result)) return reconcileMatchEffects(state);
   if (!state.league.fixtures.some(f => sameFixtureIdentity(f, fixture))) return state;
-  state = freezeMatchIncome(state, fixture);
+  state = freezeMatchEffects(state, fixture);
   const fixtures = state.league.fixtures.map((f) =>
     f.round === fixture.round && f.homeId === fixture.homeId && f.awayId === fixture.awayId
       ? { ...f, result, ...(fixture.unplayed ? { unplayed: true } : {}) }
       : f,
   );
-  return reconcileMatchIncome({ ...state, league: { ...state.league, fixtures } });
+  return reconcileMatchEffects({ ...state, league: { ...state.league, fixtures } });
 }
 
 /**
@@ -230,9 +230,9 @@ export function applyResult(
   result: { homeScore: number; awayScore: number },
 ): GameState {
   if (hasStructuralCalendar(state)) return finaliseCalendarFixture(state, fixture, result);
-  if (state.league.fixtures.some(f => sameFixtureIdentity(f, fixture) && f.result)) return reconcileMatchIncome(state);
+  if (state.league.fixtures.some(f => sameFixtureIdentity(f, fixture) && f.result)) return reconcileMatchEffects(state);
   if (!state.league.fixtures.some(f => sameFixtureIdentity(f, fixture))) return state;
-  state = freezeMatchIncome(state, fixture);
+  state = freezeMatchEffects(state, fixture);
   if (fixture.round <= 0 || isFinalsRound(fixture.round)) {
     return stampFixtureResult(state, fixture, result);
   }
@@ -278,7 +278,7 @@ export function applyResult(
   );
 
   const league: LeagueState = { ...state.league, fixtures, ladder };
-  return reconcileMatchIncome({ ...state, league });
+  return reconcileMatchEffects({ ...state, league });
 }
 
 /** 1-based ladder position of a club, or 0 if absent. */
@@ -677,7 +677,7 @@ export function registerFixturesSystem(): void {
     if (!hasStructuralCalendar(s) && (currentRound(s) < -1 || ctx.week > WEEKS_PER_SEASON)) return;
     if (s.league.clubs.length === 0) return; // league not initialised yet
     const incomeFixtures = hasStructuralCalendar(s) ? currentCalendarFixtures(s).map(fixtureBridge) : s.league.fixtures.filter(f => f.round === currentRound(s));
-    for (const fixture of incomeFixtures) s = freezeMatchIncome(s, fixture);
+    for (const fixture of incomeFixtures) s = freezeMatchEffects(s, fixture);
     setState(matchIncomePatch(s));
     const rng = makeRng(s.rngSeed);
     if (s.settings.liveRivals === true && !ctx.fastForward) {

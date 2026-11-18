@@ -173,10 +173,11 @@ async function runUntil(target: AdvanceTarget, frame: () => Promise<void>): Prom
 
       forcedSales = [];
       // A held week (N10.3: the player's match in the Worker) finishes later: wait for its end.
+      let blockedReason: string | undefined;
       const weekDone = new Promise<void>((resolve) => {
         const finish = (): void => {off(); offBlocked(); offState(); resolve();};
         const off = bus.on('week:advanced', finish);
-        const offBlocked = bus.on('week:blocked', finish);
+        const offBlocked = bus.on('week:blocked', ({reason}) => { blockedReason = reason; finish(); });
         const offState = bus.on('state:changed', () => {if (installation !== stateInstallation()) finish();});
         try {
           if (!withFastForward(() => { advanceWeek(); return weekHeld(); }, { holds: true })) finish();
@@ -187,7 +188,7 @@ async function runUntil(target: AdvanceTarget, frame: () => Promise<void>): Prom
       });
       await weekDone;
       if (installation !== stateInstallation()) return {weeksPlayed, stop: {kind:'stopped',text:'The career changed during advance.'}};
-      const failure = failedIntervalProblem();
+      const failure = failedIntervalProblem() ?? blockedReason;
       if (failure) return {weeksPlayed, stop: {kind:'stopped',text:failure}};
       weeksPlayed++;
       const pending = pendingLeagueSaveProblem();

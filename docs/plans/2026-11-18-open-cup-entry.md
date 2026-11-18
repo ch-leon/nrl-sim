@@ -25,6 +25,14 @@ ship them together as one optional Open Cup change. The final version-33 schema
 therefore includes both reward records and entry evidence. Run the final
 independent implementation review and required CI/QA on that complete feature.
 
+Implementation batching: after the reviewed reward runtime, implement foundation
+Task 4 and this plan's Tasks 1–4 as one coherent backend checkpoint. Version 33
+is never released between these steps. The final normal admission rule requires
+complete saved activation evidence; the earlier foundation-only rejection gate
+is superseded by that stricter feature-aware rule. Preserve all old-format
+exclusions and failure/recovery proofs. Review the completed backend before
+starting the presentation checkpoint, then review the whole feature for release.
+
 ## Published product contract
 
 | Topic | Initial supported behaviour |
@@ -154,10 +162,12 @@ Both current and previous season activation records must remain provable while t
 - [ ] Coordinate with the reviewed foundation's additive-schema exclusion list: reject presence, including empty/null values, of fields impossible in the declared old format. Keep old sporting, history, people, finance, cap and no-repair checks intact; do not silently normalise them.
 - [ ] For an initial-choice save, defer offer activation until league acceptance. For a valid active pre-deadline save, add an offer without a draw. At/after deadline mark unavailable this season; for next-season-choice create the offer only on annual acceptance.
 - [ ] Preserve raw backup bytes, money, RNG, contracts, cap, population, old definitions and results. Never convert old reward metadata into executable promises, rewrite an existing cup or infer a historical prize.
+- [ ] A valid old marked save may already contain an inert current-season cup even though normal setup did not author one. Preserve that instance and its ordinary receipts, mark new registration unavailable for this season with an explicit legacy-cup reason, and offer normal entry next year. Do not create a second annual draw or attach new prizes to the old cup. Include pre-deadline and post-deadline migration cases for this supported input.
 - [ ] A migrated held Week 6 match resumes normally; registration actions remain guarded, and unanswered entry expires as that interval closes. No mandatory prompt interrupts the match.
 - [ ] If activation follows a shipped v33 foundation, add explicit v33→34 tests as well as the complete v32→current chain. Normal-namespace executable imported cups require valid activation proof; developer/unmarked imports remain outside normal activation.
 - [ ] Normal League accepted results must already have complete settled ordinary/prize receipts. Still-scheduled fixtures may carry valid pre-result promises. Reject accepted-but-pending, missing and forged reward evidence; do not use developer reconciliation to repair normal imports or close.
 - [ ] Verify normal result callbacks atomically expose score, wallet, reputation, receipts and trophy. Financial failure quarantines the owned interval and preserves checkpoint/sidecar; no cancellation fallback, payout notification or stale callback may turn failure into a result.
+- [ ] Extend the foundation's verified interval-start and completed-week persistence to normal cup-enabled League intervals. Include AI-only cup weeks and headless advancement with no watched-match retirement callback; they still use the existing pending-save owner and exact readback. A failed initial write runs no hooks and counts no elapsed week. Recheck installation, source, slot and namespace before starting work. This activates the same protection for normal cup play rather than introducing a second save mechanism.
 - [ ] Run `npx vitest run tests/core/leagueCareerMigration.test.ts tests/core/save.test.ts tests/core/saveRecovery.test.ts tests/systems/leagueCareerCallbacks.test.ts tests/systems/competitionRewards.test.ts`.
 
 ## Task 5 — Entry, reports and trophy history
@@ -165,6 +175,7 @@ Both current and previous season activation records must remain provable while t
 - [ ] Add one Open Cup card to the existing League/calendar surface; open a focused entry dialog. Follow [SuperCOOKED](../specs/ui-supercooked.md) Phase 0 `tokens.ts`/`dom.ts` components and existing League/history/report patterns; do not reskin unrelated screens.
 - [ ] Before closure show fee, dates, full possible commitment, deadline, current choice and the published rewards/withdrawal rules. Enter/decline controls can change until closure; closed, expired and legacy-unavailable states explain when entry returns.
 - [ ] Show no opponent/bye before draw. After draw show actual schedule/status and queued withdrawal explicitly: the next tie is forfeited on its date, not already played. Existing `leagueSeasonView` remains the fixture owner.
+- [ ] Keep the AI cup's draw and champion readable from the cup details when the player declines or expires. The player's season view intentionally excludes competitions they did not enter; read the saved cup instance identified by activation and reuse `leagueFixtureView` for those rows instead of adding AI-only ties to the player's schedule.
 - [ ] Display reward formula and actual resolved amounts separately. Before a fixture promise exists, state the M basis; do not present a preview estimate as guaranteed cash. Reports show saved ordinary income and extra prize breakdown separately.
 - [ ] Read trophies only through foundation `competitionHonours`; show season, cup, champion and the saved full registered squad. Retired/transferred players retain saved names/IDs, without being recreated in any roster.
 - [ ] Add `tests/ui/screens/openCupEntry.test.ts`; extend `tests/ui/screens/matchReport.test.ts`, `tests/ui/screens/history.test.ts` and `tests/systems/leagueSeasonView.test.ts`. Repeated render/open/reload must not mutate state, pay money or create honours.
@@ -196,6 +207,7 @@ The read-only UI test snapshots state before opening entry, report and trophy sc
 
 - [ ] Extend `tests/systems/openCupCareer.test.ts` to normal storage with the real fixture hooks: player title, early elimination, opening bye, withdrawal, unanswered/declined AI-only cup and seeded drawn-score winner in both regions.
 - [ ] Complete two seasons with changed league choice; prove unique annual draws/prize promises, once-only honours, exact annual people work, unchanged retained capacity, no duplicate fees/income/XP and no extra calendar intervals.
+- [ ] Winning the Open Cup grants its published rewards only; it must not create the main-league title evidence used for permanent league unlocks.
 - [ ] Include typed financial failure, repeated watched/worker delivery, grouped rival failure, quota/readback retry and reload replay. No repair/forfeit recovery should mask a failed normal result transaction.
 - [ ] Update `docs/specs/career-competitions.md`, `docs/specs/career-opportunities.md`, `docs/plans/2026-11-career-competitions.md`, `docs/hub/features.md` Recently added and `docs/hub/roadmap.md`. Replace “no cup registration”/“pending offer values” only where this feature actually ships; retain wider balance and other-event work as open.
 - [ ] Run `npx tsc --noEmit`, `npx vitest run`, `npm run build`; require all pass. Obtain independent-tool review against this done-when contract, green `check`, every `webkit (<group>)` shard, `webkit` aggregate and full QA before merge.

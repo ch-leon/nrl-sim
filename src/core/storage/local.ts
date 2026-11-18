@@ -91,11 +91,24 @@ export class LocalSaveStore implements SyncSaveStore {
   }
 
   /** Throws when the payload was not stored (storage full or blocked); nothing else is touched then. */
-  write(slot: number, payload: string, meta: SaveMeta, parkedMatch?: string): void {
-    const previous = slot === 1 ? this.storage.getItem(slotKey(1)) : null;
+  write(slot: number, payload: string, meta: SaveMeta, parkedMatch?: string, verifyPayload = false, current?: () => boolean): void {
+    const key = slotKey(slot);
+    const previous = slot === 1 || verifyPayload ? this.storage.getItem(key) : null;
     const legacy = slot === 1 ? this.storage.getItem(LEGACY_SAVE_KEY) : null;
+    const writePayload = (): void => {
+      if (current && !current()) throw new Error('The destination changed before saving');
+      this.storage.setItem(key, payload);
+      if (!verifyPayload) return;
+      try {
+        if (this.storage.getItem(key) !== payload) throw new Error('Settled career was not stored');
+      } catch (error) {
+        if (previous === null) this.storage.removeItem(key);
+        else this.storage.setItem(key, previous);
+        throw error;
+      }
+    };
     if (parkedMatch === undefined) {
-      this.storage.setItem(slotKey(slot), payload);
+      writePayload();
     } else {
       // Install the small record first. If the larger checkpoint hits quota,
       // restore the exact original record before reporting the import failure.
@@ -104,7 +117,7 @@ export class LocalSaveStore implements SyncSaveStore {
       this.storage.setItem(key, parkedMatch);
       try {
         if (this.storage.getItem(key) !== parkedMatch) throw new Error('Parked match was not stored');
-        this.storage.setItem(slotKey(slot), payload);
+        writePayload();
       } catch (error) {
         if (old === null) this.storage.removeItem(key);
         else this.storage.setItem(key, old);

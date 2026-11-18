@@ -1,5 +1,5 @@
 import { leagueFixtureView } from './leagueSeasonView';
-import { freezeMatchIncome, matchIncomePatch, commitMatchState, reconcileMatchIncome } from './matchIncome';
+import { freezeMatchEffects, matchIncomePatch, commitMatchState, reconcileMatchEffects } from './matchIncome';
 // Orchestrator-owned: the PLAYER's match of the round (rival-vs-rival matches
 // are handled by fixtures.ts's own hook). The match is played on the live sim
 // (BAK-207): the week holds at kick-off, 'match:started' hands the Match scene
@@ -236,7 +236,7 @@ function applyPlayerResult(fixture: Fixture, home: TeamSheet, away: TeamSheet, s
   const accepted = fixture.competitionId
     ? before.competitions?.instances.find(i => i.id === fixture.competitionId)?.fixtures.find(f => f.id === fixture.id)?.result
     : before.league.fixtures.find(f => sameFixtureIdentity(f, fixture))?.result;
-  if (accepted) { commitMatchState(reconcileMatchIncome(before)); return () => {}; }
+  if (accepted) { commitMatchState(reconcileMatchEffects(before)); return () => {}; }
   const structural = hasStructuralCalendar(before);
   const knockout = structural ? calendarKnockout(before, fixture) : isFinalsRound(fixture.round);
   const context = structural ? calendarFixtureContext(before, fixture) : undefined;
@@ -325,7 +325,7 @@ export function registerPlayerMatchSystem(): void {
       }
     }
 
-    setState(matchIncomePatch(freezeMatchIncome(getState(), fixture)));
+    setState(matchIncomePatch(freezeMatchEffects(getState(), fixture)));
     const rng = makeRng(state.rngSeed);
     const seed = rng.int(1, 2 ** 31);
     setState({ rngSeed: rng.state() });
@@ -369,7 +369,7 @@ export function registerPlayerMatchSystem(): void {
       const release = ctx.hold();
       const record: LiveMatchRecord = { season: state.season, week: state.week, round: fixture.round, homeId: fixture.homeId, awayId: fixture.awayId, seed, calls: resumed ? [...resumed.calls] : [], ...(resumed?.controls?.length ? { controls: [...resumed.controls] } : {}), plans: resumed?.plans ? [...resumed.plans] : [], tick: resumed?.tick ?? 0, halfMinutes: NINES.halfMinutes, engineId: matchEngineIdentity() };
       if (fixture.id) { record.fixtureId = fixture.id; record.competitionId = fixture.competitionId!; record.slot = fixture.slot!; }
-      if (state.competitions?.leagueCareer) {
+      if (release.fail) {
         const installation = stateInstallation();
         bus.bindLeaguePlayback(fixture, () => stateInstallation() === installation);
       }

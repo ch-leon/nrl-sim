@@ -1,4 +1,5 @@
-import { freezeMatchIncome, reconcileMatchIncome } from './matchIncome';
+import { CompetitionRewardError } from './competitionRewards';
+import { freezeMatchEffects, reconcileMatchEffects } from './matchIncome';
 // Regional calendar and results for League careers and isolated competition prototypes.
 import { stateInstallation, type Fixture, type GameState, type LadderRow } from '../core/state';
 import { leagueCareerStateProblem } from './leagueEntryValidation';
@@ -181,9 +182,14 @@ export function finaliseCalendarFixture(state: GameState, bridge: Fixture, score
   if (blockCalendarResults) throw new Error('Invalid result transition: result commit failed');
   if (!hasStructuralCalendar(state) || structuralAdvanceProblem(state) || ![score.homeScore, score.awayScore].every(n => Number.isSafeInteger(n) && n >= 0)) return state;
   const context = calendarFixtureContext(state, bridge);
-  if (!context) return state;
+  if (!context) {
+    const instance = state.competitions!.instances.find(i => i.id === bridge.competitionId && i.season === state.season);
+    const accepted = instance?.fixtures.find(f => f.id === bridge.id && (f.status === 'completed' || f.status === 'cancelled'));
+    return instance && accepted && sameFixtureIdentity(bridge, fixtureBridge({instance, fixture: accepted}))
+      ? reconcileMatchEffects(state) : state;
+  }
   const { instance, fixture } = context;
-  state = freezeMatchIncome(state, bridge);
+  state = freezeMatchEffects(state, bridge);
   const result = resolvedResult(instance, fixture, score, forfeit);
   const updated = progressInstance({ ...instance, stageId: fixture.stageId,
     fixtures: instance.fixtures.map(f => f.id === fixture.id ? { ...f, status: 'completed', result } : f) });
@@ -194,7 +200,7 @@ export function finaliseCalendarFixture(state: GameState, bridge: Fixture, score
   // A compatibility read model for the player's own league. Cup results never change it.
   const ladder = stage.kind === 'league' && instance.entrantIds.includes(state.clubId)
     ? competitionLadder(updated) : state.league.ladder;
-  return reconcileMatchIncome({ ...state, competitions, league: ladder === state.league.ladder ? state.league : { ...state.league, ladder } });
+  return reconcileMatchEffects({ ...state, competitions, league: ladder === state.league.ladder ? state.league : { ...state.league, ladder } });
 }
 
 export function competitionLadder(instance: CompetitionInstance): LadderRow[] {
@@ -329,11 +335,12 @@ export function settleStructuralCalendar(state: GameState, week: number): GameSt
       recoveryLog(`forfeited ${live.instance.id} ${live.fixture.id}`);
       next = settled;
     } catch (err) {
+      if (err instanceof CompetitionRewardError) throw err;
       next = abandonFixture(next, live.instance.id, live.fixture.id, err);
     }
   }
   if (week >= next.competitions!.calendar!.slots.length && !structuralSeasonResolved(next)) next = withdrawUnresolved(next);
-  return next;
+  return reconcileMatchEffects(next);
 }
 
 /** Missing actual rival players produce a walkover, never a generated substitute sheet. */
