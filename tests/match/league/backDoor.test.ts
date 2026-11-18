@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { Runner } from '../../../src/match/core/engine';
+import { BODY_RADIUS } from '../../../src/match/core/body';
+import { toFieldPt } from '../../../src/match/core/field';
+import { dist } from '../../../src/match/core/vec';
 import type { ContactPlayer, Snapshot } from '../../../src/match/core/snapshot';
+import { fieldToWorldPoint } from '../../../src/scenes/matchField';
 import { DEFAULT_AWAY, DEFAULT_HOME, labSheet } from '../../../src/match/lab/sheets';
 import { LiveSim } from '../../../src/match/league/live';
 import { LEGS_ENERGY } from '../../../src/match/league/fatigue';
@@ -15,13 +19,13 @@ afterEach(()=>{ while(restores.length) restores.pop()!(); });
 class BackDoorSim extends LiveSim {
   draws=0;
   queue:number[]=[];
-  constructor(dir:1|-1=1) {
+  constructor(dir:1|-1=1, private readonly edge:1|-1=-1) {
     super(sideSheet('H',{rating:60,tactics:{attack:'expansive'}}),sideSheet('A',{rating:60}),649);
     this.tick=100; this.dir=dir; this.attacking='home'; this.tackles=1; this.mark={x:50,y:34};
     for(const p of this.players) { p.body.pos={x:50-dir*25,y:60}; p.body.vel={x:0,y:0}; p.lockUntil=0; p.busyUntil=0; p.pose='run'; }
     this.players[3]!.body.pos={...this.mark}; this.players[3]!.lockUntil=120;
-    this.players[4]!.body.pos={x:50-dir*4,y:28};
-    this.players[7]!.body.pos={x:50-dir*3,y:30};
+    this.players[4]!.body.pos={x:50-dir*4,y:34+edge*6};
+    this.players[7]!.body.pos={x:50-dir*3,y:34+edge*4};
     this.players[0]!.body.pos={x:50-dir*6,y:34};
     this.players[6]!.body.pos={x:50-dir*1.6,y:34.4};
     this.phase={kind:'ruck',t0:100,carrier:3,tackler:9,stage:'down',handover:false,heldAt:0,down:10,pace:null};
@@ -44,10 +48,10 @@ class BackDoorSim extends LiveSim {
     if(this.phase.kind==='ruck')this.phase={kind:'play',shape};
     this.ball={kind:'held',by:4};
     for(const p of this.players) {p.body.pos={x:50-this.dir*25,y:60};p.lockUntil=0;p.pose='run';}
-    this.players[4]!.body.pos={x:50,y:28};this.players[4]!.catchTick=this.tick-LIVE.passCooldown;this.players[4]!.decided=false;
-    this.players[7]!.body.pos={x:50+this.dir,y:30};
+    this.players[4]!.body.pos={x:50,y:34+this.edge*6};this.players[4]!.catchTick=this.tick-LIVE.passCooldown;this.players[4]!.decided=false;
+    this.players[7]!.body.pos={x:50+this.dir,y:34+this.edge*4};
     this.players[0]!.body.pos={x:50-this.dir*3,y:34};
-    this.players[9]!.body.pos={x:50+this.dir*3,y:28};
+    this.players[9]!.body.pos={x:50+this.dir*3,y:34+this.edge*6};
   }
   decide(intercept=false) {
     if(intercept)this.players[9]!.body.pos={x:50-this.dir,y:30.5};
@@ -61,6 +65,8 @@ class BackDoorSim extends LiveSim {
     this.queue=[.999];this.landings();this.prepareAttackShape();return this.snapshot();
   }
   next() {this.tick++;this.prepareAttackShape();return this.snapshot();}
+  stepInput() { this.controlList.push({ tick: this.tick + 1, side: 'home', kind: 'step-up' }); }
+  passFromFullback() { this.pass(this.man(0), this.man(5)); }
 }
 
 describe('ordinary back-door option (#649)',()=>{
@@ -149,6 +155,52 @@ describe('ordinary back-door option (#649)',()=>{
     }
   });
 
+  it('keeps the fullback moving goalward and toward the packet edge until the sweep expires', () => {
+    const sweepTicks = 6;
+    restores.push(applyTuning({ 'shapes.backDoor.sweepTicks': sweepTicks }));
+    for (const dir of [-1, 1] as const) for (const edge of [-1, 1] as const) {
+      const sim = new BackDoorSim(dir, edge);
+      expect(sim.choose().attackShape?.edge).toBe(edge);
+      sim.run();
+      const flight = sim.decide().ball.flight!;
+      expect(flight.backDoor).toBeDefined();
+      while (sim.tick < flight.arrivesTick) sim.step();
+      expect(sim.snapshot().ball.holder).toEqual({ side: 'home', slot: 0 });
+      const carrier = sim.man(0), atCatch = { ...carrier.body.pos };
+      const target = { x: flight.to.x + dir * LIVE.runOnM, y: flight.to.y + edge * SHAPES.backDoor.sweepWidthM };
+      expect(carrier.target).toEqual(target);
+      while (sim.tick < flight.arrivesTick + sweepTicks - 1) sim.step();
+      expect((carrier.body.pos.x - atCatch.x) * dir).toBeGreaterThan(0);
+      expect((carrier.body.pos.y - atCatch.y) * edge).toBeGreaterThan(0);
+      expect(carrier.target).toEqual(target);
+      expect(dist(carrier.body.pos, target)).toBeGreaterThan(BODY_RADIUS);
+      sim.step();
+      expect(carrier.target).not.toEqual(target);
+      expect(sim.snapshot().ball.holder).toEqual({ side: 'home', slot: 0 });
+    }
+  });
+
+  it('releases the carry target on arrival, manual input, a pass or contact', () => {
+    for (const ending of ['arrival', 'control', 'pass', 'contact'] as const) {
+      const sim = new BackDoorSim();
+      sim.choose();
+      sim.run();
+      sim.decide();
+      const caught = sim.catchFlight(), target = sim.targets()[0];
+      expect(caught.ball.holder).toEqual({ side: 'home', slot: 0 });
+      const carrier = sim.man(0);
+      if (ending === 'arrival') carrier.body.pos = { x: target!.x - BODY_RADIUS / 2, y: target!.y };
+      if (ending === 'control') sim.stepInput();
+      if (ending === 'pass') sim.passFromFullback();
+      if (ending === 'contact') sim.man(9).body.pos = { x: carrier.body.pos.x + 0.6, y: carrier.body.pos.y };
+      sim.step();
+      expect(carrier.target).not.toEqual(target);
+      if (ending === 'arrival' || ending === 'control') expect(sim.snapshot().ball.holder?.slot).toBe(0);
+      if (ending === 'pass') expect(sim.snapshot().ball.flight?.source?.player.slot).toBe(0);
+      if (ending === 'contact') expect(sim.snapshot().phase?.kind).toBe('tackle');
+    }
+  });
+
   it('runs the natural seed 5 Lab passage from heel to fullback catch', () => {
     const runner = new Runner(seed => new LiveSim(
       { ...labSheet(DEFAULT_HOME), rotation: 'standard' },
@@ -193,10 +245,23 @@ describe('ordinary back-door option (#649)',()=>{
     expect(caught.ball.holder).toEqual({ side: support.side, slot: support.slot });
     expect(caught.attackShape?.backDoor).toEqual(shape.backDoor);
     expect(at(caught.tick + 1).attackShape).toBeUndefined();
+    const swept = at(4346);
+    const screenX = (s: Snapshot) => {
+      const { fx, fy } = toFieldPt(player(s, support));
+      return fieldToWorldPoint(fx, fy, 0).x;
+    };
+    expect(swept.ball.holder).toEqual({ side: support.side, slot: support.slot });
+    expect(screenX(swept)).toBeGreaterThan(screenX(caught));
+    expect((player(swept, support).y - player(caught, support).y) * shape.edge).toBeGreaterThan(0);
+    const straightening = at(4350);
+    expect(player(straightening, support).headY! * shape.edge).toBeGreaterThan(0);
+    expect(Math.abs(player(straightening, support).headX)).toBeGreaterThan(Math.abs(player(swept, support).headX));
     runner.seek(heel.tick);
     expect(runner.cur).toEqual(heel);
     expect(at(launched.tick)).toEqual(launched);
     expect(at(caught.tick)).toEqual(caught);
+    expect(at(swept.tick)).toEqual(swept);
+    expect(at(straightening.tick)).toEqual(straightening);
   });
 
   it('off preserves the preceding ordinary-shapes event and RNG fingerprint exactly',async()=>{

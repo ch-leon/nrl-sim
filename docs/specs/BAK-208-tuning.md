@@ -1904,8 +1904,8 @@ same ordinary shape draw, with no extra receiver, completion or contest roll.
 All three exact participants must pass the existing reach/availability gates;
 no packet is assembled by teleporting a player. The half/lead/fullback hold a
 lateral origin captured at choice time. Ordinary carrier, actual receiver,
-retreat and explicit coach/script priorities win. Revision 7 identifies this
-gameplay change for live-match recovery.
+retreat and explicit coach/script priorities win. Revision 8 includes the
+fullback's carry through the sweep for live-match recovery.
 
 | Knob | Default | Meaning |
 |---|---:|---|
@@ -1917,6 +1917,8 @@ gameplay change for live-match recovery.
 | `shapes.backDoor.leadAheadM` | 2 m | Lead's target ahead of the half from the heel. The target follows the first pass and half's run, then holds at second launch through the catch. |
 | `shapes.backDoor.trailDepthM` | 3 m | Supporting fullback's run behind the actual caller, subject to ordinary passing eligibility. |
 | `shapes.backDoor.leadClearM` | 0.5 m | Real lead must be this far ahead of the backwards pass corridor before flight metadata calls it back-door. |
+| `shapes.backDoor.sweepWidthM` | 4 m | How far the catching fullback aims across the field toward the packet's edge. He also aims `live.runOnM` goalward from the pass landing point. |
+| `shapes.backDoor.sweepTicks` | 20 ticks | Maximum time to hold the sweep target after the actual catch. Within one body radius of the target the fullback returns to normal gap steering. |
 
 The actual first DH recipient remains the existing commitment. A different
 recipient abandons this option, and the later pass remains an ordinary weighted

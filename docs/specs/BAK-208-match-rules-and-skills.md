@@ -372,13 +372,19 @@ flight retains its real defender recipient and receives no back-door marker.
 The lead finishes his bounded run through the actual second catch, then the
 structure ends. Invalid identities, a locked/binned/interchanging participant,
 another pass choice, contact, kick, loose ball, turnover or dead phase also ends
-it. Actor/flight metadata is copied on snapshot reads; reads never recruit a
-recipient or consume dice. With `shapes.backDoor.on:0`, the prior three-structure
-simulation and RNG stream remain exact. This gameplay slice uses recovery engine
-revision 7; its weights and authored metres are listed in the tuning reference.
+it. After a successful second catch, the fullback carries through a short sweep
+toward the same edge he ran to from behind the half. He runs toward a point 3 m
+goalward and 4 m wider than the catch, with ordinary acceleration and carry
+speed. Normal gap steering resumes when he reaches the target or after 20 ticks.
+Play instructions, passes and contact can end that carry earlier.
+
+Actor/flight metadata is copied on snapshot reads. With `shapes.backDoor.on:0`,
+the prior three-structure simulation and RNG stream remain exact. Recovery
+engine revision 8 includes the sweep.
 
 Default Lab seed 5 shows the heel at tick 4291, DH pass to the home half at 4301,
-the half's back-door pass behind the forward at 4322 and the fullback catch at 4330.
+the half's back-door pass behind the forward at 4322 and the fullback catch at
+4330. The fullback continues the sweep screen-right through 4346.
 
 ### 5.2 Defence presets
 

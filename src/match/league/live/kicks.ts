@@ -1,4 +1,4 @@
-import { FIELD_LENGTH, FIELD_WIDTH, MID_Y } from '../../core/field';
+import { FIELD_LENGTH, FIELD_WIDTH, MID_Y, clampToGround } from '../../core/field';
 import { grubberFlight, kickFlight, landed, type BallState } from '../../core/ball';
 import type { Side } from '../../core/snapshot';
 import { clamp, dist, sub, type Vec } from '../../core/vec';
@@ -7,6 +7,7 @@ import { KICKOFF, kickoffLanding, pinnedDeep, regatherChance, type KickoffCall }
 import { KICK_CONTEST, fieldingRead, grubberRace, highBall } from '../kickContest';
 import { TOUCH, exitPoint, inOwnInGoal, outOfPlay, ownLineX, touchRestartSpot } from '../touch';
 import { ROLES } from '../roles';
+import { SHAPES } from '../attackingShapes';
 import { LIVE } from './knobs';
 import { other, AIM_TEXT, KICK_TEXT, type Player, type Phase } from './types';
 import { LiveClock } from './clock';
@@ -155,6 +156,18 @@ export abstract class LiveKicks extends LiveClock {
         this.turnover();
         r.burstUntil = this.tick + LIVE.burstTicks;
         return;
+      }
+      const ph = this.phase;
+      if (b.via === 'pass' && ph.kind === 'play' && ph.shape?.secondPass?.startedTick === b.t0) {
+        const support = ph.shape.backDoor?.support;
+        if (support && r.side === support.side && r.slot === support.slot && r.key === support.who) {
+          // Finish the fullback's outward line from the catch, under normal carry steering.
+          const to = clampToGround({
+            x: b.to.x + this.dir * LIVE.runOnM,
+            y: b.to.y + ph.shape.edge * SHAPES.backDoor.sweepWidthM,
+          }, SHAPES.marginM);
+          ph.backDoorSweep = { carrier: support, caughtAt: this.tick, until: this.tick + SHAPES.backDoor.sweepTicks, to };
+        }
       }
       if (b.via === 'kick' && r.side !== this.attacking) {
         // The kicking side got there first: their ball, a fresh set (or a try, next tick, if he is over the line).

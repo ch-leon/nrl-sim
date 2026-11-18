@@ -54,6 +54,7 @@ export abstract class LiveBase {
   protected cancelRuckDecision(): void {
     if (this.phase.kind === 'ruck' && this.phase.decision) this.phase.decision.cancelled = true;
     if (this.phase.kind === 'tackle' || this.phase.kind === 'ruck' || this.phase.kind === 'play') this.phase.shape = null;
+    if (this.phase.kind === 'play') delete this.phase.backDoorSweep;
   }
   protected attacking: Side = 'home';
   protected dir: 1 | -1 = 1;

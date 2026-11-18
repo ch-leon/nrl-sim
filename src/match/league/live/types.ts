@@ -123,7 +123,9 @@ export interface RuckDecision {
 export type Phase =
   | { kind: 'restart'; t0: number; kicking: Side; from?: 'goal-line' }
   | { kind: 'set-piece'; t0: number; side: Side; spot: Vec; how: 'ptb' | 'tap'; player: number }
-  | { kind: 'play'; shape?: AttackingShape | null }
+  | { kind: 'play'; shape?: AttackingShape | null;
+      /** Engine-owned carry target for the fullback after the actual back-door catch. */
+      backDoorSweep?: { carrier: ContactPlayer; caughtAt: number; until: number; to: Vec } }
   | { kind: 'tackle'; t0: number; carrier: number; tackler: number; big: boolean; wrestle: WrestleState | null; wreck: number; shape?: AttackingShape | null }
   | { kind: 'ruck'; t0: number; carrier: number; tackler: number; stage: 'down' | 'ptb' | 'dh'; handover: boolean; heldAt: number; down: number; pace: 'quick' | 'slow' | null; contactStartedTick?: number; decision?: RuckDecision; shape?: AttackingShape | null }
   | { kind: 'try'; t0: number; scorer: number }

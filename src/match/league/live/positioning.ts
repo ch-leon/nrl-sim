@@ -341,6 +341,14 @@ export abstract class LivePositioning extends LiveContact {
     const attackers = this.side(atk);
     const carrier = h && h.side === atk ? h : null;
     const anchor = carrier ? carrier.body.pos : receiver && receiver.side === atk ? flight!.to : bp;
+    let sweepTarget: Vec | undefined;
+    if (ph.kind === 'play' && ph.backDoorSweep) {
+      const { carrier: support, caughtAt, until, to } = ph.backDoorSweep;
+      if (carrier && carrier.side === support.side && carrier.slot === support.slot && carrier.key === support.who
+        && carrier.catchTick === caughtAt && this.tick < until && !this.locked(carrier) && carrier.subFor === null
+        && dist(carrier.body.pos, to) > BODY_RADIUS) sweepTarget = to;
+      else delete ph.backDoorSweep;
+    }
     const supports: Player[] = [];
     if (carrier || (receiver && receiver.side === atk)) {
       const lead = carrier ?? receiver!;
@@ -372,8 +380,11 @@ export abstract class LivePositioning extends LiveContact {
           p.through = false;
           p.wantsSprint = true;
         } else if (ph.kind === 'play') {
-          const defs = this.side(def).filter((d) => !this.locked(d)).map((d) => d.body.pos);
-          p.target = gapTarget(p.body.pos, this.dir, defs);
+          if (sweepTarget) p.target = sweepTarget;
+          else {
+            const defs = this.side(def).filter((d) => !this.locked(d)).map((d) => d.body.pos);
+            p.target = gapTarget(p.body.pos, this.dir, defs);
+          }
           p.through = true;
           // Space ahead, just beaten a man, or through the line: go.
           p.wantsSprint = this.tick < p.burstUntil || broken || this.laneClear(p);
