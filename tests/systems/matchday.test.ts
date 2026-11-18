@@ -13,7 +13,7 @@ import {
   forfeitResult,
   fitSquadCount,
 } from '../../src/systems/matchday';
-import { DIFFICULTY, FORFEIT_SCORE, SQUAD_MIN, type Difficulty } from '../../src/config';
+import { DIFFICULTY, FORFEIT_SCORE, PROGRESSION, SQUAD_MIN, type Difficulty } from '../../src/config';
 import { generatePlayer } from '../../src/data/player';
 import { makeRng } from '../../src/utils/rng';
 import type { Fixture, Player } from '../../src/core/state';
@@ -78,6 +78,27 @@ describe('player matchday result toast', () => {
     bus.emit('match:finished', { fixture, result: sim });
     expect(c.toasts.filter((t) => t.startsWith('Round'))).toHaveLength(1);
     expect(getState().squad.map(p => ({ xp: p.xp, level: p.level, points: p.unspentPoints }))).toEqual(xpAfter);
+    c.stop();
+  });
+
+  it('banks match level points for the coach while "spend points myself" is on (SuperCOOKED §7 #1)', () => {
+    // 55 XP: the week's trickle (+10) levels nobody, a starter's match XP (+40) does.
+    setState({
+      settings: { ...getState().settings, spendPointsMyself: true },
+      squad: getState().squad.map(p => ({ ...p, xp: 55, level: 1, unspentPoints: 0 })),
+    });
+    const c = collect();
+    advanceWeek();
+    const { fixture, sim } = c.started[0]!;
+    const before = new Map(getState().squad.map(p => [p.id, p.stats]));
+    expect(getState().squad.every(p => (p.level ?? 1) === 1)).toBe(true);
+    bus.emit('match:finished', { fixture, result: sim });
+    const levelled = getState().squad.filter(p => (p.level ?? 1) > 1);
+    expect(levelled.length).toBeGreaterThan(0);
+    for (const p of levelled) {
+      expect(p.unspentPoints).toBe((p.level! - 1) * PROGRESSION.POINTS_PER_LEVEL);
+      expect(p.stats).toEqual(before.get(p.id));
+    }
     c.stop();
   });
 

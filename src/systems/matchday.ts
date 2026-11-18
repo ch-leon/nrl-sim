@@ -248,7 +248,7 @@ function applyPlayerResult(fixture: Fixture, home: TeamSheet, away: TeamSheet, s
   commitMatchState(applied, {
     ...((structural ? context?.instance.definition.stages.find(s => s.id === fixture.stageId)?.kind === 'league' : fixture.round > 0) ? { recentPlans: [{ ...(ownSheet.tactics ?? DEFAULT_TACTICS) }, ...getState().recentPlans].slice(0, 3) } : {}),
     squad: applyMatchXp(applyMatchStats(getState().squad, sim.events, PLAYER_ID, playedIds, getState().season),
-      ownSheet, sim, fixture.homeId, fixture.awayId, getState().facilities, getState().training.focus),
+      ownSheet, sim, fixture.homeId, fixture.awayId, getState().facilities, getState().training.focus, getState().settings.spendPointsMyself === true),
   });
 
   // GitHub #7: engine emits injuries; matchday owns squad mutation + notify.
