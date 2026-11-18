@@ -389,11 +389,13 @@ export function createHud(opts: HudOpts = {}): Hud {
   parts.play.replaceChildren(actions, menu);
   const root = parts.dock;
 
-  // 3a: the decisions chip, top-left of the grounds: the count, the first, REVIEW.
+  // 3a, SuperCOOKED 20: the decisions card, top-left of the grounds: the count in an orange disc,
+  // "2 DECISIONS" over the first one waiting, REVIEW.
+  const chipN = el('span', { class: 'nrl-decisions-chip-n', attrs: { 'aria-hidden': 'true' } });
   const chipCount = el('span', { class: 'nrl-decisions-chip-count' });
   const chipTop = el('span', { class: 'nrl-decisions-chip-top' });
-  const chip = el('div', { class: 'nrl-decisions-chip', attrs: { role: 'status', 'data-decisions-chip': '' } },
-    chipCount, chipTop, button('Review', () => opts.onDecisions?.(), { class: 'nrl-decisions-review' }));
+  const chip = el('div', { class: 'nrl-decisions-chip nrl-decisions-card', attrs: { role: 'status', 'data-decisions-chip': '' } },
+    chipN, el('span', { class: 'nrl-decisions-chip-text' }, chipCount, chipTop), button('Review', () => opts.onDecisions?.(), { class: 'nrl-decisions-review' }));
   chip.hidden = true;
 
   // #368: the board objective most at risk, in the decisions chip's style under it; a tap opens Staff & Board.
@@ -447,8 +449,10 @@ export function createHud(opts: HudOpts = {}): Hud {
     renderMoney(s.money);
     // "/total" is a separate span so a narrow dock can drop it.
     const calendar = s.competitions?.leagueCareer ? s.competitions.calendar : undefined;
+    // SuperCOOKED 20: the money is labelled CASH, then the week ("WK 2/27") and the season.
     weekEl.replaceChildren(
-      document.createTextNode(inTrials(s) ? `TRIAL ${s.preseason}` : `WEEK ${s.week}`),
+      el('span', { class: 'nrl-dock-cash', text: 'Cash · ' }),
+      document.createTextNode(inTrials(s) ? `TRIAL ${s.preseason}` : `WK ${s.week}`),
       el('span', { class: 'nrl-dock-week-total', text: inTrials(s) ? '/2' : `/${calendar?.slots.length ?? WEEKS_PER_SEASON}` }),
       document.createTextNode(` · S${s.season}`),
     );
@@ -477,6 +481,7 @@ export function createHud(opts: HudOpts = {}): Hud {
     const on = !advanceInProgress() && list.length > 0 && !activeScreen();
     chip.hidden = !on;
     if (!on) return;
+    chipN.textContent = String(list.length);
     chipCount.textContent = decisionsChipCount(list.length);
     chipTop.textContent = list[0] ? `${list[0].title}${list[0].note ? ` · ${list[0].note}` : ''}` : '';
   }

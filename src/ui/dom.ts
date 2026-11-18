@@ -1298,6 +1298,18 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
 .nrl-board-chip { padding-right: 14px; cursor: pointer; text-align: left; }
 .nrl-board-chip:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
 .nrl-board-chip.nrl-hud-board-off .nrl-decisions-chip-count { color: var(--nrl-neg); }
+/* SuperCOOKED 20: the decisions card. The count in an orange disc, "2 DECISIONS" over the first one waiting, REVIEW. */
+.nrl-decisions-chip.nrl-decisions-card { height: auto; min-height: 52px; padding: 8px 8px 8px 12px; gap: 12px; border-radius: 14px; }
+.nrl-decisions-chip-n {
+  flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: var(--nrl-accent); color: var(--nrl-on-accent); font-family: var(--nrl-f-display); font-size: 0.9375rem;
+}
+.nrl-decisions-chip-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.nrl-decisions-card .nrl-decisions-chip-count { color: var(--nrl-text); font-size: 0.875rem; letter-spacing: 0.08em; }
+.nrl-decisions-card .nrl-decisions-chip-top { max-width: 18rem; }
+.nrl-decisions-card .nrl-btn.nrl-decisions-review { min-height: 36px; height: 36px; padding: 0 14px; border-radius: 10px; }
+.nrl-decisions-card .nrl-btn.nrl-decisions-review::after { inset: -8px 0; }
+.nrl-dock-cash { text-transform: uppercase; }
 
 /* ── Modal ───────────────────────────────────────────────────────────── */
 .nrl-modal-backdrop {
