@@ -13,7 +13,8 @@
 // over: a microtask, not a timer, so the burst is exactly the synchronous run of emits.
 //
 // The plugin copes with Live Activities being off or refused: every call resolves, and
-// a failure is swallowed here too. Paused is the plugin's own (it is set natively when
+// a failure is swallowed here too. Once a start comes back not started, nothing more is
+// sent for that match. Paused is the plugin's own (it is set natively when
 // the app goes to the background, when this JavaScript may already be stopped).
 
 import type { Events } from '../core/events';
@@ -80,7 +81,15 @@ export function installLiveMatch(deps: LiveMatchDeps): () => void {
       if (!t) return;
       ticker = t;
       const id = match;
-      quiet(native.startMatch({ attributes: t.attributes, content: t.content }));
+      // Refused (Live Activities off, or the system said no): send nothing more for this match.
+      const notStarted = (): void => {
+        if (id !== match) return;
+        ticker = null;
+        pending = [];
+      };
+      native.startMatch({ attributes: t.attributes, content: t.content }).then((r) => {
+        if (!r.started) notStarted();
+      }, notStarted);
       deps.onMatchLeft(() => {
         if (id === match) end();
       });

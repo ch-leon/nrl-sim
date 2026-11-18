@@ -118,7 +118,8 @@ struct StatusLine: View {
         switch state.state {
         case .live: return ("LIVE", BrandColor.accent)
         case .paused: return ("PAUSED · TAP TO RETURN", BrandColor.muted)
-        case .halfTime: return ("HALF-TIME", BrandColor.text2)
+        // The break before golden point is a half-time state with half golden.
+        case .halfTime: return (state.half == .golden ? "GOLDEN POINT NEXT" : "HALF-TIME", BrandColor.text2)
         case .fullTime: return ("FULL TIME", BrandColor.win)
         }
     }
