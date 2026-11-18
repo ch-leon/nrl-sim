@@ -1697,6 +1697,11 @@ body:has(.nrl-update-toast) .nrl-hub-chips { max-width: calc(100vw - 32px - 310p
 .nrl-news-item::before { content: ''; flex: 0 0 8px; height: 8px; border-radius: 50%; background: var(--nrl-muted); } /* the info toast's colour (#339) */
 .nrl-news-item.nrl-news-success::before { background: var(--nrl-pos); }
 .nrl-news-item.nrl-news-danger::before { background: var(--nrl-alert); }
+/* A phone on its side: slimmer rows and week heads, so four whole rows show under the decisions banner. */
+@media (max-height: 420px) {
+  .nrl-news h3 { padding: 4px 2px 2px; }
+  .nrl-news-item { min-height: 32px; padding: 2px 0; }
+}
 .nrl-news-item > .nrl-btn { margin-left: auto; flex: 0 0 auto; background: transparent; border: 1px solid color-mix(in srgb, var(--nrl-text) 30%, transparent); font-family: var(--nrl-f-label); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; font-size: 0.75rem; }
 /* His lines: no dot; his name as a COACH-style tag, the line in italics (his portrait stays, #482). */
 .nrl-news-item:has(> .nrl-coach-line)::before { display: none; }
