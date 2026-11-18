@@ -235,6 +235,13 @@ Each row: mockup → current source → what changes. Anything not listed keeps 
 - **`54-history`** → `screens/history.ts`: summary line, Seasons / Records; each season a card row (best finish highlighted green), Review and Books buttons.
 - **`55-kit`** → `screens/kit.ts`: big home and away previews left; club name + Rename, home pattern and trim, away jersey and trim on the right; Club default and **Save kit**.
 - **`56-decision`** → `decisions.ts`: "Decision · 1 of n", title, the deadline line, story, coach line, then the choices as three big cards, each with its **Sure** and **n% risk** lines as tinted pills.
+- **Built in Phase 4** (what the code has decides what shows):
+  - The Finance note says what the game does: player wages sit on the salary cap; cash pays signing fees, staff (their fee and their wage, in the running costs) and buildings. It hides on a phone on its side, where This week's lines need the room.
+  - Staff rows keep the code's words ("Analyst · $12,000 once", "wages paid with running costs") and add the week's wage beside the button. The attack coach's choices show the wage and the one-off fee on two lines.
+  - The coach's lines in News keep his portrait and his name (as the tag), with the line in italics.
+  - History keeps its Retired players and Trophies tabs. The best finish is green and its card ringed green, with no "· best" word.
+  - The Kit screen keeps three previews (home, alternate, card), and swatches stay 44px tap targets (round, not 28px).
+  - On a decision, the green **Sure** pill shows only beside a risk; a choice with no gamble has the plain pill, gain or cost.
 
 ### App (Phase 5)
 
