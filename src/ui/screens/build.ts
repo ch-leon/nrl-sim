@@ -377,7 +377,8 @@ export const BUILD_CSS = `
 .nrl-build-top { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
 .nrl-build-title { font-family: var(--nrl-f-label); font-size: 1.0625rem; font-weight: 700; letter-spacing: 0.04em; line-height: 1.15; text-transform: uppercase; min-width: 0; }
 .nrl-build-cost { font-family: var(--nrl-f-num); font-size: 0.8125rem; font-weight: 700; color: var(--nrl-accent); white-space: nowrap; }
-.nrl-build-blurb { font-size: 0.8125rem; line-height: 1.3; color: var(--nrl-text-2); overflow-wrap: anywhere; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+/* The whole line, never clamped: it is the only place a facility's effect reads before you pay (#740 review). */
+.nrl-build-blurb { font-size: 0.8125rem; line-height: 1.3; color: var(--nrl-text-2); overflow-wrap: anywhere; }
 .nrl-build-meta { font-family: var(--nrl-f-num); font-size: 0.625rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--nrl-muted); }
 .nrl-build-meta.nrl-build-why { color: var(--nrl-neg); }
 .nrl-build-meta.nrl-build-why.nrl-build-built { color: var(--nrl-pos); }

@@ -776,13 +776,12 @@ export const LEAGUE_CSS = `
 @media (max-height: 400px) {
   .nrl-next-card { flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 10px; margin-bottom: 6px; }
   .nrl-next-card-who { order: 0; flex: 1 1 auto; }
-  .nrl-next-card-top { order: 1; flex: 0 1 auto; min-width: 0; }
+  /* The name first: the "when" gives way long before it does. */
+  .nrl-next-card-top { order: 1; flex: 0 1000 auto; min-width: 0; }
   .nrl-next-card-top .nrl-stars, .nrl-next-card-line { display: none; }
   .nrl-next-card-name { font-size: 1rem; }
   .nrl-next-card-stripe { height: 18px; }
 }
-/* The rows under the card on a short phone: a played or later round is not a button, so it can be slimmer; NEXT keeps 44 on touch. */
-@media (max-height: 400px) { .nrl-fixture-row { height: 32px; } .nrl-fixtures-list { gap: 3px; } }
 .nrl-league-calendar-heading h2 { margin: 0; font-size: 1rem; }
 .nrl-league-calendar-heading p { font-size: 0.75rem; margin: 4px 0; }
 .nrl-league-calendar-heading { margin-bottom: 8px; }
@@ -893,6 +892,9 @@ button.nrl-fixture-row { pointer-events: auto; cursor: pointer; width: 100%; box
 button.nrl-fixture-row:active { background: var(--nrl-raised-hover); }
 button.nrl-fixture-row:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 1px; }
 @media (pointer: coarse) { button.nrl-fixture-row { height: 44px; } }
+/* Under 400px tall the rounds that aren't buttons are 32px, so four show under the next-opponent card. After the
+   base rules above (equal specificity: placed before them, it never applied); NEXT keeps 44px on touch. */
+@media (max-height: 400px) { .nrl-fixture-row:not(button) { height: 32px; } .nrl-fixtures-list { gap: 3px; } }
 .nrl-fixture-rd { width: 24px; flex: 0 0 auto; font-family: var(--nrl-f-label); font-size: 0.875rem; font-weight: 600; color: var(--nrl-muted); }
 .nrl-fixture-opp { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nrl-fixture-ha { flex: 0 0 auto; color: var(--nrl-muted); }
