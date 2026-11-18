@@ -16,7 +16,7 @@ import { staffWages } from './staff';
 import { BOARD_LOAN, BOARD_LOAN_REPAID, warnForWeeks, notifyContractWarning } from './contracts';
 import { FINANCE_TIERS, matchCashQuote, type FinanceLevel, type FinanceTier } from '../data/financeRules';
 import { expireEndedDeals, reconcileClubProtection } from './cap';
-import { reconcileMatchIncome, commitMatchState, fixtureMatchBase, matchIncomeTier } from './matchIncome';
+import { reconcileMatchEffects, commitMatchState, fixtureMatchBase, matchIncomeTier } from './matchIncome';
 
 /**
  * Level of the built facility with `defId`, or 0 if none is built. Placement
@@ -250,7 +250,7 @@ export function handleBankruptcy(_state: GameState): GameState {
  * count down without a salary bill.
  */
 export function applyEconomy(state: GameState): GameState {
-  commitMatchState(reconcileMatchIncome(state));
+  commitMatchState(reconcileMatchEffects(state));
   if (hasStructuralCalendar(state)) return getState();
   if (!inTrials(state)) tickContracts(getState());
   return getState();

@@ -11,7 +11,9 @@
 // changes folded into one line (#351 P0), and the stats column. A match finished
 // with no match screen up (the soak) opens the report on its own.
 import { bus } from '../../core/events';
-import { getState } from '../../core/state';
+import { getState, type Fixture, type GameState } from '../../core/state';
+import type { MatchCashQuote } from '../../data/financeRules';
+import { competitionRewardPromiseId } from '../../data/competitionRewards';
 import type { MatchEvent, MatchResult, TeamSheet } from '../../sim/events';
 import { SEASON_ROUNDS } from '../../config';
 import { PLAYER_ID, ladderPosition } from '../../systems/fixtures';
@@ -20,7 +22,6 @@ import { roundLabel } from '../../systems/matchday';
 import { recordMatchAward, playerOfTheMatch, type PlayerOfMatch } from '../../systems/stats';
 import { leagueFixtureView, type LeagueFixtureView } from '../../systems/leagueSeasonView';
 import { hasStructuralCalendar, sameFixtureIdentity } from '../../systems/competitionCalendar';
-import type { Fixture } from '../../core/state';
 import { lossReasons, type LossReason, type ReasonScreen } from '../../systems/lossReasons';
 import { el, button, mount, openModal, closeModal, getRoot } from '../dom';
 import { fmtMoney, ordinal } from '../hud';
@@ -60,6 +61,7 @@ export interface MatchReport {
   /** Saved stage decides whether this result can move the regular ladder. */
   regularLeagueMatch?: boolean;
   title: string;
+  payments?: MatchReportIncome;
   /** "Round 3", "Grand Final": the full-time card's head. */
   round: string;
   /** Your result (#351 P2): "WIN by 12", "LOSS by 4", "DRAW"; null for a match the player is not in. */
@@ -106,6 +108,42 @@ function side(result: MatchResult, id: string, name: string, score: number): Rep
   };
 }
 
+interface MatchReportIncome {
+  ordinary?: MatchCashQuote;
+  cup?: {
+    matchBase: number;
+    quotedCash: number;
+    cash: number;
+    reputation: number;
+    advertisedReputation: number;
+    title?: string;
+  };
+}
+
+/** Snapshot the club's stored payments for the exact accepted fixture. */
+export function readMatchReportIncome(state: GameState, saved: LeagueFixtureView): MatchReportIncome | undefined {
+  const { bridge, instance, fixture } = saved;
+  if (saved.status !== 'completed' || (bridge.homeId !== state.clubId && bridge.awayId !== state.clubId)) return undefined;
+  const receipt = state.matchIncome.find(r => r.season === instance.season && sameFixtureIdentity(r.fixture, bridge))?.receipt;
+  const ordinary = bridge.homeId === state.clubId ? receipt?.home : receipt?.away;
+  const id = competitionRewardPromiseId(instance.season, instance.id, fixture.id);
+  const reward = state.competitionRewards.find(r => r.id === id && r.status === 'settled');
+  const extra = reward?.status === 'settled' && reward.resolution.kind === 'result' ? reward : undefined;
+  if (!ordinary && !extra) return undefined;
+  const mine = extra?.receipts.filter(r => r.clubId === state.clubId) ?? [];
+  return {
+    ...(ordinary ? { ordinary: { ...ordinary } } : {}),
+    ...(extra ? { cup: {
+      matchBase: extra.matchBase,
+      quotedCash: extra.policies.reduce((sum, p) => sum + (p.cash ?? 0), 0),
+      cash: mine.reduce((sum, r) => sum + (r.kind === 'cash' ? r.delta : 0), 0),
+      reputation: mine.reduce((sum, r) => sum + (r.kind === 'reputation' ? r.delta : 0), 0),
+      advertisedReputation: mine.reduce((sum, r) => sum + (r.kind === 'reputation' ? r.advertisedDelta : 0), 0),
+      ...mine.flatMap(r => r.kind === 'honour' ? [{ title: r.title }] : [])[0],
+    } } : {}),
+  };
+}
+
 /** The report for a finished match. `names` maps club ids to display names. */
 export function buildMatchReport(
   result: MatchResult,
@@ -114,6 +152,7 @@ export function buildMatchReport(
   potm: PlayerOfMatch | null,
   reasons: readonly LossReason[] = [],
   saved?: LeagueFixtureView,
+  payments?: MatchReportIncome,
 ): MatchReport {
   const official = saved?.status === 'completed' ? saved.fixture.result : undefined;
   const home = side(result, fixture.homeId, names[fixture.homeId] ?? fixture.homeId, official?.homeScore ?? result.homeScore);
@@ -157,6 +196,7 @@ export function buildMatchReport(
   return {
     title: `${label} · Full time`,
     round: label,
+    ...(payments ? { payments } : {}),
     ...(saved ? { regularLeagueMatch: saved.stageKind === 'league' && saved.status === 'completed' } : {}),
     headline,
     home,
@@ -465,6 +505,27 @@ export interface ReportOpts {
   onReason?: (screen: ReasonScreen) => void;
 }
 
+function paymentSections({ ordinary, cup }: MatchReportIncome): HTMLElement[] {
+  const line = (label: string, value: string) => el('li', {}, el('span', { text: label }),
+    el('strong', { class: 'nrl-num', text: value }));
+  const section = (title: string, kind: string, ...rows: HTMLElement[]) =>
+    el('section', { class: 'nrl-report-payments', attrs: { 'data-match-payment': kind } },
+      el('h3', { text: title }), el('ul', {}, ...rows));
+  const result: HTMLElement[] = [];
+  if (ordinary) result.push(section('Ordinary match income', 'ordinary',
+    line('Total received', fmtMoney(ordinary.total)), line('Base payment', fmtMoney(ordinary.base)),
+    ...(ordinary.home ? [line('Gate receipts', fmtMoney(ordinary.home))] : []),
+    ...(ordinary.performance ? [line('Performance', fmtMoney(ordinary.performance))] : []),
+    ...(ordinary.sponsor ? [line('Sponsor', fmtMoney(ordinary.sponsor))] : [])));
+  if (cup) result.push(section('Extra Open Cup prize', 'cup',
+    line('Cash received', fmtMoney(cup.cash)),
+    ...(cup.advertisedReputation ? [line('Reputation gained', `+${cup.reputation}${cup.reputation < cup.advertisedReputation ? ' (limited by reputation cap)' : ''}`)] : []),
+    ...(cup.title ? [line('Trophy', cup.title)] : []),
+    line('Base payment for this match', fmtMoney(cup.matchBase)),
+    line('Win prize offered', fmtMoney(cup.quotedCash))));
+  return result;
+}
+
 export function openMatchReport(r: MatchReport, opts: ReportOpts = {}): HTMLElement {
   injectOverlayStyles();
   ensureReportStyles();
@@ -477,6 +538,7 @@ export function openMatchReport(r: MatchReport, opts: ReportOpts = {}): HTMLElem
     ...sideBlock(r.home, colours.home, r.home.score >= r.away.score),
     ...sideBlock(r.away, colours.away, r.away.score >= r.home.score),
     ...(r.note ? [el('p', { class: 'nrl-report-note', text: r.note })] : []),
+    ...(r.payments ? paymentSections(r.payments) : []),
     ...(r.summary.length ? [el('p', { class: 'nrl-report-summary', text: r.summary.join(' ') })] : []),
     // #351 P0: the plan changes fold into one line, so they never push the scorers down.
     ...(r.changes.length ? [el('details', { class: 'nrl-report-changes' },
@@ -534,12 +596,14 @@ export function initMatchReport(opts: ReportOpts = {}): () => void {
     const sheets = kickOff && sameFixtureIdentity(kickOff.fixture, fixture) ? kickOff : null;
     const reasons = sheets ? lossReasons(result, fixture, sheets, getState()) : [];
     // Committed fixtures are no longer returned by the scheduled-match query.
-    const competitions = getState().competitions;
+    const state = getState();
+    const { competitions } = state;
     const instance = competitions?.leagueCareer ? competitions.instances.find(i => i.id === fixture.competitionId) : undefined;
     const actual = instance?.fixtures.find(f => f.id === fixture.id);
     const saved = instance && actual ? leagueFixtureView(instance, actual) : undefined;
-    const report = buildMatchReport(result, fixture, clubNames(), p, reasons,
-      saved && sameFixtureIdentity(saved.bridge, fixture) ? saved : undefined);
+    const accepted = saved && sameFixtureIdentity(saved.bridge, fixture) ? saved : undefined;
+    const report = buildMatchReport(result, fixture, clubNames(), p, reasons, accepted,
+      accepted ? readMatchReportIncome(state, accepted) : undefined);
     if (typeof document !== 'undefined' && document.body?.classList.contains(MATCH_ACTIVE_CLASS)) showFullTime(report, result, fixture, opts);
     else openMatchReport(report, opts);
   };
@@ -644,6 +708,11 @@ export const REPORT_CSS = `
 .nrl-rp-lead .nrl-rp-pts { font-weight: 600; }
 .nrl-rp-detail { margin: 0; padding-left: 16px; font-size: 0.75rem; line-height: 1.4; color: var(--nrl-text-2); }
 .nrl-rp-detail-more { margin-top: -6px; }
+.nrl-report-payments { background: var(--nrl-raised); border-radius: 8px; padding: 6px 10px; }
+.nrl-report-payments h3, .nrl-report-payments ul { margin: 0; }
+.nrl-report-payments ul { padding: 0; list-style: none; }
+.nrl-report-payments li { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; }
+.nrl-report-payments strong { text-align: right; }
 .nrl-report-note { margin: 0; font-size: 0.8125rem; color: var(--nrl-accent); }
 .nrl-report-summary { margin: 0; font-size: 0.8125rem; font-style: italic; line-height: 1.45; color: var(--nrl-text-2); }
 .nrl-report-changes { font-size: 0.75rem; color: var(--nrl-muted); }

@@ -6,7 +6,7 @@ import { validatePlayerPopulation } from '../../src/systems/playerCareer';
 
 function legacy(): Record<string, any> {
   const state = structuredClone(careerFixture()) as any;
-  state.version = 29; delete state.playerPopulation;
+  state.version = 29; delete state.playerPopulation; delete state.competitionRewards;
   for (const p of [...state.squad, ...state.freeAgents, ...state.league.clubs.flatMap((c: any) => c.squad ?? [])]) delete p.clubHistory;
   return state;
 }
@@ -26,7 +26,7 @@ describe('v30 population save boundary', () => {
     expect(result.state.squad[0]!.clubHistory).toEqual({ spells: [{ clubId: 'player', start: { season: 3, week: 4 }, arrival: 'observed' }], academyDiscountUsed: true });
     expect(result.state.freeAgents[0]!.clubHistory).toEqual({ spells: [], academyDiscountUsed: false });
     expect(result.state.freeAgents[1]!.clubHistory).toEqual({ spells: [], academyDiscountUsed: true });
-    const stripped = structuredClone(result.state) as any; stripped.version = 29; delete stripped.playerPopulation;
+    const stripped = structuredClone(result.state) as any; stripped.version = 29; delete stripped.playerPopulation; delete stripped.competitionRewards;
     for (const p of [...stripped.squad, ...stripped.freeAgents, ...stripped.league.clubs.flatMap((c: any) => c.squad ?? [])]) delete p.clubHistory;
     expect(stripped).toEqual(raw);
     expect(JSON.stringify(raw)).toBe(before);

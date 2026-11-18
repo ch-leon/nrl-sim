@@ -1,3 +1,4 @@
+import { createOpenCupOffer } from '../../src/systems/openCupEntry';
 import { startLeagueCareer } from '../../src/systems/leagueCareerSetup';
 import { previewLeagueEntry } from '../../src/systems/leagueEntry';
 import { confirmLeagueEntry } from '../../src/systems/leagueEntryCommit';
@@ -51,7 +52,7 @@ function startLeagueMatch() {
     accepted: {season: 1, startInterval: 0, leagueId, ...entrySnapshots(competitions, 1, leagueId),
       receiptId: leagueEntryReceiptId(profile.id, 1, state.clubId, leagueId), allocationPolicy: 'adjacent-vacancy-v1', movements: []},
   };
-  setState(state);
+  setState(createOpenCupOffer(state));
   expect(saveIfChanged(getState())).toBe(true);
   return {bytes, original: bytes.get(DEV_TEST_PREFIX + slotKey(1))!};
 }
@@ -255,6 +256,7 @@ describe('async result ownership across fresh careers', () => {
       bytes = startLeagueMatch().bytes;
       const competitions = {...getState().competitions!};
       delete competitions.leagueCareer;
+      delete competitions.openCupEntry;
       setState({competitions});
       expect(saveIfChanged(getState())).toBe(true);
     } else {

@@ -1,6 +1,6 @@
 # Features
 
-Last updated: 2026-11-18
+Last updated: 2026-11-19
 
 What's in the game, with the PR that added each.
 
@@ -63,6 +63,8 @@ What's in the game, with the PR that added each.
 - Android test APK ([PR](https://github.com/ch-leon/nrl-sim/pull/394)); CI ([PR](https://github.com/ch-leon/nrl-sim/pull/442))
 
 ## Recently added
+
+- **Optional Open Cup:** AU and UK League coaches can enter free through Week 6, change their choice before the draw, or sit out while the AI cup continues. Played wins earn separate cash prizes and reputation; a played-final title preserves the full registered squad in History. Withdrawal forfeits the next actual tie on its date and keeps earlier winnings. The League card publishes the dates and rules, and reports read saved income/prize receipts. Club cap capacity stays unchanged. Initial prize values remain for testing. [PR #736](https://github.com/ch-leon/nrl-sim/pull/736) · [Implementation and release checks](../status/2026-11-open-cup.md)
 
 - **SuperCOOKED look, Phase 0 (Foundations):** the game is now **Big Coach** ("a SuperCOOKED game"): the SuperCOOKED palette (navy and ink, one orange primary a screen, green good / amber watch / red bad), self-hosted Oswald, Inter, JetBrains Mono and Archivo Black, the text wordmark on the title and the rotate card, an ink dock and toasts, white selected tabs inside sheets, and PLAY WEEK turning navy while a sheet has its own primary. Adds the shared parts later phases build screens from (status pill, stars, stat tile, player card, confirm dialog, empty state, locked tile). Layout and behaviour are unchanged ([docs/specs/ui-supercooked.md](../specs/ui-supercooked.md)).
 
@@ -159,7 +161,7 @@ What's in the game, with the PR that added each.
   ([PR #595](https://github.com/ch-leon/nrl-sim/pull/595)). New careers now use
   the cash and cap split described above.
 
-- The isolated developer regional career includes an optional cross-division
+- The original isolated developer regional prototype includes a cross-division
   Open Cup, with a saved deterministic draw, implicit byes, profile-based dates,
   a neutral final and a finite seeded tie decider. Existing match/result hooks
   draw each later round before the week settles, so a cup that is still going is

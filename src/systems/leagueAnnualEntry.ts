@@ -3,6 +3,7 @@ import { careerActionClock } from '../core/season';
 import type { LeagueEntryReceipt } from '../data/leagueCareer';
 import type { LeagueFields } from '../data/divisions';
 import { buildSavedLeagueSchedule } from '../data/leagueSchedule';
+import { reconcileMatchEffects } from './matchIncome';
 import { competitionLadder } from './competitionCalendar';
 import { leagueEntryAccount } from './leagueSelection';
 import { entryQuote } from './leagueEntryQuote';
@@ -73,5 +74,5 @@ export function annualLeagueEntry(source: GameState, fields: LeagueFields, recei
     marketBirths: next.freeAgents.filter(p => !preMarketIds.has(p.id)).length, rivalRenewals
   };
   next = { ...next, competitions: { ...next.competitions!, leagueCareer: { ...next.competitions!.leagueCareer!, accepted: { ...receipt, annualChanges } } } };
-  return { state: next, notices: [...expiry.notices, ...aging.notices, ...youth.notices, ...rivals.notices] };
+  return { state: reconcileMatchEffects(next), notices: [...expiry.notices, ...aging.notices, ...youth.notices, ...rivals.notices] };
 }

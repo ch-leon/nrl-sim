@@ -115,6 +115,60 @@ describe('definition and format boundaries', () => {
   ])('rejects invalid or unrecognised definition payload %j', patch => {
     expect(validateCompetitionDefinition({ ...cupDefinition(), ...patch })).not.toBeNull();
   });
+  const roundWin = { version: 1, trigger: 'round-win', recipient: 'winner', repeat: 'each-outcome', eligibility: 'played' } as const;
+  const titleWin = { ...roundWin, trigger: 'title', titleEligibility: 'played-final' } as const;
+  const cash = { id: 'cash', kind: 'cash', stageId: 'cup', round: 1, matchBaseMultiplier: 2, basis: 'fixture-match-base', execution: roundWin } as const;
+  const honour = { id: 'honour', kind: 'honour', stageId: 'cup', round: 2, title: 'Cup winner', squad: 'title-time-registered', execution: titleWin } as const;
+  const reputation = { id: 'reputation', kind: 'reputation', stageId: 'cup', round: 2, amount: 4, execution: titleWin } as const;
+  const executableCup = () => ({
+    ...cupDefinition(), id: 'test:open-cup',
+    stages: [{ ...cupDefinition().stages[0]!, slotIds: [7, 19] }],
+  });
+
+  it('accepts explicitly executed cash, reputation and title honours', () => {
+    expect(validateCompetitionDefinition({ ...executableCup(), rewards: [cash, reputation, honour] })).toBeNull();
+    expect(validateCompetitionDefinition(cupDefinition())).toBeNull();
+  });
+
+  it.each([
+    ['mixed executable and legacy declarations', [cash, cupDefinition().rewards[1]]],
+    ['duplicate IDs', [cash, { ...reputation, id: cash.id }]],
+    ['execution version', [{ ...cash, execution: { ...roundWin, version: 2 } }]],
+    ['winner selector', [{ ...cash, execution: { ...roundWin, recipient: undefined } }]],
+    ['cash basis', [{ ...cash, basis: undefined }]],
+    ['unexpected execution field', [{ ...cash, execution: { ...roundWin, amount: 3 } }]],
+    ['unexpected policy field', [{ ...honour, amount: 3 }]],
+    ['title eligibility absent', [{ ...honour, execution: { ...roundWin, trigger: 'title' } }]],
+    ['title eligibility on round win', [{ ...cash, execution: { ...roundWin, titleEligibility: 'played-final' } }]],
+    ['title in an earlier round', [{ ...honour, round: 1 }]],
+    ['honour in a round win', [{ ...honour, execution: roundWin }]],
+    ['incorrect squad evidence', [{ ...honour, squad: 'matchday' }]],
+    ['unknown stage', [{ ...cash, stageId: 'missing' }]],
+    ['unknown round', [{ ...cash, round: 3 }]],
+    ['unsafe cash multiplier', [{ ...cash, matchBaseMultiplier: Number.MAX_SAFE_INTEGER + 1 }]],
+    ['non-finite cash multiplier', [{ ...cash, matchBaseMultiplier: Infinity }]],
+    ['fractional cash multiplier', [{ ...cash, matchBaseMultiplier: 1.1 }]],
+    ['negative reputation', [{ ...reputation, amount: -1 }]],
+    ['non-finite reputation', [{ ...reputation, amount: NaN }]],
+    ['unsafe reputation', [{ ...reputation, amount: Number.MAX_SAFE_INTEGER + 1 }]],
+    ['cap execution', [{ id: 'cap', kind: 'capAllowance', stageId: 'cup', round: 1, basisPoints: 500, uniqueKey: 'shield', effective: 'next-season', execution: roundWin }]],
+  ])('rejects executable policy corruption in %s', (_, rewards) => {
+    expect(validateCompetitionDefinition({ ...executableCup(), rewards })).toBe('definition rewards');
+  });
+
+  it.each([
+    { id: 'generic-cup' },
+    { stages: cupDefinition().stages },
+    { venues: { rounds: 'drawn-home', final: 'same-as-rounds' } },
+  ])('restricts executable policies to the supported Open Cup rules %j', patch => {
+    expect(validateCompetitionDefinition({ ...executableCup(), ...patch, rewards: [cash] })).toBe('definition rewards');
+  });
+
+  it('still accepts inert legacy cash multipliers with fractional values', () => {
+    const legacy = { id: 'cash', kind: 'cash', stageId: 'cup', round: 1, matchBaseMultiplier: 1.1 };
+    expect(validateCompetitionDefinition({ ...cupDefinition(), rewards: [legacy] })).toBeNull();
+  });
+
   it('validates content catalogue pack identity and unique definition IDs without activating it', () => {
     expect(validatePack({ ...AU_PACK, competitions: [cupDefinition()] })).toEqual([]);
     expect(validatePack({ ...AU_PACK, competitions: [cupDefinition('uk')] })).toContainEqual(expect.stringMatching(/another pack/));
