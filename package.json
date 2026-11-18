@@ -11,7 +11,7 @@
     "build": "tsc --noEmit && vite build",
     "build:match-preview": "node scripts/build-match-preview.mjs",
     "build:android": "vite-node scripts/gen-icons.mjs && tsc --noEmit && NRL_NATIVE=1 vite build && node scripts/obfuscate-dist.mjs",
-    "build:ios": "vite-node scripts/gen-icons.mjs && vite-node scripts/gen-ios-colors.mjs && tsc --noEmit && NRL_NATIVE=1 NRL_PLATFORM=ios vite build && node scripts/obfuscate-dist.mjs",
+    "build:ios": "vite-node scripts/gen-icons.mjs && vite-node scripts/gen-ios-colors.mjs && vite-node scripts/gen-ios-captain.mjs && tsc --noEmit && NRL_NATIVE=1 NRL_PLATFORM=ios vite build && node scripts/obfuscate-dist.mjs",
     "test": "vitest run",
     "preview": "vite preview",
     "balance": "vite-node scripts/balance.ts --",

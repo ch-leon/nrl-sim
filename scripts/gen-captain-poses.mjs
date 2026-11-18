@@ -22,7 +22,7 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join, resolve } from 'node:path';
 import { captainPoses, CAPTAIN_POSES } from '../src/art/captainPoses';
-import { encodePng } from './lib/png.mjs';
+import { enlarge } from './ios-captain.mjs';
 
 const DEFAULT_OUT = '/private/tmp/claude-501/-Users-leoncreed-baker-Documents-Cavehole-NRL-Sim--claude-worktrees-six-again-repo-access-6fbfe5/eca463fa-55fb-43be-a546-1d5323d53cb8/scratchpad/phase4/captain-poses';
 const args = process.argv.slice(2);
@@ -37,17 +37,6 @@ const scales = value('--scales', imageset ? '2' : '2,4,8').split(',').map(Number
 if (scales.some(s => !Number.isInteger(s) || s < 1)) throw new Error('--scales must be positive integers, e.g. 1,2,3');
 
 const dry = flag('--dry-run');
-
-/** Nearest-neighbour: each art pixel becomes a scale x scale block. */
-function enlarge(buf, scale) {
-  const w = buf.w * scale, h = buf.h * scale;
-  const rgba = new Uint8Array(w * h * 4);
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const si = (Math.floor(y / scale) * buf.w + Math.floor(x / scale)) * 4;
-    rgba.set(buf.data.subarray(si, si + 4), (y * w + x) * 4);
-  }
-  return { w, h, png: encodePng(w, h, rgba) };
-}
 
 const poses = captainPoses();
 const first = poses[CAPTAIN_POSES[0]];

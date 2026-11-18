@@ -23,7 +23,7 @@ struct MatchActivityAttributes: ActivityAttributes {
         /// The last big moment, one line ("TRY, Walker (BRI) 3'").
         var moment: String
         var state: MatchState
-        /// The captain's pose. Phase 3 shows a ball for each; Phase 4 draws the poses.
+        /// The captain's pose: the Live Activity shows the matching picture (CaptainIcon).
         var pose: Pose
     }
 

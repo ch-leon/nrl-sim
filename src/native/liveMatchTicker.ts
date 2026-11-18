@@ -17,7 +17,7 @@ import { COLOR_TOKENS } from '../ui/tokens';
 
 /** Live while the match plays; paused is set natively when the app goes to the background. */
 export type TickerState = 'live' | 'paused' | 'half-time' | 'full-time';
-/** The captain's pose (Phase 4 draws them; Phase 3 shows a ball for every one). */
+/** The captain's pose: the Live Activity shows the matching picture (ios/App/BigCoachWidgets/MatchLiveActivity.swift). */
 export type TickerPose = 'carry' | 'try' | 'tackle' | 'fulltime';
 export type TickerHalf = 'first' | 'second' | 'golden';
 

@@ -19,7 +19,10 @@ struct MatchLiveActivity: Widget {
             let s = context.state
             return DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    TeamTag(code: a.homeCode, colour: Color(hex: a.homeColor), mine: a.mine == .home)
+                    VStack(alignment: .leading, spacing: 4) {
+                        CaptainIcon(pose: s.pose, multiple: 2)
+                        TeamTag(code: a.homeCode, colour: Color(hex: a.homeColor), mine: a.mine == .home)
+                    }
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     TeamTag(code: a.awayCode, colour: Color(hex: a.awayColor), mine: a.mine == .away)
@@ -37,12 +40,14 @@ struct MatchLiveActivity: Widget {
                     }
                 }
             } compactLeading: {
-                // Phase 4 replaces the ball with the captain in s.pose.
-                BallGlyph()
+                CaptainBadge(pose: s.pose)
             } compactTrailing: {
-                ScoreText(home: s.homeScore, away: s.awayScore, size: 14)
+                // Where the island is squeezed (iOS 27) the icon stands alone, with no score.
+                WhenRoomy {
+                    ScoreText(home: s.homeScore, away: s.awayScore, size: 14)
+                }
             } minimal: {
-                BallGlyph()
+                CaptainBadge(pose: s.pose)
             }
             .widgetURL(MatchActivityAttributes.openURL)
             .keylineTint(BrandColor.accent)
@@ -57,6 +62,15 @@ struct MatchLockScreenView: View {
     let state: MatchActivityAttributes.ContentState
 
     var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            CaptainIcon(pose: state.pose, multiple: 2)
+            details
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+    }
+
+    private var details: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 10) {
                 TeamTag(code: attributes.homeCode, colour: Color(hex: attributes.homeColor), mine: attributes.mine == .home)
@@ -71,8 +85,6 @@ struct MatchLockScreenView: View {
                 .foregroundColor(BrandColor.text)
                 .lineLimit(1)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
     }
 }
 
@@ -140,12 +152,102 @@ struct StatusLine: View {
     }
 }
 
-/// The compact island's leading glyph until Phase 4's captain poses.
-struct BallGlyph: View {
+/// The image and the spoken name of each pose.
+extension MatchActivityAttributes.Pose {
+    var imageName: String {
+        switch self {
+        case .carry: return "CaptainCarry"
+        case .try: return "CaptainTry"
+        case .tackle: return "CaptainTackle"
+        case .fulltime: return "CaptainFulltime"
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .carry: return "Captain with the ball"
+        case .try: return "Try"
+        case .tackle: return "Tackled"
+        case .fulltime: return "Full time"
+        }
+    }
+}
+
+/// The captain, drawn from Assets.xcassets: 80 px declared 3x, so 80/3 points tall at one
+/// times. Pixel art: `multiple` is a whole number, so every art pixel stays a whole number
+/// of screen pixels on a 3x screen; no smoothing, no antialiasing. The pose changes only when an
+/// update carries a new one; the system's own content transition shows the change (a plain fade).
+struct CaptainIcon: View {
+    let pose: MatchActivityAttributes.Pose
+    let multiple: Int
+
+    /// One times: the image's own size in points (80 px at 3x).
+    static let unit: CGFloat = 80.0 / 3.0
+
     var body: some View {
-        Image(systemName: "football.fill")
-            .font(.system(size: 14, weight: .bold))
-            .foregroundColor(BrandColor.accent)
+        let side = Self.unit * CGFloat(multiple)
+        Image(pose.imageName)
+            .resizable()
+            .interpolation(.none)
+            .antialiased(false)
+            .frame(width: side, height: side)
+            .accessibilityLabel(pose.label)
+            .id(pose)
+            .transition(.opacity)
+    }
+}
+
+/// The captain for the compact and minimal islands: at one times, and in a 28-point circle
+/// where the system gives the reduced-width layout.
+struct CaptainBadge: View {
+    let pose: MatchActivityAttributes.Pose
+
+    var body: some View {
+        if #available(iOS 27.0, *) {
+            TightBadge(pose: pose)
+        } else {
+            CaptainIcon(pose: pose, multiple: 1)
+        }
+    }
+}
+
+@available(iOS 27.0, *)
+private struct TightBadge: View {
+    let pose: MatchActivityAttributes.Pose
+    @Environment(\.isDynamicIslandLimitedInWidth) private var limited
+
+    var body: some View {
+        if limited {
+            CaptainIcon(pose: pose, multiple: 1)
+                .frame(width: 28, height: 28)
+                .background(BrandColor.ink)
+                .clipShape(Circle())
+        } else {
+            CaptainIcon(pose: pose, multiple: 1)
+        }
+    }
+}
+
+/// Its content unless the island is squeezed (iOS 27's reduced-width layout): then nothing.
+struct WhenRoomy<Content: View>: View {
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        if #available(iOS 27.0, *) {
+            RoomyContent(content: content)
+        } else {
+            content()
+        }
+    }
+}
+
+@available(iOS 27.0, *)
+private struct RoomyContent<Content: View>: View {
+    let content: () -> Content
+    @Environment(\.isDynamicIslandLimitedInWidth) private var limited
+
+    var body: some View {
+        if !limited { content() }
     }
 }
 
