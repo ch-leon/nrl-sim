@@ -1,8 +1,17 @@
 // tests/ui/screens/matchReport.test.ts — the match report at full time (N9.5):
 // built from the MatchResult, it agrees with the score and the overlay's tallies.
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { runMatch } from '../../../src/match/league/match';
-import { BONUS_TRY_MARK, buildMatchReport, countUpValue, fullTimeStats, initials, injuryChip, ladderMove, planChangeLines, planChangesSummary, resultHeadline, shortName } from '../../../src/ui/screens/matchReport';
+import { buildNewGameState, getState, loadState, type Fixture } from '../../../src/core/state';
+import { leagueFixtureView } from '../../../src/systems/leagueSeasonView';
+import { fixtureBridge } from '../../../src/systems/competitionCalendar';
+import { drawOpenCup } from '../../../src/systems/openCup';
+import { cupDefinition } from '../../fixtures/competition';
+import { competitionRewardPromiseId } from '../../../src/data/competitionRewards';
+import { matchCashQuote } from '../../../src/data/financeRules';
+import { closeModal } from '../../../src/ui/dom';
+import { stubDocument, type StubNode } from '../stubDom';
+import { BONUS_TRY_MARK, openMatchReport, readMatchReportIncome, buildMatchReport, countUpValue, fullTimeStats, initials, injuryChip, ladderMove, planChangeLines, planChangesSummary, resultHeadline, shortName } from '../../../src/ui/screens/matchReport';
 import { fmtPotmLine, fmtPotmShort } from '../../../src/ui/screens/potm';
 import { playerOfTheMatch } from '../../../src/systems/stats';
 import { summaryLines } from '../../../src/match/view/commentary';
@@ -187,7 +196,6 @@ describe('the full-time card occasion (#640)', () => {
 });
 
 import { competitions } from '../../data/leagueCareerFixtures';
-import { leagueFixtureView } from '../../../src/systems/leagueSeasonView';
 
 describe('saved League match reports', () => {
   it.each(['higher-seed', 'seeded-draw', 'forfeit'] as const)('uses saved dates, stage and official %s winner', decider => {
@@ -205,5 +213,76 @@ describe('saved League match reports', () => {
     expect(report.note).not.toContain('Live Test FC through');
     const regular = leagueFixtureView(instance, instance.fixtures[0]!);
     expect(buildMatchReport(result, regular.bridge, names, null, [], regular).regularLeagueMatch).toBe(true);
+  });
+});
+
+describe('settled match payments', () => {
+  it.each(['home', 'away'] as const)('reopens the neutral report for the %s club using saved gate and prize receipts', side => {
+    const state = buildNewGameState('Live Test FC', 11);
+    const definition = cupDefinition('au');
+    definition.id = 'au:open-cup';
+    definition.stages[0]!.slotIds = [7, 19];
+    const { instance } = drawOpenCup({
+      definition, season: 1, seed: 4, clubIds: ['player', 'rival-gulls'], currentSlot: 1,
+    });
+    const actual = instance.fixtures[0]!;
+    actual.status = 'completed';
+    actual.homeId = side === 'home' ? 'player' : 'rival-gulls';
+    actual.awayId = side === 'away' ? 'player' : 'rival-gulls';
+    actual.result = { homeScore: side === 'home' ? 20 : 4, awayScore: side === 'away' ? 20 : 4, winnerId: 'player', decider: 'score' };
+    const accepted = fixtureBridge({ instance, fixture: actual });
+    const base = 7_500;
+    const ordinary = matchCashQuote({ matchBase: base, kind: 'played', venue: 'neutral', result: 'win' });
+    const other = matchCashQuote({ matchBase: base, kind: 'played', venue: 'neutral', result: 'loss' });
+    state.matchIncome = [{
+      id: 'ordinary', season: 1, fixture: accepted, matchBase: base, kind: 'played', neutral: true,
+      homeSponsor: 0, awaySponsor: 0, homeStand: 0, receipt: { home: side === 'home' ? ordinary : other, away: side === 'away' ? ordinary : other },
+    }];
+    const { id, competitionId, stageId, slot, round, homeId, awayId } = accepted;
+    const { neutral } = actual;
+    state.competitionRewards = [{
+      id: competitionRewardPromiseId(1, competitionId!, id!), version: 1, season: 1, instanceId: competitionId!, fixtureId: id!,
+      definitionId: definition.id, definitionName: definition.name, definitionVersion: definition.version,
+      stageId: stageId!, round, slot: slot!, homeId, awayId, neutral, status: 'settled', matchBase: base,
+      policies: [{ policy: {
+        id: 'cash', kind: 'cash', stageId: stageId!, round, basis: 'fixture-match-base', matchBaseMultiplier: 5,
+        execution: { version: 1, eligibility: 'played', recipient: 'winner', repeat: 'each-outcome', trigger: 'round-win' },
+      }, cash: 37_500 }],
+      resolution: { kind: 'result', result: actual.result },
+      receipts: [
+        { id: 'cash', outcomeId: 'win', policyId: 'cash', clubId: 'player', kind: 'cash', delta: 37_500 },
+        { id: 'rep', outcomeId: 'win', policyId: 'rep', clubId: 'player', kind: 'reputation',
+          advertisedDelta: 1, delta: 0, reputationBefore: 100, reputationAfter: 100 },
+      ],
+    }];
+    const saved = leagueFixtureView(instance, actual);
+    const result = runMatch(sheet('player', 'Live Test FC'), sheet('rival-gulls', 'Gulls'), { seed: 11 });
+    const original = structuredClone(state);
+    stubDocument();
+    try {
+      loadState(state);
+      for (let i = 0; i < 2; i++) {
+        const income = readMatchReportIncome(getState(), saved);
+        const report = buildMatchReport(result, accepted, names, null, [], saved, income);
+        expect(report.payments?.ordinary).toEqual(ordinary);
+        expect(report.payments?.cup).toMatchObject({ matchBase: base, quotedCash: 37_500, cash: 37_500, reputation: 0, advertisedReputation: 1 });
+        const modal = openMatchReport(report) as unknown as StubNode;
+        const payment = modal.querySelector('[data-match-payment="ordinary"]')!;
+        const gate = '$' + ordinary.home.toLocaleString('en-US');
+        expect(ordinary.home).toBeGreaterThan(0);
+        expect(payment.words()).toContain('Gate receipts');
+        expect(payment.words()).toContain(gate);
+        expect(payment.words()).not.toContain('Home income');
+        const prize = modal.querySelector('[data-match-payment="cup"]')!;
+        expect(prize.words()).toMatch(/Extra Open Cup prize.*Cash received.*\$37,500.*Base payment for this match.*\$7,500/);
+        closeModal();
+        expect(getState()).toEqual(original);
+      }
+    } finally {
+      closeModal();
+      vi.unstubAllGlobals();
+    }
+    const different: Fixture = { ...accepted, slot: slot! + 1 };
+    expect(readMatchReportIncome({ ...state, matchIncome: [{ ...state.matchIncome[0]!, fixture: different }] }, saved)?.ordinary).toBeUndefined();
   });
 });

@@ -53,6 +53,12 @@ export type PlaybackSpeed = 1 | 2 | 4 | 8;
 /** The speeds offered on the match controls, slowest first. */
 export const PLAYBACK_SPEEDS: readonly PlaybackSpeed[] = [1, 2, 4, 8];
 
+/** The speed the match's one speed button goes to next (SuperCOOKED 40): 1 → 2 → 4 → 8 → 1. Pure. */
+export function nextSpeed(speed: PlaybackSpeed): PlaybackSpeed {
+  const i = PLAYBACK_SPEEDS.indexOf(speed);
+  return PLAYBACK_SPEEDS[(i + 1) % PLAYBACK_SPEEDS.length]!;
+}
+
 /** One player sprite (+ its shadow), positioned by its feet. */
 export interface PlaybackActor {
   place(x: number, y: number, depth: number): void;
@@ -812,7 +818,7 @@ export class LivePlayback {
     const picture = this.runner.cur;
     // The sim's own count and possession, Labs or not: held through kicks in the air and dead time.
     this.shownTackle = holdTackle(this.shownTackle, this.controlPhase, this.controlAttacking, this.controlTackle, !!picture.ball.holder);
-    this.opts.overlay?.setTackle?.(this.finished || this.replay ? null : this.shownTackle.count);
+    this.opts.overlay?.setTackle?.(this.finished || this.replay ? null : this.shownTackle.count, this.shownTackle.side);
     this.showClockFrom(picture.clock);
   }
 

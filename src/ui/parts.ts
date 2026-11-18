@@ -24,6 +24,15 @@ export function statusPill(word: string, tone: Tone): HTMLElement {
     el('span', { class: 'nrl-pill-dot', attrs: { 'aria-hidden': 'true' } }), word);
 }
 
+/**
+ * A pill with no dot (SuperCOOKED 43: the full-time card's ladder, gate and injury pills): what it
+ * says, tinted with its tone, or 'plain' (panel and line, white words) for a figure with no verdict.
+ */
+export function infoPill(tone: Tone | 'plain', ...content: (string | Node)[]): HTMLElement {
+  ensurePartsStyles();
+  return el('span', { class: 'nrl-pill nrl-pill-bare', attrs: { 'data-tone': tone } }, ...content);
+}
+
 /** A bare 8px status dot, for a card or a table cell that says the word elsewhere (its label). */
 export function statusDot(tone: Tone, label: string): HTMLElement {
   ensurePartsStyles();
@@ -238,6 +247,8 @@ export const PARTS_CSS = `
 :is(.nrl-pill, .nrl-dot, .nrl-pcard-fit)[data-tone="alert"] { --nrl-tone: var(--nrl-alert); --nrl-tone-rgb: 255, 59, 31; }
 /* Red words on navy read lighter than the dot (00's "Unhappy"). */
 .nrl-pill[data-tone="alert"] { color: #ff6a52; }
+.nrl-pill[data-tone="plain"] { --nrl-tone: var(--nrl-text); background: var(--nrl-panel); box-shadow: inset 0 0 0 1px var(--nrl-line); }
+.nrl-pill b { font-family: var(--nrl-f-num); font-weight: 700; }
 
 /* Stars: five, half steps; the filled part is a white star clipped over the empty one. */
 .nrl-stars { display: inline-flex; line-height: 1; white-space: nowrap; font-family: var(--nrl-f-body); }

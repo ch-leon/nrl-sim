@@ -49,7 +49,8 @@ describe('exact signed-term protection', () => {
     const rival = s.league.clubs.find(c => c.squad)!;
     s.capAccount.protectedIds = [s.squad[0]!.id];
     rival.capAccount!.protectedIds = [rival.squad![0]!.id];
-    const raw = {...s, version: 30};
+    const {competitionRewards: _, ...old} = s;
+    const raw = {...old, version: 30};
     const before = structuredClone(raw);
     const result = migrateState(raw);
     expect(result.ok).toBe(true);
@@ -80,7 +81,8 @@ describe('exact signed-term protection', () => {
     const s = careerFixture();
     const p = s.squad[0]!;
     const renewal = {salary: 1234, startSeason: 2, endSeason: 3};
-    const raw = {...s, version: 30, season: 2,
+    const {competitionRewards: _, ...old} = s;
+    const raw = {...old, version: 30, season: 2,
       squad: s.squad.map(x => x.id === p.id ? {...x, deal: {salary: 1000, startSeason: 1, endSeason: 1, renewal}} : x),
       capAccount: {...s.capAccount, protectedIds: [p.id]}};
     const result = migrateState(raw);
