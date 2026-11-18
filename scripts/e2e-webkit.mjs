@@ -1,3 +1,4 @@
+import { runLeagueSelection } from './e2e-webkit/screens/leagueSelection.mjs';
 import { runCounterText } from './e2e-webkit/match/counterText.mjs';
 import { runTrials } from './e2e-webkit/screens/trials.mjs';
 import { runPlayerSales } from './e2e-webkit/screens/playerSales.mjs';
@@ -52,6 +53,7 @@ import { runExpansionIntro } from './e2e-webkit/screens/expansionIntro.mjs';
 // just that). Exits 1 on any failure.
 //
 //   npm run e2e:webkit
+//   npm run e2e:webkit -- --league-selection-only   (#574 production entry, reload and annual choices)
 //   npm run e2e:webkit -- --size 956x330           (or E2E_SIZES="956x330 844x390")
 //   WEBKIT_PATH=/path/to/pw_run.sh npm run e2e:webkit
 //   E2E_URL=http://localhost:5173/ npm run e2e:webkit   (against a server you started)
@@ -97,6 +99,7 @@ import { runMatchPlays } from './e2e-webkit/match/plays.mjs';
 // in this same order. Each section opens its own contexts and writes its own folder
 // under e2e-output/webkit, so a section plays the same alone as after the others.
 const SECTIONS = [
+  ['runLeagueSelection', (b) => runLeagueSelection(b)],
   ['runCounterText', (b) => runCounterText(b)],
   ['runTrials', (b) => runTrials(b)],
   ['runExpansionIntro', (b) => runExpansionIntro(b)],
@@ -134,7 +137,7 @@ const SECTIONS = [
 const GROUPS = {
   match: ['runPlaytest', 'runPauseSettings', 'runTutorialWalk', 'runCoachCalls', 'runLabsControls', 'runMatchPlays'],
   text: ['runCounterText', 'runLargeTextTargets', 'runLadderForm'],
-  screens: ['runPlayerSales', 'runContentPacks', 'runTrials', 'runExpansionIntro', 'runDerby', 'runOfficeUnlocks', 'runUnlocks', 'runRecruit', 'runScreens', 'runTownSetup', 'runFlow', 'runCoachName', 'runDifficulty', 'runCoachVoice', 'runCoachSays', 'runPlaybook'],
+  screens: ['runLeagueSelection', 'runPlayerSales', 'runContentPacks', 'runTrials', 'runExpansionIntro', 'runDerby', 'runOfficeUnlocks', 'runUnlocks', 'runRecruit', 'runScreens', 'runTownSetup', 'runFlow', 'runCoachName', 'runDifficulty', 'runCoachVoice', 'runCoachSays', 'runPlaybook'],
   portrait: ['runSize', 'runPortrait', 'runDockTextSize', 'runDevSettings'],
 };
 
@@ -159,6 +162,7 @@ const GROUPS = {
   }
 }
 
+const LEAGUE_ONLY = argv.includes('--league-selection-only');
 const SALES_ONLY = argv.includes('--player-sales-only');
 const SCREENS_ONLY = argv.includes('--screens-only');
 const CONTROLS_ONLY = argv.includes('--controls-only');
@@ -171,12 +175,14 @@ if (argv.includes('--group') && !GROUPS[GROUP]) {
   console.error(`bad --group "${GROUP ?? ''}": want one of ${Object.keys(GROUPS).join(', ')}`);
   process.exit(2);
 }
-if (GROUP && (SALES_ONLY || SCREENS_ONLY || CONTROLS_ONLY || CALLS_ONLY || PLAYBOOK_ONLY || PLAYS_ONLY || DEV_ONLY)) {
+if (GROUP && (LEAGUE_ONLY || SALES_ONLY || SCREENS_ONLY || CONTROLS_ONLY || CALLS_ONLY || PLAYBOOK_ONLY || PLAYS_ONLY || DEV_ONLY)) {
   console.error('--group does not combine with --screens-only, --controls-only, --coach-calls-only, --playbook-only or --match-plays-only');
   process.exit(2);
 }
 /** [name, run] pairs this invocation plays, in the full run's order. */
-const plan = SALES_ONLY
+const plan = LEAGUE_ONLY
+  ? SECTIONS.filter(([n]) => n === 'runLeagueSelection')
+  : SALES_ONLY
   ? SECTIONS.filter(([n]) => n === 'runPlayerSales')
   : CALLS_ONLY
   ? [['runCoachCalls', (b) => runCoachCalls(b, [[667, 375], [844, 390]])]]
