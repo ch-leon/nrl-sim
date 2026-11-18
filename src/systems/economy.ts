@@ -15,7 +15,7 @@ import { staffWages } from './staff';
 import { BOARD_LOAN, BOARD_LOAN_REPAID, warnForWeeks, notifyContractWarning } from './contracts';
 import { FINANCE_TIERS, matchCashQuote, type FinanceLevel, type FinanceTier } from '../data/financeRules';
 import { expireEndedDeals, reconcileClubProtection } from './cap';
-import { reconcileMatchIncome, commitMatchState } from './matchIncome';
+import { reconcileMatchIncome, commitMatchState, fixtureMatchBase, matchIncomeTier } from './matchIncome';
 
 /**
  * Level of the built facility with `defId`, or 0 if none is built. Placement
@@ -60,7 +60,7 @@ export function sponsorReturn(level: number, _reputation: number, tier: FinanceT
 
 /** Sponsor extra per eligible match at the club's own tier (not a weekly grant). */
 export function sponsorIncome(state: GameState): number {
-  return sponsorReturn(facilityLevel(state, 'sponsorBoard'), state.reputation, state.capAccount.tier);
+  return sponsorReturn(facilityLevel(state, 'sponsorBoard'), state.reputation, matchIncomeTier(state));
 }
 
 /** Retired passive revenue: waiting never earns cash. */
@@ -149,10 +149,7 @@ export function homeGate(state: GameState, fixture: Fixture): GateEstimate {
   // attendance by ticket prices or apply a hidden difficulty modifier to cash.
   const context = state.competitions?.instances.find(i => i.id === fixture.competitionId);
   const actual = context?.fixtures.find(f => f.id === fixture.id);
-  const homeAccount = fixture.homeId === state.clubId ? state.capAccount : state.league.clubs.find(c => c.id === fixture.homeId)?.capAccount;
-  const awayAccount = fixture.awayId === state.clubId ? state.capAccount : state.league.clubs.find(c => c.id === fixture.awayId)?.capAccount;
-  const hostBase = FINANCE_TIERS[homeAccount?.tier ?? 'premier'].matchBase;
-  const matchBase = actual?.neutral ? Math.min(hostBase, FINANCE_TIERS[awayAccount?.tier ?? 'premier'].matchBase) : hostBase;
+  const matchBase = fixtureMatchBase(state, fixture, actual?.neutral ?? false);
   const receipts = matchCashQuote({ matchBase,
     kind: fixture.unplayed || actual?.status === 'cancelled' || actual?.result?.decider === 'forfeit' ? 'unplayed' : context?.definition.format.kind === 'exhibition' || (!context && fixture.round <= 0) ? 'trial' : 'played',
     venue: actual?.neutral ? 'neutral' : fixture.homeId === state.clubId ? 'home' : 'away', result: 'loss',

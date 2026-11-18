@@ -2,7 +2,8 @@
 import { SEASON_ROUNDS } from '../config';
 import { bus } from '../core/events';
 import { emptyFinance, getState, setState, type Fixture, type GameState } from '../core/state';
-import { FINANCE_TIERS, matchCashQuote, type FinanceLevel, type MatchCashInput, type MatchCashQuote } from '../data/financeRules';
+import { divisionForClub } from '../data/competitionDivisions';
+import { FINANCE_TIERS, matchCashQuote, tierForRank, type FinanceLevel, type FinanceTier, type MatchCashInput, type MatchCashQuote } from '../data/financeRules';
 
 export interface MatchIncomeRecord {
   id: string;
@@ -37,9 +38,23 @@ export function incomeIdentity(state: GameState, fixture: Fixture): string {
 function level(state: GameState, club: string, def: 'sponsorBoard' | 'grandstand'): FinanceLevel {
   return (club === state.clubId ? Math.max(0, ...state.facilities.filter(f => f.defId === def).map(f => f.level)) : 0) as FinanceLevel;
 }
-function base(state: GameState, club: string): number {
-  const account = club === state.clubId ? state.capAccount : state.league.clubs.find(c => c.id === club)?.capAccount;
-  return FINANCE_TIERS[account?.tier ?? 'premier'].matchBase;
+
+/** Selectable League careers may retain a higher salary cap after moving divisions. */
+export function matchIncomeTier(state: GameState, clubId: string = state.clubId): FinanceTier {
+  const competitions = state.competitions;
+  if (competitions?.leagueCareer) {
+    const membership = competitions.world && divisionForClub(competitions.world, competitions.instances, clubId);
+    if (!membership || membership.instance.season !== state.season) throw new Error('Missing current division for match income');
+    return tierForRank(membership.division.rank);
+  }
+  const account = clubId === state.clubId ? state.capAccount : state.league.clubs.find(c => c.id === clubId)?.capAccount;
+  return account?.tier ?? 'premier';
+}
+
+/** Shared by kickoff promises and hypothetical gate projections. */
+export function fixtureMatchBase(state: GameState, fixture: Fixture, neutral: boolean): number {
+  const host = FINANCE_TIERS[matchIncomeTier(state, fixture.homeId)].matchBase;
+  return neutral ? Math.min(host, FINANCE_TIERS[matchIncomeTier(state, fixture.awayId)].matchBase) : host;
 }
 
 /** Snapshot before play. Completed old fixtures without a promise gain no claim. */
@@ -52,7 +67,7 @@ export function freezeMatchIncome(state: GameState, fixture: Fixture): GameState
   const neutral = actual?.neutral ?? false;
   const record: MatchIncomeRecord = {
     id, season: state.season, fixture: { ...fixture },
-    matchBase: neutral ? Math.min(base(state, fixture.homeId), base(state, fixture.awayId)) : base(state, fixture.homeId),
+    matchBase: fixtureMatchBase(state, fixture, neutral),
     kind: context?.definition.format.kind === 'exhibition' || (!context && fixture.round <= 0) ? 'trial' : 'played', neutral,
     homeSponsor: level(state, fixture.homeId, 'sponsorBoard'), awaySponsor: level(state, fixture.awayId, 'sponsorBoard'),
     homeStand: level(state, fixture.homeId, 'grandstand'),
