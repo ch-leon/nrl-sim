@@ -566,13 +566,12 @@ export function __unlockSaves(): void {
  * a save was needed and did not land.
  */
 export function saveIfChanged(state: GameState): boolean {
-  if (failedIntervalProblem()) return false;
+  if (weekHeld() || failedIntervalProblem() || slotImported || savesLocked) return false;
   const store = getStore();
   if (!store) return false;
   try {
     if (store.read(activeSlot) === JSON.stringify(state)) return true;
-  } catch { /* unreadable: try the write */ }
-  if (weekHeld() || slotImported || savesLocked) return false;
+  } catch { return false; } // An unreadable slot cannot safely be replaced.
   return writeSlot(activeSlot, state) ? (lastSaved = state, true) : false;
 }
 
