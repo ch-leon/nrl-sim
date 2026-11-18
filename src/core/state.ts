@@ -7,7 +7,7 @@ import { initialPlayerPopulation, installPlayerHistory } from '../systems/player
 import type { TeamTactics } from '../match/league/presets';
 import type { CompetitionCareerState } from '../data/competition';
 import { bus } from './events';
-import { packForCountry, selectPack } from '../content';
+import { activePack, packForCountry, selectPack } from '../content';
 import { makeRng } from '../utils/rng';
 import { generateFreeAgent, generatePlayer, generatePlayerAround, POSITIONS } from '../data/player';
 import type { FacilityDefId } from '../data/facility';
@@ -390,6 +390,14 @@ export function loadState(next: GameState): void {
   bus.emit('state:changed', state);
 }
 
+export interface NewGameOptions {
+  difficulty?: Difficulty | undefined;
+  coachName?: string | undefined;
+  openAll?: boolean | undefined;
+  home?: GameState['home'];
+  groundName?: string | undefined;
+}
+
 /**
  * Deterministically create a brand-new game. Squad = 20 players shaped like a
  * rival's at the league mean (#140: one star, one first-grader and one depth
@@ -400,10 +408,23 @@ export function loadState(next: GameState): void {
 export function createNewGame(
   clubName: string,
   seed: number = Date.now() >>> 0,
-  options: { difficulty?: Difficulty | undefined; coachName?: string | undefined; openAll?: boolean | undefined; home?: GameState['home']; groundName?: string | undefined } = {},
+  options: NewGameOptions = {},
 ): GameState {
   const pack = packForCountry(options.home?.country);
   selectPack(pack);
+  const state = buildNewGameState(clubName, seed, options);
+  loadState(state);
+  return state;
+}
+
+/** Build from the caller's prepared, selected regional content without installing a career. */
+export function buildNewGameState(
+  clubName: string,
+  seed: number = Date.now() >>> 0,
+  options: NewGameOptions = {},
+): GameState {
+  const pack = packForCountry(options.home?.country);
+  if (activePack().id !== pack) throw new Error('Select the club’s regional content before building its opening state.');
   const difficulty = options.difficulty ?? DEFAULT_DIFFICULTY;
   const rng = makeRng(seed);
 
@@ -481,7 +502,6 @@ export function createNewGame(
     rngSeed: rng.state(),
   };
 
-  loadState(result);
   return result;
 }
 

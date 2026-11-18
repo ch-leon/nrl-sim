@@ -43,6 +43,11 @@ export function buildDivisionTrials(world: DivisionSchedule, profile: RegionalCa
   return trials;
 }
 
+export function scheduleDivisionLeagues(world: DivisionSchedule): CompetitionInstance[] {
+  return world.instances.map(i => ({ ...i, status: 'scheduled' as const, stageId: 'regular',
+    fixtures: i.fixtures.map(f => ({ ...f, status: 'scheduled' as const, slot: i.definition.stages[0]!.slotIds![f.round - 1]! })) }));
+}
+
 /** Construct and install only into a genuinely fresh isolated developer career.
  * Ordinary careers, imports and paid competition offers cannot call around this gate. */
 export function setupStructuralDivisionCareer(profile: RegionalCareerProfile, seed: number, colors: [string, string] = DEFAULT_PLAYER_COLORS,
@@ -53,8 +58,7 @@ export function setupStructuralDivisionCareer(profile: RegionalCareerProfile, se
     || state.competitions !== undefined || state.facilities.length || state.league.fixtures.some(f => f.result)
     || state.squad.some(p => (p.career?.games ?? 0) > 0)) throw new Error('Start a fresh developer career for regional divisions.');
   const world = createDivisionWorld(profile, activePack(), seed, { name: state.clubName, colors, difficulty: state.settings.difficulty });
-  const leagues = world.instances.map(i => ({ ...i, status: 'scheduled' as const, stageId: 'regular',
-    fixtures: i.fixtures.map(f => ({ ...f, status: 'scheduled' as const, slot: i.definition.stages[0]!.slotIds![f.round - 1]! })) }));
+  const leagues = scheduleDivisionLeagues(world);
   const local = leagues.find(i => i.entrantIds.includes(state.clubId))!;
   const instances = [...leagues, ...buildDivisionTrials(world, profile, 1, seed)];
   const cup = structuralOpenCup(profile, activePack(), seed, world.clubs.map(c => c.id), state.clubId, options.enterOpenCup);

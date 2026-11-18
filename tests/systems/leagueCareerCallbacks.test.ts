@@ -1,3 +1,6 @@
+import { startLeagueCareer } from '../../src/systems/leagueCareerSetup';
+import { previewLeagueEntry } from '../../src/systems/leagueEntry';
+import { confirmLeagueEntry } from '../../src/systems/leagueEntryCommit';
 import { entrySnapshots } from '../data/leagueCareerFixtures';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createLegacyGame } from '../helpers/legacyGame';
@@ -16,10 +19,10 @@ import { DEV_TEST_PREFIX, liveMatchKey, slotKey } from '../../src/core/storageKe
 import { setupStructuralDivisionCareer } from '../../src/systems/divisionCareer';
 import { AU_CAREER_PROFILE } from '../../src/content/career/au';
 import { leagueEntryReceiptId } from '../../src/data/leagueCareer';
-import { __setStorage, __unlockSaves, saveIfChanged, exportSave, enableAutosave, pendingLeagueSaveProblem, downloadSave, exportFilename, installImportedSave, setActiveSlot } from '../../src/core/save';
+import { __setStorage, __unlockSaves, saveIfChanged, exportSave, enableAutosave, pendingLeagueSaveProblem, downloadSave, exportFilename, installImportedSave, loadSlot, setActiveSlot } from '../../src/core/save';
 
 afterEach(() => {vi.restoreAllMocks();vi.unstubAllGlobals();clearHeldWeek();clearTickHooks();clearSeasonHooks();bus.clear();setCareerNamespace(null);__setStorage(null);});
-function startLeagueMatch() {
+function installStorage() {
   const bytes = new Map<string, string>();
   const storage = {
     getItem: (key: string) => bytes.get(key) ?? null,
@@ -29,6 +32,12 @@ function startLeagueMatch() {
   vi.stubGlobal('localStorage', storage);
   __setStorage(storage);
   __unlockSaves();
+  setActiveSlot(1);
+  return bytes;
+}
+
+function startLeagueMatch() {
+  const bytes = installStorage();
   setCareerNamespace(DEV_TEST_PREFIX);
   createNewGame('Watched quarantine', 573);
   const state = setupStructuralDivisionCareer(AU_CAREER_PROFILE, 573);
@@ -239,15 +248,27 @@ describe('async result ownership across fresh careers', () => {
     } finally { off(); }
   });
 
-  it.each(['pending', 'quarantined', 'isolated prototype'] as const)('exports the actual kick-off checkpoint and parked calls when %s', status => {
-    const {bytes} = startLeagueMatch();
-    const saveKey = DEV_TEST_PREFIX + slotKey(1), matchKey = DEV_TEST_PREFIX + liveMatchKey(1);
-    if (status === 'isolated prototype') {
+  it.each(['pending', 'quarantined', 'isolated prototype'] as const)('exports and resumes the actual kick-off checkpoint and parked calls when %s', async status => {
+    let bytes: Map<string,string>;
+    const prototype = status === 'isolated prototype';
+    if (prototype) {
+      bytes = startLeagueMatch().bytes;
       const competitions = {...getState().competitions!};
       delete competitions.leagueCareer;
       setState({competitions});
       expect(saveIfChanged(getState())).toBe(true);
+    } else {
+      bytes = installStorage();
+      setCareerNamespace(null);
+      const started = await startLeagueCareer({clubName:'Normal recovery',seed:573});
+      expect(started.ok).toBe(true);
+      const leagueId = AU_CAREER_PROFILE.startingDivisionId;
+      const preview = previewLeagueEntry(getState(),leagueId);
+      if (!preview.ok) throw new Error(preview.message);
+      expect(confirmLeagueEntry({leagueId,previewKey:preview.preview.previewKey}).ok).toBe(true);
     }
+    const prefix = prototype ? DEV_TEST_PREFIX : '';
+    const saveKey = prefix + slotKey(1), matchKey = prefix + liveMatchKey(1);
     const source = bytes.get(saveKey)!;
     const matches: Events['match:started'][] = [];
     bus.on('match:started', value => { matches.push(value); });
@@ -287,20 +308,7 @@ describe('async result ownership across fresh careers', () => {
       expect(a.download).toBe(exportFilename(JSON.parse(source)));
       expect(notice).toHaveBeenCalledWith(expect.objectContaining({text:expect.stringMatching(/saved|start/i)}));
     }
-    const installed = installImportedSave(file, 2);
-    if (status === 'isolated prototype') {
-      expect(installed.ok).toBe(true);
-      if (!installed.ok) throw new Error(installed.message);
-      try {
-        setActiveSlot(2);
-        loadState(installed.state);
-        expect(readLiveMatch()).toEqual(JSON.parse(sidecar));
-        advanceWeek();
-        expect(matches[1]!.fixture).toEqual(matches[0]!.fixture);
-        expect(matches[1]!.live).toMatchObject({calls, resumeAt:47, seed: live.seed});
-      } finally { setActiveSlot(1); }
-    } else {
-      expect(installed.ok).toBe(false);
+    if (!prototype) {
       const record = JSON.parse(sidecar);
       bytes.set(matchKey, JSON.stringify({...record, fixtureId: record.fixtureId + '-foreign'}));
       expect(() => exportSave(getState())).toThrow();
@@ -314,15 +322,29 @@ describe('async result ownership across fresh careers', () => {
       expect(() => exportSave(getState())).toThrow();
       bytes.set(saveKey, source);
       try {
-        setCareerNamespace(null);
-        bytes.set(slotKey(1), source);
-        expect(() => exportSave(getState())).toThrow();
         setCareerNamespace(DEV_TEST_PREFIX);
-        setActiveSlot(2);
-        bytes.set(DEV_TEST_PREFIX + slotKey(2), source);
+        bytes.set(DEV_TEST_PREFIX + slotKey(1), source);
         expect(() => exportSave(getState())).toThrow();
-      } finally { setActiveSlot(1); setCareerNamespace(DEV_TEST_PREFIX); }
+        setCareerNamespace(null);
+        setActiveSlot(2);
+        bytes.set(slotKey(2), source);
+        expect(() => exportSave(getState())).toThrow();
+      } finally { setActiveSlot(1); setCareerNamespace(null); }
     }
+    const installed = installImportedSave(file, 2);
+    expect(installed.ok).toBe(true);
+    setActiveSlot(2);
+    try {
+      const loaded = loadSlot();
+      if (loaded.status !== 'ok') throw new Error('The exported checkpoint did not load');
+      loadState(loaded.state);
+      expect(readLiveMatch()).toEqual(JSON.parse(sidecar));
+      advanceWeek();
+      expect(matches[1]!.fixture).toEqual(matches[0]!.fixture);
+      expect(matches[1]!.live).toMatchObject({calls, resumeAt:47, seed: live.seed});
+      expect(bytes.get(saveKey)).toBe(source);
+      expect(bytes.get(matchKey)).toBe(sidecar);
+    } finally { setActiveSlot(1); }
   });
 
   it.each(['advance', 'replacement'] as const)('a pending write is bound to the settled career when resuming by %s', async route => {

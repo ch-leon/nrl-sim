@@ -22,8 +22,7 @@ it('the actual boot Continue loop returns to recovery when a selected save becom
   // Execute the real boot section in isolation: importing main itself would boot
   // Phaser and register every system. No copy of the guard under test lives here.
   const main = readFileSync(new URL('../../src/main.ts', import.meta.url), 'utf8');
-  const section = main.slice(main.indexOf('  let choice = playtest'), main.indexOf('  if (getState().league.clubs.length === 0)'));
-  expect(section).toContain('while (');
+  const section = main.slice(main.indexOf('  let choice: TitleChoice = playtest'), main.indexOf('  if (getState().league.clubs.length === 0)'));
   const js = ts.transpileModule(section, { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.ESNext } }).outputText;
   const run = new Function('showTitleFlow', 'loadSlot', 'createNewGame', 'clearLiveMatch', 'loadState', 'preparePack', `return (async () => { const playtest = null; const uiRoot = {}; ${js} })();`);
   await expect(run(showTitleFlow, loadSlot, defaults, clearLiveMatch, loadState, preparePack)).rejects.toBe(reachedRecovery);

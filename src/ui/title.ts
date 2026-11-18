@@ -8,9 +8,10 @@
 // attribute.
 
 import {
-  deleteSlot, downloadOriginalSave, exportRecoverySaves, getSlotSummaries, installImportedSave, listSlotMeta, pickSaveFile, setActiveSlot, type SlotSummary,
+  captureSlot, deleteSlot, downloadOriginalSave, exportRecoverySaves, getSlotSummaries, installImportedSave, listSlotMeta, pickSaveFile, setActiveSlot, type SlotSummary,
 } from '../core/save';
 import { cleanName, GROUND_MAX, NAME_MAX } from '../data/names';
+import type { LeagueCareerDestination } from '../systems/leagueCareerSetup';
 import type { GameState } from '../core/state';
 import { colorsForTown, defaultClubName, foldTown, groundForTown, townColorsAllowed, townHash, type Town } from '../data/townSetup';
 import { buildLabel } from './buildInfo';
@@ -28,8 +29,7 @@ import { commercialEnabled } from '../commercial/flags';
 import { openLoginDialog, openPaywall } from './screens/paywall';
 import { listenForPress, MOTION_CSS } from './dom';
 
-export interface TitleChoice {
-  mode: 'continue' | 'new';
+export type TitleChoice = {
   clubName?: string;
   coachName?: string;
   openAll?: boolean;
@@ -38,7 +38,11 @@ export interface TitleChoice {
   seed?: number;
   home?: GameState['home'];
   groundName?: string;
-}
+} & (
+  | { mode: 'continue' }
+  | { mode: 'new'; careerMode: 'classic' }
+  | { mode: 'new'; careerMode: 'league'; destination: LeagueCareerDestination }
+);
 
 const DEFAULT_CLUB_NAME = 'Cavehole Crushers';
 
@@ -147,6 +151,9 @@ ${MOTION_CSS}
 .nrl-title-swatch:disabled { opacity: 0.25; cursor: default; }
 .nrl-title-swatch:active:not(:disabled) { transform: scale(var(--nrl-press)); transition: transform var(--nrl-dur-press) var(--nrl-ease-out); }
 .nrl-title-pick { background: #1b264a; }
+/* Switch the fill and ink together so the newly selected mode is readable on the tap frame. */
+.nrl-title .nrl-title-career-mode[aria-pressed] { transition: none; }
+.nrl-title-career-mode[aria-pressed="false"] { color: #fff; }
 .nrl-title-difficulty-copy { margin: 0; font-size: 0.8125rem; line-height: 1.3; color: #c9d1ea; }
 .nrl-title-difficulty-hint { color: #f4d03f; }
 .nrl-title-pick[aria-pressed="true"], .nrl-title-pick[aria-pressed="true"]:hover, .nrl-title-pick[aria-pressed="true"]:active:not(:disabled) { background: #f4d03f; color: #0e1630; }
@@ -274,12 +281,24 @@ function jerseyUrl(colors: [string, string]): string {
   }
 }
 
+export function showLeagueLoading(root: HTMLElement): HTMLElement {
+  const overlay = mk('div', 'nrl-title');
+  overlay.setAttribute('data-nrl-league-loading', '');
+  overlay.setAttribute('role', 'status');
+  const style = document.createElement('style');
+  style.textContent = TITLE_CSS;
+  overlay.appendChild(style);
+  overlay.appendChild(mk('h1', 'nrl-title-step', 'Preparing your leagues…'));
+  root.appendChild(overlay);
+  return overlay;
+}
+
 /**
  * Renders the title overlay into `root` (#ui-root). Resolves once with the
  * player's choice, after making that slot active so load()/save() target it,
  * then removes itself.
  */
-export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
+export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleChoice> {
   return new Promise<TitleChoice>((resolve) => {
     listenForPress();
     const overlay = mk('div', 'nrl-title');
@@ -410,6 +429,8 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
       if (notice) {
         const n = mk('div', 'nrl-title-notice', notice);
         n.setAttribute('data-nrl-notice', '');
+        n.setAttribute('data-nrl-title-error', '');
+        n.setAttribute('role', 'status');
         foot.appendChild(n);
       }
       main.appendChild(foot);
@@ -588,6 +609,23 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
       });
       const sec = swatches('Secondary', 'data-nrl-secondary', PLAYER_SECONDARY_COLORS, (c) => { secondary = c; });
 
+      let careerMode: 'classic' | 'league' = 'classic';
+      const modes = mk('div', 'nrl-title-swatches');
+      modes.setAttribute('role', 'group');
+      modes.setAttribute('aria-label', 'Career mode');
+      for (const mode of ['classic', 'league'] as const) {
+        const btn = mkButton(mode === 'classic' ? 'Classic' : 'League', 'data-nrl-career-mode-' + mode, 'nrl-title-pick nrl-title-career-mode');
+        btn.setAttribute('aria-pressed', String(careerMode === mode));
+        btn.addEventListener('click', () => {
+          careerMode = mode;
+          for (const option of ['classic','league'])
+            modes.querySelector('[data-nrl-career-mode-' + option + ']')?.setAttribute('aria-pressed', String(careerMode === option));
+          go.replaceChildren();
+          go.appendChild(start);
+        });
+        modes.appendChild(btn);
+      }
+      form.appendChild(field('Career mode', modes));
       const diffBox = mk('div', 'nrl-title-swatches');
       const diffButtons = new Map<Difficulty, HTMLButtonElement>();
       for (const d of DIFFICULTIES) {
@@ -644,9 +682,9 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
         }
         return bad.length === 0;
       };
-      const begin = (): void => {
+      const begin = (destination?: LeagueCareerDestination): void => {
         if (!namesOk()) return;
-        if (s.status !== 'empty') deleteSlot(s.slot);
+        if (careerMode === 'classic' && s.status !== 'empty') deleteSlot(s.slot);
         const club = cleanName(input.value);
         const name = club.ok ? club.name : DEFAULT_CLUB_NAME;
         const coach = cleanName(coachInput.value);
@@ -655,7 +693,7 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
         const home = selected
           ? { town, region: selected.region, country: selected.country, lat: selected.lat, lon: selected.lon }
           : { town };
-        finish(s.slot, { mode: 'new', seed, clubName: name, ...(coach.ok ? { coachName: coach.name } : {}), difficulty, ...(veteran.checked ? { openAll: true } : {}), colors: [primary, secondary],
+        finish(s.slot, { mode: 'new', ...(destination ? {careerMode: 'league', destination} : {careerMode: 'classic'}), seed, clubName: name, ...(coach.ok ? { coachName: coach.name } : {}), difficulty, ...(veteran.checked ? { openAll: true } : {}), colors: [primary, secondary],
           home, groundName: groundName.ok ? groundName.name : groundForTown(town || name, selected?.id ?? town) });
       };
       // Start waits for the town list, and says so while it does (#613).
@@ -664,15 +702,25 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
       const ready = (): void => { start.textContent = 'Start'; start.disabled = false; };
       start.addEventListener('click', () => {
         if (start.disabled || !namesOk()) return;
-        if (s.status === 'empty') return begin();
+        let destination: LeagueCareerDestination | undefined;
+        let occupant = s;
+        if (careerMode === 'league') {
+          const {raw, result} = captureSlot(s.slot);
+          if (result.status !== 'ok' && result.status !== 'empty') return showSlots(result.message);
+          destination = {slot: s.slot, expectedOriginal: raw};
+          occupant = result.status === 'empty' ? {slot: s.slot, status:'empty'} : {
+            slot: s.slot, status: 'ok', clubName: result.state.clubName, season: result.state.season, week: result.state.week,
+          };
+        }
+        if (occupant.status === 'empty') return begin(destination);
         // A season (or an unreadable save) is in this slot: say what Start replaces first.
         go.replaceChildren();
-        const what = s.status === 'ok' ? `${s.clubName} (S${s.season} W${s.week})` : 'the unreadable save';
+        const what = occupant.status === 'ok' ? `${occupant.clubName} (S${occupant.season} W${occupant.week})` : 'the unreadable save';
         const ask = mk('div', 'nrl-title-confirm', `Start over? This replaces ${what}.`);
         ask.setAttribute('data-nrl-confirm', '');
         go.appendChild(ask);
         const yes = mkButton('Start over', 'data-nrl-start-confirm', 'nrl-title-btn-go');
-        yes.addEventListener('click', begin);
+        yes.addEventListener('click', () => begin(destination));
         go.appendChild(yes);
         const no = mkButton('Cancel', 'data-nrl-start-cancel');
         no.addEventListener('click', () => { go.replaceChildren(); go.appendChild(start); });
@@ -704,7 +752,8 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
 
     // Fresh install (all slots empty): go straight to setting up a club in slot 1.
     const summaries = getSlotSummaries();
-    if (summaries.every((x) => x.status === 'empty')) showSetup(summaries[0]!);
+    if (error) showSlots(error);
+    else if (summaries.every((x) => x.status === 'empty')) showSetup(summaries[0]!);
     else showSlots();
 
     root.appendChild(overlay);

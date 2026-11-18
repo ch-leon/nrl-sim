@@ -1,6 +1,7 @@
 import { freezeMatchIncome, reconcileMatchIncome } from './matchIncome';
-// Structural calendar/result adapter. Production offers and finance remain gated.
-import type { Fixture, GameState, LadderRow } from '../core/state';
+// Regional calendar and results for League careers and isolated competition prototypes.
+import { stateInstallation, type Fixture, type GameState, type LadderRow } from '../core/state';
+import { leagueCareerStateProblem } from './leagueEntryValidation';
 import { careerNamespace } from '../core/storage/local';
 import { DEV_TEST_PREFIX } from '../core/storageKeys';
 import { NINES } from '../match/league/rules';
@@ -58,14 +59,32 @@ export function structuralPolicyProblem(state: GameState): string | null {
   return null;
 }
 
+// A new installation or entry receipt must prove its complete saved world once.
+// Match hooks keep that receipt while applying individual results to the calendar.
+const admitted = new WeakMap<object, {installation: number; world: unknown}>();
+
+function normalLeagueProblem(state: GameState): string | null {
+  const progress = state.competitions?.leagueCareer;
+  if (!progress || typeof progress !== 'object' || careerNamespace() !== null) return 'This League career is unsupported.';
+  const cached = admitted.get(progress);
+  if (cached?.installation === stateInstallation() && cached.world === state.competitions!.world) return null;
+  const problem = leagueCareerStateProblem(state);
+  if (problem) return problem.message;
+  admitted.set(progress, {installation: stateInstallation(), world: state.competitions!.world});
+  return null;
+}
+
 export function structuralAdvanceProblem(state: GameState): string | null {
   if (state.competitions && 'leagueCareer' in state.competitions) {
-    if (!structuralRuntimeAllowed()) return 'League careers are not enabled yet outside the isolated developer career.';
+    if (!structuralRuntimeAllowed()) {
+      const problem = normalLeagueProblem(state);
+      if (problem) return problem;
+    }
     if (!isPlayableLeagueCareer(state)) return 'The League career progression snapshot is invalid or unsupported.';
     if (state.competitions.leagueCareer!.phase !== 'active') return 'A league choice is required before time can advance.';
   }
   if (!hasStructuralCalendar(state)) return null;
-  if (!structuralRuntimeAllowed()) return 'Competition prototypes require the isolated developer career.';
+  if (!state.competitions?.leagueCareer && !structuralRuntimeAllowed()) return 'Competition prototypes require the isolated developer career.';
   if (state.competitions!.calendar!.status !== 'active') return 'The competition prototype is waiting for next-season setup.';
   const policy = structuralPolicyProblem(state); if (policy) return policy;
   if (state.competitions!.instances.some(i => i.season === state.season && i.fixtures.some(f => f.slot === state.week && f.status === 'pending')))
@@ -73,7 +92,7 @@ export function structuralAdvanceProblem(state: GameState): string | null {
   return null;
 }
 
-/** Validated lifecycle capability only; normal save admission remains separately refused. */
+/** Check the live lifecycle shape during interval settlement. */
 export function isPlayableLeagueCareer(state: GameState): boolean {
   return !!state.competitions?.leagueCareer && state.boardLoan?.owed === 0
     && !validateInput(state as unknown as Record<string, unknown>, state.version);

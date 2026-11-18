@@ -1,3 +1,4 @@
+import { leagueCareerStateProblem } from '../systems/leagueEntryValidation';
 import { migrateObservedProtection } from '../systems/cap';
 import { initialPlayerPopulation, installPlayerHistory } from '../systems/playerCareer';
 import { reconcileMatchIncome } from '../systems/matchIncome';
@@ -376,6 +377,14 @@ function migrateChecked(raw: unknown): MigrateResult {
       message: `This save is from a newer version of ${BRAND.name} (save v${version}, this game supports v${SAVE_VERSION}). Update the game to load it.`,
     };
   }
+  const competitions = cur.competitions;
+  if (competitions && typeof competitions === 'object' && 'leagueCareer' in competitions) {
+    const state = cur as unknown as GameState;
+    const problem = leagueCareerStateProblem(state);
+    return problem ? { ok: false, outcome: problem.reason === 'unsupported' ? 'unsupported' : 'unrecoverable',
+      reason: 'corrupt', message: problem.message }
+      : { ok: true, outcome: 'valid', state, repairs: [] };
+  }
   // Pre-finance careers are kept and are not converted. v28 and later migrate.
   if (version <= LAST_PRE_FINANCE_VERSION) {
     return { ok: false, outcome: 'unrecoverable', reason: 'corrupt',
@@ -404,11 +413,6 @@ function parseSave(text: string): MigrateResult {
     parsed = JSON.parse(text);
   } catch {
     return { ok: false, outcome: 'unrecoverable', reason: 'corrupt', message: 'File is not valid JSON.' };
-  }
-  if (parsed && typeof parsed === 'object' && 'competitions' in parsed) {
-    const competitions = (parsed as { competitions?: unknown }).competitions;
-    if (competitions && typeof competitions === 'object' && 'leagueCareer' in competitions)
-      return { ok: false, outcome: 'unsupported', reason: 'corrupt', message: 'League careers are not enabled yet. Your original save has been kept.' };
   }
   try { return migrateState(parsed); }
   catch { return { ok: false, outcome: 'unrecoverable', reason: 'corrupt', message: 'Save could not be migrated.' }; }
@@ -473,7 +477,7 @@ export function getSlotSummaries(): SlotSummary[] {
 // ── save / load / clear ──────────────────────────────────────────────────────
 
 /** Write `state` to `slot`. Returns false (after warning + ui:notify) on failure. */
-export function writeSlot(slot: number, state: GameState): boolean {
+export function writeSlot(slot: number, state: GameState, expectedOriginal?: string | null): boolean {
   if (savesLocked) return false;
   const store = getStore();
   if (!store) {
@@ -483,6 +487,7 @@ export function writeSlot(slot: number, state: GameState): boolean {
   }
   try {
     const original = store.read(slot);
+    if (expectedOriginal !== undefined && expectedOriginal !== original) return false;
     if (original !== null) {
       const approved = approvedOriginals.get(store)?.get(slot);
       if (approved?.raw !== original) {
@@ -651,29 +656,39 @@ export type LoadResult =
 
 /** Read without changing the source, including legacy and future-version bytes. */
 export function loadSlot(slot = activeSlot): LoadResult {
+  return captureSlot(slot).result;
+}
+
+/** The status shown when replacing a club and the bytes authorized by that choice
+ * come from one read. The writer compares them again after asynchronous setup. */
+export function captureSlot(slot: number): { result: LoadResult; raw: string | null } {
   const store = getStore();
-  if (!store) return { status: 'corrupt', outcome: 'unrecoverable', message: 'Storage unavailable. Your career may still be on this device.' };
   try {
+    if (!store) throw new Error('Storage unavailable');
     const raw = store.read(slot);
-    if (raw === null) return { status: 'empty' };
-    const res = parseSave(raw);
-    if (!res.ok) return { status: res.reason, outcome: res.outcome, message: res.message };
-    if (hasStructuralCalendar(res.state) && (careerNamespace() !== DEV_TEST_PREFIX || structuralPolicyProblem(res.state)))
-      return { status: 'corrupt', outcome: 'unrecoverable', message: structuralPolicyProblem(res.state) ?? 'Competition prototypes require the isolated developer career.' };
-    // An offered, qualified or entered competition can never finish on this calendar.
-    // Close it here so a save that would freeze the week loads ready to advance.
-    const state = reconcileMatchIncome(recoverUnfinishableCompetitions(res.state));
-    // A repaired state must not reach trusted memory until its exact source is
-    // retained and verified by #522's preservation path. Persisting comes later.
-    if (res.repairs.length) {
-      try { store.keepCorrupt(raw, slot); }
-      catch { return { status: 'corrupt', outcome: 'unrecoverable', message: 'Could not preserve the original. The repaired career was not loaded.' }; }
-    }
-    approveOriginal(store, slot, raw, res.repairs.length > 0 || JSON.parse(raw).version !== SAVE_VERSION);
-    return { status: 'ok', outcome: res.outcome, state, repairs: res.repairs };
+    return { raw, result: classifySlot(store, slot, raw) };
   } catch {
-    return { status: 'corrupt', outcome: 'unrecoverable', message: 'Storage could not be read. Your career has been kept.' };
+    return { raw: null, result: { status: 'corrupt', outcome: 'unrecoverable', message: 'Storage could not be read. Your career has been kept.' } };
   }
+}
+
+function classifySlot(store: LocalSaveStore, slot: number, raw: string | null): LoadResult {
+  if (raw === null) return { status: 'empty' };
+  const res = parseSave(raw);
+  if (!res.ok) return { status: res.reason, outcome: res.outcome, message: res.message };
+  if (!res.state.competitions?.leagueCareer && hasStructuralCalendar(res.state) && (careerNamespace() !== DEV_TEST_PREFIX || structuralPolicyProblem(res.state)))
+    return { status: 'corrupt', outcome: 'unrecoverable', message: structuralPolicyProblem(res.state) ?? 'Competition prototypes require the isolated developer career.' };
+  // An offered, qualified or entered competition can never finish on this calendar.
+  // Close it here so a save that would freeze the week loads ready to advance.
+  const state = res.state.competitions?.leagueCareer ? res.state : reconcileMatchIncome(recoverUnfinishableCompetitions(res.state));
+  // A repaired state must not reach trusted memory until its exact source is
+  // retained and verified by #522's preservation path. Persisting comes later.
+  if (res.repairs.length) {
+    try { store.keepCorrupt(raw, slot); }
+    catch { return { status: 'corrupt', outcome: 'unrecoverable', message: 'Could not preserve the original. The repaired career was not loaded.' }; }
+  }
+  approveOriginal(store, slot, raw, res.repairs.length > 0 || JSON.parse(raw).version !== SAVE_VERSION);
+  return { status: 'ok', outcome: res.outcome, state, repairs: res.repairs };
 }
 
 /** Compatibility wrapper. Rejected careers stay in place and cannot be autosaved over. */
@@ -1031,14 +1046,14 @@ export function installImportedSave(text: string, slot: number): ImportResult {
   if (peeled.bad) return { ok: false, message: 'the match in this file could not be read.' };
   const res = importSave(peeled.text);
   if (!res.ok) return res;
-  if (hasStructuralCalendar(res.state) && careerNamespace() !== DEV_TEST_PREFIX) return { ok: false, message: 'Competition prototypes can only be imported into the isolated developer career.' };
+  if (!res.state.competitions?.leagueCareer && hasStructuralCalendar(res.state) && careerNamespace() !== DEV_TEST_PREFIX) return { ok: false, message: 'Competition prototypes can only be imported into the isolated developer career.' };
   if (hasStructuralCalendar(res.state)) {
     const policy = structuralPolicyProblem(res.state);
     if (policy) return { ok: false, message: policy };
   }
-  const recovered = recoverUnfinishableCompetitions(res.state);
+  const recovered = res.state.competitions?.leagueCareer ? res.state : recoverUnfinishableCompetitions(res.state);
   const installed = recovered === res.state ? res : { ...res, state: recovered };
-  const destinationStatus = loadSlot(slot);
+  const {result: destinationStatus, raw: expectedOriginal} = captureSlot(slot);
   if (destinationStatus.status !== 'empty' && destinationStatus.status !== 'ok') return { ok: false, message: 'Destination needs recovery before replacement.' };
   // Repaired/historical imports retain both the exact incoming file (including
   // its match envelope) and the occupied destination before any installation.
@@ -1052,7 +1067,7 @@ export function installImportedSave(text: string, slot: number): ImportResult {
       if (destination !== null) store.keepCorrupt(destination, slot);
     } catch { return { ok: false, message: 'Could not preserve originals. Import was not installed.' }; }
   }
-  if (!writeSlot(slot, installed.state)) return { ok: false, message: '' };
+  if (!writeSlot(slot, installed.state, expectedOriginal)) return { ok: false, message: '' };
   if (peeled.live) {
     if (!writeLiveMatch(peeled.live, slot)) clearLiveMatch(slot);
   } else {
