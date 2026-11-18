@@ -1314,6 +1314,8 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
 .nrl-decisions-card .nrl-btn.nrl-decisions-review::after { inset: -8px 0; }
 .nrl-dock-money-line { display: flex; align-items: baseline; gap: 5px; }
 .nrl-dock-cash { font-family: var(--nrl-f-num); font-size: 0.5625rem; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--nrl-muted); }
+/* 620 and under (568×320): no room for the word beside the money, which the dock's tabs need (webkit portrait, dock text sizes). */
+@media (max-width: 620px) { .nrl-dock-cash { display: none; } }
 
 /* ── Modal ───────────────────────────────────────────────────────────── */
 .nrl-modal-backdrop {
