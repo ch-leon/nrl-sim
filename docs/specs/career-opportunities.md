@@ -219,7 +219,8 @@ Sand, crowd, floodlights, eccentric hosts and a podium distinguish events visual
 
 At a coaching checkpoint, game advancement pauses until the coach chooses or
 explicitly selects auto-coach. Fast-forward must not silently miss decisions.
-Skipping presentation uses the saved auto-coach policy and the same simulation;
+Skipping an action only skips its presentation and stops at the next coaching checkpoint.
+Explicitly finishing with auto-coach uses the saved policy and the same simulation;
 watching and skipping with identical seeds and choices produce identical outcomes.
 Automatic coaching must be viable, without an exclusive watch-only prize.
 
@@ -243,7 +244,7 @@ eligibility, calendar load, finite outcomes and measured rewards before activati
 | Champions Series | Earned qualification; adapt across a short series | Prestige, honours, a club display |
 | Budget Cup / Salary Challenge | Restricted registered squad budget | Recruitment/tactical achievement and prize cash |
 | Homegrown Trophy | Club-trained participation | Academy identity and honours |
-| Big Mick's Break the Line | One player; country-show carrying/tackling rounds | Substantial individual XP, Human Bulldozer badge, sponsor access |
+| Big Mick's Break the Line | One player; country-show carrying/tackling rounds | Substantial individual XP, Personal champion badge, supported club prize and harder playable invitation; sponsor access is a later candidate |
 | Sunset Beach Fives | Selected group; sand, short games, limited kicking, lifeguard opponents | Team development, beach trophy, island-circuit invitation |
 | Floodlit Fives / Floodlight Cup | Small squad; open space and quick turnarounds under lights | Cash, development, neon trophy, elite edition |
 | Golden Boot Island | One kicker; limited attempts, wind and awkward angles | Kicking development, specialist coaching; distinctive boots only after gear ships |
