@@ -854,7 +854,10 @@ async function play() {
       return raw ? JSON.parse(raw).tick : 0;
     });
     if (afterTick + 40 < tick) throw new Error(`resumed tick ${afterTick} is behind the kill tick ${tick}`);
-    rec.notes.push(`killed at ${before} (tick ${tick}); resumed at ${after} (tick ${afterTick})`);
+    // The held week's slot keeps its earlier settings across a hard reload.
+    // Restore the speed this playthrough's replay wait explicitly runs at.
+    await matchSpeed(8);
+    rec.notes.push(`killed at ${before} (tick ${tick}); resumed at ${after} (tick ${afterTick}); restored ×8`);
   });
   await step('try-replay', async (rec) => {
     if (!liveOn) return 'skipped';
@@ -955,16 +958,23 @@ async function play() {
   await step('coach-call', async (rec) => {
     if (!liveOn) return 'skipped';
     if (!halfTimeDone && (await halfTimeCard().count())) await playHalfTime(rec);
+    if (await page.locator('.nrl-mo-final').count()) return 'no set call before full time';
     if (!(await page.locator('.nrl-mo-bar [data-coach]').count())) return 'no COACH button on the match screen';
     // At ×8 the calls on offer switch with possession every second or so and are never still
     // long enough for a locator click: call at ×1, opening the tray and tapping its first row
     // inside the page, then go back to ×8. The half-time sheet can come up between the check
     // above and this tap (it covers the bar): play it, then set the speed.
-    await matchSpeed(1).catch(async (e) => {
-      if (halfTimeDone || !(await halfTimeCard().count())) throw e;
-      await playHalfTime(rec);
-      await matchSpeed(1);
-    });
+    try {
+      await matchSpeed(1).catch(async (e) => {
+        if (halfTimeDone || !(await halfTimeCard().count())) throw e;
+        await playHalfTime(rec);
+        await matchSpeed(1);
+      });
+    } catch (e) {
+      // Natural full time can cover the speed button between the check and tap.
+      if (await page.locator('.nrl-mo-final').count()) return 'no set call before full time';
+      throw e;
+    }
     // A call that lands names itself on the badge at once (MatchScene.makeCall), lights its tile
     // and shuts the tray a moment later (#608); one refused (the play moved on) rebuilds the rows,
     // and a tap inside 300ms of the rows changing makes no call: read it in the same task.

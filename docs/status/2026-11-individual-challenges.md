@@ -91,6 +91,14 @@ wide letters through the real UI, and checks content visibility and action reach
 so neither random names nor a shorter morale label can conceal the regression.
 Final review and exact-head CI/QA receipts remain in the PR.
 
+A later desktop QA run exposed a separate match-playthrough assumption: reloading
+the live match resets playback to the normal 2×, but the replay wait still assumed
+8×. The failure artifact showed 04:59 in the second half at 2×, followed by natural
+full time covering the next coach-control click. The harness explicitly restores
+8× after checking resumed clock/tick continuity and accepts natural full time
+before or during coach-speed selection. Replay, call, persistence and timeout
+assertions are retained; no game-speed or match behavior changes are involved.
+
 ## Reproduce
 
 ```sh
