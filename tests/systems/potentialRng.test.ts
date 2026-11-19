@@ -44,11 +44,10 @@ import { contractsEndingSoon } from '../../src/systems/contracts';
 // #650/#652 retained the prior 1788836146 fingerprint. #649 ordinary attacking
 // structures moved the season seed to 3236754777. Career persistence and the
 // merged main career work move it again; compare UI-read/no-read in both AI modes.
-// Main's career-only pin: 3782523015. The wide pre-catch back-door geometry in
-// #722 revision 9 changes match outcomes and the combined season stream; its
-// measured pin is 1950957202. Both AI modes still compare UI-read and no-read
-// runs, and AI=0 pins this measured stream.
-const MAIN_SEED_AFTER_SEASON = 1950957202;
+// The wide back-door catch in #722 revision 9 moved the measured pin to 1950957202.
+// The lead read in revision 10 moves this season back to 3782523015, the career-only
+// main pin. Both AI modes still compare UI-read and no-read runs.
+const MAIN_SEED_AFTER_SEASON = 3782523015;
 
 describe('the rng stream (#369)', () => {
   it.each([0, 1])('weekly potential and dot reads preserve the season stream with habit AI=%i', (ai) => {

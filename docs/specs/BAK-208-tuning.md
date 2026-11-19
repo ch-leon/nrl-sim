@@ -1864,8 +1864,9 @@ redraw to its ordinary ruck and retained through the pass/carry; standalone PTBs
 choose at the ruck. All packet members must be on the field, free, not interchanging
 and within the setup reach. The nearest feasible half links the compact forward
 triangle; `busyUntil` remains a pass-only restriction and does not lock movement.
-Inputs/scripted sheets retain priority. No decoy,
-back-door pass or carrier-line contest is added. Off draws nothing and retains
+Inputs/scripted sheets retain priority. The initial slice added no decoy,
+back-door pass or carrier-line contest; the later back-door packet and bounded
+lead read are described below. Off draws nothing and retains
 main f465021's simulation; enabled preparation changes movement/RNG timing, so
 match recovery engine revision is 6. Browser and standard-harness sign-off remain
 required; baseline target misses are not changes caused by this slice.
@@ -1924,3 +1925,19 @@ The actual first DH recipient remains the existing commitment. A different
 recipient abandons this option, and the later pass remains an ordinary weighted
 choice with its usual handling/interception risk. Marker metadata records only
 actual geometry; it promises no catch or successful outcome.
+
+### Back-door lead read (stacked follow-up [draft PR #744](https://github.com/ch-leon/nrl-sim/pull/744))
+
+During a valid back-door play, the nearest eligible free line defender within the
+read radius checks toward the actual lead runner. He aims to hold his current depth
+and step across toward the lead. The read ends after its duration or
+when its eligibility conditions stop holding, and the same packet cannot select a
+replacement reader. This changes positioning only; it adds no pass, catch or
+carrier-line contest roll. Recovery engine revision 10 includes the read.
+
+| Knob | Default | Meaning |
+|---|---:|---|
+| `shapes.leadDecoy.on` | 1 | 1 enables the bounded lead read; 0 leaves normal line targets. |
+| `shapes.leadDecoy.reachM` | 8 m | Maximum lead-to-defender distance to begin or maintain the read. |
+| `shapes.leadDecoy.shadeM` | 2 m | Maximum lateral target offset toward the lead per update; the defender holds his current depth. |
+| `shapes.leadDecoy.readTicks` | 8 ticks | Maximum duration of the read before normal line targeting resumes. |

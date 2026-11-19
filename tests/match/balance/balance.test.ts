@@ -300,9 +300,9 @@ describe('measuring and reporting', () => {
     // with the last-tackle call alone; 12-0:118:c104b852219f311c was Balanced with held up alone).
     // Early ordinary-DH commitment (#672) moves receiver/dart rolls four ticks earlier.
     // Ordinary structures (#649) add a once-per-contact/PTB roll and real setup movement.
-    // The wide pre-catch back-door geometry (#722 revision 9) re-pins these; before it:
-    // balanced 0-10:139:11df3e2d9bd34d36 / expansive 10-0:135:aefa21a87c2cd66e.
-    { attack: 'balanced' as const, expected: '12-6:141:82d97834a1c52696' },
+    // Lead-decoy movement changes the Balanced seed-1 replay; Expansive's pin stays unchanged.
+    // Before lead decoy, Balanced was 12-6:141:82d97834a1c52696.
+    { attack: 'balanced' as const, expected: '6-4:125:3b59450ec3a85edd' },
     { attack: 'expansive' as const, expected: '10-4:150:975213c1842aa58e' },
   ])('pins an even $attack / Slide match (seed 1)', async ({ attack, expected }) => {
     const sim = new LiveSim(sideSheet('H', { rating: 60, tactics: { attack } }), sideSheet('A', { rating: 60 }), 1);

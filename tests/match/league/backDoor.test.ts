@@ -67,6 +67,39 @@ class BackDoorSim extends LiveSim {
     this.queue=[spill ? 0 : .999];this.landings();this.prepareAttackShape();return this.snapshot();
   }
   next() {this.tick++;this.prepareAttackShape();return this.snapshot();}
+
+  prepareLeadRead() {
+    this.choose();
+    this.run();
+    const carrierY = this.man(4).body.pos.y;
+    this.lineX = 50 + this.dir * 10;
+    this.man(7).body.vel = { x: this.dir * 3, y: 0 };
+    this.man(9).body.pos = { x: 50 + this.dir * 20, y: carrierY };
+    this.man(12).body.pos = { x: 50 + this.dir * 3, y: carrierY };
+    this.man(13).body.pos = { x: 50 + this.dir * 3, y: carrierY - this.edge * 2 };
+    this.man(16).body.pos = { x: 50 + this.dir * 4, y: carrierY + this.edge * 4 };
+    this.man(17).body.pos = { x: 50 + this.dir * 6, y: carrierY + this.edge * 4 };
+  }
+
+  holdOffsideReader() {
+    const d = this.man(16);
+    const eligible = new Map(this.side('away').filter(p => p !== d).map(p => [p, p.key]));
+    this.retreat = { side: 'away', dir: this.dir, line: d.body.pos.x + this.dir, eligible, markers: new Map() };
+  }
+
+  holdMarker(index: number) {
+    this.ruckPlayedAt = this.tick;
+    this.markers = [index];
+  }
+
+  readingSlot() {
+    return this.phase.kind === 'play' ? this.phase.shape?.leadRead?.defender.slot : undefined;
+  }
+}
+
+function targetsWithoutLeadRead(sim: BackDoorSim) {
+  const restore = applyTuning({ 'shapes.leadDecoy.on': 0 });
+  try { return sim.targets(); } finally { restore(); }
 }
 
 describe('ordinary back-door option (#649)',()=>{
@@ -237,7 +270,13 @@ describe('ordinary back-door option (#649)',()=>{
     expect((player(ready, lead).x - player(heel, lead).x) * shape.dir).toBeGreaterThan(0);
     expect((player(ready, lead).x - player(ready, caller).x) * shape.dir).toBeGreaterThan(SHAPES.backDoor.leadClearM);
     expect(at(4301).ball.flight).toMatchObject({ via: 'pass', receiver: caller });
-    expect(at(4309).ball.holder).toEqual({ side: caller.side, slot: caller.slot });
+    const halfCatch = at(4309);
+    expect(halfCatch.ball.holder).toEqual({ side: caller.side, slot: caller.slot });
+    const reader = { side: 'away', slot: 7, who: 'Hunter Faleolo' } as const;
+    const checked = at(4317);
+    expect(player(halfCatch, reader).y - player(checked, reader).y).toBeGreaterThan(1);
+    expect(Math.abs(player(halfCatch, reader).x - player(checked, reader).x)).toBeLessThan(0.3);
+    expect(checked.attackShape).not.toHaveProperty('leadRead');
     const before = at(4321), launched = at(4322), flight = launched.ball.flight!;
     expect(flight).toMatchObject({ via: 'pass', startedTick: 4322, source: { player: caller }, receiver: support, backDoor: { lead } });
     expect(behindLead(flight.from, flight.to, player(before, lead), shape.dir)).toBe(true);
@@ -270,6 +309,7 @@ describe('ordinary back-door option (#649)',()=>{
     expect(player(carry, support).headY! * shape.edge).toBeGreaterThan(0);
     runner.seek(heel.tick);
     expect(runner.cur).toEqual(heel);
+    expect(at(checked.tick)).toEqual(checked);
     expect(at(launched.tick)).toEqual(launched);
     expect(at(caught.tick)).toEqual(caught);
     expect(at(carry.tick)).toEqual(carry);
@@ -284,5 +324,90 @@ describe('ordinary back-door option (#649)',()=>{
     const spec='node:crypto',{createHash}=await import(spec);
     expect(`${sim.points.home}-${sim.points.away}:${parts.length}:${createHash('sha256').update(parts.join('|')).digest('hex').slice(0,16)}`).toBe('0-8:138:a3c50b2b797e77b1');
     expect(draws).toBe(842); // preceding engine, after the kickoff coin toss
+  });
+});
+
+describe('reading the back-door lead (#649)', () => {
+  it('shades one eligible spare defender and returns him to his line on expiry', () => {
+    for (const dir of [-1, 1] as const) for (const edge of [-1, 1] as const) {
+      const sim = new BackDoorSim(dir, edge), control = new BackDoorSim(dir, edge);
+      sim.prepareLeadRead();
+      control.prepareLeadRead();
+      const draws = sim.draws, normal = targetsWithoutLeadRead(control), shaded = sim.targets();
+      const changed = shaded.flatMap((target, i) => dist(target, normal[i]!) > 0 ? [i] : []);
+      expect(changed).toEqual([16]);
+      const reader = sim.man(16);
+      expect(shaded[16]).toEqual({ x: reader.body.pos.x, y: reader.body.pos.y - edge * 2 });
+      expect(sim.draws).toBe(draws);
+      sim.tick += SHAPES.leadDecoy.readTicks;
+      control.tick = sim.tick;
+      expect(sim.targets()).toEqual(targetsWithoutLeadRead(control));
+      expect(sim.readingSlot()).toBeUndefined();
+      expect(sim.draws).toBe(draws);
+    }
+  });
+
+  it('respects defensive duties and drops an invalidated read without choosing another man', () => {
+    const towardAnother = ['held marker', 'retreating', 'locked', 'binned', 'interchanging', 'cooldown'] as const;
+    for (const duty of towardAnother) {
+      const sim = new BackDoorSim();
+      sim.prepareLeadRead();
+      const reader = sim.man(16);
+      if (duty === 'held marker') sim.holdMarker(16);
+      if (duty === 'retreating') sim.holdOffsideReader();
+      if (duty === 'locked') reader.lockUntil = sim.tick + 1;
+      if (duty === 'binned') reader.binUntilS = 1000;
+      if (duty === 'interchanging') reader.subFor = 0;
+      if (duty === 'cooldown') reader.cooldownUntil = sim.tick + 1;
+      sim.targets();
+      expect(sim.readingSlot(), duty).toBe(8);
+      const standIn = sim.man(17);
+      standIn.key = 'new player';
+      sim.targets();
+      expect(sim.readingSlot()).toBeUndefined();
+    }
+  });
+
+  it('requires an actual run and releases the defender on the real pass or immediate contact', () => {
+    const sim = new BackDoorSim();
+    sim.prepareLeadRead();
+    const lead = sim.man(7);
+    lead.body.vel.x = -3;
+    sim.targets();
+    expect(sim.readingSlot()).toBeUndefined();
+    lead.body.vel.x = 3;
+    const shading = sim.targets()[16];
+    expect(sim.readingSlot()).toBe(7);
+    expect(sim.decide().ball.flight?.backDoor).toBeDefined();
+    expect(sim.targets()[16]).not.toEqual(shading);
+
+    const early = new BackDoorSim();
+    early.prepareLeadRead();
+    early.man(4).catchTick = early.tick;
+    early.man(12).body.pos = { x: 50.8, y: early.man(4).body.pos.y };
+    early.targets();
+    early.step();
+    expect(early.snapshot().phase?.kind).toBe('tackle');
+    expect(early.snapshot().contact?.defenders[0]?.slot).toBe(3);
+    expect(early.readingSlot()).toBeUndefined();
+  });
+
+  it('with the read off preserves #722 game events, motion and RNG draws', async () => {
+    restores.push(applyTuning({ 'shapes.leadDecoy.on': 0 }));
+    const sim = new LiveSim(labSheet(DEFAULT_HOME), labSheet(DEFAULT_AWAY), 5);
+    const rng = (sim as unknown as { rng: { next: () => number } }).rng;
+    const next = rng.next.bind(rng);
+    let draws = 0;
+    rng.next = () => { draws++; return next(); };
+    const events: string[] = [], frames: Snapshot[] = [];
+    while (!sim.finished) {
+      sim.step();
+      for (const e of sim.tickEvents) events.push(`${e.tick}:${e.kind}:${e.side ?? ''}:${e.detail ?? ''}`);
+      if (sim.tick >= 4308 && sim.tick <= 4339) frames.push(sim.snapshot());
+    }
+    const spec = 'node:crypto', { createHash } = await import(spec);
+    expect(createHash('sha256').update(JSON.stringify({ events, frames })).digest('hex').slice(0, 16)).toBe('38fca2d84d918d21');
+    expect(sim.points).toEqual({ home: 12, away: 6 });
+    expect(draws).toBe(834);
   });
 });
