@@ -73,12 +73,17 @@ async function advanceOne(page, inspectMatch) {
   await openNav(page, 'club');
   await page.locator('[data-hud="advance"]').click();
   const next = async () => page.waitForFunction(n => {
+    if (document.querySelector('[data-skip-events]')) return 'event';
     if (document.querySelector('[data-ask-proceed]')) return 'ask';
     if (document.querySelector('.nrl-mo-controls [data-skip-pill]')) return 'match';
     return window.__nrlState().competitions.calendar.elapsedIntervals > n ? 'done' : false;
   }, before.competitions.calendar.elapsedIntervals, { timeout: 60000 }).then(h => h.jsonValue());
   let stage = await next();
-  if (stage === 'ask') { await page.locator('[data-ask-proceed]').click(); stage = await next(); }
+  while (stage === 'ask' || stage === 'event') {
+    // This journey deliberately advances past unrelated optional entries.
+    await page.locator(stage === 'event' ? '[data-skip-events]' : '[data-ask-proceed]').click();
+    stage = await next();
+  }
   if (stage === 'match') {
     await page.waitForFunction(key => !!localStorage.getItem(key), SIDECAR);
     if (inspectMatch) await inspectMatch();

@@ -89,12 +89,17 @@ async function advance(page, inspectMatch) {
   await openNav(page, 'club');
   await page.locator('[data-hud="advance"]').click();
   const next = () => page.waitForFunction(n => {
+    if (document.querySelector('[data-skip-events]')) return 'event';
     if (document.querySelector('[data-ask-proceed]')) return 'ask';
     if (document.querySelector('.nrl-mo-controls [data-skip-pill]')) return 'match';
     return window.__nrlState().competitions.calendar.elapsedIntervals > n ? 'done' : false;
   }, s.competitions.calendar.elapsedIntervals, { timeout: 60000 }).then(h => h.jsonValue());
   let stage = await next();
-  if (stage === 'ask') { await page.locator('[data-ask-proceed]').click(); stage = await next(); }
+  while (stage === 'ask' || stage === 'event') {
+    // This journey deliberately advances past unrelated optional entries.
+    await page.locator(stage === 'event' ? '[data-skip-events]' : '[data-ask-proceed]').click();
+    stage = await next();
+  }
   if (stage === 'match') {
     await page.waitForFunction(k => !!localStorage.getItem(k), SIDECAR);
     if (inspectMatch) await inspectMatch();
@@ -248,8 +253,45 @@ export async function runIndividualChallenges(browser) {
     await controls(page); await shot('larger-coaching'); await finish(page, true);
     assert(record(await state(page)).contest.progress.result === 'won', 'Qualification fixture did not win');
     await leave(page); await advance(page);
-    while ((await state(page)).week < 9) await advance(page);
-    await open(page, 'invitational'); await page.locator('[data-challenge-player]').waitFor();
+    while ((await state(page)).week < 8) await advance(page);
+    // Begin before the Invitational opens in Week 9. A genuine earned title
+    // qualifies this club; no fixture, honour or contest result is manufactured.
+    let reminded = false;
+    for (let attempt = 0; attempt < 12 && !reminded; attempt++) {
+      const beforeRun = await state(page);
+      assert(beforeRun.week <= 13, 'Long advance silently crossed the Invitational deadline');
+      await openNav(page, 'club');
+      await page.locator('.nrl-hud-menu-toggle').click();
+      await page.locator('.nrl-hud-menu-item').filter({ hasText: 'To season end' }).click();
+      for (let step = 0; step < 4; step++) {
+        const stage = await page.waitForFunction(n => {
+          if (document.querySelector('[data-event-reminder]')) return 'event';
+          if (document.querySelector('[data-confirm-advance]')) return 'confirm';
+          if (document.querySelector('[data-ask-proceed]')) return 'ask';
+          if (window.__nrlState().competitions.calendar.elapsedIntervals > n) return 'started';
+          return false;
+        }, beforeRun.competitions.calendar.elapsedIntervals, { timeout: 120000 }).then(h => h.jsonValue());
+        if (stage === 'event') { reminded = true; break; }
+        if (stage === 'started') break;
+        await page.locator(stage === 'confirm' ? '[data-confirm-advance]' : '[data-ask-proceed]').click();
+      }
+      if (!reminded) {
+        await page.waitForFunction(() => !document.querySelector('.nrl-dock[data-advancing]'), null, { timeout: 120000 });
+        reminded = await page.locator('[data-event-reminder]').count() > 0;
+      }
+      assert((await state(page)).week <= 13, 'Long advance silently skipped later-opening entry');
+      if (!reminded) await page.keyboard.press('Escape'); // close an unrelated new decision; next run asks before defaulting it
+    }
+    assert(reminded, 'Long advances never surfaced the newly open Invitational');
+    assert(/Invitational/.test(await page.locator('[data-event-reminder]').innerText()), 'Late-opening warning named the wrong event');
+    const held = (await state(page)).competitions.calendar.elapsedIntervals;
+    await shot('later-opening-reminder');
+    await page.locator('[data-review-events]').click();
+    await page.locator('[data-open-opportunity="invitational"]').click();
+    await page.locator(DIALOG).waitFor();
+    assert((await state(page)).competitions.calendar.elapsedIntervals === held, 'Review resumed the cancelled long advance');
+    report.laterOpeningReminderWeek = (await state(page)).week;
+    await page.locator('[data-challenge-player]').waitFor();
     const now = await state(page);
     const entrant = now.squad.find(q => !q.injuredWeeks && !q.suspendedWeeks);
     await book(page, entrant.id); await shot('invitation'); await leave(page);
