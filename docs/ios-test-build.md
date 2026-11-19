@@ -3,8 +3,9 @@
 A way to put the game on Leon's own iPhone as a real app, for play-testing, with a
 free Apple ID: no Apple Developer Program, no TestFlight, no App Store. It plays
 exactly like the web build, with saves kept on that phone. This is Phase 1 of
-[docs/specs/ios.md](specs/ios.md) (the shell) plus Phase 2 (durable saves, below); the
-widget extension and Live Activities are later phases.
+[docs/specs/ios.md](specs/ios.md) (the shell), Phase 2 (durable saves, below) and Phase 3
+(the widget extension and the match on the lock screen,
+[below](#lock-screen-and-dynamic-island)); the club widgets are a later phase.
 
 The app is wrapped with [Capacitor](https://capacitorjs.com/), the same as the
 [Android test build](android-test-build.md): the same Vite build the website uses,
@@ -163,6 +164,69 @@ above), so the behaviour marked *not yet checked* is intended, not observed.
 - **60 frames a second, expected.** The spec notes iOS web views cap drawing at 60 even
   on 120Hz phones; the sim steps at 20Hz, so that would be fine. *Not yet checked.*
 
+## Lock screen and Dynamic Island
+
+Phase 3 of the spec: a match you are playing shows as a **Live Activity** on the lock
+screen and, on phones that have one, in the Dynamic Island.
+
+**What it shows.** Both clubs' codes with yours starred (as the match's score bug does),
+the score, the half and the match minute *as of the last update* ("2nd half 4'"), one
+line for the last big moment ("TRY, Walker (BRI) 3'"), and a state: LIVE, PAUSED · TAP
+TO RETURN, HALF-TIME (GOLDEN POINT NEXT before a drawn final's golden point) or FULL
+TIME. The island's compact form is a ball on the left (the
+captain's poses come in Phase 4) and the score on the right; the expanded form matches
+the lock screen; the minimal form is the ball. Colours are the SuperCOOKED tokens; text is
+the system font for now (the brand fonts ship as woff2, which a widget extension cannot load).
+
+**When it changes.** It starts at kick-off of a match you are in, and updates on tries,
+conversions, penalty goals, field goals, big hits, sin bins, half-time, the second half's
+kick-off, the break before golden point and its kick-off, and full time. Nothing on it
+ticks by itself. Skip to full time
+sends one update, the final score. Only full time lights the screen (an alert); every
+other update is silent. When the app goes to the background the match stops, so the
+activity should say PAUSED until you come back. Tapping it opens the app (the
+`bigcoach://` link), which is expected to resume the match where it was, as any return to
+the app does. None of this has been seen on a phone or in the Simulator yet. Full time stays on it until you leave the
+match; Back to club, Save & exit, or any other way out of the match ends it at once. An
+activity left over from a run that was killed is ended at the next launch. With Live
+Activities switched off for the app (Settings > Big Coach > Live Activities), nothing
+shows and the game plays as before.
+
+**Where it lives.** The extension is the `BigCoachWidgets` target
+(`ios/App/BigCoachWidgets/`, bundle id `au.com.supercooked.bigrugbycoach.dev.widgets`,
+embedded in the app). The app's side is the `LiveMatch` plugin
+(`ios/App/App/LiveActivity/LiveMatchPlugin.swift`), driven from the game by
+`src/native/liveMatch.ts` (iPhone build only). The shape both share is
+`ios/App/Shared/MatchActivityAttributes.swift`. Both targets are in the App Group
+`group.au.com.supercooked.bigrugbycoach.dev`, unused until the club widgets (Phase 5).
+The three folders are synchronised with the disk: a Swift file or an asset catalogue
+dropped into one is in its target at the next build, with no project edit. The target
+was added by `scripts/ios/add-widget-target.rb`. `BrandColors.swift` is generated from
+`src/ui/tokens.ts` by `npx vite-node scripts/gen-ios-colors.mjs` (`build:ios` runs it; a
+test fails while it is out of date).
+
+**Signing (once, by hand).** The new target has no team, like the app. In Xcode, select
+the **BigCoachWidgets** target, **Signing & Capabilities**, and pick the same **Personal
+Team** as the App target. Both targets carry the App Groups capability; if Xcode asks to
+register the group for the Personal Team, let it. Do not add Push Notifications.
+
+**Try it.**
+
+1. `npm run build:ios && npx cap sync ios`, then Run from Xcode (phone or Simulator).
+2. Start a match. Score a try or wait for one.
+3. Lock the phone, or swipe home: the lock screen (and the island) show the score,
+   the minute and PAUSED · TAP TO RETURN.
+4. Tap it: the app should open on the match, which should play on; go away again at
+   half-time and it should say HALF-TIME.
+5. Play or Skip to full time: the screen lights once, FULL TIME with the result.
+6. Back to club (or Save & exit mid-match): the activity is gone.
+7. Settings > Big Coach > Live Activities off, play a match: nothing shows, nothing breaks.
+
+**Unproven on a free Apple ID.** Apple does not say whether a free-signed app may show
+Live Activities (the spec's "Still unproven"). Nothing paid is used: no push, no
+frequent-updates key, no stale date, no timed dismissal. If the phone refuses, the
+game carries on without it, and the Simulator is the fallback until the paid account.
+
 ## What only the phone can show
 
 The Simulator cannot check these. They are Leon's to try on the phone:
@@ -175,4 +239,6 @@ The Simulator cannot check these. They are Leon's to try on the phone:
 - A cold start in airplane mode.
 - Saves surviving the 7-day re-install.
 - Saving when the app is sent to the background (see Saves).
+- The Live Activity on a free-signed phone at all, and on the lock screen and the
+  Dynamic Island (see Lock screen and Dynamic Island).
 - The Saves on iPhone checks, if the Simulator is still unavailable.

@@ -79,6 +79,9 @@ import { initGameAnalytics } from './analytics/gameEvents';
 import { bootNativeMirror } from './core/storage/native';
 import { isIosNative } from './core/storage/platform';
 
+/** web, android or ios: vite.config.ts's define (src/platform.ts). Absent under vite-node. */
+declare const __NRL_PLATFORM__: string | undefined;
+
 // Phaser rendering conventions per ARCHITECTURE.md §7.
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -247,6 +250,14 @@ async function boot(): Promise<void> {
 
   const g = new Phaser.Game(config);
   game = g;
+  // The iPhone app's lock-screen match ticker (docs/specs/ios.md §3). The build folds the
+  // test to false for the web and Android, so their bundles carry none of it.
+  // A chunk that fails to load only loses the ticker; the game plays on.
+  if (typeof __NRL_PLATFORM__ !== 'undefined' && __NRL_PLATFORM__ === 'ios') {
+    import('./native/ios')
+      .then((m) => m.startIosNative(g))
+      .catch((err: unknown) => console.error('nrl-sim: the iPhone lock-screen ticker did not load', err));
+  }
   trackDensity(g);
   setMatchSceneProbe(() => g.scene.isActive('Match')); // Developer settings waits for the match (#519)
   // `?e2e` exposes the game to the end-to-end playthrough (scripts/e2e-season.mjs),
