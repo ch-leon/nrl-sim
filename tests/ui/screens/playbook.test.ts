@@ -166,12 +166,13 @@ describe('the Lineup’s Plays sheet (plan §4.2)', () => {
     hireAttackCoach('kicking');
     buyPlay('kick-pass');
     openLineupScreen();
-    const btn = q('[data-plays]')! as unknown as HTMLButtonElement & StubNode;
-    const full = (): string => btn.querySelector('.nrl-lineup-plays-full')!.textContent;
-    const short = (): string => btn.querySelector('.nrl-lineup-plays-short')!.textContent;
+    // SuperCOOKED Phase 1: Plays is in the Squad header's ⋯ menu, which is drawn each time it opens.
+    const playsBtn = (): StubNode => { if (!q('[data-plays]')) tap(q('[data-squad-more]')); return q('[data-plays]')!; };
+    const full = (): string => playsBtn().querySelector('.nrl-lineup-plays-full')!.textContent;
+    const short = (): string => playsBtn().querySelector('.nrl-lineup-plays-short')!.textContent;
     expect(full()).toBe('Plays: — · — · —');
     expect(short()).toBe('Plays 0/3');
-    btn.onclick!.call(btn, {} as PointerEvent);
+    tap(playsBtn());
     const sheet = q('[data-plays-sheet]')!;
     expect(sheet).not.toBeNull();
     // Not inside the plan sheet: no presets in it.
@@ -185,7 +186,7 @@ describe('the Lineup’s Plays sheet (plan §4.2)', () => {
     expect(rows().find((r) => r.attrs['data-play'] === 'kick-pass')!.attrs['aria-pressed']).toBe('true');
     expect(full()).toBe('Plays: Kick-pass · Block play · —');
     expect(short()).toBe('Plays 2/3');
-    expect(btn.title).toContain('Plays: Kick-pass · Block play · —: the set plays you take into the match');
+    expect((playsBtn() as unknown as HTMLButtonElement).title).toContain('Plays: Kick-pass · Block play · —: the set plays you take into the match');
     tap(rows().find((r) => r.attrs['data-play'] === 'inside-ball')!);
     // The fourth is greyed and refused.
     const fourth = rows().find((r) => r.attrs['data-play'] === 'short-side-raid')!;
@@ -203,8 +204,8 @@ describe('the Lineup’s Plays sheet (plan §4.2)', () => {
 
   it('with nothing bought the sheet points at the Playbook', () => {
     openLineupScreen();
-    const btn = q('[data-plays]')! as unknown as HTMLButtonElement & StubNode;
-    btn.onclick!.call(btn, {} as PointerEvent);
+    tap(q('[data-squad-more]')); // Plays is in the Squad header's ⋯ (SuperCOOKED Phase 1)
+    tap(q('[data-plays]'));
     expect(q('[data-plays-list]')!.textContent).toContain('Buy plays on the Playbook');
   });
 });

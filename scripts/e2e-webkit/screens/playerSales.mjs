@@ -121,7 +121,10 @@ export async function runPlayerSales(browser) {
         assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-text-size')), textSize === 'normal' ? null : textSize);
         const openReview = async () => {
           if (screen === 'contracts') await page.locator(`[data-contract-sell="${player.id}"]`).tap();
-          else await page.locator('[data-player-action="sell"]').tap();
+          else {
+            await page.locator('[data-player-tab="deal"]').tap(); // the deals are on the Deal tab (SuperCOOKED 37)
+            await page.locator('[data-player-action="sell"]').tap();
+          }
           await page.locator('[data-sale-confirm]').waitFor();
         };
         await openNav(page, screen === 'contracts' ? 'contracts' : 'squad');

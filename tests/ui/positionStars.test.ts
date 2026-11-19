@@ -3,7 +3,8 @@ import { StubNode, stubDocument } from './stubDom';
 import { createNewGame, getState } from '../../src/core/state';
 import { initLeague } from '../../src/systems/fixtures';
 import { bus } from '../../src/core/events';
-import { ratingText, overallRating } from '../../src/data/player';
+import { ratingText, overallRating, playerStars } from '../../src/data/player';
+import { starsLabel } from '../../src/ui/parts';
 import { openSquadScreen } from '../../src/ui/screens/squad';
 import { openRecruitScreen } from '../../src/ui/screens/recruit';
 import { openRivalSquad } from '../../src/ui/screens/rivalSquad';
@@ -26,18 +27,18 @@ afterEach(() => { slot.close?.(); slot.close = null; vi.unstubAllGlobals(); });
 
 describe('temporary stars on existing screens (#537)', () => {
   it('renders stars beside existing overall on Squad', () => {
-    openSquadScreen();
+    openSquadScreen('list'); // SuperCOOKED 31: the list shows stars in place of the number
     const root = slot.screen as StubNode;
-    const ratings = root.querySelectorAll('.nrl-row-ovr').map(n => n.textContent);
+    const ratings = root.querySelectorAll('.nrl-row-ovr').map(n => n.attrs['aria-label']);
     expect(ratings).toHaveLength(getState().squad.length);
-    for (const p of getState().squad) expect(ratings).toContain(ratingText(overallRating(p)));
+    for (const p of getState().squad) expect(ratings).toContain(starsLabel(playerStars(p)));
   });
   it('renders stars beside existing overall on Recruit', () => {
     openRecruitScreen();
     const root = slot.screen as StubNode;
     for (const row of root.querySelectorAll('[data-row-player]')) {
       const p = getState().freeAgents.find(p => p.id === row.attrs['data-row-player'])!;
-      expect(row.querySelector('.nrl-row-ovr')!.textContent).toBe(ratingText(overallRating(p)));
+      expect(row.querySelector('.nrl-row-ovr')!.attrs['aria-label']).toBe(starsLabel(playerStars(p))); // SuperCOOKED 34: stars, no number
     }
   });
   it('renders stars beside existing overall on the rival squad', () => {
@@ -46,11 +47,12 @@ describe('temporary stars on existing screens (#537)', () => {
     const root = slot.modal as StubNode;
     for (const p of club.squad!) expect(root.textContent).toContain(ratingText(overallRating(p)));
   });
-  it('renders stars beside existing overall and four bars on the player screen', () => {
+  it('renders his rating as five stars, no number (SuperCOOKED §3.5), and his four stats on the player screen', () => {
     const p = getState().squad[0]!;
     openPlayerPage(p, { kind: 'squad' });
     const root = slot.modal as StubNode;
-    expect(root.textContent).toContain(ratingText(overallRating(p)));
+    expect(root.querySelector('[data-stars]')!.getAttribute('aria-label')).toBe(starsLabel(playerStars(p)));
+    expect(root.textContent).not.toContain(ratingText(overallRating(p)));
     expect(root.querySelector('.nrl-player-stats')!.children).toHaveLength(4);
   });
 });
