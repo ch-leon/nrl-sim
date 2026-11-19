@@ -26,6 +26,11 @@ const BANNED: [string, RegExp][] = [
   ['TimelineView', /TimelineView/],
   ['setInterval', /\bsetInterval\b/],
   ['setTimeout', /\bsetTimeout\b/],
+  // The club widgets (Phase 5): one timeline entry that never refreshes by itself.
+  ['a timeline that refreshes at its end (.atEnd)', /\.atEnd\b/],
+  ['a Foundation Timer', /\bTimer\s*[.(]/],
+  ['relative date text', /RelativeDateTimeFormatter|Text\([^)]*,\s*style:/],
+  ['setInterval-like polling via requestAnimationFrame', /\brequestAnimationFrame\b/],
 ];
 
 const SCANNED = [
@@ -34,10 +39,20 @@ const SCANNED = [
 ];
 
 describe('no timers and no push in the iPhone code', () => {
+  it("the club widget's only timeline is one entry with a .never policy", () => {
+    const widget = readFileSync('ios/App/BigCoachWidgets/ClubWidget.swift', 'utf8');
+    const policies = [...widget.matchAll(/policy:\s*\.(\w+)/g)].map((m) => m[1]);
+    expect(policies).toEqual(['never']);
+    expect(widget).toMatch(/Timeline\(entries: \[ClubEntry\([^\]]*\)\], policy: \.never\)/);
+  });
+
   it('scans the Swift, the entitlements and plists, and src/native', () => {
     expect(SCANNED.some((f) => f.endsWith('MatchLiveActivity.swift'))).toBe(true);
     expect(SCANNED.some((f) => f.endsWith('LiveMatchPlugin.swift'))).toBe(true);
     expect(SCANNED.some((f) => f.endsWith('liveMatch.ts'))).toBe(true);
+    for (const f of ['ClubWidget.swift', 'ClubWidgetsPlugin.swift', 'ClubSnapshot.swift', 'clubWidgets.ts', 'clubSnapshot.ts']) {
+      expect(SCANNED.some((p) => p.endsWith(f)), f).toBe(true);
+    }
   });
 
   for (const [what, pattern] of BANNED) {

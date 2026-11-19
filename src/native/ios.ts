@@ -3,7 +3,10 @@
 // and Android, so the whole module (and @capacitor/core with it) stays out of their bundles.
 
 import { bus } from '../core/events';
+import { getState } from '../core/state';
 import { NINES } from '../match/league/rules';
+import { installClubWidgets, type ClubWidgetsNative } from './clubWidgets';
+import { ClubWidgets } from './clubWidgetsPlugin';
 import { installLiveMatch, type LiveMatchNative } from './liveMatch';
 import { LiveMatch } from './liveMatchPlugin';
 
@@ -15,9 +18,21 @@ export interface IosGame {
   scene: { getScene(key: string): { events: { once(event: string, fn: () => void): unknown } } | null | undefined };
 }
 
-/** The lock screen's match ticker (Phase 3). Returns a stop function (tests). */
-export function startIosNative(game: IosGame, native: LiveMatchNative = LiveMatch): () => void {
-  return installLiveMatch({
+/** The career in play, or null before there is one (a fresh install at the title screen). */
+function career() {
+  try {
+    return getState();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The lock screen's match ticker (Phase 3) and the club widgets (Phase 5). Returns a
+ * stop function (tests).
+ */
+export function startIosNative(game: IosGame, native: LiveMatchNative = LiveMatch, widgets: ClubWidgetsNative = ClubWidgets): () => void {
+  const stopTicker = installLiveMatch({
     bus,
     native,
     halfMinutes: () => NINES.halfMinutes,
@@ -33,4 +48,9 @@ export function startIosNative(game: IosGame, native: LiveMatchNative = LiveMatc
       scene.events.once(SCENE_SHUTDOWN, fn);
     },
   });
+  const stopWidgets = installClubWidgets({ bus, native: widgets, read: career });
+  return () => {
+    stopTicker();
+    stopWidgets();
+  };
 }

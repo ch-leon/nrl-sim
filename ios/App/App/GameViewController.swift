@@ -9,12 +9,14 @@ import Capacitor
 // second swipe before it leaves the app. The landscape-only lock is in Info.plist.
 // SceneDelegate and Main.storyboard both make this class.
 // It also registers the app's own native plugins with the bridge: LiveMatch, the match
-// Live Activity (LiveActivity/LiveMatchPlugin.swift, docs/specs/ios.md §3).
+// Live Activity (LiveActivity/LiveMatchPlugin.swift, docs/specs/ios.md §3), and
+// ClubWidgets, the club widgets' snapshot (LiveActivity/ClubWidgetsPlugin.swift).
 class GameViewController: CAPBridgeViewController {
     override var prefersStatusBarHidden: Bool { true }
 
     override open func capacitorDidLoad() {
         bridge?.registerPluginInstance(LiveMatchPlugin())
+        bridge?.registerPluginInstance(ClubWidgetsPlugin())
     }
 
     override var preferredScreenEdgesDeferringSystemGestures: UIRectEdge { .bottom }

@@ -242,6 +242,11 @@ export function injuryRecoveryPerWeek(facilities: readonly PlacedFacility[]): nu
   return 1 + (medicalBay?.level ?? 0) + Number(physio);
 }
 
+/** Week advances until a player `injuredWeeks` out is fit, at today's recovery (0 when fit). */
+export function weeksUntilFit(injuredWeeks: number, facilities: readonly PlacedFacility[]): number {
+  return injuredWeeks <= 0 ? 0 : Math.ceil(injuredWeeks / injuryRecoveryPerWeek(facilities));
+}
+
 export function applyInjuries(state: GameState): GameState {
   const recovery = injuryRecoveryPerWeek(state.facilities);
 
