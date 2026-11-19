@@ -41,8 +41,8 @@ interface Played {
   refusals: Set<string>;
 }
 
-/** Current-default witnesses after wide pre-catch back-door movement: seed 1 offers take-two, seed 50 tap-go. */
-const PENALTY_SEEDS = [1, 50];
+/** Current-default penalty witnesses after lead-decoy movement: seed 19 offers Take the two; seed 40 offers Tap and go. */
+const PENALTY_SEEDS = [19, 40];
 
 /** Play with the home coach making `call` whenever he may (as a player at the tray does: a tap, in on the next tick). */
 function play(seed: number, call: CoachCall | null, minutes = 6, side: 'home' | 'away' = 'home'): Played {

@@ -32,22 +32,23 @@ function surface() {
   };
 }
 
-/**
- * A match level at full time, with golden point on (the lab's `final=1`) and the historical seven-minute
- * halves (#678 cut them to 2:30), with the lab's default sides: the first such seed from 28 (seed 12 before
- * the weighted receiver, #649, then 28; held up at the line, #652, reshuffled 28, and the last-tackle call, #650,
- * found 63; so the seed is searched for rather than pinned).
+/** A decided full-time match after golden point, using the lab's default sides and seven-minute halves.
+ * Try the known seed 70 first; keep the original contiguous window as a fallback if its replay changes.
  */
 const GOLDEN_FROM = 28;
+const GOLDEN_SEEDS = [70, ...Array.from({ length: 60 }, (_, i) => GOLDEN_FROM + i).filter((seed) => seed !== 70)];
 
 function play(): Snapshot[] {
-  for (let seed = GOLDEN_FROM; seed < GOLDEN_FROM + 60; seed++) {
+  for (const seed of GOLDEN_SEEDS) {
     const sim = new LiveSim(labSheet(DEFAULT_HOME), labSheet(DEFAULT_AWAY), seed, { goldenPoint: true, length: { halves: 2, halfMinutes: 7 } });
     const snaps: Snapshot[] = [sim.snapshot()];
     while (!sim.finished) { sim.step(); snaps.push(sim.snapshot()); }
-    if (snaps.some((q) => q.phase?.kind === 'half-time' && !!q.phase.golden)) return snaps;
+    const golden = snaps.some((q) => q.phase?.kind === 'half-time' && !!q.phase.golden);
+    const final = snaps[snaps.length - 1]!;
+    // Require a decided result so the winner and loser pose checks exercise both branches.
+    if (golden && final.score!.home !== final.score!.away) return snaps;
   }
-  throw new Error('no level match in 60 seeds');
+  throw new Error('no decided golden-point match in 60 seeds');
 }
 
 describe('the whistle (#675)', () => {
