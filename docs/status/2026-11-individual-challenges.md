@@ -1,6 +1,7 @@
 # Individual challenges — implementation and release evidence
 
-19 November 2026. Issue [#710](https://github.com/ch-leon/nrl-sim/issues/710).
+19 November 2026. Issue [#710](https://github.com/ch-leon/nrl-sim/issues/710),
+[PR #745](https://github.com/ch-leon/nrl-sim/pull/745).
 Implementation baseline `008c7cee`. Release candidate: full final review, CI, QA,
 merge and deployed verification must be recorded in the PR before calling it live.
 

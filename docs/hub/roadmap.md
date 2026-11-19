@@ -35,7 +35,7 @@ live gameplay change; work still open below has not shipped.
   [PR #742](https://github.com/ch-leon/nrl-sim/pull/742): book during Weeks 1–4, miss the Week 5 opener, return
   before Week 6 with development. [Delivery evidence](../status/2026-11-player-assignments.md).
   [Big Mick's Break the Line](../specs/individual-challenges.md) now has both Showground
-  and Invitational editions implemented, with six coached carry/defend clashes, watched
+  and Invitational editions implemented in [PR #745](https://github.com/ch-leon/nrl-sim/pull/745), with six coached carry/defend clashes, watched
   action, real club absence, saved rewards and permanent qualification.
   [Verification and release evidence](../status/2026-11-individual-challenges.md).
   Further assignments, other challenge formats, small-sided events, sponsors and gear remain later work.
