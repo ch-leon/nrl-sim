@@ -49,6 +49,8 @@ export function eventOpportunities(state: GameState): EventOpportunity[] {
         : record.status === 'coaching' ? 'Contest in progress · Resume coaching'
         : record.status === 'ready-for-interval' ? `Contest complete · Back Week ${ed.returnWeek}`
         : record.status === 'interrupted' ? 'Interrupted · Player returned' : 'Completed · View report';
+    } else if (record?.status === 'cancelled' && (!active || state.week > ed.bookingEndWeek)) {
+      status = 'closed'; detail = 'Cancelled · Returns next season';
     } else if (ed.requiresFirstTitle && !challengeQualified(state)) {
       status = 'locked'; detail = 'Win Break the Line to unlock entry';
     } else if (!active || state.week > ed.bookingEndWeek) {

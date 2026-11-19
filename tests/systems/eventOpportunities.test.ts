@@ -41,6 +41,7 @@ it('suppresses registered and declined entries, but a cancelled booking is offer
   const cancelled = changeChallenge(challenge.state, 'showground', {kind:'cancel'});
   if (!cancelled.ok) throw Error(cancelled.message);
   expect(ids(cancelled.state)).toEqual(['showground']);
+  expect(eventOpportunities({...cancelled.state, week:6}).find(e=>e.id==='showground')).toMatchObject({status:'closed', detail:'Cancelled · Returns next season'});
   s = state(6); s.competitions!.openCupEntry!.current.choice = 'decline';
   expect(ids(s)).toEqual([]);
 });

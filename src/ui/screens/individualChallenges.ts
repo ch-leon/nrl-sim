@@ -67,7 +67,7 @@ function guide(edition: ChallengeEdition): HTMLElement {
     ...edition.opponents.flatMap(rival=>[el('h3',{text:rival.name}),paragraph(`Runs with ${names[rival.attack]}. Defends with ${names[rival.defence]}.`),abilities(rival)]));
 }
 
-export function openIndividualChallenge(editionId: ChallengeEditionId): HTMLElement {
+export function openIndividualChallenge(editionId: ChallengeEditionId, findOpener?: () => HTMLElement | null): HTMLElement {
   const edition = CHALLENGE_EDITIONS[editionId];
   const slot = getActiveSlot();
   const namespace = careerNamespace();
@@ -91,7 +91,7 @@ export function openIndividualChallenge(editionId: ChallengeEditionId): HTMLElem
   const modal = openModal(content,{class:'duel-modal',cut:true,onRemove:()=>{
     lane?.close(); lane=null; disposeState?.();
     document.removeEventListener('keydown', dialogKeys, true);
-    const opener = document.querySelector<HTMLElement>(`[data-challenge-open="${editionId}"]`) ?? document.querySelector<HTMLElement>('[data-open-events]') ?? originalOpener;
+    const opener = findOpener?.() ?? document.querySelector<HTMLElement>(`[data-challenge-open="${editionId}"]`) ?? originalOpener;
     if (opener?.isConnected && 'focus' in opener) (opener as HTMLElement).focus();
   }});
   const stillHere = () => modal.isConnected && slot === getActiveSlot() && namespace === careerNamespace();

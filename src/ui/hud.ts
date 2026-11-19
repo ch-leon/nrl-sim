@@ -411,12 +411,13 @@ export function createHud(opts: HudOpts = {}): Hud {
     boardTitle, boardDetail);
   boardEl.hidden = true;
   const eventsDetail = el('span', {class:'nrl-home-events-detail'});
+  const eventsNames = el('span', {class:'nrl-home-events-names'});
   const events = button('', () => opts.onEvents?.(), {class:'nrl-home-events'});
   events.setAttribute('data-home-events', '');
   events.setAttribute('data-open-events', '');
   events.setAttribute('aria-haspopup', 'dialog');
   events.append(el('span', {class:'nrl-home-events-title', text:'Events · View all'}),
-    el('span', {class:'nrl-home-events-names', text:'Big Mick · Skills Camp · Open Cup'}), eventsDetail);
+    eventsNames, eventsDetail);
   const chips = el('div', { class: 'nrl-hub-chips' }, chip, events, boardEl);
   if (opts.onDecisions || opts.onBoard || opts.onEvents) mount(chips);
 
@@ -480,6 +481,7 @@ export function createHud(opts: HudOpts = {}): Hud {
   function renderChip(s: GameState): void {
     const opportunities = opts.onEvents && !advanceInProgress() && !activeScreen() ? eventOpportunities(s) : [];
     events.hidden = opportunities.length === 0;
+    eventsNames.textContent = opportunities.map(event => event.id === 'showground' ? 'Big Mick' : event.name).join(' · ');
     const first = opportunities[0];
     eventsDetail.textContent = first ? `${first.name} · ${first.detail}` : '';
     const board = opts.onBoard && !advanceInProgress() && !activeScreen() ? boardChip(s, runway) : null;

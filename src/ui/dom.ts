@@ -1923,8 +1923,8 @@ body:has(.nrl-update-toast) .nrl-hub-chips { max-width: calc(100vw - 32px - 310p
 /* Disabled with its reason inside (SuperCOOKED §3.2): the raised fill so the amber line reads; the label dims. */
 .nrl-btn.nrl-btn-primary.nrl-placebar-go:disabled { background: var(--nrl-raised); color: var(--nrl-text-2); opacity: 1; }
 .nrl-btn.nrl-placebar-go:disabled .nrl-placebar-go-label { opacity: 0.55; }
-/* The bar spans the top while placing; the HUD's top chips (board, decisions) wait under it. */
-body:has(.nrl-placebar:not([hidden])) .nrl-decisions-chip { visibility: hidden; }
+/* The bar spans the top while placing; the HUD's top chips wait under it. */
+body:has(.nrl-placebar:not([hidden])) .nrl-hub-chips { visibility: hidden; }
 
 /* ── Kit & colours (#79), under Office ───────────────────────────────────── */
 .nrl-kit { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }

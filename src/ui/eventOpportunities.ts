@@ -9,7 +9,7 @@ import { openOpenCupEntry } from './screens/openCupEntry';
 function openEvent(id: OpportunityId): void {
   if (id === 'skills-camp') openSkillsCamp(() => document.querySelector('[data-open-events]'));
   else if (id === 'open-cup') openOpenCupEntry(() => document.querySelector('[data-open-events]'));
-  else openIndividualChallenge(id);
+  else openIndividualChallenge(id, () => document.querySelector('[data-open-events]'));
 }
 
 /** A bounded list, reached directly from the club. The existing dialogs own entry. */
