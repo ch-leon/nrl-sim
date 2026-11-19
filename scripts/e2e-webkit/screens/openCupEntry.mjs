@@ -76,6 +76,16 @@ async function closeCup(page) {
   await page.locator(DIALOG).waitFor({ state: 'detached' });
 }
 
+/** Resolves once every finite animation on the dialog's backdrop, card and contents has finished. */
+async function settled(dialog) {
+  await dialog.evaluate((el) => {
+    const root = el.closest('.nrl-modal-backdrop') ?? el.closest('.nrl-modal') ?? el;
+    const running = root.getAnimations({ subtree: true })
+      .filter((a) => a.effect?.getComputedTiming().iterations !== Infinity);
+    return Promise.all(running.map((a) => a.finished.catch(() => {})));
+  });
+}
+
 async function inspectOffer(page) {
   const dialog = page.locator(DIALOG);
   assert(!await page.locator(BRACKET).count(), 'Open offer revealed an opponent or bye');
@@ -84,7 +94,9 @@ async function inspectOffer(page) {
   assert(/1 × M[\s\S]+1 × M[\s\S]+2 × M[\s\S]+3 × M[\s\S]+5 × M/.test(text), 'Cash prize formula incomplete');
   assert(/\+1 reputation/.test(text) && /\+2 more/.test(text) && /including reserves/.test(text) && /Byes and forfeits earn no prize/.test(text), 'Prize or squad terms incomplete');
   const buttons = [`${DIALOG} .nrl-cup-head button`, action('enter'), action('decline')];
-  await page.waitForTimeout(200);
+  // The card pops in from 97% scale (nrl-pop-in, --nrl-dur-fast): a 44px button measured mid-pop reads
+  // about 42.7px. Measure once the dialog's own animations have finished, not after a fixed wait.
+  await settled(dialog);
   const problems = await reachProblems(page, '.nrl-cup-modal', buttons);
   assert(!problems.length, problems.join('; '));
   for (const sel of buttons) {

@@ -24,7 +24,7 @@ import { COLOR_TOKENS } from '../ui/tokens';
  */
 export const TICKER_STATES = ['live', 'paused', 'half-time', 'full-time'] as const;
 export type TickerState = (typeof TICKER_STATES)[number];
-/** The captain's pose (Phase 4 draws them; Phase 3 shows a ball for every one). */
+/** The captain's pose: the Live Activity shows the matching picture (ios/App/BigCoachWidgets/MatchLiveActivity.swift). */
 export const TICKER_POSES = ['carry', 'try', 'tackle', 'fulltime'] as const;
 export type TickerPose = (typeof TICKER_POSES)[number];
 export const TICKER_HALVES = ['first', 'second', 'golden'] as const;
