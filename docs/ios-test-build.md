@@ -173,10 +173,22 @@ screen and, on phones that have one, in the Dynamic Island.
 the score, the half and the match minute *as of the last update* ("2nd half 4'"), one
 line for the last big moment ("TRY, Walker (BRI) 3'"), and a state: LIVE, PAUSED · TAP
 TO RETURN, HALF-TIME (GOLDEN POINT NEXT before a drawn final's golden point) or FULL
-TIME. The island's compact form is a ball on the left (the
-captain's poses come in Phase 4) and the score on the right; the expanded form matches
-the lock screen; the minimal form is the ball. Colours are the SuperCOOKED tokens; text is
+TIME. The island's compact form is the captain on the left
+and the score on the right; the expanded form matches the lock screen; the minimal form is
+the captain alone. Colours are the SuperCOOKED tokens; text is
 the system font for now (the brand fonts ship as woff2, which a widget extension cannot load).
+
+**Captain icon.** The little figure is a generic player in the brand colours, the same
+for every save for now (the real captain in the club's kit comes later). It has four
+poses: carrying the ball (the default), diving (after a try), wrapped up (after a big
+hit) and arms up (full time). A pose changes only when an update arrives and stays until
+the next one; there is no run cycle and no timer. The four pictures are PNGs made from the
+game's own pixel art (`src/art/captainPoses.ts`) by `npm run build:ios`, kept in
+`ios/App/BigCoachWidgets/Assets.xcassets`; a test fails if they fall out of date. On
+phones whose island is squeezed (iOS 27's reduced-width layout) it shows the icon alone in
+a small circle, with no score. On the phone, look at: whether the figure is crisp at real
+size (hard pixel edges, no blur or shimmer, on a 3x phone and, for the lock screen, a 2x one), that the pose changes after a try, a big hit
+and at full time, and that the full-time pose's thin raised arms still read.
 
 **When it changes.** It starts at kick-off of a match you are in, and updates on tries,
 conversions, penalty goals, field goals, big hits, sin bins, half-time, the second half's
@@ -241,4 +253,6 @@ The Simulator cannot check these. They are Leon's to try on the phone:
 - Saving when the app is sent to the background (see Saves).
 - The Live Activity on a free-signed phone at all, and on the lock screen and the
   Dynamic Island (see Lock screen and Dynamic Island).
+- The captain icon's crispness at real size, the fade between poses, and the circle in
+  the squeezed island (see Captain icon).
 - The Saves on iPhone checks, if the Simulator is still unavailable.
