@@ -44,6 +44,8 @@ import { kickerAndCaptain } from '../../match/league/sheets';
 import { potentialText } from '../../systems/potential';
 import { renamePlayer } from '../../systems/rename';
 import { nameField, renameButton } from '../rename';
+import { awayPlayerIds, campDisposalProblem } from '../../systems/playerAssignments';
+import { campAbsenceText, campAvailability } from './playerAssignments';
 
 // ── View-model (pure) ───────────────────────────────────────────────────────
 
@@ -77,6 +79,7 @@ export interface PlayerPageModel {
   overall: number;
   /** "Your squad", "Free agent" or the rival's name. */
   where: string;
+  assignment: string | null;
   /** Each stat, and (your own players, N11) what a week's training under the squad focus adds. */
   stats: { label: string; value: number; gain?: number; key?: keyof PlayerStats; ceiling?: number; focus?: boolean }[];
   /** The squad's training focus in words, for your own players (N11). */
@@ -179,6 +182,7 @@ export function playerActions(p: Player, ctx: PlayerContext, state: GameState): 
   const terms = releaseTerms(p, clock.season, clock.week, clock.duration);
   const short = state.money < terms.payout;
   const sale = quotePlayerSale(state, p.id);
+  const campReleaseBlock = campDisposalProblem(state, p.id);
   return [
     {
       id: 'renew',
@@ -201,10 +205,10 @@ export function playerActions(p: Player, ctx: PlayerContext, state: GameState): 
       id: 'release',
       label: `Release · ${fmtMoney(terms.payout)}`,
       detail: `Frees ${fmtMoney(terms.capFreed)} of this season's cap${terms.nextCapFreed ? ` and ${fmtMoney(terms.nextCapFreed)} next season` : ''}. No signing fee back.`,
-      enabled: !atMin && !short,
+      enabled: !atMin && !short && !campReleaseBlock,
       danger: true,
       confirm: 'Really release?',
-      ...(atMin ? { why: minWhy } : short ? { why: `Not enough cash. Releasing him costs ${fmtMoney(terms.payout)}.` } : {}),
+      ...(campReleaseBlock ? { why: campReleaseBlock } : atMin ? { why: minWhy } : short ? { why: `Not enough cash. Releasing him costs ${fmtMoney(terms.payout)}.` } : {}),
     },
   ];
 }
@@ -219,9 +223,10 @@ const ordinal = (n: number): string => {
  * Where your player sits in the coach's nine (N14, #263): "Starting halfback",
  * "On the bench" or "Not picked". Pure.
  */
-export function lineupSlotText(state: Pick<GameState, 'lineup' | 'squad'>, playerId: string): string {
+export function lineupSlotText(state: GameState, playerId: string): string {
+  if (awayPlayerIds(state).has(playerId)) return 'Away at Skills Camp';
   // The side as it runs out (injured men covered, the bench topped up), not the saved sheet.
-  const side = resolveLineup(state.lineup, state.squad);
+  const side = resolveLineup(state.lineup, state.squad, awayPlayerIds(state));
   const slot = side.starters.findIndex((p) => p?.id === playerId);
   if (slot >= 0) return `Starting ${positionLabel(LINEUP_SLOTS[slot]!).toLowerCase()}`;
   if (side.bench.some((p) => p.id === playerId)) return 'On the bench';
@@ -243,8 +248,8 @@ export function fitnessPct(p: Pick<Player, 'injuredWeeks' | 'injuryRisk'>): numb
  * (LINEUP_SLOTS order), 10–13 the bench, as the side runs out (injured men
  * covered). Men not in the side have none. Pure.
  */
-export function squadNumbers(state: Pick<GameState, 'lineup' | 'squad'>): Map<string, number> {
-  const side = resolveLineup(state.lineup, state.squad);
+export function squadNumbers(state: GameState): Map<string, number> {
+  const side = resolveLineup(state.lineup, state.squad, awayPlayerIds(state));
   const out = new Map<string, number>();
   side.starters.forEach((p, slot) => { if (p) out.set(p.id, slot + 1); });
   side.bench.forEach((p, i) => out.set(p.id, LINEUP_SLOTS.length + 1 + i));
@@ -256,8 +261,8 @@ export function squadNumbers(state: Pick<GameState, 'lineup' | 'squad'>): Map<st
  * coach's picks when they are in the nine, else the defaults — as the Lineup
  * screen and the match work it out. Pure.
  */
-export function sideRoles(state: Pick<GameState, 'lineup' | 'squad'>): { starters: Set<string>; kicker?: string; captain?: string } {
-  const side = resolveLineup(state.lineup, state.squad);
+export function sideRoles(state: GameState): { starters: Set<string>; kicker?: string; captain?: string } {
+  const side = resolveLineup(state.lineup, state.squad, awayPlayerIds(state));
   const nine = side.starters.flatMap((p, slot) => (p ? [{ ...p, position: LINEUP_SLOTS[slot]!, stats: statsAt(p, LINEUP_SLOTS[slot]!) }] : []));
   return { starters: new Set(nine.map((p) => p.id)), ...kickerAndCaptain(nine, state.lineup) };
 }
@@ -283,6 +288,7 @@ export function playerPageModel(p: Player, ctx: PlayerContext, state: GameState)
   const seasonsAtClub = p.joinedSeason !== undefined ? clock.season - p.joinedSeason + 1 : null;
   // Keep the squad focus visible: it now controls level-point spending.
   const focus = state.training?.focus ?? 'balanced';
+  const assignment = squad ? campAbsenceText(campAvailability(state), p.id) : null;
   return {
     xp: `Level ${p.level ?? 1} · XP ${Math.floor(p.xp ?? 0)}/${PROGRESSION.XP_PER_LEVEL}`,
     id: p.id,
@@ -290,7 +296,8 @@ export function playerPageModel(p: Player, ctx: PlayerContext, state: GameState)
     position: positionLabel(p.position),
     age: p.age,
     overall: overallRating(p),
-    where: ctx.kind === 'squad' ? `Your squad · ${lineupSlotText(state, p.id)}` : ctx.kind === 'freeAgent' ? (p.junior ? 'Academy prospect' : 'Free agent') : ctx.club.name,
+    where: ctx.kind === 'squad' ? (awayPlayerIds(state).has(p.id) ? 'Your squad' : `Your squad · ${lineupSlotText(state, p.id)}`) : ctx.kind === 'freeAgent' ? (p.junior ? 'Academy prospect' : 'Free agent') : ctx.club.name,
+    assignment,
     // Stats train in fractions; the page shows whole numbers.
     stats: shownStats(p.position).map((key) => ({
       label: key === 'footyIQ' ? activePack().vocab.iqStat : STAT_LABELS.find(([k]) => k === key)![1],
@@ -685,7 +692,8 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
       }));
       panel.append(tiles);
       foot = el('div', { class: 'nrl-player-foot' },
-        el('div', { class: `nrl-player-where${m.injured ? ' nrl-player-out' : ''}`, text: m.injured ? `${m.where} · ${m.fitness}` : m.where }));
+        el('div', { class: `nrl-player-where${m.injured ? ' nrl-player-out' : ''}`, text: m.injured ? `${m.where} · ${m.fitness}` : m.where }),
+        ...(m.assignment ? [el('div', { class: 'nrl-player-where', text: m.assignment, attrs: { 'data-camp-absence': p.id } })] : []));
       if (spending) {
         const done = button('Done', () => { spending = false; render(); }, { class: 'nrl-btn-outline' });
         done.setAttribute('data-spend-done', '');
@@ -728,8 +736,14 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
           return b;
         };
         jobs.append(el('h3', { text: 'In the side' }),
-          role('Goal-kicker', roles.kicker, 'kicker', () => commitLineup(setKicker(getState().lineup, p.id))),
-          role('Captain', roles.captain, 'captain', () => commitLineup(setCaptain(getState().lineup, p.id))));
+          role('Goal-kicker', roles.kicker, 'kicker', () => {
+            const live = getState();
+            commitLineup(setKicker(live.lineup, p.id, awayPlayerIds(live)));
+          }),
+          role('Captain', roles.captain, 'captain', () => {
+            const live = getState();
+            commitLineup(setCaptain(live.lineup, p.id, awayPlayerIds(live)));
+          }));
         if (!roles.starter) notes.push({ text: 'Roles: starters only — pick him in the nine', attn: true });
       }
       for (const a of m.actions) {

@@ -4,7 +4,7 @@
 // action can no longer be reversed.
 import { describe, it, expect, beforeEach } from 'vitest';
 import { bus, type Events } from '../../src/core/events';
-import { createNewGame, getState, setState, type GameState } from '../../src/core/state';
+import { createNewGame, getState, loadState, setState, type GameState } from '../../src/core/state';
 import { addFacility } from '../../src/data/club';
 import { FACILITY_CATALOG, type FacilityDefId } from '../../src/data/facility';
 import { GRID_H, GRID_W } from '../../src/config';
@@ -151,6 +151,19 @@ describe('sign', () => {
     const r = resolveLineup(getState().lineup, getState().squad);
     expect(r.lineup.starters).not.toContain(agent.id);
     expect(r.lineup.bench).not.toContain(agent.id);
+  });
+
+  it('a saved signing Undo cannot remove a player from a byte-identical replacement installation', () => {
+    const id = getState().freeAgents[0]!.id;
+    expect(signWithUndo(id).ok).toBe(true);
+    const undo = currentOffer()!;
+    expect(undo.canRevert(getState())).toBe(true);
+    const replacement = structuredClone(getState());
+    loadState(replacement);
+    expect(undo.canRevert(replacement)).toBe(false);
+    undo.revert();
+    expect(getState()).toBe(replacement);
+    expect(getState().squad.some(p => p.id === id)).toBe(true);
   });
 
   it('cannot be undone once he has gone again', () => {

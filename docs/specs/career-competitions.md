@@ -28,8 +28,11 @@ rewards. Gear remains a later expansion. The [plan](../plans/2026-11-career-comp
 records the revised delivery sequence.
 
 The 16 November amendment defined product intent. The league-selection portion
-subsequently shipped in #719. The optional Open Cup is the current implementation
-slice; other events and assignments remain later work.
+subsequently shipped in #719, followed by the optional Open Cup in #736. The
+current implementation slice is [Skills Camp](player-assignments.md), #708:
+bookings in Weeks 1–4, away for Week 5 and returned before Week 6. Its approved
+starting rules and [implementation plan](../plans/2026-11-19-player-assignments.md)
+retain the gates below. Other assignment families and special events remain later work.
 The audited baseline and structural configuration below remain historical evidence
 of v1. Existing stable identities, snapshots, once-only results/rewards, persistent
 people, finite outcomes and calendar ownership remain required.

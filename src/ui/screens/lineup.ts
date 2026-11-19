@@ -28,7 +28,7 @@ import { PLAYER_ID } from '../../systems/fixtures';
 import { playerRivalContext, rivalStyle } from '../../systems/rivalRound';
 import { kickerAndCaptain } from '../../match/league/sheets';
 import {
-  LINEUP_SLOTS, POSITION_SHORT, autoPickKeepingPlan, commitLineup, setRotation, describeFills, effectiveRating, lineupAverage, lineupChanges, occupant, placeAt, positionFit,
+  LINEUP_SLOTS, POSITION_SHORT, autoPickKeepingPlan, commitLineup, setRotation, describeFills, effectiveRating, isSelectable, lineupAverage, lineupChanges, occupant, placeAt, positionFit,
   resolveLineup, sameSpot, setTactics, spotOf, statsAt, swapSpots, validTactics, type Spot,
 } from '../../systems/lineup';
 import { squadMore, squadTabs, squadViewSeg } from './squad';
@@ -43,6 +43,8 @@ import { DEFAULT_PLAYER_COLORS } from '../../config';
 import { kitFromColors, type Kit } from '../../art/match/kit';
 import { portraitDataUrl } from '../../art/portrait';
 import { ensurePartsStyles, fitnessTone, playerCard, starsEl, statusPill } from '../parts';
+import { awayPlayerIds } from '../../systems/playerAssignments';
+import { campAbsenceText, campAvailability } from './playerAssignments';
 
 const STYLE_ID = 'nrl-lineup-styles';
 
@@ -101,13 +103,14 @@ const LINEUP_CSS = `
 @media (hover: hover) and (pointer: fine) { .nrl-lineup-row:hover { background: var(--nrl-raised-hover); } }
 .nrl-lineup-row:active { background: var(--nrl-raised-hover); }
 .nrl-lineup-row:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: -2px; }
-.nrl-lineup-row[data-injured], .nrl-lineup-row[data-banned] { opacity: 0.55; cursor: default; }
+.nrl-lineup-row[data-injured], .nrl-lineup-row[data-banned], .nrl-lineup-row[data-away] { opacity: 0.55; cursor: default; }
 .nrl-swap-face { width: 28px; height: 32px; border-radius: 6px; background: var(--nrl-raised); image-rendering: pixelated; }
 .nrl-lineup-row-id { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .nrl-lineup-row-name { font-family: var(--nrl-f-label); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nrl-swap-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
 .nrl-swap-meta .nrl-pill { min-height: 1.25rem; padding: 0 7px; font-family: var(--nrl-f-label); font-size: 0.625rem; letter-spacing: 0.06em; text-transform: uppercase; }
 .nrl-lineup-where { font-family: var(--nrl-f-num); font-size: 0.5625rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); white-space: nowrap; }
+.nrl-lineup-where[data-away] { color: var(--nrl-alert); }
 .nrl-lineup-pick { flex: 0 0 auto; margin: 0; font-size: 0.6875rem; line-height: 1.35; color: var(--nrl-muted); }
 /* The header (30): Squad / Recruit, the line, Pitch / List, Swap, Auto pick, ⋯. */
 .nrl-sq .nrl-squad-view > .nrl-btn { padding: 0 12px; font-size: 0.8125rem; }
@@ -281,15 +284,26 @@ export function openLineupScreen(): void {
     choosing = false;
     if (swapping && sameSpot(swapping, spot)) swapping = null;
     else if (swapping) {
-      const next = swapSpots(getState().lineup, swapping, spot);
+      const s = getState();
+      const away = awayPlayerIds(s);
+      const next = swapSpots(s.lineup, swapping, spot, away);
+      const swappingAway = [occupant(s.lineup, swapping), occupant(s.lineup, spot)].some((id) => id !== null && away.has(id));
       swapping = null;
-      if (next !== getState().lineup) { commitLineup(next); return; }
+      if (next !== s.lineup) { commitLineup(next); return; }
+      if (swappingAway) toast('Tap a slot and choose an available player from the squad list.');
     } else swapping = spot;
     render();
   };
 
   /** A tap on a candidate in the swap panel: into the spot being swapped. */
   const tapPlayer = (p: Player): void => {
+    const s = getState();
+    const away = awayPlayerIds(s);
+    if (away.has(p.id)) {
+      const absence = campAbsenceText(campAvailability(s), p.id);
+      toast(`${p.name} · ${absence ?? 'Away at Skills Camp'}`, 'danger');
+      return;
+    }
     if (p.injuredWeeks > 0) {
       toast(`${p.name} is injured — out ${p.injuredWeeks}w.`, 'danger');
       return;
@@ -298,9 +312,9 @@ export function openLineupScreen(): void {
       toast(`${p.name} is suspended — banned ${p.suspendedWeeks}w.`, 'danger');
       return;
     }
-    const lineup = getState().lineup;
+    const lineup = s.lineup;
     if (!swapping) return;
-    const next = placeAt(lineup, swapping, p.id);
+    const next = placeAt(lineup, swapping, p.id, away);
     swapping = null;
     if (next !== lineup) commitLineup(next);
     else render();
@@ -317,7 +331,7 @@ export function openLineupScreen(): void {
   const kit = (): Kit => kitFromColors(getState().league.clubs.find((c) => c.id === PLAYER_ID)?.colors ?? DEFAULT_PLAYER_COLORS, PLAYER_ID);
 
   /** A card for `p` in `spot` (or a reserve, spot null): tap opens his page, a long press swaps. */
-  const card = (p: Player | null, spot: Spot | null, slotPos: Position | null): HTMLElement => {
+  const card = (p: Player | null, spot: Spot | null, slotPos: Position | null, cover?: Player | null): HTMLElement => {
     const label = spot?.kind === 'starter' ? POSITION_SHORT[slotPos!] : spot ? `B${spot.index + 1}` : '';
     if (!p) {
       // An empty slot or seat: a dashed card that starts the swap for it.
@@ -331,24 +345,25 @@ export function openLineupScreen(): void {
     const injured = p.injuredWeeks > 0;
     const banned = (p.suspendedWeeks ?? 0) > 0;
     const pct = fitnessPct(p);
-    const word = injured ? `injured, out ${p.injuredWeeks} weeks` : banned ? `banned ${p.suspendedWeeks} weeks` : `fit ${pct}%`;
+    const camp = awayPlayerIds(getState()).has(p.id);
+    const word = camp ? `away at Skills Camp${cover ? `, ${cover.name} covers` : ''}` : injured ? `injured, out ${p.injuredWeeks} weeks` : banned ? `banned ${p.suspendedWeeks} weeks` : `fit ${pct}%`;
     const c = playerCard({
       portrait: portraitDataUrl(p.id, kit()),
       name: shortName(p.name),
       stars: playerStars(p),
       position: slotPos ? POSITION_SHORT[slotPos] : POSITION_SHORT[p.position],
-      fitness: { tone: injured || banned ? 'alert' : fitnessTone(pct), word },
+      fitness: { tone: camp || injured || banned ? 'alert' : fitnessTone(pct), word },
       captain: spot?.kind === 'starter' && roles.captain === p.id,
       kicker: spot?.kind === 'starter' && roles.kicker === p.id,
     });
     if (spot) c.setAttribute('data-spot', spot.kind === 'starter' ? `s${spot.slot}` : `b${spot.index}`);
     c.setAttribute('data-player-open', p.id);
-    if (injured) c.setAttribute('data-out', '');
+    if (camp || injured) c.setAttribute('data-out', '');
     else if (banned) c.setAttribute('data-banned', '');
     if (swapping && spot && sameSpot(swapping, spot)) c.setAttribute('data-selected', '');
     if (swapping && !(spot && sameSpot(swapping, spot))) c.setAttribute('data-dim', '');
     const fit = slotPos ? positionFit(p.position, slotPos) : 1;
-    c.title = `${p.name} · ${positionLabel(p.position)}${slotPos && fit < 1 ? ` · at ${positionLabel(slotPos)} ×${fit}` : ''}${injured ? ` · injured, out ${p.injuredWeeks}w` : banned ? ` · suspended, banned ${p.suspendedWeeks}w` : ''}`;
+    c.title = `${p.name} · ${positionLabel(p.position)}${slotPos && fit < 1 ? ` · at ${positionLabel(slotPos)} ×${fit}` : ''}${camp ? ` · Away at Skills Camp${cover ? ` · ${cover.name} covers` : ''}` : injured ? ` · injured, out ${p.injuredWeeks}w` : banned ? ` · suspended, banned ${p.suspendedWeeks}w` : ''}`;
     // A tap opens his page; while choosing or swapping, it picks the card for the swap.
     let pressed = 0;
     let held = false;
@@ -375,7 +390,9 @@ export function openLineupScreen(): void {
   const render = (): void => {
     const s = getState();
     // A man who has left the club is replaced in the saved lineup as soon as the screen sees it.
-    const today = resolveLineup(s.lineup, s.squad);
+    const away = awayPlayerIds(s);
+    const camp = campAvailability(s);
+    const today = resolveLineup(s.lineup, s.squad, away);
     if (today.changed) {
       commitLineup(today.lineup);
       return; // state:changed renders again
@@ -386,13 +403,18 @@ export function openLineupScreen(): void {
     const byId = new Map(s.squad.map((p) => [p.id, p] as const));
     const at = (id: string | null): Player | null => (id ? byId.get(id) ?? null : null);
 
+    // A man away at camp keeps his place on the sheet; the card says who covers him on the day.
+    const coverCard = (slot: number, pos: Position): HTMLElement => {
+      const p = at(lineup.starters[slot] ?? null);
+      return card(p, { kind: 'starter', slot }, pos, p && away.has(p.id) ? today.starters[slot] ?? null : undefined);
+    };
     // The pitch: the nine in four lanes (SuperCOOKED 30), in LINEUP_SLOTS order within each.
     field.replaceChildren(
       el('span', { class: 'nrl-pitch-halfway', attrs: { 'aria-hidden': 'true' } }),
       ...LANES.map((lane) => el('div', { class: 'nrl-pitch-lane', attrs: { 'data-lane': lane.label } },
         el('span', { class: 'nrl-pitch-lane-label', text: lane.label }),
         el('div', { class: 'nrl-pitch-cards' },
-          ...LINEUP_SLOTS.flatMap((pos, slot) => (lane.positions.includes(pos) ? [card(at(lineup.starters[slot] ?? null), { kind: 'starter', slot }, pos)] : []))))));
+          ...LINEUP_SLOTS.flatMap((pos, slot) => (lane.positions.includes(pos) ? [coverCard(slot, pos)] : []))))));
     field.toggleAttribute('data-swapping', swapping !== null);
 
     // The side: who is being swapped and who can go there, or the bench and the reserves.
@@ -416,6 +438,8 @@ export function openLineupScreen(): void {
       close.setAttribute('data-swap-cancel', '');
       const list = el('div', { class: 'nrl-lineup-list nrl-swap-list' }, ...rows.map((p) => {
         const where = spotOf(lineup, p.id);
+        const absence = campAbsenceText(camp, p.id);
+        const isAway = away.has(p.id);
         const injured = p.injuredWeeks > 0;
         const banned = (p.suspendedWeeks ?? 0) > 0;
         const fit = slotPos ? swapFit(positionFit(p.position, slotPos)) : null;
@@ -423,15 +447,18 @@ export function openLineupScreen(): void {
           el('img', { class: 'nrl-swap-face', attrs: { src: portraitDataUrl(p.id, kit()), alt: '', width: '28', height: '32' } }),
           el('span', { class: 'nrl-lineup-row-id' },
             el('span', { class: 'nrl-lineup-row-name', text: shortName(p.name) }),
-            starsEl(playerStars(p), { size: 11 })),
+            absence && camp ? el('span', { class: 'nrl-lineup-row-meta', text: `Skills Camp · Back W${camp.rules.returnWeek}` })
+              : starsEl(playerStars(p), { size: 11 })),
           el('span', { class: 'nrl-swap-meta' },
-            injured ? statusPill(`Out ${p.injuredWeeks}w`, 'alert') : banned ? statusPill(`Ban ${p.suspendedWeeks}w`, 'alert')
+            isAway ? statusPill('Camp', 'alert') : injured ? statusPill(`Out ${p.injuredWeeks}w`, 'alert') : banned ? statusPill(`Ban ${p.suspendedWeeks}w`, 'alert')
               : fit ? statusPill(fit.tag === 'fits' ? `${POSITION_SHORT[slotPos!]} ✓` : fit.tag === 'plays it' ? `Plays ${POSITION_SHORT[slotPos!]}` : 'Out of pos', fit.tone)
                 : statusPill(POSITION_SHORT[p.position], 'muted'),
-            el('span', { class: 'nrl-lineup-where', text: swapFrom(where) })));
-        if (injured) row.setAttribute('data-injured', '');
+            el('span', { class: 'nrl-lineup-where', text: swapFrom(where), attrs: isAway ? { 'data-away': '' } : {} })));
+        if (isAway) row.setAttribute('data-away', '');
+        else if (injured) row.setAttribute('data-injured', '');
         else if (banned) row.setAttribute('data-banned', '');
-        row.title = slotPos ? `Rating at ${positionLabel(slotPos)}: ${effectiveRating(p, slotPos)} (overall ${Math.round(overallRating(p))})` : `Overall ${Math.round(overallRating(p))}`;
+        if (absence) row.setAttribute('data-camp-absence', p.id);
+        row.title = absence ?? (slotPos ? `Rating at ${positionLabel(slotPos)}: ${effectiveRating(p, slotPos)} (overall ${Math.round(overallRating(p))})` : `Overall ${Math.round(overallRating(p))}`);
         return row;
       }));
       hintScroll(list);
@@ -440,11 +467,11 @@ export function openLineupScreen(): void {
       const prev = side.querySelector<HTMLElement>('.nrl-swap-list');
       const keep = prev && swapFor && sameSpot(swapFor, target) ? prev.scrollTop : 0;
       swapFor = target;
-      const away = occupantId ? byId.get(occupantId) : undefined;
+      const leaving = occupantId ? byId.get(occupantId) : undefined;
       side.replaceChildren(
         el('div', { class: 'nrl-swap-head' }, el('span', { class: 'nrl-swap-title', text: `Swap ${what}` }), close),
         list,
-        el('p', { class: 'nrl-lineup-pick', text: away ? `Tap a man to swap him in. ${shortName(away.name)} goes where he came from.` : 'Tap a man to put him there.' }));
+        el('p', { class: 'nrl-lineup-pick', text: leaving ? `Tap a man to swap him in. ${shortName(leaving.name)} goes where he came from.` : 'Tap a man to put him there.' }));
       if (keep) list.scrollTop = keep;
     } else {
       swapFor = null;
@@ -454,17 +481,22 @@ export function openLineupScreen(): void {
       ], sideTab, (id) => { sideTab = id; render(); }, { class: 'nrl-side-tabs', label: 'Bench and reserves' });
       for (const [id, b] of tabs.buttons) b.setAttribute('data-side-tab', id);
       const cards = sideTab === 'bench'
-        ? Array.from({ length: BENCH.size }, (_, i) => card(at(lineup.bench[i] ?? null), { kind: 'bench', index: i }, null))
+        ? Array.from({ length: BENCH.size }, (_, i) => {
+          const p = at(lineup.bench[i] ?? null);
+          const cover = p && away.has(p.id) ? today.bench.find((b) => !lineup.bench.includes(b.id)) ?? null : undefined;
+          return card(p, { kind: 'bench', index: i }, null, cover);
+        })
         : reserves.map((p) => card(p, null, null));
       const list = el('div', { class: 'nrl-lineup-bench nrl-side-cards' }, ...cards);
       hintScroll(list);
       side.replaceChildren(tabs.el, list);
     }
 
-    const fitCount = s.squad.filter((p) => p.injuredWeeks <= 0 && (p.suspendedWeeks ?? 0) <= 0).length;
-    const pickedN = lineup.starters.filter((id) => id !== null).length;
+    const fitCount = s.squad.filter((p) => isSelectable(p, away)).length;
+    const starters = away.size ? today.starters.map((p) => p?.id ?? null) : lineup.starters;
+    const pickedN = starters.filter((id) => id !== null).length;
     const notes = today.fills.length ? ` · on the day: ${describeFills(today.fills).replace(/^Lineup: /, '')}` : '';
-    const avg = lineupAverage(lineup, s.squad);
+    const avg = lineupAverage({ ...lineup, starters }, s.squad);
     if (swapping) {
       const slotPos = swapping.kind === 'starter' ? LINEUP_SLOTS[swapping.slot]! : null;
       sub.textContent = slotPos ? `Pick who plays ${positionLabel(slotPos).toLowerCase()}` : `Pick who sits on bench seat ${(swapping as { index: number }).index + 1}`;
@@ -483,7 +515,7 @@ export function openLineupScreen(): void {
     swapping = null;
     choosing = false;
     const cur = getState().lineup;
-    const best = autoPickKeepingPlan(getState().squad, cur);
+    const best = autoPickKeepingPlan(getState().squad, cur, awayPlayerIds(getState()));
     commitLineup(best);
     toast(autoPickNote(lineupChanges(cur, best)));
   }, { class: 'nrl-btn-outline' });
@@ -544,7 +576,7 @@ export function openPlanSheet(): void {
   );
   const render = (): void => {
     const s = getState();
-    const today = resolveLineup(s.lineup, s.squad);
+    const today = resolveLineup(s.lineup, s.squad, awayPlayerIds(s));
     const lineup = s.lineup;
     const nine = today.starters.flatMap((p, slot) => (p ? [{ ...p, position: LINEUP_SLOTS[slot]!, stats: statsAt(p, LINEUP_SLOTS[slot]!) }] : []));
     const tactics = validTactics(lineup.tactics);

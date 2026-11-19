@@ -140,6 +140,36 @@ describe('player matchday injuries (GitHub #7)', () => {
     registerPlayerMatchSystem();
   });
 
+  it('uses the frozen sheet for legacy injury names and ignores IDs outside the match', () => {
+    const s = getState();
+    const absent = s.squad[0]!;
+    const lineup = autoPick(s.squad.filter((p) => p.id !== absent.id));
+    const benchId = lineup.bench[0]!;
+    const name = s.squad.find((p) => p.id === benchId)!.name;
+    const squad = s.squad.map((p) => p.id === absent.id ? { ...p, name } : p);
+    setState({ squad, lineup });
+    const c = collect();
+    advanceWeek();
+    const { fixture, sim } = c.started[0]!;
+    setState({ lineup: { ...lineup, bench: [absent.id, ...lineup.bench.slice(1)] } });
+    bus.emit('match:finished', {
+      fixture,
+      result: {
+        ...sim,
+        events: [{ t: 1, kind: 'try', teamId: PLAYER_ID, player: name }],
+        injuries: [
+          { teamId: PLAYER_ID, playerName: name, weeks: 2 },
+          { teamId: PLAYER_ID, playerId: absent.id, playerName: name, weeks: 3 },
+        ],
+      },
+    });
+    c.stop();
+    expect(getState().squad.find((p) => p.id === absent.id)).toEqual(squad[0]);
+    const played = getState().squad.find((p) => p.id === benchId)!;
+    expect(played.injuredWeeks).toBe(2);
+    expect(played.career).toMatchObject({ games: 0, tries: 1 });
+  });
+
   it('applies sim injuries onto squad players and notifies', () => {
     // Force high injuryRisk so a big-hit injury is likely across a few seeds.
     const boosted: Player[] = getState().squad.map((p) => ({ ...p, injuryRisk: 95, injuredWeeks: 0 }));
