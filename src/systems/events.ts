@@ -20,7 +20,8 @@ import { BOARD, EVENTS, ON_FIELD, SQUAD_CAP, WEEKS_PER_SEASON, WILDCARDS } from 
 import { transferBetweenClubs } from './playerTransfers';
 import { signingFee } from './freeagency';
 import { hasStaff, WELFARE_CARDS } from './staff';
-import { isFieldable } from './lineup';
+import { isFieldable, isSelectable } from './lineup';
+import { awayPlayerIds } from './playerAssignments';
 import { reviewSuspension, withSuspension } from './suspension';
 import { makeRng, type Rng } from '../utils/rng';
 import { fmtMoney } from '../utils/money';
@@ -118,7 +119,8 @@ function effectParts(effects: readonly EventEffect[], opts?: { welfare?: boolean
 
 /** The player's fit, signed squad members (juniors are not first-graders yet). */
 function fitSquad(state: GameState): Player[] {
-  return state.squad.filter((p) => isFieldable(p) && !p.junior);
+  const away = awayPlayerIds(state);
+  return state.squad.filter(p => isSelectable(p,away) && !p.junior);
 }
 
 /**
@@ -132,7 +134,8 @@ export function incidentWeight(p: Player): number {
 
 /** Who an incident can land on: fit seniors, or any senior if the whole squad is out. */
 function incidentPool(state: GameState): Player[] {
-  const seniors = state.squad.filter((p) => !p.junior);
+  const away = awayPlayerIds(state);
+  const seniors = state.squad.filter(p => !p.junior && !away.has(p.id));
   const fit = seniors.filter((p) => isFieldable(p));
   return [...(fit.length > 0 ? fit : seniors)].sort((a, b) => a.id.localeCompare(b.id));
 }
@@ -354,6 +357,7 @@ export function applyEffects(state: GameState, effects: readonly EventEffect[], 
         break;
       }
       case 'suspend': {
+        if (ctx.subjectId && awayPlayerIds(s).has(ctx.subjectId)) break;
         const rolled = typeof e.weeks === 'number' ? e.weeks : rng.int(e.weeks[0], e.weeks[1]);
         const granted = reviewSuspension(s, { weeks: rolled, source: e.source, cause: ctx.reason }, rng);
         const put = withSuspension(s, ctx.subjectId, granted);

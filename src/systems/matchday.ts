@@ -11,7 +11,7 @@ import type { RivalPlanContext } from '../match/league/ai';
 import { bus, type LiveMatchData } from '../core/events';
 import { getState, setState, stateInstallation, type Fixture, type GameState, type RivalClub } from '../core/state';
 import { registerTickHook, weekHeld, TICK_ORDER, type WeekRelease } from '../core/time';
-import { clearLiveMatch, liveMatchSameRules, readLiveMatch, writeLiveMatch, type LiveMatchRecord } from './liveMatchRecord';
+import { belongsToFixture, clearLiveMatch, liveMatchSameRules, readLiveMatch, writeLiveMatch, type LiveMatchRecord } from './liveMatchRecord';
 import { matchEngineIdentity } from './matchEngineIdentity';
 import { NINES } from '../match/league/rules';
 import { DEFAULT_PLAYER_COLORS, FORFEIT_SCORE, SQUAD_MIN, SEASON_ROUNDS, difficultyMultipliers } from '../config';
@@ -28,6 +28,7 @@ import { hasStaff } from './staff';
 import { applyMatchStats, recordMatchAward } from './stats';
 import { injureRivalPlayers } from './rivals';
 import { playerRivalContext, rivalSheet } from './rivalRound';
+import { awayPlayerIds } from './playerAssignments';
 import { autoPick, describeFills, resolveLineup } from './lineup';
 import { calendarFixtureContext, calendarKnockout, finaliseCalendarFixture, hasStructuralCalendar, sameFixtureIdentity } from './competitionCalendar';
 
@@ -126,14 +127,14 @@ export function resumePlayerMatch(): boolean {
  * be held until playback reaches full-time (same no-spoiler rule as the result).
  * Does not touch forfeit / SQUAD_MIN / bankruptcy flows.
  */
-function applyMatchInjuries(injuries: readonly MatchInjury[]): string[] {
+function applyMatchInjuries(injuries: readonly MatchInjury[], participantIds: ReadonlySet<string>): string[] {
   const own = injuries.filter((inj) => inj.teamId === PLAYER_ID);
   if (own.length === 0) return [];
   let squad = getState().squad;
   const toasts: string[] = [];
   for (const inj of own) {
     const idx = squad.findIndex((p) =>
-      inj.playerId !== undefined ? p.id === inj.playerId : p.name === inj.playerName,
+      participantIds.has(p.id) && (inj.playerId !== undefined ? p.id === inj.playerId : p.name === inj.playerName),
     );
     if (idx < 0) continue;
     const cur = squad[idx]!;
@@ -153,7 +154,8 @@ function sheetFor(clubId: string): TeamSheet {
     // The coach's lineup (#69), resolved for today: an injured starter is covered
     // for this match and the news says by whom; a man who has left the club is
     // replaced in the saved lineup as well.
-    const picked = resolveLineup(state.lineup ?? autoPick(state.squad), state.squad);
+    const away = awayPlayerIds(state);
+    const picked = resolveLineup(state.lineup ?? autoPick(state.squad), state.squad,away);
     if (picked.changed) setState({ lineup: picked.lineup });
     if (picked.fills.length > 0) bus.emit('ui:notify', { text: describeFills(picked.fills), kind: 'info', match: true });
     // The set plays he takes in (#326): only ones the club owns, at most three, in his order.
@@ -163,7 +165,7 @@ function sheetFor(clubId: string): TeamSheet {
       PLAYER_ID,
       state.clubName,
       entry?.colors ?? DEFAULT_PLAYER_COLORS,
-      plays.length > 0 ? { ...picked, plays } : picked,
+      plays.length > 0 ? { ...picked, plays } : picked, away,
     );
   }
   const rival = state.league.clubs.find((c) => c.id === clubId);
@@ -232,6 +234,7 @@ function applyPlayerResult(fixture: Fixture, home: TeamSheet, away: TeamSheet, s
   // Finals draws still stamp as-is; knockoutWinner favours home (higher seed).
   const ownSheet = fixture.homeId === PLAYER_ID ? home : away;
   const playedIds = (ownSheet.roster ?? []).flatMap((r) => (r.id ? [r.id] : []));
+  const participantIds = new Set([...playedIds, ...(ownSheet.bench ?? []).flatMap((r) => (r.id ? [r.id] : []))]);
   const before = getState();
   const accepted = fixture.competitionId
     ? before.competitions?.instances.find(i => i.id === fixture.competitionId)?.fixtures.find(f => f.id === fixture.id)?.result
@@ -247,12 +250,12 @@ function applyPlayerResult(fixture: Fixture, home: TeamSheet, away: TeamSheet, s
   if (applied === before) return () => {};
   commitMatchState(applied, {
     ...((structural ? context?.instance.definition.stages.find(s => s.id === fixture.stageId)?.kind === 'league' : fixture.round > 0) ? { recentPlans: [{ ...(ownSheet.tactics ?? DEFAULT_TACTICS) }, ...getState().recentPlans].slice(0, 3) } : {}),
-    squad: applyMatchXp(applyMatchStats(getState().squad, sim.events, PLAYER_ID, playedIds, getState().season),
+    squad: applyMatchXp(applyMatchStats(getState().squad, sim.events, PLAYER_ID, playedIds, getState().season, participantIds),
       ownSheet, sim, fixture.homeId, fixture.awayId, getState().facilities, getState().training.focus, getState().settings.spendPointsMyself === true),
   });
 
   // GitHub #7: engine emits injuries; matchday owns squad mutation + notify.
-  const injuryToasts = applyMatchInjuries(sim.injuries);
+  const injuryToasts = applyMatchInjuries(sim.injuries, participantIds);
   // The rival's injuries land on its own squad (#74), silently.
   const rivalHurt = sim.injuries.filter((i) => i.teamId !== PLAYER_ID && i.playerId);
   if (rivalHurt.length > 0) {
@@ -297,7 +300,8 @@ export function registerPlayerMatchSystem(): void {
     const fixture = getCurrentFixture(state, PLAYER_ID);
     if (!fixture || fixture.result) return;
 
-    const fit = fitSquadCount(state.squad);
+    const absent = awayPlayerIds(state);
+    const fit = fitSquadCount(state.squad.filter(p => !absent.has(p.id)));
     if (fit < SQUAD_MIN) {
       const result = forfeitResult(fixture);
       const applied = hasStructuralCalendar(state) ? finaliseCalendarFixture(getState(), fixture, result, true) : applyResult(getState(), { ...fixture, unplayed: true }, result);
@@ -356,9 +360,7 @@ export function registerPlayerMatchSystem(): void {
     };
     // A live match the app was closed in the middle of (#73): this is the same match.
     const prior = readLiveMatch();
-    const sameFixture =
-      prior && prior.season === state.season && prior.week === state.week && prior.round === fixture.round && prior.homeId === fixture.homeId && prior.awayId === fixture.awayId
-        && prior.competitionId === fixture.competitionId && prior.fixtureId === fixture.id && prior.slot === fixture.slot ? prior : null;
+    const sameFixture = prior && belongsToFixture(prior,state,fixture) ? prior : null;
     // Never replay incompatible inputs, even a call queued at tick zero.
     const stale = !!sameFixture && (!liveMatchSameRules(sameFixture) || sameFixture.seed !== seed);
     const resumed = stale ? null : sameFixture;

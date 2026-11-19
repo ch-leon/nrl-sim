@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { bus } from '../../src/core/events';
-import { getState, setState } from '../../src/core/state';
+import { getState, loadState, setState } from '../../src/core/state';
 import { careerFixture } from '../helpers/playerCareer';
 import { applyPlayerSale, confirmPlayerSale, quotePlayerSale, transferBetweenClubs } from '../../src/systems/playerTransfers';
 import { ownerOf, validatePlayerPopulation } from '../../src/systems/playerCareer';
 import { saleOfferQuote } from '../../src/data/financeRules';
 import { salaryDemand } from '../../src/systems/cap';
 import { registerFinanceSystem } from '../../src/systems/economy';
-import { migrateState } from '../../src/core/save';
+import { getActiveSlot, migrateState, setActiveSlot } from '../../src/core/save';
 import { advanceWeek, clearHeldWeek, clearTickHooks, registerTickHook, weekHeld } from '../../src/core/time';
 
 function fixture() {
@@ -52,6 +52,19 @@ describe('funded player transfers', () => {
       () => { buyer.cash = 1_000_000; p.deal!.renewal!.salary = 9_000_000; return q.offer; },
     ]) { const offer = change(); const before = structuredClone(s); expect(applyPlayerSale(s, offer).ok).toBe(false); expect(s).toEqual(before); }
   });
+  it.each(['slot','installation','state'] as const)('cannot commit another owned sale after a change of %s', change => {
+    const {s,p} = fixture(); loadState(s);
+    const originalSlot = getActiveSlot();
+    try {
+      const q = quotePlayerSale(getState(),p.id); if (!q.ok) throw Error(q.message);
+      if (change === 'slot') setActiveSlot(originalSlot === 1 ? 2 : 1);
+      else if (change === 'installation') loadState(structuredClone(s));
+      else setState({});
+      const before = getState();
+      expect(confirmPlayerSale(q.offer)).toMatchObject({ok:false,reason:'stale-offer'});
+      expect(getState()).toBe(before);
+    } finally {setActiveSlot(originalSlot);}
+  });
   it('refuses minimum squads and restricted emergency grants', () => {
     const { s, p } = fixture(); s.squad = s.squad.slice(0, 13);
     expect(quotePlayerSale(s, p.id)).toMatchObject({ ok: false, reason: 'squad-min' });
@@ -60,7 +73,7 @@ describe('funded player transfers', () => {
   });
   it('books and notifies once after the entire ownership change', () => {
     const { s, p, buyer } = fixture(); setState(s); registerFinanceSystem();
-    const q = quotePlayerSale(s, p.id); if (!q.ok) throw Error(q.message);
+    const q = quotePlayerSale(getState(), p.id); if (!q.ok) throw Error(q.message);
     const notices: string[] = []; bus.on('ui:notify', ({ text }) => notices.push(text));
     const snapshots: boolean[] = []; bus.on('state:changed', () => snapshots.push(migrateState(JSON.parse(JSON.stringify(getState()))).ok));
     const seen: string[] = []; bus.on('money:changed', () => seen.push(ownerOf(getState(), p.id)!));
@@ -124,7 +137,8 @@ describe('sale proceeds and existing player debt', () => {
     s.money = recovery === 'partial' ? -2 * fee : recovery === 'exact' ? -fee : -fee + 500;
     buyer.cash = fee;
     const before = structuredClone(s);
-    const quote = quotePlayerSale(s, p.id);
+    setState(s); registerFinanceSystem();
+    const quote = quotePlayerSale(getState(), p.id);
     expect(quote.ok).toBe(true); if (!quote.ok) throw Error(quote.message);
     expect(s).toEqual(before);
     const moved = applyPlayerSale(s, quote.offer);
@@ -138,7 +152,6 @@ describe('sale proceeds and existing player debt', () => {
     expect(afterBuyer.squad!.filter(x => x.id === p.id)).toHaveLength(1);
     expect(validatePlayerPopulation(moved.state)).toBeNull();
     expect(migrateState(JSON.parse(JSON.stringify(moved.state))).ok).toBe(true);
-    setState(s); registerFinanceSystem();
     expect(confirmPlayerSale(quote.offer).ok).toBe(true);
     expect(getState().money).toBe(s.money + fee);
     expect(getState().finance[0]!.transfers).toBe(s.finance[0]!.transfers + fee);

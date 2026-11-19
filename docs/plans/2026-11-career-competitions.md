@@ -1,6 +1,6 @@
 # Career progression, competitions and rewards
 
-## Current plan — reconciled 18 November 2026
+## Current plan — reconciled 19 November 2026
 
 Leon approved a broader, playful career: **choose an eligible league each season,
 win to unlock harder leagues, and send players to optional cups, events and
@@ -24,7 +24,12 @@ season, and moving down retains club salary-cap capacity. Existing Classic
 careers keep their format. [Release and verification](../status/2026-11-league-selection.md).
 The Open Cup entry, prizes and receipt-backed views are implemented in [PR #736](https://github.com/ch-leon/nrl-sim/pull/736).
 [Open Cup evidence and release gates](../status/2026-11-open-cup.md).
-Assignments, special events and gear remain later slices.
+The first assignment is now the approved [Skills Camp](../specs/player-assignments.md),
+implemented in [PR #742](https://github.com/ch-leon/nrl-sim/pull/742) under #708 and its
+[implementation plan](2026-11-19-player-assignments.md). Book in Weeks 1–4, send one
+player away for the opening league match in Week 5, and welcome him back before
+Week 6. One free annual place and 70 base XP are the accepted starting values for
+testing. Later assignment families, special events and gear remain separate slices.
 
 ### Changes that govern future implementation
 
@@ -47,7 +52,7 @@ Assignments, special events and gear remain later slices.
 | Slice | Deliverable | Done when |
 | --- | --- | --- |
 | A | Selectable league career and Open Cup — league selection shipped in #719; cup entry/rewards/views implemented in #736 | Win, unlock, choose to stay or move, and finish/decline a cup with valid people, finances and next-season setup. |
-| B | Player assignments | Send a player away, cover an overlapping fixture, and receive the player and recorded outcome once. |
+| B | Player assignments — Skills Camp implemented in PR #742 | Send a player away, cover an overlapping fixture, and receive the player and recorded outcome once. |
 | C | Watched/coached individual challenge | Coach animated rounds, earn a personal and supported club reward, and reveal a next opportunity. |
 | D | Distinct small-sided event and invitation chain | A beach or floodlit event changes play and squad decisions, with a saved route to a later challenge. |
 | E | Wider catalogue and endgame | Add Shield/youth/Champions Series and further events, each with its own decision and bounded rewards. |
@@ -88,10 +93,12 @@ opportunity/history presentation (#578) and integrated career balance (#562/#582
 [#708 assignments](https://github.com/ch-leon/nrl-sim/issues/708),
 [#710 watched/coached individual challenge](https://github.com/ch-leon/nrl-sim/issues/710)
 and [#711 distinct small-sided event](https://github.com/ch-leon/nrl-sim/issues/711)
-remain planned. #579–#581 retain the Shield/youth/Champions content, with ordering
-chosen against those prerequisites. Assignment recall/transfer rules, concurrent
-event phases, event simulation rules and actual reward values must still be
-specified before their dependent behaviour is enabled. Use existing finance and
+are separate slices: #708 is implemented in PR #742; #710/#711 remain planned.
+#579–#581 retain the Shield/youth/Champions content, with ordering chosen against
+those prerequisites. The first camp's eligibility, training substitution, return,
+cancellation and disposal rules are specified. Future assignment families and
+concurrent event phases, event simulation rules and reward values still need
+their own scope before dependent behaviour is enabled. Use existing finance and
 progression owners; numerical tuning and the wider design are not claimed complete.
 
 **Open Cup implementation decisions, 18 November:** Leon confirmed free entry

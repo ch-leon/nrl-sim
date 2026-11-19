@@ -19,6 +19,7 @@ import { initWeekSummary } from './ui/weekSummary';
 import { initMatchArtAhead, warmMatchArt } from './scenes/matchArtAhead';
 import { createNav } from './ui/nav';
 import { closeModal, closeScreen } from './ui/dom';
+import { showAssignmentRecovery } from './ui/assignmentRecovery';
 import { initToasts } from './ui/toasts';
 import { getCurrentFixture, initLeague, registerFixturesSystem } from './systems/fixtures';
 import { registerUnlockSystem } from './systems/unlocks';
@@ -414,7 +415,8 @@ async function boot(): Promise<void> {
   if (pending && fixture && !fixture.result && pending.season === getState().season
     && pending.week === getState().week && pending.round === fixture.round
     && pending.homeId === fixture.homeId && pending.awayId === fixture.awayId) {
-    const resume = (): void => void setTimeout(() => advanceWeek(), 0);
+    const recover = showAssignmentRecovery(() => location.reload());
+    const resume = (): void => void setTimeout(recover ?? advanceWeek, 0);
     if (g.isBooted) resume();
     else g.events.once(Phaser.Core.Events.READY, resume);
   } else {

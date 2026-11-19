@@ -1,0 +1,89 @@
+import './primeField';
+import { deepStrictEqual, equal, ok } from 'node:assert/strict';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { preparePack, selectPack } from '../src/content';
+import { bus, type Events } from '../src/core/events';
+import { __setStorage, __unlockSaves, exportSave, importSave, installImportedSave, loadSlot, saveIfChanged, setActiveSlot } from '../src/core/save';
+import { getState, loadState, SAVE_VERSION } from '../src/core/state';
+import { setCareerNamespace } from '../src/core/storage/local';
+import { liveMatchKey, slotKey } from '../src/core/storageKeys';
+import { advanceWeek, failedIntervalProblem, weekHeld } from '../src/core/time';
+import { advanceWeekAsTapped, checkState, registerAllSystems } from '../src/qa/soak';
+import { startLeagueCareer } from '../src/systems/leagueCareerSetup';
+import { previewLeagueEntry } from '../src/systems/leagueEntry';
+import { confirmLeagueEntry } from '../src/systems/leagueEntryCommit';
+import { leagueCareerStateProblem } from '../src/systems/leagueEntryValidation';
+import { LIVE_MATCH_EXPORT_FIELD, readLiveMatch } from '../src/systems/liveMatchRecord';
+
+const [mode, pack, directory] = process.argv.slice(2) as [string, 'au'|'uk', string];
+ok(['capture','verify'].includes(mode) && ['au','uk'].includes(pack));
+const bytes = new Map<string,string>();
+const storage = {getItem: (key:string) => bytes.get(key) ?? null, setItem: (key:string,text:string) => { bytes.set(key,text); }, removeItem: (key:string) => { bytes.delete(key); }};
+Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage });
+setCareerNamespace(null); __setStorage(storage); __unlockSaves(); setActiveSlot(1);
+equal(SAVE_VERSION,33);
+await preparePack(pack); selectPack(pack);
+const file = (week:number) => join(directory, 'v33-'+pack+'-week-'+week+'.json');
+const side = join(directory,'live-matches','v33-'+pack+'-week-5.json');
+const checkBoundary = (week:number, text:string) => {
+  const imported = importSave(text);
+  if (!imported.ok) throw new Error(imported.message);
+  const s = imported.state;
+  equal(s.pack,pack); equal(s.version,33); equal(s.season,1); equal(s.week,week);
+  equal(s.competitions!.calendar!.elapsedIntervals,week-1);
+  equal(s.settings.difficulty,'normal'); equal(s.competitions!.openCupEntry!.current.lifecycle,'open'); equal(s.competitions!.openCupEntry!.current.choice,'unanswered'); equal(s.competitions!.openCupEntry!.current.resolution,null);
+  deepStrictEqual(checkState(s),[]); equal(leagueCareerStateProblem(s),null);
+  deepStrictEqual(imported.repairs,[]); equal(JSON.stringify(s),text);
+};
+const kickoffs: Events['match:started'][] = [];
+bus.on('match:started', m => kickoffs.push(m));
+if (mode === 'capture') {
+  const created = await startLeagueCareer({clubName:'QA '+pack.toUpperCase()+' League', seed:573, home:pack==='au'?{town:'Brisbane',country:'AU'}:{town:'Leeds',country:'GB'}}, {slot:1,expectedOriginal:null});
+  if (!created.ok) throw new Error(created.message);
+  registerAllSystems();
+  const s = getState(), first = previewLeagueEntry(s,s.competitions!.world!.profile.startingDivisionId);
+  if (!first.ok) throw new Error(first.message);
+  const accepted = confirmLeagueEntry(first.preview);
+  if (!accepted.ok) throw new Error(accepted.message);
+  for (let week=1; week<=4; week++) {
+    equal(getState().week,week);
+    if (week===4) {
+      ok(saveIfChanged(getState(), true)); const raw = bytes.get(slotKey(1))!; checkBoundary(week,raw); writeFileSync(file(week),raw);
+    }
+    advanceWeekAsTapped();
+    equal(failedIntervalProblem(),null); equal(weekHeld(),false); equal(getState().week,week+1);
+  }
+  const played = kickoffs.length; equal(played,2);
+  ok(saveIfChanged(getState(),true));
+  const checkpoint = bytes.get(slotKey(1))!; checkBoundary(5,checkpoint);
+  advanceWeek(); ok(weekHeld()); equal(kickoffs.length,played+1);
+  const slotBytes = bytes.get(slotKey(1))!, sidecar = bytes.get(liveMatchKey(1))!;
+  equal(slotBytes,checkpoint);
+  const live = JSON.parse(sidecar);
+  deepStrictEqual(readLiveMatch(),live); equal(live.tick,0); equal(live.fixtureId,kickoffs.at(-1)!.fixture.id); equal(live.seed,kickoffs.at(-1)!.live.seed);
+  equal(exportSave(getState()),JSON.stringify({...JSON.parse(slotBytes),[LIVE_MATCH_EXPORT_FIELD]:live},null,2));
+  mkdirSync(join(directory,'live-matches'),{recursive:true});
+  writeFileSync(file(5),slotBytes); writeFileSync(side,sidecar);
+  console.log(JSON.stringify({mode,pack,played,week:5,tick:live.tick,fixture:live.fixtureId,matchSeed:live.seed}));
+} else {
+  const w4=readFileSync(file(4),'utf8'), w5=readFileSync(file(5),'utf8'), rawLive=readFileSync(side,'utf8'), live=JSON.parse(rawLive);
+  for (const [week,text] of [[4,w4],[5,w5]] as const) checkBoundary(week,text);
+  const before=installImportedSave(w4,1); if (!before.ok) throw new Error(before.message);
+  const trial=loadSlot(1); if (trial.status!=='ok') throw new Error(trial.status);
+  deepStrictEqual(before.repairs,[]); deepStrictEqual(trial.repairs,[]); equal(bytes.get(slotKey(1)),w4);
+  loadState(trial.state); registerAllSystems(); advanceWeekAsTapped();
+  equal(weekHeld(),false); equal(failedIntervalProblem(),null); equal(getState().week,5);
+  equal(bytes.get(slotKey(1)),w5); equal(kickoffs.length,1);
+  kickoffs.length=0;
+  const installed=installImportedSave(JSON.stringify({...JSON.parse(w5),[LIVE_MATCH_EXPORT_FIELD]:live},null,2),1);
+  if (!installed.ok) throw new Error(installed.message);
+  const slot=loadSlot(1); if (slot.status!=='ok') throw new Error(slot.status);
+  deepStrictEqual(installed.repairs,[]); deepStrictEqual(slot.repairs,[]);
+  equal(bytes.get(slotKey(1)),w5); equal(bytes.get(liveMatchKey(1)),rawLive);
+  loadState(slot.state); registerAllSystems(); advanceWeek();
+  ok(weekHeld()); equal(failedIntervalProblem(),null); equal(kickoffs.length,1);
+  equal(kickoffs[0]!.fixture.id,live.fixtureId); equal(kickoffs[0]!.live.seed,live.seed);
+  equal(bytes.get(liveMatchKey(1)),rawLive); deepStrictEqual(readLiveMatch(),live);
+  console.log(JSON.stringify({mode,pack,week:5,tick:live.tick,fixture:live.fixtureId,matchSeed:live.seed}));
+}

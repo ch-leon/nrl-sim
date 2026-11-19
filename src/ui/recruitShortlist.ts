@@ -6,7 +6,8 @@ import { SQUAD_CAP } from '../config';
 import { overallRating } from '../data/player';
 import { signingFee } from '../systems/freeagency';
 import { capRoomFor, salaryDemand } from '../systems/cap';
-import { LINEUP_SLOTS, isFieldable, positionFit, effectiveRating, resolveLineup } from '../systems/lineup';
+import { LINEUP_SLOTS, isSelectable, positionFit, effectiveRating, resolveLineup } from '../systems/lineup';
+import { awayPlayerIds } from '../systems/playerAssignments';
 
 export interface RecruitShortlist {
   ids: string[];
@@ -31,9 +32,10 @@ export function recruitShortlist(state: GameState): RecruitShortlist {
   // Natural, fieldable cover per starting slot: two wingers need twice the cover.
   // A lock has no natural starting slot, so use his best positional fit.
   const positions = [...new Set(LINEUP_SLOTS)];
+  const away = awayPlayerIds(state);
   const cover = positions.map((pos) => ({
     pos,
-    ratio: state.squad.filter((p) => isFieldable(p) && positionFit(p.position, pos) === 1).length
+    ratio: state.squad.filter((p) => isSelectable(p, away) && positionFit(p.position, pos) === 1).length
       / LINEUP_SLOTS.filter((slot) => slot === pos).length,
   }));
   const leastCover = Math.min(...cover.map(({ ratio }) => ratio));
@@ -50,7 +52,7 @@ export function recruitShortlist(state: GameState): RecruitShortlist {
   const chosen = small ? pool : affordable.slice(0, reach ? 3 : 4);
   if (reach) chosen.push(reach);
 
-  const starters = resolveLineup(state.lineup, state.squad).starters;
+  const starters = resolveLineup(state.lineup, state.squad, away).starters;
   const gain = (p: Player): number => {
     const fit = Math.max(...LINEUP_SLOTS.map((pos) => positionFit(p.position, pos)));
     return Math.max(...LINEUP_SLOTS.flatMap((pos, i) => positionFit(p.position, pos) === fit

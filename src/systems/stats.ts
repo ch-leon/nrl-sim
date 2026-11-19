@@ -74,15 +74,15 @@ const add = (a: StatTally, b: StatTally): StatTally => ({
 });
 
 /**
- * Apply one match to the squad: every player in `playedIds` gets a game; events
- * (matched by name, squad-unique in practice) add tries/tackles/line breaks to
- * both career and the current season. Returns a new squad array.
+ * Apply one match to the squad: every player in `playedIds` gets a game,
+ * while named events count for any player on the frozen sheet, including the bench.
  */
 export function applyMatchStats(squad: readonly Player[], events: readonly MatchEvent[],
-  teamId: string, playedIds: readonly string[], season: number): Player[] {
+  teamId: string, playedIds: readonly string[], season: number, participantIds: ReadonlySet<string>): Player[] {
   const byName = foldEvents(events, teamId);
   const played = new Set(playedIds);
   return squad.map((p) => {
+    if (!participantIds.has(p.id)) return p;
     const delta = { ...(byName.get(p.name) ?? emptyTally()), games: played.has(p.id) ? 1 : 0 };
     if (delta.games === 0 && delta.tries + delta.tackles + delta.lineBreaks + (delta.sinBins ?? 0) === 0) return p;
     const cur = p.seasonStats && p.seasonStats.season === season ? p.seasonStats : { ...emptyTally(), season };
