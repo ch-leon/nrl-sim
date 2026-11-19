@@ -70,7 +70,7 @@ class ConversionWeatherSim extends LiveSim {
     let from: { x: number; y: number } | undefined;
     while (this.tick < 500) {
       this.step();
-      if (this.phase.kind === 'conversion' && this.ball.kind === 'flight') from = this.ball.from;
+      if (!from && this.phase.kind === 'conversion') from = this.snapshot().ball.flight?.from;
       const event = this.tickEvents.find(e => e.kind === 'conversion');
       if (event && from) return { event, from, points: this.points.home };
     }
