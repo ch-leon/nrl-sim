@@ -1,11 +1,15 @@
 # Individual challenges — Big Mick's Break the Line
 
-Design proposal for #710, 19 November 2026. Baseline `99991d55`.
+Approved starting design for #710, 19 November 2026. Implementation baseline `008c7cee`.
 The approved career-opportunities direction requires animated, watchable and
 coachable individual contests. Leon selected a combination of the proposed
-three-opponent gauntlet and alternating running/defending duels. The event terms
-below are proposed test values awaiting his answer; this document does not enable
-an event. Skills Camp remains governed by its existing specification.
+three-opponent gauntlet and alternating running/defending duels. Leon approved the dates and starting reward values below and instructed
+implementation on 19 November. Numeric combat tuning remains subject to the
+published proof gates; this document alone does not enable an event. Skills Camp remains governed by its existing specification.
+
+Readable reference: [Big Mick’s Break the Line — rules, coaching and rewards](https://app.notion.com/p/41d0870d4c44813888c3c05c3b8ad833).
+The Notion guide preserves the full product contract and numerical appendix;
+keep it reconciled with measured tuning and release status.
 
 ## Player experience
 
@@ -20,7 +24,7 @@ lane, scoring marker, bunting, spectators and Big Mick as host/final opponent.
 No direct movement, aiming, reaction tapping or decision timer. Introductions and
 presentation may be skipped. Preserve existing match presentation and saves.
 
-## Proposed entry, rewards and next goal
+## Approved entry, rewards and next goal
 
 | Term | First edition | Mick's Invitational |
 | --- | --- | --- |

@@ -86,9 +86,9 @@ equally good policies by lower energy cost, then fixed action order Power/Angle/
 
 Do not precompute the entire random result path when enabling auto: each action/result commits through the normal boundary. Checkpoints pause clock progression. Skip animation advances only presentation; continuing decisions requires an explicitly enabled auto-coach policy.
 
-## Entry, scheduling and reward proposals being discussed separately
+## Approved entry, scheduling and starting rewards
 
-The product specification proposes the following terms, separately from engine tuning: free entry in weeks 1–5, Showground departure/event week 6 and return week 7; Invitational registration in weeks 9–13 and event week 14 unlocked by first title; each edition can be entered once per season (both editions may be entered in the same season); Showground 60 base completion XP plus 60 winner XP and $8,000 winner cash; Invitational 80 plus 80 and $16,000. Rewards are defined per edition and settled once through explicit receipts, existing XP progression preferences and cash/finance prize accounting. Personal honour and earned invitation require real persisted state, not just celebration text.
+Leon approved the following starting terms on 19 November, separately from numerical combat tuning: free entry in weeks 1–5, Showground departure/event week 6 and return week 7; Invitational registration in weeks 9–13 and event week 14 unlocked by first title; each edition can be entered once per season (both editions may be entered in the same season); Showground 60 base completion XP plus 60 winner XP and $8,000 winner cash; Invitational 80 plus 80 and $16,000. Rewards are defined per edition and settled once through explicit receipts, existing XP progression preferences and cash/finance prize accounting. Personal honour and earned invitation require real persisted state, not just celebration text.
 
 A week-6 Showground first title unlocks that same season's Invitational registration in weeks 9–13 for the week-14 event. The once-per-season restriction is per edition, not one event total. Terminal recovery returns the player and preserves settled rewards. Training overlap and whether completion XP substitutes for weekly training must be explicitly defined outside this pure engine.
 
