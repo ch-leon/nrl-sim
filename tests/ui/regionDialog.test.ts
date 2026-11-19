@@ -32,20 +32,15 @@ describe('region dialog (#203)', () => {
   it('caps the card to the region', () => {
     expect(rule('.nrl-dialog-region .nrl-modal')).toContain('max-height: 100%');
   });
-  it("pins the player page's actions to the foot of its column, on screen without scrolling (3f)", () => {
-    const r = rule('.nrl-player-actions', PLAYER_CSS);
-    expect(r).toContain('position: sticky');
-    expect(r).toMatch(/bottom: (0;|-?[\d.]+rem)/);
-    expect(r).toContain('background');
-    expect(r).toContain('z-index');
-    expect(r).toContain('margin-top: auto'); // pushed to the column's foot
-    expect(r).toContain('flex: 0 0 auto'); // never squeezed out
-    // #415: the column holding them scrolls when its words outgrow it (a larger text size); the
-    // actions, sticky at its foot, stay in view while the rest scrolls under them.
-    const side = rule('.nrl-player-card, .nrl-player-side', PLAYER_CSS);
-    expect(side).toContain('overflow-y: auto');
-    expect(side).toContain('min-height: 0');
-    expect(rule('.nrl-player-about', PLAYER_CSS)).toContain('overflow-y: auto');
+  it("pins the player page's actions to its foot, on screen without scrolling (3f)", () => {
+    // SuperCOOKED 35–37: header, tabs, the tab's page, its foot. The page scrolls on its own when its
+    // words outgrow it (#415); the foot, which holds the deals on the Deal tab, never does.
+    expect(rule('.nrl-player > *', PLAYER_CSS)).toContain('flex: 0 0 auto'); // the foot is never squeezed out
+    const panel = rule('.nrl-player-panel', PLAYER_CSS);
+    expect(panel).toContain('overflow-y: auto');
+    expect(panel).toContain('min-height: 0');
+    expect(panel).toContain('flex: 1 1 auto');
+    expect(rule('.nrl-player-actions', PLAYER_CSS)).toContain('flex: 0 0 auto');
   });
   it('has one close, ◂ back, and no Close in the action row (#349 A5)', () => {
     expect(CSS + PLAYER_CSS).not.toContain('.nrl-player-close');

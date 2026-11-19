@@ -122,12 +122,14 @@ export async function runSize(browser, W, H) {
   // #203: the player page (Squad → a player) sits above the dock (there is no top bar
   // any more), with ◂ SQUAD (it has no ✕) and Renew / Sell / Release on screen; the
   // dock's tabs stay whole and tappable.
-  const PLAYER = ['.nrl-player-modal', ['.nrl-player-modal [data-back]', '[data-player-action="renew"]',
-    '[data-player-action="sell"]', '[data-player-action="release"]']];
+  // SuperCOOKED 37: the deals are on the Deal tab; Sell shows only with a buyer, so it is not asked for.
+  const PLAYER = ['.nrl-player-modal', ['.nrl-player-modal [data-back]', '[data-player-tab="stats"]', '[data-player-action="renew"]',
+    '[data-player-action="release"]']];
   await step('player-page', async () => {
-    await tap('.nrl-nav .nrl-btn[data-screen="squad"]');
+    await openNav(page, 'squad');
     await tap('.nrl-card-open .nrl-row-name');
     await page.waitForSelector('[data-player-page]');
+    await tap('[data-player-tab="deal"]');
     await page.waitForTimeout(300);
     const out = await reachProblems(page, ...PLAYER);
     out.push(...await page.evaluate(() => {
@@ -151,7 +153,7 @@ export async function runSize(browser, W, H) {
     if (await renew.isDisabled()) { rec.notes.push('renew not offered for this player'); return []; }
     await renew.tap();
     await page.waitForTimeout(300);
-    return reachProblems(page, '.nrl-player-modal', ['.nrl-player-modal [data-back]', '[data-player-action="sell"]']);
+    return reachProblems(page, '.nrl-player-modal', ['.nrl-player-modal [data-back]', '[data-player-action="release"]']);
   });
   await step('player-page-closed', async () => {
     await tap('.nrl-player-modal [data-back]');

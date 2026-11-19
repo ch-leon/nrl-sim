@@ -9,6 +9,7 @@ const PBXPROJ = raw(import.meta.glob('../ios/App/App.xcodeproj/project.pbxproj',
 const INFO_PLIST = raw(import.meta.glob('../ios/App/App/Info.plist', { query: '?raw', import: 'default', eager: true }));
 const APP_ENTITLEMENTS = raw(import.meta.glob('../ios/App/App/App.entitlements', { query: '?raw', import: 'default', eager: true }));
 const WIDGET_ENTITLEMENTS = raw(import.meta.glob('../ios/App/BigCoachWidgets/BigCoachWidgets.entitlements', { query: '?raw', import: 'default', eager: true }));
+const CAP_PACKAGE = raw(import.meta.glob('../ios/App/CapApp-SPM/Package.swift', { query: '?raw', import: 'default', eager: true }));
 const MAIN_STORYBOARD = raw(import.meta.glob('../ios/App/App/Base.lproj/Main.storyboard', { query: '?raw', import: 'default', eager: true }));
 
 /** Every value a build setting takes in the project, in order. */
@@ -74,5 +75,14 @@ describe('iPhone Xcode project', () => {
 
   it("the storyboard's screen is GameViewController", () => {
     expect(MAIN_STORYBOARD).toMatch(/customClass="GameViewController"/);
+  });
+
+  // Phase 2 (durable saves): `npx cap sync ios` links the save mirror's plugins; a sync
+  // run without them installed would drop them and the app would lose its native saves.
+  it('links the Filesystem and Share plugins (the save mirror and the share-sheet export)', () => {
+    expect(CAP_PACKAGE).toContain('.package(name: "CapacitorFilesystem", path: "../../../node_modules/@capacitor/filesystem")');
+    expect(CAP_PACKAGE).toContain('.package(name: "CapacitorShare", path: "../../../node_modules/@capacitor/share")');
+    expect(CAP_PACKAGE).toContain('.product(name: "CapacitorFilesystem", package: "CapacitorFilesystem")');
+    expect(CAP_PACKAGE).toContain('.product(name: "CapacitorShare", package: "CapacitorShare")');
   });
 });

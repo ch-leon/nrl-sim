@@ -146,11 +146,13 @@ it('keeps a camper registered with a named absence and prevents selecting him fr
 
   openLineupScreen();
   const body = document.body as unknown as StubNode;
-  const row = body.querySelector(`[data-camp-absence="${id}"]`)!;
-  expect(row.textContent).toContain('Skills Camp');
   const slot = away.lineup.starters.indexOf(id);
   expect(body.querySelector(`[data-spot="s${slot}"]`)?.words()).toMatch(/Skills Camp.*covers/);
-  body.querySelector('[data-spot="s0"]')!.click();
+  // Phase 1: candidates only list in the Swap panel, so start a swap on another starter first.
+  body.querySelector('[data-swap-start]')!.click();
+  body.querySelector(`[data-spot="s${slot === 0 ? 1 : 0}"]`)!.click();
+  const row = body.querySelector(`[data-camp-absence="${id}"]`)!;
+  expect(row.textContent).toContain('Skills Camp');
   row.click();
   expect(getState().lineup).toEqual(away.lineup);
 });

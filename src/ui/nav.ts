@@ -238,6 +238,9 @@ export function createNav(opts: NavOptions = {}): Nav {
 
   const sheet = el('div', { class: 'nrl-nav-sheet', attrs: { id: 'nrl-nav-sheet', role: 'menu', 'aria-label': 'Office' } });
   sheet.hidden = true;
+  const sheetHead = el('div', { class: 'nrl-office-head', attrs: { 'aria-hidden': 'true' } },
+    el('span', { class: 'nrl-office-title', text: OFFICE_LABEL }),
+    el('span', { class: 'nrl-office-note', text: 'Everything that isn’t on the pitch' }));
   const dim = el('div', { class: 'nrl-office-dim', attrs: { 'aria-hidden': 'true' } });
   dim.hidden = true;
   dim.addEventListener('click', () => setSheet(false));
@@ -304,7 +307,8 @@ export function createNav(opts: NavOptions = {}): Nav {
     const tabs = registry.list().filter((s) => !s.more && !s.hidden);
     const sheeted = registry.list().filter((s) => s.more && !s.hidden);
     root.replaceChildren(club, ...tabs.map((s) => buttons.get(s.id)!));
-    sheet.replaceChildren(...sheeted.map((s) => buttons.get(s.id)!));
+    // SuperCOOKED 50: "OFFICE" over the tiles, and what it holds.
+    sheet.replaceChildren(sheetHead, ...sheeted.map((s) => buttons.get(s.id)!));
     if (sheeted.length > 0) {
       more.setAttribute('data-nav-holds', sheeted.flatMap((s) => [s.id, ...s.holds]).join(' '));
       root.append(more);

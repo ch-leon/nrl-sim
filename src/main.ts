@@ -76,6 +76,8 @@ import { syncDevMarker } from './labs/marker';
 import { startAnalytics, track } from './analytics';
 import { dockTab } from './analytics/events';
 import { initGameAnalytics } from './analytics/gameEvents';
+import { bootNativeMirror } from './core/storage/native';
+import { isIosNative } from './core/storage/platform';
 
 /** web, android or ios: vite.config.ts's define (src/platform.ts). Absent under vite-node. */
 declare const __NRL_PLATFORM__: string | undefined;
@@ -102,6 +104,10 @@ let game: Phaser.Game | null = null;
 let portraitBlocked = false;
 
 async function boot(): Promise<void> {
+  // The iOS app (docs/specs/ios.md Phase 2): put back any save the web view lost from
+  // its native copy, and mirror every write from here on, before anything reads a save.
+  // Not awaited on the web or Android, where boot runs exactly as before.
+  if (isIosNative()) await bootNativeMirror();
   // Isolated visual rehearsal: boot before any career reads or autosave hooks.
   if (location.hash === '#artlab') {
     const { bootArtLab } = await import('./labs/art/boot');

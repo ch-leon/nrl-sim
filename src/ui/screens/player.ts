@@ -21,7 +21,7 @@ import { discoveredFreeAgents } from '../../systems/playerCareer';
 import { bus } from '../../core/events';
 import { getState, setState, type GameState, type Player, type PlayerStats, type RivalClub, type StatTally } from '../../core/state';
 import { save } from '../../core/save';
-import { marketWage, overallRating, ratingText, shownStats } from '../../data/player';
+import { marketWage, overallRating, playerStars, shownStats } from '../../data/player';
 import { ROMAN, TRAITS, headlineTrait, traitTip } from '../../data/traits';
 import { PROGRESSION, MORALE, SQUAD_CAP, SQUAD_MIN } from '../../config';
 import { renewEarly, renewalRefusal, sellPlayer } from '../../systems/contracts';
@@ -34,10 +34,11 @@ import { PLAYER_ID } from '../../systems/fixtures';
 import { DEFAULT_PLAYER_COLORS } from '../../config';
 import { kitFromColors, type Kit } from '../../art/match/kit';
 import { PORTRAIT_H, PORTRAIT_W, TRAINING_KIT, portraitDataUrl } from '../../art/portrait';
-import { ARMED_CLASS, armGuard, armedTap, backButton, button, closeModal, el, openModal } from '../dom';
-import { ensureScreenStyles, fitColour } from './recruit';
+import { ARMED_CLASS, armGuard, armedTap, backButton, button, closeModal, el, openModal, segmented, type SegItem } from '../dom';
+import { ensurePartsStyles, fitnessTone, starsEl, statTile, statusPill, type Tone } from '../parts';
+import { ensureScreenStyles } from './recruit';
 import { fmtMoney } from './finance';
-import { focusLabel } from '../../systems/training';
+import { focusLabel, spendPointBlock, spendSquadPoint } from '../../systems/training';
 import { LINEUP_SLOTS, commitLineup, resolveLineup, setCaptain, setKicker, statsAt } from '../../systems/lineup';
 import { kickerAndCaptain } from '../../match/league/sheets';
 import { potentialText } from '../../systems/potential';
@@ -80,10 +81,16 @@ export interface PlayerPageModel {
   where: string;
   assignment: string | null;
   /** Each stat, and (your own players, N11) what a week's training under the squad focus adds. */
-  stats: { label: string; value: number; gain?: number }[];
+  stats: { label: string; value: number; gain?: number; key?: keyof PlayerStats; ceiling?: number; focus?: boolean }[];
   /** The squad's training focus in words, for your own players (N11). */
   trainingFocus: string | null;
-  traits: { label: string; tip: string; bad: boolean }[];
+  traits: { label: string; tip: string; bad: boolean; name?: string; level?: number; blurb?: string; seen?: string | undefined; headline?: boolean }[];
+  /** His rating in half stars (SuperCOOKED §3.5: no number on the page). */
+  stars?: number;
+  /** Level points banked for the coach to spend (your own players only; §7 #1). */
+  unspent?: number;
+  /** The season his deal ends, when he has a signed one. */
+  endSeason?: number | null;
   morale: { value: number; word: string; reasons: string[] };
   /** "Fit" or "Out 3 weeks". */
   fitness: string;
@@ -295,11 +302,20 @@ export function playerPageModel(p: Player, ctx: PlayerContext, state: GameState)
     stats: shownStats(p.position).map((key) => ({
       label: key === 'footyIQ' ? activePack().vocab.iqStat : STAT_LABELS.find(([k]) => k === key)![1],
       value: Math.round(p.stats[key]),
+      key,
+      ceiling: Math.round(p.ceilings[key] ?? p.stats[key]),
+      focus: squad && focus === key,
     })),
     trainingFocus: squad ? focusLabel(focus) : null,
     traits: p.traits
       .filter((t) => t.id in TRAITS)
-      .map((t) => ({ label: `${TRAITS[t.id].name} ${ROMAN[t.level]}`, tip: `${t === headline ? 'Headline trait. ' : ''}${traitTip(t.id)}`, bad: TRAITS[t.id].bad ?? false })),
+      .map((t) => ({
+        label: `${TRAITS[t.id].name} ${ROMAN[t.level]}`, tip: `${t === headline ? 'Headline trait. ' : ''}${traitTip(t.id)}`, bad: TRAITS[t.id].bad ?? false,
+        name: TRAITS[t.id].name, level: t.level, blurb: TRAITS[t.id].blurb, seen: TRAITS[t.id].seen, headline: t === headline,
+      })),
+    stars: playerStars(p),
+    unspent: squad ? p.unspentPoints ?? 0 : 0,
+    endSeason: ctx.kind === 'freeAgent' ? null : (queuedDeal ? null : p.deal?.endSeason ?? null),
     morale: { value: p.morale, word: moraleWord(p.morale), reasons: squad ? moraleReasons(p) : [] },
     fitness: p.injuredWeeks > 0 ? `Out ${weeksText(p.injuredWeeks)}` : (p.suspendedWeeks ?? 0) > 0 ? `Banned ${weeksText(p.suspendedWeeks ?? 0)}` : 'Fit',
     injured: p.injuredWeeks > 0 || (p.suspendedWeeks ?? 0) > 0,
@@ -341,8 +357,8 @@ function ensurePlayerStyles(): void {
 
 /** The page's stylesheet (exported for tests). */
 export const PLAYER_CSS = `
-/* 3f: a full sheet over the one it was opened from (a region dialog, #203: the dock stays whole below it).
-   Solid navy: the sheet under it must not show through. */
+/* SuperCOOKED 35–37: one sheet over the one it was opened from (a region dialog, #203: the dock stays
+   whole below it). Solid navy: the sheet under it must not show through. */
 .nrl-dialog-region .nrl-modal.nrl-player-modal {
   width: 100%;
   max-width: 1180px;
@@ -350,106 +366,108 @@ export const PLAYER_CSS = `
   max-height: 100%;
   background: var(--nrl-navy);
   border-radius: 16px;
-  box-shadow: var(--nrl-shadow-tray);
-  padding: 10px 14px;
+  box-shadow: inset 0 0 0 1px var(--nrl-line), var(--nrl-shadow-tray);
+  padding: 12px 16px;
 }
-/* Three columns, 230 / 1fr / 200: who he is, what he can do, his jobs and the deals. */
+/* The header (who he is, how he is), the tabs, the tab's page (it scrolls), its foot (it holds still). */
 .nrl-player {
   flex: 1 1 auto;
   min-height: 0;
-  display: grid;
-  grid-template-columns: 230px minmax(0, 1fr) 200px;
-  gap: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   font-size: 0.8125rem;
 }
-.nrl-player.nrl-player-rival { grid-template-columns: 230px minmax(0, 1fr); }
-/* #415: each column scrolls on its own when its words outgrow it (a larger text size, a short phone):
-   ◂ back holds still at the top of the card, the deals at the foot of the side. */
-.nrl-player-card, .nrl-player-side { min-height: 0; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; overscroll-behavior: contain; }
-.nrl-player-card > *, .nrl-player-side > * { flex-shrink: 0; }
-.nrl-player-card .nrl-back { align-self: flex-start; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
-/* ◂ back and Rename (#398) share the card's top row; back gives way when the club's name is long. */
-.nrl-player-headrow { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; position: sticky; top: 0; z-index: 1; background: var(--nrl-navy); }
-.nrl-player-headrow .nrl-back { flex: 0 1 auto; min-width: 0; }
-.nrl-player-top { display: flex; align-items: center; gap: 10px; }
-.nrl-player-portrait {
-  flex: 0 0 auto;
-  width: 64px;
-  height: 64px;
-  border-radius: 10px;
-  background: var(--nrl-button);
-  image-rendering: pixelated;
-  image-rendering: crisp-edges;
-}
-.nrl-player-id { min-width: 0; }
-.nrl-player-name { font-family: var(--nrl-f-label); font-size: 1.375rem; font-weight: 700; line-height: 1; overflow-wrap: anywhere; }
-.nrl-player-meta { margin-top: 4px; font-size: 0.75rem; color: var(--nrl-text-2); }
-.nrl-player-where { font-size: 0.75rem; color: var(--nrl-muted); }
+.nrl-player > * { flex: 0 0 auto; min-width: 0; }
+.nrl-player-head { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.nrl-player-head .nrl-back { flex: 0 0 auto; }
+.nrl-player-portrait { flex: 0 0 auto; width: 40px; height: 40px; border-radius: 8px; background: var(--nrl-raised); image-rendering: pixelated; image-rendering: crisp-edges; }
+.nrl-player-id { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.nrl-player-name { font-family: var(--nrl-f-display); font-size: 1.375rem; line-height: 1; letter-spacing: -0.02em; text-transform: uppercase; overflow-wrap: anywhere; }
+.nrl-player-meta { font-size: 0.75rem; color: var(--nrl-muted); }
+.nrl-player-pills { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; }
+.nrl-player-head .nrl-stars { flex: 0 0 auto; font-size: 1.625rem; }
+.nrl-player-bar { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.nrl-player-bar .nrl-seg { flex: 0 1 auto; }
+.nrl-player-bar .nrl-rename-open { margin-left: auto; }
+/* The tab's page: it scrolls on its own; the header, the tabs and the foot hold still (#415). */
+.nrl-player-panel { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 8px; }
+.nrl-player-panel > * { flex-shrink: 0; }
+.nrl-player-foot { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+.nrl-player-foot > .nrl-player-where { flex: 1 1 auto; min-width: 0; }
+.nrl-player-where { font-size: 0.8125rem; color: var(--nrl-text-2); }
 .nrl-player-out { color: var(--nrl-neg); }
-.nrl-player-tiles { display: flex; gap: 6px; }
-.nrl-player-tile { flex: 1 1 0; min-width: 0; border-radius: 8px; background: var(--nrl-raised); padding: 6px 8px; display: flex; flex-direction: column; }
-.nrl-player-tile b { font-family: var(--nrl-f-num); font-size: 1.25rem; font-weight: 600; line-height: 1.2; }
-.nrl-player-tile span { font-size: 0.6875rem; color: var(--nrl-muted); }
-.nrl-player-deal { font-size: 0.75rem; line-height: 1.35; color: var(--nrl-text-2); }
+/* Stats: his four as big tiles (00's stat tile); the faint bar is the ceiling. */
+.nrl-player-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.nrl-player-stats .nrl-stat-tile { position: relative; }
+.nrl-btn.nrl-spend-plus { position: absolute; top: 8px; right: 8px; width: 36px; min-width: 36px; min-height: 36px; height: 36px; padding: 0; border-radius: 8px; font-family: var(--nrl-f-display); font-size: 1.25rem; }
+.nrl-btn.nrl-spend-plus::after { content: ''; position: absolute; inset: -4px; }
+.nrl-spend-capped { position: absolute; top: 12px; right: 10px; font-family: var(--nrl-f-label); font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--nrl-muted); }
+.nrl-spend-left { font-family: var(--nrl-f-label); font-size: 0.875rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--nrl-accent); }
+/* Traits: a card each, the level as three pips. */
+.nrl-player-traits { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 10px; }
+.nrl-player-trait { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 14px; background: var(--nrl-panel); box-shadow: inset 0 0 0 1px var(--nrl-line); overflow-wrap: anywhere; }
+.nrl-player-trait-top { display: flex; align-items: center; gap: 8px; }
+.nrl-player-trait-name { flex: 1 1 auto; font-family: var(--nrl-f-label); font-size: 1.0625rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.nrl-player-trait-bad .nrl-player-trait-name { color: var(--nrl-neg); }
+.nrl-player-pips { flex: 0 0 auto; display: flex; gap: 3px; }
+.nrl-player-pips > span { width: 14px; height: 5px; border-radius: 3px; background: var(--nrl-line); }
+.nrl-player-pips > span[data-on] { background: var(--nrl-text); }
+.nrl-player-trait-tag { font-family: var(--nrl-f-label); font-size: 0.625rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 6px; border-radius: 6px; background: var(--nrl-raised); color: var(--nrl-text-2); }
+.nrl-player-trait-what { font-size: 0.8125rem; line-height: 1.4; color: var(--nrl-text-2); }
+.nrl-player-trait-seen { font-size: 0.6875rem; line-height: 1.4; color: var(--nrl-muted); }
+/* Deal: his jobs in the side, then the contract card with its deals. */
+.nrl-player-deal-tab { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.nrl-player-deal-tab.nrl-player-deal-one { grid-template-columns: minmax(0, 1fr); }
+.nrl-player-jobs { display: flex; flex-direction: column; gap: 8px; }
+.nrl-player h3 { margin: 0; font-family: var(--nrl-f-num); font-size: 0.625rem; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; color: var(--nrl-muted); }
+.nrl-btn.nrl-player-role { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 48px; padding: 0 12px 0 14px; border-radius: 12px; background: var(--nrl-panel); box-shadow: inset 0 0 0 1px var(--nrl-line); font-size: 1rem; }
+.nrl-player-role-knob { flex: 0 0 auto; width: 38px; height: 22px; padding: 3px; box-sizing: border-box; border-radius: 11px; background: var(--nrl-line); display: flex; align-items: center; }
+.nrl-player-role-knob::before { content: ''; width: 16px; height: 16px; border-radius: 50%; background: var(--nrl-muted); }
+.nrl-player-role[aria-pressed="true"] .nrl-player-role-knob { background: var(--nrl-accent); justify-content: flex-end; }
+.nrl-player-role[aria-pressed="true"] .nrl-player-role-knob::before { background: var(--nrl-on-accent); }
+.nrl-player-role-state { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.nrl-player-contract { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 14px; background: var(--nrl-panel); box-shadow: inset 0 0 0 1px var(--nrl-line); }
+.nrl-player-contract-ends { font-family: var(--nrl-f-display); font-size: 1.375rem; line-height: 1; text-transform: uppercase; letter-spacing: -0.02em; }
+.nrl-player-deal { font-size: 0.8125rem; line-height: 1.35; color: var(--nrl-text-2); }
 .nrl-player-expiring { color: var(--nrl-neg); }
-/* The middle column scrolls on its own; the left and the actions hold still. */
-.nrl-player-about { min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; padding-right: 4px; }
-.nrl-player [data-club-history] { flex: 0 0 auto; }
-.nrl-player h3 { flex: 0 0 auto; margin: 10px 0 4px; font-family: var(--nrl-f-label); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); }
-.nrl-player h3:first-child { margin-top: 0; }
-.nrl-player-stats { display: flex; flex-direction: column; flex: 0 0 auto; }
-/* Label and number columns in em, so a larger text size widens them with the words (#371). */
-.nrl-statrow { display: grid; grid-template-columns: 5.5em minmax(0, 1fr) 2.3em 4.3em; align-items: center; gap: 8px; min-height: 28px; }
-.nrl-stattrack { height: 6px; border-radius: 3px; background: var(--nrl-button); overflow: hidden; }
-.nrl-statfill { height: 100%; background: var(--nrl-accent); }
-.nrl-stat-val { font-family: var(--nrl-f-num); font-weight: 600; }
-.nrl-stat-gain { font-family: var(--nrl-f-num); font-size: 0.75rem; color: var(--nrl-pos); white-space: nowrap; }
-.nrl-stat-gain.nrl-stat-loss { color: var(--nrl-neg); }
-.nrl-player-trait, .nrl-player-line { flex: 0 0 auto; margin: 2px 0; font-size: 0.75rem; line-height: 1.4; color: var(--nrl-text-2); overflow-wrap: anywhere; }
-.nrl-player-trait b { color: var(--nrl-text); font-weight: 600; margin-right: 6px; }
-.nrl-player-trait-bad b { color: var(--nrl-neg); }
+/* The deals sit in the page's foot (3f): it never scrolls, so they are always on screen. */
+.nrl-player-deal-foot { flex-direction: column; align-items: flex-end; gap: 6px; }
+.nrl-player-deal-foot .nrl-player-why { flex: 0 0 auto; align-self: stretch; }
+.nrl-player-actions { flex: 0 0 auto; display: flex; gap: 8px; }
+.nrl-player-actions .nrl-btn { min-width: 7.5rem; padding: 0 14px; white-space: normal; }
+/* What each deal costs, and why one is shut (in amber, SuperCOOKED §3.2). Whole lines, wrapped (#415). */
+.nrl-player-why { display: flex; flex-direction: column; gap: 2px; font-size: 0.6875rem; line-height: 1.35; color: var(--nrl-muted); }
+.nrl-player-why .nrl-attn { color: var(--nrl-neg); }
+/* Record: the lines the first view leaves out (level, potential, condition, tallies, club history). */
+.nrl-player-line { font-size: 0.8125rem; line-height: 1.45; color: var(--nrl-text-2); overflow-wrap: anywhere; }
 .nrl-player-line b { color: var(--nrl-muted); font-weight: 500; }
-/* Roles (N11): a row per job, ON in yellow, OFF muted. */
-.nrl-btn.nrl-player-role { flex: 0 0 auto; width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 12px; font-size: 1rem; }
-.nrl-player-role-state { color: var(--nrl-muted); }
-.nrl-player-role[aria-pressed="true"] .nrl-player-role-state { color: var(--nrl-accent); }
-/* What each deal costs, and why one is shut (in yellow): just above the buttons. Whole lines, wrapped (#415). */
-.nrl-player-why { flex: 0 0 auto; margin-top: auto; display: flex; flex-direction: column; gap: 2px; font-size: 0.6875rem; line-height: 1.35; color: var(--nrl-muted); }
-/* #203: the actions are pinned to the foot of the column, on screen without scrolling. */
-.nrl-player-actions {
-  flex: 0 0 auto;
-  margin-top: auto;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  position: sticky;
-  bottom: 0;
-  background: var(--nrl-navy);
-  z-index: 1;
-}
-.nrl-player-why + .nrl-player-actions { margin-top: 0; }
-.nrl-player-actions .nrl-btn { min-width: 0; padding: 0 6px; white-space: normal; font-size: 0.9375rem; }
-.nrl-player-actions .nrl-btn-primary { grid-column: 1 / -1; font-size: 1.0625rem; }
-/* Short sheets (667×375, 956×330): tighter, so the jobs and the deals still fit. */
+.nrl-player [data-club-history] { flex: 0 0 auto; }
+.nrl-player [data-club-history] h3 { margin-top: 6px; }
+/* Short sheets (667×375, 956×330): the tiles and the head close up so the stats fit unscrolled. */
 @media (max-height: 400px) {
-  .nrl-player-card, .nrl-player-side { gap: 6px; }
-  .nrl-statrow { min-height: 26px; }
-  .nrl-player-tile { padding: 4px 8px; }
-  .nrl-player-tile b { font-size: 1.125rem; }
+  .nrl-dialog-region .nrl-modal.nrl-player-modal { padding: 8px 12px; }
+  .nrl-player { gap: 6px; }
+  .nrl-player-name { font-size: 1.125rem; }
+  .nrl-player-head .nrl-stars { font-size: 1.25rem; }
+  .nrl-player-stats { gap: 6px; }
+  .nrl-player-stats .nrl-stat-tile { padding: 8px 10px; gap: 4px; }
+  .nrl-player-stats .nrl-stat-value { font-size: 1.75rem; }
+  .nrl-player-head .nrl-back { min-height: 36px; }
 }
-/* A narrow phone (667): the side columns give a little. */
+/* A narrow phone (667): the pills give way to the name; the deal's two halves stack when Large. */
 @media (max-width: 760px) {
-  .nrl-player { grid-template-columns: 196px minmax(0, 1fr) 176px; gap: 12px; }
-  .nrl-player.nrl-player-rival { grid-template-columns: 196px minmax(0, 1fr); }
-  .nrl-statrow { grid-template-columns: 4.6em minmax(0, 1fr) 2em 4em; gap: 6px; }
+  .nrl-player-head { gap: 8px; }
+  .nrl-player-pills { gap: 4px; }
+  .nrl-player-pills .nrl-pill { min-height: 1.375rem; padding: 0 7px; font-size: 0.6875rem; gap: 4px; }
+  .nrl-player-head .nrl-stars { font-size: 1.125rem; }
+  .nrl-player-portrait { display: none; }
 }
-/* Large and Larger text (#371): the name keeps to whole words in the narrow card, and on a
-   narrow phone the side columns give the stats' bars some room back. */
 html[data-text-size] .nrl-player-name { font-size: 1.125rem; overflow-wrap: break-word; }
 @media (max-width: 760px) {
-  html[data-text-size] .nrl-player { grid-template-columns: 180px minmax(0, 1fr) 164px; }
-  html[data-text-size] .nrl-player.nrl-player-rival { grid-template-columns: 180px minmax(0, 1fr); }
-  html[data-text-size] .nrl-statrow { grid-template-columns: 4.4em minmax(1.5em, 1fr) 1.8em 3.6em; gap: 4px; }
+  html[data-text-size] .nrl-player-deal-tab { grid-template-columns: minmax(0, 1fr); }
+  html[data-text-size] .nrl-player-head .nrl-stars { font-size: 0.875rem; }
+  html[data-text-size] .nrl-player-stats .nrl-stat-label { font-size: 0.6875rem; }
 }
 `;
 
@@ -496,29 +514,40 @@ function backLabel(ctx: PlayerContext): string {
   return ctx.kind === 'squad' ? 'Squad' : ctx.kind === 'freeAgent' ? 'Recruit' : ctx.club.name;
 }
 
-function statBars(stats: PlayerPageModel['stats'], focus: string | null): HTMLElement {
-  return el('div', { class: 'nrl-statbars nrl-player-stats' }, ...stats.map(({ label, value, gain }) => {
-    const fill = el('div', { class: 'nrl-statfill' });
-    fill.style.width = `${Math.max(0, Math.min(100, value))}%`;
-    const row = el('div', { class: 'nrl-statrow' },
-      el('span', { text: label }), el('div', { class: 'nrl-stattrack' }, fill), el('span', { class: 'nrl-stat-val', text: String(value) }));
-    // N11: what a week's training under the squad focus adds (a stat that does not move shows nothing).
-    row.append(gain !== undefined && gain !== 0
-      ? el('span', { class: `nrl-stat-gain${gain < 0 ? ' nrl-stat-loss' : ''}`, text: `${gain < 0 ? '−' : '+'}${Math.abs(gain).toFixed(1)}/wk`, attrs: { title: `A week's training under the ${focus} focus`, 'data-gain': '' } })
-      : el('span'));
-    return row;
-  }));
+/** The page's four tabs (SuperCOOKED 35–37, and Record for what the first view leaves out). */
+type PlayerTab = 'stats' | 'traits' | 'deal' | 'record';
+const PLAYER_TABS: readonly SegItem<PlayerTab>[] = [
+  { id: 'stats', label: 'Stats' },
+  { id: 'traits', label: 'Traits' },
+  { id: 'deal', label: 'Deal' },
+  { id: 'record', label: 'Record', title: 'Level, potential, condition, tallies and club history' },
+];
+
+/** Morale's tone for its pill (SuperCOOKED §3.7, moraleWord's bands): happy good, content neither, then watch, then bad. */
+export function moraleTone(m: number): Tone {
+  return m >= 70 ? 'pos' : m >= 50 ? 'muted' : m >= 30 ? 'neg' : 'alert';
+}
+
+/** The fitness pill: "Fit 88%" in its tone, or "Out 3 wk" / "Banned 2 wk" in red. */
+function fitnessPill(p: Player, pct: number): HTMLElement {
+  if (p.injuredWeeks > 0) return statusPill(`Out ${p.injuredWeeks} wk`, 'alert');
+  if ((p.suspendedWeeks ?? 0) > 0) return statusPill(`Banned ${p.suspendedWeeks} wk`, 'alert');
+  return statusPill(`Fit ${pct}%`, fitnessTone(pct));
 }
 
 /**
  * Open the page for `player` as found in `ctx`. It follows the player through
- * state changes (a renewal updates the contract line; a sale, release or
+ * state changes (a renewal updates the contract card; a sale, release or
  * signing closes it). `onClose` runs when it closes by any route (◂ back, a
  * dock tap), so a rival squad can come back.
  */
 export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClose?: () => void } = {}): HTMLElement {
   ensurePlayerStyles();
+  ensurePartsStyles();
   const content = el('div', { class: `nrl-player${ctx.kind === 'rival' ? ' nrl-player-rival' : ''}`, attrs: { 'data-player-page': player.id } });
+  let tab: PlayerTab = 'stats';
+  // Spending level points by hand (§7 #1): the tiles take a + while it is open.
+  let spending = false;
   let armed: PlayerActionId | null = null;
   // The armed button's wait (#612, dom.ts armGuard): four seconds or a tap anywhere else puts
   // it back in place, with no re-render under that tap.
@@ -547,6 +576,42 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
   };
   const back = backButton(backLabel(ctx), finish);
 
+  /** The deals (Sign / Renew / Sell / Release) as buttons, with the two-tap Release and the sale review. */
+  const dealButtons = (p: Player, m: PlayerPageModel): HTMLElement | null => {
+    atRest = null;
+    // Sell shows only once a club would buy him (SuperCOOKED 37: "No buyer" stays out of sight).
+    const shown = m.actions.filter((a) => a.id !== 'sell' || a.enabled);
+    if (!shown.length) return null;
+    const actions = el('div', { class: 'nrl-player-actions' });
+    for (const a of shown) {
+      // Renew or Sign is the tab's one primary; Sell and Release are destructive.
+      const primary = a.id === 'renew' || a.id === 'sign';
+      const ask = armed === a.id ? a.confirm : undefined;
+      const btn = button(ask ?? a.label, () => {
+        if (a.id === 'sell') {
+          arm(null);
+          saleReview = saleConfirmation(p.id, {
+            back,
+            onCancel: () => { saleReview = null; render(); content.querySelector<HTMLButtonElement>('[data-player-action="sell"]')?.focus(); },
+            onSold: () => finish(),
+          });
+          render(); saleReview.querySelector<HTMLButtonElement>('[data-sale-cancel]')?.focus(); return;
+        }
+        if (a.confirm && armed !== a.id) { arm(a.id); render(); return; }
+        if (a.confirm && !armedTap(performance.now() - armedAt)) return;
+        arm(null);
+        const res = runAction(a.id, p.id);
+        if (!res.ok) bus.emit('ui:notify', { text: res.message ?? FAILURE[res.reason ?? ''] ?? 'Not possible.', kind: 'info' });
+      }, { class: primary ? 'nrl-btn-primary' : ask ? `nrl-btn-danger ${ARMED_CLASS}` : 'nrl-btn-danger' });
+      if (ask) atRest = () => { btn.classList.remove(ARMED_CLASS); btn.textContent = a.label; };
+      btn.setAttribute('data-player-action', a.id);
+      if (!a.enabled) { btn.disabled = true; btn.title = a.why ?? ''; }
+      else if (a.detail) btn.title = a.detail;
+      actions.append(btn);
+    }
+    return actions;
+  };
+
   const render = (): void => {
     const state = getState();
     const p = findPlayer(player.id, ctx, state);
@@ -558,15 +623,15 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
     }
     const m = playerPageModel(p, ctx, state);
     const kit = kitFor(ctx, state);
+    const unspent = m.unspent ?? 0;
+    if (unspent <= 0) spending = false;
 
-    // Left: who he is, his overall and fitness, his deal.
+    // The header: ◂ back, who he is, how he is (fitness and morale, each a word, §3.7), his stars.
     const portrait = el('img', {
       class: 'nrl-player-portrait',
       attrs: { src: portraitDataUrl(p.id, kit), alt: '', width: String(PORTRAIT_W * 4), height: String(PORTRAIT_H * 4) },
     });
     const meta = [m.position, `age ${m.age}`, ...(m.number !== null ? [`#${m.number}`] : [])].join(' · ');
-    const fit = el('b', { text: p.injuredWeeks > 0 ? 'OUT' : `${m.fitnessPct}%` });
-    fit.style.color = fitColour(m.fitnessPct);
     const rename = renaming === null
       ? null
       : nameField({
@@ -588,129 +653,143 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
           return null;
         },
       });
-    const card = el('div', { class: 'nrl-player-card' },
-      el('div', { class: 'nrl-player-headrow' }, back,
-        ...(rename ? [] : [renameButton(() => { renaming = m.name; render(); })])),
-      el('div', { class: 'nrl-player-top' }, portrait,
-        el('div', { class: 'nrl-player-id' },
-          ...(rename ? [] : [el('div', { class: 'nrl-player-name', text: m.name })]),
-          el('div', { class: 'nrl-player-meta', text: meta }))),
-      // While renaming, the field takes the room the tiles and the deal had (667×375).
-      ...(rename ? [rename] : []),
-      el('div', { class: 'nrl-player-where', text: m.where }),
-      ...(m.assignment ? [el('div', { class: 'nrl-player-where', text: m.assignment, attrs: { 'data-camp-absence': p.id } })] : []),
-      ...(m.fitness !== 'Fit' ? [el('div', { class: 'nrl-player-where nrl-player-out', text: m.fitness })] : []),
-    );
-    if (!rename) card.append(
-      el('div', { class: 'nrl-player-tiles' },
-        el('div', { class: 'nrl-player-tile', attrs: { title: 'Overall rating' } }, el('b', { text: ratingText(m.overall) }), el('span', { text: 'overall' })),
-        el('div', { class: 'nrl-player-tile', attrs: { title: `Fitness: 100 less his injury risk (${p.injuryRisk}); 0 while injured` } }, fit, el('span', { text: 'fitness' }))),
-      el('div', { class: `nrl-player-deal${m.contract.expiring ? ' nrl-player-expiring' : ''}`, text: ctx.kind === 'freeAgent' ? m.contract.text : `Contract: ${m.contract.text}` }),
-      ...(m.tenure ? [el('div', { class: 'nrl-player-deal', text: m.tenure })] : []),
-    );
+    const head = el('div', { class: 'nrl-player-head' }, back, portrait,
+      el('div', { class: 'nrl-player-id' },
+        ...(rename ? [rename] : [el('div', { class: 'nrl-player-name', text: m.name })]),
+        el('div', { class: 'nrl-player-meta', text: meta })),
+      el('div', { class: 'nrl-player-pills' },
+        fitnessPill(p, m.fitnessPct),
+        statusPill(m.morale.word, moraleTone(m.morale.value))),
+      starsEl(m.stars ?? 0));
 
-    // Middle: his stats and this week's training, traits, condition, record.
-    const line = (label: string, text: string): HTMLElement =>
-      el('div', { class: 'nrl-player-line' }, el('b', { text: `${label}: ` }), text);
-    const moraleText = `${m.morale.word} (${m.morale.value})${m.morale.reasons.length ? ' · ' + m.morale.reasons.join(', ') : ''}`;
-    const about = el('div', { class: 'nrl-player-col nrl-player-about' },
-      el('h3', { text: m.trainingFocus ? `Stats · this week's training: ${m.trainingFocus}` : 'Stats' }),
-      statBars(m.stats, m.trainingFocus),
-      el('div', { class: 'nrl-player-line', attrs: { 'data-potential': '' }, text: m.potential }),
-      el('div', { class: 'nrl-player-line', attrs: { 'data-xp': '' }, text: m.xp }),
-      el('h3', { text: 'Traits' }),
-      ...(m.traits.length > 0
-        ? m.traits.map((t) => el('div', { class: `nrl-player-trait${t.bad ? ' nrl-player-trait-bad' : ''}` }, el('b', { text: t.label }), t.tip))
-        : [el('div', { class: 'nrl-player-line', text: 'None — a solid citizen' })]),
-      el('h3', { text: 'Condition' }),
-      line('Morale', moraleText),
-      line('Injury risk', m.injuryRisk),
-      ...(m.season || m.career ? [el('h3', { text: 'Record' })] : []),
-      ...(m.season ? [line('This season', fmtTally(m.season))] : []),
-      ...(m.career ? [line('Career', fmtTally(m.career))] : []),
-      playerHistory(p, state),
-    );
+    // The tabs, and Rename at the row's end.
+    const tabs = segmented(PLAYER_TABS, tab, (id) => { tab = id; spending = false; render(); }, { label: 'Player page', class: 'nrl-player-tabs' });
+    for (const [id, b] of tabs.buttons) b.setAttribute('data-player-tab', id);
+    const bar = el('div', { class: 'nrl-player-bar' }, tabs.el,
+      ...(rename ? [] : [renameButton(() => { renaming = m.name; render(); })]));
 
-    // Right: his jobs in the nine (N11), then the deals pinned at the foot.
-    const side = el('div', { class: 'nrl-player-side' });
-    const notes: { text: string; attn: boolean }[] = [];
-    if (m.roles && !saleReview) {
-      const roles = m.roles;
-      // The Lineup screen's switches: picking the man already chosen goes back to the default.
-      const role = (job: string, on: boolean, attr: 'kicker' | 'captain', pick: () => void): HTMLButtonElement => {
-        const b = button('', pick, { class: 'nrl-player-role' });
-        b.append(el('span', { text: job }), el('span', { class: 'nrl-player-role-state', text: on ? 'On' : 'Off' }));
-        b.setAttribute('aria-pressed', String(on));
-        b.setAttribute('data-player-role', attr);
-        b.disabled = !roles.starter;
-        b.title = !roles.starter ? 'Starters only' : on ? 'His job: tap to go back to the default' : `Make him the ${job.toLowerCase()}`;
-        return b;
-      };
-      side.append(
-        el('h3', { text: 'Roles' }),
-        role('Goal-kicker', roles.kicker, 'kicker', () => {
-          const live = getState();
-          commitLineup(setKicker(live.lineup, p.id, awayPlayerIds(live)));
-        }),
-        role('Captain', roles.captain, 'captain', () => {
-          const live = getState();
-          commitLineup(setCaptain(live.lineup, p.id, awayPlayerIds(live)));
-        }),
-      );
-      if (!roles.starter) notes.push({ text: 'Roles: starters only — pick him in the nine', attn: true });
-    }
-    for (const a of m.actions) {
-      const verb = a.label.split(/[ ·+]/)[0];
-      if (a.why) notes.push({ text: `${verb}: ${a.why}`, attn: true });
-      else if (a.detail) notes.push({ text: `${verb}: ${a.detail}`, attn: false });
-    }
-    if (ctx.kind === 'rival') notes.push({ text: `Plays for ${ctx.club.name}: not for sale`, attn: false });
-    if (notes.length && !saleReview) {
-      side.append(el('div', { class: 'nrl-player-why' },
-        ...notes.map((n) => el('div', { class: n.attn ? 'nrl-attn' : '', text: n.text, attrs: { title: n.text } }))));
-    }
-    atRest = null;
-    if (saleReview) side.append(saleReview);
-    else if (m.actions.length) {
-      const actions = el('div', { class: 'nrl-player-actions' });
-      for (const a of m.actions) {
-        // Renew or Sign is the page's one primary; Sell and Release share the row under it.
-        const primary = a.id === 'renew' || a.id === 'sign';
-        const ask = armed === a.id ? a.confirm : undefined;
-        const btn = button(ask ?? a.label, () => {
-          if (a.id === 'sell') {
-            arm(null);
-            saleReview = saleConfirmation(p.id, {
-              back,
-              onCancel: () => { saleReview = null; render(); content.querySelector<HTMLButtonElement>('[data-player-action="sell"]')?.focus(); },
-              onSold: () => finish(),
-            });
-            render(); saleReview.querySelector<HTMLButtonElement>('[data-sale-cancel]')?.focus(); return;
+    const panel = el('div', { class: 'nrl-player-panel', attrs: { 'data-player-panel': tab } });
+    let foot: HTMLElement | null = null;
+    const line = (label: string, text: string, attrs: Record<string, string> = {}): HTMLElement =>
+      el('div', { class: 'nrl-player-line', attrs }, el('b', { text: `${label}: ` }), text);
+
+    if (tab === 'stats') {
+      // His four stats (shownStats), the training focus in the accent, the ceiling the faint bar.
+      const tiles = el('div', { class: 'nrl-player-stats' }, ...m.stats.map((st) => {
+        const tile = statTile({ label: st.focus ? `${st.label} · Training` : st.label, value: st.value, ...(st.ceiling !== undefined ? { ceiling: st.ceiling } : {}), focus: st.focus === true });
+        tile.classList.add('nrl-statrow');
+        if (spending && st.key) {
+          const key = st.key;
+          if (spendPointBlock(p, key) === 'at-ceiling') tile.append(el('span', { class: 'nrl-spend-capped', text: 'At ceiling' }));
+          else {
+            const plus = button('+', () => { spendSquadPoint(p.id, key); }, { class: 'nrl-spend-plus nrl-btn-outline' });
+            plus.setAttribute('data-spend-stat', key);
+            plus.setAttribute('aria-label', `Put a point into ${st.label}`);
+            tile.append(plus);
           }
-          if (a.confirm && armed !== a.id) { arm(a.id); render(); return; }
-          if (a.confirm && !armedTap(performance.now() - armedAt)) return;
-          arm(null);
-          const res = runAction(a.id, p.id);
-          if (!res.ok) bus.emit('ui:notify', { text: res.message ?? FAILURE[res.reason ?? ''] ?? 'Not possible.', kind: 'info' });
-        }, { class: primary ? 'nrl-btn-primary' : ask ? `nrl-btn-danger ${ARMED_CLASS}` : 'nrl-btn-danger' });
-        if (ask) atRest = () => { btn.classList.remove(ARMED_CLASS); btn.textContent = a.label; };
-        btn.setAttribute('data-player-action', a.id);
-        if (!a.enabled) { btn.disabled = true; btn.title = a.why ?? ''; }
-        else if (a.detail) btn.title = a.detail;
-        actions.append(btn);
+        }
+        return tile;
+      }));
+      panel.append(tiles);
+      foot = el('div', { class: 'nrl-player-foot' },
+        el('div', { class: `nrl-player-where${m.injured ? ' nrl-player-out' : ''}`, text: m.injured ? `${m.where} · ${m.fitness}` : m.where }),
+        ...(m.assignment ? [el('div', { class: 'nrl-player-where', text: m.assignment, attrs: { 'data-camp-absence': p.id } })] : []));
+      if (spending) {
+        const done = button('Done', () => { spending = false; render(); }, { class: 'nrl-btn-outline' });
+        done.setAttribute('data-spend-done', '');
+        foot.append(el('span', { class: 'nrl-spend-left', text: `${unspent} point${unspent === 1 ? '' : 's'} to spend` }), done);
+      } else if (unspent > 0) {
+        const spend = button(`Spend ${unspent} point${unspent === 1 ? '' : 's'} ▸`, () => { spending = true; render(); }, { class: 'nrl-btn-primary' });
+        spend.setAttribute('data-spend-open', '');
+        spend.title = 'Each tap of + puts one point into that stat, up to its ceiling';
+        foot.append(spend);
       }
-      side.append(actions);
+    } else if (tab === 'traits') {
+      // A card per trait: its name, its level as three pips, what it does, how it shows on the pitch.
+      panel.append(m.traits.length > 0
+        ? el('div', { class: 'nrl-player-traits' }, ...m.traits.map((t) => {
+          const pips = el('span', { class: 'nrl-player-pips', attrs: { role: 'img', 'aria-label': `Level ${t.level ?? 1} of 3` } },
+            ...[1, 2, 3].map((n) => el('span', n <= (t.level ?? 1) ? { attrs: { 'data-on': '' } } : {})));
+          return el('div', { class: `nrl-player-trait${t.bad ? ' nrl-player-trait-bad' : ''}`, attrs: t.headline ? { 'data-headline': '' } : {} },
+            el('div', { class: 'nrl-player-trait-top' },
+              el('span', { class: 'nrl-player-trait-name', text: t.name ?? t.label }),
+              ...(t.headline ? [el('span', { class: 'nrl-player-trait-tag', text: 'Headline trait' })] : []),
+              pips),
+            el('div', { class: 'nrl-player-trait-what', text: t.blurb ?? t.tip }),
+            ...(t.seen ? [el('div', { class: 'nrl-player-trait-seen', text: `On the pitch: ${t.seen}` })] : []));
+        }))
+        : el('div', { class: 'nrl-player-line', text: 'None — a solid citizen' }));
+    } else if (tab === 'deal') {
+      const notes: { text: string; attn: boolean }[] = [];
+      const jobs = el('div', { class: 'nrl-player-jobs' });
+      if (m.roles) {
+        const roles = m.roles;
+        // The goal-kicker and captain switches: picking the man already chosen goes back to the default.
+        const role = (job: string, on: boolean, attr: 'kicker' | 'captain', pick: () => void): HTMLButtonElement => {
+          const b = button('', pick, { class: 'nrl-player-role' });
+          b.append(el('span', { text: job }), el('span', { class: 'nrl-player-role-knob', attrs: { 'aria-hidden': 'true' } }),
+            el('span', { class: 'nrl-player-role-state', text: on ? 'On' : 'Off' }));
+          b.setAttribute('aria-pressed', String(on));
+          b.setAttribute('data-player-role', attr);
+          b.disabled = !roles.starter;
+          b.title = !roles.starter ? 'Starters only' : on ? 'His job: tap to go back to the default' : `Make him the ${job.toLowerCase()}`;
+          return b;
+        };
+        jobs.append(el('h3', { text: 'In the side' }),
+          role('Goal-kicker', roles.kicker, 'kicker', () => {
+            const live = getState();
+            commitLineup(setKicker(live.lineup, p.id, awayPlayerIds(live)));
+          }),
+          role('Captain', roles.captain, 'captain', () => {
+            const live = getState();
+            commitLineup(setCaptain(live.lineup, p.id, awayPlayerIds(live)));
+          }));
+        if (!roles.starter) notes.push({ text: 'Roles: starters only — pick him in the nine', attn: true });
+      }
+      for (const a of m.actions) {
+        if (a.id === 'sell' && !a.enabled) continue; // no buyer: Sell stays out of sight
+        const verb = a.label.split(/[ ·+]/)[0];
+        if (a.why) notes.push({ text: `${verb}: ${a.why}`, attn: true });
+        else if (a.detail) notes.push({ text: `${verb}: ${a.detail}`, attn: false });
+      }
+      if (ctx.kind === 'rival') notes.push({ text: `Plays for ${ctx.club.name}: not for sale`, attn: false });
+      const card = el('div', { class: 'nrl-player-contract' },
+        el('h3', { text: ctx.kind === 'freeAgent' ? 'To sign him' : 'Contract' }),
+        ...(m.endSeason ? [el('div', { class: 'nrl-player-contract-ends', text: `Ends season ${m.endSeason}` })] : []),
+        el('div', { class: `nrl-player-deal${m.contract.expiring ? ' nrl-player-expiring' : ''}`, text: ctx.kind === 'freeAgent' ? m.contract.text : `Contract: ${m.contract.text}` }),
+        ...(m.tenure ? [el('div', { class: 'nrl-player-deal', text: m.tenure })] : []));
+      // What each deal costs sits under the contract; why one is shut (§3.2: disabled says why) goes
+      // above the deals in the foot, which never scrolls, so a phone (no `title`) reads it whole.
+      const whyLines = (list: typeof notes): HTMLElement => el('div', { class: 'nrl-player-why' },
+        ...list.map((n) => el('div', { class: n.attn ? 'nrl-attn' : '', text: n.text, attrs: { title: n.text } })));
+      const costs = notes.filter((n) => !n.attn);
+      const shut = notes.filter((n) => n.attn);
+      if (costs.length) card.append(whyLines(costs));
+      panel.append(el('div', { class: `nrl-player-deal-tab${m.roles ? '' : ' nrl-player-deal-one'}` }, ...(m.roles ? [jobs] : []), card));
+      // The deals hold still at the foot, on screen without scrolling (3f).
+      const deals = dealButtons(p, m);
+      if (deals) foot = el('div', { class: 'nrl-player-foot nrl-player-deal-foot' }, ...(shut.length ? [whyLines(shut)] : []), deals);
+    } else {
+      // Record: what the first view leaves out, all still here (SuperCOOKED 35, "moved off the page").
+      const moraleText = `${m.morale.word} (${m.morale.value})${m.morale.reasons.length ? ' · ' + m.morale.reasons.join(', ') : ''}`;
+      panel.append(
+        line('Level', m.xp.replace(/^Level /, ''), { 'data-xp': '' }),
+        el('div', { class: 'nrl-player-line', attrs: { 'data-potential': '' }, text: m.potential }),
+        ...(m.trainingFocus ? [line("This week's training", m.trainingFocus)] : []),
+        line('Morale', moraleText),
+        line('Injury risk', m.injuryRisk),
+        ...(m.season ? [line('This season', fmtTally(m.season))] : []),
+        ...(m.career ? [line('Career', fmtTally(m.career))] : []),
+        ...(m.tenure ? [el('div', { class: 'nrl-player-line', text: m.tenure })] : []),
+        playerHistory(p, state),
+      );
     }
 
-    // A redraw (a job switched, Sell armed, Rename) builds the columns again: each keeps its place (#614).
-    // Upright the sheet scrolls, not the columns, and it holds its own place.
-    const tops = Array.from(content.children, (col) => col.scrollTop);
-    // A rival's man has no jobs or deals here: two columns, the note under his card.
-    if (ctx.kind === 'rival') {
-      card.append(...side.childNodes);
-      content.replaceChildren(card, about);
-    } else content.replaceChildren(card, about, side);
-    Array.from(content.children).forEach((col, i) => { if (tops[i]) col.scrollTop = tops[i]; });
+    // A redraw (a job switched, a point spent, Rename) keeps the tab's place (#614).
+    const top = content.querySelector<HTMLElement>('.nrl-player-panel')?.getAttribute('data-player-panel') === tab
+      ? content.querySelector<HTMLElement>('.nrl-player-panel')!.scrollTop : 0;
+    content.replaceChildren(head, bar, panel, ...(foot ? [foot] : []));
+    if (top) panel.scrollTop = top;
   };
 
   const off = bus.on('state:changed', () => {

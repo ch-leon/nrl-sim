@@ -49,6 +49,13 @@ export const DEV_TEST_BACKUP_KEY = 'nrl-sim-devtest-backup';
 /** A normal key found changed on the way back, kept here before the backup is put back (#519). */
 export const DEV_TEST_DISPLACED_KEY = 'nrl-sim-devtest-displaced';
 
+/** The commercial build's entitlement cache, dev stub and first run (#362, #364). */
+export const ENTITLEMENTS_CACHE_KEY = 'nrl-sim-entitlements-cache';
+export const ENTITLEMENTS_STUB_KEY = 'nrl-sim-entitlements-stub';
+export const COMMERCIAL_FIRST_RUN_KEY = 'nrl-sim-commercial-first-run';
+/** The match commentary's log mode, kept between matches (the prototype's key). */
+export const LOG_MODE_KEY = 'nrlsim.logMode';
+
 /** Original payloads preserved before migration/repair, scoped to a slot and career. */
 export function recoveryKey(slot: number): string {
   return `nrl-sim-save-recovery-${slot}`;

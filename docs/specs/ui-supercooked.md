@@ -205,6 +205,11 @@ Each row: mockup → current source → what changes. Anything not listed keeps 
   - **Moved off the page:** XP bar and level text, potential text, morale reasons, injury-risk word, season and career tallies. Keep them reachable later if wanted, but not on the first view.
   - **Sell** ("No buyer") is hidden until there is a buyer.
   - Free agents: Deal shows Sign instead. A rival's player: read-only, no Deal actions.
+- **Decided in Phase 1 (Leon, 18 Nov):**
+  - Plan, Plays and the training focus sit in a **⋯ menu** at the right of the Squad header (pitch and list), each opening what it did before.
+  - The player page has a **fourth tab, Record**: level and XP, potential, morale and its reasons, injury risk, season and career tallies, club history.
+  - The list view has **no To / Wage / Morale columns**; the contract-ending dot stays on the name, and the figures are on the player page's Deal tab and in Contracts.
+  - The pitch is opened as the `lineup` screen and the list as `squad`, so links, hints and the dock that lead to the Lineup still land on it.
 
 ### Match (Phase 2)
 
@@ -232,6 +237,11 @@ Each row: mockup → current source → what changes. Anything not listed keeps 
 - **`21-building-popup`** → `screens/build.ts` (facility popup): name + ✕, level as three bars, **Now / Next level** boxes side by side (the effect values), upkeep line "on the salary cap", **Upgrade to Ln · $X**, then Move and Demolish.
 - **`22-build`** → `screens/build.ts`: All / Training / Club; tiles show name, price (accent), one plain line of what it does, footprint and upkeep on the cap. Built: "BUILT · Ln · tap it on the grounds". One-only already built: amber "ONE ONLY · ALREADY BUILT".
 - **`23-league`** → `screens/fixtures.ts` and the ladder: ladder with last-5 form as lettered dots (W green, L amber), your row highlighted, dashed accent line under the finals cut; right column **next opponent card** (home/away, their stars, ladder spot, record, last meeting), then your run of fixtures.
+- **Built in Phase 3** (what the code has decides what shows):
+  - No facility has upkeep, so the cards and tiles show none. The building card keeps "No recurring upkeep", and the Build tiles say "one-off cost".
+  - CASH is a small word before the money, and the week stays "WK 2/27 · S1": the season stays on show, and the dock's tabs keep their room.
+  - The next-opponent card opens the full preview (the NEXT row still does too). On a phone on its side it is one line, their name and when.
+  - The ladder keeps its W and L columns, and its form column hides under 760px wide, as before.
 
 ### Office (Phase 4)
 
@@ -242,6 +252,13 @@ Each row: mockup → current source → what changes. Anything not listed keeps 
 - **`54-history`** → `screens/history.ts`: summary line, Seasons / Records; each season a card row (best finish highlighted green), Review and Books buttons.
 - **`55-kit`** → `screens/kit.ts`: big home and away previews left; club name + Rename, home pattern and trim, away jersey and trim on the right; Club default and **Save kit**.
 - **`56-decision`** → `decisions.ts`: "Decision · 1 of n", title, the deadline line, story, coach line, then the choices as three big cards, each with its **Sure** and **n% risk** lines as tinted pills.
+- **Built in Phase 4** (what the code has decides what shows):
+  - The Finance note says what the game does: player wages sit on the salary cap; cash pays signing fees, staff (their fee and their wage, in the running costs) and buildings. It hides on a phone on its side, where This week's lines need the room.
+  - Staff rows keep the code's words ("Analyst · $12,000 once", "wages paid with running costs") and add the week's wage beside the button. The attack coach's choices show the wage and the one-off fee on two lines.
+  - The coach's lines in News keep his portrait and his name (as the tag), with the line in italics.
+  - History keeps its Retired players and Trophies tabs. The best finish is green and its card ringed green, with no "· best" word.
+  - The Kit screen keeps three previews (home, alternate, card), and swatches stay 44px tap targets (round, not 28px).
+  - On a decision, the green **Sure** pill shows only beside a risk; a choice with no gamble has the plain pill, gain or cost.
 
 ### App (Phase 5)
 

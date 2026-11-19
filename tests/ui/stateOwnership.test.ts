@@ -44,6 +44,7 @@ describe('screens call their owners without reapplying effects', () => {
     const id = getState().lineup.starters[0]!;
     const player = getState().squad.find((p) => p.id === id)!;
     openPlayerPage(player, { kind: 'squad' }); vi.mocked(saves.save).mockClear();
+    tap('[data-player-tab="deal"]'); // the roles are on the Deal tab (SuperCOOKED Phase 1)
     tap('[data-player-role="captain"]');
     expect(getState().lineup.captain).toBe(player.id);
     expect(saves.save).toHaveBeenCalledTimes(1);
