@@ -1,6 +1,15 @@
 # Career progression, competitions and rewards
 
-## Current plan — reconciled 19 November 2026
+## Current plan — reconciled 20 November 2026
+
+**Event discovery follow-up:** Leon missed the Showground entry window. Add a
+main-club Events card, direct booking access and explicit reminders before
+single/multi-week advancement closes an unentered opportunity, including Skills
+Camp, Open Cup and both Big Mick editions. Existing dates and rewards stay intact;
+missed windows show their next season rather than reopening. See
+[#751](https://github.com/ch-leon/nrl-sim/issues/751) and the
+[implementation plan](2026-11-20-event-reminders.md). Release/checker evidence
+belongs in the delivery PR and the readable Notion guide.
 
 Leon approved a broader, playful career: **choose an eligible league each season,
 win to unlock harder leagues, and send players to optional cups, events and

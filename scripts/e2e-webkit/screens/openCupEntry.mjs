@@ -160,14 +160,16 @@ async function advanceOne(page, { controlled = true, onResult } = {}) {
   await openNav(page, 'club');
   await page.locator('[data-hud="advance"]').tap();
   const outcome = () => page.waitForFunction(n => {
+    if (document.querySelector('[data-skip-events]')) return 'event';
     if (document.querySelector('[data-ask-proceed]')) return 'ask';
     if (document.querySelector('.nrl-mo-controls [data-skip-pill]')) return 'match';
     if (window.__nrlState().competitions.calendar.elapsedIntervals > n) return 'done';
     return false;
   }, elapsed, { timeout: 60000 }).then(handle => handle.jsonValue());
   let next = await outcome();
-  if (next === 'ask') {
-    await page.locator('[data-ask-proceed]').tap();
+  while (next === 'ask' || next === 'event') {
+    // Cup journeys deliberately leave other optional event entries unanswered.
+    await page.locator(next === 'event' ? '[data-skip-events]' : '[data-ask-proceed]').tap();
     next = await outcome();
   }
   if (next === 'match') {

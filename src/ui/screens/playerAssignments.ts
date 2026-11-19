@@ -144,7 +144,7 @@ function choice<T extends string>(label: string, attr: string, value: T, options
   return el('label', { class: 'nrl-camp-choice' }, el('span', { text: label }), select);
 }
 
-function openSkillsCamp(findOpener: () => HTMLElement | null): HTMLElement {
+export function openSkillsCamp(findOpener: () => HTMLElement | null): HTMLElement {
   const originalOpener = document.activeElement;
   const dismiss = button('Close', closeModal);
   const title = el('h2', { text: 'Skills Camp', attrs: { id: 'nrl-camp-title' } });
