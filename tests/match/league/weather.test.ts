@@ -4,9 +4,10 @@
 // first at the next stoppage, and runMatch reports the injuries by squad id.
 import { describe, it, expect, afterEach } from 'vitest';
 import { WEATHER, injuryChance, lostInContactChance, weatherEffect } from '../../../src/match/league/weather';
-import { goalChance, postsFor } from '../../../src/match/league/goals';
+import { conversionSpot, goalChance, postsFor } from '../../../src/match/league/goals';
 import { FIELD_LENGTH, MID_Y } from '../../../src/match/core/field';
 import { LiveSim } from '../../../src/match/league/live';
+import { NINES } from '../../../src/match/league/rules';
 import { runMatch } from '../../../src/match/league/match';
 import { applyTuning } from '../../../src/match/league/tuning';
 import { sideSheet } from '../../../src/match/balance/measure';
@@ -51,6 +52,32 @@ function events(seed: number, weather: WeatherKind, minutes = 6): SimEvent[] {
   return out;
 }
 
+class ConversionWeatherSim extends LiveSim {
+  constructor(weather: WeatherKind) {
+    super(sideSheet('H', { rating: 60 }), sideSheet('A', { rating: 60 }), 1, { weather });
+  }
+
+  convertFrom(groundedY: number, roll: number) {
+    const striker = this.at('home', 1);
+    this.attacking = 'home';
+    this.dir = this.dirOf('home');
+    const posts = postsFor(this.dir, FIELD_LENGTH, MID_Y);
+    striker.body.pos = { x: posts.x + this.dir, y: groundedY };
+    this.ball = { kind: 'held', by: this.indexOf(striker) };
+    this.score(striker);
+    this.rng.next = () => roll;
+
+    let from: { x: number; y: number } | undefined;
+    while (this.tick < 500) {
+      this.step();
+      if (this.phase.kind === 'conversion' && this.ball.kind === 'flight') from = this.ball.from;
+      const event = this.tickEvents.find(e => e.kind === 'conversion');
+      if (event && from) return { event, from, points: this.points.home };
+    }
+    throw new Error('The conversion did not finish');
+  }
+}
+
 describe('weather in the live sim', () => {
   let restore: (() => void) | null = null;
   afterEach(() => {
@@ -68,23 +95,23 @@ describe('weather in the live sim', () => {
     expect(rain).toBeGreaterThan(clear * 1.2);
   }, 60_000);
 
-  it('wind: goal kicks go over less often than in the clear', () => {
-    // The spread is what the sim multiplies into the kick (goalAcc). A wider
-    // spread is a miss more often from the same spot. Counting conversions
-    // over a handful of matches is smaller than the noise: 16 seeds went the
-    // wrong way after the grubber chase, 24 the right way, a few points apart.
+  it('wind: the same conversion and roll can miss in wind and go over in the clear', () => {
+    const groundedY = 18;
     const posts = postsFor(1, FIELD_LENGTH, MID_Y);
     const spread = weatherEffect('wind').goalSpread;
     expect(spread).toBeGreaterThan(1);
-    const spot = { x: FIELD_LENGTH - 22, y: 18 };
-    expect(goalChance(spot, posts, 60, spread)).toBeLessThan(goalChance(spot, posts, 60, 1));
-    const clear = events(1, 'clear');
-    const wind = events(1, 'wind');
-    expect(clear.filter((e) => e.kind === 'conversion').length).toBeGreaterThan(0);
-    expect(wind.filter((e) => e.kind === 'conversion').length).toBeGreaterThan(0);
-    const sig = (es: SimEvent[]): string => es.map((e) => `${e.tick}:${e.kind}:${e.detail ?? ''}`).join('|');
-    expect(sig(wind)).not.toBe(sig(clear));
-  }, 60_000);
+    const spot = conversionSpot(groundedY, posts, 1);
+    const clearChance = goalChance(spot, posts, 60), windChance = goalChance(spot, posts, 60, spread);
+    expect(windChance).toBeLessThan(clearChance);
+    // Put the same draw between the two chances and play the genuine post-try conversion.
+    const roll = (clearChance + windChance) / 2;
+    const clear = new ConversionWeatherSim('clear').convertFrom(groundedY, roll);
+    const wind = new ConversionWeatherSim('wind').convertFrom(groundedY, roll);
+    expect(wind.from).toEqual(clear.from);
+    expect(clear.event).toMatchObject({ kind: 'conversion', side: 'home', detail: 'good' });
+    expect(wind.event).toMatchObject({ kind: 'conversion', side: 'home', detail: 'missed' });
+    expect(clear.points - wind.points).toBe(NINES.conversionPoints);
+  });
 
   it('a ball lost in the tackle is a knock-on: the error, then the other side’s set', () => {
     restore = applyTuning({ 'weather.lostHeld': 0.2 });
