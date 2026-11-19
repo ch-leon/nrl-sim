@@ -1,5 +1,5 @@
 # Commercial saves — storage adapter, save metadata and conflict rules
-**GitHub:** #360 (commercial foundations 01) | **Status:** shipped, no cloud yet
+**GitHub:** #360 (commercial foundations 01) | **Status:** shipped, no cloud yet; iOS native mirror added (docs/specs/ios.md Phase 2)
 
 ## Problem
 Saves are the whole `GameState` as JSON (v21, about 140 KB) in three localStorage
@@ -47,6 +47,56 @@ rename. Nothing a player sees changes.
 - **Export and import** are unchanged: the file is the save JSON (plus the live match,
   as before). Meta is not exported; an import writes fresh meta like any save.
 
+## Native mirror (iOS app only) — docs/specs/ios.md Phase 2
+iOS may clear a web view's storage, so in the iOS app every save key also has a native
+copy. localStorage stays the working copy; nothing changes on the web or Android.
+
+- **Where it hooks in.** `browserStorage()` (`local.ts`) hands out localStorage wrapped by
+  `mirroredStorage()` (`nativeMirror.ts`): each `setItem` / `removeItem` of a mirrored key
+  that lands is also queued for the native side. The entitlement keys, the first-run
+  record and the match log mode now reach storage through `browserStorage()` too.
+- **Which keys** (`isMirroredKey`, named from `storageKeys.ts`): the slots, slot meta,
+  live-match records and recovery copies (`-<slot>`), the legacy save, device id, Labs,
+  the iOS hint, the log mode, and the commercial keys (entitlements cache and stub, first
+  run). Not mirrored: the playtest career (`nrl-sim-devtest:*`, `-backup`, `-displaced`),
+  and the corrupt-save copy, which `keepCorrupt` writes once only (restoring an old one
+  would stop a newer one being kept).
+- **Files.** One file per key in `Library/nrl-sim-saves/` (Capacitor Filesystem,
+  `Directory.Library`: not shown in Files, included in device backups), named
+  `encodeURIComponent(key) + '.txt'`. A write goes to `.tmp`, is renamed to `.ready`, then
+  replaces the file. The sync prefers `.ready`, never reads `.tmp`, and a `.ready` with
+  no file beside it is promoted, never deleted, so the only good copy is never lost.
+- **Launch.** `main.ts` awaits `bootNativeMirror()` before anything reads a save, in the
+  iOS app only. The boot sync reads the native copies in parallel. localStorage wins: a
+  key it lacks is restored from native (unless marked deleted); a key it has is never
+  overwritten, and is rewritten natively when the copy differs or is missing (a write
+  cut short by suspension, or a career saved before the mirror). If the native side
+  fails to load, boot goes on with localStorage and nothing is mirrored.
+- **Writes.** One key's native writes run in order; while one is in flight the later
+  ones collapse to the latest (last write wins). A failed native write is logged and
+  never blocks or breaks the localStorage write. Nothing is timed: each native write is
+  started by the storage write (or the boot sync) that caused it.
+- **Deletes.** A delete first writes a `.gone` marker, then removes the copies. The sync
+  treats a marked key as deleted and finishes the removal, so a delete cut short (or a
+  failed removal) cannot bring a career back. The next write of the key clears it.
+- **Export.** `downloadSave`, `downloadOriginalSave` and `downloadNames` go through
+  `deliverFile()` (`native.ts`): a browser download everywhere, except the iOS app,
+  which writes the file to the cache and opens the share sheet (`@capacitor/share`). On
+  iOS the "exported" toast shows only once the share completes; a cancel shows nothing.
+  Import is unchanged.
+- **Packaging.** The Capacitor plugins load only by dynamic import in the iOS build
+  (`capacitorFiles.ts`), each behind `IOS_CODE` (`platform.ts`); their chunks are named
+  `capacitor-*` and kept out of the PWA precache. `capacitor.config.ts` sets `android.includePlugins: []` so the Android project
+  links none of them.
+- **Platform.** `IOS_CODE` / `isIosNative()` (`platform.ts`) is `IS_IOS_APP` from
+  `src/platform.ts`, a build-time literal true only in `npm run build:ios`, so web and
+  Android builds contain no Capacitor plugin code at all.
+- **Known limits.** The Labs field length is read when `src/match/core/field.ts` loads
+  (before the boot sync), so a restored Labs value applies from the next launch. File
+  names assume no two keys differ only by case (the iOS volume is case-insensitive);
+  none do today.
+- Tests: `tests/core/nativeMirror.test.ts`.
+
 ## Conflict rules — `resolveSaveConflict(local, remote)`
 `src/core/storage/conflict.ts`, pure (no UI, no network). It takes each side's
 `SaveMeta` (null: no save on that side) and returns `'keep-local' | 'take-remote' |
@@ -66,8 +116,8 @@ The sync that will call it records `lastSyncedChecksum` in the local meta after 
 successful sync; nothing sets it yet.
 
 ## Out of scope (later tasks)
-Supabase or any network code, login, the conflict-choice UI, native (Capacitor)
-storage. `SAVE_VERSION`, the `GameState` shape and the slot count are unchanged.
+Supabase or any network code, login, the conflict-choice UI. Native storage is a
+mirror of localStorage in the iOS app only (above), not a store of its own. `SAVE_VERSION`, the `GameState` shape and the slot count are unchanged.
 
 ## Tests
 `tests/core/storageKeys.test.ts` (key pins), `tests/utils/hash.test.ts` (checksum pins),

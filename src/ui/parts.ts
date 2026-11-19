@@ -275,7 +275,7 @@ export const PARTS_CSS = `
 .nrl-pcard-face > img { width: 34px; height: 38px; image-rendering: pixelated; }
 .nrl-pcard-tag { position: absolute; top: 0; left: 27px; padding: 3px 4px; border-radius: 0 0 4px 4px; background: var(--nrl-accent); color: var(--nrl-on-accent); font-family: var(--nrl-f-display); font-size: 0.5625rem; line-height: 1; }
 .nrl-pcard-body { flex: 1 1 auto; min-width: 0; padding: 6px 8px; display: flex; flex-direction: column; justify-content: space-between; gap: 2px; }
-.nrl-pcard-name { padding-right: 10px; font-family: var(--nrl-f-label); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; line-height: 1.15; }
+.nrl-pcard-name { padding-right: 10px; font-family: var(--nrl-f-label); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal; }
 .nrl-pcard-foot { display: flex; justify-content: space-between; align-items: center; gap: 4px; }
 .nrl-pcard-pos { font-family: var(--nrl-f-num); font-size: 0.625rem; color: var(--nrl-muted); }
 .nrl-pcard-fit { position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--nrl-tone, var(--nrl-muted)); }

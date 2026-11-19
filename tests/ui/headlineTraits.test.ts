@@ -28,8 +28,9 @@ describe('player screen headline copy (#543 PM ruling)', () => {
     const seed = s.rngSeed;
     openPlayerPage(p, { kind: 'squad' });
     const root = slot.modal as StubNode;
+    root.querySelector('[data-player-tab="traits"]')!.click(); // SuperCOOKED 36: traits are their own tab
     expect(root.textContent).toContain('None — a solid citizen');
-    expect(root.textContent).not.toContain('Headline trait.');
+    expect(root.textContent).not.toContain('Headline trait');
     expect(root.querySelectorAll('.nrl-player-trait')).toHaveLength(0);
     expect(root.querySelectorAll('.nrl-player-line').filter(n => n.textContent === 'None — a solid citizen')).toHaveLength(1);
     expect(p).toEqual(before);
@@ -41,9 +42,12 @@ describe('player screen headline copy (#543 PM ruling)', () => {
     expect(p).toBeDefined();
     openPlayerPage(p, { kind: 'squad' });
     const root = slot.modal as StubNode;
+    root.querySelector('[data-player-tab="traits"]')!.click();
     const rows = root.querySelectorAll('.nrl-player-trait');
     expect(rows).toHaveLength(p.traits.length);
-    expect(rows.filter(n => n.textContent.includes('Headline trait. '))).toHaveLength(1);
+    // The headline is a tag on its card (SuperCOOKED 36), not a sentence prefix.
+    expect(rows.filter(n => n.querySelector('[data-headline]') !== null || n.hasAttribute('data-headline'))).toHaveLength(1);
+    expect(rows.filter(n => n.textContent.includes('Headline trait'))).toHaveLength(1);
     expect(rows.every(n => n.textContent.trim().length > 0)).toBe(true);
     expect(root.textContent).not.toContain('None — a solid citizen');
   });

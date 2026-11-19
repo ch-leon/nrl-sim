@@ -40,8 +40,8 @@ describe('player-match scouting uses kick-off habit context', () => {
       const advice = preview.querySelector('[data-preview-line="Counters"]')!.textContent;
       openLineupScreen();
       const body = document.body as unknown as StubNode;
-      const planButton = body.querySelector('[data-plan]')! as unknown as HTMLButtonElement;
-      planButton.onclick!.call(planButton, {} as PointerEvent);
+      body.querySelector('[data-squad-more]')!.click(); // SuperCOOKED Phase 1: Plan is in the Squad header's ⋯
+      body.querySelector('[data-plan]')!.click();
       const lineup = body.querySelector('[data-plan-opponent]')!.textContent;
       openRivalSquad(opponent);
       const scouting = body.querySelector('[data-usual-fit]')!.getAttribute('data-style');

@@ -210,6 +210,20 @@ export async function runLargeTextTargets(browser) {
         }
         await page.waitForSelector('[data-player-page]', { state: 'attached' });
         await page.waitForTimeout(250);
+        // SuperCOOKED 35–37: each tab in turn; their lines are read on each (the Record tab last, for Potential).
+        const cut = () => page.evaluate(() => {
+          const out = [];
+          for (const d of document.querySelectorAll('.nrl-player-why > div, .nrl-player-line, .nrl-player-trait, .nrl-player-deal')) {
+            if (d.scrollWidth > d.clientWidth + 1) out.push(`"${d.textContent.slice(0, 30)}" cut short (${d.scrollWidth}>${d.clientWidth})`);
+          }
+          return out;
+        });
+        const tabbed = [];
+        for (const tab of ['traits', 'deal', 'record']) {
+          await page.locator(`[data-player-tab="${tab}"]`).tap();
+          await page.waitForTimeout(150);
+          tabbed.push(...(await cut()).map((p) => `${tab}: ${p}`));
+        }
         const out = await page.evaluate(() => {
           const out = [];
           for (const d of document.querySelectorAll('.nrl-player-why > div, .nrl-player-line, .nrl-player-trait, .nrl-player-deal')) {
@@ -225,13 +239,16 @@ export async function runLargeTextTargets(browser) {
           } else {
             potential.scrollIntoView({ block: 'nearest' });
             const cr = potential.getBoundingClientRect();
-            const col = document.querySelector('.nrl-player-about').getBoundingClientRect();
+            const col = document.querySelector('.nrl-player-panel').getBoundingClientRect();
             if (cr.height < 10 || cr.top < col.top - 1 || cr.bottom > col.bottom + 1) out.push('potential cannot be scrolled into view');
           }
           if (document.querySelector('.nrl-player-curve') || document.body.textContent.includes('Projected peak:')) out.push('old projection remains');
           return out;
         });
-        out.push(...await targetProblems(page, '[data-player-page] :is(.nrl-back, [data-player-action])', safe, false));
+        out.push(...tabbed);
+        await page.locator('[data-player-tab="deal"]').tap();
+        await page.waitForTimeout(150);
+        out.push(...await targetProblems(page, '[data-player-page] :is(.nrl-back, [data-player-tab], [data-player-action])', safe, false));
         // #420: renew him (to a full-length deal); the greyed Renew then carries no price.
         const renew = page.locator('[data-player-action="renew"]');
         if (await renew.isEnabled()) {
@@ -246,19 +263,19 @@ export async function runLargeTextTargets(browser) {
         await clearToasts();
         return out;
       });
-      // #422: every tile on Lineup over a 44px band, the first-visit hint up and then gone.
+      // #422: every card on the Squad pitch (the Lineup, SuperCOOKED 30) over a 44px band, the first-visit hint up and then gone.
       await step('lineup-tiles', async (rec) => {
         await home();
         await openNav(page, 'lineup');
-        await page.waitForSelector('.nrl-lineup-field .nrl-lineup-tile');
+        await page.waitForSelector('.nrl-lineup-field .nrl-pcard');
         await page.waitForTimeout(250);
-        const out = (await targetProblems(page, '.nrl-lineup-tile', safe)).map((p) => `hint up: ${p}`);
+        const out = (await targetProblems(page, '.nrl-lineup-body .nrl-pcard', safe)).map((p) => `hint up: ${p}`);
         if (await page.locator('.nrl-hint-x').count()) await page.locator('.nrl-hint-x').tap();
         await page.waitForTimeout(150);
-        out.push(...await targetProblems(page, '.nrl-lineup-tile', safe));
+        out.push(...await targetProblems(page, '.nrl-lineup-body .nrl-pcard', safe));
         const scroll = await page.evaluate(() => [document.scrollingElement.scrollHeight > innerHeight + 1, document.scrollingElement.scrollWidth > innerWidth + 1]);
         if (scroll[0] || scroll[1]) out.push('the page scrolls');
-        rec.notes.push(`${await page.locator('.nrl-lineup-tile').count()} tiles`);
+        rec.notes.push(`${await page.locator('.nrl-lineup-body .nrl-pcard').count()} cards`);
         return out;
       });
       // #418: the decisions chip on the grounds.
