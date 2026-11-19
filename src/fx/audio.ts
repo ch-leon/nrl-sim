@@ -13,6 +13,7 @@
 //    pointer/key listener that resume()s it on the first user gesture.
 
 import { openAllUnlocks } from '../systems/unlocks';
+import { setSpendPointsMyself } from '../systems/training';
 import { devSettingsEntryVisible } from '../labs/flags';
 import { bus } from '../core/events';
 import type { MatchEvent } from '../sim/events';
@@ -1224,6 +1225,10 @@ export function initAudioUi(): () => void {
   // #371: a letter over each side's players, so the sides read apart without their colours; off when absent.
   const teamLetters = toggle('Team letters on players', 'Each side’s letter over its players in a match.',
     () => getState().settings.teamLetters === true, (on) => setSetting({ teamLetters: on }), 'nrl-letters-toggle');
+  // SuperCOOKED §7 #1 (Leon: opt-in): level points bank on the player page for the coach to spend;
+  // off when absent, as every career before it, and the training focus spends them as they come.
+  const spendPoints = toggle('Spend points myself', 'Level points wait on the player page for you to spend. Off, your training focus spends them.',
+    () => getState().settings.spendPointsMyself === true, (on) => { setSpendPointsMyself(on); save(getState()); }, 'nrl-points-toggle');
   // #371: Normal, Large, Larger: main.ts puts the save's size on <html> when it changes.
   const textSize = segmented(TEXT_SIZES.map((t) => ({ id: t.id, label: t.label })), textSizeOf(settings.textSize), (id) => {
     textSize.set(id);
@@ -1328,7 +1333,7 @@ export function initAudioUi(): () => void {
     el('div', { class: 'nrl-settings-cols' },
       el('div', { class: 'nrl-settings-col' },
         el('label', { class: 'nrl-audio-row' }, el('b', { text: 'Volume' }), slider),
-        mute.row, coachCalls.row, liveRivals.row, teamLetters.row),
+        mute.row, coachCalls.row, liveRivals.row, spendPoints.row, teamLetters.row),
       el('div', { class: 'nrl-settings-col' },
         textSizeRow,
         // One row for the two, so the key-moments and weekly-summary switches (#366, #368) cost no height.
@@ -1349,7 +1354,7 @@ export function initAudioUi(): () => void {
     labs.remove();
     if (devSettingsEntryVisible()) content.querySelector('.nrl-settings-col:last-child')?.append(labs);
     syncInstallVisibility();
-    for (const t of [mute, coachCalls, keyMoments, liveRivals, weekSummary, teamLetters]) t.sync();
+    for (const t of [mute, coachCalls, keyMoments, liveRivals, weekSummary, teamLetters, spendPoints]) t.sync();
     textSize.set(textSizeOf(getState().settings.textSize));
     slider.value = String(Math.round(clampVolume(getState().settings.volume) * 100));
     importIdle();

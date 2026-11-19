@@ -28,6 +28,8 @@ import type { RosterEntry } from '../../sim/events';
 // N15.2) through `comment()`: the overlay keeps the score from the events and
 // only says something of its own when a score or a call came with no line.
 import { SET_TACKLES } from '../../config';
+import { browserStorage } from '../../core/storage/local';
+import { LOG_MODE_KEY } from '../../core/storageKeys';
 import { newReplayOffer, stepReplayOffer, type ReplayOffer } from '../../match/view/replay';
 import { el, button, mount, ensureStyles, getRoot, segmented, type Segmented } from '../dom';
 import { bus } from '../../core/events';
@@ -346,17 +348,14 @@ export function statTable(rows: readonly StatRow[], heads: readonly [string, str
  */
 export type LogMode = 'line' | 'full';
 
-/** Where the log mode is kept between matches (the prototype's key). */
-export const LOG_MODE_KEY = 'nrlsim.logMode';
+/** Where the log mode is kept between matches (the prototype's key, storageKeys.ts). */
+export { LOG_MODE_KEY };
 
 type ModeStore = Pick<Storage, 'getItem' | 'setItem'>;
 
+/** The storage layer (mirrored natively in the iOS app); null where there is none or it is blocked. */
 function localStore(): ModeStore | null {
-  try {
-    return typeof localStorage === 'undefined' ? null : localStorage;
-  } catch {
-    return null; // blocked site data
-  }
+  return browserStorage();
 }
 
 /** The log mode a match opens with: the last one picked, 'line' the first time (a full log reopens as the line). */

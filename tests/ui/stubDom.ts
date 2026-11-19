@@ -87,6 +87,21 @@ export class StubNode {
     return this.all().filter((n) => key! in n.attrs && (want === undefined || n.attrs[key!] === want));
   }
   querySelector(sel: string): StubNode | null { return this.querySelectorAll(sel)[0] ?? null; }
+  /** This node or its nearest ancestor matching a `.class` or `[data-x]` selector (the same subset). */
+  closest(sel: string): StubNode | null {
+    const m = sel.match(/^\[([^\]=]+)(?:="([^"]*)")?\]$/);
+    const hit = (n: StubNode): boolean => sel.startsWith('.')
+      ? n.className.split(' ').includes(sel.slice(1))
+      : !!m && m[1]! in n.attrs && (m[2] === undefined || n.attrs[m[1]!] === m[2]);
+    for (let n: StubNode | null = this; n; n = n.parentNode) if (hit(n)) return n;
+    return null;
+  }
+  /** No canvas here: a `<canvas>` has no drawing context, so a portrait comes out blank. */
+  getContext(): null { return null; }
+  /** No layout here: every box is at the origin, with no size. */
+  getBoundingClientRect(): { left: number; top: number; right: number; bottom: number } {
+    return { left: 0, top: 0, right: 0, bottom: 0 };
+  }
   /** Every word a player could read or hear: text, and the attributes a screen reader speaks. */
   words(): string {
     return [this, ...this.all()].map((n) => [n.text, n.attrs['aria-label'] ?? '', n.attrs.title ?? ''].join(' ')).join(' ');

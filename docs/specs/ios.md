@@ -204,7 +204,7 @@ do not start it until Leon reopens it.
 | --- | --- | --- | --- | --- |
 | 0 | This spec | | Answered §6 on 18 Nov 2026 | Merged |
 | 1 | **iOS shell.** `@capacitor/ios`, `ios/`, `build:ios`, landscape and iPhone only, status and home bar, dev app id, icon and launch screen, the platform flag, `docs/ios-test-build.md` | Free | The five steps in §1 | The game runs full screen in landscape on Leon's iPhone from a cold start in airplane mode, with sound, and a career survives closing the app |
-| 2 | **Durable saves.** Native file mirror with restore at launch; export through the share sheet; import checked | Free | Play, delete nothing, confirm a save survives | A save comes back after web view storage is cleared; export and import work on the phone |
+| 2 | **Durable saves.** Native file mirror with restore at launch; export through the share sheet; import checked. *As built (18 Nov 2026): it goes further than restoring a missing save. An explicit key list is mirrored (not the playtest career or the corrupt copy). A delete leaves a marker so it cannot come back. At launch a native copy older than the web view's is rewritten. Import is unchanged and not yet checked in the app ([commercial-saves.md](commercial-saves.md), [ios-test-build.md](../ios-test-build.md#saves-on-iphone)).* | Free | Play, delete nothing, confirm a save survives | A save comes back after web view storage is cleared; export and import work on the phone |
 | 3 | **Widget extension and bridge, with the local match ticker.** Extension target, shared data group, the plugin, lock screen and island layouts with a static ball icon | Free (unproven on device; Simulator otherwise) | Pick the team for the new target; leave a match mid-game and look at the lock screen | Start a match, leave the app: the score and "Paused" show; tap returns to the match; full-time shows the result, then clears when you leave the match (not after 15 minutes: built 18 Nov 2026 with no timed end) |
 | 4 | **Captain poses.** Export script, pose per event, tight-space layout | Free | Look at it during a match | Try, tackle and full-time each change the icon |
 | 5 | **Club widgets.** Next fixture and injured star back, in rounds; points to spend once SuperCOOKED manual spending has shipped | Free | Add the widget to the lock screen | The widget is right after advancing a week and after a week away |
@@ -277,7 +277,7 @@ Each of these gets checked in the phase named, before the rest of that phase is 
 - Whether the game's save-on-hide fires reliably when iOS backgrounds the app (Phase 1).
 - Whether sound returns after a phone call, and whether other apps' music keeps playing under the game (Phase 1).
 - That Capacitor's tool sets the project up with Swift Package Manager by default (Phase 1).
-- Export and import inside the app's web view (Phase 2).
+- Export and import inside the app's web view (Phase 2). *18 Nov 2026: export now uses the share sheet; both compiled, neither run yet.*
 - Live Activity images supplied through the shared container, for the real captain (Phase 4).
 - Whether RevenueCat's Test Store or Xcode's local purchase testing runs on a free-signed phone, not just the Simulator (Phase 7 prep).
 - How long a match runs in real time at each speed, how many updates Apple's push budget allows in that window, and whether finishing the match and uploading its timeline fits in the few seconds iOS allows after you leave (Phase 8 spec).

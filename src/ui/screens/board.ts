@@ -12,7 +12,7 @@ import { fmtMoney } from '../../utils/money';
 import { objectiveLine, objectiveRisk, sackedSummary } from '../../systems/board';
 import { financeSummary } from './finance';
 import { ladderPosition } from '../../systems/fixtures';
-import { ATTACK_COACHES, ATTACK_SPECIALITIES, STAFF, STAFF_ROLES, attackCoach, attackCoachRefusal, hireAttackCoach, hireStaff, releaseStaff, STAFF_APPOINTMENT_PRICES } from '../../systems/staff';
+import { ATTACK_COACHES, ATTACK_SPECIALITIES, STAFF, STAFF_ROLES, attackCoach, attackCoachRefusal, attackCoachWage, hireAttackCoach, hireStaff, releaseStaff, staffWage, STAFF_APPOINTMENT_PRICES } from '../../systems/staff';
 import { el, button, openModal, openScreen, closeScreen, ensureStyles, guardDoubleTap } from '../dom';
 
 /** How an objective stands (3k): ON TRACK / AT RISK while the season runs, MET / FAILED once reviewed, PENDING before a ball is kicked. */
@@ -56,14 +56,18 @@ function objectiveDetail(o: Objective, state: GameState): string {
   return o.status !== 'pending' || detail === 'pending' ? '' : detail;
 }
 
-/** The board (3k): BOARD · SEASON N, the patience bar, and each objective with how it stands. */
+/** A week's wage, as the staff rows show it ("$800/wk"). */
+const perWeek = (wage: number): string => `${fmtMoney(wage)}/wk`;
+
+/** The board (3k; SuperCOOKED 52): BOARD · SEASON N, patience as pips, and each objective as a card with its chip. */
 export function buildObjectivesSection(state: GameState): HTMLElement {
   const box = el('div', { class: 'nrl-board' });
   box.append(el('h2', { class: 'nrl-screen-title nrl-board-title', text: `Board · Season ${state.season}` }));
-  const pct = Math.max(0, Math.min(100, (state.boardPatience / BOARD.MAX_PATIENCE) * 100));
+  // One pip a point of patience: lit while it lasts, red at two or less.
+  const pips = Array.from({ length: BOARD.MAX_PATIENCE }, (_, i) => el('i', { class: i < state.boardPatience ? 'nrl-board-pip-on' : '' }));
   box.append(el('div', { class: 'nrl-board-patience', attrs: { 'aria-label': `Board patience ${state.boardPatience} of ${BOARD.MAX_PATIENCE}` } },
     el('span', { class: 'nrl-label', text: 'Patience' }),
-    el('span', { class: `nrl-board-bar${state.boardPatience <= 2 ? ' nrl-board-bar-low' : ''}` }, el('i', { attrs: { style: `width:${pct}%` } })),
+    el('span', { class: `nrl-board-pips${state.boardPatience <= 2 ? ' nrl-board-pips-low' : ''}`, attrs: { 'aria-hidden': 'true' } }, ...pips),
     el('span', { class: 'nrl-num', text: `${state.boardPatience}/${BOARD.MAX_PATIENCE}` })));
   if (state.objectives.length === 0) {
     box.append(el('p', { class: 'nrl-board-empty', text: 'The board will set goals once the season is under way.' }));
@@ -95,11 +99,13 @@ export function staffRows(state: GameState): HTMLElement[] {
     const who = member
       ? `${def.title}: ${member.name} · appointed`
       : `${def.title} · ${fmtMoney(STAFF_APPOINTMENT_PRICES[role])} once`;
+    // SuperCOOKED 52: the week's wage beside the button; Hire outlined, Release the quiet destructive one.
     const row = el('div', { class: 'nrl-staff-row', attrs: { 'data-staff': role } },
       el('div', { class: 'nrl-staff-info' }, el('strong', { class: 'nrl-name-wrap', text: who }), el('span', { class: 'nrl-staff-blurb', text: def.blurb })),
+      el('span', { class: 'nrl-staff-wage', text: perWeek(member ? member.wage : staffWage(state, role)) }),
       member
-        ? button('Release', () => { releaseStaff(role); }, { class: 'nrl-btn-danger' })
-        : button('Hire', () => { hireStaff(role); }, { class: 'nrl-btn-primary' }),
+        ? button('Release', () => { releaseStaff(role); }, { class: 'nrl-btn-danger nrl-staff-release' })
+        : button('Hire', () => { hireStaff(role); }, { class: 'nrl-staff-hire-one' }),
     );
     if (!member && state.money < STAFF_APPOINTMENT_PRICES[role]) {
       const hire = row.querySelector('button');
@@ -127,14 +133,17 @@ export function attackCoachRow(state: GameState): HTMLElement {
       el('div', { class: 'nrl-staff-info' },
         el('strong', { class: 'nrl-name-wrap', text: `${def.title}: ${coach.name} · appointed` }),
         el('span', { class: 'nrl-staff-blurb', text: `${def.blurb} Plays you buy stay if he goes.` })),
-      button('Release', () => { releaseStaff('attackCoach'); }, { class: 'nrl-btn-danger' }));
+      el('span', { class: 'nrl-staff-wage', text: perWeek(coach.wage) }),
+      button('Release', () => { releaseStaff('attackCoach'); }, { class: 'nrl-btn-danger nrl-staff-release' }));
   }
   const hires = el('div', { class: 'nrl-staff-hires' }, ...ATTACK_SPECIALITIES.map((sp) => {
     const def = ATTACK_COACHES[sp];
     const why = attackCoachRefusal(state, sp) ?? (state.money < STAFF_APPOINTMENT_PRICES[sp] ? 'Not enough cash' : null);
-    const b = button('', () => { hireAttackCoach(sp); }, { class: 'nrl-btn-primary nrl-staff-hire' });
+    // A choice button (SuperCOOKED 52): the speciality, then its wage and fee, or why it's locked.
+    const b = button('', () => { hireAttackCoach(sp); }, { class: 'nrl-staff-hire' });
     b.append(el('span', { class: 'nrl-staff-hire-name', text: `Hire ${def.short}` }),
-      el('small', { text: why ?? `${fmtMoney(STAFF_APPOINTMENT_PRICES[sp])} once` }));
+      ...(why ? [el('small', { text: why })]
+        : [el('small', { text: perWeek(attackCoachWage(state, sp)) }), el('small', { text: `${fmtMoney(STAFF_APPOINTMENT_PRICES[sp])} once` })]));
     b.setAttribute('data-hire-attack', sp);
     b.title = why ? `${def.title}: ${why.toLowerCase()} (you have ${state.reputation})` : `${def.title} · ${fmtMoney(STAFF_APPOINTMENT_PRICES[sp])} once. ${def.blurb}`;
     if (why) { b.disabled = true; b.setAttribute('data-locked', ''); }
@@ -233,13 +242,18 @@ export const BOARD_CSS = `
 .nrl-board .nrl-board-title { margin: 0; letter-spacing: 0.04em; line-height: 30px; white-space: normal; }
 .nrl-board-patience { display: flex; align-items: center; gap: 8px; }
 .nrl-board-patience .nrl-num { font-size: 0.8125rem; font-weight: 500; }
-.nrl-board-bar { flex: 1 1 auto; height: 6px; border-radius: 3px; background: var(--nrl-line); overflow: hidden; display: flex; }
-.nrl-board-bar i { background: var(--nrl-accent); }
-.nrl-board-bar.nrl-board-bar-low i { background: var(--nrl-neg); }
-.nrl-board-obj { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--nrl-raised); border-radius: 8px; padding: 8px 10px; font-size: 0.8125rem; }
+.nrl-board-patience .nrl-label { font-family: var(--nrl-f-num); font-size: 0.625rem; letter-spacing: 0.16em; }
+/* SuperCOOKED 52: patience as pips, one a point. */
+.nrl-board-pips { flex: 1 1 auto; display: flex; gap: 3px; }
+.nrl-board-pips i { flex: 0 1 22px; height: 8px; border-radius: 4px; background: var(--nrl-line); }
+.nrl-board-pips i.nrl-board-pip-on { background: var(--nrl-text); }
+.nrl-board-pips.nrl-board-pips-low i.nrl-board-pip-on { background: var(--nrl-neg); }
+/* Each objective a ringed card with one status chip. */
+.nrl-board-obj { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--nrl-panel); border: 1px solid var(--nrl-line); border-radius: 12px; padding: 8px 10px; font-size: 0.875rem; }
 .nrl-board-obj-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
+.nrl-board-obj-text > span { font-weight: 600; }
 .nrl-board-obj-text small { font-size: 0.6875rem; color: var(--nrl-muted); }
-.nrl-board-status { font-family: var(--nrl-f-label); font-size: 0.8125rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; }
+.nrl-board-status { display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: 11px; border: 1px solid currentColor; font-size: 0.6875rem; font-weight: 700; white-space: nowrap; background: color-mix(in srgb, currentColor 12%, transparent); }
 .nrl-board-status-on-track, .nrl-board-status-met { color: var(--nrl-pos); }
 .nrl-board-status-at-risk { color: var(--nrl-accent); }
 .nrl-board-status-failed, .nrl-board-status-off-track { color: var(--nrl-neg); }
@@ -250,18 +264,25 @@ export const BOARD_CSS = `
 .nrl-staff-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .nrl-staff-row { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 4px 0; border-top: 1px solid var(--nrl-button); box-sizing: border-box; }
 .nrl-staff-info { flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
-.nrl-staff-info strong { font-size: 0.8125rem; font-weight: 600; }
+.nrl-staff-info strong { font-size: 0.875rem; font-weight: 600; }
 .nrl-staff-blurb { font-size: 0.75rem; color: var(--nrl-muted); }
-.nrl-staff-row .nrl-btn { flex: 0 0 auto; min-height: 40px; border-radius: 8px; padding: 0 14px; }
+.nrl-staff-wage { flex: 0 0 auto; font-family: var(--nrl-f-num); font-size: 0.75rem; color: var(--nrl-text-2); white-space: nowrap; }
+.nrl-staff-row .nrl-btn { flex: 0 0 auto; min-height: 40px; border-radius: 10px; padding: 0 14px; font-family: var(--nrl-f-label); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+/* SuperCOOKED 52: Hire outlined, Release raised with the destructive colour in its words. */
+.nrl-staff-row .nrl-btn.nrl-staff-hire-one, .nrl-staff-row .nrl-btn.nrl-staff-hire { background: transparent; border: 1px solid color-mix(in srgb, var(--nrl-text) 35%, transparent); color: var(--nrl-text); }
+.nrl-staff-row .nrl-btn.nrl-staff-hire-one { padding: 0 16px; }
+.nrl-staff-row .nrl-btn.nrl-staff-hire-one:active:not(:disabled), .nrl-staff-row .nrl-btn.nrl-staff-hire:active:not(:disabled) { background: var(--nrl-raised); }
+.nrl-staff-row .nrl-btn.nrl-staff-release { background: var(--nrl-raised); color: var(--nrl-neg); }
 @media (pointer: coarse) { .nrl-staff-row .nrl-btn { min-height: 44px; } }
 /* The attack coach (#326): his four specialities under the row's words, two or four across. */
 .nrl-staff-row-attack { flex-wrap: wrap; }
 .nrl-staff-row-attack .nrl-staff-info { flex-basis: 100%; }
 .nrl-staff-hires { flex: 1 1 100%; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 116px), 1fr)); gap: 6px; }
-.nrl-staff-row .nrl-btn.nrl-staff-hire { min-height: 44px; padding: 2px 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.15; min-width: 0; }
-.nrl-staff-hire-name { font-size: 0.8125rem; white-space: nowrap; }
-.nrl-staff-hire small { font-size: 0.6875rem; font-weight: 500; opacity: 0.85; white-space: nowrap; }
+.nrl-staff-row .nrl-btn.nrl-staff-hire { min-height: 52px; padding: 3px 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.15; min-width: 0; background: var(--nrl-panel); border-color: var(--nrl-line); }
+.nrl-staff-hire-name { font-size: 0.75rem; white-space: nowrap; }
+.nrl-staff-hire small { font-family: var(--nrl-f-num); font-size: 0.625rem; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--nrl-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .nrl-staff-hire[data-locked] { opacity: 0.55; cursor: default; }
+.nrl-staff-hire[data-locked] small { color: var(--nrl-neg); }
 @media (max-width: 700px) { .nrl-screen.nrl-staff { grid-template-columns: 230px minmax(0, 1fr); gap: 12px; } }
 
 /* The sacked card: centred, navy, like full time (3s). */

@@ -33,6 +33,8 @@ import { hasStaff } from '../../systems/staff';
 import { styleLine, whenBehindLine } from '../tacticsBlurbs';
 import { shortName } from './matchReport';
 import { buildOpenCupCard } from './openCupEntry';
+import { starsForOverall } from '../../data/player';
+import { ensurePartsStyles, starsEl } from '../parts';
 import { buildSkillsCampCard } from './playerAssignments';
 import { awayPlayerIds } from '../../systems/playerAssignments';
 
@@ -278,7 +280,8 @@ function buildCalendarFixtures(state: GameState, view: LeagueSeasonView): League
   const scroll = columnScroll(list, () => centreIn(list, current));
   render();
   const currentText = view.choiceRequired ? 'League selection required' : `Week ${state.week} · ${view.currentLabel}`;
-  col.append(el('div', { class: 'nrl-fixtures-head' }, label, toggle),
+  const next = view.choiceRequired ? null : nextOpponentCard(state);
+  col.append(...(next ? [next] : []), el('div', { class: 'nrl-fixtures-head' }, label, toggle),
     el('p', { class: 'nrl-league-foot', text: currentText }), list);
   return { el: col, ...scroll };
 }
@@ -490,7 +493,7 @@ function buildLadder(state: GameState): LeagueColumn {
   table.append(el('colgroup', {}, ...cols.map((c) => el('col', { class: `nrl-ladder-col-${c}` }))));
   const head = el('tr', {},
     el('th', { attrs: { 'aria-label': 'Position' } }),
-    el('th', { class: 'nrl-ladder-heading', text: ladderHeading(state) }),
+    el('th', { class: 'nrl-ladder-club-head', text: 'Club' }),
     ...['P', 'W', ...(draws ? ['D'] : []), 'L', '+/−', 'Pts'].map((h) => el('th', { class: 'nrl-num', text: h })),
     el('th', { class: 'nrl-ladder-form', text: 'Form' }),
   );
@@ -530,7 +533,12 @@ function buildLadder(state: GameState): LeagueColumn {
   const scrollBox = (): HTMLElement => view && typeof getComputedStyle === 'function' && getComputedStyle(col).overflowY === 'auto' ? col : scroll;
   const drops = [hintScroll(scroll), ...(view ? [hintScroll(col)] : [])];
   const drop = (): void => { for (const off of drops) off(); };
-  col.append(scroll, el('div', { class: 'nrl-league-foot', text: `${cut ? `Top ${cut} make the finals` : 'No finals'} · tap a club for its squad` }));
+  // SuperCOOKED 23: "LADDER" over the table, the round it stands after and the finals cut on the right.
+  const [title, ...after] = ladderHeading(state).split(' · ');
+  col.prepend(el('div', { class: 'nrl-ladder-top' },
+    el('span', { class: 'nrl-ladder-heading' }, el('span', { class: 'nrl-ladder-title', text: title! }), ...(after.length ? [el('span', { class: 'nrl-ladder-after', text: ` · ${after.join(' · ')}` })] : [])),
+    el('span', { class: 'nrl-ladder-note', text: cut ? `Top ${cut} play finals` : 'No finals' })));
+  col.append(scroll, el('div', { class: 'nrl-league-foot', text: 'Tap a club for its squad' }));
   return { el: col, drop, ...columnScroll(scrollBox, () => {
     // Start at the goal on a short screen; the whole table is reached by scrolling.
     if (scrollBox() === scroll) centreIn(scroll, mine);
@@ -616,8 +624,40 @@ function buildFixtures(state: GameState): LeagueColumn {
     else centreIn(list, current);
   });
   render();
-  col.append(el('div', { class: 'nrl-fixtures-head' }, label, toggle), list);
+  const next = nextOpponentCard(state);
+  col.append(...(next ? [next] : []), el('div', { class: 'nrl-fixtures-head' }, label, toggle), list);
   return { el: col, ...scroll };
+}
+
+/**
+ * The next opponent at the top of the club's fixtures (SuperCOOKED 23): the stage and where, their stars,
+ * "v Them" or "@ Them" by a stripe in their colour, then their place, record and this season's meetings.
+ * A tap opens the full preview, as the NEXT row does. Null with no match to come.
+ */
+export function nextOpponentCard(state: GameState): HTMLElement | null {
+  const p = nextMatchPreview(state);
+  if (!p) return null;
+  ensurePartsStyles();
+  const stage = p.label ?? (p.stage === 'Trial' ? `Trial ${p.round + 2}` : p.stage === 'Round' ? `Round ${p.round}` : p.stage);
+  const where = p.neutral ? 'Neutral' : p.home ? 'Home' : 'Away';
+  const view = leagueSeasonView(state);
+  const row = (view?.ladder ?? state.league.ladder).find((r) => r.clubId === p.opponent.id);
+  const record = row && row.played > 0 ? `won ${row.wins}, lost ${row.losses}${row.draws ? `, drew ${row.draws}` : ''}` : 'no games yet';
+  // A place on a ladder nobody has played on yet says nothing.
+  const place = p.opponent.ladderPos > 0 && row && row.played > 0 ? `${fmtOrdinal(p.opponent.ladderPos)} · ` : '';
+  const stripe = el('span', { class: 'nrl-next-card-stripe', attrs: { 'aria-hidden': 'true' } });
+  stripe.style.background = p.opponent.colors[0];
+  const card = el('button', {
+    class: 'nrl-next-card',
+    attrs: { type: 'button', 'data-next-card': '', 'aria-label': `Next: ${stage}, ${where}, ${p.home || p.neutral ? 'v' : 'at'} ${p.opponent.name}. Preview` },
+    onClick: () => openNextMatch(),
+  },
+  el('span', { class: 'nrl-next-card-top' },
+    el('span', { class: 'nrl-next-card-when', text: `Next · ${stage} · ${where}` }),
+    starsEl(starsForOverall(p.opponent.strength), { size: 12 })),
+  el('span', { class: 'nrl-next-card-who' }, stripe, el('span', { class: 'nrl-next-card-name', text: `${p.home || p.neutral ? 'v' : '@'} ${p.opponent.name}` })),
+  el('span', { class: 'nrl-next-card-line', text: `${place}${record} · ${fmtHeadToHead(p.headToHead)}` }));
+  return card;
 }
 
 /** The preview last opened: the League sheet under it fills it again when the week moves on (#603). */
@@ -715,7 +755,37 @@ function ensureLeagueStyles(): void {
 }
 
 export const LEAGUE_CSS = `
-/* 3h: one sheet, the ladder and the fixtures side by side; each column scrolls inside itself. */
+/* 3h, SuperCOOKED 23: one sheet, the ladder and the fixtures side by side; each column scrolls inside itself. */
+.nrl-ladder-top { flex: 0 0 auto; display: flex; align-items: baseline; justify-content: space-between; gap: 10px; min-height: 26px; }
+.nrl-ladder-heading { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nrl-ladder-title { font-family: var(--nrl-f-display); font-size: 1.125rem; letter-spacing: -0.02em; text-transform: uppercase; color: var(--nrl-text); }
+.nrl-ladder-after, .nrl-ladder-note { font-family: var(--nrl-f-num); font-size: 0.625rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--nrl-muted); white-space: nowrap; }
+.nrl-ladder-table th.nrl-ladder-club-head { text-align: left; }
+/* The next opponent (23): a ringed card over the club's fixtures; a tap opens the preview. */
+.nrl-next-card {
+  pointer-events: auto; flex: 0 0 auto; display: flex; flex-direction: column; gap: 4px; margin: 0 0 8px; padding: 10px 12px; border: 0; border-radius: 14px;
+  background: var(--nrl-panel); box-shadow: inset 0 0 0 1px var(--nrl-line); color: var(--nrl-text); font: inherit; text-align: left; cursor: pointer;
+}
+.nrl-next-card:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) { .nrl-next-card:hover { background: var(--nrl-raised-hover); } }
+.nrl-next-card:active { background: var(--nrl-raised-hover); }
+.nrl-next-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.nrl-next-card-when { font-family: var(--nrl-f-num); font-size: 0.625rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--nrl-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nrl-next-card-who { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.nrl-next-card-stripe { flex: 0 0 auto; width: 6px; height: 26px; border-radius: 3px; }
+.nrl-next-card-name { min-width: 0; font-family: var(--nrl-f-display); font-size: 1.5rem; line-height: 1.1; letter-spacing: -0.02em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nrl-next-card-line { font-size: 0.8125rem; line-height: 1.3; color: var(--nrl-text-2); overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+/* A phone on its side: one line, their name and when, so four of the club's rounds still show under it;
+   the preview a tap away has their stars, place, record and meetings. */
+@media (max-height: 400px) {
+  .nrl-next-card { flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 10px; margin-bottom: 6px; }
+  .nrl-next-card-who { order: 0; flex: 1 1 auto; }
+  /* The name first: the "when" gives way long before it does. */
+  .nrl-next-card-top { order: 1; flex: 0 1000 auto; min-width: 0; }
+  .nrl-next-card-top .nrl-stars, .nrl-next-card-line { display: none; }
+  .nrl-next-card-name { font-size: 1rem; }
+  .nrl-next-card-stripe { height: 18px; }
+}
 .nrl-league-calendar-heading h2 { margin: 0; font-size: 1rem; }
 .nrl-league-calendar-heading p { font-size: 0.75rem; margin: 4px 0; }
 .nrl-league-calendar-heading { margin-bottom: 8px; }
@@ -795,7 +865,9 @@ export const LEAGUE_CSS = `
 }
 .nrl-form-W { background: var(--nrl-win); color: var(--nrl-on-accent); } /* navy on the green (SuperCOOKED §2) */
 .nrl-form-D { background: var(--nrl-line); }
-.nrl-form-L { background: var(--nrl-out); }
+/* SuperCOOKED 23: a loss in amber (it is a watch, not an alarm), the letters on round dots. */
+.nrl-form-L { background: var(--nrl-neg); color: var(--nrl-on-accent); }
+.nrl-form i { border-radius: 50%; }
 .nrl-form-empty { color: var(--nrl-muted); }
 
 /* The club's fixtures: 38px rows on the panel fill, the result in Mono. */
@@ -824,6 +896,9 @@ button.nrl-fixture-row { pointer-events: auto; cursor: pointer; width: 100%; box
 button.nrl-fixture-row:active { background: var(--nrl-raised-hover); }
 button.nrl-fixture-row:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 1px; }
 @media (pointer: coarse) { button.nrl-fixture-row { height: 44px; } }
+/* Under 400px tall the rounds that aren't buttons are 32px, so four show under the next-opponent card. After the
+   base rules above (equal specificity: placed before them, it never applied); NEXT keeps 44px on touch. */
+@media (max-height: 400px) { .nrl-fixture-row:not(button) { height: 32px; } .nrl-fixtures-list { gap: 3px; } }
 .nrl-fixture-rd { width: 24px; flex: 0 0 auto; font-family: var(--nrl-f-label); font-size: 0.875rem; font-weight: 600; color: var(--nrl-muted); }
 .nrl-fixture-opp { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nrl-fixture-ha { flex: 0 0 auto; color: var(--nrl-muted); }

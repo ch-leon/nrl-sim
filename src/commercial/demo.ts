@@ -13,6 +13,7 @@ import { bus } from '../core/events';
 import { getState, type GameState } from '../core/state';
 import type { SlotSummary } from '../core/save';
 import { commercialEnabled } from './flags';
+import { COMMERCIAL_FIRST_RUN_KEY } from '../core/storageKeys';
 import { type Entitlements, PLATFORM, commercialStorage, entitlementsFor, getEntitlementService, hasFullGame } from './entitlements';
 
 /**
@@ -33,7 +34,7 @@ export const GRANDFATHER_EXISTING_SAVES = true;
 export const DEMO_ENDED_TEXT = "That's the end of the demo.";
 
 /** When the commercial build first ran on this device, and the careers it found then. */
-export const FIRST_RUN_KEY = 'nrl-sim-commercial-first-run';
+export const FIRST_RUN_KEY = COMMERCIAL_FIRST_RUN_KEY;
 
 export interface FirstRun {
   at: number;
