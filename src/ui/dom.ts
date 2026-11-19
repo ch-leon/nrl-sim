@@ -1250,9 +1250,17 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
   border-radius: 1px;
   background: var(--nrl-accent);
 }
-.nrl-office-name { font-family: var(--nrl-f-label); font-size: 1.125rem; font-weight: 700; letter-spacing: 0.02em; color: var(--nrl-text); }
+.nrl-office-name { font-family: var(--nrl-f-label); font-size: 1.125rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--nrl-text); }
 .nrl-office-status { font-family: var(--nrl-f-body); font-size: 0.75rem; font-weight: 400; color: var(--nrl-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .nrl-office-status[data-attn] { color: var(--nrl-accent); }
+/* SuperCOOKED 50: "OFFICE" over the tiles; a tile that wants you has an orange edge and dot as well as its orange line. */
+.nrl-office-head { grid-column: 1 / -1; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 2px 2px 0; }
+.nrl-office-title { font-family: var(--nrl-f-display); font-size: 1.25rem; letter-spacing: -0.02em; text-transform: uppercase; color: var(--nrl-text); }
+.nrl-office-note { font-size: 0.75rem; color: var(--nrl-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nrl-nav-sheet > .nrl-btn:has(.nrl-office-status[data-attn]) { position: relative; box-shadow: inset 0 0 0 1px var(--nrl-accent); }
+.nrl-nav-sheet > .nrl-btn:has(.nrl-office-status[data-attn])::after { content: ''; position: absolute; top: 10px; right: 10px; width: 8px; height: 8px; border-radius: 50%; background: var(--nrl-accent); }
+/* A short phone (956×330, 568×320): the tiles need the room; OFFICE on its tab says where you are. */
+@media (max-height: 360px) { .nrl-office-head { display: none; } }
 .nrl-office-status:empty { display: none; }
 .nrl-nav-sheet > .nrl-btn.nrl-office-locked { cursor: default; opacity: 0.55; }
 .nrl-office-locked .nrl-office-status { white-space: normal; }
@@ -1684,47 +1692,67 @@ body:has(.nrl-update-toast) .nrl-hub-chips { max-width: calc(100vw - 32px - 310p
 .nrl-news-head { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; min-width: 0; min-height: 44px; margin-bottom: 8px; }
 .nrl-news h2 { margin: 0; flex: 0 0 auto; }
 .nrl-news-filters { margin-left: auto; }
-.nrl-news h3 { margin: 10px 0 4px; }
-.nrl-news-week:first-child h3 { margin-top: 0; }
+/* SuperCOOKED 53: the week in small mono caps, then flat rows, each with a dot in its kind's colour. */
+.nrl-news h3 { margin: 0; padding: 8px 2px 4px; font-family: var(--nrl-f-num); font-size: 0.625rem; font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase; color: var(--nrl-muted); }
+.nrl-news-week:first-child h3 { padding-top: 0; }
 .nrl-news-list { overflow-y: visible; }
 .nrl-news-item {
-  padding: 6px 10px;
-  margin-bottom: 4px;
-  border-radius: 8px;
-  background: var(--nrl-panel);
-  border-left: 3px solid var(--nrl-muted); /* the info toast's edge (#339) */
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--nrl-button);
+  box-sizing: border-box;
   color: var(--nrl-text);
+  font-size: 0.875rem;
   line-height: 1.35;
   overflow-wrap: anywhere;
 }
-.nrl-news-item.nrl-news-success { border-left-color: var(--nrl-pos); }
-.nrl-news-item.nrl-news-danger { border-left-color: var(--nrl-alert); }
+.nrl-news-item::before { content: ''; flex: 0 0 8px; height: 8px; border-radius: 50%; background: var(--nrl-muted); } /* the info toast's colour (#339) */
+.nrl-news-item.nrl-news-success::before { background: var(--nrl-pos); }
+.nrl-news-item.nrl-news-danger::before { background: var(--nrl-alert); }
+/* A phone on its side: slimmer rows and week heads, so four whole rows show under the decisions banner. */
+@media (max-height: 420px) {
+  .nrl-news h3 { padding: 4px 2px 2px; }
+  .nrl-news-item { min-height: 32px; padding: 2px 0; }
+}
+.nrl-news-item > .nrl-btn { margin-left: auto; flex: 0 0 auto; background: transparent; border: 1px solid color-mix(in srgb, var(--nrl-text) 30%, transparent); font-family: var(--nrl-f-label); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; font-size: 0.75rem; }
+/* His lines: no dot; his name as a COACH-style tag, the line in italics (his portrait stays, #482). */
+.nrl-news-item:has(> .nrl-coach-line)::before { display: none; }
+.nrl-news-item > .nrl-coach-line { flex: 1 1 auto; align-items: flex-start; padding: 4px 0; font-size: 0.875rem; }
+.nrl-news-item .nrl-coach-name { display: inline-block; margin-right: 8px; padding: 1px 6px; border-radius: 6px; background: var(--nrl-text-2); color: var(--nrl-navy); font-family: var(--nrl-f-label); font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; vertical-align: 1px; }
+.nrl-news-item .nrl-coach-text { font-style: italic; color: var(--nrl-text); }
 .nrl-news-empty { margin: 24px 0; text-align: center; color: var(--nrl-muted); }
 /* Waiting decisions: one row, however many, with the button to their popup. */
 .nrl-news-decisions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   flex: 0 0 auto;
   margin: 0 0 8px;
   padding: 0 6px 0 12px;
   min-height: 48px;
-  background: var(--nrl-raised);
-  border-radius: 10px;
+  background: color-mix(in srgb, var(--nrl-accent) 10%, transparent); /* SuperCOOKED 53: an orange-tinted ringed banner */
+  border: 1px solid color-mix(in srgb, var(--nrl-accent) 45%, transparent);
+  border-radius: 12px;
+  box-sizing: border-box;
 }
 .nrl-news-decisions[hidden] { display: none; }
 .nrl-news-decisions-text { flex: 1 1 auto; min-width: 0; color: var(--nrl-text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nrl-news-decisions-text b { font-family: var(--nrl-f-label); font-size: 0.9375rem; letter-spacing: 0.06em; color: var(--nrl-accent); margin-right: 8px; }
+.nrl-news-decisions-text b { font-family: var(--nrl-f-label); font-size: 0.875rem; letter-spacing: 0.06em; color: var(--nrl-accent); margin-right: 12px; }
 .nrl-news-answer { flex: 0 0 auto; min-height: 36px; }
 
 /* ── A decision card (#75, #338, #346): the story, its deadline, a row per choice ── */
 .nrl-event-card { margin: 0 0 8px; }
 .nrl-event-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 12px; padding-right: 44px; }
-.nrl-event-title { font-family: var(--nrl-f-display); font-size: 1.125rem; font-weight: 400; letter-spacing: -0.02em; text-transform: uppercase; line-height: 1.15; }
+/* SuperCOOKED 56: the title big in Archivo over its deadline line; the choices as ringed cards with pills. */
+.nrl-event-head { flex-direction: column; align-items: flex-start; gap: 4px; }
+.nrl-event-title { font-family: var(--nrl-f-display); font-size: 1.75rem; font-weight: 400; letter-spacing: -0.02em; text-transform: uppercase; line-height: 1; }
 /* The deadline wraps (#345: it was cut off at "…or it's "Ban the t"). */
-.nrl-event-meta { font-size: 0.75rem; color: var(--nrl-accent); line-height: 1.3; overflow-wrap: anywhere; }
-.nrl-event-text { margin: 6px 0 10px; overflow-wrap: anywhere; line-height: 1.45; font-size: 0.875rem; color: var(--nrl-text-2); }
-.nrl-event-choices { display: flex; flex-direction: column; gap: 6px; }
+.nrl-event-meta { font-size: 0.75rem; color: var(--nrl-muted); line-height: 1.3; overflow-wrap: anywhere; }
+.nrl-event-text { margin: 8px 0 10px; overflow-wrap: anywhere; line-height: 1.45; font-size: 0.9375rem; color: var(--nrl-text); }
+.nrl-event-choices { display: flex; flex-direction: column; gap: 8px; }
 .nrl-btn.nrl-event-choice {
   flex: 1 1 auto;
   width: 100%;
@@ -1732,9 +1760,11 @@ body:has(.nrl-update-toast) .nrl-hub-chips { max-width: calc(100vw - 32px - 310p
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 2px;
-  padding: 8px 12px;
-  background: var(--nrl-raised);
+  gap: 6px;
+  padding: 10px 12px;
+  background: var(--nrl-panel);
+  border: 1px solid var(--nrl-line);
+  border-radius: 14px;
   text-align: left;
   text-transform: none;
   letter-spacing: 0;
@@ -1743,17 +1773,20 @@ body:has(.nrl-update-toast) .nrl-hub-chips { max-width: calc(100vw - 32px - 310p
 }
 @media (hover: hover) and (pointer: fine) { .nrl-btn.nrl-event-choice:hover:not(:disabled) { background: var(--nrl-raised-hover); } }
 .nrl-btn.nrl-event-choice:active:not(:disabled) { background: var(--nrl-raised-hover); }
-.nrl-event-choice-label { font-family: var(--nrl-f-label); font-size: 1.0625rem; font-weight: 700; letter-spacing: 0.02em; line-height: 1.2; color: var(--nrl-text); }
-.nrl-event-choice-hint { font-family: var(--nrl-f-body); font-size: 0.75rem; font-weight: 400; line-height: 1.35; color: var(--nrl-text-2); }
-/* #346: a risk is its own line, marked so it never reads as a sure cost. */
-.nrl-event-choice-risk {
-  font-family: var(--nrl-f-body); font-size: 0.75rem; font-weight: 400; line-height: 1.35;
-  color: var(--nrl-neg); padding-left: 8px; border-left: 2px solid var(--nrl-alert); margin-top: 2px;
+.nrl-event-choice-label { font-family: var(--nrl-f-label); font-size: 1.0625rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; line-height: 1.2; color: var(--nrl-text); }
+/* #346: what's sure and each risk are pills of their own, so a risk never reads as a sure cost. */
+.nrl-event-choice-hint, .nrl-event-choice-risk {
+  font-family: var(--nrl-f-body); font-size: 0.6875rem; font-weight: 600; line-height: 1.35; letter-spacing: 0; text-transform: none;
+  padding: 3px 8px; border-radius: 10px; border: 1px solid; max-width: 100%; box-sizing: border-box;
 }
+/* Green only for the "Sure:" beside a risk; a choice with no gamble has the plain pill, gains and costs alike. */
+.nrl-event-choice-hint { color: var(--nrl-text-2); background: var(--nrl-raised); border-color: var(--nrl-line); }
+.nrl-event-choice-hint.nrl-event-choice-sure { color: var(--nrl-pos); background: color-mix(in srgb, var(--nrl-pos) 12%, transparent); border-color: color-mix(in srgb, var(--nrl-pos) 40%, transparent); }
+.nrl-event-choice-risk { color: var(--nrl-neg); background: color-mix(in srgb, var(--nrl-neg) 12%, transparent); border-color: color-mix(in srgb, var(--nrl-neg) 40%, transparent); }
 /* The decisions popup and Advance Week's ask (#338, #345): a region dialog, one card. */
 .nrl-dialog-region .nrl-decisions-modal { width: min(100%, 680px); }
 .nrl-decisions h2, .nrl-ask h2 { margin: 0 0 8px; padding-right: 44px; min-height: 36px; display: flex; align-items: center; }
-.nrl-decisions-count { font-family: var(--nrl-f-label); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); margin: 0 0 2px; }
+.nrl-decisions-count { font-family: var(--nrl-f-num); font-size: 0.6875rem; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; color: var(--nrl-muted); margin: 0 0 6px; min-height: 20px; display: flex; align-items: center; }
 .nrl-decisions-note { margin: 0 0 12px; color: var(--nrl-text-2); }
 .nrl-decisions-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .nrl-decisions-actions .nrl-btn { flex: 1 1 12rem; }
@@ -1765,8 +1798,13 @@ body:has(.nrl-update-toast) .nrl-hub-chips { max-width: calc(100vw - 32px - 310p
 .nrl-ask-due .nrl-ask-note { color: var(--nrl-accent); }
 /* Short landscape phones: the choices side by side, so all of them show with their hints. */
 @media (max-height: 500px) {
+  /* The pills and the big title cost height: tighter here, so both choices and their risks fit (portrait's bali-choices-fit). */
+  .nrl-decisions-count { margin-bottom: 2px; min-height: 0; }
+  .nrl-event-head { gap: 2px; }
   .nrl-event-title { font-size: 1rem; }
-  .nrl-event-text { margin: 4px 0 8px; font-size: 0.8125rem; line-height: 1.35; }
+  .nrl-event-text { margin: 2px 0 6px; font-size: 0.8125rem; line-height: 1.35; }
+  .nrl-btn.nrl-event-choice { padding: 8px 12px; gap: 3px; }
+  .nrl-event-choice-hint, .nrl-event-choice-risk { padding-top: 0; padding-bottom: 0; line-height: 1.3; }
   .nrl-event-choices { flex-direction: row; align-items: stretch; }
   .nrl-btn.nrl-event-choice { flex: 1 1 0; min-width: 0; width: auto; justify-content: flex-start; }
   .nrl-decisions h2, .nrl-ask h2 { margin-bottom: 4px; }
@@ -1866,24 +1904,29 @@ body:has(.nrl-placebar:not([hidden])) .nrl-decisions-chip { visibility: hidden; 
 .nrl-kit { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .nrl-kit-head { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; min-height: 44px; margin-bottom: 8px; }
 .nrl-kit h2 { margin: 0; }
-.nrl-kit h3 { margin: 10px 0 4px; }
-.nrl-kit-controls > h3:first-child { margin-top: 0; }
+/* SuperCOOKED 55: section heads in Oswald caps, field labels in small mono caps. */
+.nrl-kit h3 { margin: 10px 0 4px; font-family: var(--nrl-f-label); font-size: 0.875rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.nrl-kit-controls > h3:first-child { margin-top: 0; font-family: var(--nrl-f-num); font-size: 0.625rem; font-weight: 500; letter-spacing: 0.16em; color: var(--nrl-muted); }
 .nrl-kit-note { margin: 0; font-size: 0.75rem; color: var(--nrl-muted); }
-.nrl-kit-body { display: flex; gap: 16px; flex: 1 1 auto; min-height: 0; }
+.nrl-kit-body { display: flex; gap: 20px; flex: 1 1 auto; min-height: 0; }
 .nrl-kit-side { display: flex; flex-direction: column; gap: 10px; flex: 0 0 auto; }
-.nrl-kit-preview { display: flex; gap: 8px; align-items: flex-end; padding: 8px 10px; border-radius: 10px; background: var(--nrl-panel); }
-.nrl-kit-preview figure { margin: 0; text-align: center; font-family: var(--nrl-f-label); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--nrl-muted); }
+/* Each preview its own ringed panel. */
+.nrl-kit-preview { display: flex; gap: 8px; align-items: stretch; }
+.nrl-kit-preview figure { margin: 0; flex: 1 1 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px; padding: 8px; border-radius: 14px; background: var(--nrl-panel); border: 1px solid var(--nrl-line); text-align: center; font-family: var(--nrl-f-num); font-size: 0.625rem; font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase; color: var(--nrl-muted); }
+/* Rename is the field's own outlined button; Save kit stays the screen's one primary. */
+.nrl-kit .nrl-rename-row > .nrl-btn { flex: 0 0 auto; padding: 0 14px; }
+.nrl-kit .nrl-btn.nrl-rename-save, .nrl-kit-actions .nrl-btn:not(.nrl-btn-primary) { background: transparent; color: var(--nrl-text); border: 1px solid color-mix(in srgb, var(--nrl-text) 30%, transparent); }
 .nrl-kit-sprite { width: 72px; height: 77px; image-rendering: pixelated; }
 .nrl-kit-portrait { width: 60px; image-rendering: pixelated; }
 .nrl-kit-controls { flex: 1 1 16rem; min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-.nrl-kit-label { font-family: var(--nrl-f-label); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); margin: 6px 0 4px; }
+.nrl-kit-label { font-family: var(--nrl-f-num); font-size: 0.625rem; font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase; color: var(--nrl-muted); margin: 6px 0 4px; }
 .nrl-kit-row { display: flex; flex-wrap: wrap; gap: 6px; }
 .nrl-kit-row .nrl-seg { flex-wrap: wrap; }
 .nrl-kit-swatch {
   pointer-events: auto;
   width: 44px; height: 44px; /* #194: a tap target */
   border: 2px solid rgba(255, 255, 255, 0.15);
-  border-radius: 10px;
+  border-radius: 50%;
   cursor: pointer;
 }
 .nrl-kit-swatch[aria-pressed="true"] { border-color: var(--nrl-navy); box-shadow: 0 0 0 2px var(--nrl-text); }
