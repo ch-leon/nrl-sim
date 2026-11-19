@@ -1929,8 +1929,8 @@ actual geometry; it promises no catch or successful outcome.
 ### Back-door lead read (stacked follow-up [draft PR #744](https://github.com/ch-leon/nrl-sim/pull/744))
 
 During a valid back-door play, the nearest eligible free line defender within the
-read radius checks toward the actual lead runner. His goalward target is unchanged;
-his cross-field target shifts toward the lead. The read ends after its duration or
+read radius checks toward the actual lead runner. He aims to hold his current depth
+and step across toward the lead. The read ends after its duration or
 when its eligibility conditions stop holding, and the same packet cannot select a
 replacement reader. This changes positioning only; it adds no pass, catch or
 carrier-line contest roll. Recovery engine revision 10 includes the read.
