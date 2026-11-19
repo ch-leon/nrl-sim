@@ -1,6 +1,6 @@
 # Features
 
-Last updated: 2026-11-19
+Last updated: 2026-11-20
 
 What's in the game, with the PR that added each.
 
@@ -63,6 +63,8 @@ What's in the game, with the PR that added each.
 - Android test APK ([PR](https://github.com/ch-leon/nrl-sim/pull/394)); CI ([PR](https://github.com/ch-leon/nrl-sim/pull/442))
 
 ## Recently added
+
+- **Events on the club home** ([PR #752](https://github.com/ch-leon/nrl-sim/pull/752)): the Events card names Big Mick, Skills Camp and Open Cup, shows the nearest deadline and opens their booking screens. Play Week and fast-forward warn before unentered opportunities close, including the later-opening Invitational. Coaches can review or deliberately continue without entering; missed entries explain when they return.
 
 - **Readable player details on small phones** ([PR #745](https://github.com/ch-leon/nrl-sim/pull/745)): the narrow player header stacks its status pills; on short, narrow screens the whole player sheet scrolls so long names, every tab and Deal actions remain readable at Larger text.
 

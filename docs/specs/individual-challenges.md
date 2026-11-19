@@ -24,6 +24,24 @@ lane, scoring marker, bunting, spectators and Big Mick as host/final opponent.
 No direct movement, aiming, reaction tapping or decision timer. Introductions and
 presentation may be skipped. Preserve existing match presentation and saves.
 
+## Event discovery and reminders
+
+Follow-up requested 20 November after Leon missed Showground registration:
+[#751](https://github.com/ch-leon/nrl-sim/issues/751),
+[implementation plan](../plans/2026-11-20-event-reminders.md).
+The main club grounds expose an Events summary and list with direct access to
+the existing booking dialogs. League retains its event cards. The list shows
+open, booked, played, locked and missed opportunities; a missed entry explains
+when it returns. Deadlines come from the current career records and rules.
+
+Showground closes after Week 5, Invitational after Week 13; the shared reminder
+also covers Skills Camp after Week 4 and Open Cup before Week 7. An advance
+that would close an unentered opportunity offers review or explicit continuation
+without entering. Fast-forward also checks opportunities that open during its
+run. Intentional continuation is scoped to that run, not a permanent dismissal.
+Existing due-contest decisions retain priority. No automatic booking, deadline
+extension, reward change or save migration is part of this follow-up.
+
 ## Approved entry, rewards and next goal
 
 | Term | First edition | Mick's Invitational |
