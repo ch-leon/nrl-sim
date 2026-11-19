@@ -95,11 +95,9 @@ function validContest(contest: ChallengeContest, r: IndividualChallengeRecord, c
 
 interface Context {pack:string; season:number; week?:number; clubIds:readonly string[]; runningChallenge?: IndividualChallengeRecord | undefined}
 export function validateIndividualChallenges(value: unknown, c: CompetitionCareerState, ctx: Context): string|null {
-  if (value===undefined) {
-    if (ctx.runningChallenge) return 'missing running challenge';
-    contestProofs.clear();
-    return null;
-  }
+  // Isolated Open Cup checks recurse here without a history. They must not
+  // evict the outer career's proofs before its own challenge sweep resumes.
+  if (value===undefined) return ctx.runningChallenge ? 'missing running challenge' : null;
   if (!Array.isArray(value) || !c.leagueCareer || c.leagueCareer.phase==='initial-choice' || !supportedCampCalendar(c,ctx.pack)) return 'challenge calendar';
   const proofs: typeof contestProofs = new Map();
   const seen = new Set<string>();
