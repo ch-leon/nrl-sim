@@ -52,8 +52,7 @@ describe('changing the plan at the breaks (N11)', () => {
   });
 
   it('after a try the change waits for the restart', () => {
-    // After the fullback sweep in #722, seed 1 still has a try in this short match.
-    const r = play(1, EXP_RUSH, (s) => s.phaseKind === 'try');
+    const r = play(5, EXP_RUSH, (s) => s.phaseKind === 'try');
     expect(r.plans).toHaveLength(1);
     const at = r.plans[0]!.tick;
     const plan = r.events.find((e) => e.kind === 'plan')!;

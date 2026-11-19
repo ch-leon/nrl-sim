@@ -36,8 +36,7 @@ function playMatch(seed: number, halfMinutes = 7, maxTick = 30_000): Snapshot[] 
 }
 
 describe('the referee (#642)', () => {
-  // Seed 2 supplies both try and penalty signals. Keep seed 3 first for the other fixtures.
-  const matches = [3, 2].map((seed) => playMatch(seed));
+  const matches = [3, 11].map((seed) => playMatch(seed));
 
   it('is a pure function of the snapshot', () => {
     const s = matches[0]![500]!;
