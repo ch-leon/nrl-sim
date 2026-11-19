@@ -45,7 +45,7 @@ describe('Staff & Board: the attack coach’s row', () => {
     const row = attackCoachRow(getState()) as unknown as StubNode;
     const hires = row.querySelectorAll('[data-hire-attack]');
     expect(hires.map((b) => b.attrs['data-hire-attack'])).toEqual(['direct', 'width', 'kicking', 'razzle']);
-    expect(hires.map((b) => b.textContent)).toEqual(['Hire Direct$16,000 once', 'Hire Width$19,000 once', 'Hire Kicking$18,000 once', 'Hire RazzleNeeds reputation 50']);
+    expect(hires.map((b) => b.textContent)).toEqual(['Hire Direct$800/wk$16,000 once', 'Hire Width$950/wk$19,000 once', 'Hire Kicking$900/wk$18,000 once', 'Hire RazzleNeeds reputation 50']);
     expect(hires.map((b) => b.disabled)).toEqual([false, false, false, true]);
     expect(row.words()).toContain('Plays you buy stay if he goes.');
 
