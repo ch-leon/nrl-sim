@@ -1,3 +1,5 @@
+import { clubReservations } from './playerAvailability';
+export { awayPlayerIds } from './playerAvailability';
 import type { GameState, Player, TrainingFocus } from '../core/state';
 import {
   CAMP_RULES,
@@ -51,14 +53,6 @@ export function currentSkillsCamp(state: GameState): CampRecord | null {
   };
 }
 
-const nobody: ReadonlySet<string> = new Set();
-export function awayPlayerIds(state: Pick<GameState, 'competitions' | 'season' | 'clubId'>): ReadonlySet<string> {
-  const away = state.competitions?.assignments?.find(
-    (r) => r.season === state.season && r.clubId === state.clubId && r.status === 'away'
-  );
-  return away?.booking ? new Set([away.booking.participantId]) : nobody;
-}
-
 interface CampProjection {
   reason: string | null;
   fitCount: number;
@@ -72,8 +66,10 @@ interface CampProjection {
 export function projectCampDeparture(
   state: GameState,
   booking: Pick<CampBooking, 'participantId'>,
-  targetSlot = CAMP_RULES.departureWeek,
-  outgoingId?: string
+  targetSlot: number = CAMP_RULES.departureWeek,
+  outgoingId?: string,
+  ownReservation = campId(state.season, state.clubId),
+  title: string = CAMP_RULES.title
 ): CampProjection {
   const intervals = Math.max(0, targetSlot - state.week);
   const recovery = (intervals + 1) * injuryRecoveryPerWeek(state.facilities);
@@ -86,19 +82,21 @@ export function projectCampDeparture(
     }));
   const id = booking.participantId;
   const player = state.squad.find((p) => p.id === id && p.id !== outgoingId);
-  const fit = squad.filter(isFieldable);
-  const selected = resolveLineup(state.lineup, squad);
+  const others = new Set(clubReservations(state).filter(r=>r.week === targetSlot && r.id !== ownReservation).map(r=>r.playerId));
+  const fit = squad.filter(p => isFieldable(p) && !others.has(p.id));
+  const selected = resolveLineup(state.lineup, squad, others);
   const starter = selected.starters.findIndex((p) => p?.id === id);
   const benched = selected.bench.some((p) => p.id === id);
   let reason: string | null = null;
   if (!player) reason = 'The booked player has left the club.';
+  else if (others.has(id)) reason = 'The player already has a commitment for this week.';
   else if (player.injuredWeeks > 0) reason = 'The player is injured and must be fit before departure.';
-  else if ((player.suspendedWeeks ?? 0) > 0) reason = 'The player is suspended and cannot attend Skills Camp.';
+  else if ((player.suspendedWeeks ?? 0) > 0) reason = `The player is suspended and cannot attend ${title}.`;
   const minimum = CAMP_RULES.minSquad;
   const remaining = fit.filter((p) => p.id !== id).length;
   if (!reason && remaining < minimum)
-    reason = `Only ${remaining} players can cover the opening fixture. Skills Camp requires ${minimum}.`;
-  const side = reason ? selected : resolveLineup(state.lineup, squad, new Set([id]));
+    reason = `Only ${remaining} players can cover the fixture. ${title} requires ${minimum}.`;
+  const side = reason ? selected : resolveLineup(state.lineup, squad, new Set([...others, id]));
   const cover = reason
     ? null
     : starter >= 0
@@ -178,16 +176,14 @@ export function changeCampBooking(state: GameState, offerId: string, revision: n
 }
 
 export function campDisposalProblem(state: GameState, playerId: string): string | null {
-  const r = state.competitions?.assignments?.find(
-    (r) => r.season === state.season && r.clubId === state.clubId && ['booked', 'away'].includes(r.status)
-  );
-  if (!r?.booking) return null;
-  if (r.status === 'away') return 'Finish the Skills Camp interval before changing the squad.';
-  if (playerId === r.booking.participantId) return 'Cancel this player’s Skills Camp booking before moving him.';
-  const before = projectCampDeparture(state, r.booking);
-  const after = projectCampDeparture(state, r.booking, CAMP_RULES.departureWeek, playerId);
-  if (after.coverCount < r.rules.minSquad && after.coverCount < before.coverCount)
-    return 'Cancel Skills Camp or arrange enough cover before moving this player.';
+  for (const r of clubReservations(state)) {
+    if (r.away && r.title === CAMP_RULES.title) return 'Finish the Skills Camp interval before changing the squad.';
+    if (playerId === r.playerId) return r.away ? `This player is away at ${r.title}.` : `Cancel this player’s ${r.title} booking before moving him.`;
+    const projection = (outgoingId?: string) => projectCampDeparture(state,{participantId:r.playerId},r.week,outgoingId,r.id,r.title);
+    const after = projection(playerId);
+    if (after.coverCount < CAMP_RULES.minSquad && after.coverCount < projection().coverCount)
+      return `Arrange enough cover for ${r.title} before moving this player.`;
+  }
   return null;
 }
 

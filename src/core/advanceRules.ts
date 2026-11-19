@@ -18,7 +18,7 @@ export type AdvanceTarget =
  * Why a multi-advance halted. `target` means it finished normally; the others
  * are the "needs attention" stops.
  */
-export type StopKind = 'forfeit' | 'injury' | 'contract' | 'bankruptcy' | 'decision' | 'choice-required' | 'target';
+export type StopKind = 'forfeit' | 'injury' | 'contract' | 'bankruptcy' | 'decision' | 'choice-required' | 'challenge-decision' | 'target';
 
 export interface StopReason {
   kind: StopKind;

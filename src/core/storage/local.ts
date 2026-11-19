@@ -19,6 +19,8 @@ export interface StorageLike {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
   removeItem(key: string): void;
+  /** Publish mirrored changes only after the entire synchronous save has passed verification. */
+  withVerifiedWrite?(write: (storage: StorageLike) => void): void;
 }
 
 /**
@@ -115,24 +117,34 @@ export class LocalSaveStore implements SyncSaveStore {
 
   /** Throws when the payload was not stored (storage full or blocked); nothing else is touched then. */
   write(slot: number, payload: string, meta: SaveMeta, parkedMatch?: string | null, verifyPayload = false, current?: () => boolean, expectedOriginal?: string | null): void {
+    const apply = (storage: StorageLike) =>
+      this.writeCareer(storage, slot, payload, parkedMatch, verifyPayload, current, expectedOriginal);
+    if ((verifyPayload || parkedMatch !== undefined) && this.storage.withVerifiedWrite) this.storage.withVerifiedWrite(apply);
+    else apply(this.storage);
+    this.pending.set(slot, meta);
+    this.queueFlush();
+  }
+
+  private writeCareer(storage: StorageLike, slot: number, payload: string, parkedMatch: string | null | undefined,
+    verifyPayload: boolean, current?: () => boolean, expectedOriginal?: string | null): void {
     const key = slotKey(slot);
-    const previous = slot === 1 || verifyPayload ? this.storage.getItem(key) : null;
-    const legacy = slot === 1 ? this.storage.getItem(LEGACY_SAVE_KEY) : null;
+    const previous = slot === 1 || verifyPayload ? storage.getItem(key) : null;
+    const legacy = slot === 1 ? storage.getItem(LEGACY_SAVE_KEY) : null;
     const matchKey = liveMatchKey(slot);
-    const ownsSidecar = (): boolean => parkedMatch === undefined || this.storage.getItem(matchKey) === parkedMatch;
+    const ownsSidecar = (): boolean => parkedMatch === undefined || storage.getItem(matchKey) === parkedMatch;
     const writePayload = (): void => {
       if (verifyPayload && expectedOriginal !== undefined && this.read(slot) !== expectedOriginal)
         throw new Error('The destination changed before saving');
       if (current && !current()) throw new Error('The destination changed before saving');
-      this.storage.setItem(key, payload);
+      storage.setItem(key, payload);
       if (!verifyPayload) return;
       try {
-        if (this.storage.getItem(key) !== payload || !ownsSidecar() || (current && !current())) throw new Error('Settled career was not stored');
+        if (storage.getItem(key) !== payload || !ownsSidecar() || (current && !current())) throw new Error('Settled career was not stored');
       } catch (error) {
         // A replacement sidecar belongs to the other writer's career.
         if (ownsSidecar()) {
-          if (previous === null) this.storage.removeItem(key);
-          else this.storage.setItem(key, previous);
+          if (previous === null) storage.removeItem(key);
+          else storage.setItem(key, previous);
         }
         throw error;
       }
@@ -142,18 +154,18 @@ export class LocalSaveStore implements SyncSaveStore {
     } else {
       // Install the small record first. If the larger checkpoint hits quota,
       // restore the exact original record before reporting the import failure.
-      const old = this.storage.getItem(matchKey);
+      const old = storage.getItem(matchKey);
       try {
-        if (parkedMatch === null) this.storage.removeItem(matchKey);
-        else this.storage.setItem(matchKey, parkedMatch);
+        if (parkedMatch === null) storage.removeItem(matchKey);
+        else storage.setItem(matchKey, parkedMatch);
         if (!ownsSidecar()) throw new Error('Parked match was not stored');
         writePayload();
       } catch (error) {
         // Restore our staged sidecar, or a failed sidecar write while the old
         // career is still present. Leave a competing replacement pair together.
-        if (ownsSidecar() || this.storage.getItem(key) === previous) {
-          if (old === null) this.storage.removeItem(matchKey);
-          else this.storage.setItem(matchKey, old);
+        if (ownsSidecar() || storage.getItem(key) === previous) {
+          if (old === null) storage.removeItem(matchKey);
+          else storage.setItem(matchKey, old);
         }
         throw error;
       }
@@ -161,10 +173,8 @@ export class LocalSaveStore implements SyncSaveStore {
     // Only retire the legacy source we replaced. A different, shadowed career
     // must survive ordinary autosaves of slot 1, including a future-version one.
     if (slot === 1 && (previous === null || previous === legacy)) {
-      try { this.storage.removeItem(LEGACY_SAVE_KEY); } catch { /* best effort */ }
+      try { storage.removeItem(LEGACY_SAVE_KEY); } catch { /* best effort */ }
     }
-    this.pending.set(slot, meta);
-    this.queueFlush();
   }
 
   /** Empty the slot (and the legacy key for slot 1) and drop its meta. Throws if storage does. */

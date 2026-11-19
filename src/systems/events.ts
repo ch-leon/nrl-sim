@@ -1,3 +1,4 @@
+import { awaitingCampReplay } from './parkedLeagueFixture';
 // src/systems/events.ts — the random events deck (GitHub #75). Draws at most one
 // card a week from data/events.ts, resolves the player's choice (or the card's
 // default once ANSWER_WEEKS pass) and runs the temporary modifiers choices leave
@@ -329,7 +330,7 @@ export function applyEffects(state: GameState, effects: readonly EventEffect[], 
   let banned: Applied['banned'];
   const rolls: boolean[] = [];
   const updateSubject = (fn: (p: Player) => Player): void => {
-    if (!ctx.subjectId) return;
+    if (!ctx.subjectId || awayPlayerIds(s).has(ctx.subjectId)) return;
     s = { ...s, squad: s.squad.map((p) => (p.id === ctx.subjectId ? fn(p) : p)) };
   };
   effects.forEach((e, i) => {
@@ -603,7 +604,7 @@ function commit(a: Applied): void {
 /** The player picked choice `index` on a pending card. Returns false if it no longer exists. */
 export function chooseEvent(eventId: string, index: number): boolean {
   const s = getState();
-  if (hasStructuralCalendar(s) || weekHeld()) return false;
+  if (awaitingCampReplay(s) || hasStructuralCalendar(s) || weekHeld()) return false;
   const r = resolveEvent(s, eventId, index, elapsedInterval(s));
   if (!r) return false;
   commit(r);
@@ -664,6 +665,7 @@ export function resolveDueRollovers(state: GameState, now: number): Applied {
  * draw's eligibility check would not draw it.
  */
 export function plantPending(cardId: string): boolean {
+  if (awaitingCampReplay(getState())) return false;
   const card = cardById(cardId);
   if (!card) return false;
   const s = getState();

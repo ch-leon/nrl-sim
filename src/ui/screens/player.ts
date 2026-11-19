@@ -45,7 +45,9 @@ import { potentialText } from '../../systems/potential';
 import { renamePlayer } from '../../systems/rename';
 import { nameField, renameButton } from '../rename';
 import { awayPlayerIds, campDisposalProblem } from '../../systems/playerAssignments';
-import { campAbsenceText, campAvailability } from './playerAssignments';
+import { clubReservations } from '../../systems/playerAvailability';
+import { challengeHonours } from '../../systems/individualChallenges';
+import { nextReservation, reservationText, tripLabel } from '../playerReservations';
 
 // ── View-model (pure) ───────────────────────────────────────────────────────
 
@@ -224,7 +226,8 @@ const ordinal = (n: number): string => {
  * "On the bench" or "Not picked". Pure.
  */
 export function lineupSlotText(state: GameState, playerId: string): string {
-  if (awayPlayerIds(state).has(playerId)) return 'Away at Skills Camp';
+  const away = clubReservations(state).find(t=>t.away && t.playerId===playerId);
+  if (away) return `Away at ${away.title}`;
   // The side as it runs out (injured men covered, the bench topped up), not the saved sheet.
   const side = resolveLineup(state.lineup, state.squad, awayPlayerIds(state));
   const slot = side.starters.findIndex((p) => p?.id === playerId);
@@ -288,7 +291,7 @@ export function playerPageModel(p: Player, ctx: PlayerContext, state: GameState)
   const seasonsAtClub = p.joinedSeason !== undefined ? clock.season - p.joinedSeason + 1 : null;
   // Keep the squad focus visible: it now controls level-point spending.
   const focus = state.training?.focus ?? 'balanced';
-  const assignment = squad ? campAbsenceText(campAvailability(state), p.id) : null;
+  const assignment = squad ? reservationText(clubReservations(state), p.id) : null;
   return {
     xp: `Level ${p.level ?? 1} · XP ${Math.floor(p.xp ?? 0)}/${PROGRESSION.XP_PER_LEVEL}`,
     id: p.id,
@@ -623,8 +626,10 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
     }
     const m = playerPageModel(p, ctx, state);
     const kit = kitFor(ctx, state);
+    const trip = nextReservation(clubReservations(state),p.id);
+    const challengeAway = !!trip?.away && tripLabel(trip) === 'Contest';
     const unspent = m.unspent ?? 0;
-    if (unspent <= 0) spending = false;
+    if (unspent <= 0 || challengeAway) spending = false;
 
     // The header: ◂ back, who he is, how he is (fitness and morale, each a word, §3.7), his stars.
     const portrait = el('img', {
@@ -693,11 +698,13 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
       panel.append(tiles);
       foot = el('div', { class: 'nrl-player-foot' },
         el('div', { class: `nrl-player-where${m.injured ? ' nrl-player-out' : ''}`, text: m.injured ? `${m.where} · ${m.fitness}` : m.where }),
-        ...(m.assignment ? [el('div', { class: 'nrl-player-where', text: m.assignment, attrs: { 'data-camp-absence': p.id } })] : []));
+        ...(m.assignment ? [el('div', { class: 'nrl-player-where', text: m.assignment, attrs: { [trip && tripLabel(trip)==='Contest' ? 'data-challenge-absence' : 'data-camp-absence']: p.id } })] : []));
       if (spending) {
         const done = button('Done', () => { spending = false; render(); }, { class: 'nrl-btn-outline' });
         done.setAttribute('data-spend-done', '');
         foot.append(el('span', { class: 'nrl-spend-left', text: `${unspent} point${unspent === 1 ? '' : 's'} to spend` }), done);
+      } else if (challengeAway && unspent > 0) {
+        foot.append(el('span',{text:'Level points can be spent when the player returns.'}));
       } else if (unspent > 0) {
         const spend = button(`Spend ${unspent} point${unspent === 1 ? '' : 's'} ▸`, () => { spending = true; render(); }, { class: 'nrl-btn-primary' });
         spend.setAttribute('data-spend-open', '');
@@ -781,6 +788,7 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
         ...(m.season ? [line('This season', fmtTally(m.season))] : []),
         ...(m.career ? [line('Career', fmtTally(m.career))] : []),
         ...(m.tenure ? [el('div', { class: 'nrl-player-line', text: m.tenure })] : []),
+        ...challengeHonours(state,p.id).map(r=>line('Personal honour', `Season ${r.season} · ${r.award!.honour}`, {'data-challenge-honour':r.id})),
         playerHistory(p, state),
       );
     }

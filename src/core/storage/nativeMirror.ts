@@ -10,8 +10,8 @@
 // localStorage. Web and Android never get here.
 //
 // Pure: the native side is the small NativeFiles interface (capacitorFiles.ts is the
-// Capacitor one, loaded lazily; tests use a Map). No timers: every native write is
-// started by the storage write (or the boot sync) that caused it.
+// Capacitor one, loaded lazily; tests use a Map). Ordinary writes never wait for
+// confirmation. A challenge checkpoint alone requests a bounded native readback.
 //
 // The rules:
 //  - localStorage wins. The boot sync only fills gaps from native; it never
@@ -94,12 +94,21 @@ export function isMirroredKey(key: string): boolean {
 }
 
 type Op = { kind: 'set'; value: string } | { kind: 'remove' };
+type Confirmation = 'confirmed' | 'failed' | 'timeout' | 'superseded';
+interface PendingCheck {
+  value: string;
+  current: () => boolean;
+  result: Promise<Confirmation>;
+  finish: (result: Confirmation) => void;
+}
+
 type Log = (message: string, error?: unknown) => void;
 const warn: Log = (message, error) => console.warn(`nrl-sim: ${message}`, error);
 
 export class NativeMirror {
   /** The op to apply next, per key: the latest one asked for. */
   private readonly next = new Map<string, Op>();
+  private readonly checks = new Map<string, PendingCheck>();
   private readonly running = new Set<string>();
   private idleWaiters: Array<() => void> = [];
 
@@ -113,6 +122,37 @@ export class NativeMirror {
   /** Mirror a delete. Never throws. */
   remove(key: string): void {
     this.enqueue(key, { kind: 'remove' });
+  }
+
+  /** Check/retry only these accepted bytes, in order with this key's ordinary writes. */
+  confirm(key: string, value: string, current: () => boolean, signal: AbortSignal): Promise<Confirmation> {
+    try {
+      if (!current() || signal.aborted) return Promise.resolve('superseded');
+    } catch {
+      return Promise.resolve('failed');
+    }
+    const existing = this.checks.get(key);
+    if (existing?.value === value) return existing.result;
+    existing?.finish('superseded');
+
+    let resolve!: (outcome: Confirmation) => void;
+    const result = new Promise<Confirmation>(r => { resolve = r; });
+    const abort = () => check.finish('superseded');
+    const timer = setTimeout(() => check.finish('timeout'), 5000);
+    const check: PendingCheck = {
+      value, current, result,
+      finish: outcome => {
+        if (this.checks.get(key) !== check) return;
+        this.checks.delete(key);
+        clearTimeout(timer);
+        signal.removeEventListener('abort', abort);
+        resolve(outcome);
+      },
+    };
+    this.checks.set(key, check);
+    signal.addEventListener('abort', abort, {once: true});
+    if (!this.running.has(key)) void this.drain(key);
+    return result;
   }
 
   /** Resolves once every queued native write has finished (or failed). */
@@ -162,6 +202,7 @@ export class NativeMirror {
         if (text === null) return;
         try {
           storage.setItem(key, text);
+          if (storage.getItem(key) !== text) throw new Error('Restored bytes did not match');
           restored.push(key);
         } catch (err) {
           this.log(`native copy of ${key} not restored`, err);
@@ -188,6 +229,8 @@ export class NativeMirror {
   }
 
   private enqueue(key: string, op: Op): void {
+    const check = this.checks.get(key);
+    if (check && (op.kind === 'remove' || op.value !== check.value)) check.finish('superseded');
     this.next.set(key, op);
     if (!this.running.has(key)) void this.drain(key);
   }
@@ -195,7 +238,14 @@ export class NativeMirror {
   private async drain(key: string): Promise<void> {
     this.running.add(key);
     try {
-      for (let op = this.next.get(key); op; op = this.next.get(key)) {
+      while (true) {
+        const op = this.next.get(key);
+        if (!op) {
+          const check = this.checks.get(key);
+          if (!check) break;
+          await this.verify(key, check);
+          continue;
+        }
         this.next.delete(key);
         try {
           if (op.kind === 'set') await this.write(key, op.value);
@@ -212,6 +262,33 @@ export class NativeMirror {
         for (const resolve of waiters) resolve();
       }
     }
+  }
+
+  private async verify(key: string, check: PendingCheck): Promise<void> {
+    const owned = () => this.checks.get(key) === check && check.current();
+    try {
+      if (!owned()) { check.finish('superseded'); return; }
+      if (!await this.matches(key, check.value)) {
+        if (!owned()) { check.finish('superseded'); return; }
+        // A boot may have kept the local save after a native failure. Repair it
+        // once on explicit confirmation, using the ordinary crash-safe protocol.
+        await this.write(key, check.value);
+        if (!await this.matches(key, check.value)) { check.finish('failed'); return; }
+      }
+      check.finish(owned() ? 'confirmed' : 'superseded');
+    } catch (error) {
+      this.log(`native checkpoint for ${key} could not be confirmed`, error);
+      check.finish('failed');
+    }
+  }
+
+  /** Exactly the copy boot would recover: a delete marker wins, then .ready, then the final file. */
+  private async matches(key: string, value: string): Promise<boolean> {
+    const file = fileForKey(key);
+    const names = await this.files.list();
+    if (names.includes(file + SUFFIXES.gone)) return false;
+    const recovery = names.includes(file + SUFFIXES.ready) ? file + SUFFIXES.ready : file;
+    return names.includes(recovery) && await this.files.read(recovery) === value;
   }
 
   private async write(key: string, value: string): Promise<void> {
@@ -255,15 +332,28 @@ export class NativeMirror {
 
 /** `base` with every write and delete of a mirrored key also sent to `mirror`, after `base` took it. */
 export function mirroredStorage(base: StorageLike, mirror: NativeMirror): StorageLike {
+  const publish = (key: string, value: string | null): void => {
+    if (!isMirroredKey(key)) return;
+    // A Web Storage shim can silently drop or truncate a write, or refuse a delete.
+    try { if (base.getItem(key) !== value) return; } catch { return; }
+    if (value === null) mirror.remove(key);
+    else mirror.set(key, value);
+  };
+  function view(after: (key: string, value: string | null) => void): StorageLike {
+    return {
+      getItem: key => base.getItem(key),
+      setItem(key, value) { base.setItem(key, value); after(key, value); },
+      removeItem(key) { base.removeItem(key); after(key, null); },
+    };
+  }
   return {
-    getItem: (key) => base.getItem(key),
-    setItem: (key, value) => {
-      base.setItem(key, value); // throws (storage full): nothing mirrored, as nothing changed
-      if (isMirroredKey(key)) mirror.set(key, value);
-    },
-    removeItem: (key) => {
-      base.removeItem(key);
-      if (isMirroredKey(key)) mirror.remove(key);
+    ...view(publish),
+    withVerifiedWrite(write) {
+      // Scope staging to this caller's view. An independent, reentrant writer
+      // still publishes its own accepted changes. A thrown save publishes none.
+      const changes = new Map<string, string | null>();
+      write(view((key, value) => changes.set(key, value)));
+      for (const [key, value] of changes) publish(key, value);
     },
   };
 }
@@ -280,7 +370,7 @@ export interface MirrorBoot {
   /** The native side, loaded only when `ios` (a dynamic import, so the web bundle never carries it). */
   loadFiles: () => Promise<NativeFiles>;
   /** Make the mirrored storage the one browserStorage() hands out. */
-  install: (storage: StorageLike) => void;
+  install: (storage: StorageLike, mirror: NativeMirror) => void | boolean;
   log?: Log;
 }
 
@@ -291,7 +381,8 @@ export interface MirrorBoot {
  * what localStorage has and nothing is mirrored ('failed'). Never throws.
  */
 export async function startNativeMirror(boot: MirrorBoot): Promise<{ start: MirrorStart; mirror?: NativeMirror }> {
-  if (!boot.ios || !boot.storage) return { start: 'inactive' };
+  if (!boot.ios) return { start: 'inactive' };
+  if (!boot.storage) return { start: 'failed' };
   const log = boot.log ?? warn;
   let files: NativeFiles;
   try {
@@ -304,6 +395,6 @@ export async function startNativeMirror(boot: MirrorBoot): Promise<{ start: Mirr
   let keys: string[] = [];
   try { keys = boot.keys(); } catch { /* unenumerable: restore only */ }
   await mirror.sync(boot.storage, keys);
-  boot.install(mirroredStorage(boot.storage, mirror));
+  if (boot.install(mirroredStorage(boot.storage, mirror), mirror) === false) return { start: 'failed', mirror };
   return { start: 'active', mirror };
 }

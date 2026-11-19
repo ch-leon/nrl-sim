@@ -105,7 +105,7 @@ function creditCash(balance: number, delta: number, label: string): number {
   return next;
 }
 
-function creditPlayerPrize(state: GameState, season: number, delta: number): GameState {
+export function creditPlayerPrize(state: GameState, season: number, delta: number): GameState {
   const matching = state.finance.filter(book => book.season === season);
   if (matching.length > 1) throw new CompetitionRewardError('Ambiguous competition reward season book');
   const book = matching[0] ?? emptyFinance(season);

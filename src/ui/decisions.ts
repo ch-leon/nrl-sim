@@ -26,6 +26,11 @@ import { fmtMoney } from '../utils/money';
 import { el, button, openModal, closeModal, activeScreen, dialogOpen } from './dom';
 import { ADVANCE_FAILED_TEXT } from './hud';
 import { demoBlocked } from '../commercial/demo';
+import { dueIndividualChallenge } from '../systems/individualChallenges';
+import { challengeAdvanceProblem } from '../systems/individualChallengeCommit';
+import { CHALLENGE_EDITIONS } from '../data/individualChallengeRules';
+import { openIndividualChallenge } from './screens/individualChallenges';
+import { weekHeld } from '../core/time';
 
 // ── View-model (pure) ─────────────────────────────────────────────────────────
 
@@ -89,15 +94,26 @@ export function decisionViews(state: GameState): DecisionView[] {
 
 /** The decisions chip's list (3a): soonest due first, each with when it is due. Pure. */
 export function decisionChipItems(state: GameState): { title: string; note: string }[] {
-  return decisionViews(state)
+  const challenge = dueIndividualChallenge(state);
+  const event = challenge && !weekHeld() && challengeAdvanceProblem(state)
+    ? [{ title: CHALLENGE_EDITIONS[challenge.editionId].name, note: 'Needs your coaching decision' }] : [];
+  return [...event, ...decisionViews(state)
     .slice()
     .sort((a, b) => a.advancesLeft - b.advancesLeft)
-    .map((v) => ({ title: v.title, note: v.advancesLeft === 1 ? 'due now' : `${v.advancesLeft} wks left` }));
+    .map((v) => ({ title: v.title, note: v.advancesLeft === 1 ? 'due now' : `${v.advancesLeft} wks left` }))];
 }
 
 /** Number of cards waiting for a choice (the News and Advance Week badges). */
 export function pendingDecisionCount(state: GameState): number {
-  return state.eventDeck.pending.length;
+  return state.eventDeck.pending.length + Number(!weekHeld() && !!dueIndividualChallenge(state) && !!challengeAdvanceProblem(state));
+}
+
+/** A contest never supplies a default coaching decision to an advance. */
+function openRequiredChallenge(): HTMLElement | null {
+  const state = getState();
+  const challenge = dueIndividualChallenge(state);
+  return !weekHeld() && challenge && challengeAdvanceProblem(state)
+    ? openIndividualChallenge(challenge.editionId) : null;
 }
 
 /** The card's deadline, in advances rather than calendar weeks. */
@@ -183,6 +199,8 @@ export function decisionCard(view: DecisionView, onChoose: (id: string, index: n
  * answers), offers its button. A region dialog: the HUD and nav stay usable.
  */
 export function openDecisions(opts: { then?: { label: string; run: () => void } } = {}): HTMLElement | null {
+  const challenge = openRequiredChallenge();
+  if (challenge) return challenge;
   const content = el('div', { class: 'nrl-decisions', attrs: { 'data-decisions': '' } });
   const render = (): void => {
     const views = decisionViews(getState());
@@ -224,6 +242,7 @@ export function openDecisions(opts: { then?: { label: string; run: () => void } 
  * Keep advancing) or going ahead, which takes the defaults that fall due.
  */
 export function askBeforeAdvance(span: number, proceed: () => void): void {
+  if (openRequiredChallenge()) return;
   const ask = demoBlocked() ? null : advanceAsk(getState(), span);
   if (!ask) {
     proceed();
@@ -255,6 +274,7 @@ export function askBeforeAdvance(span: number, proceed: () => void): void {
  * the HUD does for its own runs.
  */
 export function advanceUntilAsked(target: AdvanceTarget, run: (t: AdvanceTarget) => Promise<AdvanceRun>, opts: { confirmed?: boolean } = {}): void {
+  if (openRequiredChallenge()) return;
   const span = targetSpan(target, getState().week, getState().preseason);
   // With a card waiting, the ask below puts this question instead (one dialog, not two).
   const question = pendingDecisionCount(getState()) === 0 && !opts.confirmed && !demoBlocked() ? longAdvanceQuestion(span) : null;
@@ -265,6 +285,7 @@ export function advanceUntilAsked(target: AdvanceTarget, run: (t: AdvanceTarget)
   askBeforeAdvance(span, () => {
     const startSeason = getState().season;
     run(target).then((r) => {
+      if (r.stop.kind === 'challenge-decision') { if (!dialogOpen()) openRequiredChallenge(); return; }
       if (r.stop.kind !== 'decision') return;
       const s = getState();
       const rest = remainingTarget(target, { weeksPlayed: r.weeksPlayed, week: s.week, startSeason, season: s.season,

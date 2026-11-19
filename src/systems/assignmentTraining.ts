@@ -3,8 +3,8 @@ import type { Player, PlayerStats, TrainingFocus } from '../core/state';
 import { shownStats } from '../data/player';
 import { awardXp, spendByFocus, type LevelPointSpendMode } from './training';
 
-import { CAMP_RULES } from '../data/playerAssignments';
-export const CAMP_BASE_XP = CAMP_RULES.baseXp;
+import { CAMP_BASE_XP } from '../data/playerAssignments';
+export { CAMP_BASE_XP };
 
 export interface CampAwardReceipt {
   effectiveXp: number;
@@ -37,7 +37,12 @@ export function campTrainingFoci(player: Pick<Player, 'position' | 'stats' | 'ce
 type CampAthlete = Pick<Player,'age'|'traits'|'position'|'stats'|'ceilings'|'xp'|'level'|'unspentPoints'>;
 export function applyCampAward<P extends CampAthlete>(player: P, { campFocus, clubFocus, mode }: CampAwardOptions):
   { player: P; receipt: CampAwardReceipt } {
-  const awarded = awardXp(player, CAMP_BASE_XP, []);
+  return applyAssignmentAward(player, CAMP_BASE_XP, { ...(campFocus ? {campFocus} : {}), clubFocus, mode });
+}
+
+export function applyAssignmentAward<P extends CampAthlete>(player: P, baseXp: number, {campFocus, clubFocus, mode}: CampAwardOptions):
+  { player: P; receipt: CampAwardReceipt } {
+  const awarded = awardXp(player, baseXp, []);
   const focus = mode === 'auto' ? (campFocus ?? clubFocus) : null;
   const returned = focus === null ? awarded : spendByFocus(awarded, focus);
   const xpBefore = player.xp ?? 0;

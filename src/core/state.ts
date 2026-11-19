@@ -130,8 +130,8 @@ export interface LeagueState {
 export type WeatherKind = 'clear' | 'rain' | 'wind';
 
 /** v30 adds player histories, v31 optional league progression, and v32 exact
- * protected agreements. v33 adds Open Cup entry and v34 optional Skills Camp records. Finance state migrates from v28; v27 requires a new career. */
-export const SAVE_VERSION = 34;
+ * protected agreements. v33 adds Open Cup entry and v34 optional Skills Camp records. v35 adds individual challenge checkpoints. Finance state migrates from v28; v27 requires a new career. */
+export const SAVE_VERSION = 35;
 
 /** The hires the facilities don't cover (N14.5), and the attack coach who opens set plays to buy (#326). */
 export type StaffRole = 'assistantCoach' | 'analyst' | 'welfare' | 'attackCoach';

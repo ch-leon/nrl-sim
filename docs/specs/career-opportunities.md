@@ -11,10 +11,17 @@ records independent review, CI/full QA and public confirmation/reload verificati
 The normal optional Open Cup, prizes and receipt-backed views are implemented in
 [PR #736](https://github.com/ch-leon/nrl-sim/pull/736). The [Open Cup evidence record](../status/2026-11-open-cup.md)
 records local verification and the required PR release gates.
-Its initial prize values are for testing, with wider #582 balance still open. Assignments [#708](https://github.com/ch-leon/nrl-sim/issues/708),
-the watched/coached individual challenge [#710](https://github.com/ch-leon/nrl-sim/issues/710),
-the distinct small-sided event [#711](https://github.com/ch-leon/nrl-sim/issues/711)
-and gear are later work.
+Its initial prize values are for testing, with wider #582 balance still open. The first
+assignment, Skills Camp, shipped in [PR #742](https://github.com/ch-leon/nrl-sim/pull/742).
+The watched/coached individual challenge [#710](https://github.com/ch-leon/nrl-sim/issues/710)
+now has an implementation candidate: [Big Mick's rules](individual-challenges.md),
+[exact engine and measured tuning](individual-challenge-engine.md), and
+[verification evidence](../status/2026-11-individual-challenges.md). Three carry/defend
+duels lead to a finite bonus if tied; Showground and a permanently unlocked Invitational
+both have annual entry windows, actual player absence, XP and cash receipts, and personal
+honours. The [readable Notion guide](https://app.notion.com/p/41d0870d4c44813888c3c05c3b8ad833)
+records every mechanic. Further assignments, the distinct small-sided event
+[#711](https://github.com/ch-leon/nrl-sim/issues/711), sponsors and gear remain later work.
 
 **Status:** Leon approved the direction and requested this specification. This
 records that agreement; event names, numerical balance and unimplemented delivery
@@ -203,12 +210,13 @@ Individual contests must contain short animated action and meaningful coaching
 decisions with visible consequences. They are not just a result card or a direct-control
 action game. Use skippable introductions, readable opponents and a quick rematch rhythm.
 
-Working example — **Big Mick's Break the Line**:
+The first implementation is **Big Mick's Break the Line** ([complete rules](individual-challenges.md)):
 
 - Select one player using relevant abilities, traits and current condition.
 - Inspect the next opponent and choose an approach such as power, footwork or
-  conserving energy. These are proposed choices; the event rules must give each
-  a distinct, explainable trade-off rather than a universally best button.
+  conserving energy. Carry choices are Power through, Change the angle and Controlled
+  carry; defence choices are Shoot the hit, Track the hips and Set and wrap. Each has
+  a measured reachable title advantage, with published energy costs and odds.
 - Watch a short carrying/tackling round; read why it succeeded or failed.
 - Coach between rounds in response to the opponent and remaining stamina.
 - Complete a finite final/decider and return with the published rewards.

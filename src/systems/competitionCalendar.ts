@@ -1,4 +1,4 @@
-import { runningCampContext } from '../core/time';
+import { runningCampContext, runningChallengeContext } from '../core/time';
 import type { RunningCamp } from '../data/playerAssignments';
 import { CompetitionRewardError } from './competitionRewards';
 import { freezeMatchEffects, reconcileMatchEffects } from './matchIncome';
@@ -71,7 +71,7 @@ function normalLeagueProblem(state: GameState, runningCamp?: RunningCamp): strin
   if (!progress || typeof progress !== 'object' || careerNamespace() !== null) return 'This League career is unsupported.';
   const cached = admitted.get(progress);
   if (cached?.installation === stateInstallation() && cached.world === state.competitions!.world) return null;
-  const problem = leagueCareerStateProblem(state,runningCamp);
+  const problem = leagueCareerStateProblem(state,runningCamp,runningChallengeContext(state));
   if (problem) return problem.message;
   admitted.set(progress, {installation: stateInstallation(), world: state.competitions!.world});
   return null;
@@ -98,7 +98,7 @@ export function structuralAdvanceProblem(state: GameState): string | null {
 /** Check the live lifecycle shape during interval settlement. */
 export function isPlayableLeagueCareer(state: GameState): boolean {
   return !!state.competitions?.leagueCareer && state.boardLoan?.owed === 0
-    && !validateInput(state as unknown as Record<string, unknown>, state.version,runningCampContext(state));
+    && !validateInput(state as unknown as Record<string, unknown>, state.version,runningCampContext(state),runningChallengeContext(state));
 }
 
 /** Activation is an explicit local developer operation, never an imported flag. */
@@ -206,7 +206,7 @@ export function finaliseCalendarFixture(state: GameState, bridge: Fixture, score
       fulfilled:{fixtureId:fixture.id,slot:state.week,result:{...result}}}}};
   }
   const runningCamp = runningCampContext(state);
-  const problem = validateCompetitions(competitions, { pack: state.pack ?? 'au', season: state.season, week: state.week, clubIds: state.league.clubs.map(c => c.id), ...(runningCamp ? {runningCamp} : {}) });
+  const problem = validateCompetitions(competitions, { pack: state.pack ?? 'au', season: state.season, week: state.week, clubIds: state.league.clubs.map(c => c.id), runningChallenge:runningChallengeContext(state), ...(runningCamp ? {runningCamp} : {}) });
   if (problem) throw new Error(`Invalid result transition: ${problem}`);
   const stage = instance.definition.stages.find(s => s.id === fixture.stageId)!;
   // A compatibility read model for the player's own league. Cup results never change it.
@@ -261,7 +261,7 @@ function applyInstances(state: GameState, instances: CompetitionInstance[]): Gam
   const runningCamp = runningCampContext(state);
   const competitions = { ...state.competitions!, instances };
   const problem = validateCompetitions(competitions, {
-    pack: state.pack ?? 'au', season: state.season, week: state.week, clubIds: state.league.clubs.map(c => c.id), ...(runningCamp ? {runningCamp} : {}),
+    pack: state.pack ?? 'au', season: state.season, week: state.week, clubIds: state.league.clubs.map(c => c.id), runningChallenge:runningChallengeContext(state), ...(runningCamp ? {runningCamp} : {}),
   });
   if (problem) {
     recoveryLog(`left unchanged (${problem})`);

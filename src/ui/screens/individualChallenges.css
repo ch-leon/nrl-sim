@@ -1,0 +1,56 @@
+.duel-card { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px; margin:0 0 8px; padding:8px 10px; border:1px solid var(--nrl-line); border-left:4px solid #eab15c; border-radius:10px; background:var(--nrl-raised); }
+.duel-card h3,.duel-card p,.duel-dialog h2,.duel-dialog h3,.duel-dialog p { margin:0; }
+.duel-card p { font-size:.75rem; color:var(--nrl-text-2); }
+.duel-card h3,.duel-dialog h3 { font-family:var(--nrl-f-label); font-size:1.05rem; }
+.duel-modal.nrl-modal { width:min(780px,calc(100vw - 16px - var(--nrl-safe-l,0px) - var(--nrl-safe-r,0px))); max-width:none; padding:0; max-height:none; overflow:hidden; background:var(--nrl-navy); }
+.duel-dialog { display:flex; flex-direction:column; color:var(--nrl-text); max-height:calc(100dvh - 12px - var(--nrl-safe-t,0px) - var(--nrl-safe-b,0px)); }
+.duel-dialog header,.duel-footer { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:4px 12px; background:var(--nrl-navy); padding:6px 12px; flex:none; }
+.duel-dialog header { border-bottom:1px solid var(--nrl-line); }
+.duel-dialog h2 { font-size:1.125rem; color:var(--nrl-text); }
+.duel-dialog .nrl-btn,.duel-card .nrl-btn,.duel-dialog select { min-width:44px; min-height:44px; white-space:normal; }
+.duel-body { overflow:auto; overscroll-behavior:contain; min-height:0; padding:10px 12px; display:grid; gap:10px; align-content:start; background:var(--nrl-navy); }
+.duel-dialog p { line-height:1.35; }
+.duel-dialog details { background:var(--nrl-raised); border-radius:8px; padding:0 10px; }
+.duel-dialog summary { cursor:pointer; box-sizing:border-box; min-height:44px; padding:12px 0; font-family:var(--nrl-f-label); }
+.duel-dialog details[open] { padding-bottom:8px; }
+.duel-dialog details p + p,.duel-dialog details h3 { margin-top:6px; }
+.duel-picker { display:grid; gap:4px; position:relative; }
+.duel-picker::after { content:""; position:absolute; right:14px; bottom:20px; width:6px; height:6px; border-right:2px solid currentColor; border-bottom:2px solid currentColor; transform:rotate(45deg); pointer-events:none; }
+.duel-picker select { appearance:none; -webkit-appearance:none; box-sizing:border-box; height:46px; width:100%; color:var(--nrl-text); background:var(--nrl-raised); border:1px solid var(--nrl-line); border-radius:6px; padding:0 30px 0 8px; font:inherit; }
+.duel-preview,.duel-receipt { display:grid; gap:6px; padding:10px; background:var(--nrl-raised); border-radius:10px; border-left:3px solid #dfb96b; }
+.duel-abilities dl { display:flex; flex-wrap:wrap; gap:4px; padding:0; margin:5px 0; }
+.duel-abilities dl div { display:flex; align-items:baseline; gap:4px; border:1px solid var(--nrl-line); padding:3px 6px; border-radius:5px; }
+.duel-abilities dt { font-size:.75rem; color:var(--nrl-text-2); }
+.duel-abilities dd { margin:0; font-family:var(--nrl-f-num); font-weight:bold; }
+.duel-actions { display:flex; flex-wrap:wrap; gap:6px; }
+.duel-footer { justify-content:flex-end; border-top:1px solid var(--nrl-line); }
+.duel-footer:empty { display:none; }
+.duel-stage-wrap { display:none; }
+.duel-dialog[data-live] { height:min(525px,calc(100dvh - 12px - var(--nrl-safe-t,0px) - var(--nrl-safe-b,0px))); }
+.duel-dialog[data-live] .duel-middle { display:grid; grid-template-columns:minmax(0,1.12fr) minmax(0,1fr); min-height:0; flex:1; }
+.duel-dialog:not([data-live]) .duel-middle { display:flex; flex-direction:column; min-height:0; }
+.duel-dialog[data-live] .duel-stage-wrap { display:flex; flex-direction:column; justify-content:center; background:transparent; min-height:0; position:relative; }
+.duel-lane { flex:1; min-height:0; position:relative; }
+.duel-score { display:flex; gap:4px 12px; justify-content:space-between; flex-wrap:wrap; color:var(--nrl-text); background:var(--nrl-panel); font-family:var(--nrl-f-label); padding:6px 10px; }
+.duel-dialog[data-watch] .duel-middle { grid-template-columns:minmax(0,1fr); }
+.duel-dialog[data-watch] .duel-body { display:none; }
+.duel-choices { display:grid; gap:5px; }
+.duel-choices .nrl-btn { text-align:left; display:grid; justify-items:start; align-content:center; border:1px solid var(--nrl-line); padding:5px 9px; }
+.duel-choices .nrl-btn[aria-pressed=true] { border-color:var(--nrl-accent); box-shadow:inset 3px 0 var(--nrl-accent); }
+.duel-choices small { font: .75rem/1.25 var(--nrl-f-body); color:var(--nrl-text-2); }
+#ui-root:has(.duel-dialog[data-live]) > :not(.nrl-modal-backdrop:has(.duel-dialog)) { visibility:hidden; }
+.nrl-modal-backdrop:has(.duel-dialog[data-live]) { background:transparent; }
+.duel-modal.nrl-modal:has(.duel-dialog[data-live]) { background:transparent; box-shadow:0 0 0 200vmax rgba(6, 13, 16, .96); }
+.duel-status { color:var(--nrl-alert); }
+@media (max-height:400px) {
+ .duel-dialog header,.duel-footer { padding:2px 8px; }
+ .duel-dialog[data-live] .duel-middle { grid-template-columns:minmax(0,.94fr) minmax(0,1fr); }
+ .duel-dialog[data-watch] .duel-middle { grid-template-columns:1fr; }
+ .duel-body { padding:6px 8px; gap:6px; }
+}
+@media (orientation:portrait) { .duel-dialog[data-live] .duel-middle { grid-template-columns:1fr; grid-template-rows:minmax(100px,1fr) minmax(100px,1.1fr); } }
+
+.duel-crew { display:flex; flex-wrap:wrap; gap:5px 12px; align-items:center; padding:6px 8px; border-block:1px solid var(--nrl-line); background:var(--nrl-panel); }
+.duel-crew div { display:flex; align-items:center; gap:5px; }
+.duel-crew img { image-rendering:pixelated; }
+.duel-crew strong { font-family:var(--nrl-f-label); font-size:.875rem; }

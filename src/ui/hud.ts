@@ -17,6 +17,7 @@ import { ECON, WEEKS_PER_SEASON } from '../config';
 import { fmtMoney, fmtMoneyShort } from '../utils/money';
 import { el, button, mount, ensureStyles, dock, activeScreen, onScreenChange } from './dom';
 import { MATCH_ACTIVE_CLASS } from './screens/matchOverlay';
+import { challengeAdvanceProblem } from '../systems/individualChallengeCommit';
 
 /** Options for {@link createHud}. */
 export interface HudOpts {
@@ -494,11 +495,12 @@ export function createHud(opts: HudOpts = {}): Hud {
     actions.toggleAttribute('data-advancing', on);
     root.toggleAttribute('data-advancing', on);
     if (on) setMenuOpen(false);
-    advanceLabel.textContent = (on ? (s.competitions?.leagueCareer ? `Week ${s.week} of ${s.competitions.calendar!.slots.length}…` : advanceProgressLabel(s.week)) : playerMatchPending() ? `${RESUME_MATCH_LABEL} ▸` : leagueChoiceRequired(s) && !weekHeld() ? 'Choose league ▸' : PLAY_WEEK_LABEL).toUpperCase();
+    const challenge = !weekHeld() && challengeAdvanceProblem(s);
+    advanceLabel.textContent = (on ? (s.competitions?.leagueCareer ? `Week ${s.week} of ${s.competitions.calendar!.slots.length}…` : advanceProgressLabel(s.week)) : playerMatchPending() ? `${RESUME_MATCH_LABEL} ▸` : leagueChoiceRequired(s) && !weekHeld() ? 'Choose league ▸' : challenge ? 'Contest ▸' : PLAY_WEEK_LABEL).toUpperCase();
     advanceSub.hidden = on;
     // #350 H1: a decision waiting shows on the button that would take its default.
     advanceLabel.querySelector('.nrl-hud-alert')?.remove();
-    const waiting = on ? 0 : s.eventDeck.pending.length;
+    const waiting = on ? 0 : s.eventDeck.pending.length + Number(!!challenge);
     if (waiting > 0) {
       advanceLabel.append(el('span', {
         class: 'nrl-hud-alert', text: String(waiting), attrs: { 'aria-label': decisionsBadgeLabel(waiting), 'data-hud': 'decisions' },

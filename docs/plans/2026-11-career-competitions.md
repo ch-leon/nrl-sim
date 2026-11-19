@@ -29,7 +29,12 @@ implemented in [PR #742](https://github.com/ch-leon/nrl-sim/pull/742) under #708
 [implementation plan](2026-11-19-player-assignments.md). Book in Weeks 1–4, send one
 player away for the opening league match in Week 5, and welcome him back before
 Week 6. One free annual place and 70 base XP are the accepted starting values for
-testing. Later assignment families, special events and gear remain separate slices.
+testing. [Big Mick's Break the Line](../specs/individual-challenges.md) is now implemented
+as the next release candidate: three carry/defend duels, saved coaching choices and
+animation, Week 6 Showground and Week 14 Invitational, real club cover, personal
+honours and cash/XP on return. [Verification](../status/2026-11-individual-challenges.md)
+and the [readable Notion rules](https://app.notion.com/p/41d0870d4c44813888c3c05c3b8ad833)
+track mechanics and delivery. Other assignment families, formats and gear remain separate slices.
 
 ### Changes that govern future implementation
 
@@ -53,7 +58,7 @@ testing. Later assignment families, special events and gear remain separate slic
 | --- | --- | --- |
 | A | Selectable league career and Open Cup — league selection shipped in #719; cup entry/rewards/views implemented in #736 | Win, unlock, choose to stay or move, and finish/decline a cup with valid people, finances and next-season setup. |
 | B | Player assignments — Skills Camp implemented in PR #742 | Send a player away, cover an overlapping fixture, and receive the player and recorded outcome once. |
-| C | Watched/coached individual challenge | Coach animated rounds, earn a personal and supported club reward, and reveal a next opportunity. |
+| C | Watched/coached individual challenge — Big Mick implementation candidate | Coach animated rounds, earn a personal and supported club reward, and reveal a next opportunity. |
 | D | Distinct small-sided event and invitation chain | A beach or floodlit event changes play and squad decisions, with a saved route to a later challenge. |
 | E | Wider catalogue and endgame | Add Shield/youth/Champions Series and further events, each with its own decision and bounded rewards. |
 | Later | Gear | Specify and validate equipment acquisition, boosts, slots and visual presentation separately. |
@@ -93,7 +98,8 @@ opportunity/history presentation (#578) and integrated career balance (#562/#582
 [#708 assignments](https://github.com/ch-leon/nrl-sim/issues/708),
 [#710 watched/coached individual challenge](https://github.com/ch-leon/nrl-sim/issues/710)
 and [#711 distinct small-sided event](https://github.com/ch-leon/nrl-sim/issues/711)
-are separate slices: #708 is implemented in PR #742; #710/#711 remain planned.
+are separate slices: #708 is implemented in PR #742; #710 now has its two-edition
+implementation and verification candidate; #711 remains planned.
 #579–#581 retain the Shield/youth/Champions content, with ordering chosen against
 those prerequisites. The first camp's eligibility, training substitution, return,
 cancellation and disposal rules are specified. Future assignment families and

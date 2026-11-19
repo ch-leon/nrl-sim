@@ -1,0 +1,367 @@
+{
+  "source_commit": "008c7ceef9a04de5823823c0f9c9ccd3ecbd9ac1",
+  "saved_format": 34,
+  "season": 1,
+  "career_seed": 573,
+  "difficulty": "normal",
+  "namespace": null,
+  "slot": 1,
+  "storage": "Private in-memory localStorage. Fresh Node process per command.",
+  "runtime": {
+    "node": "22.22.3",
+    "vite_node": "2.1.9",
+    "package_lock": {
+      "filename": "package-lock.json",
+      "bytes": 295339,
+      "sha256": "745b8322101300f7a12bb1794150e5feea8e5debe65c56e52f6a282858bcd52a"
+    }
+  },
+  "match_settings": {
+    "field_length_m": 100,
+    "halves": 2,
+    "half_minutes": 2.5,
+    "live_rivals": false,
+    "coach_inputs": []
+  },
+  "regions": {
+    "au": {
+      "club_name": "QA AU League",
+      "home": {
+        "town": "Brisbane",
+        "country": "AU"
+      },
+      "club_matches": [
+        1,
+        4,
+        5,
+        6,
+        8,
+        9,
+        11,
+        12,
+        14
+      ],
+      "boundaries": [
+        {
+          "week": 5,
+          "elapsed_intervals": 4,
+          "rng_state": 937800272,
+          "open_cup": {
+            "lifecycle": "open",
+            "choice": "unanswered",
+            "resolution": null
+          },
+          "slot": {
+            "filename": "v34-au-week-5.json",
+            "bytes": 424832,
+            "sha256": "516a31222e174f4982d6bbca5c887046831ee9b8f870c6c5fdedafb17c5ede2c"
+          }
+        },
+        {
+          "week": 6,
+          "elapsed_intervals": 5,
+          "rng_state": 1945706824,
+          "open_cup": {
+            "lifecycle": "open",
+            "choice": "unanswered",
+            "resolution": null
+          },
+          "slot": {
+            "filename": "v34-au-week-6.json",
+            "bytes": 433243,
+            "sha256": "fa88a131d6ca84440814896a11e4c16bb01b38722f3e7e007ce80cc2b3e5f5eb"
+          },
+          "sidecar": {
+            "filename": "live-matches/v34-au-week-6.json",
+            "bytes": 284,
+            "sha256": "f1d10ef60f39011366ff5c76ed918c8786a59d0fe438751f0739b42c84f7ecd4"
+          },
+          "fixture_id": "au-career-3x8:au-local:s1:i0:f6",
+          "competition_id": "au-career-3x8:au-local:s1:i0",
+          "round": 2,
+          "match_seed": 2126618068,
+          "engine_id": "nrl-live-6-0a1b2b2c68eb48",
+          "pause": {
+            "tick": 720,
+            "match_seconds": 33.9,
+            "snapshot_sha256": "2bb3b37b3d164d7ad42ce74e954b3779c038b74496ec138ea04037a2f782f049"
+          },
+          "finished": {
+            "home_score": 4,
+            "away_score": 0,
+            "event_count": 118,
+            "result_sha256": "7db526d6fc57f932f9ce5d7db471fa65fcadbff956ab2d4fe142e0cce06bc99a",
+            "settled_slot_sha256": "9b86a8b6e9921831944b76aa3573caddbbc3290a8f62168f8741697ca18d8d93"
+          }
+        },
+        {
+          "week": 13,
+          "elapsed_intervals": 12,
+          "rng_state": 1170836160,
+          "open_cup": {
+            "lifecycle": "drawn",
+            "choice": "unanswered",
+            "resolution": "expired"
+          },
+          "slot": {
+            "filename": "v34-au-week-13.json",
+            "bytes": 522097,
+            "sha256": "eb481f592f36178108be6ff3f89b1997b816403c13e8f50ed05b4a9f4164446a"
+          }
+        },
+        {
+          "week": 14,
+          "elapsed_intervals": 13,
+          "rng_state": 475059293,
+          "open_cup": {
+            "lifecycle": "drawn",
+            "choice": "unanswered",
+            "resolution": "expired"
+          },
+          "slot": {
+            "filename": "v34-au-week-14.json",
+            "bytes": 532855,
+            "sha256": "47f0f7660555e5c81e0776b9fd4dfc6f6c6fcd93753f3ab177847cd1cb276851"
+          },
+          "sidecar": {
+            "filename": "live-matches/v34-au-week-14.json",
+            "bytes": 286,
+            "sha256": "0aa00416a688e7ee79b5a465bea9d15b04cb0d36651d29dbb4995e05f34cc110"
+          },
+          "fixture_id": "au-career-3x8:au-local:s1:i0:f27",
+          "competition_id": "au-career-3x8:au-local:s1:i0",
+          "round": 7,
+          "match_seed": 886433642,
+          "engine_id": "nrl-live-6-0a1b2b2c68eb48",
+          "pause": {
+            "tick": 720,
+            "match_seconds": 33.9,
+            "snapshot_sha256": "e02ba4d58433c8ff35b6abfbeda56d4b0e1304395571322d39b6dcdbd801a24d"
+          },
+          "finished": {
+            "home_score": 1,
+            "away_score": 0,
+            "event_count": 109,
+            "result_sha256": "209430f17909e3962c5c6fab23b69f0425c39dd1f19ad314c4c41bb7a7648bef",
+            "settled_slot_sha256": "624d1927472d485a3763f9d82c0d2e3dc6cde2b437ec2a1c5b7712a1e2826538"
+          }
+        }
+      ]
+    },
+    "uk": {
+      "club_name": "QA UK League",
+      "home": {
+        "town": "Leeds",
+        "country": "GB"
+      },
+      "club_matches": [
+        1,
+        4,
+        5,
+        6,
+        8,
+        9,
+        11,
+        12,
+        14
+      ],
+      "boundaries": [
+        {
+          "week": 5,
+          "elapsed_intervals": 4,
+          "rng_state": 2037918750,
+          "open_cup": {
+            "lifecycle": "open",
+            "choice": "unanswered",
+            "resolution": null
+          },
+          "slot": {
+            "filename": "v34-uk-week-5.json",
+            "bytes": 421176,
+            "sha256": "b460a5dc8b082b34ec428f50640e1b62d40188d05873d75861cdc79579f41489"
+          }
+        },
+        {
+          "week": 6,
+          "elapsed_intervals": 5,
+          "rng_state": 3045825302,
+          "open_cup": {
+            "lifecycle": "open",
+            "choice": "unanswered",
+            "resolution": null
+          },
+          "slot": {
+            "filename": "v34-uk-week-6.json",
+            "bytes": 429460,
+            "sha256": "a366b23421353f436e39ab65136fb8d7140761e9cdaa5119b392a7936fcc6db1"
+          },
+          "sidecar": {
+            "filename": "live-matches/v34-uk-week-6.json",
+            "bytes": 280,
+            "sha256": "407e65db17dcfeba890e631873bffa46666037a8be2c1b19e1c2d09d5fb80436"
+          },
+          "fixture_id": "uk-career-3x8:uk-local:s1:i0:f4",
+          "competition_id": "uk-career-3x8:uk-local:s1:i0",
+          "round": 2,
+          "match_seed": 184501686,
+          "engine_id": "nrl-live-6-017a0b6bfc64d1",
+          "pause": {
+            "tick": 720,
+            "match_seconds": 33.9,
+            "snapshot_sha256": "c20851b3b46e8210efac6f1143f836720a4d421ec452ac138f24bd793bb43f45"
+          },
+          "finished": {
+            "home_score": 0,
+            "away_score": 0,
+            "event_count": 109,
+            "result_sha256": "00c2496fe35eb0cac663e280feee9305022a8fd8359ebfae9bf87b4d591f4db9",
+            "settled_slot_sha256": "b32df022ecafa4271ce0c3df4f73870b77193bb52d0719fe6a97f1a723f589b5"
+          }
+        },
+        {
+          "week": 13,
+          "elapsed_intervals": 12,
+          "rng_state": 2270954638,
+          "open_cup": {
+            "lifecycle": "drawn",
+            "choice": "unanswered",
+            "resolution": "expired"
+          },
+          "slot": {
+            "filename": "v34-uk-week-13.json",
+            "bytes": 517458,
+            "sha256": "c609c0ea0ced039393131cfd4801306d4a6f4c907278cf519f888f38ab6e66b8"
+          }
+        },
+        {
+          "week": 14,
+          "elapsed_intervals": 13,
+          "rng_state": 1575177771,
+          "open_cup": {
+            "lifecycle": "drawn",
+            "choice": "unanswered",
+            "resolution": "expired"
+          },
+          "slot": {
+            "filename": "v34-uk-week-14.json",
+            "bytes": 528107,
+            "sha256": "72108eb55843242153351fcc4488eecb62d1eba03b26c0165b5230bd6a024929"
+          },
+          "sidecar": {
+            "filename": "live-matches/v34-uk-week-14.json",
+            "bytes": 290,
+            "sha256": "096d5b919b9d92dbf7704d1bd1f09199139c2175cced7838e0d1cf13039ecaae"
+          },
+          "fixture_id": "uk-career-3x8:uk-local:s1:i0:f24",
+          "competition_id": "uk-career-3x8:uk-local:s1:i0",
+          "round": 7,
+          "match_seed": 1767553706,
+          "engine_id": "nrl-live-6-017a0b6bfc64d1",
+          "pause": {
+            "tick": 720,
+            "match_seconds": 33.9,
+            "snapshot_sha256": "f728fcdf9dc44bf0f516bf3857d3f889cb042e934a4cdb40f55f3cc042365d22"
+          },
+          "finished": {
+            "home_score": 6,
+            "away_score": 6,
+            "event_count": 110,
+            "result_sha256": "ba07754a020599799c2e84c11f6b9fa00a696e3f5b6b6efeecf61f7c8a5c412d",
+            "settled_slot_sha256": "0a75ead9c9be9c6fac2152c7643465e60d459fc7f1c249af4733a7aa41832044"
+          }
+        }
+      ]
+    }
+  },
+  "completed_camp_variant": {
+    "pack": "au",
+    "week": 6,
+    "elapsed_intervals": 5,
+    "rng_state": 1945706824,
+    "open_cup": {
+      "lifecycle": "open",
+      "choice": "unanswered",
+      "resolution": null
+    },
+    "slot": {
+      "filename": "v34-au-week-6-camp-completed.json",
+      "bytes": 434350,
+      "sha256": "6157f11cf2d2ad29150052b8c9ac01889d3aff9a3214afe68a58a6256babe1cd"
+    },
+    "camp": {
+      "id": "skills-camp:s1:player",
+      "season": 1,
+      "clubId": "player",
+      "pack": "au",
+      "instanceId": "au-career-3x8:au-local:s1:i0",
+      "fixtureId": "au-career-3x8:au-local:s1:i0:f3",
+      "opponentId": "rival-au-bellbirds",
+      "rules": {
+        "definitionId": "skills-camp",
+        "version": 1,
+        "title": "Skills Camp",
+        "opensWeek": 1,
+        "closesWeek": 4,
+        "departureWeek": 5,
+        "returnWeek": 6,
+        "minSquad": 13,
+        "onField": 9,
+        "bench": 4,
+        "baseXp": 70,
+        "fee": 0,
+        "eligibility": "owned-fit-unbanned",
+        "substitution": "replace-weekly-xp",
+        "facilities": "none",
+        "spending": "mode-at-return",
+        "cancellation": "before-departure"
+      },
+      "revision": 3,
+      "status": "completed",
+      "booking": {
+        "participantId": "p_16wlus2_480108",
+        "participantName": "Lenny Steplock",
+        "bookedWeek": 4,
+        "focus": "balanced"
+      },
+      "reason": null,
+      "award": {
+        "effectiveXp": 17.5,
+        "xpBefore": 30,
+        "xpAfter": 47.5,
+        "levelsGained": 0,
+        "newPoints": 0,
+        "bankedBefore": 0,
+        "bankedAfter": 0,
+        "pointsSpent": 0,
+        "priorPointsSpent": 0,
+        "statGains": {},
+        "mode": "auto",
+        "focus": "balanced"
+      },
+      "awardBasis": {
+        "age": 36,
+        "clubFocus": "balanced",
+        "xpTraits": [],
+        "stats": {
+          "strength": 46,
+          "stamina": 34.500000000000014,
+          "speed": 38.500000000000014,
+          "footyIQ": 46
+        }
+      }
+    }
+  },
+  "capture_driver": {
+    "filename": "capture.ts.txt",
+    "bytes": 14370,
+    "sha256": "256320c890800581d56abc1706aab94b854380b9d0f5f45b8feaf247a722e222"
+  },
+  "held_export_recipe": "JSON.stringify({ ...JSON.parse(slot), nrlLiveMatch: JSON.parse(sidecar) }, null, 2)",
+  "verification": {
+    "identical_full_regeneration_files": 13,
+    "previous_week_replays": 4,
+    "held_imports_reopened_and_completed": 4,
+    "completed_camp_imports": 1,
+    "repairs": 0
+  }
+}

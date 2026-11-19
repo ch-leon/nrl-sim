@@ -1,3 +1,4 @@
+import { awaitingCampReplay } from './parkedLeagueFixture';
 // src/systems/rename.ts — renaming players and clubs in-game (GitHub #398).
 //
 // A rename writes the fields the save already has: Player.name (in the squad,
@@ -8,7 +9,7 @@
 // No DOM, no Phaser.
 
 import { KIT_PATTERNS, type KitDesign } from '../art/match/kit';
-import type { GameState, Player, RivalClub } from '../core/state';
+import { getState, stateInstallation, type GameState, type Player, type RivalClub } from '../core/state';
 import { cleanName } from '../data/names';
 import { colorsContrast } from '../config';
 
@@ -84,6 +85,7 @@ export type RenameResult = { ok: true; patch: Partial<GameState> | null } | { ok
 
 /** Rename one player from typed text. `patch` is null when the name is unchanged. */
 export function renamePlayer(state: GameState, id: string, raw: string): RenameResult {
+  if (awaitingCampReplay(state)) return {ok:false,why:'Resume the saved match before changing names.'};
   const check = cleanName(raw);
   if (!check.ok) return check;
   if (!allPlayers(state).some((p) => p.id === id)) return { ok: false, why: 'That player is no longer there' };
@@ -92,6 +94,7 @@ export function renamePlayer(state: GameState, id: string, raw: string): RenameR
 
 /** Rename one club from typed text (a rival's colours with it). `patch` is null when nothing changes. */
 export function renameClub(state: GameState, id: string, raw: string, colors?: [string, string]): RenameResult {
+  if (awaitingCampReplay(state)) return {ok:false,why:'Resume the saved match before changing names.'};
   const check = cleanName(raw);
   if (!check.ok) return check;
   if (!state.league.clubs.some((c) => c.id === id)) return { ok: false, why: 'That club is not in the league' };
@@ -107,5 +110,6 @@ export function isValidDesign(d: KitDesign, primary: string): boolean {
 
 /** Kit edit alongside the club's name/colours. Use the designer's displayed primary colour. */
 export function changeKit(design: KitDesign, primary: string): Pick<GameState, 'kit'> | null {
+  if (stateInstallation() && awaitingCampReplay(getState())) return null;
   return isValidDesign(design, primary) ? { kit: design } : null;
 }

@@ -1,6 +1,6 @@
 # Individual challenge pure-engine proposal
 
-Design candidate for issue #710. The combined carry/defend format is the selected direction; the exact numerical rules below are proposed parameters to measure, not demonstrated balance or separately approved product policy. No product implementation accompanies this document.
+Implementation contract for issue #710. Leon approved the combined carry/defend format, dates and rewards. The combat parameters below were tuned against the permanent exact-probability and seeded balance runner; the feature is being built and is not live yet.
 
 ## Contest and actor data
 
@@ -50,11 +50,11 @@ This is a matchup modifier, never a guaranteed counter. Power exploits light/mob
 
 ## Traits
 
-Verified existing IDs: `wreckingBall` (Wrecking Ball), `dontArgue` (Don't Argue), `dancingFeet` (Dancing Feet), `hitman` (Hitman). Proposed event bonus is `2 + level` whole rating points (3/4/5 at I/II/III): Power receives the strongest of Wrecking Ball or Don't Argue; Angle receives Dancing Feet; Shoot receives Hitman on defence. Do not stack the two Power traits. Traits add after fatigue. Equal Power bonuses credit Wrecking Ball first, a stable declared tie rule. Explain these event-specific magnitudes in the preview; do not claim they are the live match modifiers. All other traits have no clash effect; normal XP traits remain handled by progression settlement. Brick Wall is excluded because its existing meaning requires two tacklers.
+Verified existing IDs: `wreckingBall` (Wrecking Ball), `dontArgue` (Don't Argue), `dancingFeet` (Dancing Feet), `hitman` (Hitman). The measured event bonus is `level` whole rating points (1/2/3 at I/II/III): Power receives the strongest of Wrecking Ball or Don't Argue; Angle receives Dancing Feet; Shoot receives Hitman on defence. Do not stack the two Power traits. Traits add after fatigue. Equal Power bonuses credit Wrecking Ball first, a stable declared tie rule. Explain these event-specific magnitudes in the preview; do not claim they are the live match modifiers. All other traits have no clash effect; normal XP traits remain handled by progression settlement. Brick Wall is excluded because its existing meaning requires two tacklers.
 
 ## Random distribution and scoring
 
-One integer random sample `j` uniformly distributed over `{-12, -11, ..., 12}` per resolved clash. Exactly 25 equally likely outcomes. The effective jitter scale in tenths is `q = 15` for Shoot, `q = 10` for Track, and `q = 6` for Wrap. Controlled further uses `q = floor(3*q/4)`, yielding 11, 7, or 4. Thus a committed hit creates more clean stops AND breaks; wrapping narrows outcomes toward held carries; Controlled further narrows outcomes.
+One integer random sample `j` uniformly distributed over `{-12, -11, ..., 12}` per resolved clash. Exactly 25 equally likely outcomes. The effective jitter scale in tenths is `q = 40` for Shoot, `q = 32` for Track, and `q = 22` for Wrap. Controlled further uses `q = floor(3*q/4)`, yielding 30, 24, or 16. Thus a committed hit creates more clean stops AND breaks; wrapping narrows outcomes toward held carries; Controlled further narrows outcomes.
 
 Compute:
 
@@ -111,3 +111,24 @@ the frozen snapshot at departure.
 9. Reusable runner: add a permanent challenge-engine test/analysis harness that can enumerate exact auto values and simulate reproducible seed sets for competing policies, with actor matrices, edition, policy version and parameter version in its report. Do not use the full-match balance harness as if this is a league match; reuse its reporting conventions where practical. Report seed count/confidence intervals for sampling, and label exact DP results separately. No throwaway balancing scripts.
 
 These gates include intentionally falsifiable requirements: if Controlled or Wrap is dominated, or the fixed patterns make coaching rote, revise the formulas before implementation is considered designed or balanced.
+
+## Measured starting balance — 19 November 2026
+
+The permanent runner is `npx vite-node scripts/qa-individual-challenges.ts -- --strict-balance`. Its report separates exact public probabilities from sampled outcomes and keeps the complete actor/policy matrix, useful-call witnesses, traits, confidence intervals and computation counts.
+
+The first proposed jitter and trait magnitudes produced a difficulty cliff (balanced 45 Showground 14.7%, balanced 60 100%). Widening the contact variation to the values above and reducing the fitting trait bonus corrected that cliff while preserving the action identities. No dates, rewards or opponent ratings changed.
+
+| Actual rounded abilities, all four | Showground exact Auto title | Invitational exact Auto title |
+| --- | ---: | ---: |
+| 45 | 35.32% | 7.64% |
+| 60 | 83.76% | 40.75% |
+
+The 4,096 paired-seed run passed the strict difficulty, six-useful-calls, approach-value, tie pacing and trait-bound checks. All six calls have reachable situations with a strictly better title chance. All 20 near-peer trait comparisons remained below a ten-percentage-point uplift at level III. Exact probabilities fell inside 243 of 250 per-comparison sampled 95% intervals; these are descriptive intervals, not an additional acceptance gate.
+
+Low-cost-call usage is deliberately a diagnostic: only one of five near-peer actors falls in the provisional 20–50% usage band. The balanced-45 actor conserves in about 37% of runs, while speed favours aggressive calls and several other archetypes always use at least one conserving call. There is no artificial action quota.
+
+A small descriptive sample of 18 genuinely generated players used every real challenge ability, including hidden ratings. Mean Showground/Invitational chances were outside backs 79.72%/42.75%, halves 59.94%/23.42%, hookers 66.15%/27.01%, forwards 73.72%/33.90%; these are not population estimates or position-equality targets. The UI must show each entrant's own exact odds.
+
+Largest observed initial solve: 497 decision states and 5,775 classifications; Node time 0.35–4.95 ms. Browser/mobile measurements and full career/recovery checks remain separate release gates.
+
+The strengthened QA also gates seven roll-distribution checks, all 21 pairs of clash indices, and pooled exact-versus-sampled title rates across independent actor/edition seed blocks. A deliberate missing-roll mutation and reused-first-roll mutation both fail the strict CLI. The report separately shows Auto versus the best fixed coach (2.22–11.99 percentage points in near-peer examples) and versus a sensible myopic coach (0.19–2.34 points); the original five-point-over-one-naive-policy gate does not imply five points of lookahead advantage. Margin-only action witnesses are reported separately and do not satisfy the six-useful-calls gate.

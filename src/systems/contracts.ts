@@ -1,3 +1,4 @@
+import { awaitingCampReplay } from './parkedLeagueFixture';
 import { careerActionClock } from '../core/season';
 // src/systems/contracts.ts — contract warnings, early renewal and selling (GitHub #40).
 // Pure TypeScript, no Phaser. Warnings are derived from the weekly decrement in
@@ -99,6 +100,7 @@ export function takeBoardLoan(_amount: number): boolean {
 
 /** At the rollover, after the prize and before the board's verdict: the season's loan is repaid in full. */
 export function repayBoardLoan(): number {
+  if (awaitingCampReplay(getState())) return 0;
   const owed = getState().boardLoan.owed;
   if (owed <= 0) return 0;
   earnMoney(-owed, BOARD_LOAN_REPAID);
@@ -152,6 +154,7 @@ export function renewalRefusal(state: GameState, p: Player): { reason: string; m
  * Reasons: 'not-found', 'already-renewed', 'not-final-season', 'over-cap'.
  */
 export function renewEarly(state: GameState, playerId: string): SignResult {
+  if (awaitingCampReplay(getState())) return {ok:false,reason:'match-active',message:'Resume the saved match before changing contracts.'};
   const p = state.squad.find((x) => x.id === playerId);
   if (!p) return { ok: false, reason: 'not-found', message: 'Player not found.' };
   const blocked = renewalRefusal(state, p);

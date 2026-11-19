@@ -9,6 +9,8 @@
 // await, no setTimeout — so pipeline order is exact and no hook can observe a
 // later hook's mutation.
 
+import { challengeAdvanceProblem } from '../systems/individualChallengeCommit';
+import { dueIndividualChallenge, settleIndividualChallenge } from '../systems/individualChallenges';
 import type { RunningCamp } from '../data/playerAssignments';
 import { completeCamp, currentSkillsCamp, departForCamp } from '../systems/playerAssignments';
 import { getState, setState, resetForNewSeason, stateInstallation, type GameState } from './state';
@@ -170,6 +172,7 @@ interface LeagueInterval extends IntervalCheckpoint {
   installation: number;
   published: boolean;
   runningCamp?: RunningCamp;
+  runningChallenge?: import('../data/individualChallenges').IndividualChallengeRecord;
   afterSaved?: () => void;
 }
 
@@ -190,6 +193,13 @@ export function runningCampContext(state: GameState): RunningCamp | undefined {
     || interval.source.season !== state.season || interval.source.week !== state.week || interval.source.clubId !== state.clubId
     || interval.source.pack !== state.pack) return undefined;
   return interval.runningCamp;
+}
+
+export function runningChallengeContext(state: GameState) {
+  const interval = leagueInterval;
+  return interval?.runningChallenge && ownsInterval(interval) && !interval.published && interval.slot===getActiveSlot()
+    && interval.namespace===careerNamespace() && interval.source.season===state.season && interval.source.week===state.week
+    && interval.source.clubId===state.clubId && interval.source.pack===state.pack ? interval.runningChallenge : undefined;
 }
 
 function verifiedCupInterval(interval: LeagueInterval): boolean {
@@ -239,6 +249,8 @@ export function advanceWeek(): void {
   if (weekHeld() || (leagueInterval && ownsInterval(leagueInterval))) return;
   // Also refuse inactive or malformed League markers before any interval work.
   if (structuralAdvanceProblem(getState())) return;
+  const decision = challengeAdvanceProblem(getState());
+  if (decision) { const {week,season} = getState(); bus.emit('week:blocked',{week,season,reason:decision}); return; }
   if (demoStops()) return; // the demo's last week is played (#362; never with the commercial flag off)
   const { week, season, competitions } = getState();
   const installation = stateInstallation();
@@ -308,6 +320,8 @@ export function advanceWeek(): void {
 
   runIntervalWork(interval, () => {
     if (interval?.kind === 'league' && verifiedCupInterval(interval)) {
+      const contest = dueIndividualChallenge(checkpoint.source);
+      if (contest?.status==='ready-for-interval') interval.runningChallenge = structuredClone(contest);
       const departed = departForCamp(checkpoint.source);
       if (departed !== checkpoint.source) {
         interval.runningCamp = {record:structuredClone(currentSkillsCamp(departed)!)};
@@ -386,7 +400,7 @@ function finishLeagueInterval(interval: LeagueInterval, settled: GameState): voi
   const final = week >= calendar.slots.length;
   const advanced = final ? closeLeagueSeason(settled) : {...settled, week: week + 1,
     competitions: {...competitions, calendar: {...calendar, elapsedIntervals: calendar.elapsedIntervals + 1}}};
-  const next = interval.runningCamp ? completeCamp(advanced) : advanced;
+  const next = settleIndividualChallenge(interval.runningCamp ? completeCamp(advanced) : advanced);
   if (final && next === settled) {
     failLeagueInterval(interval, 'The settled final interval could not be closed. Reload the saved interval to recover.');
     return;
@@ -527,7 +541,7 @@ export function advanceWeeks(n: number): void {
   if (n <= 0 || retryPendingLeagueSave() || structuralAdvanceProblem(getState())) return;
   withFastForward(() => {
     for (let i = 0; i < n; i++) {
-      if (retryPendingLeagueSave() || failedIntervalProblem() || structuralAdvanceProblem(getState()) || getState().sacked || weekHeld()) return;
+      if (retryPendingLeagueSave() || failedIntervalProblem() || structuralAdvanceProblem(getState()) || challengeAdvanceProblem(getState()) || getState().sacked || weekHeld()) return;
       if (demoStops()) return; // once, not once per week left (#362)
       advanceWeek();
     }

@@ -5,6 +5,7 @@ import { BRAND } from './brand';
 import { BootScene } from './scenes/BootScene';
 import { GroundsScene } from './scenes/GroundsScene';
 import { MatchScene } from './scenes/MatchScene';
+import { IndividualChallengeScene, bindIndividualChallengeGame } from './scenes/IndividualChallengeScene';
 import { bus, type Events } from './core/events';
 import { createNewGame, getState, loadState, stateInstallation, type GameState } from './core/state';
 import { enableAutosave, getActiveSlot, getSlotSummaries, hasSave, loadSlot, save, setActiveSlot } from './core/save';
@@ -93,7 +94,7 @@ const config: Phaser.Types.Core.GameConfig = {
   // their cameras on the 'resize' event. #627: at the screen's pixel density
   // (world/density.ts), so zooms are whole device px, not whole CSS px.
   scale: densityScaleConfig(),
-  scene: [BootScene, GroundsScene, MatchScene],
+  scene: [BootScene, GroundsScene, MatchScene, IndividualChallengeScene],
 };
 
 const uiRoot = document.getElementById('ui-root') as HTMLElement;
@@ -250,6 +251,7 @@ async function boot(): Promise<void> {
 
   const g = new Phaser.Game(config);
   game = g;
+  bindIndividualChallengeGame(g);
   // The iPhone app's lock-screen match ticker (docs/specs/ios.md §3). The build folds the
   // test to false for the web and Android, so their bundles carry none of it.
   // A chunk that fails to load only loses the ticker; the game plays on.
@@ -314,6 +316,7 @@ async function boot(): Promise<void> {
     // open), so clear any screen/dialog before the match takes over the view.
     closeScreen();
     closeModal();
+    g.scene.stop('IndividualChallenge');
     g.scene.stop('Grounds');
     g.scene.start('Match', { home, away, fixture, live });
   });

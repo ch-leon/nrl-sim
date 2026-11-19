@@ -7,10 +7,12 @@ import {
   ENTITLEMENTS_CACHE_KEY, ENTITLEMENTS_STUB_KEY, IOS_INSTALL_HINT_KEY, LABS_KEY, LEGACY_SAVE_KEY, LOG_MODE_KEY,
   liveMatchKey, recoveryKey, saveMetaKey, slotKey,
 } from '../../src/core/storageKeys';
-import { browserStorage, setMirroredStorage } from '../../src/core/storage/local';
+import { browserStorage, LocalSaveStore, setMirroredStorage } from '../../src/core/storage/local';
 import {
   fileForKey, isMirroredKey, keyForFile, mirroredStorage, NativeMirror, startNativeMirror, type NativeFiles,
 } from '../../src/core/storage/nativeMirror';
+import { metaFor } from '../../src/core/storage/meta';
+import { acknowledgeNativeCheckpoint as ack, beginNativeCheckpointBoot as begin } from '../../src/core/storage/nativeCheckpoint';
 import { bootNativeMirror, deliverFile, exportPath } from '../../src/core/storage/native';
 import { IOS_CODE, isIosNative } from '../../src/core/storage/platform';
 import { APP_PLATFORM, IS_IOS_APP } from '../../src/platform';
@@ -96,6 +98,7 @@ async function afterWipe(native: ReturnType<typeof fakeFiles>): Promise<Map<stri
 }
 
 afterEach(() => {
+  begin(false);
   setMirroredStorage(null);
   __setStorage(null);
   vi.unstubAllGlobals();
@@ -390,6 +393,201 @@ describe('deletes cannot come back', () => {
     release();
     await mirror.idle();
     expect([...native.files]).toEqual([[F(slotKey(1)), 'v3']]);
+  });
+});
+
+describe('only accepted local changes reach recovery', () => {
+  it.each(['set', 'remove'] as const)('a silent local %s failure cannot replace the last good native copy', async operation => {
+    const native = fakeFiles();
+    const mirror = new NativeMirror(native.api, quiet());
+    const base = fakeStorage();
+    const storage = mirroredStorage(base, mirror);
+    const key = slotKey(2);
+    storage.setItem(key, 'accepted');
+    await mirror.idle();
+    base.setItem = () => {};
+    base.removeItem = () => {};
+    if (operation === 'set') storage.setItem(key, 'rejected');
+    else storage.removeItem(key);
+    await mirror.idle();
+    expect(native.calls.filter(c => c.op === 'write')).toHaveLength(1);
+    expect((await afterWipe(native)).get(key)).toBe('accepted');
+  });
+
+  it('only reports a boot restore once the web view has accepted its native bytes', async () => {
+    const native = fakeFiles();
+    native.files.set(F(slotKey(2)), 'saved');
+    const base = fakeStorage();
+    base.setItem = () => {};
+    const mirror = new NativeMirror(native.api, quiet());
+    expect(await mirror.sync(base, [])).toEqual([]);
+    expect(native.files.get(F(slotKey(2)))).toBe('saved');
+  });
+
+  it('never stages a rolled-back verified payload or sidecar in the native directory, even if rollback fails', async () => {
+    const native = fakeFiles();
+    const mirror = new NativeMirror(native.api, quiet());
+    const base = fakeStorage();
+    const storage = mirroredStorage(base, mirror);
+    const store = new LocalSaveStore(storage, 3);
+    const meta = metaFor('previous', null, 'test');
+    store.write(2, 'previous', meta, 'old sidecar', true);
+    await Promise.resolve();
+    await mirror.idle();
+    native.calls.length = 0;
+    const write = base.setItem;
+    base.setItem = (key, value) => { if (value !== 'previous') write(key, value); };
+    expect(() => store.write(2, 'rejected', meta, 'staged sidecar', true,
+      () => base.map.get(slotKey(2)) !== 'rejected')).toThrow();
+    await mirror.idle();
+    expect(native.calls.filter(c => c.op === 'write')).toEqual([]);
+    const restored = await afterWipe(native);
+    expect(restored.get(slotKey(2))).toBe('previous');
+    expect(restored.get(liveMatchKey(2))).toBe('old sidecar');
+  });
+});
+
+describe('native outcome acknowledgement', () => {
+  const key = slotKey(2);
+  function start() {
+    const native = fakeFiles();
+    const mirror = new NativeMirror(native.api, quiet());
+    const storage = mirroredStorage(fakeStorage(), mirror);
+    begin(true)(storage, mirror);
+    return {native, mirror, storage};
+  }
+
+  it('reads matching recoverable bytes and supports a fresh boot with no pending writes', async () => {
+    const {native, mirror, storage} = start();
+    storage.setItem(key, 'result');
+    expect(await ack(key, 'result')).toBe('confirmed');
+    expect(native.calls.filter(c => c.op === 'write')).toHaveLength(1);
+    expect(native.calls).toContainEqual({op: 'read', name: F(key)});
+    await mirror.idle();
+    const restored = fakeStorage();
+    const restarted = new NativeMirror(native.api, quiet());
+    await restarted.sync(restored, []);
+    begin(true)(mirroredStorage(restored, restarted), restarted);
+    expect(await ack(key, 'result')).toBe('confirmed');
+    expect(native.calls.filter(c => c.op === 'write')).toHaveLength(1);
+  });
+
+  it('failure stays retryable, with a bounded number of attempts and no unrelated slot rewrite', async () => {
+    const {native, storage, mirror} = start();
+    native.failWhen(c => c.op === 'write');
+    storage.setItem(key, 'result');
+    await mirror.idle();
+    expect(await ack(key, 'result')).toBe('failed');
+    expect(native.calls.filter(c => c.op === 'write')).toHaveLength(2);
+    expect(await ack(slotKey(1), 'result')).toBe('superseded');
+    expect(await ack(DEV_TEST_PREFIX + key, 'result')).toBe('unavailable');
+    native.failWhen(null);
+    expect(await ack(key, 'result')).toBe('confirmed');
+    native.failWhen(c => c.op === 'read');
+    expect(await ack(key, 'result')).toBe('failed');
+    expect(storage.getItem(key)).toBe('result');
+  });
+
+  it('refuses altered bytes even when every native write and rename resolved successfully', async () => {
+    const {native, storage} = start();
+    const write = native.api.write;
+    native.api.write = (name, value) => write(name, value + '?');
+    storage.setItem(key, 'result');
+    expect(await ack(key, 'result')).toBe('failed');
+    expect(storage.getItem(key)).toBe('result');
+    expect(await ack(DEVICE_ID_KEY, 'result')).toBe('unavailable');
+  });
+
+  it('uses the recovery directory listing when native stat cannot distinguish a missing file from a stat error', async () => {
+    const {native, storage, mirror} = start();
+    storage.setItem(key, 'result');
+    await mirror.idle();
+    native.files.set(F(key) + '.gone', '');
+    const exists = native.api.exists;
+    native.api.exists = name => name.endsWith('.gone') ? Promise.resolve(false) : exists(name);
+    expect(await ack(key, 'result')).toBe('failed');
+    expect((await afterWipe(native)).has(key)).toBe(false);
+  });
+
+  it('an old native write cannot overwrite a newly acknowledged career after an in-process reboot', async () => {
+    const {native} = start();
+    const base = fakeStorage();
+    let storage!: StorageLike;
+    const boot = () => bootNativeMirror({
+      ios: true, storage: base, keys: () => [...base.map.keys()], loadFiles: async () => native.api,
+      install: s => { storage = s; }, log: quiet(),
+    });
+    expect(await boot()).toBe('active');
+    const release = native.hold();
+    storage.setItem(key, 'first');
+    const old = ack(key, 'first');
+    const replacement = boot();
+    expect(await old).toBe('superseded');
+    base.setItem(key, 'second');
+    release();
+    expect(await replacement).toBe('active');
+    expect(await ack(key, 'second')).toBe('confirmed');
+    expect((await afterWipe(native)).get(key)).toBe('second');
+  });
+
+  it('a hung write times out; retry confirms only after its file exists', async () => {
+    const {native, storage} = start();
+    vi.useFakeTimers();
+    const release = native.hold();
+    try {
+      storage.setItem(key, 'result');
+      const pending = ack(key, 'result');
+      await vi.advanceTimersByTimeAsync(10000);
+      expect(await pending).toBe('timeout');
+      expect(native.files.has(F(key))).toBe(false);
+      const retry = ack(key, 'result');
+      release();
+      expect(await retry).toBe('confirmed');
+    } finally {
+      release();
+      vi.useRealTimers();
+    }
+  });
+
+  it('a collapsed write and a deletion supersede waiters, even if identical bytes are re-created', async () => {
+    const {native, storage, mirror} = start();
+    const release = native.hold();
+    storage.setItem(key, 'first');
+    storage.setItem(key, 'second');
+    const collapsed = ack(key, 'second');
+    storage.setItem(key, 'third');
+    const deleted = ack(key, 'third');
+    storage.removeItem(key);
+    storage.setItem(key, 'third');
+    expect(await collapsed).toBe('superseded');
+    expect(await deleted).toBe('superseded');
+    release();
+    expect(await ack(key, 'third')).toBe('confirmed');
+    storage.removeItem(key);
+    await mirror.idle();
+    expect(await ack(key, 'third')).toBe('superseded');
+    expect((await afterWipe(native)).has(key)).toBe(false);
+  });
+
+  it('a late boot cannot reclaim an unavailable or replaced mirror or complete its old acknowledgement', async () => {
+    const {native, storage, mirror} = start();
+    const release = native.hold();
+    storage.setItem(key, 'result');
+    const pending = ack(key, 'result');
+    const obsolete = begin(true);
+    const current = begin(true);
+    expect(obsolete(storage, mirror)).toBe(false);
+    expect(await pending).toBe('superseded');
+    expect(await ack(key, 'result')).toBe('unavailable');
+    release();
+    await mirror.idle();
+    expect(current(storage, mirror)).toBe(true);
+    expect(await ack(key, 'result')).toBe('confirmed');
+    expect(await bootNativeMirror({ios: true, storage, keys: () => [],
+      loadFiles: async () => { throw new Error('plugin unavailable'); }, install: vi.fn(), log: quiet()})).toBe('failed');
+    expect(await ack(key, 'result')).toBe('unavailable');
+    begin(false);
+    expect(await ack(key, 'result')).toBe('inactive');
   });
 });
 
