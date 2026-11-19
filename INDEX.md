@@ -369,3 +369,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261118-224714-standard | standard | e977848 | main | [report](runs/20261118-224714-standard/report.md) |
 | 20261118-234750-standard | standard | bb5fecb | main | [report](runs/20261118-234750-standard/report.md) |
 | 20261119-025656-lead-decoy-bounded-check | lead decoy bounded check | 0e34997e | feat/match-lead-decoy | [report](runs/20261119-025656-lead-decoy-bounded-check/report.md) |
+| 20261119-072407-back-door-on-v-off-standard | back door on v off (standard) | f248854 | feat/match-back-door | [report](runs/20261119-072407-back-door-on-v-off-standard/report.md) |
