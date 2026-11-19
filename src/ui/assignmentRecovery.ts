@@ -4,6 +4,8 @@ import { getState, stateInstallation } from '../core/state';
 import { careerNamespace } from '../core/storage/local';
 import { advanceWeek, failedIntervalProblem } from '../core/time';
 import { awaitingCampReplay } from '../systems/parkedLeagueFixture';
+import { dueIndividualChallenge } from '../systems/individualChallenges';
+import { acknowledgeChallengeOutcome, challengeOutcomeVisible } from '../systems/individualChallengeCommit';
 import { button, el, ensureStyles } from './dom';
 import { ROTATE_ON_CLASS } from './orientation';
 
@@ -28,7 +30,7 @@ export function showAssignmentRecovery(backToTitle: () => void): (() => void) | 
   const previous = document.activeElement;
   const locked = [document.getElementById('game-root'), document.getElementById('ui-root')]
     .filter((root): root is HTMLElement => !!root && !root.hasAttribute('inert'));
-  const retry = button('Retry match', resume, { class: 'nrl-btn-primary' });
+  const retry = button('Retry match', () => void resume(), { class: 'nrl-btn-primary' });
   retry.setAttribute('data-camp-recovery-retry', '');
   const exit = button('Back to title', () => {
     if (isCurrent()) backToTitle();
@@ -48,7 +50,7 @@ export function showAssignmentRecovery(backToTitle: () => void): (() => void) | 
     retry.disabled = !ready || resuming;
   }
 
-  function resume(): void {
+  async function resume(): Promise<void> {
     if (!ready || resuming || !isCurrent()) return;
     const blocked = failedIntervalProblem();
     if (blocked) {
@@ -66,7 +68,13 @@ export function showAssignmentRecovery(backToTitle: () => void): (() => void) | 
     failure = '';
     refresh();
     try {
-      advanceWeek();
+      const contest = dueIndividualChallenge(getState());
+      if (contest?.status === 'ready-for-interval' && !challengeOutcomeVisible(getState(), contest.editionId)) {
+        const confirmed = await acknowledgeChallengeOutcome(contest.editionId);
+        if (!isCurrent()) return;
+        if (!confirmed.ok) failure = confirmed.message;
+      }
+      if (!failure) advanceWeek();
     } catch (error) {
       console.error('nrl-sim: could not restart the saved match', error);
       failure = 'The saved match could not be resumed. Try again or return to the title screen.';
@@ -128,7 +136,7 @@ export function showAssignmentRecovery(backToTitle: () => void): (() => void) | 
   return () => {
     if (ready || !isCurrent()) return;
     ready = true;
-    resume();
+    void resume();
   };
 }
 

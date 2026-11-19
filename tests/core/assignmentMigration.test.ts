@@ -3,7 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { preparePack, selectPack } from '../../src/content';
 import { bus, type Events } from '../../src/core/events';
 import { __setStorage, __unlockSaves, installImportedSave, setActiveSlot } from '../../src/core/save';
-import { getState, loadState } from '../../src/core/state';
+import { SAVE_VERSION, getState, loadState } from '../../src/core/state';
 import { liveMatchKey, slotKey } from '../../src/core/storageKeys';
 import {
   advanceWeek,
@@ -104,10 +104,10 @@ it.each(['au', 'uk'] as const)(
     expect(squadIdentity(replayed)).toEqual(squadIdentity(w5));
     expect(fixtureCalendar(replayed)).toEqual(fixtureCalendar(w5));
     // The slot holds what was played, in the current save version.
-    expect(bytes.get(slotKey(1))).toBe(JSON.stringify({ ...replayed, version: 34 }));
+    expect(bytes.get(slotKey(1))).toBe(JSON.stringify({ ...replayed, version: SAVE_VERSION }));
     if (sameEngine) {
       expect(replayed).toEqual(w5);
-      expect(bytes.get(slotKey(1))).toBe(JSON.stringify({ ...w5, version: 34 }));
+      expect(bytes.get(slotKey(1))).toBe(JSON.stringify({ ...w5, version: SAVE_VERSION }));
     }
     const parked = installImportedSave(JSON.stringify({ ...w5, [LIVE_MATCH_EXPORT_FIELD]: live }), 1);
     if (!parked.ok) throw Error(parked.message);

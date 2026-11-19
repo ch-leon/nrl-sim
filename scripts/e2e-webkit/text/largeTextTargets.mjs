@@ -200,13 +200,24 @@ export async function runLargeTextTargets(browser) {
       // #415, #420: the player page at this size.
       await step('player-page', async (rec) => {
         await home();
-        await openNav(page, 'squad');
-        await page.waitForTimeout(300);
-        // On his name (a trait chip in the middle of a narrow row has its own tip). A tap during a
-        // re-render (a toast, the week's news) can miss the row: once more if so.
-        for (let i = 0; i < 2 && !(await page.locator('[data-player-page]').count()); i++) {
-          await page.locator('.nrl-grid-body > .nrl-row .nrl-row-name').first().tap();
-          await page.waitForSelector('[data-player-page]', { state: 'attached', timeout: 3000 }).catch(() => {});
+        if (W === 568 && size === 'larger') {
+          // A valid maximum-length, wide-letter name plus the shirt number must
+          // leave a readable Record panel. This is a deliberate layout stress case.
+          await openNav(page, 'lineup');
+          await page.locator('.nrl-lineup-field .nrl-pcard[data-spot="s4"]').tap();
+          await page.locator('[data-rename-open]').tap();
+          await page.locator('[data-player-rename]').fill('WWWWWWWWWWWWWWWWWWWWWWWW');
+          await page.locator('[data-player-rename]').press('Enter');
+          rec.notes.push('24-character wide-name selected five-eighth');
+        } else {
+          await openNav(page, 'squad');
+          await page.waitForTimeout(300);
+          // On his name (a trait chip in the middle of a narrow row has its own tip). A tap during a
+          // re-render (a toast, the week's news) can miss the row: once more if so.
+          for (let i = 0; i < 2 && !(await page.locator('[data-player-page]').count()); i++) {
+            await page.locator('.nrl-grid-body > .nrl-row .nrl-row-name').first().tap();
+            await page.waitForSelector('[data-player-page]', { state: 'attached', timeout: 3000 }).catch(() => {});
+          }
         }
         await page.waitForSelector('[data-player-page]', { state: 'attached' });
         await page.waitForTimeout(250);
@@ -219,10 +230,26 @@ export async function runLargeTextTargets(browser) {
           return out;
         });
         const tabbed = [];
-        for (const tab of ['traits', 'deal', 'record']) {
+        for (const tab of ['stats', 'traits', 'deal', 'record']) {
           await page.locator(`[data-player-tab="${tab}"]`).tap();
           await page.waitForTimeout(150);
           tabbed.push(...(await cut()).map((p) => `${tab}: ${p}`));
+          // A tall panel's bounds alone do not prove its text is visible: it may
+          // be clipped by the sheet, or a fixed header/footer may cover it.
+          tabbed.push(...(await page.evaluate(() => {
+            const panel = document.querySelector('.nrl-player-panel');
+            const text = panel.querySelector('.nrl-stat-value, .nrl-player-trait-what, .nrl-player-deal, .nrl-player-line');
+            if (!text) return ['no tab text to read'];
+            text.scrollIntoView({ block: 'center' });
+            const r = text.getBoundingClientRect();
+            const p = panel.getBoundingClientRect();
+            const sheet = document.querySelector('.nrl-player').getBoundingClientRect();
+            const top = Math.max(r.top, p.top, sheet.top, 0);
+            const bottom = Math.min(r.bottom, p.bottom, sheet.bottom, innerHeight);
+            if (bottom - top < Math.min(r.height, 24) - 1) return [`tab text has only ${Math.round(Math.max(0, bottom - top))}px visible`];
+            const hit = document.elementFromPoint((r.left + r.right) / 2, (top + bottom) / 2);
+            return !hit || !text.contains(hit) ? ['tab text is covered after scrolling'] : [];
+          })).map((p) => `${tab}: ${p}`));
         }
         const out = await page.evaluate(() => {
           const out = [];
@@ -240,7 +267,9 @@ export async function runLargeTextTargets(browser) {
             potential.scrollIntoView({ block: 'nearest' });
             const cr = potential.getBoundingClientRect();
             const col = document.querySelector('.nrl-player-panel').getBoundingClientRect();
-            if (cr.height < 10 || cr.top < col.top - 1 || cr.bottom > col.bottom + 1) out.push('potential cannot be scrolled into view');
+            const sheet = document.querySelector('.nrl-player').getBoundingClientRect();
+            if (cr.height < 10 || cr.top < Math.max(col.top, sheet.top, 0) - 1 || cr.bottom > Math.min(col.bottom, sheet.bottom, innerHeight) + 1) out.push('potential cannot be scrolled into view');
+            else if (!potential.contains(document.elementFromPoint((cr.left + cr.right) / 2, (cr.top + cr.bottom) / 2))) out.push('potential is covered after scrolling');
           }
           if (document.querySelector('.nrl-player-curve') || document.body.textContent.includes('Projected peak:')) out.push('old projection remains');
           return out;

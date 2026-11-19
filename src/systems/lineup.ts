@@ -11,6 +11,7 @@
 import { getState, setState, type Lineup, type Player, type PlayerStats, type Position } from '../core/state';
 import { save } from '../core/save';
 import { overallRating } from '../data/player';
+import { awayPlayerIds } from './playerAvailability';
 import { awaitingCampReplay } from './parkedLeagueFixture';
 import { BENCH, DEFAULT_ROTATION, isRotation, type Rotation } from '../match/league/bench';
 import { DEFAULT_TACTICS, isAttackPreset, isDefencePreset, type TeamTactics } from '../match/league/presets';
@@ -426,7 +427,14 @@ export function signingNote(placed: Pick<SigningPlacement, 'where' | 'slot'>): s
 
 /** Keep a coach edit once, immediately; unchanged pure results do not save. No toast or Undo. */
 export function commitLineup(next: Lineup): boolean {
-  if (next === getState().lineup || awaitingCampReplay(getState())) return false;
+  const state = getState();
+  const previous = state.lineup;
+  if (next === previous || awaitingCampReplay(state)) return false;
+  for (const id of awayPlayerIds(state)) {
+    if ((next.kicker === id && previous.kicker !== id) || (next.captain === id && previous.captain !== id)
+      || next.starters.some((p,slot) => p === id && previous.starters[slot] !== id)
+      || (next.bench.includes(id) && !previous.bench.includes(id))) return false;
+  }
   setState({ lineup: next });
   save(getState());
   return true;

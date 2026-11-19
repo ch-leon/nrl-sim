@@ -1,5 +1,7 @@
 // Competition metadata only (#570). The existing match/time systems remain
 // authoritative until the calendar and result-lifecycle work wires this in.
+import type { IndividualChallengeRecord } from './individualChallenges';
+import { validateIndividualChallenges } from '../systems/individualChallengeEvidence';
 import { validateAssignments, type CampRecord, type RunningCamp } from './playerAssignments';
 import { validateOpenCupEntry, type OpenCupEntryState } from './openCupEntry';
 import { validateLeagueCareer, type LeagueProgress } from './leagueCareer';
@@ -101,6 +103,7 @@ export interface CompetitionInstance {
 }
 export interface CompetitionCareerState {
   assignments?: CampRecord[];
+  individualChallenges?: import('./individualChallenges').IndividualChallengeRecord[];
   openCupEntry?: OpenCupEntryState;
   schemaVersion: 1;
   instances: CompetitionInstance[];
@@ -370,8 +373,8 @@ export function completedCompetition(instance: CompetitionInstance): string | nu
 }
 
 /** Returns the first invalid field; callers retain the entire rejected input. */
-export function validateCompetitions(v: unknown, context: { pack: string; season: number; week?: number; clubIds: readonly string[]; clubId?: string; runningCamp?: RunningCamp }): string | null {
-  if (!record(v) || !keys(v, ['schemaVersion', 'instances', 'calendar', 'world', 'leagueCareer', 'openCupEntry', 'assignments']) || v.schemaVersion !== 1 || !Array.isArray(v.instances)) return 'competitions';
+export function validateCompetitions(v: unknown, context: { pack: string; season: number; week?: number; clubIds: readonly string[]; clubId?: string; runningCamp?: RunningCamp; runningChallenge?: IndividualChallengeRecord | undefined }): string | null {
+  if (!record(v) || !keys(v, ['schemaVersion', 'instances', 'calendar', 'world', 'leagueCareer', 'openCupEntry', 'assignments', 'individualChallenges']) || v.schemaVersion !== 1 || !Array.isArray(v.instances)) return 'competitions';
   const clubIds = new Set(context.clubIds);
   const instanceIds = new Set<string>();
   const fixtureIds = new Set<string>();
@@ -460,7 +463,8 @@ export function validateCompetitions(v: unknown, context: { pack: string; season
     if (progress) return progress;
   }
   try { const c = v as unknown as CompetitionCareerState;
-    return validateOpenCupEntry(v.openCupEntry, c, context) ?? validateAssignments(v.assignments,c,context);
+    return validateOpenCupEntry(v.openCupEntry, c, context) ?? validateAssignments(v.assignments,c,context)
+      ?? validateIndividualChallenges(v.individualChallenges,c,context);
   }
   catch { return 'Open Cup offer terms'; }
 }

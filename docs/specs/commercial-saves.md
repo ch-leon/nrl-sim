@@ -53,7 +53,9 @@ copy. localStorage stays the working copy; nothing changes on the web or Android
 
 - **Where it hooks in.** `browserStorage()` (`local.ts`) hands out localStorage wrapped by
   `mirroredStorage()` (`nativeMirror.ts`): each `setItem` / `removeItem` of a mirrored key
-  that lands is also queued for the native side. The entitlement keys, the first-run
+  that reads back exactly is also queued for the native side. A verified career
+  transaction stages its native writes until the whole local write passes, so a
+  rolled-back or silently dropped write is not published as recovery truth. The entitlement keys, the first-run
   record and the match log mode now reach storage through `browserStorage()` too.
 - **Which keys** (`isMirroredKey`, named from `storageKeys.ts`): the slots, slot meta,
   live-match records and recovery copies (`-<slot>`), the legacy save, device id, Labs,
@@ -71,11 +73,22 @@ copy. localStorage stays the working copy; nothing changes on the web or Android
   key it lacks is restored from native (unless marked deleted); a key it has is never
   overwritten, and is rewritten natively when the copy differs or is missing (a write
   cut short by suspension, or a career saved before the mirror). If the native side
-  fails to load, boot goes on with localStorage and nothing is mirrored.
+  fails to load (or iOS local storage is unavailable), boot reports failure and goes
+  on with the available local copy; challenge outcome acknowledgement stays unavailable.
+  Production boots once before any save readers are installed. An in-process reboot
+  invalidates pending acknowledgements and waits for the prior writer, but it is not
+  a supported hot-swap while callers retain and write through the old storage object.
 - **Writes.** One key's native writes run in order; while one is in flight the later
   ones collapse to the latest (last write wins). A failed native write is logged and
-  never blocks or breaks the localStorage write. Nothing is timed: each native write is
-  started by the storage write (or the boot sync) that caused it.
+  never blocks or breaks the localStorage write. Ordinary writes remain best-effort.
+- **Challenge checkpoints.** An outcome must acknowledge its exact physical slot key
+  and verified payload before iOS reveals it. The acknowledgement reads the copy boot
+  would recover (delete marker, then ready file, then final file), and may make one
+  explicit repair attempt. Each attempt times out after five seconds. Failure or
+  timeout leaves the local outcome available for retry; superseding bytes, deletion
+  or a new boot invalidate the acknowledgement. Web and Android are inactive. Scratch
+  playtest namespaces remain unmirrored and therefore cannot obtain iOS confirmation.
+  The caller rechecks career ownership after awaiting; `idle()` alone is not proof.
 - **Deletes.** A delete first writes a `.gone` marker, then removes the copies. The sync
   treats a marked key as deleted and finishes the removal, so a delete cut short (or a
   failed removal) cannot bring a career back. The next write of the key clears it.

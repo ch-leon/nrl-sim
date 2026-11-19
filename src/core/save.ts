@@ -1,4 +1,4 @@
-import { awaitingCampReplay } from '../systems/parkedLeagueFixture';
+import { awaitingCampReplay, CHALLENGE_REPLAY_PROBLEM, inconsistentChallengeReplay } from '../systems/parkedLeagueFixture';
 import { leagueCareerStateProblem } from '../systems/leagueEntryValidation';
 import { migrateObservedProtection } from '../systems/cap';
 import { initialPlayerPopulation, installPlayerHistory } from '../systems/playerCareer';
@@ -33,7 +33,7 @@ import { autoPick } from '../systems/lineup';
 import { DEFAULT_TACTICS } from '../match/league/presets';
 import { bus } from './events';
 import { registerTickHook, TICK_ORDER, unregisterTickHook, weekHeld, activePaidCupCheckpoint, leagueIntervalSaveHeld, failedIntervalProblem, failedIntervalCheckpoint, type IntervalCheckpoint } from './time';
-import { clearLiveMatch, isLiveMatchRecord, LIVE_MATCH_EXPORT_FIELD, peelLiveMatchExport, readLiveMatch, writeLiveMatch } from '../systems/liveMatchRecord';
+import { clearLiveMatch, isLiveMatchRecord, parseLiveMatch, LIVE_MATCH_EXPORT_FIELD, peelLiveMatchExport, readLiveMatch, writeLiveMatch } from '../systems/liveMatchRecord';
 import { CORRUPT_SAVE_KEY, LEGACY_SAVE_KEY, liveMatchKey, slotKey } from './storageKeys';
 import { BRAND } from '../brand';
 import { cleanName } from '../data/names';
@@ -336,6 +336,7 @@ export const MIGRATIONS: readonly MigrationStep[] = [
   { from: 32, to: 33, run: old => ({...old, competitionRewards: []}) },
   // Absence of assignment records means the club has never booked a place.
   { from: 33, to: 34, run: old => old },
+  { from: 34, to: 35, run: old => old },
   // v32 snapshots the agreement observed under v31 ID-only protection.
   // Already recorded exact terms keep their provenance, including queued terms.
   { from: 31, to: 32, run: old => {
@@ -386,6 +387,8 @@ function migrateChecked(raw: unknown): MigrateResult {
     };
   }
   // Pre-finance careers are kept and are not converted. v28 and later migrate.
+  if ('individualChallenges' in cur || (version < 35 && cur.competitions && typeof cur.competitions === 'object' && 'individualChallenges' in cur.competitions))
+    return {ok:false,outcome:'unrecoverable',reason:'corrupt',message:'Invalid individual challenge data for this save format.'};
   if (version <= LAST_PRE_FINANCE_VERSION) {
     return { ok: false, outcome: 'unrecoverable', reason: 'corrupt',
       message: `This save is from an older version of ${BRAND.name} (save v${version}). Please start a new career. Your original save has been kept.` };
@@ -398,7 +401,7 @@ function migrateChecked(raw: unknown): MigrateResult {
   if (competitions && typeof competitions === 'object' && 'leagueCareer' in competitions) {
     let state = cur as unknown as GameState;
     if (version === 32) state = createOpenCupOffer({...structuredClone(state),version:SAVE_VERSION,competitionRewards:[]});
-    if (version === 33) state = {...state,version:SAVE_VERSION};
+    if (version === 33 || version === 34) state = {...state,version:SAVE_VERSION};
     const problem = leagueCareerStateProblem(state);
     return problem ? { ok: false, outcome: problem.reason === 'unsupported' ? 'unsupported' : 'unrecoverable',
       reason: 'corrupt', message: problem.message }
@@ -719,6 +722,11 @@ function classifySlot(store: LocalSaveStore, slot: number, raw: string | null): 
   if (raw === null) return { status: 'empty' };
   const res = parseSave(raw);
   if (!res.ok) return { status: res.reason, outcome: res.outcome, message: res.message };
+  if (res.state.competitions?.individualChallenges?.length) {
+    const live = parseLiveMatch(store.storage.getItem(liveMatchKey(slot)));
+    if (inconsistentChallengeReplay(res.state,live))
+      return {status:'corrupt',outcome:'unrecoverable',message:CHALLENGE_REPLAY_PROBLEM};
+  }
   if (!res.state.competitions?.leagueCareer && hasStructuralCalendar(res.state) && (careerNamespace() !== DEV_TEST_PREFIX || structuralPolicyProblem(res.state)))
     return { status: 'corrupt', outcome: 'unrecoverable', message: structuralPolicyProblem(res.state) ?? 'Competition prototypes require the isolated developer career.' };
   // An offered, qualified or entered competition can never finish on this calendar.
@@ -1059,6 +1067,7 @@ export function downloadNames(state: GameState): void {
  * can say it too; a refused file changes nothing.
  */
 export function applyNamesFile(text: string): { ok: boolean; text: string } {
+  if (awaitingCampReplay(getState())) return {ok:false,text:'Resume the saved match before changing names.'};
   const res = importNames(getState(), text);
   const say = (ok: boolean, msg: string, kind: 'success' | 'info' | 'danger'): { ok: boolean; text: string } => {
     bus.emit('ui:notify', { text: msg, kind });
@@ -1084,6 +1093,7 @@ export function installImportedSave(text: string, slot: number): ImportResult {
   if (peeled.bad) return { ok: false, message: 'the match in this file could not be read.' };
   const res = importSave(peeled.text);
   if (!res.ok) return res;
+  if (inconsistentChallengeReplay(res.state,peeled.live)) return {ok:false,message:CHALLENGE_REPLAY_PROBLEM};
   if (!res.state.competitions?.leagueCareer && hasStructuralCalendar(res.state) && careerNamespace() !== DEV_TEST_PREFIX) return { ok: false, message: 'Competition prototypes can only be imported into the isolated developer career.' };
   if (hasStructuralCalendar(res.state)) {
     const policy = structuralPolicyProblem(res.state);

@@ -11,10 +11,17 @@ records independent review, CI/full QA and public confirmation/reload verificati
 The normal optional Open Cup, prizes and receipt-backed views are implemented in
 [PR #736](https://github.com/ch-leon/nrl-sim/pull/736). The [Open Cup evidence record](../status/2026-11-open-cup.md)
 records local verification and the required PR release gates.
-Its initial prize values are for testing, with wider #582 balance still open. Assignments [#708](https://github.com/ch-leon/nrl-sim/issues/708),
-the watched/coached individual challenge [#710](https://github.com/ch-leon/nrl-sim/issues/710),
-the distinct small-sided event [#711](https://github.com/ch-leon/nrl-sim/issues/711)
-and gear are later work.
+Its initial prize values are for testing, with wider #582 balance still open. The first
+assignment, Skills Camp, shipped in [PR #742](https://github.com/ch-leon/nrl-sim/pull/742).
+The watched/coached individual challenge [#710](https://github.com/ch-leon/nrl-sim/issues/710)
+now has an implementation candidate: [Big Mick's rules](individual-challenges.md),
+[exact engine and measured tuning](individual-challenge-engine.md), and
+[verification evidence](../status/2026-11-individual-challenges.md). Three carry/defend
+duels lead to a finite bonus if tied; Showground and a permanently unlocked Invitational
+both have annual entry windows, actual player absence, XP and cash receipts, and personal
+honours. The [readable Notion guide](https://app.notion.com/p/41d0870d4c44813888c3c05c3b8ad833)
+records every mechanic. Further assignments, the distinct small-sided event
+[#711](https://github.com/ch-leon/nrl-sim/issues/711), sponsors and gear remain later work.
 
 **Status:** Leon approved the direction and requested this specification. This
 records that agreement; event names, numerical balance and unimplemented delivery
@@ -53,10 +60,11 @@ The agreed direction is:
 - Recurring events, connected invitations, familiar opponents and personal goals
   should keep careers interesting after the first top-league title.
 
-Example: send a reserve prop to Big Mick's challenge, cover his absence at home,
-coach him through the rounds, then bring back XP, a champion badge and a sponsor
-opportunity. Next season he qualifies for a tougher challenge while his understudy
-competes for a permanent league place.
+Example: send a reserve prop to Big Mick's Showground challenge, cover his absence
+at home, coach his carries and tackles, then bring back XP, a personal champion
+honour and a club cash prize. The club permanently qualifies for the harder
+Invitational, starting later that same season, and may send any eligible player.
+Sponsors and gear remain future expansions.
 
 ## 2. What changes from the previous plan
 
@@ -203,12 +211,13 @@ Individual contests must contain short animated action and meaningful coaching
 decisions with visible consequences. They are not just a result card or a direct-control
 action game. Use skippable introductions, readable opponents and a quick rematch rhythm.
 
-Working example — **Big Mick's Break the Line**:
+The first implementation is **Big Mick's Break the Line** ([complete rules](individual-challenges.md)):
 
 - Select one player using relevant abilities, traits and current condition.
 - Inspect the next opponent and choose an approach such as power, footwork or
-  conserving energy. These are proposed choices; the event rules must give each
-  a distinct, explainable trade-off rather than a universally best button.
+  conserving energy. Carry choices are Power through, Change the angle and Controlled
+  carry; defence choices are Shoot the hit, Track the hips and Set and wrap. Each has
+  a measured reachable title advantage, with published energy costs and odds.
 - Watch a short carrying/tackling round; read why it succeeded or failed.
 - Coach between rounds in response to the opponent and remaining stamina.
 - Complete a finite final/decider and return with the published rewards.
@@ -219,7 +228,8 @@ Sand, crowd, floodlights, eccentric hosts and a podium distinguish events visual
 
 At a coaching checkpoint, game advancement pauses until the coach chooses or
 explicitly selects auto-coach. Fast-forward must not silently miss decisions.
-Skipping presentation uses the saved auto-coach policy and the same simulation;
+Skipping an action only skips its presentation and stops at the next coaching checkpoint.
+Explicitly finishing with auto-coach uses the saved policy and the same simulation;
 watching and skipping with identical seeds and choices produce identical outcomes.
 Automatic coaching must be viable, without an exclusive watch-only prize.
 
@@ -243,7 +253,7 @@ eligibility, calendar load, finite outcomes and measured rewards before activati
 | Champions Series | Earned qualification; adapt across a short series | Prestige, honours, a club display |
 | Budget Cup / Salary Challenge | Restricted registered squad budget | Recruitment/tactical achievement and prize cash |
 | Homegrown Trophy | Club-trained participation | Academy identity and honours |
-| Big Mick's Break the Line | One player; country-show carrying/tackling rounds | Substantial individual XP, Human Bulldozer badge, sponsor access |
+| Big Mick's Break the Line | One player; country-show carrying/tackling rounds | Substantial individual XP, Personal champion badge, supported club prize and harder playable invitation; sponsor access is a later candidate |
 | Sunset Beach Fives | Selected group; sand, short games, limited kicking, lifeguard opponents | Team development, beach trophy, island-circuit invitation |
 | Floodlit Fives / Floodlight Cup | Small squad; open space and quick turnarounds under lights | Cash, development, neon trophy, elite edition |
 | Golden Boot Island | One kicker; limited attempts, wind and awkward angles | Kicking development, specialist coaching; distinctive boots only after gear ships |
