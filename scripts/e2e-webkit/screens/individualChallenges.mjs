@@ -112,6 +112,27 @@ async function advance(page, inspectMatch) {
 }
 async function startDue(page) {
   const before = await state(page);
+  // Mandatory contest entry belongs to Play week, including while a sheet hides
+  // Events. Closing it must return focus to the visible initiating control.
+  for (const screen of ['club', 'squad', 'fixtures']) {
+    await openNav(page, screen);
+    await page.locator('[data-hud="advance"]').focus();
+    await page.keyboard.press('Enter');
+    await page.locator('[data-challenge-start]').waitFor();
+    // Escape preserves an underlying sheet so the check catches focus attempts
+    // on the hidden Events card, as well as the normal bare-club entry path.
+    await page.keyboard.press('Escape');
+    await page.locator(DIALOG).waitFor({ state: 'detached' });
+    assert(await page.evaluate(() => {
+      const el = document.activeElement;
+      if (!(el instanceof HTMLButtonElement)) return false;
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden'
+        && el.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2));
+    }), `Mandatory contest from ${screen} lost focus to a hidden or obscured control`);
+    assert((await state(page)).competitions.calendar.elapsedIntervals === before.competitions.calendar.elapsedIntervals,
+      'Closing the due contest advanced the club clock');
+  }
   await openNav(page, 'club');
   await page.locator('[data-hud="advance"]').click();
   await page.locator('[data-challenge-start]').waitFor();
