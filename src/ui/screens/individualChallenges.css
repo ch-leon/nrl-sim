@@ -3,7 +3,9 @@
 .duel-card p { font-size:.75rem; color:var(--nrl-text-2); }
 .duel-card h3,.duel-dialog h3 { font-family:var(--nrl-f-label); font-size:1.05rem; }
 .duel-modal.nrl-modal { width:min(780px,calc(100vw - 16px - var(--nrl-safe-l,0px) - var(--nrl-safe-r,0px))); max-width:none; padding:0; max-height:none; overflow:hidden; background:var(--nrl-navy); }
-.duel-dialog { display:flex; flex-direction:column; color:var(--nrl-text); max-height:calc(100dvh - 12px - var(--nrl-safe-t,0px) - var(--nrl-safe-b,0px)); }
+/* Toast reserves can change in any phase. Keep header/footer targets anchored. */
+.duel-dialog { display:flex; flex-direction:column; color:var(--nrl-text); height:min(525px,calc(100dvh - 12px - var(--nrl-safe-t,0px) - var(--nrl-safe-b,0px))); max-height:calc(100dvh - 12px - var(--nrl-safe-t,0px) - var(--nrl-safe-b,0px)); }
+.duel-middle { flex:1; min-height:0; }
 .duel-dialog header,.duel-footer { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:4px 12px; background:var(--nrl-navy); padding:6px 12px; flex:none; }
 .duel-dialog header { border-bottom:1px solid var(--nrl-line); }
 .duel-dialog h2 { font-size:1.125rem; color:var(--nrl-text); }
@@ -26,11 +28,8 @@
 .duel-footer { justify-content:flex-end; border-top:1px solid var(--nrl-line); }
 .duel-footer:empty { display:none; }
 .duel-stage-wrap { display:none; }
-.duel-dialog:is([data-live],[data-confirming]) { height:min(525px,calc(100dvh - 12px - var(--nrl-safe-t,0px) - var(--nrl-safe-b,0px))); }
 .duel-dialog[data-live] .duel-middle { display:grid; grid-template-columns:minmax(0,1.12fr) minmax(0,1fr); min-height:0; flex:1; }
 .duel-dialog:not([data-live]) .duel-middle { display:flex; flex-direction:column; min-height:0; }
-/* A toast reserve may change while the coach aims at Confirm. Keep its footer anchored. */
-.duel-dialog[data-confirming] .duel-middle { flex:1; }
 .duel-dialog[data-live] .duel-stage-wrap { display:flex; flex-direction:column; justify-content:center; background:transparent; min-height:0; position:relative; }
 .duel-lane { flex:1; min-height:0; position:relative; }
 .duel-score { display:flex; gap:4px 12px; justify-content:space-between; flex-wrap:wrap; color:var(--nrl-text); background:var(--nrl-panel); font-family:var(--nrl-f-label); padding:6px 10px; }

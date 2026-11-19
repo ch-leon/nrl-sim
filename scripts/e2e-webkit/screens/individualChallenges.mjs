@@ -34,8 +34,32 @@ async function open(page, edition = 'showground') {
   await page.locator(`[data-challenge-open="${edition}"]`).click();
   await page.locator(DIALOG).waitFor();
 }
+async function stableToastAim(page, selector, label) {
+  // Layout-only regression: the real toast system left an 86px reserve in
+  // these dialogs, then removed it. Reproduce that spacing change in one
+  // task, without changing any career data or contest command.
+  const aim = await page.evaluate(selector => {
+    const body = document.querySelector('[data-challenge-dialog] .duel-body');
+    const button = document.querySelector(selector);
+    body.classList.add('nrl-toast-reserve');
+    body.style.setProperty('--nrl-toast-pad', '86px');
+    const before = button.getBoundingClientRect();
+    const x = before.x + before.width / 2, y = before.y + before.height / 2;
+    body.classList.remove('nrl-toast-reserve');
+    body.style.removeProperty('--nrl-toast-pad');
+    const after = button.getBoundingClientRect();
+    return { x, y, movement: Math.max(...['x','y','width','height'].map(k => Math.abs(before[k] - after[k]))),
+      hittable: button.contains(document.elementFromPoint(x, y)) };
+  }, selector);
+  assert(aim.movement <= 1, `Toast reserve moved ${label} by ${aim.movement}px`);
+  assert(aim.hittable, `Original ${label} aim no longer hits its button`);
+  return aim;
+}
 async function leave(page) {
-  await page.locator('[data-challenge-leave]').click();
+  // Cover both booked entries and earned reports in the genuine journeys.
+  // Detachment alone is insufficient: a missed aim can close the backdrop.
+  const aim = await stableToastAim(page, '[data-challenge-leave]', 'Back to club');
+  await page.mouse.click(aim.x, aim.y);
   await page.locator(DIALOG).waitFor({ state: 'detached' });
 }
 async function confirm(page) {
@@ -93,24 +117,7 @@ async function startDue(page) {
 async function finish(page, checkToastReserve = false) {
   await page.locator('[data-challenge-finish]').click();
   if (checkToastReserve) {
-    // Layout-only regression: the real toast system left an 86px reserve in
-    // this confirmation, then removed it. Reproduce that spacing change in one
-    // task, without changing any career data or contest command.
-    const aim = await page.evaluate(() => {
-      const body = document.querySelector('[data-challenge-dialog] .duel-body');
-      const button = document.querySelector('[data-challenge-confirm]');
-      body.classList.add('nrl-toast-reserve');
-      body.style.setProperty('--nrl-toast-pad', '86px');
-      const before = button.getBoundingClientRect();
-      const x = before.x + before.width / 2, y = before.y + before.height / 2;
-      body.classList.remove('nrl-toast-reserve');
-      body.style.removeProperty('--nrl-toast-pad');
-      const after = button.getBoundingClientRect();
-      return { x, y, movement: Math.max(...['x','y','width','height'].map(k => Math.abs(before[k] - after[k]))),
-        hittable: button.contains(document.elementFromPoint(x, y)) };
-    });
-    assert(aim.movement <= 1, `Toast reserve moved Confirm by ${aim.movement}px`);
-    assert(aim.hittable, 'Original confirmation aim no longer hits Confirm');
+    const aim = await stableToastAim(page, '[data-challenge-confirm]', 'Confirm');
     await page.mouse.click(aim.x, aim.y);
     await page.waitForFunction(() => !document.querySelector('[data-challenge-confirm]'));
   } else await confirm(page);

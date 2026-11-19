@@ -156,7 +156,7 @@ export function openIndividualChallenge(editionId: ChallengeEditionId): HTMLElem
   function render(): void {
     lane?.close(); lane=null;
     body.replaceChildren(); stage.replaceChildren(); actions.replaceChildren();
-    content.removeAttribute('data-live'); content.removeAttribute('data-watch'); content.removeAttribute('data-confirming');
+    content.removeAttribute('data-live'); content.removeAttribute('data-watch');
     body.scrollTop=0;
     const s=getState();
     const record=currentIndividualChallenge(s,editionId);
@@ -198,7 +198,6 @@ export function openIndividualChallenge(editionId: ChallengeEditionId): HTMLElem
     if (previous.length) body.append(el('details',{},el('summary',{text:'Past contests'}),...previous.map(r=>report(r,r.contest?.edition ?? edition,challengeQualified(s)))));
   }
   function confirmation(): void {
-    content.setAttribute('data-confirming','');
     actions.append(control('Back','back',()=>{review=null;render();body.focus();}),
       control(review?.action.kind==='finish' ? 'Confirm finish' : review?.action.kind==='book' ? 'Confirm booking' : 'Confirm','confirm',()=>{ if(review) void submit(review); },true));
   }
