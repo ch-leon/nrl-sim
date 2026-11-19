@@ -69,7 +69,7 @@ export function report(record: IndividualChallengeRecord, edition: ChallengeEdit
   panel.append(el('h3',{text:won ? edition.honour : 'The crew takes the title'}),
     paragraph(`${record.participantName} · Season ${record.season} · ${contest.progress.playerScore}–${contest.progress.crewScore}. Scoring margin ${margin > 0 ? '+' : ''}${margin}.`));
   if (contest.clashes.length === 7) panel.append(paragraph(`Bonus carry · ${outcomeName[contest.clashes[6]!.score]}.`));
-  if (record.award) panel.append(el('strong',{text:'Settled on return'}),paragraph(`+${record.award.xp.effectiveXp} XP · ${money(record.award.cash)} club purse · ${record.award.xp.newPoints} new level points.`));
+  if (record.award) panel.append(el('strong',{text:'Settled on return'}),paragraph(`+${Math.round(record.award.xp.effectiveXp * 100) / 100} XP · ${money(record.award.cash)} club purse · ${record.award.xp.newPoints} new level points.`));
   else panel.append(el('strong',{text:'Earned · payable on return'}),paragraph(`${edition.completionXp + (won ? edition.winnerXp : 0)} base XP · ${money(won ? edition.winnerCash : 0)} club purse. Play the club interval to bring ${record.participantName} back before Week ${edition.returnWeek}.`));
   if (won && edition.id === 'showground') panel.append(paragraph(qualified ? "The club has earned permanent entry to Mick’s Invitational." : "Returning with the title will unlock Mick’s Invitational for your club."));
   panel.append(el('details',{},el('summary',{text:'Clash by clash'}),...contest.clashes.map((clash,i)=>paragraph(`${i+1}. ${lastClash(clash)}`))));

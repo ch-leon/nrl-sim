@@ -4,7 +4,7 @@ import type { GameState } from '../core/state';
 import type { CompetitionCareerState } from '../data/competition';
 import { competitionFixtureId } from '../data/competition';
 import { CHALLENGE_EDITIONS, CHALLENGE_RATINGS, type ChallengeActor } from '../data/individualChallengeRules';
-import { challengeEngines, challengeFixture, challengeId, challengeRound, type ChallengeContest, type IndividualChallengeRecord } from '../data/individualChallenges';
+import { challengeEngines, challengeFixture, challengeId, challengeRound, type ChallengeContest, type ChallengeEngineVersion, type IndividualChallengeRecord } from '../data/individualChallenges';
 import { canonicalLeagueJson } from '../data/leagueCareer';
 import { shownStats } from '../data/player';
 import { supportedCampCalendar, validAssignmentAward, validAssignmentBasis } from '../data/playerAssignments';
@@ -41,13 +41,23 @@ function policyFor(c:ChallengeContest) {
   return policy;
 }
 
-function validContest(contest: ChallengeContest, r: IndividualChallengeRecord, careerSeed:number):boolean {
+// Keep only the inexpensive proofs from the last successful history sweep. A fixed
+// entry cap thrashes when every save walks a longer career in the same order;
+// retaining all its DP tables would instead grow much heavier with each season.
+// Canonical contents survive cloned saves and cannot bless an in-place mutation.
+let contestProofs = new Map<string,ChallengeEngineVersion['replay']>();
+function validContest(contest: ChallengeContest, r: IndividualChallengeRecord, careerSeed:number, proofs:typeof contestProofs):boolean {
   if (!fields(contest,['actor','edition','engineVersion','policyVersion','eventSeed','autoCoach','titleProbability','clashes','commands','progress'])
     || !integer(contest.engineVersion,1) || contest.policyVersion!==CHALLENGE_POLICY_VERSION || !validActor(contest.actor,r)
     || !Array.isArray(contest.clashes) || contest.clashes.length>7 || !Array.isArray(contest.commands)
     || contest.eventSeed!==challengeEventSeed(careerSeed,r.id)) return false;
   const engine = challengeEngines[contest.engineVersion];
   if (!engine || !same(contest.edition,engine.editions[r.editionId])) return false;
+  const proof = canonicalLeagueJson([careerSeed,r.id,r.editionId,r.participantId,r.participantName,contest]);
+  if (contestProofs.get(proof)===engine.replay) {
+    proofs.set(proof,engine.replay);
+    return true;
+  }
   const replayed = engine.replay(contest.edition,contest.actor,contest.eventSeed,contest.clashes);
   if (!replayed || !same(replayed,contest.progress)) return false;
   const policy = policyFor(contest);
@@ -69,13 +79,20 @@ function validContest(contest: ChallengeContest, r: IndividualChallengeRecord, c
       progress = advanceChallengeProgress(progress,clash);
     } while (cmd.kind==='finish' && !progress.result);
   }
-  return auto===contest.autoCoach && progress.clashIndex===contest.clashes.length;
+  if (auto!==contest.autoCoach || progress.clashIndex!==contest.clashes.length) return false;
+  proofs.set(proof,engine.replay);
+  return true;
 }
 
 interface Context {pack:string; season:number; week?:number; clubIds:readonly string[]; runningChallenge?: IndividualChallengeRecord | undefined}
 export function validateIndividualChallenges(value: unknown, c: CompetitionCareerState, ctx: Context): string|null {
-  if (value===undefined) return ctx.runningChallenge ? 'missing running challenge' : null;
+  if (value===undefined) {
+    if (ctx.runningChallenge) return 'missing running challenge';
+    contestProofs.clear();
+    return null;
+  }
   if (!Array.isArray(value) || !c.leagueCareer || c.leagueCareer.phase==='initial-choice' || !supportedCampCalendar(c,ctx.pack)) return 'challenge calendar';
+  const proofs: typeof contestProofs = new Map();
   const seen = new Set<string>();
   const titles:number[] = [];
   const entries = value as IndividualChallengeRecord[];
@@ -99,7 +116,7 @@ export function validateIndividualChallenges(value: unknown, c: CompetitionCaree
       continue;
     }
     const contest = r.contest;
-    if (!contest || !validContest(contest,r,c.leagueCareer.scheduleSeed)) return 'challenge replay';
+    if (!contest || !validContest(contest,r,c.leagueCareer.scheduleSeed,proofs)) return 'challenge replay';
     const terminal = r.status==='completed' || r.status==='interrupted';
     if (r.revision!==r.bookingRevision+1+contest.commands.length+Number(terminal)) return 'challenge revision';
     if (r.status==='interrupted') {
@@ -122,7 +139,9 @@ export function validateIndividualChallenges(value: unknown, c: CompetitionCaree
     if (won && r.editionId==='showground') titles.push(r.season);
   }
   if (ctx.runningChallenge && !entries.some(r=>same(r,ctx.runningChallenge))) return 'the running contest differs from its saved checkpoint';
-  return entries.some(r=>r.editionId==='invitational' && !titles.some(year=>year<=r.season)) ? 'unearned challenge invitation' : null;
+  if (entries.some(r=>r.editionId==='invitational' && !titles.some(year=>year<=r.season))) return 'unearned challenge invitation';
+  contestProofs = proofs;
+  return null;
 }
 
 export function individualChallengeOwnerProblem(state:GameState, runningChallenge?:IndividualChallengeRecord): string|null {

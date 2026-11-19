@@ -8,7 +8,7 @@ import { careerNamespace } from '../../core/storage/local';
 import { CHALLENGE_CALL_COST, CHALLENGE_CALL_NAMES as names, CHALLENGE_EDITIONS, type ChallengeClash, type ChallengeEdition, type ChallengeEditionId } from '../../data/individualChallengeRules';
 import { challengeEngines, type ChallengeContest } from '../../data/individualChallenges';
 import { challengeCheckpoint, challengeCalls, previewChallengeAction } from '../../systems/individualChallengeEngine';
-import { acknowledgeChallengeOutcome, captureChallengeAction, challengeOutcomeVisible, confirmChallengeAction, type ChallengeSelection } from '../../systems/individualChallengeCommit';
+import { acknowledgeChallengeOutcome, captureChallengeAction, challengeAdvanceProblem, challengeOutcomeVisible, confirmChallengeAction, type ChallengeSelection } from '../../systems/individualChallengeCommit';
 import { challengeCover, challengeEntryPreview, challengeQualified, currentIndividualChallenge, type ChallengeAction, type ChallengeResult } from '../../systems/individualChallenges';
 import { isSelectable, POSITION_SHORT } from '../../systems/lineup';
 import { ROTATE_ON_CLASS } from '../orientation';
@@ -184,6 +184,8 @@ export function openIndividualChallenge(editionId: ChallengeEditionId): HTMLElem
       if (s.week===edition.eventWeek) actions.append(control('Withdraw','withdraw',()=>inspect({kind:'withdraw'})),control('Start contest','start',()=>run({kind:'start'}),true));
       else actions.append(control('Cancel booking','cancel',()=>inspect({kind:'cancel'})));
     } else if (record && ['ready-for-interval','completed','interrupted'].includes(record.status)) {
+      const advanceProblem = record.status === 'ready-for-interval' ? challengeAdvanceProblem(s) : null;
+      if (advanceProblem) body.append(el('p',{class:'duel-status',text:advanceProblem,attrs:{role:'status'}}));
       body.append(report(record,record.contest?.edition ?? edition,challengeQualified(s)));
       const margins=(s.competitions?.individualChallenges ?? []).filter(r=>r.participantId===record.participantId && r.editionId===editionId && r.status==='completed' && r.contest)
         .map(r=>r.contest!.progress.playerScore-r.contest!.progress.crewScore);

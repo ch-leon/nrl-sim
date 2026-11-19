@@ -11,6 +11,9 @@ import { challengeCheckpoint, initialChallengeProgress, resolveChallengeAction }
 import { clashFrame, LANE_MARKER, CLASH_DURATION } from '../../../src/scenes/individualChallengePresentation';
 import { buildIndividualChallengeCards, openIndividualChallenge } from '../../../src/ui/screens/individualChallenges';
 import { closeModal } from '../../../src/ui/dom';
+import { decisionChipItems } from '../../../src/ui/decisions';
+import { report } from '../../../src/ui/screens/individualChallengeCopy';
+import { applyAssignmentAward } from '../../../src/systems/assignmentTraining';
 import { StubNode, stubDocument } from '../stubDom';
 
 const edition = CHALLENGE_EDITIONS.showground;
@@ -166,4 +169,30 @@ it('withholds watched and batch results after a failed native acknowledgement, t
   await vi.waitFor(()=>expect(reopened.querySelector('[data-challenge-podium]')).not.toBeNull());
   expect(bytes.get('nrl-sim-save-slot-1')).toBe(batch);
   expect(files.get(fileForKey('nrl-sim-save-slot-1'))).toBe(batch);
+});
+
+
+it('explains insufficient club cover in the finished report and decision chip', () => {
+  installCoaching();
+  const finished = changeChallenge(getState(),'showground',{kind:'finish'});
+  if (!finished.ok) throw Error(finished.message);
+  const participantId = finished.state.competitions!.individualChallenges![0]!.participantId;
+  let available = 0;
+  loadState({...finished.state, squad:finished.state.squad.map(p=>p.id===participantId ? p : {...p,injuredWeeks:++available <= 12 ? 0 : 2,suspendedWeeks:0})});
+  expect(record().status).toBe('ready-for-interval');
+  const d = opened();
+  expect(d.words()).toContain('Arrange enough legal club cover before advancing the contest week.');
+  expect(decisionChipItems(getState())[0]!.note).toContain('club cover');
+  expect(decisionChipItems(getState())[0]!.note).not.toContain('coaching decision');
+});
+
+it.each([[71.99999999999999,'72'],[71.125,'71.13']])('formats settled XP %s without floating-point tails', (effectiveXp,shown) => {
+  installCoaching();
+  const finished = changeChallenge(getState(),'showground',{kind:'finish'});
+  if (!finished.ok) throw Error(finished.message);
+  const r = currentIndividualChallenge(finished.state,'showground')!;
+  const entrant = finished.state.squad.find(p=>p.id===r.participantId)!;
+  const xp = applyAssignmentAward(entrant,60,{clubFocus:'balanced',mode:'manual'}).receipt;
+  const panel = report({...r,status:'completed',award:{xp:{...xp,effectiveXp},cash:0,honour:null}},edition,false) as unknown as StubNode;
+  expect(panel.words()).toContain(`+${shown} XP`);
 });

@@ -60,10 +60,11 @@ The agreed direction is:
 - Recurring events, connected invitations, familiar opponents and personal goals
   should keep careers interesting after the first top-league title.
 
-Example: send a reserve prop to Big Mick's challenge, cover his absence at home,
-coach him through the rounds, then bring back XP, a champion badge and a sponsor
-opportunity. Next season he qualifies for a tougher challenge while his understudy
-competes for a permanent league place.
+Example: send a reserve prop to Big Mick's Showground challenge, cover his absence
+at home, coach his carries and tackles, then bring back XP, a personal champion
+honour and a club cash prize. The club permanently qualifies for the harder
+Invitational, starting later that same season, and may send any eligible player.
+Sponsors and gear remain future expansions.
 
 ## 2. What changes from the previous plan
 

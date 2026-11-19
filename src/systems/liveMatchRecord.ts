@@ -130,13 +130,20 @@ export function belongsToFixture(record: LiveMatchRecord, state: Pick<GameState,
     && record.fixtureId === fixture.id && record.slot === fixture.slot;
 }
 
+/** Shared recovery boundary for the active match and non-active save-slot checks. */
+export function parseLiveMatch(raw: string | null | undefined): LiveMatchRecord | null {
+  if (!raw) return null;
+  try {
+    const record = recoveryRecord(JSON.parse(raw));
+    return record ? optionalControls(record) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function readLiveMatch(): LiveMatchRecord | null {
   try {
-    const raw = store()?.getItem(liveMatchKey(getActiveSlot()));
-    if (!raw) return null;
-    const parsed: unknown = JSON.parse(raw);
-    const record = recoveryRecord(parsed);
-    return record ? optionalControls(record) : null;
+    return parseLiveMatch(store()?.getItem(liveMatchKey(getActiveSlot())));
   } catch {
     return null;
   }

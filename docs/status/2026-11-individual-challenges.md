@@ -57,6 +57,21 @@ validated receipts, survive renamed/sold/retired players and do not replay twice
 - Native checkpoint scoped Claude review approved; engine QA findings were addressed.
   Final review and aggregate checks are separate, mandatory release gates below.
 
+## Independent review follow-ups
+
+Claude's full-feature review approved the candidate with four non-blocking findings.
+The follow-up removes repeated historical policy solves without trusting mutable
+objects, shares the tolerant saved-match recovery parser with slot classification,
+rounds fractional XP receipts to two decimals and displays the actual cover refusal.
+Regression tests cover more than sixteen distinct historical contestants, changed
+saved evidence, truncated/legacy sidecars and the two player-facing explanations.
+
+The first frozen full local suite passed 5,412 tests across 409 files. Its initial
+remote QA passed challenge/camp careers, balance, the multi-season soak and career
+agency, but match hand-off took 1,081 ms against the unchanged 1,000 ms performance
+budget. Final-head checks and review outcomes belong in the PR, including any
+required follow-up; this document does not represent a deployment receipt.
+
 ## Reproduce
 
 ```sh

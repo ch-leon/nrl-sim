@@ -33,7 +33,7 @@ import { autoPick } from '../systems/lineup';
 import { DEFAULT_TACTICS } from '../match/league/presets';
 import { bus } from './events';
 import { registerTickHook, TICK_ORDER, unregisterTickHook, weekHeld, activePaidCupCheckpoint, leagueIntervalSaveHeld, failedIntervalProblem, failedIntervalCheckpoint, type IntervalCheckpoint } from './time';
-import { clearLiveMatch, isLiveMatchRecord, LIVE_MATCH_EXPORT_FIELD, peelLiveMatchExport, readLiveMatch, writeLiveMatch } from '../systems/liveMatchRecord';
+import { clearLiveMatch, isLiveMatchRecord, parseLiveMatch, LIVE_MATCH_EXPORT_FIELD, peelLiveMatchExport, readLiveMatch, writeLiveMatch } from '../systems/liveMatchRecord';
 import { CORRUPT_SAVE_KEY, LEGACY_SAVE_KEY, liveMatchKey, slotKey } from './storageKeys';
 import { BRAND } from '../brand';
 import { cleanName } from '../data/names';
@@ -723,12 +723,9 @@ function classifySlot(store: LocalSaveStore, slot: number, raw: string | null): 
   const res = parseSave(raw);
   if (!res.ok) return { status: res.reason, outcome: res.outcome, message: res.message };
   if (res.state.competitions?.individualChallenges?.length) {
-    const rawMatch = store.storage.getItem(liveMatchKey(slot));
-    if (rawMatch) {
-      const live:unknown = JSON.parse(rawMatch);
-      if (isLiveMatchRecord(live) && inconsistentChallengeReplay(res.state,live))
-        return {status:'corrupt',outcome:'unrecoverable',message:CHALLENGE_REPLAY_PROBLEM};
-    }
+    const live = parseLiveMatch(store.storage.getItem(liveMatchKey(slot)));
+    if (inconsistentChallengeReplay(res.state,live))
+      return {status:'corrupt',outcome:'unrecoverable',message:CHALLENGE_REPLAY_PROBLEM};
   }
   if (!res.state.competitions?.leagueCareer && hasStructuralCalendar(res.state) && (careerNamespace() !== DEV_TEST_PREFIX || structuralPolicyProblem(res.state)))
     return { status: 'corrupt', outcome: 'unrecoverable', message: structuralPolicyProblem(res.state) ?? 'Competition prototypes require the isolated developer career.' };

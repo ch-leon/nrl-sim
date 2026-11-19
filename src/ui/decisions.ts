@@ -95,8 +95,9 @@ export function decisionViews(state: GameState): DecisionView[] {
 /** The decisions chip's list (3a): soonest due first, each with when it is due. Pure. */
 export function decisionChipItems(state: GameState): { title: string; note: string }[] {
   const challenge = dueIndividualChallenge(state);
-  const event = challenge && !weekHeld() && challengeAdvanceProblem(state)
-    ? [{ title: CHALLENGE_EDITIONS[challenge.editionId].name, note: 'Needs your coaching decision' }] : [];
+  const challengeProblem = challenge && !weekHeld() ? challengeAdvanceProblem(state) : null;
+  const event = challenge && challengeProblem
+    ? [{ title: CHALLENGE_EDITIONS[challenge.editionId].name, note: challengeProblem }] : [];
   return [...event, ...decisionViews(state)
     .slice()
     .sort((a, b) => a.advancesLeft - b.advancesLeft)
