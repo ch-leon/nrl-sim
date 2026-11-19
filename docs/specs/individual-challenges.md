@@ -75,7 +75,9 @@ A tie has exactly one bonus player carry against Mick: a clean breakthrough wins
 otherwise the host retains the title. Publish this rule before entry. Maximum
 seven clashes, no unbounded sudden death. The bonus uses remaining energy.
 If the title is mathematically decided early, say so; remaining clashes still
-count toward the stored best score and scoring margin. Offer the same explicit
+count toward personal best scoring margin (player points minus crew points) for
+that player and edition. Keep raw scores in each receipt for history; auto-coach
+does not separately optimize raw player points. Offer the same explicit
 Auto-coach control; never pretend a decided clash can reverse the title.
 
 Attacking calls: Power through, Change the angle, Controlled carry. Defensive
@@ -89,7 +91,9 @@ event comparison, including those usually hidden on a position's player screen.
 Snapshot the same displayed values used by the engine. Admission is open to all
 positions, not a promise of equal aptitude: clearly identify this as a physical
 challenge that suits stronger carriers/tacklers, show every entrant's actual
-ratings and title-chance estimate, and measure results for all position groups.
+ratings and the exact auto-coach title-chance estimate for those ratings, and
+measure results for all position groups. Recompute the estimate from the frozen
+actor snapshot at departure; never use the hidden seeded rolls in an estimate.
 Do not boost hidden stats, scale opponents to the entrant or silently exclude a
 position. Viable auto-coach means competitive decisions for that entrant, not a
 guaranteed title for every athlete. Rival ratings are authored
@@ -184,12 +188,16 @@ match result events or uses match playback as its simulation authority.
 
 The local verified save remains the immediate commit authority. The native iPhone
 mirror remains asynchronous best-effort storage, not an acknowledged second
-transaction for existing game writes. For interactive challenge results only,
-require an acknowledged matching native slot payload before revealing the new
-outcome on iOS. A failure/timeout offers retry or leave/export while preserving
+transaction for existing game writes. For every newly committed challenge outcome (manual, individual auto-coached
+clash, or Finish batch), require an acknowledged matching native slot payload
+before revealing the outcome on iOS. A failure/timeout offers retry or leave/export while preserving
 the locally committed result; reload resumes this unrevealed boundary and never
 selects a replacement call. Merely waiting for `idle()` is insufficient because
-it also resolves after failures. Web/Android retain verified local writes.
+it also resolves after failures. While that acknowledgement is pending, block
+further challenge commands and club advance; reconstruct this gate on reload
+before exposing a committed result or starting a ready interval. Keep every async
+completion bound to the current slot, namespace, installation and saved revision.
+Web/Android retain verified local writes.
 A locally rejected/no-op checkpoint must never be queued as accepted
 native recovery truth; correct the mirror acceptance seam and test failure then
 restart. Preserve ordering and namespace/slot identity, and do not claim that a
@@ -198,7 +206,10 @@ local save proves the native write has completed.
 Bump the save format from v34 without retroactive trips or rewards. Reject new
 challenge fields claimed by older formats before legacy migration early returns.
 Validate records, revisions, finite round count, phase/cursor, ownership history,
-award basis, RNG and replay-consistent outcomes. Keep historical names/IDs and
+award basis, event seed and replay-consistent outcomes. Each stored clash includes
+its index-derived roll, recomputed from event seed and clash number on validation;
+there is no action-consumed RNG stream. Derive XP receipt limits from the edition
+policy and existing progression modifiers, not camp's fixed maximum. Keep historical names/IDs and
 awards after rename, sale, retirement and fixture pruning.
 
 Personal badges derive from settled challenge receipts by stable player ID, not
@@ -210,7 +221,7 @@ Version the event engine separately, with an explicit active/retired registry.
 A newly introduced engine version also bumps the save format so older builds
 refuse it safely. Store structured explanations with committed outcomes. Retain the first pure engine for compatible
 old checkpoints. Unknown future save/engine formats are refused without replacing
-the destination career. If a known, validated checkpoint's engine is unavailable,
+the destination career. If a known engine can no longer execute new clashes but its validator is retained,
 provide an owned Resolve interruption command at a loaded coaching boundary: retain committed history/effects, return
 the player once, cancel unearned awards and explain the interruption. Ready-for-interval records settle their already validated committed result, even
 if gameplay for that known engine was retired. Retain known-version validators;
@@ -248,6 +259,9 @@ ordinary reload of the latest committed slot cannot reroll a clash.
 2. All six role choices are meaningful across published opponent/stat/energy
    scenarios. Compare fixed-call policies and auto-coach over a reusable seeded
    runner; measure title/tie rates, energy, duration and progression against staying.
+   Also report exact auto-coach title chances for real generated players in every
+   position group, retaining their actual off-role stats, in both editions. No
+   equal-win-rate target or artificial position normalization is implied.
 3. Exactly six clashes plus at most one bonus; no early elimination or silent
    decision under normal fast-forward. Coaching does not tick the world.
 4. Stale previews, duplicate taps, prior installations, different slots/namespaces,
