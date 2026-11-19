@@ -66,7 +66,7 @@ What's in the game, with the PR that added each.
 
 - **Readable player details on small phones** ([PR #745](https://github.com/ch-leon/nrl-sim/pull/745)): the narrow player header stacks its status pills; on short, narrow screens the whole player sheet scrolls so long names, every tab and Deal actions remain readable at Larger text.
 
-- **Stable challenge controls:** entry, booking, coaching and result dialogs keep a bounded height so notifications cannot move Confirm or Back to club away from your aim. Long details scroll inside the card. [Verification](../status/2026-11-individual-challenges.md)
+- **Stable challenge controls** ([PR #750](https://github.com/ch-leon/nrl-sim/pull/750)): entry, booking, coaching and result dialogs keep a bounded height so notifications cannot move Confirm or Back to club away from your aim. Long details scroll inside the card. [Verification](../status/2026-11-individual-challenges.md)
 
 - **Big Mick’s Break the Line** ([PR #745](https://github.com/ch-leon/nrl-sim/pull/745)): send one player to the Week 6 Showground contest, coach three carry/defend duels and watch the saved clashes in a country-show arena. Six calls trade off ability, matchup, risk and energy; Skip stops at the next decision, while explicit Auto or Finish handles coaching. The player misses that club fixture and returns before Week 7 with development; a title adds $8,000, a personal honour and permanent club access to the harder Week 14 Invitational. Its title pays $16,000. Booking windows, cover, exact entrant odds and earned-versus-paid rewards are visible in League. [Rules and Notion guide](../specs/individual-challenges.md) · [Verification and release evidence](../status/2026-11-individual-challenges.md)
 

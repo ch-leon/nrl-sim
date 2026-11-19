@@ -118,7 +118,8 @@ missed Back to club. The report remained valid and resumable. A scoped geometry
 probe then measured the same notification-reserve effect on report headers:
 41px movement for Showground and 46px for Invitational.
 
-The follow-up for [#749](https://github.com/ch-leon/nrl-sim/issues/749) keeps every
+[PR #750](https://github.com/ch-leon/nrl-sim/pull/750), the follow-up for
+[#749](https://github.com/ch-leon/nrl-sim/issues/749), keeps every
 challenge phase at the same bounded height, including entry, booking, reports and
 retry/saving states. The middle remains scrollable and absorbs spacing changes;
 the header and footer stay anchored. Browser checks assert the original aimed
