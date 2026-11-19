@@ -33,6 +33,13 @@ export const APP_PLATFORM: AppPlatform =
     ? (__NRL_PLATFORM__ as AppPlatform)
     : 'web';
 
+/**
+ * True only in the iPhone build. Written on the raw define (not APP_PLATFORM) so the
+ * bundler folds it to a literal: code behind `IS_IOS_APP ? … : …` (the iOS save mirror
+ * and share-sheet export, src/core/storage/native.ts) is dropped from web and Android builds.
+ */
+export const IS_IOS_APP: boolean = typeof __NRL_PLATFORM__ !== 'undefined' && __NRL_PLATFORM__ === 'ios';
+
 /** True inside a native app (Android or iPhone), false on the web. */
 export function isNativeApp(platform: AppPlatform = APP_PLATFORM): boolean {
   return platform !== 'web';
