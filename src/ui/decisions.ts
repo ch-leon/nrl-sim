@@ -31,6 +31,8 @@ import { challengeAdvanceProblem } from '../systems/individualChallengeCommit';
 import { CHALLENGE_EDITIONS } from '../data/individualChallengeRules';
 import { openIndividualChallenge } from './screens/individualChallenges';
 import { weekHeld } from '../core/time';
+import { closingEventOpportunities } from '../systems/eventOpportunities';
+import { remindClosingEvents } from './eventOpportunities';
 
 // ── View-model (pure) ─────────────────────────────────────────────────────────
 
@@ -242,11 +244,16 @@ export function openDecisions(opts: { then?: { label: string; run: () => void } 
  * weeks would take by default, and offers Answer now (the decisions popup, then
  * Keep advancing) or going ahead, which takes the defaults that fall due.
  */
-export function askBeforeAdvance(span: number, proceed: () => void): void {
+export function askBeforeAdvance(span: number, proceed: (acknowledged: ReadonlySet<string>) => void, acknowledged: ReadonlySet<string> = new Set()): void {
   if (openRequiredChallenge()) return;
+  const closing = demoBlocked() ? [] : closingEventOpportunities(getState(), span, acknowledged);
+  if (closing.length) {
+    remindClosingEvents(closing, () => askBeforeAdvance(span, proceed, new Set([...acknowledged, ...closing.map(e => e.key)])));
+    return;
+  }
   const ask = demoBlocked() ? null : advanceAsk(getState(), span);
   if (!ask) {
-    proceed();
+    proceed(acknowledged);
     return;
   }
   const list = el('ul', { class: 'nrl-ask-list' });
@@ -254,9 +261,9 @@ export function askBeforeAdvance(span: number, proceed: () => void): void {
     list.append(el('li', { class: `nrl-ask-row${r.due ? ' nrl-ask-due' : ''}`, attrs: { 'data-ask-row': r.id } },
       el('span', { class: 'nrl-ask-title', text: r.title }), el('span', { class: 'nrl-ask-note', text: r.note })));
   }
-  const answer = button('Answer now', () => openDecisions({ then: { label: 'Keep advancing', run: () => askBeforeAdvance(span, proceed) } }), { class: 'nrl-ask-answer nrl-btn-primary' });
+  const answer = button('Answer now', () => openDecisions({ then: { label: 'Keep advancing', run: () => askBeforeAdvance(span, proceed, acknowledged) } }), { class: 'nrl-ask-answer nrl-btn-primary' });
   answer.setAttribute('data-ask-answer', '');
-  const go = button(ask.proceed, () => { closeModal(); proceed(); }, { class: 'nrl-ask-proceed' });
+  const go = button(ask.proceed, () => { closeModal(); proceed(acknowledged); }, { class: 'nrl-ask-proceed' });
   go.setAttribute('data-ask-proceed', '');
   const n = ask.rows.length;
   const content = el('div', { class: 'nrl-ask', attrs: { 'data-advance-ask': '' } },
@@ -274,30 +281,34 @@ export function askBeforeAdvance(span: number, proceed: () => void): void {
  * the badge and News say the card is there. Errors in the run are posted, as
  * the HUD does for its own runs.
  */
-export function advanceUntilAsked(target: AdvanceTarget, run: (t: AdvanceTarget) => Promise<AdvanceRun>, opts: { confirmed?: boolean } = {}): void {
+export function advanceUntilAsked(target: AdvanceTarget, run: (t: AdvanceTarget, acknowledged?: ReadonlySet<string>) => Promise<AdvanceRun>, opts: { confirmed?: boolean; acknowledged?: ReadonlySet<string> } = {}): void {
   if (openRequiredChallenge()) return;
   const span = targetSpan(target, getState().week, getState().preseason);
   // With a card waiting, the ask below puts this question instead (one dialog, not two).
   const question = pendingDecisionCount(getState()) === 0 && !opts.confirmed && !demoBlocked() ? longAdvanceQuestion(span) : null;
   if (question) {
-    confirmLongAdvance(question, () => advanceUntilAsked(target, run, { confirmed: true }));
+    confirmLongAdvance(question, () => advanceUntilAsked(target, run, { ...opts, confirmed: true }));
     return;
   }
-  askBeforeAdvance(span, () => {
+  askBeforeAdvance(span, (acknowledged) => {
     const startSeason = getState().season;
-    run(target).then((r) => {
+    run(target, acknowledged).then((r) => {
       if (r.stop.kind === 'challenge-decision') { if (!dialogOpen()) openRequiredChallenge(); return; }
-      if (r.stop.kind !== 'decision') return;
+      if (r.stop.kind !== 'decision' && r.stop.kind !== 'event-deadline') return;
       const s = getState();
       const rest = remainingTarget(target, { weeksPlayed: r.weeksPlayed, week: s.week, startSeason, season: s.season,
         seasonClosed: s.competitions?.leagueCareer?.phase === 'next-season-choice' });
       if (!rest || activeScreen() || dialogOpen()) return;
-      openDecisions({ then: { label: keepAdvancingLabel(rest), run: () => advanceUntilAsked(rest, run, { confirmed: true }) } });
+      if (r.stop.kind === 'event-deadline') {
+        advanceUntilAsked(rest, run, { confirmed: true, acknowledged });
+        return;
+      }
+      openDecisions({ then: { label: keepAdvancingLabel(rest), run: () => advanceUntilAsked(rest, run, { confirmed: true, acknowledged }) } });
     }).catch((err: unknown) => {
       console.error(err);
       bus.emit('ui:notify', { text: ADVANCE_FAILED_TEXT, kind: 'danger' });
     });
-  });
+  }, opts.acknowledged);
 }
 
 /** #350 H3: one slip on the ▾ menu must not play out a season. */

@@ -91,7 +91,7 @@ export function openIndividualChallenge(editionId: ChallengeEditionId): HTMLElem
   const modal = openModal(content,{class:'duel-modal',cut:true,onRemove:()=>{
     lane?.close(); lane=null; disposeState?.();
     document.removeEventListener('keydown', dialogKeys, true);
-    const opener = document.querySelector<HTMLElement>(`[data-challenge-open="${editionId}"]`) ?? originalOpener;
+    const opener = document.querySelector<HTMLElement>(`[data-challenge-open="${editionId}"]`) ?? document.querySelector<HTMLElement>('[data-open-events]') ?? originalOpener;
     if (opener?.isConnected && 'focus' in opener) (opener as HTMLElement).focus();
   }});
   const stillHere = () => modal.isConnected && slot === getActiveSlot() && namespace === careerNamespace();

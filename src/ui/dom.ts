@@ -1283,6 +1283,32 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
   z-index: 45;
 }
 body.nrl-match-active .nrl-hub-chips { display: none; }
+.nrl-home-events {
+  pointer-events: auto; width: 340px; max-width: 100%; min-width: 0;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
+  padding: 9px 12px; text-align: left; white-space: normal;
+  background: rgba(5, 7, 13, 0.95); border: 1px solid var(--nrl-line); border-radius: 14px;
+  color: var(--nrl-text); font: inherit; cursor: pointer;
+}
+.nrl-home-events[hidden] { display: none; }
+.nrl-home-events-title { color: var(--nrl-accent); font-weight: 700; font-size: .875rem; }
+.nrl-home-events-names { font-size: .8125rem; }
+.nrl-home-events-detail { font-size: .75rem; color: var(--nrl-text-2); }
+.nrl-home-events:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
+.nrl-opportunities-modal { max-width: min(520px, calc(100vw - 24px)); max-height: calc(100dvh - 110px); overflow: auto; }
+.nrl-opportunities { padding: 16px; overflow-wrap: anywhere; }
+.nrl-opportunities h2 { margin: 0 0 10px; font-size: 1.25rem; }
+.nrl-opportunities p, .nrl-opportunities li { font-size: .875rem; line-height: 1.4; }
+.nrl-opportunities li + li { margin-top: 10px; }
+.nrl-opportunities-list { display: grid; gap: 12px; }
+.nrl-opportunity { padding: 12px; border: 1px solid var(--nrl-line); border-radius: 10px; }
+.nrl-opportunity h3 { margin: 0; font-size: 1rem; }
+.nrl-opportunity p { margin: 8px 0; }
+.nrl-opportunities .nrl-decisions-actions { flex-wrap: wrap; }
+.nrl-opportunities .nrl-btn { white-space: normal; height: auto; min-height: 44px; }
+@media (max-height: 380px) {
+  .nrl-home-events { gap: 2px; padding: 6px 10px; }
+}
 .nrl-decisions-chip {
   pointer-events: auto;
   height: 44px;

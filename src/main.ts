@@ -15,6 +15,7 @@ import { expansionIntroLines } from './ui/expansionCopy';
 import { generateObjectives } from './systems/board';
 import { advanceWeek, weekHeld } from './core/time';
 import { advanceInProgress, advanceUntil, nextFrame } from './core/advance';
+import { openEvents } from './ui/eventOpportunities';
 import { advanceFromClub, createHud } from './ui/hud';
 import { initWeekSummary } from './ui/weekSummary';
 import { initMatchArtAhead, warmMatchArt } from './scenes/matchArtAhead';
@@ -294,13 +295,14 @@ async function boot(): Promise<void> {
     onAdvanceWeek: advanceOneWeek,
     onAdvanceUntil: (t) => {
       commitUndo();
-      advanceUntilAsked(t, advanceUntil);
+      advanceUntilAsked(t, (target, acknowledged) => advanceUntil(target, undefined, acknowledged));
     },
     onNextMatch: () => nav.open('fixtures'),
     onMoney: () => nav.open('finance'),
     onBoard: () => nav.open('staff'), // the objective at risk (#368)
     onDecisions: () => void openDecisions(),
     decisions: decisionChipItems,
+    onEvents: () => openEvents(),
     runwayWeeks,
   });
   // #368: the weekly summary, from the club as it stands now; its Play Week is the dock's.

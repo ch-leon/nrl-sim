@@ -13,6 +13,7 @@
 // last (commercial flag on only); the demo's end has its own event, not the toast.
 
 import { bus } from './events';
+import { closingEventOpportunities } from '../systems/eventOpportunities';
 import { pendingLeagueSaveProblem, retryPendingLeagueSave } from './save';
 import { getState, stateInstallation, type GameState } from './state';
 import { advanceWeek, failedIntervalProblem, weekHeld, withFastForward } from './time';
@@ -82,7 +83,7 @@ function newCards(before: GameState, after: GameState): string[] {
  * observe a half-run tick); between weeks the run awaits `frame` (the next paint
  * by default). A second call while one is running does nothing.
  */
-export async function advanceUntil(target: AdvanceTarget, frame: () => Promise<void> = nextFrame): Promise<AdvanceRun> {
+export async function advanceUntil(target: AdvanceTarget, frame: () => Promise<void> = nextFrame, acknowledgedEvents: ReadonlySet<string> = new Set()): Promise<AdvanceRun> {
   const state = getState();
   const failed = failedIntervalProblem() ?? retryPendingLeagueSave();
   if (failed) return { weeksPlayed: 0, stop: { kind: 'stopped', text: failed } };
@@ -107,7 +108,7 @@ export async function advanceUntil(target: AdvanceTarget, frame: () => Promise<v
   stopAsked = false;
   let run: AdvanceRun;
   try {
-    run = await runUntil(target, frame);
+    run = await runUntil(target, frame, acknowledgedEvents);
   } finally {
     running = false;
     stopAsked = false;
@@ -139,7 +140,7 @@ function choiceRequired(state: GameState): boolean {
   return isPlayableLeagueCareer(state) && state.competitions!.leagueCareer!.phase !== 'active';
 }
 
-async function runUntil(target: AdvanceTarget, frame: () => Promise<void>): Promise<AdvanceRun> {
+async function runUntil(target: AdvanceTarget, frame: () => Promise<void>, acknowledgedEvents: ReadonlySet<string>): Promise<AdvanceRun> {
   if (target.kind === 'weeks' && target.weeks <= 0) {
     return { weeksPlayed: 0, stop: { kind: 'target', text: `Advanced ${targetLabel(target)}.` } };
   }
@@ -169,6 +170,9 @@ async function runUntil(target: AdvanceTarget, frame: () => Promise<void>): Prom
       if (decision) return {weeksPlayed,stop:{kind:'challenge-decision',text:decision}};
       // The demo ends here: stop before the week, not inside it (#362).
       if (demoBlocked(before)) return { weeksPlayed, stop: { kind: 'demo', text: DEMO_ENDED_TEXT } };
+
+      const closing = closingEventOpportunities(before, 1, acknowledgedEvents);
+      if (closing.length) return { weeksPlayed, stop: { kind: 'event-deadline', text: `${closing.map(e => e.name).join(', ')}: entries close this week.` } };
 
       // Forfeit risk is checked before the tick, the only point it can be avoided.
       const camp = before.competitions?.assignments?.find(r => r.season === before.season && r.clubId === before.clubId && r.status === 'booked' && r.rules.departureWeek === before.week);

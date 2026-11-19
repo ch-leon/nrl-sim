@@ -17,10 +17,12 @@ import { ECON, WEEKS_PER_SEASON } from '../config';
 import { fmtMoney, fmtMoneyShort } from '../utils/money';
 import { el, button, mount, ensureStyles, dock, activeScreen, onScreenChange } from './dom';
 import { MATCH_ACTIVE_CLASS } from './screens/matchOverlay';
+import { eventOpportunities } from '../systems/eventOpportunities';
 import { challengeAdvanceProblem } from '../systems/individualChallengeCommit';
 
 /** Options for {@link createHud}. */
 export interface HudOpts {
+  onEvents?: () => void;
   /** Reopen the required initial/annual League choice. */
   onChooseLeague?: () => void;
   /** Called when the "Advance Week" button is clicked. Absent => button disabled. */
@@ -408,8 +410,15 @@ export function createHud(opts: HudOpts = {}): Hud {
   const boardEl = el('button', { class: 'nrl-decisions-chip nrl-board-chip', attrs: { type: 'button', 'data-hud': 'board' }, onClick: () => opts.onBoard?.() },
     boardTitle, boardDetail);
   boardEl.hidden = true;
-  const chips = el('div', { class: 'nrl-hub-chips' }, chip, boardEl);
-  if (opts.onDecisions || opts.onBoard) mount(chips);
+  const eventsDetail = el('span', {class:'nrl-home-events-detail'});
+  const events = button('', () => opts.onEvents?.(), {class:'nrl-home-events'});
+  events.setAttribute('data-home-events', '');
+  events.setAttribute('data-open-events', '');
+  events.setAttribute('aria-haspopup', 'dialog');
+  events.append(el('span', {class:'nrl-home-events-title', text:'Events · View all'}),
+    el('span', {class:'nrl-home-events-names', text:'Big Mick · Skills Camp · Open Cup'}), eventsDetail);
+  const chips = el('div', { class: 'nrl-hub-chips' }, chip, events, boardEl);
+  if (opts.onDecisions || opts.onBoard || opts.onEvents) mount(chips);
 
   let lastMoney: number | null = null;
   let flashTimer: ReturnType<typeof setTimeout> | undefined;
@@ -469,6 +478,10 @@ export function createHud(opts: HudOpts = {}): Hud {
 
   /** The chips show on the bare grounds only: a sheet over them hides them (3a: one place to look). */
   function renderChip(s: GameState): void {
+    const opportunities = opts.onEvents && !advanceInProgress() && !activeScreen() ? eventOpportunities(s) : [];
+    events.hidden = opportunities.length === 0;
+    const first = opportunities[0];
+    eventsDetail.textContent = first ? `${first.name} · ${first.detail}` : '';
     const board = opts.onBoard && !advanceInProgress() && !activeScreen() ? boardChip(s, runway) : null;
     boardEl.hidden = !board;
     if (board) {
