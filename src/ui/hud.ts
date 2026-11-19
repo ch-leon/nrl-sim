@@ -418,7 +418,7 @@ export function createHud(opts: HudOpts = {}): Hud {
   events.setAttribute('aria-haspopup', 'dialog');
   events.append(el('span', {class:'nrl-home-events-title', text:'Events · View all'}),
     eventsNames, eventsDetail);
-  const chips = el('div', { class: 'nrl-hub-chips' }, chip, events, boardEl);
+  const chips = el('div', { class: 'nrl-hub-chips', attrs: {tabindex:'0', role:'region', 'aria-label':'Club updates'} }, chip, events, boardEl);
   if (opts.onDecisions || opts.onBoard || opts.onEvents) mount(chips);
 
   let lastMoney: number | null = null;
@@ -498,6 +498,7 @@ export function createHud(opts: HudOpts = {}): Hud {
     const list = opts.decisions?.(s) ?? [];
     const on = !advanceInProgress() && list.length > 0 && !activeScreen();
     chip.hidden = !on;
+    chips.hidden = !on && !board && opportunities.length === 0;
     if (!on) return;
     chipN.textContent = String(list.length);
     chipCount.textContent = decisionsChipCount(list.length);

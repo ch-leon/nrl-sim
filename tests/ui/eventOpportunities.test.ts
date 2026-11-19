@@ -84,6 +84,10 @@ it('renders actual home opportunity names, including the Invitational, and hides
   expect(events.words()).not.toContain('Skills Camp');
   openScreen(document.createElement('div'), undefined, 'fixtures');
   expect(events.hidden).toBe(true);
+  expect(body().querySelector('.nrl-hub-chips')!.hidden).toBe(true);
   closeScreen(); expect(events.hidden).toBe(false);
+  const competitions = getState().competitions!;
+  setState({competitions:{...competitions, leagueCareer:{...competitions.leagueCareer!, phase:'initial-choice'}}});
+  expect(body().querySelector('.nrl-hub-chips')!.hidden).toBe(true);
   hud.destroy();
 });

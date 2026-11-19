@@ -1269,19 +1269,26 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
 @keyframes nrl-sheet-up { from { opacity: 0; transform: translateY(var(--nrl-rise)); } }
 
 /* ── Hub chips: the club home's only things on the grounds (3a) ──────────
-   The decisions waiting, and (#368) the board objective most at risk under it. */
+   Decisions, optional events and the board objective; scroll clear of the dock and install hint. */
 .nrl-hub-chips {
   pointer-events: none;
   position: fixed;
   top: calc(12px + var(--nrl-safe-t));
   left: calc(16px + var(--nrl-safe-l));
   max-width: calc(100vw - 32px - var(--nrl-safe-l) - var(--nrl-safe-r));
+  max-height: calc(100dvh - var(--nrl-nav-h, 0px) - var(--nrl-toast-lift, 0px) - var(--nrl-safe-t) - 24px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 8px;
   z-index: 45;
 }
+.nrl-hub-chips[hidden] { display: none; }
+.nrl-hub-chips:has(> :not([hidden])) { pointer-events: auto; }
+.nrl-hub-chips > * { flex-shrink: 0; }
+.nrl-hub-chips:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
 body.nrl-match-active .nrl-hub-chips { display: none; }
 .nrl-home-events {
   pointer-events: auto; width: 340px; max-width: 100%; min-width: 0;
@@ -1308,6 +1315,7 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
 .nrl-opportunities .nrl-btn { white-space: normal; height: auto; min-height: 44px; }
 @media (max-height: 380px) {
   .nrl-home-events { gap: 2px; padding: 6px 10px; }
+  .nrl-home-events-names { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
 .nrl-decisions-chip {
   pointer-events: auto;
