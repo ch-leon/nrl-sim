@@ -1,0 +1,48 @@
+{
+  "name": "lead decoy bounded check",
+  "description": "Scoped #649 check: with the lead-decoy back-door available, does the current decoy default (shapes.leadDecoy.on=1) differ from the same game with this knob off, over 40 consecutive seeds? Compare flat neutral balanced 60v60 and Expansive v Balanced at 60v60. This is not the broader #649 standard acceptance run.",
+  "seeds": 40,
+  "seedStart": 1,
+  "scenarios": [
+    {
+      "name": "balanced 60 v 60",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced"
+        }
+      }
+    },
+    {
+      "name": "expansive v balanced",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced"
+        }
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "decoy off",
+      "tuning": {
+        "shapes.leadDecoy.on": 0
+      }
+    }
+  ]
+}
