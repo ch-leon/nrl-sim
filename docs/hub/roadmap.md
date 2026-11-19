@@ -7,7 +7,7 @@ live gameplay change; work still open below has not shipped.
 
 ## Now
 
-- **Attacking shapes.** Ordinary forward pods and edge shifts merged on 17 November. Free players prepare during contact and retain the same choice through the play-the-ball. The initial Expansive win-rate drop did not replicate on held-out seeds. The back-door draft remains open and unmerged. Leon's marked-up seed-5 clip moved the fullback's sweep earlier so he receives at pace outside the lead. Wider balance acceptance, release checks and the later decoy slice remain open. [Merged PR #715](https://github.com/ch-leon/nrl-sim/pull/715) · [Draft PR #722](https://github.com/ch-leon/nrl-sim/pull/722) · [Tracker #649](https://github.com/ch-leon/nrl-sim/issues/649)
+- **Attacking shapes.** Forward pods and edge shifts ([PR #715](https://github.com/ch-leon/nrl-sim/pull/715)) and back-door support runs ([PR #722](https://github.com/ch-leon/nrl-sim/pull/722)). Decoys and wider balance acceptance remain open. [Tracker #649](https://github.com/ch-leon/nrl-sim/issues/649)
 
 - **Match presentation — whole-match consistency:** [PR #706](https://github.com/ch-leon/nrl-sim/pull/706), merged 17 November, fixes the binned player and detached overlays at the whistle. Officials, benches and crowd already read consistently with the merged art in the clear/rain/wind audit. Complete-match, interchange and normal/fast-playback evidence is recorded in the PR; real-phone validation remains. Follow the [implementation plan](../plans/2026-11-match-art-and-animation.md).
 

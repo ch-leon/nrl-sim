@@ -1904,8 +1904,8 @@ same ordinary shape draw, with no extra receiver, completion or contest roll.
 All three exact participants must pass the existing reach/availability gates;
 no packet is assembled by teleporting a player. The half/lead/fullback hold a
 lateral origin captured at choice time. Ordinary carrier, actual receiver,
-retreat and explicit coach/script priorities win. Revision 9 includes the
-fullback's wide reception for live-match recovery.
+retreat and explicit coach/script priorities win. Live-match recovery uses
+engine revision 7.
 
 | Knob | Default | Meaning |
 |---|---:|---|
@@ -1916,11 +1916,11 @@ fullback's wide reception for live-match recovery.
 | `shapes.backDoor.supportDepth` / `.supportWidth` | 6 / 0 m | Fullback behind the setup anchor, inside the half. |
 | `shapes.backDoor.leadAheadM` | 3 m | Lead's target ahead of the half from the heel. The target follows the first pass and half's run, then holds at second launch through the catch. |
 | `shapes.backDoor.trailDepthM` | 2 m | Fullback's running target behind the half before the pass. The actual positions determine ordinary passing eligibility. |
-| `shapes.backDoor.leadClearM` | 0.5 m | Real lead must be this far ahead of the backwards pass corridor before flight metadata calls it back-door. |
+| `shapes.backDoor.leadClearM` | 0.5 m | Real lead must be this far ahead of the backwards pass corridor for the half's pass to keep the back-door option; otherwise it ends. |
 | `shapes.backDoor.sweepWidthM` | 15 m | Fullback's lateral running target relative to the setup origin, toward the packet's edge. On a marked pass he runs through the actual landing point by `live.runOnM` along his existing heading. |
 | `shapes.backDoor.sweepLeadTicks` | 5 ticks | How early the fullback starts his wide run before the tackled carrier begins to play the ball. |
 
 The actual first DH recipient remains the existing commitment. A different
 recipient abandons this option, and the later pass remains an ordinary weighted
-choice with its usual handling/interception risk. Marker metadata records only
-actual geometry; it promises no catch or successful outcome.
+choice with its usual handling/interception risk; the option promises no catch
+or successful outcome.

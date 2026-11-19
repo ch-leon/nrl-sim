@@ -33,86 +33,24 @@ Together, the two samples give 40.2% off versus 39.1% on over 1,600 games each.
 This does not prove balance parity; it does not justify retuning to the initial
 sample. Defaults remain unchanged. Leon approved merging #714/#715 on 17 November;
 the branches integrate the newer career work before their final checks. The PRs
-record the merge outcome. Back-door passing and support runs are next; their new
-PR stays open for review.
+record the merge outcome. Back-door support runs followed in #722 (below).
 
-## Pause handoff — 17 November 2026
+## Back-door support runs (#722)
 
-Leon approved merging #714 and #715, then asked to finish up and pause at his
-usage limit. Both integrated heads passed every CI group and aggregate; #715
-also passed Android. #714 merged at `2b88ef3`; #715 merged at `2bdb86b`.
-Integration preserved the new career work and updated the combined season RNG
-checksum to `119391389`, with both UI-read/no-read parity checks retained.
+The back door is a fourth ordinary attacking shape, built on #715's pods and edge
+shifts in `attackingShapes.ts`. When it is chosen, a half, a forward lead and the
+fullback are picked once from the players who can reach their spots. The forward
+starts his lead run as the ball is heeled. The fullback starts his wide sweep from
+depth a few ticks before the tackled player plays the ball, and runs through the
+catch at pace if the half passes behind the lead to him. Who gets the ball is still
+the ordinary weighted receiver choice. Pass, interception, catch and contact odds
+are unchanged. A different pass, a coach call or a set play ends the option without
+a new roll.
 
-[PR #722](https://github.com/ch-leon/nrl-sim/pull/722) is an **unfinished, unmerged
-draft**, saved on `feat/match-back-door`. Fourteen focused checks, typecheck and
-diff checks pass. The new option preserves ordinary pass choices/odds and
-handling; its OFF switch preserves #715's match hash and 842 post-kickoff RNG
-draws. Full-suite, balance and browser validation remain outstanding.
-
-The bounded default Lab seeds 1–6 produced no genuine back-door witness.
-Seed 5 has a real half-to-fullback pass at tick 4322, but its lead remains 0.90 m
-behind the half. One through-running/sprint adjustment did not establish physical
-readiness; no odds, weights or geometry threshold was relaxed. Resume with the
-lead's readiness **before dummy-half run-on**, then prove ordinary play and
-validate. No further agent work was scheduled during that pause.
-
-## Resumed back-door support — 18 November 2026
-
-Leon resumed agent work. The candidate integrates current main, including the
-SuperCOOKED UI handoff documents. Starting the forward's run as the ball is heeled
-fixes the readiness problem with seven positioning lines and no new tuning
-values, receiver preference, pass odds or defender-deception bonus. Gameplay
-source for the initial on/off comparison was `a9a9c35`.
-
-Default Lab seed 5 now supplies the real passage: heel 4291, DH-to-half pass
-4301/catch 4309, half-to-fullback pass behind the forward 4322/catch 4330. The
-forward is 1.29 m ahead at launch; the shape ends at 4331. Focused coverage steps
-the lead through readiness in both directions, preserves ordinary alternatives
-and cancellation, checks snapshot isolation and pause/seek replay, and retains
-the exact preceding simulation/RNG fingerprint when the feature is off.
-
-Separate agents handle fixture maintenance, production browser footage and the
-standard on/off harness comparison. The main agent reviews the code and visual
-evidence. The [published comparison](https://github.com/ch-leon/nrl-sim/blob/8de8313c8990ffb0e8caa84d51814e95af8e00aa/runs/20261118-031501-back-door-on-off-standard/report.md)
-contains all 13 standard scenarios with ON as baseline and OFF as the variant.
-The six preset rows use 100 seeds in both orientations (200 tracked games per
-setting); their raw win rates remain below 45% with both settings, with draws
-reported separately. Expansive versus Balanced is 36.5% wins / 20.5% draws ON and
-37.5% / 20.0% OFF. Several match-count targets also remain low in both arms.
-This does not complete #649's balance acceptance or prove parity; no defaults
-were retuned. PR #722 stays open and unmerged for Leon. Separate QA workflow,
-different-tool review and physical-phone sign-off remain release checks.
-
-Production Chromium confirms the actual default-team launch/catch metadata and
-repeats both snapshots and rendered actor positions/textures after pause/seek at
-4301, 4309, 4322 and 4330. The 844×390 layout has no horizontal overflow and the
-passage raises no page errors. The reproduction link is
-`/#lab?seed=5&tick=4291`, using the Lab's default teams.
-The PR records the final test/CI outcome and normal-speed clip. Hash and
-live-match fixtures follow the changed simulation without weakening the UI-read
-RNG parity, penalty-choice or capped loss-reason assertions.
-
-### Fullback receives on the sweep
-
-Leon marked up the labeled seed-5 clip to show the fullback running out from
-depth before catching wide. The earlier `c30f8ba` version kept the close catch
-and steered the fullback outward afterward. The revised route starts the
-fullback's run as the tackled player gets up and sets the forward outside the
-half. The fullback receives at pace outside the lead through the existing
-receiver choice, backwards pass and catch checks.
-
-Default Lab seed 5 retains the heel at 4291, DH pass at 4301 and second launch
-at 4322. The fullback catches at 4338 around field (84.1, 13.6), 10.4 m outside
-the lead and moving about 7.5 m/s. The marked sketch puts the catch around
-(83.7, 17.0). The simulated catch is about 3.4 m farther out. Seed 4 catches on
-the other edge at 5003. The focused regressions cover both attacking directions,
-legal flight, continued receiver motion, ordinary interruptions, replay and
-the feature-off fingerprint.
-
-The earlier test and CI records through `288bfd2` and published on/off comparison
-at `a9a9c35` predate the wide reception. PR #722 remains open and unmerged.
-[PR #722](https://github.com/ch-leon/nrl-sim/pull/722)
+`shapes.backDoor.on:0` restores #715's three-shape match and RNG stream exactly.
+Live-match recovery uses engine revision 7. BAK-208 and the tuning reference list
+the rules and values. The PR records the balance comparison and the #322 edge-race
+check.
 
 Status: stages 1–4 presentation and the first stage-5 pass are implemented in
 five linked PRs. Leon reviewed the clip and approved merging on 17 November

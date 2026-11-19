@@ -347,7 +347,7 @@ weights/distances are in tuning's **Ordinary attacking structures** section.
 Decoys that influence defenders and carrier-line contests remain separate work. This is
 an initial review default, subject to browser and standard-harness comparison.
 
-### Ordinary back-door support (#649, next shape slice)
+### Ordinary back-door support (#649)
 
 `shapes.backDoor.on:1` adds one ordinary structure without changing the existing
 spread/pod/edge weights. A reachable free half, forward lead and fullback prepare
@@ -365,9 +365,9 @@ must really be behind him, available and in the usual passing window to be
 selected by the existing weighted receiver choice. Pass probability, intercept
 reads, catch/spill checks and contact odds are unchanged. A lead can still receive
 an ordinary pass when eligible: this adds no defender-deception or paid-play bonus.
-`ball.flight.backDoor.lead` identifies a genuine ball launched behind the exact
-lead runner to the fullback beyond him on the packet's edge. The pass leads
-the fullback from his real position and velocity. He runs through the reception
+The option carries on only when the half's actual pass goes behind the exact lead
+runner to the fullback beyond him on the packet's edge; any other pass ends it.
+The pass leads the fullback from his real position and velocity. He runs through the reception
 along his existing heading, with the usual catch reach and handling checks.
 An intercepted flight retains its real defender recipient.
 
@@ -377,14 +377,10 @@ another pass choice, contact, kick, loose ball, turnover or dead phase also ends
 it. The fullback returns to ordinary carrier steering on receipt and carries
 his momentum into the next step.
 
-Actor/flight metadata is copied on snapshot reads. With `shapes.backDoor.on:0`,
-the prior three-structure simulation and RNG stream remain exact. Recovery
-engine revision 9 includes the wider reception.
-
-Default Lab seed 5 shows the heel at tick 4291, DH pass to the home half at 4301,
-the half's back-door pass behind the forward at 4322 and the fullback catch at
-4338. At the catch the fullback is 10.4 m beyond the lead across the field and
-running at about 7.5 m/s. Seed 4 shows a catch on the opposite edge at tick 5003.
+The shape's participants are copied on snapshot reads, so reading cannot change
+play. With `shapes.backDoor.on:0`, the prior three-structure simulation and RNG
+stream remain exact. Live-match recovery uses engine revision 7, so a match saved
+under revision 6 is not replayed with the back door.
 
 ### 5.2 Defence presets
 
