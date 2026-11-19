@@ -109,6 +109,23 @@ height and anchor their action footer while their content spacing changes. The
 browser regression checks the original button target across that layout change;
 it does not change career data, gameplay probabilities or reward assertions.
 
+## Public-build dialog follow-up
+
+PR #745 merged as `6fa043c` after exact-head Claude approval, all required PR CI
+and full QA passed. Public WebKit verification passed the manual/reload and auto
+journeys; the two-edition journey reached the Invitational earned result but
+missed Back to club. The report remained valid and resumable. A scoped geometry
+probe then measured the same notification-reserve effect on report headers:
+41px movement for Showground and 46px for Invitational.
+
+The follow-up for [#749](https://github.com/ch-leon/nrl-sim/issues/749) keeps every
+challenge phase at the same bounded height, including entry, booking, reports and
+retry/saving states. The middle remains scrollable and absorbs spacing changes;
+the header and footer stay anchored. Browser checks assert the original aimed
+point still hits the intended control after reserve changes before completing
+the real booking, result and return commands. Release receipts belong in the
+follow-up PR and the readable Notion guide.
+
 ## Reproduce
 
 ```sh
