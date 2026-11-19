@@ -1,6 +1,6 @@
 # Features
 
-Last updated: 2026-11-18
+Last updated: 2026-11-19
 
 What's in the game, with the PR that added each.
 
@@ -66,9 +66,9 @@ What's in the game, with the PR that added each.
 
 - **League career in the local release candidate.** Start in Local in Australia or the UK. A finals title unlocks the next league permanently. At season review, choose where to play next year. Moving down preserves the club’s salary-cap capacity, and each match pays at the chosen division’s rate. Final review and release checks are pending. [Draft PR #719](https://github.com/ch-leon/nrl-sim/pull/719) · [Verification](../status/2026-11-league-selection.md)
 
-- **Back-door support (unmerged draft).** The forward starts on the heel and the fullback sweeps out from depth before the half passes. Default Lab seed 5 shows the fullback catching on the run 10.4 m outside the lead. The published on/off comparison used an earlier draft. [PR #722](https://github.com/ch-leon/nrl-sim/pull/722)
+- **Back-door support and lead read (stacked draft).** The forward leads from the heel and the fullback sweeps out from depth before the half passes. Default Lab seed 5 shows the fullback catching on the run 10.4 m outside the lead. In that passage, Hunter Faleolo (away 7) checks toward Xavier Stampton's (home 7) real lead from ticks 4310–4317, then returns to his normal line target at 4318; the pass is at 4322 and the fullback catches at 4338. The published on/off comparison used an earlier draft, before the wider reception and lead read. [Draft PR #744](https://github.com/ch-leon/nrl-sim/pull/744), stacked on [PR #722](https://github.com/ch-leon/nrl-sim/pull/722) · [Tracker #649](https://github.com/ch-leon/nrl-sim/issues/649)
 
-- **Attacking shapes:** free players prepare a compact forward pod or an edge shift during established tackle contact and carry that choice into the play-the-ball, alongside the existing spread. The selected players must be close enough to form it; the pod uses two forwards and a nearby free half. Real seed-1 play demonstrates both structures settled before release. [PR #715](https://github.com/ch-leon/nrl-sim/pull/715), the first slice of [#649](https://github.com/ch-leon/nrl-sim/issues/649), preserves explicit instructions, receiver commitment and unassigned support runners. The initial Expansive win-rate drop did not replicate on fresh seeds; defaults remain unchanged. Merged through #715 on 17 November. Back-door work remains a separate open candidate; decoys follow later.
+- **Attacking shapes:** free players prepare a compact forward pod or an edge shift during established tackle contact and carry that choice into the play-the-ball, alongside the existing spread. The selected players must be close enough to form it; the pod uses two forwards and a nearby free half. Real seed-1 play demonstrates both structures settled before release. [PR #715](https://github.com/ch-leon/nrl-sim/pull/715), the first slice of [#649](https://github.com/ch-leon/nrl-sim/issues/649), preserves explicit instructions, receiver commitment and unassigned support runners. The initial Expansive win-rate drop did not replicate on fresh seeds; defaults remain unchanged. Merged through #715 on 17 November. The back-door packet and bounded lead read are in the stacked draft above; wider balance acceptance and release checks remain open.
 
 - **Real players and funded transfers** ([PR #716](https://github.com/ch-leon/nrl-sim/pull/716)): review the actual buyer, fee and unchanged deal before selling; the same player joins that club. Sale and event recruitment fees appear under Transfers in Finance. Market refreshes reveal existing unsigned players, club spells remain readable, and History includes retired people. Annual births are bounded. Emergency scholarships only replace unavoidable expiry/retirement vacancies below 13; injuries and bans no longer manufacture extra players. Save v30 retains supported v28/v29 careers.
 

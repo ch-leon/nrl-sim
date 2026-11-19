@@ -1,13 +1,13 @@
 # Roadmap
 
-Last updated: 2026-11-18
+Last updated: 2026-11-19
 
 Status checked against GitHub on 7 Nov 2026. Merged tooling is not the same as a
 live gameplay change; work still open below has not shipped.
 
 ## Now
 
-- **Attacking shapes.** Ordinary forward pods and edge shifts merged on 17 November. Free players prepare during contact and retain the same choice through the play-the-ball. The initial Expansive win-rate drop did not replicate on held-out seeds. The back-door draft remains open and unmerged. Leon's marked-up seed-5 clip moved the fullback's sweep earlier so he receives at pace outside the lead. Wider balance acceptance, release checks and the later decoy slice remain open. [Merged PR #715](https://github.com/ch-leon/nrl-sim/pull/715) · [Draft PR #722](https://github.com/ch-leon/nrl-sim/pull/722) · [Tracker #649](https://github.com/ch-leon/nrl-sim/issues/649)
+- **Attacking shapes.** Ordinary forward pods and edge shifts merged on 17 November. Free players prepare during contact and retain the same choice through the play-the-ball. The initial Expansive win-rate drop did not replicate on held-out seeds. The back-door support and lead-read candidate remains open and unmerged. Default Lab seed 5 shows the fullback's sweep and catch at pace outside the lead; during ticks 4310–4317, Hunter Faleolo (away 7) checks toward Xavier Stampton's (home 7) lead, then returns to his normal target at 4318. The actual pass is at 4322 and catch at 4338. Wider balance acceptance and release checks remain open. [Merged PR #715](https://github.com/ch-leon/nrl-sim/pull/715) · [Draft PR #744](https://github.com/ch-leon/nrl-sim/pull/744), stacked on [PR #722](https://github.com/ch-leon/nrl-sim/pull/722) · [Tracker #649](https://github.com/ch-leon/nrl-sim/issues/649)
 
 - **Match presentation — whole-match consistency:** [PR #706](https://github.com/ch-leon/nrl-sim/pull/706), merged 17 November, fixes the binned player and detached overlays at the whistle. Officials, benches and crowd already read consistently with the merged art in the clear/rain/wind audit. Complete-match, interchange and normal/fast-playback evidence is recorded in the PR; real-phone validation remains. Follow the [implementation plan](../plans/2026-11-match-art-and-animation.md).
 
