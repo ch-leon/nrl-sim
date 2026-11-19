@@ -1150,6 +1150,9 @@ async function play() {
     if (tooSmall(mute)) found.push(`Mute ${mute.w}×${mute.h}`);
     await closeAny();
     await navTo('lineup');
+    // SuperCOOKED Phase 1: rows live in the swap picker, not the normal Pitch view.
+    await tap('[data-swap-start]');
+    await tap('.nrl-lineup-field .nrl-pcard[data-spot^="s"]');
     await page.waitForSelector('.nrl-lineup-row');
     const row = await smallestBox('.nrl-lineup-row');
     if (row) rec.notes.push(`lineup rows ${row.w}×${row.h}`);
@@ -1309,7 +1312,7 @@ async function play() {
     // QA finding 22: the screens that save at once are live during the hold. A change now (the
     // squad's training focus) must not write the half-ticked week: slot 1 stays as the week began.
     await navTo('squad');
-    await tap('[data-focus-menu]');
+    await tap('[data-squad-more]'); // focus choices live in the header's ⋯ tray
     const focus = page.locator('.nrl-squad-focus [data-focus]:not(.nrl-sort-active)').first();
     rec.notes.push(`focus → ${await focus.getAttribute('data-focus')} during the hold`);
     await press(focus);
