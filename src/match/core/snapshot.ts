@@ -79,8 +79,6 @@ export interface BallFlightSnap {
   receiver?: ContactPlayer;
   /** Written only for an actual pass launch, never used by match decisions. */
   source?: { player: ContactPlayer; headX: number; headY: number; speed: number; odometer: number; legs: number; blown: boolean };
-  /** Only an actual, non-intercepted pass travelling behind this exact lead runner. */
-  backDoor?: { lead: ContactPlayer };
 }
 
 export interface BallSnap {

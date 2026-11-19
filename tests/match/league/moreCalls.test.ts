@@ -41,7 +41,7 @@ interface Played {
   refusals: Set<string>;
 }
 
-/** Current-default witnesses after wide pre-catch back-door movement: seed 1 offers take-two, seed 50 tap-go. */
+/** Current-default witnesses after the timed back-door runs (#722; seed 11 before): seed 1 offers take-two, seed 50 tap-go. */
 const PENALTY_SEEDS = [1, 50];
 
 /** Play with the home coach making `call` whenever he may (as a player at the tray does: a tap, in on the next tick). */
@@ -293,7 +293,7 @@ describe('five more calls (#396): each does what it says', () => {
   it('Offload: more offloads, and some spilled', () => {
     let withCall = 0;
     let without = 0;
-    // The original seeds 1–8 are tied after the wide back-door geometry; use a fixed contiguous cohort.
+    // Seeds 1–8 tie (17 offloads each way) after the timed back-door runs (#722); a fixed contiguous cohort of 32.
     for (let seed = 1; seed <= 32; seed++) {
       const called = play(seed, 'offload').events.filter((e) => e.kind === 'offload' && e.side === 'home').length;
       const plain = play(seed, null).events.filter((e) => e.kind === 'offload' && e.side === 'home').length;

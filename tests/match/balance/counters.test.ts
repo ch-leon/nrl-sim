@@ -78,7 +78,7 @@ describe('tracked counter measurements', () => {
     expect(both.trackedCounts!.pointsFor).toEqual(both.opponentCounts!.pointsAgainst);
   });
   it('calculates wins plus half draws and its sample SE on a two-seed cell', () => {
-    // After the wide back-door run, seed 8 is a draw and seed 9 is a win in this cell.
+    // After the timed back-door runs (#722), seed 8 is a draw and seed 9 is a win in this cell.
     // Seed 3 supplies a neutral one-minute draw (seed 2 before #649).
     // This two-sample fixture checks aggregation mechanics, not match balance.
     const tiny = cell;

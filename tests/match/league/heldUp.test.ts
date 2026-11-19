@@ -123,7 +123,7 @@ describe('held up: in the sim', () => {
     const count = (over: Record<string, number>): { same: number; moved: number } => {
       let same = 0;
       let moved = 0;
-      // After wide back-door geometry, seed 20 supplies the rare first-rule witness.
+      // After the timed back-door runs (#722), seed 20 supplies the rare first-rule witness (41 before).
       for (const seed of [1, 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 20]) {
         const off = withTuning({ 'heldUp.on': 0 }, () => play(seed));
         const on = withTuning(over, () => play(seed));

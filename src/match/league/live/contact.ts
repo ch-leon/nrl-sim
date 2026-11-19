@@ -29,7 +29,7 @@ import { LivePenalties } from './penalties';
 
 export abstract class LiveContact extends LivePenalties {
   /** Write-only launch history for sprite handoff; never consulted by match decisions. */
-  protected visualPass: (NonNullable<BallFlightSnap['source']> & { tick: number; backDoor?: BallFlightSnap['backDoor'] }) | null = null;
+  protected visualPass: (NonNullable<BallFlightSnap['source']> & { tick: number }) | null = null;
   /** Presentation history only; never consulted by match decisions. */
   protected visualContact: ContactSnap | null = null;
   /** Render metadata only: no rolls, movement or changes to the contest. */
@@ -105,9 +105,7 @@ export abstract class LiveContact extends LivePenalties {
       // Run through the arrived ball along the fullback's existing line.
       supportTo: add(flight.to, scale(to.body.heading, LIVE.runOnM)),
     };
-    if (this.visualPass) this.visualPass.backDoor={lead:{...b.lead}};
   }
-
 
   /**
    * A set play's botched pass picked off (#326): thrown toward `toward` and
