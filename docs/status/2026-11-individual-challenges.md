@@ -72,6 +72,25 @@ agency, but match hand-off took 1,081 ms against the unchanged 1,000 ms performa
 budget. Final-head checks and review outcomes belong in the PR, including any
 required follow-up; this document does not represent a deployment receipt.
 
+## Release QA follow-ups
+
+The general season playthrough exposed two navigation assumptions left behind by
+an earlier Squad UI refresh. It now opens Swap before measuring picker rows and
+opens the squad menu before changing training focus during a held week. Its touch
+size, saved-byte, advance-refusal and timeout assertions are unchanged. Both local
+phone/desktop playthroughs passed all 72/73 steps after those corrections.
+
+The smallest-phone Larger-text check also exposed a real long-name header problem:
+a selected Marley Sidestepney left a 17px Record panel for a 24px potential line;
+fixed Deal actions could collapse their content panel entirely. The narrow header
+now stacks its fitness/morale pills. At no more than 600px wide and 400px high,
+the whole player sheet scrolls, keeping all text and actions reachable without
+reducing the chosen font size. Larger layouts retain their fixed header/tab/footer
+arrangement. The existing browser journey renames a selected starter to 24 legal
+wide letters through the real UI, and checks content visibility and action reach,
+so neither random names nor a shorter morale label can conceal the regression.
+Final review and exact-head CI/QA receipts remain in the PR.
+
 ## Reproduce
 
 ```sh

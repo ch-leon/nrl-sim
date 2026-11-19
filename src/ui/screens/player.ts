@@ -466,6 +466,17 @@ export const PLAYER_CSS = `
   .nrl-player-head .nrl-stars { font-size: 1.125rem; }
   .nrl-player-portrait { display: none; }
 }
+/* Give long names room without squeezing the scrollable tab below a readable line. */
+@media (max-width: 600px) {
+  .nrl-player-pills { flex-direction: column; align-items: flex-start; }
+}
+/* A short, narrow sheet cannot fit the full header, tabs and Deal actions around
+   a readable panel. Scroll the whole sheet so every line and control stays reachable. */
+@media (max-width: 600px) and (max-height: 400px) {
+  .nrl-player { display: block; overflow-y: auto; overscroll-behavior: contain; }
+  .nrl-player > * + * { margin-top: 6px; }
+  .nrl-player-panel { overflow-y: visible; }
+}
 html[data-text-size] .nrl-player-name { font-size: 1.125rem; overflow-wrap: break-word; }
 @media (max-width: 760px) {
   html[data-text-size] .nrl-player-deal-tab { grid-template-columns: minmax(0, 1fr); }
