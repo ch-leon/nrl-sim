@@ -1,7 +1,23 @@
 # Player continuity: lifecycle implementation evidence
 
-17 November 2026. This is an implementation checkpoint for #572, not a completed
-career release or a claim of balanced long-term progression.
+## Released · 17 November 2026
+
+[#572](https://github.com/ch-leon/nrl-sim/issues/572) shipped through
+[PR #716](https://github.com/ch-leon/nrl-sim/pull/716), merged at
+`03812a1618b80fbc1348bd6b0966b3df704e9b7a`. [Claude approved](https://github.com/ch-leon/nrl-sim/pull/716#issuecomment-6941417666)
+reviewed head `6144f108`; all [CI/WebKit gates](https://github.com/ch-leon/nrl-sim/actions/runs/44036288907)
+and [full QA](https://github.com/ch-leon/nrl-sim/actions/runs/44036425669) passed.
+[Deployment succeeded](https://github.com/ch-leon/nrl-sim/actions/runs/44038855633).
+This completed player continuity and funded sales, not long-term balance or the
+broader competition catalogue. League selection subsequently shipped separately
+in [#719](https://github.com/ch-leon/nrl-sim/pull/719); its [release record](2026-11-league-selection.md)
+documents the later normal regional activation.
+
+## Historical implementation and measurement checkpoints
+
+The following 17 November measurements and review notes retain their original
+source revisions. Statements about pending final review or gated regional play
+apply to those checkpoints; the final delivery evidence is above.
 
 The lifecycle keeps unsigned people across discovery and Academy intakes,
 records signing/release/expiry spells, archives actual retirees, and books
@@ -96,7 +112,7 @@ numbers identify their source revision rather than claiming invariant balance
 values. TypeScript, production build and all **4,527 tests across 341 files** passed
 on the integrated source. The later small-screen sale-panel and focus fixes
 receive their own affected-suite/browser checks. Independent-tool review and
-exact-head CI/QA remain required before merge.
+exact-head CI/QA were still required at that checkpoint; the final gates passed as recorded above.
 
 
 ## Final review follow-up
@@ -117,8 +133,8 @@ WebKit `player-sales` regression passes five size/text combinations, including
 568×320 Larger, using saved careers and native keyboard confirmation. It checks
 Cancel as a no-op, the actual buyer's single payment, unchanged contracts,
 unique ownership and reload persistence. Screenshots and the report are CI
-artifacts, not committed files. This is targeted browser evidence, not a claim
-that the later full PR gates have passed.
+artifacts, not committed files. This targeted browser evidence preceded the
+full PR gates, which subsequently passed as recorded above.
 
 The existing small-screen flow additionally caught a renewal notification over
 Contracts' sale buttons. The review now sits above ordinary notifications;

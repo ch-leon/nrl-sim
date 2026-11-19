@@ -1,6 +1,7 @@
+import { isolateMiniatureLeagueProgression } from '../helpers/miniatureLeague';
 import { entrySnapshots } from '../data/leagueCareerFixtures';
 import { closeLeagueSeason } from '../../src/systems/leagueCareer';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WEEKS_PER_SEASON } from '../../src/config';
 import { makeRng } from '../../src/utils/rng';
 import { rivalSigningTick } from '../../src/systems/rivals';
@@ -37,7 +38,8 @@ function marked(planning = true): GameState {
   s.squad.forEach(p => { p.deal = {salary:1000,startSeason:1,endSeason:1}; });
   return s;
 }
-beforeEach(() => { bus.clear(); commitUndo(); });
+beforeEach(() => { isolateMiniatureLeagueProgression(); bus.clear(); commitUndo(); });
+afterEach(() => vi.restoreAllMocks());
 describe('League management action clock', () => {
   it.each(['au','uk'] as const)('uses authored duration for %s final-slot payout and zero expired obligation', pack => {
     const s = marked(false); s.pack = pack;

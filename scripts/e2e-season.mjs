@@ -123,12 +123,24 @@ const goHome = async () => {
   await wait(150);
 };
 /** Squad's segments (Lineup and Recruit are not tabs), and Finance's VIEW ▸ for Contracts. */
-const NAV_VIA = { lineup: ['squad', '.nrl-sq-tabs [data-seg="lineup"]'], recruit: ['squad', '.nrl-sq-tabs [data-seg="recruit"]'], contracts: ['finance', '[data-finance-contracts]'] };
+const NAV_VIA = { lineup: ['squad', '[data-squad-view="pitch"]'], recruit: ['squad', '.nrl-sq-tabs [data-seg="recruit"]'], contracts: ['finance', '[data-finance-contracts]'] };
 /**
  * Open a nav destination by id as a player would: its dock tab, a segment or link
  * inside the sheet that holds it, or OFFICE then its tile. A tab tapped while its
  * own sheet is open closes it (the dock is a toggle), so an open sheet is left as is.
  */
+/** On the Squad sheet's pitch: List in its header, for the list (keyed 'squad'). */
+const squadList = async () => {
+  await page.waitForSelector('.nrl-screen-region:is([data-screen-key="squad"], [data-screen-key="lineup"])');
+  if (await sheetOpen('lineup')) await press(page.locator('[data-squad-view="list"]').first());
+  await page.waitForSelector('.nrl-screen-region[data-screen-key="squad"]');
+};
+/** The match's one speed button (SuperCOOKED 40) to `speed`: each tap moves it on, 1× → 2× → 4× → 8× → 1×. */
+const matchSpeed = async (speed) => {
+  const b = page.locator('.nrl-mo-controls .nrl-mo-speed');
+  for (let i = 0; i < 4 && (await b.getAttribute('data-speed')) !== String(speed); i++) await press(b);
+  if ((await b.getAttribute('data-speed')) !== String(speed)) throw new Error(`the speed button reads ×${await b.getAttribute('data-speed')}, not ×${speed}`);
+};
 const navTo = async (id) => {
   if (await sheetOpen(id)) return;
   if (NAV_VIA[id]) {
@@ -142,6 +154,8 @@ const navTo = async (id) => {
     // Its tab is lit for another of its sheets (Squad for Lineup, League for the ladder): a tap would close that.
     if ((await tab.first().getAttribute('aria-current')) === 'page' && (await page.locator('.nrl-screen-region').count())) await goHome();
     await press(tab.first());
+    // SQUAD opens the view last used (SuperCOOKED 30–31): the pitch is keyed 'lineup', the list 'squad'.
+    if (id === 'squad') await squadList();
     return;
   }
   if (!(await page.locator('.nrl-nav-sheet:not([hidden])').count())) await press(page.locator('.nrl-nav [data-nav-more]').first());
@@ -596,14 +610,14 @@ async function play() {
     await closeAny();
     // From Recruit, its Squad segment; from anywhere else, the SQUAD tab.
     const seg = page.locator('.nrl-sq-tabs [data-seg="squad"]');
-    if (await seg.count()) await press(seg.first());
+    if (await seg.count()) { await press(seg.first()); await squadList(); }
     else await navTo('squad');
     await page.waitForSelector('[data-screen-key="squad"]');
   });
-  // N11: the squad's training focus, a ▾ menu in the Squad sheet's header; the pick is saved at once.
+  // N11: the squad's training focus, in the Squad header's ⋯ (SuperCOOKED Phase 1); the pick is saved at once.
   await step('training-focus', async (rec) => {
-    if (!(await page.locator('[data-focus-menu]').count())) return 'no training focus on this build';
-    await tap('[data-focus-menu]');
+    if (!(await page.locator('[data-squad-more]').count())) return 'no training focus on this build';
+    await tap('[data-squad-more]');
     await tap('.nrl-squad-focus [data-focus="speed"]');
     const focus = (await save())?.training?.focus;
     if (focus !== 'speed') throw new Error(`the saved training focus is ${focus}, not speed`);
@@ -617,6 +631,7 @@ async function play() {
     // His name: the row's middle can be a trait chip, which says what the trait does instead (#349 S3).
     await press(open.locator('.nrl-row-name'));
     await page.waitForSelector(`[data-player-page="${id}"]`);
+    await tap('[data-player-tab="deal"]'); // the deals are on the Deal tab (SuperCOOKED 37)
     const actions = await page.locator(`[data-player-page="${id}"] [data-player-action]`).evaluateAll((els) => els.map((e) => e.getAttribute('data-player-action')));
     rec.notes.push(`player ${id}; actions ${actions.join(', ') || 'none'}`);
   });
@@ -729,25 +744,28 @@ async function play() {
   await step('lineup-plan', async (rec) => {
     await closeAny();
     await navTo('lineup');
-    await page.waitForSelector('.nrl-lineup-row');
-    await tap('.nrl-screen-tools [data-plan]');
+    await page.waitForSelector('.nrl-lineup-field .nrl-pcard');
+    await tap('[data-squad-more]'); // the plan is in the Squad header's ⋯ (SuperCOOKED Phase 1)
+    await tap('.nrl-squad-more-tray [data-plan]');
     await page.waitForSelector('.nrl-lineup-plan');
     if (!(await page.locator('.nrl-lineup-tac [data-tactic="grind"]').count())) return 'no tactics on this build';
     await tap('.nrl-lineup-tac [data-tactic="grind"]');
     if ((await page.locator('.nrl-lineup-tac [data-tactic="grind"]').getAttribute('aria-pressed')) !== 'true') throw new Error('Grind did not light on the plan sheet');
     await tap('.nrl-lineup-plan [data-plan-done]');
     await page.waitForSelector('.nrl-lineup-plan', { state: 'detached', timeout: 5000 });
-    // Select a fit starter's tile (an injured one is replaced on the day, and the kick with
-    // him), then make him the goal-kicker.
-    const fit = page.locator('.nrl-lineup-tile[data-spot^="s"]:not([data-out]):not([data-empty])').first();
+    // Open a fit starter's card (an injured one is replaced on the day, and the kick with
+    // him), then make him the goal-kicker on his Deal tab (SuperCOOKED 37).
+    const fit = page.locator('.nrl-lineup-field .nrl-pcard[data-spot^="s"]:not([data-out])').first();
     const spot = await fit.getAttribute('data-spot');
     await press(fit);
-    await tap('.nrl-lineup-kc [data-make-kicker]');
+    await tap('[data-player-tab="deal"]');
+    if ((await page.locator('[data-player-role="kicker"]').getAttribute('aria-pressed')) !== 'true') await tap('[data-player-role="kicker"]');
+    await tap('.nrl-player-modal [data-back]');
     const l = await page.evaluate(() => window.__nrlState?.().lineup ?? null);
     const slot = Number(spot.slice(1));
     if (l?.tactics?.attack !== 'grind') throw new Error(`the lineup's attack is ${l?.tactics?.attack}, not grind`);
     if (!l?.kicker || l.kicker !== l.starters[slot]) throw new Error(`the kicker is ${l?.kicker}, not ${l?.starters?.[slot]} (${spot})`);
-    if (!(await page.locator(`.nrl-lineup-tile[data-spot="${spot}"] [data-kicker]`).count())) throw new Error(`no K badge on ${spot}`);
+    if (!/K/.test(await page.locator(`.nrl-pcard[data-spot="${spot}"] .nrl-pcard-tag`).textContent().catch(() => ''))) throw new Error(`no K badge on ${spot}`);
     rec.notes.push(`Grind / ${l.tactics.defence}; kicker ${l.kicker} (${spot})`);
     await closeAny();
   });
@@ -781,7 +799,7 @@ async function play() {
     if (!liveOn) return 'skipped: no live-match setting';
     await tapAdvanceWeek();
     await page.waitForSelector('.nrl-mo-controls', { timeout: 15000 });
-    await press(page.locator('.nrl-mo-controls [data-speed="8"]'));
+    await matchSpeed(8);
     await wait(6000);
     const clock = (await page.locator('.nrl-mo-clock').textContent())?.trim();
     if (!clock || clock === '00:00') throw new Error(`the live match clock did not move (${clock})`);
@@ -940,8 +958,13 @@ async function play() {
     if (!(await page.locator('.nrl-mo-bar [data-coach]').count())) return 'no COACH button on the match screen';
     // At ×8 the calls on offer switch with possession every second or so and are never still
     // long enough for a locator click: call at ×1, opening the tray and tapping its first row
-    // inside the page, then go back to ×8.
-    await press(page.locator('.nrl-mo-controls [data-speed="1"]'));
+    // inside the page, then go back to ×8. The half-time sheet can come up between the check
+    // above and this tap (it covers the bar): play it, then set the speed.
+    await matchSpeed(1).catch(async (e) => {
+      if (halfTimeDone || !(await halfTimeCard().count())) throw e;
+      await playHalfTime(rec);
+      await matchSpeed(1);
+    });
     // A call that lands names itself on the badge at once (MatchScene.makeCall), lights its tile
     // and shuts the tray a moment later (#608); one refused (the play moved on) rebuilds the rows,
     // and a tap inside 300ms of the rows changing makes no call: read it in the same task.
@@ -975,7 +998,7 @@ async function play() {
     if (!call.lit) throw new Error(`${call.call} was made but its tile was not lit`);
     if (!trayClosed) throw new Error(`the tray stayed open after ${call.call} was made`);
     rec.notes.push(`called ${call.call}; badge reads "${call.badge}"${refused.length ? ` (${refused.length} refused first)` : ''}${empty ? `; ${empty} looks at an empty tray` : ''}`);
-    await press(page.locator('.nrl-mo-controls [data-speed="8"]'));
+    await matchSpeed(8);
   });
   // N11: the half-time card comes up by itself and waits for Continue (#341); change the attack and play on.
   await step('half-time-plan', async (rec) => {

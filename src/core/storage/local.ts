@@ -26,11 +26,34 @@ export interface StorageLike {
  * it throws (storage blocked).
  */
 export function browserStorage(): StorageLike | null {
+  if (mirrored) return mirrored;
   try {
     return typeof localStorage === 'undefined' ? null : localStorage;
   } catch {
     return null;
   }
+}
+
+// In the iOS app, localStorage with every write and delete also kept in a native
+// file (nativeMirror.ts). Installed once at boot, before any save is read, and the
+// same object from then on (prefixedStorage keys its views by identity). Never set
+// on the web or Android.
+let mirrored: StorageLike | null = null;
+
+/** Hand out `storage` from browserStorage() from now on (null: localStorage again). */
+export function setMirroredStorage(storage: StorageLike | null): void {
+  mirrored = storage;
+}
+
+/** Every key in the browser's localStorage (for the mirror's first copy). [] when there is none. */
+export function browserStorageKeys(): string[] {
+  if (typeof localStorage === 'undefined') return [];
+  const keys: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key !== null) keys.push(key);
+  }
+  return keys;
 }
 
 // ── The career namespace (Developer settings' playtest career, #519) ─────────
@@ -91,23 +114,47 @@ export class LocalSaveStore implements SyncSaveStore {
   }
 
   /** Throws when the payload was not stored (storage full or blocked); nothing else is touched then. */
-  write(slot: number, payload: string, meta: SaveMeta, parkedMatch?: string): void {
-    const previous = slot === 1 ? this.storage.getItem(slotKey(1)) : null;
+  write(slot: number, payload: string, meta: SaveMeta, parkedMatch?: string | null, verifyPayload = false, current?: () => boolean, expectedOriginal?: string | null): void {
+    const key = slotKey(slot);
+    const previous = slot === 1 || verifyPayload ? this.storage.getItem(key) : null;
     const legacy = slot === 1 ? this.storage.getItem(LEGACY_SAVE_KEY) : null;
+    const matchKey = liveMatchKey(slot);
+    const ownsSidecar = (): boolean => parkedMatch === undefined || this.storage.getItem(matchKey) === parkedMatch;
+    const writePayload = (): void => {
+      if (verifyPayload && expectedOriginal !== undefined && this.read(slot) !== expectedOriginal)
+        throw new Error('The destination changed before saving');
+      if (current && !current()) throw new Error('The destination changed before saving');
+      this.storage.setItem(key, payload);
+      if (!verifyPayload) return;
+      try {
+        if (this.storage.getItem(key) !== payload || !ownsSidecar() || (current && !current())) throw new Error('Settled career was not stored');
+      } catch (error) {
+        // A replacement sidecar belongs to the other writer's career.
+        if (ownsSidecar()) {
+          if (previous === null) this.storage.removeItem(key);
+          else this.storage.setItem(key, previous);
+        }
+        throw error;
+      }
+    };
     if (parkedMatch === undefined) {
-      this.storage.setItem(slotKey(slot), payload);
+      writePayload();
     } else {
       // Install the small record first. If the larger checkpoint hits quota,
       // restore the exact original record before reporting the import failure.
-      const key = liveMatchKey(slot);
-      const old = this.storage.getItem(key);
-      this.storage.setItem(key, parkedMatch);
+      const old = this.storage.getItem(matchKey);
       try {
-        if (this.storage.getItem(key) !== parkedMatch) throw new Error('Parked match was not stored');
-        this.storage.setItem(slotKey(slot), payload);
+        if (parkedMatch === null) this.storage.removeItem(matchKey);
+        else this.storage.setItem(matchKey, parkedMatch);
+        if (!ownsSidecar()) throw new Error('Parked match was not stored');
+        writePayload();
       } catch (error) {
-        if (old === null) this.storage.removeItem(key);
-        else this.storage.setItem(key, old);
+        // Restore our staged sidecar, or a failed sidecar write while the old
+        // career is still present. Leave a competing replacement pair together.
+        if (ownsSidecar() || this.storage.getItem(key) === previous) {
+          if (old === null) this.storage.removeItem(matchKey);
+          else this.storage.setItem(matchKey, old);
+        }
         throw error;
       }
     }

@@ -499,7 +499,10 @@ function buildThisWeek(s: FinanceSummary): HTMLElement {
     lineItem('Home gates (avg/wk)', s.gateWeekly));
   // Where the seven do not fit (a hint over the sheet, Larger text), the foot fades: a line hidden whole made the Net look wrong (#610).
   hintScroll(lines);
-  return el('div', { class: 'nrl-finance-weekly' }, lines, lineItem('Net', s.netWeekly, { cls: 'nrl-finance-net' }));
+  // SuperCOOKED 51: where cash and the cap part ways, said as the game runs them (no facility has upkeep;
+  // staff and buildings are paid for once, in cash). Shown where there is room for it.
+  return el('div', { class: 'nrl-finance-weekly' }, lines, lineItem('Net', s.netWeekly, { cls: 'nrl-finance-net' }),
+    el('p', { class: 'nrl-finance-cashnote', text: 'Player wages sit on the salary cap, not your cash. Cash pays for signing fees, staff and buildings.' }));
 }
 
 /** A Mono money cell, red when negative; a dash for no season. */
@@ -639,8 +642,9 @@ export const FINANCE_CSS = `
 .nrl-finance-left { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .nrl-finance-keys { display: flex; flex-direction: column; gap: 6px; }
 .nrl-finance-keys > .nrl-screen-title { line-height: 30px; letter-spacing: 0.04em; }
-.nrl-finance-tile { display: flex; flex-direction: column; background: var(--nrl-raised); border-radius: 10px; padding: 8px 10px; }
-.nrl-finance-tile .nrl-label { font-size: 0.75rem; }
+.nrl-finance-tile { display: flex; flex-direction: column; background: var(--nrl-panel); box-shadow: inset 0 0 0 1px var(--nrl-line); border-radius: 12px; padding: 8px 12px; }
+/* SuperCOOKED 51: the tiles' labels in JetBrains Mono small caps, the figure big under them. */
+.nrl-finance-tile .nrl-label { font-family: var(--nrl-f-num); font-size: 0.625rem; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; color: var(--nrl-muted); }
 .nrl-finance-big { font-size: 1.25rem; line-height: 1.25; }
 .nrl-finance-making .nrl-finance-big { font-size: 1.375rem; color: var(--nrl-pos); }
 .nrl-finance-losing .nrl-finance-big { font-size: 1.375rem; color: var(--nrl-neg); }
@@ -652,11 +656,12 @@ button.nrl-finance-contracts {
   flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px;
   font-family: var(--nrl-f-body);
 }
-@media (hover: hover) and (pointer: fine) { button.nrl-finance-contracts:hover { background: #22305c; } }
-button.nrl-finance-contracts:active { background: #22305c; }
+@media (hover: hover) and (pointer: fine) { button.nrl-finance-contracts:hover { background: var(--nrl-raised-hover); } }
+button.nrl-finance-contracts:active { background: var(--nrl-raised-hover); }
 button.nrl-finance-contracts:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
 .nrl-finance-contracts-text { font-size: 0.75rem; color: var(--nrl-muted); }
 .nrl-finance-contracts-due .nrl-finance-contracts-text { color: var(--nrl-accent); }
+button.nrl-finance-contracts.nrl-finance-contracts-due { box-shadow: inset 0 0 0 1px var(--nrl-accent); }
 .nrl-finance-view { font-family: var(--nrl-f-label); font-size: 0.875rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap; }
 .nrl-finance-right { display: flex; flex-direction: column; gap: 6px; min-width: 0; min-height: 0; }
 .nrl-finance-right > .nrl-seg { align-self: flex-start; }
@@ -670,7 +675,11 @@ button.nrl-finance-contracts:focus-visible { outline: 2px solid var(--nrl-accent
 .nrl-finance-value { text-align: right; white-space: nowrap; }
 .nrl-finance-row.nrl-finance-net { min-height: 32px; border-top: 2px solid var(--nrl-line); font-size: 0.875rem; font-weight: 600; }
 .nrl-finance-weekly .nrl-finance-net { flex: 0 0 auto; }
-.nrl-finance-row.nrl-finance-net .nrl-finance-label { color: var(--nrl-text); }
+.nrl-finance-row.nrl-finance-net .nrl-finance-label { color: var(--nrl-text); font-family: var(--nrl-f-label); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.nrl-finance-row.nrl-finance-net .nrl-finance-value { font-family: var(--nrl-f-display); font-size: 1.125rem; font-weight: 400; }
+.nrl-finance-cashnote { flex: 0 0 auto; margin: 8px 0 0; padding: 8px 12px; border-radius: 10px; background: var(--nrl-panel); font-size: 0.75rem; line-height: 1.4; color: var(--nrl-text-2); }
+/* A phone on its side: the lines above need the room (#610); the Guide's Money page also says salaries sit on the cap. */
+@media (max-height: 440px) { .nrl-finance-cashnote { display: none; } }
 .nrl-finance-empty { color: var(--nrl-muted); margin: 8px 0; }
 .nrl-finance-foot { font-size: 0.6875rem; color: var(--nrl-muted); margin: 4px 0 0; }
 /* SEASON P&L and LEDGER: compact Mono tables. */

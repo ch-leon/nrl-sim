@@ -14,7 +14,7 @@ afterEach(() => { __setStorage(null); setCareerNamespace(null); });
 
 describe('v32 exact protection preserves v31 checkpoints', () => {
   it('keeps v31 as the additive progression format and gives protection its own migration', () => {
-    expect(SAVE_VERSION).toBe(32);
+    expect(SAVE_VERSION).toBeGreaterThanOrEqual(32);
     const old = {...careerFixture(), version: 30};
     expect(MIGRATIONS.find(m => m.from === 30)!.run(old)).toEqual(old);
     expect(MIGRATIONS.find(m => m.from === 31)?.to).toBe(32);
@@ -30,7 +30,8 @@ describe('v32 exact protection preserves v31 checkpoints', () => {
     p.deal = {...p.deal!, renewal: {salary: 1234, startSeason: p.deal!.endSeason + 1, endSeason: p.deal!.endSeason + 1}};
     ai.deal = {...ai.deal!, renewal: {salary: 2345, startSeason: ai.deal!.endSeason + 1, endSeason: ai.deal!.endSeason + 1}};
     s.capAccount.protectedIds = [p.id]; rival.capAccount!.protectedIds = [ai.id];
-    const raw = {...s, version: 31}; const original = JSON.stringify(raw);
+    const {competitionRewards: _, ...old} = s;
+    const raw = {...old, version: 31}; const original = JSON.stringify(raw);
     const key = (mode === 'DEV' ? DEV_TEST_PREFIX : '') + slotKey(1);
     const bytes = new Map([[key, original]]);
     __setStorage({getItem: k => bytes.get(k) ?? null, setItem: (k,v) => {bytes.set(k,v);}, removeItem: k => {bytes.delete(k);}});
@@ -60,7 +61,8 @@ describe('v32 exact protection preserves v31 checkpoints', () => {
     s = archiveRetirees(s, [own[3]!, ai[3]!], s);
     s.capAccount.protectedIds = [...own.map(p => p.id), 'unknown'];
     s.league.clubs.find(c => c.id === rival.id)!.capAccount!.protectedIds = [...ai.map(p => p.id), 'unknown'];
-    const result = migrateState({...s, version: 31});
+    const {competitionRewards: _, ...old} = s;
+    const result = migrateState({...old, version: 31});
     expect(result.ok).toBe(true); if (!result.ok) throw Error(result.message);
     expect(result.state.capAccount.protectedIds).toEqual([own[0]!.id]);
     expect(result.state.league.clubs.find(c => c.id === rival.id)!.capAccount!.protectedIds).toEqual([ai[0]!.id]);
@@ -73,7 +75,8 @@ describe('v32 exact protection preserves v31 checkpoints', () => {
     ai.deal = {salary: 3000, startSeason: 1, endSeason: 1, renewal: {salary: 4000, startSeason: 2, endSeason: 2}};
     rival.capAccount = freezeSignedTerms(rival.squad!, rival.capAccount!, 1);
     const before = structuredClone(s);
-    const result = migrateState({...s, version: 31});
+    const {competitionRewards: _, ...old} = s;
+    const result = migrateState({...old, version: 31});
     expect(result.ok).toBe(true); if (!result.ok) throw Error(result.message);
     expect(result.state.capAccount).toEqual(before.capAccount);
     expect(result.state.league.clubs.find(c => c.id === rival.id)!.capAccount).toEqual(before.league.clubs.find(c => c.id === rival.id)!.capAccount);

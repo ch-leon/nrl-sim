@@ -16,6 +16,7 @@ import { bus } from './events';
 import { pendingLeagueSaveProblem, retryPendingLeagueSave } from './save';
 import { getState, stateInstallation, type GameState } from './state';
 import { advanceWeek, failedIntervalProblem, weekHeld, withFastForward } from './time';
+import { projectCampDeparture } from '../systems/playerAssignments';
 import { isPlayableLeagueCareer, structuralAdvanceProblem } from '../systems/competitionCalendar';
 import { getCurrentFixture, PLAYER_ID } from '../systems/fixtures';
 import { fitSquadCount, playerMatchPending } from '../systems/matchday';
@@ -165,18 +166,20 @@ async function runUntil(target: AdvanceTarget, frame: () => Promise<void>): Prom
       if (demoBlocked(before)) return { weeksPlayed, stop: { kind: 'demo', text: DEMO_ENDED_TEXT } };
 
       // Forfeit risk is checked before the tick, the only point it can be avoided.
+      const camp = before.competitions?.assignments?.find(r => r.season === before.season && r.clubId === before.clubId && r.status === 'booked' && r.rules.departureWeek === before.week);
       const pre = forfeitRisk({
-        fitCount: fitSquadCount(before.squad),
+        fitCount: camp?.booking ? projectCampDeparture(before,camp.booking).fitCount : fitSquadCount(before.squad),
         playerFixturePending: playerFixturePending(),
       });
       if (pre) return { weeksPlayed, stop: pre };
 
       forcedSales = [];
       // A held week (N10.3: the player's match in the Worker) finishes later: wait for its end.
+      let blockedReason: string | undefined;
       const weekDone = new Promise<void>((resolve) => {
         const finish = (): void => {off(); offBlocked(); offState(); resolve();};
         const off = bus.on('week:advanced', finish);
-        const offBlocked = bus.on('week:blocked', finish);
+        const offBlocked = bus.on('week:blocked', ({reason}) => { blockedReason = reason; finish(); });
         const offState = bus.on('state:changed', () => {if (installation !== stateInstallation()) finish();});
         try {
           if (!withFastForward(() => { advanceWeek(); return weekHeld(); }, { holds: true })) finish();
@@ -187,7 +190,7 @@ async function runUntil(target: AdvanceTarget, frame: () => Promise<void>): Prom
       });
       await weekDone;
       if (installation !== stateInstallation()) return {weeksPlayed, stop: {kind:'stopped',text:'The career changed during advance.'}};
-      const failure = failedIntervalProblem();
+      const failure = failedIntervalProblem() ?? blockedReason;
       if (failure) return {weeksPlayed, stop: {kind:'stopped',text:failure}};
       weeksPlayed++;
       const pending = pendingLeagueSaveProblem();

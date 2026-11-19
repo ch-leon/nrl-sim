@@ -6,6 +6,8 @@
 // applyTraining runs strictly before applyInjuries so an injured player trains at
 // ×0.3 THIS week and recovers AFTER.
 
+import { awaitingCampReplay } from './parkedLeagueFixture';
+import { awayPlayerIds } from './playerAssignments';
 import { getState, setState, type GameState, type Player, type PlacedFacility, type PlayerStats, type TrainingFocus } from '../core/state';
 import { FACILITY_CATALOG, levelMult, type FacilityDef, type FacilityDefId } from '../data/facility';
 import { STAT_MAX, PROGRESSION } from '../config';
@@ -53,7 +55,7 @@ export function facilityXpMultiplier(facilities: readonly PlacedFacility[]): num
  * Trait multiplier: workhorse ×1.2 at level I (×1.32 II, ×1.44 III) and
  * youngGun ×1.3 stack multiplicatively; all other traits ×1.0.
  */
-export function traitMult(player: Player): number {
+export function traitMult(player: Pick<Player,'traits'>): number {
   let m = 1;
   const work = traitBoost(player.traits, 'workhorse');
   if (work > 0) m *= 1 + 0.2 * work;
@@ -69,16 +71,22 @@ export function injuryMult(player: Player): number {
 const clamp = (n: number): number => Math.max(STAT_FLOOR, Math.min(STAT_MAX, n));
 
 /**
- * The career spends level points by focus as soon as they are earned.
- * The persona harness sets `manual` so a playtester can spend those points
- * itself; every real career leaves this unset and keeps the automatic spend.
+ * The career spends level points by focus as soon as they are earned, unless the
+ * coach spends them (`settings.spendPointsMyself`, SuperCOOKED §7 #1: the callers pass
+ * it as `byHand`), when they bank for spendPoint. The persona harness sets `manual`
+ * so a playtester can spend those points itself.
  */
-let spendMode: 'auto' | 'manual' = 'auto';
-export function setSpendMode(mode: 'auto' | 'manual'): void {
+export type LevelPointSpendMode = 'auto' | 'manual';
+
+let spendMode: LevelPointSpendMode = 'auto';
+export function setSpendMode(mode: LevelPointSpendMode): void {
   spendMode = mode;
 }
-function spendIfAuto(player: Player, focus: TrainingFocus): Player {
-  return spendMode === 'manual' ? player : spendByFocus(player, focus);
+export function levelPointSpendMode(byHand = false): LevelPointSpendMode {
+  return spendMode === 'manual' || byHand ? 'manual' : 'auto';
+}
+function spendIfAuto(player: Player, focus: TrainingFocus, byHand = false): Player {
+  return levelPointSpendMode(byHand) === 'manual' ? player : spendByFocus(player, focus);
 }
 
 // ── The squad's training focus (N11) ─────────────────────────────────────────
@@ -114,7 +122,7 @@ export function weakestStat(squad: readonly Player[]): keyof PlayerStats {
 }
 
 /** Award XP and bank level points, without spending or changing stats. No RNG. */
-export function awardXp(player: Player, baseXp: number, facilities: readonly PlacedFacility[] = []): Player {
+export function awardXp<P extends Pick<Player,'age'|'traits'|'xp'|'level'|'unspentPoints'>>(player: P, baseXp: number, facilities: readonly PlacedFacility[] = []): P {
   let xp = (player.xp ?? 0) + Math.max(0, baseXp) * ageMod(player.age) * traitMult(player) * facilityXpMultiplier(facilities);
   const levels = Math.floor(xp / PROGRESSION.XP_PER_LEVEL);
   xp -= levels * PROGRESSION.XP_PER_LEVEL;
@@ -123,7 +131,7 @@ export function awardXp(player: Player, baseXp: number, facilities: readonly Pla
 }
 
 /** Reusable #540 “spend by focus” rule. Ties follow shown-stat order. */
-export function spendByFocus(player: Player, focus: TrainingFocus = 'balanced'): Player {
+export function spendByFocus<P extends Pick<Player,'position'|'stats'|'ceilings'|'unspentPoints'>>(player: P, focus: TrainingFocus = 'balanced'): P {
   const stats = { ...player.stats };
   let points = player.unspentPoints ?? 0;
   const keys = shownStats(player.position);
@@ -138,6 +146,47 @@ export function spendByFocus(player: Player, focus: TrainingFocus = 'balanced'):
   return { ...player, stats, unspentPoints: points };
 }
 
+/**
+ * Why `stat` can't take one of `player`'s banked points (SuperCOOKED §7 #1), or null when
+ * it can: it must be one of his four shown stats, he must have a point, and the stat must
+ * be under its ceiling. Pure.
+ */
+export function spendPointBlock(player: Player, stat: keyof PlayerStats): 'not-shown' | 'no-points' | 'at-ceiling' | null {
+  if (!shownStats(player.position).includes(stat)) return 'not-shown';
+  if ((player.unspentPoints ?? 0) <= 0) return 'no-points';
+  if (player.stats[stat] >= (player.ceilings[stat] ?? player.stats[stat])) return 'at-ceiling';
+  return null;
+}
+
+/** One banked point into `stat`, up to its ceiling (the same step spendByFocus takes); unchanged when spendPointBlock says no. Pure. */
+export function spendPoint(player: Player, stat: keyof PlayerStats): Player {
+  if (spendPointBlock(player, stat)) return player;
+  return {
+    ...player,
+    stats: { ...player.stats, [stat]: Math.min(player.ceilings[stat]!, player.stats[stat] + 1) },
+    unspentPoints: (player.unspentPoints ?? 0) - 1,
+  };
+}
+
+/** Settings' "spend points myself" switch (SuperCOOKED §7 #1). Off again, banked points go back to the focus at the next award. */
+export function setSpendPointsMyself(on: boolean): void {
+  const settings = getState().settings;
+  if ((settings.spendPointsMyself === true) === on) return;
+  setState({ settings: { ...settings, spendPointsMyself: on } });
+}
+
+/** The coach spends one of a squad player's banked points (the player page's +). Returns whether it was spent. */
+export function spendSquadPoint(playerId: string, stat: keyof PlayerStats): boolean {
+  const s = getState();
+  if (awaitingCampReplay(s)) return false;
+  const at = s.squad.findIndex((p) => p.id === playerId);
+  if (at < 0) return false;
+  const next = spendPoint(s.squad[at]!, stat);
+  if (next === s.squad[at]) return false;
+  setState({ squad: s.squad.map((p, i) => (i === at ? next : p)) });
+  return true;
+}
+
 /** Existing veteran decline only; hidden stats remain fixed. No passive growth. */
 export function trainPlayer(player: Player, _facilities: PlacedFacility[] = [], _focus: TrainingFocus = 'balanced'): PlayerStats {
   const next = { ...player.stats };
@@ -148,15 +197,17 @@ export function trainPlayer(player: Player, _facilities: PlacedFacility[] = [], 
   return next;
 }
 
-/** A small weekly XP trickle even without buildings; injury still slows training. */
-export function trainWeek(player: Player, facilities: PlacedFacility[], focus: TrainingFocus = 'balanced'): Player {
+/** Weekly XP and decline. An away assignment can substitute for the XP and point spending. */
+export function trainWeek(player: Player, facilities: PlacedFacility[], focus: TrainingFocus = 'balanced',
+  byHand = false, options: { skipXp?: boolean } = {}): Player {
   const declined = { ...player, stats: trainPlayer(player) };
-  return spendIfAuto(awardXp(declined, PROGRESSION.WEEKLY_XP * injuryMult(player), facilities), focus);
+  if (options.skipXp) return declined;
+  return spendIfAuto(awardXp(declined, PROGRESSION.WEEKLY_XP * injuryMult(player), facilities), focus, byHand);
 }
 
 /** Match XP uses the sheets and recorded moments, never the simulation RNG. */
 export function applyMatchXp(squad: readonly Player[], own: TeamSheet, result: MatchResult,
-  homeId: string, awayId: string, facilities: PlacedFacility[], focus: TrainingFocus = 'balanced'): Player[] {
+  homeId: string, awayId: string, facilities: PlacedFacility[], focus: TrainingFocus = 'balanced', byHand = false): Player[] {
   const starters = new Set((own.roster ?? []).map(p => p.id));
   const bench = new Set((own.bench ?? []).map(p => p.id));
   const moments = foldEvents(result.events, own.clubId);
@@ -167,13 +218,14 @@ export function applyMatchXp(squad: readonly Player[], own: TeamSheet, result: M
     const xp = (starters.has(p.id) ? PROGRESSION.STARTER_XP : PROGRESSION.BENCH_XP)
       + (tally?.tries ?? 0) * PROGRESSION.TRY_XP + (tally?.lineBreaks ?? 0) * PROGRESSION.LINE_BREAK_XP
       + (potm && potm.teamId === own.clubId && potm.name === p.name ? PROGRESSION.POTM_XP : 0);
-    return spendIfAuto(awardXp(p, xp, facilities), focus);
+    return spendIfAuto(awardXp(p, xp, facilities), focus, byHand);
   });
 }
 
 /** Weekly hook (10), before injury recovery (20). */
 export function applyTraining(state: GameState): GameState {
-  const squad = state.squad.map(p => trainWeek(p, state.facilities, state.training?.focus ?? 'balanced'));
+  const away = awayPlayerIds(state);
+  const squad = state.squad.map(p => trainWeek(p, state.facilities, state.training?.focus ?? 'balanced', state.settings.spendPointsMyself === true, {skipXp:away.has(p.id)}));
   setState({ squad });
   return getState();
 }
@@ -184,12 +236,19 @@ export function applyTraining(state: GameState): GameState {
  * a built physioCentre adds 1 extra. Deterministic (no RNG).
  * injuredWeeks = max(0, injuredWeeks − recovery).
  */
+export function injuryRecoveryPerWeek(facilities: readonly PlacedFacility[]): number {
+  const medicalBay = facilities.find(f => f.defId === 'medicalBay');
+  const physio = facilities.some(f => f.defId === 'physioCentre');
+  return 1 + (medicalBay?.level ?? 0) + Number(physio);
+}
+
+/** Week advances until a player `injuredWeeks` out is fit, at today's recovery (0 when fit). */
+export function weeksUntilFit(injuredWeeks: number, facilities: readonly PlacedFacility[]): number {
+  return injuredWeeks <= 0 ? 0 : Math.ceil(injuredWeeks / injuryRecoveryPerWeek(facilities));
+}
+
 export function applyInjuries(state: GameState): GameState {
-  const medicalBay = state.facilities.find((f) => f.defId === 'medicalBay');
-  const physio = state.facilities.find((f) => f.defId === 'physioCentre');
-  let recovery = 1;
-  if (medicalBay) recovery += medicalBay.level;
-  if (physio) recovery += 1;
+  const recovery = injuryRecoveryPerWeek(state.facilities);
 
   let changed = false;
   const squad = state.squad.map((p) => {

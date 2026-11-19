@@ -123,15 +123,27 @@ export const SHEET_EXIT = '.nrl-nav [data-nav-home]';
 
 /**
  * Destinations inside another sheet: the sheet, then what opens them there. The
- * ladder shares League's sheet (3h); Lineup and Recruit are Squad's segments;
- * Contracts is Finance's VIEW ▸.
+ * ladder shares League's sheet (3h); Recruit is Squad's segment; Contracts is
+ * Finance's VIEW ▸.
  */
 const NAV_VIA = {
   ladder: ['fixtures', null],
-  lineup: ['squad', '.nrl-sq-tabs [data-seg="lineup"]'],
   recruit: ['squad', '.nrl-sq-tabs [data-seg="recruit"]'],
   contracts: ['finance', '[data-finance-contracts]'],
 };
+
+/**
+ * SuperCOOKED 30–31: SQUAD opens whichever of its views was last used, the pitch (the
+ * Lineup, keyed 'lineup') or the list (keyed 'squad'); Pitch / List in its header switch.
+ */
+const SQUAD_VIEW = { squad: 'list', lineup: 'pitch' };
+const SQUAD_SHEET = '.nrl-screen-region:is([data-screen-key="squad"], [data-screen-key="lineup"])';
+
+/** The Squad header's ⋯, then one of its items (the game plan, the set plays, a training focus). */
+export async function squadMenu(page, item) {
+  if (!(await page.locator('.nrl-squad-more-tray').count())) await page.locator('.nrl-screen-region [data-squad-more]').tap();
+  await page.locator(`.nrl-squad-more-tray ${item}`).tap();
+}
 
 /**
  * Open a destination as a player would: its dock tab, OFFICE then its tile, or
@@ -141,24 +153,37 @@ const NAV_VIA = {
 export async function openNav(page, id) {
   if (id === 'club') { await page.locator(SHEET_EXIT).tap(); return; }
   if (await page.locator(`.nrl-screen-region[data-screen-key="${id}"]`).count()) return;
+  if (SQUAD_VIEW[id]) {
+    if (await page.locator('.nrl-screen-region[data-screen-key="recruit"]').count()) await page.locator('.nrl-sq-tabs [data-seg="squad"]').tap();
+    else if (!(await page.locator(SQUAD_SHEET).count())) await dockTab(page, 'squad');
+    await page.locator(SQUAD_SHEET).waitFor();
+    if (!(await page.locator(`.nrl-screen-region[data-screen-key="${id}"]`).count())) await page.locator(`[data-squad-view="${SQUAD_VIEW[id]}"]`).tap();
+    await page.locator(`.nrl-screen-region[data-screen-key="${id}"]`).waitFor();
+    return;
+  }
   if (NAV_VIA[id]) {
     const [via, sel] = NAV_VIA[id];
     await openNav(page, via);
     if (sel) await page.locator(sel).first().tap();
     return;
   }
-  const direct = page.locator(`.nrl-nav > .nrl-btn[data-screen="${id}"]`);
-  if (await direct.count() && await direct.first().isVisible()) {
-    // Lit for another of its sheets (Squad for Lineup): CLUB first, or the tap would close that.
-    if ((await direct.first().getAttribute('aria-current')) === 'page' && (await page.locator('.nrl-screen-region').count())) {
-      await page.locator(SHEET_EXIT).tap();
-    }
-    return direct.first().tap();
-  }
+  if (await dockTab(page, id)) return;
   const more = page.locator('.nrl-nav [data-nav-more]');
   if (!(await more.count())) throw new Error(`no nav item for "${id}"`);
   if (!(await page.locator('.nrl-nav-sheet:not([hidden])').count())) await more.tap();
   await page.locator(`.nrl-nav-sheet [data-screen="${id}"]`).tap();
+}
+
+/** Its dock tab, if it has one showing: true when tapped. */
+async function dockTab(page, id) {
+  const direct = page.locator(`.nrl-nav > .nrl-btn[data-screen="${id}"]`);
+  if (!(await direct.count()) || !(await direct.first().isVisible())) return false;
+  // Lit for another of its sheets (Squad for Recruit): CLUB first, or the tap would close that.
+  if ((await direct.first().getAttribute('aria-current')) === 'page' && (await page.locator('.nrl-screen-region').count())) {
+    await page.locator(SHEET_EXIT).tap();
+  }
+  await direct.first().tap();
+  return true;
 }
 
 export const NO_INSETS = { l: 0, t: 0, r: 0, b: 0 };
@@ -179,6 +204,17 @@ export async function skipFromPill(page) {
     await skip.tap();
     if (!(await armed.count())) return;
   }
+}
+
+/**
+ * The match's one speed button (SuperCOOKED 40) to `speed`: it shows the speed playing and each tap
+ * moves it on (1× → 2× → 4× → 8× → 1×), so tap until it reads the one wanted.
+ */
+export async function setMatchSpeed(page, speed) {
+  const b = page.locator('.nrl-mo-controls .nrl-mo-speed');
+  for (let i = 0; i < 4 && (await b.getAttribute('data-speed')) !== String(speed); i++) await b.tap();
+  const now = await b.getAttribute('data-speed');
+  if (now !== String(speed)) throw new Error(`the speed button reads ×${now}, not ×${speed}`);
 }
 
 /** Play a real match through the phone controls, then wait for its held week. */

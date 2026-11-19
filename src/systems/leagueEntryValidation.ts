@@ -1,3 +1,4 @@
+import type { RunningCamp } from '../data/playerAssignments';
 import { SAVE_VERSION, type GameState } from '../core/state';
 import { careerActionClock } from '../core/season';
 import { validateCurrent, validateInput } from '../core/saveValidation';
@@ -13,11 +14,11 @@ import { isOpenCupInstance } from './openCup';
 import { entryQuote } from './leagueEntryQuote';
 import { leagueAccessFromClose } from './leagueSelection';
 
-function strictStateProblem(state: GameState): string | null {
+function strictStateProblem(state: GameState, runningCamp?: RunningCamp): string | null {
   const data = state as unknown as Record<string, unknown>;
-  const problem = validateInput(data, state.version);
+  const problem = validateInput(data, state.version,runningCamp);
   if (problem) return problem;
-  const checked = validateCurrent(data);
+  const checked = validateCurrent(data,runningCamp);
   if (!checked.ok) return checked.message;
   if (checked.repairs.length || (checked.state !== state && canonicalLeagueJson(checked.state) !== canonicalLeagueJson(state)))
     return 'The League career requires a save repair.';
@@ -106,14 +107,17 @@ interface LeagueStateProblem { reason: 'invalid' | 'unsupported'; message: strin
 
 /** Strict admission of an already marked League save. Does not select a pack,
  * install the state, recover prototypes or grant entry to a storage namespace. */
-export function leagueCareerStateProblem(state: GameState): LeagueStateProblem | null {
+export function leagueCareerStateProblem(state: GameState, runningCamp?: RunningCamp): LeagueStateProblem | null {
   try {
     const c = state.competitions;
     const progress = c?.leagueCareer;
     if (!progress || !c.world || state.boardLoan?.owed !== 0)
       return { reason: 'invalid', message: 'Missing League career or outstanding board debt.' };
     if (state.version !== SAVE_VERSION) return { reason: 'unsupported', message: 'This League career format is unsupported.' };
-    const invalid = strictStateProblem(state);
+    const offer = c.openCupEntry?.current;
+    if (offer?.lifecycle === 'drawn' && state.week < offer.deadline)
+      return { reason: 'invalid', message: 'The Open Cup draw was published before registration closed.' };
+    const invalid = strictStateProblem(state,runningCamp);
     if (invalid) return { reason: 'invalid', message: invalid };
     const unsupported = runtimeProblem(state);
     if (unsupported) return { reason: 'unsupported', message: unsupported };

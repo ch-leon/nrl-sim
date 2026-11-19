@@ -1,6 +1,6 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav } from '../common.mjs';
+import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, squadMenu, reachProblems } from '../common.mjs';
 
 // ── Landscape screens (#336, #344, #347, #343, #351) ─────────────────────────
 // Every nav screen and the main popups on a phone held sideways. Each must show
@@ -23,8 +23,8 @@ export const SCREEN_RUNS = (process.env.E2E_SCREEN_SIZES ?? '844x390@47,0,47,21 
 
 /** Screens reached from the dock: what shows its content, and what must stay on screen. */
 const NAV_SCREENS = [
-  { id: 'squad', box: '.nrl-screen-region', rows: '.nrl-grid-body > .nrl-row', primary: ['[data-focus-menu]'], more: '.nrl-grid-body' },
-  { id: 'lineup', box: '.nrl-screen-region', rows: '.nrl-lineup-list > *', card: '.nrl-lineup-field', primary: ['[data-auto-pick]'], more: '.nrl-lineup-list' },
+  { id: 'squad', box: '.nrl-screen-region', rows: '.nrl-grid-body > .nrl-row', primary: ['[data-squad-more]', '[data-sort-menu]'], more: '.nrl-grid-body' },
+  { id: 'lineup', box: '.nrl-screen-region', rows: '.nrl-lineup-field .nrl-pcard', card: '.nrl-lineup-field', primary: ['[data-auto-pick]', '[data-swap-start]', '[data-squad-more]'] },
   { id: 'recruit', box: '.nrl-screen-region', rows: '.nrl-grid-body > .nrl-row', primary: ['.nrl-grid-body > :first-child .nrl-row-action'] },
   { id: 'fixtures', box: '.nrl-screen-region', rows: '.nrl-fixture-row', primary: ['[data-next-row]'] },
   { id: 'ladder', box: '.nrl-screen-region', rows: '.nrl-ladder-table tbody tr', more: '.nrl-ladder-scroll' },
@@ -262,7 +262,7 @@ function toastReport(page, avoid, safe, tappable = true) {
     return {
       problems: [...new Set(out)], shown: shown.length, queued: all.length - 1,
       text: t.querySelector('.nrl-toast-text')?.textContent ?? '', kind, more: t.querySelector('.nrl-toast-more')?.textContent ?? '',
-      bg: getComputedStyle(t).backgroundColor, lane: lane?.dataset.lane ?? '',
+      bg: getComputedStyle(t).backgroundColor, bar: getComputedStyle(t).borderLeftColor, lane: lane?.dataset.lane ?? '',
     };
   }, [avoid, safe, tappable]);
 }
@@ -274,7 +274,7 @@ function toastReport(page, avoid, safe, tappable = true) {
  */
 const CLUB_AVOID = ['.nrl-dock', '.nrl-hud-menu:not([hidden])', '.nrl-nav-sheet:not([hidden])', '[data-decisions-chip]:not([hidden])', '.nrl-board-chip:not([hidden])', '.nrl-screen-x', '.nrl-screen-head', '.nrl-news-head'];
 /** …and in a match: the score bug, the stats, the commentary line or full log, and every control. */
-const MATCH_AVOID = ['.nrl-mo-scoreboard', '.nrl-mo-statsheet', '.nrl-mo-strip', '.nrl-mo-full', '.nrl-mo-log-toggle', '.nrl-mo-bar [data-coach]', '.nrl-mo-controls', '.nrl-mo-calls', '.nrl-mo-replay'];
+const MATCH_AVOID = ['.nrl-mo-scoreboard', '.nrl-mo-statsheet', '.nrl-mo-strip', '.nrl-mo-full', '.nrl-mo-tackle', '.nrl-mo-bar [data-coach]', '.nrl-mo-controls', '.nrl-mo-calls', '.nrl-mo-replay'];
 /** The burst the check fires: a problem, a routine stop, good news, a confirmation. */
 const TOAST_BURST = [
   { text: 'Kai Smith injured — out 3w', kind: 'danger' },
@@ -282,8 +282,9 @@ const TOAST_BURST = [
   { text: 'Signed Jack Taufa', kind: 'success' },
   { text: 'Advanced 4 weeks.', kind: 'info' },
 ];
-/** Each kind's fill (Broadcast Quiet's tokens: info on the navy sheet, success green, danger red; src/ui/dom.ts). */
-const TOAST_BG = { 'nrl-toast-danger': 'rgb(122, 42, 36)', 'nrl-toast-info': 'rgba(14, 22, 48, 0.97)', 'nrl-toast-success': 'rgb(29, 90, 51)' };
+/** Every toast is ink; its left bar is its kind (SuperCOOKED §4: info muted, success green, danger red; src/ui/dom.ts). */
+const TOAST_FILL = 'rgba(5, 7, 13, 0.97)';
+const TOAST_BAR = { 'nrl-toast-danger': 'rgb(255, 59, 31)', 'nrl-toast-info': 'rgb(143, 152, 171)', 'nrl-toast-success': 'rgb(20, 195, 142)' };
 
 export async function runScreens(browser, { w: W, h: H, safe }) {
   const tag = `${W}x${H}${safe.l || safe.r || safe.b || safe.t ? '-safe' : ''}`;
@@ -386,7 +387,8 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
       out.push(...r.problems);
       if (r.text !== want.text) out.push(`toast ${i + 1} reads "${r.text}", want "${want.text}"`);
       if (r.kind !== `nrl-toast-${want.kind}`) out.push(`toast ${i + 1} ("${want.text}") is ${r.kind || 'unclassed'}, want nrl-toast-${want.kind}`);
-      if (r.bg !== TOAST_BG[`nrl-toast-${want.kind}`]) out.push(`toast ${i + 1} is ${r.bg}, want ${TOAST_BG[`nrl-toast-${want.kind}`]} for ${want.kind}`);
+      if (r.bg !== TOAST_FILL) out.push(`toast ${i + 1} is ${r.bg}, want ${TOAST_FILL}`);
+      if (r.bar !== TOAST_BAR[`nrl-toast-${want.kind}`]) out.push(`toast ${i + 1}'s bar is ${r.bar}, want ${TOAST_BAR[`nrl-toast-${want.kind}`]} for ${want.kind}`);
       const more = TOAST_BURST.length - 1 - i;
       if (r.more !== (more ? `+${more}` : '')) out.push(`toast ${i + 1}'s counter reads "${r.more}", want "${more ? `+${more}` : ''}"`);
       if (r.lane !== 'dock') out.push(`toast ${i + 1} is in the ${r.lane} lane, not the dock's`);
@@ -520,8 +522,9 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
     await want('grounds → SQUAD', dockTab('squad'), 'squad', true);
     await want('SQUAD → LEAGUE', dockTab('fixtures'), 'fixtures', false);
     await want('LEAGUE → SQUAD', dockTab('squad'), 'squad', false);
-    await want('Squad → Lineup', '.nrl-sq-tabs [data-seg="lineup"]', 'lineup', false);
-    await want('Lineup → Recruit', '.nrl-sq-tabs [data-seg="recruit"]', 'recruit', false);
+    await want('Squad → List', '[data-squad-view="list"]', 'squad', false);
+    await want('List → Pitch', '[data-squad-view="pitch"]', 'lineup', false);
+    await want('Pitch → Recruit', '.nrl-sq-tabs [data-seg="recruit"]', 'recruit', false);
     await tap('.nrl-nav [data-nav-more]');
     await page.waitForSelector('.nrl-nav-sheet:not([hidden])');
     await page.waitForTimeout(250);
@@ -557,7 +560,7 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
     await textSize(size);
     await step(`fit-lineup-${size}`, async () => {
       await openNav(page, 'lineup');
-      await tap('[data-plan]');
+      await squadMenu(page, '[data-plan]');
       await page.waitForSelector('.nrl-lineup-plan');
       const out = await readoutProblems();
       if (await page.locator('.nrl-lineup-plan [data-fit]').count() !== 8) out.push('missing fit buttons');
@@ -586,19 +589,23 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
     await tap('.nrl-screen-region [data-player-open] .nrl-row-name');
     await page.waitForSelector('[data-player-page]');
     // No ✕ (Broadcast Quiet): ◂ SQUAD is its one way out.
-    return check(rec, { box: '.nrl-player-modal', rows: '.nrl-player-stats .nrl-statrow', card: '.nrl-player-stats', exit: '.nrl-player-modal [data-back]',
-      primary: ['[data-player-action="renew"]', '[data-player-action="sell"]', '[data-player-action="release"]'] }, null);
+    // SuperCOOKED 35–37: Stats first; the deals on the Deal tab.
+    const out = await check(rec, { box: '.nrl-player-modal', rows: '.nrl-player-stats .nrl-statrow', card: '.nrl-player-stats', exit: '.nrl-player-modal [data-back]',
+      primary: ['[data-player-tab="traits"]', '[data-player-tab="deal"]', '[data-player-tab="record"]'] }, null);
+    await tap('[data-player-tab="deal"]');
+    return [...(out ?? []), ...await reachProblems(page, '.nrl-player-modal', ['[data-player-action="renew"]', '[data-player-action="release"]'])];
   });
   // #538: the temporary Potential line also fits a phone on its side, without a redesign.
   await step('popup-player-potential-667x375', async () => {
     await page.setViewportSize({ width: 667, height: 375 });
     await page.waitForTimeout(250);
+    await tap('[data-player-tab="record"]'); // Potential is on the Record tab (Leon, 18 Nov)
     return page.evaluate(() => {
       const line = document.querySelector('[data-potential]');
       if (!line || !/^Potential: ★*(?:½)?$/.test(line.textContent)) return ['missing plain Potential star line'];
       line.scrollIntoView({ block: 'nearest' });
       const r = line.getBoundingClientRect();
-      const col = document.querySelector('.nrl-player-about').getBoundingClientRect();
+      const col = document.querySelector('.nrl-player-panel').getBoundingClientRect();
       const out = [];
       if (r.left < 0 || r.right > innerWidth || r.height < 10 || r.top < 0 || r.bottom > innerHeight
         || r.top < col.top - 1 || r.bottom > col.bottom + 1 || line.scrollWidth > line.clientWidth + 1) out.push('Potential line clipped at 667x375');
@@ -861,8 +868,7 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
   // and the lane gives way to the Replay try chip.
   await step('match-toast', async (rec) => {
     const out = [];
-    // The log's three modes (3m): the LOG switch brings the line back, the line opens the full log.
-    if (await page.locator('.nrl-match-overlay[data-log="hidden"]').count()) await page.locator('.nrl-mo-log-toggle').tap();
+    // The log (SuperCOOKED 40): the line in the bottom bar opens the full log.
     if (await page.locator('.nrl-match-overlay[data-log="line"]').count()) await page.locator('.nrl-mo-strip').tap();
     if (!(await page.locator('.nrl-match-overlay[data-log="full"]').count())) out.push('the full log did not open from the commentary line');
     await page.waitForTimeout(300);

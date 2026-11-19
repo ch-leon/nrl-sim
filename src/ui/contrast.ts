@@ -1,5 +1,5 @@
 // src/ui/contrast.ts — the theme's text against its backgrounds, checked against
-// WCAG AA (#371). Every text colour the Broadcast Quiet tokens put on a surface is
+// WCAG AA (#371). Every text colour the theme's tokens (SuperCOOKED, ui-supercooked.md §2) put on a surface is
 // listed here once; tests/ui/contrast.test.ts runs them all, so a later theme change
 // that drops a pair under 4.5:1 fails CI rather than quietly going out. Pure: no DOM.
 import { COLOR_TOKENS, type ColorToken } from './tokens';
@@ -14,17 +14,17 @@ export interface TextPair {
   where: string;
 }
 
-/** The surfaces body text sits on: the dock and dialogs, the tiles and rows, buttons, sheets, your club's row. */
-const SURFACES: readonly ColorToken[] = ['navy', 'panel', 'raised', 'button', 'sheet', 'me'];
+/** The surfaces body text sits on: ink (the dock, toasts, the title, the placement bar), dialogs, the tiles and rows, buttons, sheets, your club's row. */
+const SURFACES: readonly ColorToken[] = ['ink', 'navy', 'panel', 'raised', 'button', 'sheet', 'me'];
 /** The text colours used on them: words, secondary words, labels, the yellow, up and down. */
 const INKS: readonly ColorToken[] = ['text', 'text2', 'muted', 'accent', 'pos', 'neg'];
 
 /** Every text/background pair the theme uses. */
 export const TEXT_PAIRS: readonly TextPair[] = [
   ...INKS.flatMap((text) => SURFACES.map((on) => ({ text, on, where: `${text} words on ${on}` }))),
-  { text: 'onAccent', on: 'accent', where: 'the yellow primary button, the selected chip, the clock box' },
-  { text: 'onAccent', on: 'neg', where: 'an armed Sell or Release' },
-  { text: 'text', on: 'win', where: 'the WIN BY tag and a W in the form guide' },
+  { text: 'onAccent', on: 'accent', where: 'the orange primary button, a screen switch\'s selected tab, the clock box' },
+  { text: 'onAccent', on: 'text', where: 'a selected tab inside a sheet (white, navy words)' },
+  { text: 'onAccent', on: 'win', where: 'the WIN BY tag and a W in the form guide (navy on the green)' },
   { text: 'text', on: 'out', where: 'the DEBT badge and an L in the form guide' },
   { text: 'text', on: 'injured', where: 'an injured tile' },
 ];
@@ -51,6 +51,18 @@ function over(top: Rgba, under: Rgba): Rgba {
   const a = top[3];
   return [top[0] * a + under[0] * (1 - a), top[1] * a + under[1] * (1 - a), top[2] * a + under[2] * (1 - a), 1];
 }
+
+/** `top` (translucent) laid over the opaque `under`, as an opaque '#rrggbb'. Pure. */
+export function blend(top: string, under: string): string {
+  const [r, g, b] = over(parseColor(top), parseColor(under));
+  return `#${[r, g, b].map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')}`;
+}
+
+/**
+ * An armed Sell or Release (dom.ts .nrl-btn-armed, the title's armed Delete): amber words on the
+ * amber at 16% over the raised fill. Not a token pair, so it is checked on its own.
+ */
+export const ARMED_FILL = 'rgba(255, 138, 61, 0.16)';
 
 /** WCAG relative luminance. */
 function luminance([r, g, b]: Rgba): number {

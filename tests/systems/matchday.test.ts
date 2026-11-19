@@ -13,7 +13,7 @@ import {
   forfeitResult,
   fitSquadCount,
 } from '../../src/systems/matchday';
-import { DIFFICULTY, FORFEIT_SCORE, SQUAD_MIN, type Difficulty } from '../../src/config';
+import { DIFFICULTY, FORFEIT_SCORE, PROGRESSION, SQUAD_MIN, type Difficulty } from '../../src/config';
 import { generatePlayer } from '../../src/data/player';
 import { makeRng } from '../../src/utils/rng';
 import type { Fixture, Player } from '../../src/core/state';
@@ -81,6 +81,27 @@ describe('player matchday result toast', () => {
     c.stop();
   });
 
+  it('banks match level points for the coach while "spend points myself" is on (SuperCOOKED §7 #1)', () => {
+    // 55 XP: the week's trickle (+10) levels nobody, a starter's match XP (+40) does.
+    setState({
+      settings: { ...getState().settings, spendPointsMyself: true },
+      squad: getState().squad.map(p => ({ ...p, xp: 55, level: 1, unspentPoints: 0 })),
+    });
+    const c = collect();
+    advanceWeek();
+    const { fixture, sim } = c.started[0]!;
+    const before = new Map(getState().squad.map(p => [p.id, p.stats]));
+    expect(getState().squad.every(p => (p.level ?? 1) === 1)).toBe(true);
+    bus.emit('match:finished', { fixture, result: sim });
+    const levelled = getState().squad.filter(p => (p.level ?? 1) > 1);
+    expect(levelled.length).toBeGreaterThan(0);
+    for (const p of levelled) {
+      expect(p.unspentPoints).toBe((p.level! - 1) * PROGRESSION.POINTS_PER_LEVEL);
+      expect(p.stats).toEqual(before.get(p.id));
+    }
+    c.stop();
+  });
+
   it('reconciles accepted cash without applying sporting stats again on redelivery', () => {
     const c = collect(); advanceWeek();
     const { fixture, sim } = c.started[0]!;
@@ -117,6 +138,36 @@ describe('player matchday injuries (GitHub #7)', () => {
     createNewGame('Tester', 7);
     initLeague(getState());
     registerPlayerMatchSystem();
+  });
+
+  it('uses the frozen sheet for legacy injury names and ignores IDs outside the match', () => {
+    const s = getState();
+    const absent = s.squad[0]!;
+    const lineup = autoPick(s.squad.filter((p) => p.id !== absent.id));
+    const benchId = lineup.bench[0]!;
+    const name = s.squad.find((p) => p.id === benchId)!.name;
+    const squad = s.squad.map((p) => p.id === absent.id ? { ...p, name } : p);
+    setState({ squad, lineup });
+    const c = collect();
+    advanceWeek();
+    const { fixture, sim } = c.started[0]!;
+    setState({ lineup: { ...lineup, bench: [absent.id, ...lineup.bench.slice(1)] } });
+    bus.emit('match:finished', {
+      fixture,
+      result: {
+        ...sim,
+        events: [{ t: 1, kind: 'try', teamId: PLAYER_ID, player: name }],
+        injuries: [
+          { teamId: PLAYER_ID, playerName: name, weeks: 2 },
+          { teamId: PLAYER_ID, playerId: absent.id, playerName: name, weeks: 3 },
+        ],
+      },
+    });
+    c.stop();
+    expect(getState().squad.find((p) => p.id === absent.id)).toEqual(squad[0]);
+    const played = getState().squad.find((p) => p.id === benchId)!;
+    expect(played.injuredWeeks).toBe(2);
+    expect(played.career).toMatchObject({ games: 0, tries: 1 });
   });
 
   it('applies sim injuries onto squad players and notifies', () => {

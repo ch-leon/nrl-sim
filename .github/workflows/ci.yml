@@ -96,8 +96,9 @@ jobs:
     # has no WebKit for it ("Playwright does not support webkit on ubuntu26.04-x64").
     # Go back to ubuntu-latest once playwright-core is on a version that does.
     runs-on: ubuntu-24.04
-    # Cold WebKit dependency installs can take 20+ minutes before layout/playthrough checks begin.
-    # Leave time for the complete checks on slower runners; no per-check timeouts are relaxed.
+    # Cold WebKit dependency installs have taken 13–24 minutes (the Ubuntu mirror at ~110 kB/s)
+    # before layout/playthrough checks begin; the package cache below takes that out on a warm
+    # run, and 45 leaves a cold one room to finish. No per-check timeouts are relaxed.
     timeout-minutes: 45
     strategy:
       fail-fast: false
@@ -112,16 +113,50 @@ jobs:
       - run: npm ci
       - name: Playwright version
         id: pw
-        run: echo "version=$(node -p "require('playwright-core/package.json').version")" >> "$GITHUB_OUTPUT"
-      # The WebKit build is keyed on playwright-core's version; the system libraries it
-      # needs are installed every time (--with-deps), cached browser or not.
+        run: |
+          echo "version=$(node -p "require('playwright-core/package.json').version")" >> "$GITHUB_OUTPUT"
+          echo "image=${ImageOS:-unknown}-${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
+          echo "os=${ImageOS:-unknown}" >> "$GITHUB_OUTPUT"
+      # The WebKit build is keyed on playwright-core's version.
       - name: Cache WebKit
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
           key: ms-playwright-webkit-${{ runner.os }}-${{ steps.pw.outputs.version }}
+      # The system libraries WebKit needs (--with-deps) are still installed every time, but
+      # their .deb files are cached: downloading them (~125 MB) was the slow part. Keyed on the
+      # runner image and playwright-core; a new image restores the last set and fetches only
+      # what changed. Saved straight after the install, so a shard that fails later still saves.
+      - name: Restore WebKit's system packages
+        id: webkit-debs
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/webkit-debs
+          key: webkit-debs-${{ steps.pw.outputs.image }}-${{ steps.pw.outputs.version }}
+          restore-keys: |
+            webkit-debs-${{ steps.pw.outputs.os }}-
+      - name: Seed apt with the cached packages
+        run: |
+          echo 'APT::Keep-Downloaded-Packages "true";' | sudo tee /etc/apt/apt.conf.d/99keep-debs
+          if compgen -G "$HOME/.cache/webkit-debs/*.deb" > /dev/null; then
+            sudo cp "$HOME"/.cache/webkit-debs/*.deb /var/cache/apt/archives/
+          fi
       - name: Fetch WebKit
         run: npx playwright-core install --with-deps webkit
+      - name: Keep WebKit's system packages
+        if: steps.webkit-debs.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p "$HOME/.cache/webkit-debs"
+          if compgen -G "/var/cache/apt/archives/*.deb" > /dev/null; then
+            cp /var/cache/apt/archives/*.deb "$HOME/.cache/webkit-debs/"
+          fi
+          du -sh "$HOME/.cache/webkit-debs"
+      - name: Cache WebKit's system packages
+        if: steps.webkit-debs.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/webkit-debs
+          key: webkit-debs-${{ steps.pw.outputs.image }}-${{ steps.pw.outputs.version }}
       - name: WebKit layout and portrait boot (${{ matrix.group }})
         run: npm run e2e:webkit -- --group ${{ matrix.group }}
       - name: Keep the screenshots

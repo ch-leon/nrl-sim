@@ -399,6 +399,11 @@ export function checkState(s: GameState): string[] {
 export function asOldSave(s: GameState, version: number): Record<string, unknown> {
   const raw = JSON.parse(JSON.stringify(s)) as Record<string, unknown> & GameState;
   const out: Record<string, unknown> = raw;
+  if (version < 33) {
+    delete out.competitionRewards;
+    if (raw.competitions) delete raw.competitions.openCupEntry;
+    for (const club of raw.league.clubs) delete club.reputation;
+  }
   // Synthetic old saves predate the new-career ladder, just like the real corpus.
   delete out.unlocks;
   delete out.preseason;

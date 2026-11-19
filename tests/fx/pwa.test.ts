@@ -55,6 +55,13 @@ describe('gen-icons.mjs', () => {
       expect(bytes[24]).toBe(8); // bit depth
       expect(bytes[25]).toBe(6); // colour type RGBA
     }
+
+    // The iPhone app's icon (docs/specs/ios.md §2): 1024px with no alpha channel, as App Store Connect requires.
+    const ios: Uint8Array = new Uint8Array(fs.readFileSync(path.join(root, 'ios', 'App', 'App', 'Assets.xcassets', 'AppIcon.appiconset', 'AppIcon-512@2x.png')));
+    for (let i = 0; i < 8; i++) expect(ios[i]).toBe(PNG_SIG[i]);
+    expect(u32be(ios, 16)).toBe(1024);
+    expect(u32be(ios, 20)).toBe(1024);
+    expect(ios[25]).toBe(2); // colour type RGB
   });
 });
 
@@ -134,6 +141,31 @@ describe('isStandalone()', () => {
   it('is false when window is undefined', async () => {
     const { isStandalone } = await freshPwa();
     expect(isStandalone()).toBe(false);
+  });
+});
+
+describe('wantsIosHint()', () => {
+  const SAFARI = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
+
+  it('offers Add to Home Screen in iPhone Safari on the web', async () => {
+    vi.stubGlobal('navigator', { userAgent: SAFARI, maxTouchPoints: 5 });
+    vi.stubGlobal('window', { matchMedia: () => ({ matches: false }) });
+    const { wantsIosHint } = await freshPwa();
+    expect(wantsIosHint(false)).toBe(true);
+  });
+
+  it('never in the native app, even where its web view reads as Safari', async () => {
+    vi.stubGlobal('navigator', { userAgent: SAFARI, maxTouchPoints: 5 });
+    vi.stubGlobal('window', { matchMedia: () => ({ matches: false }) });
+    const { wantsIosHint } = await freshPwa();
+    expect(wantsIosHint(true)).toBe(false);
+  });
+
+  it('the test build is the web, so the default asks the browser', async () => {
+    vi.stubGlobal('navigator', { userAgent: SAFARI, maxTouchPoints: 5 });
+    vi.stubGlobal('window', { matchMedia: () => ({ matches: false }) });
+    const { wantsIosHint } = await freshPwa();
+    expect(wantsIosHint()).toBe(true);
   });
 });
 

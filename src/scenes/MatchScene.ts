@@ -32,13 +32,14 @@ import { isDerbyFixture } from '../systems/derby';
 import { SKIP_ARMED_LABEL, SKIP_ARMED_SAY, SKIP_ARM_MS, SKIP_LABEL, TRAY_CALLED_MS, callForRole, callsLockedHint, callsUnlockLine, coachBadge, cssHex, lockedNote, matchSettingsOpener, mountMatchOverlay, renderCoachBadge, showMatchSheet, showPlanCard, skipTap, trayCallsOn, trayHidden, trayPlayEls, trayPlays, trayPlaysKey, trayPlaysOn, trayTap, TRAY_CAP, TRAY_CAP_WITH_PLAYS, trayRowEls, trayRows, trayWithLocked, type MatchOverlayHandle, type PlanCardHandle, type TrayPlay } from '../ui/screens/matchOverlay';
 import { PLAYS_BY_ID, type PlayId } from '../data/plays';
 import { setFullTimeExit, shortName } from '../ui/screens/matchReport';
-import { styleLine } from '../ui/tacticsBlurbs';
+import { styleLine, whenBehindLine } from '../ui/tacticsBlurbs';
+import { hasStaff } from '../systems/staff';
 import { halfTimePlaysLine } from '../ui/playbookText';
 import {
   LivePlayback,
   keyMomentsOn,
   playbackSpeedOf,
-  PLAYBACK_SPEEDS,
+  nextSpeed,
   type PlaybackBall,
   type PlaybackSpeed,
 } from '../match/view/livePlayback';
@@ -164,7 +165,7 @@ const BALL_WOBBLE_RATE = 1.3;
 /** Smallest turn the ball is drawn at (radians). */
 const BALL_TURN_STEP = Math.PI / 12;
 /** The in-match labels (name tag, "Kick-off…") in the HUD's label face (Broadcast Quiet). */
-const MATCH_LABEL_FONT = '"Barlow Condensed", "Arial Narrow", sans-serif';
+const MATCH_LABEL_FONT = '"Oswald", "Arial Narrow", sans-serif';
 /** On screen while a live match waits for its art to be painted or uploaded (N10.5). */
 export const KICK_OFF_TEXT = 'Kick-off…';
 
@@ -499,7 +500,7 @@ export class MatchScene extends Phaser.Scene {
         fontSize: '15px',
         fontStyle: 'bold',
         color: '#ffffff',
-        backgroundColor: 'rgba(14,22,48,0.85)',
+        backgroundColor: 'rgba(5,7,13,0.85)',
         padding: { x: 5, y: 1 },
         resolution: 2,
       })
@@ -768,7 +769,7 @@ export class MatchScene extends Phaser.Scene {
       const letter = side === 'home' ? letters[0] : letters[1];
       for (const actor of this.players[side]) {
         const text = this.add
-          .text(0, 0, letter, { fontFamily: MATCH_LABEL_FONT, fontSize: '12px', fontStyle: 'bold', color: '#ffffff', backgroundColor: 'rgba(14,22,48,0.7)', padding: { x: 3, y: 0 }, resolution: 2 })
+          .text(0, 0, letter, { fontFamily: MATCH_LABEL_FONT, fontSize: '12px', fontStyle: 'bold', color: '#ffffff', backgroundColor: 'rgba(5,7,13,0.7)', padding: { x: 3, y: 0 }, resolution: 2 })
           .setOrigin(0.5, 1)
           .setDepth(DEPTH_TAG - 1);
         this.letters.push({ actor, text });
@@ -1001,16 +1002,11 @@ export class MatchScene extends Phaser.Scene {
     pause.setAttribute('aria-label', 'Pause');
     pause.setAttribute('data-pause', '');
     pill.append(pause);
-    this.speedButtons = PLAYBACK_SPEEDS.map((s) => {
-      const b = button(`${s}×`, () => this.setSpeed(s), { class: 'nrl-mo-speed' });
-      b.dataset.speed = String(s);
-      b.setAttribute('aria-label', `Speed ×${s}`);
-      pill.append(b);
-      return b;
-    });
+    // One speed button (SuperCOOKED 40): it shows the speed playing and each tap moves it on, 1× → 2× → 4× → 8× → 1×.
+    const speed = button(`${start}×`, () => this.setSpeed(nextSpeed(Number(speed.dataset.speed) as PlaybackSpeed)), { class: 'nrl-mo-speed' });
+    pill.append(speed);
+    this.speedButtons = [speed];
     this.markSpeed(start);
-    const divider = document.createElement('span');
-    divider.className = 'nrl-mo-pill-div';
     // SKIP has no undo and sits a finger's width from 8× (#348 M3): the first tap
     // arms it, the second goes. The live sim can only skip to full time (no break in between).
     const skip = button(SKIP_LABEL, () => this.tapSkip(skip, armedSay), { class: 'nrl-mo-skip' });
@@ -1020,7 +1016,7 @@ export class MatchScene extends Phaser.Scene {
     const armedSay = document.createElement('span');
     armedSay.className = 'nrl-mo-sr';
     armedSay.setAttribute('role', 'status');
-    pill.append(divider, skip, armedSay);
+    pill.append(skip, armedSay);
     this.controlsEl = pill;
     const slot = this.overlay?.slot?.('speed');
     if (slot) slot.append(pill);
@@ -1146,6 +1142,8 @@ export class MatchScene extends Phaser.Scene {
   /** The tray (`.nrl-mo-calls`): only while it is open do its rows exist. */
   private callsEl: HTMLDivElement | null = null;
   private trayTitle: HTMLSpanElement | null = null;
+  /** " · tackle 3" beside the title (41). */
+  private trayTackle: HTMLSpanElement | null = null;
   private trayList: HTMLDivElement | null = null;
   private trayFoot: HTMLDivElement | null = null;
   /** The calls the rows were last built for, so a row isn't rebuilt under the finger. */
@@ -1198,10 +1196,16 @@ export class MatchScene extends Phaser.Scene {
     title.className = 'nrl-mo-tray-title';
     const note = document.createElement('span');
     note.className = 'nrl-mo-tray-note';
-    note.textContent = 'Match keeps playing';
+    note.textContent = 'One call a set · match keeps playing';
+    // 41: a dot, whose ball (the title the checks read) and the tackle, kept apart so a new tackle never rebuilds the tiles.
+    const tackle = document.createElement('span');
+    tackle.className = 'nrl-mo-tray-tackle';
+    const who = document.createElement('span');
+    who.className = 'nrl-mo-tray-who';
+    who.append(title, tackle);
     const head = document.createElement('div');
     head.className = 'nrl-mo-tray-head';
-    head.append(title, note);
+    head.append(who, note);
     const list = document.createElement('div');
     list.className = 'nrl-mo-tray-list';
     const foot = document.createElement('div');
@@ -1236,6 +1240,7 @@ export class MatchScene extends Phaser.Scene {
     this.coachBadgeEl = badge;
     this.callsEl = tray;
     this.trayTitle = title;
+    this.trayTackle = tackle;
     this.trayList = list;
     this.trayFoot = foot;
     const slot = this.overlay?.slot?.('coach');
@@ -1352,6 +1357,9 @@ export class MatchScene extends Phaser.Scene {
     // The kick-off pair (#397) is up: the break before his side's kick-off.
     const title = rows.some((r) => r.id === 'kickoff') ? 'Kick-off' : attacking ? 'Your ball' : 'Their ball';
     if (this.trayTitle.textContent !== title) this.trayTitle.textContent = title;
+    this.trayTitle.parentElement?.toggleAttribute('data-theirs', !attacking && title !== 'Kick-off');
+    const tackleText = title === 'Kick-off' ? '' : ` · tackle ${Math.min(SET_TACKLES, pb.controlTackle + 1)}`;
+    if (this.trayTackle && this.trayTackle.textContent !== tackleText) this.trayTackle.textContent = tackleText;
     const key = `${title}:${rows.map((r) => r.buttons.map((b) => `${b.call}${b.locked !== undefined ? '#' : b.why === null ? '' : '-'}`).join('+')).join(',')}`;
     // Just opened, nothing was under the finger yet. From then on new tiles, or the same ones moved, are a change (#608).
     const opened = this.trayKey === '';
@@ -1505,7 +1513,8 @@ export class MatchScene extends Phaser.Scene {
     const to = pb instanceof LivePlayback && !this.finished ? pb.slowedTo : null;
     if (to === this.slowShown) return;
     this.slowShown = to;
-    for (const b of this.speedButtons) b.toggleAttribute('data-slow', to !== null && b.dataset.speed === String(to));
+    // One button: it pulses while a key moment holds the match slower than the speed it shows.
+    for (const b of this.speedButtons) b.toggleAttribute('data-slow', to !== null && b.dataset.speed !== String(to));
     this.controlsEl?.toggleAttribute('data-slowed', to !== null);
   }
 
@@ -1518,12 +1527,13 @@ export class MatchScene extends Phaser.Scene {
     }
   }
 
-  /** The speed playing now: a yellow circle in the pill (#348 M3). */
+  /** The speed playing now, on its one button (SuperCOOKED 40), and the speed a tap goes to, said aloud. */
   private markSpeed(speed: PlaybackSpeed): void {
     for (const b of this.speedButtons) {
-      const on = b.dataset.speed === String(speed);
-      b.toggleAttribute('data-active', on);
-      b.setAttribute('aria-pressed', String(on));
+      b.dataset.speed = String(speed);
+      b.textContent = `${speed}×`;
+      b.setAttribute('aria-label', `Speed ×${speed}. Tap for ×${nextSpeed(speed)}`);
+      b.title = `Speed ×${speed}: tap for ×${nextSpeed(speed)}`;
     }
   }
 
@@ -1583,6 +1593,15 @@ export class MatchScene extends Phaser.Scene {
     return `${lead} · ${side === 'home' ? ph : pa}% possession · legs ${legs(side)}% v ${legs(other)}%${calls}`;
   }
 
+  /** The Analyst is on the staff (the half-time sheet then says where the other side goes when behind). The lab has no game: no. */
+  private analystHired(): boolean {
+    try {
+      return hasStaff(getState(), 'analyst');
+    } catch {
+      return false;
+    }
+  }
+
   private openPlanCard(head: string): void {
     const pb = this.playback;
     const side = this.planSide;
@@ -1597,8 +1616,12 @@ export class MatchScene extends Phaser.Scene {
       head,
       score: `${s.home}–${s.away}`,
       summary: this.planSummary(pb, side),
-      // How the other side plays (the ladder shows it too, N11).
-      tendency: `${shortName(other === 'home' ? this.home.name : this.away.name)} play ${styleLine(pb.planFor(other))}`,
+      // How the other side plays (the ladder shows it too, N11); with the Analyst, where they go when behind (§7 #3).
+      opponent: {
+        name: shortName(other === 'home' ? this.home.name : this.away.name),
+        plan: styleLine(pb.planFor(other)),
+        behind: this.analystHired() ? whenBehindLine(pb.planFor(other)) : null,
+      },
       // The plays taken in (#326), read-only: a change would re-shape a resumed match's sheet.
       plays: halfTimePlaysLine((side === 'home' ? this.home : this.away).plays) ?? undefined,
       go: head === 'Half-time' ? 'Start 2nd half ▸' : head === 'Golden point' ? 'Golden point ▸' : 'Continue ▸',

@@ -1,5 +1,5 @@
 import { entrySnapshots } from '../data/leagueCareerFixtures';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createNewGame, getState, setState, loadState, emptyFinance as importedEmptyFinance, type GameState } from '../../src/core/state';
 import { closeLeagueSeason } from '../../src/systems/leagueCareer';
 import { competitionLadder, finaliseCalendarFixture } from '../../src/systems/competitionCalendar';
@@ -22,6 +22,11 @@ import { buildDivisionTrials, setupStructuralDivisionCareer } from '../../src/sy
 import { competitionFixtureId } from '../../src/data/competition';
 import * as leagueSeason from '../../src/systems/leagueCareer';
 import * as leagueSelection from '../../src/systems/leagueSelection';
+
+import { isolateMiniatureLeagueProgression } from '../helpers/miniatureLeague';
+import { createOpenCupOffer } from '../../src/systems/openCupEntry';
+
+beforeEach(isolateMiniatureLeagueProgression);
 
 export function closingState(): GameState {
   createNewGame('League close', 573);
@@ -59,6 +64,7 @@ describe('pure League season close', () => {
     c.leagueCareer={version:1,scheduleSeed:573,initialFields:Object.fromEntries(AU_CAREER_PROFILE.divisions.map(d=>[d.id,d.entrants.map(e=>e.clubId)])),clubId:'player',phase:'active',
       access:[{leagueId:AU_CAREER_PROFILE.startingDivisionId}],accepted:{season:1,startInterval:0,leagueId:AU_CAREER_PROFILE.startingDivisionId,
         ...entrySnapshots(c, 1, AU_CAREER_PROFILE.startingDivisionId), receiptId:leagueEntryReceiptId(c.world!.profile.id,1,'player',AU_CAREER_PROFILE.startingDivisionId),allocationPolicy:'adjacent-vacancy-v1',movements:[]}};
+    s.competitions = createOpenCupOffer(s).competitions!;
     expect(validateInput(s as unknown as Record<string,unknown>,s.version)).toBeNull();
     const closed=closeLeagueSeason(s);const h=closed.history[0]!;
     expect(h.premiership).toBe(false);expect(h.league!.lastPlayerFinal).toMatchObject({round:1,stageName:'Finals',result:{winnerId:expect.not.stringMatching(/^player$/)}});

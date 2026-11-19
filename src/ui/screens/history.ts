@@ -11,6 +11,7 @@ import { el, button, openScreen, closeScreen, screenHead, segmented, backButton 
 import { initSeasonReview, openSeasonReview } from './seasonReview';
 import { FINANCE_LINE_LABELS, ensureFinanceStyles, fmtMoney, fmtMoneyCompact, fmtNetClosing, seasonBooks } from './finance';
 import { FINALS_ROUNDS } from '../../systems/fixtures';
+import { competitionHonours } from '../../systems/competitionRewards';
 import { roundLabel } from '../../systems/matchday';
 
 /** The top eight make the finals (systems/fixtures finalsSeeds). */
@@ -223,7 +224,8 @@ export function historyRowView(entry: SeasonHistoryEntry, state: Pick<GameState,
 }
 
 /** Seasons, club records or retired players; the choice holds while the game is open. */
-let historyView: 'seasons' | 'records' | 'players' = 'seasons';
+type HistoryView = 'seasons' | 'records' | 'players' | 'trophies';
+let historyView: HistoryView = 'seasons';
 
 /** The seasons table (3l): one row a season, newest first, with its review and books. */
 function buildSeasonsTable(state: GameState): HTMLElement {
@@ -275,14 +277,30 @@ function buildRecords(state: GameState): HTMLElement {
     ...rows.map(([label, value]) => el('div', { class: 'nrl-history-record' }, el('span', { class: 'nrl-label', text: label }), el('span', { class: 'nrl-name-wrap', text: value }))));
 }
 
+function buildTrophies(state: GameState): HTMLElement {
+  const honours = [...competitionHonours(state, state.clubId)].sort((a, b) => b.season - a.season);
+  if (!honours.length) return el('p', { class: 'nrl-screen-empty nrl-history-empty', text: 'No cup trophies yet.' });
+  return el('div', { class: 'nrl-history-trophies' }, ...honours.map(honour =>
+    el('article', { class: 'nrl-history-trophy', attrs: { 'data-competition-honour': honour.id } },
+      el('h2', { text: honour.title }),
+      el('p', { text: `Season ${honour.season} · Champion: ${honour.clubName}` }),
+      el('h3', { text: 'Registered squad at the final' }),
+      el('ul', { class: 'nrl-history-trophy-squad' }, ...honour.players.map(player => el('li', {
+        text: player.name, attrs: { 'data-trophy-player-id': player.id },
+      }))),
+    )));
+}
+
 /** Open the History sheet (3l): past seasons from GameState.history, and the club's records. */
 export function openHistoryScreen(): HTMLElement {
   ensureHistoryStyles();
   const state = getState();
   const body = el('div', { class: 'nrl-history-body' });
-  const render = (): void => { body.replaceChildren(historyView === 'seasons' ? buildSeasonsTable(state) : historyView === 'records' ? buildRecords(state) : retiredPlayerRecords(state)); };
-  const seg = segmented<'seasons' | 'records' | 'players'>(
-    [{ id: 'seasons', label: 'Seasons' }, { id: 'records', label: 'Records' }, { id: 'players', label: 'Retired players' }],
+  const views = { seasons: buildSeasonsTable, records: buildRecords, players: retiredPlayerRecords, trophies: buildTrophies };
+  const render = (): void => { body.replaceChildren(views[historyView](state)); };
+  const seg = segmented<HistoryView>(
+    [{ id: 'seasons', label: 'Seasons' }, { id: 'records', label: 'Records' },
+      { id: 'players', label: 'Retired players' }, { id: 'trophies', label: 'Trophies' }],
     historyView,
     (id) => { historyView = id; seg.set(id); render(); },
     { label: 'History view' },
@@ -377,28 +395,34 @@ export const HISTORY_CSS = `
 /* 3l: one row a season, newest first; only the rows scroll. */
 .nrl-history-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; }
 .nrl-history-table { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
-.nrl-history-rows { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.nrl-history-rows { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 6px; }
+/* SuperCOOKED 54: each season a ringed card; the best finish ringed and lettered green. */
 .nrl-history-row {
   display: grid;
   grid-template-columns: 52px 80px 70px 44px minmax(0, 1fr) 104px 150px;
   align-items: center;
   column-gap: 8px;
-  min-height: 44px;
-  padding: 4px 0;
-  border-top: 1px solid var(--nrl-button);
+  min-height: 52px;
+  padding: 4px 8px;
+  background: var(--nrl-panel);
+  border: 1px solid var(--nrl-line);
+  border-radius: 12px;
   font-size: 0.8125rem;
   box-sizing: border-box;
 }
-.nrl-history-row.nrl-history-headrow { min-height: 22px; padding: 0; border-top: 0; flex: 0 0 auto; }
+.nrl-history-row.nrl-history-headrow { min-height: 22px; padding: 0 9px; background: none; border: 0; border-radius: 0; flex: 0 0 auto; }
+.nrl-history-headrow .nrl-label { font-family: var(--nrl-f-num); font-size: 0.625rem; font-weight: 500; letter-spacing: 0.12em; }
+.nrl-history-row:has(.nrl-history-best) { border-color: color-mix(in srgb, var(--nrl-pos) 45%, transparent); }
 .nrl-history-row > span { min-width: 0; }
 .nrl-history-row .nrl-num { font-weight: 500; }
+.nrl-history-row .nrl-history-season { font-family: var(--nrl-f-display); font-size: 1rem; font-weight: 400; letter-spacing: -0.02em; }
 .nrl-history-row small { display: block; font-family: var(--nrl-f-body); font-size: 0.6875rem; font-weight: 400; color: var(--nrl-muted); line-height: 1.3; letter-spacing: 0; text-transform: none; }
-.nrl-history-finish { font-family: var(--nrl-f-label); font-size: 1rem; font-weight: 700; }
-.nrl-history-finish.nrl-history-best { color: var(--nrl-accent); }
+.nrl-history-finish { font-family: var(--nrl-f-label); font-size: 0.9375rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+.nrl-history-finish.nrl-history-best { color: var(--nrl-pos); }
 .nrl-history-finish small { color: var(--nrl-accent); font-family: var(--nrl-f-label); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
 .nrl-history-player { overflow-wrap: anywhere; }
 .nrl-history-actions { display: flex; gap: 6px; justify-content: flex-end; }
-.nrl-history-actions .nrl-btn { min-height: 34px; padding: 0 12px; font-size: 0.875rem; border-radius: 8px; }
+.nrl-history-actions .nrl-btn { min-height: 34px; padding: 0 12px; font-size: 0.75rem; border-radius: 10px; background: transparent; border: 1px solid color-mix(in srgb, var(--nrl-text) 30%, transparent); font-family: var(--nrl-f-label); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
 @media (pointer: coarse) { .nrl-history-actions .nrl-btn { min-height: 44px; } }
 .nrl-history-empty { padding: 32px 16px; }
 /* A narrow phone (667px): slimmer columns, and the season's note to two lines (the whole of it in its tooltip). */
@@ -406,11 +430,18 @@ export const HISTORY_CSS = `
   .nrl-history-row { grid-template-columns: 48px 58px 62px 30px minmax(0, 1fr) 92px 128px; column-gap: 6px; }
   .nrl-history-player small { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .nrl-history-actions { gap: 4px; }
-  .nrl-history-actions .nrl-btn { padding: 0 8px; font-size: 0.8125rem; }
+  .nrl-history-actions .nrl-btn { padding: 0 8px; font-size: 0.75rem; }
 }
 .nrl-history-records { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); column-gap: 24px; }
 .nrl-history-record { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 32px; border-top: 1px solid var(--nrl-button); font-size: 0.8125rem; }
 .nrl-history-record > span:last-child { text-align: right; }
+
+.nrl-history-trophies { display: grid; gap: 10px; padding: 4px 0; }
+.nrl-history-trophy { padding: 10px 14px; border-radius: 10px; background: var(--nrl-raised); overflow-wrap: anywhere; }
+.nrl-history-trophy h2 { margin: 0; color: var(--nrl-accent); font-size: 1.125rem; }
+.nrl-history-trophy p { margin: 3px 0 12px; }
+.nrl-history-trophy h3 { margin: 0 0 4px; font-size: 0.875rem; }
+.nrl-history-trophy-squad { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr)); gap: 4px 12px; margin: 0; padding: 0; list-style: none; }
 
 /* A season's books: the table scrolls, the net and the closing balance beside it. */
 .nrl-books-body { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 460px) minmax(180px, 240px); gap: 16px; }

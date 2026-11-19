@@ -17,7 +17,7 @@ describe('v31 additive progression save boundary', () => {
     expect(SAVE_VERSION).toBeGreaterThanOrEqual(31); expect(LAST_PRE_FINANCE_VERSION).toBe(27);
   });
   it('migrates normal v30 bytes without constructing or inferring progression', () => {
-    createNewGame('Existing', 30); const old = {...clone(getState()), version: 30}; const original = JSON.stringify(old);
+    createNewGame('Existing', 30); const {competitionRewards: _, ...legacy} = clone(getState()); const old = {...legacy, version: 30}; const original = JSON.stringify(old);
     const result = migrateState(old); expect(result).toMatchObject({ok: true, repairs: [], state: {...old, version: SAVE_VERSION}});
     expect(JSON.stringify(old)).toBe(original);
     if (!result.ok) throw new Error(result.message);
@@ -38,7 +38,7 @@ describe('v31 additive progression save boundary', () => {
     setCareerNamespace(DEV_TEST_PREFIX); createNewGame('Existing DEV', 573);
     const dev = setupStructuralDivisionCareer(AU_CAREER_PROFILE, 573);
     for (const dormant of [false, true]) {
-      const old = {...clone(dev), version: 30};
+      const {competitionRewards: _, ...legacy} = clone(dev); const old = {...legacy, version: 30};
       if (dormant) { delete old.competitions!.calendar; delete old.competitions!.world; }
       const original = JSON.stringify(old); const result = migrateState(old);
       expect(result).toMatchObject({ok: true, state: {...old, version: SAVE_VERSION}, repairs: []});

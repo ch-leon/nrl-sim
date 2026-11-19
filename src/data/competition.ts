@@ -1,5 +1,7 @@
 // Competition metadata only (#570). The existing match/time systems remain
 // authoritative until the calendar and result-lifecycle work wires this in.
+import { validateAssignments, type CampRecord, type RunningCamp } from './playerAssignments';
+import { validateOpenCupEntry, type OpenCupEntryState } from './openCupEntry';
 import { validateLeagueCareer, type LeagueProgress } from './leagueCareer';
 import type { MatchRules } from '../content/pack';
 import { validateCompetitionCalendar, type CompetitionCalendar } from './competitionCalendar';
@@ -20,12 +22,22 @@ export interface CompetitionStageDefinition {
   /** Optional snapshotted dates: one ascending calendar slot per stage round. */
   slotIds?: number[];
 }
-export type CompetitionRewardPolicy = { id: string; stageId: string; round: number } & (
+type RewardPolicyIdentity = { id: string; stageId: string; round: number };
+type WinnerExecution = { version: 1; recipient: 'winner'; repeat: 'each-outcome'; eligibility: 'played' };
+type TitleExecution = WinnerExecution & { trigger: 'title'; titleEligibility: 'played-final' };
+export type RewardExecution = TitleExecution | (WinnerExecution & { trigger: 'round-win'; titleEligibility?: never });
+export type ExecutableCompetitionRewardPolicy = RewardPolicyIdentity & (
+  | { kind: 'cash'; matchBaseMultiplier: number; basis: 'fixture-match-base'; execution: RewardExecution }
+  | { kind: 'reputation'; amount: number; execution: RewardExecution }
+  | { kind: 'honour'; title: string; squad: 'title-time-registered'; execution: TitleExecution }
+);
+type LegacyCompetitionRewardPolicy = RewardPolicyIdentity & { execution?: never } & (
   | { kind: 'cash'; matchBaseMultiplier: number }
   | { kind: 'reputation'; amount: number }
   | { kind: 'honour'; title: string }
   | { kind: 'capAllowance'; basisPoints: number; uniqueKey: string; effective: 'next-season' }
 );
+export type CompetitionRewardPolicy = LegacyCompetitionRewardPolicy | ExecutableCompetitionRewardPolicy;
 export interface CompetitionLineupPolicy { onField: number; benchSize: number; minSquad: number; maxSquad: number }
 export type CompetitionEligibility = { kind: 'open' } | {
   kind: 'youth'; maxAge: number; minRegistered: number; minStarters: number; minBench: number; minOnField: number;
@@ -88,6 +100,8 @@ export interface CompetitionInstance {
   winnerId?: string;
 }
 export interface CompetitionCareerState {
+  assignments?: CampRecord[];
+  openCupEntry?: OpenCupEntryState;
   schemaVersion: 1;
   instances: CompetitionInstance[];
   calendar?: CompetitionCalendar;
@@ -124,16 +138,45 @@ function matchRules(v: unknown): v is MatchRules {
     && number(v.halfTimeLegsBack) && v.halfTimeLegsBack <= 1 && number(v.playOnMaxS, Number.MIN_VALUE)
     && number(v.goldenPointMinutes, Number.MIN_VALUE) && integer(v.goldenPointBreakTicks);
 }
+const REWARD_KEYS = ['id', 'stageId', 'round', 'kind'];
+
+export function isOpenCupDefinitionId(id: string): boolean {
+  return id === 'open-cup' || id.endsWith(':open-cup');
+}
+
+/** Executable policies are opt-in, versioned and safe to copy into a promise. */
+export function isExecutableCompetitionRewardPolicy(v: unknown): v is ExecutableCompetitionRewardPolicy {
+  if (!record(v) || !text(v.id) || !text(v.stageId) || !integer(v.round, 1)) return false;
+  const exec = v.execution;
+  if (!record(exec) || exec.version !== 1 || exec.recipient !== 'winner'
+    || exec.repeat !== 'each-outcome' || exec.eligibility !== 'played') return false;
+  const commonExecution = ['version', 'trigger', 'recipient', 'repeat', 'eligibility'];
+  if (exec.trigger === 'round-win') {
+    if (!keys(exec, commonExecution)) return false;
+  } else if (exec.trigger !== 'title' || exec.titleEligibility !== 'played-final'
+    || !keys(exec, [...commonExecution, 'titleEligibility'])) return false;
+  const common = [...REWARD_KEYS, 'execution'];
+  switch (v.kind) {
+    case 'cash': return keys(v, [...common, 'matchBaseMultiplier', 'basis']) && v.basis === 'fixture-match-base'
+      && integer(v.matchBaseMultiplier);
+    case 'reputation': return keys(v, [...common, 'amount']) && integer(v.amount);
+    case 'honour': return keys(v, [...common, 'title', 'squad']) && text(v.title)
+      && v.squad === 'title-time-registered' && exec.trigger === 'title';
+    default: return false;
+  }
+}
+
 function reward(v: unknown, stages: readonly CompetitionStageDefinition[]): boolean {
   if (!record(v) || !text(v.id) || !text(v.stageId) || !integer(v.round, 1)) return false;
   const stage = stages.find(s => s.id === v.stageId);
   if (!stage || v.round > stage.rounds) return false;
-  const common = ['id', 'stageId', 'round', 'kind'];
+  if ('execution' in v) return isExecutableCompetitionRewardPolicy(v)
+    && (v.execution.trigger === 'round-win' || (stage.kind === 'knockout' && stage === stages[stages.length - 1] && v.round === stage.rounds));
   switch (v.kind) {
-    case 'cash': return keys(v, [...common, 'matchBaseMultiplier']) && number(v.matchBaseMultiplier);
-    case 'reputation': return keys(v, [...common, 'amount']) && number(v.amount);
-    case 'honour': return keys(v, [...common, 'title']) && text(v.title);
-    case 'capAllowance': return keys(v, [...common, 'basisPoints', 'uniqueKey', 'effective']) && integer(v.basisPoints, 0, 10_000) && text(v.uniqueKey) && v.effective === 'next-season';
+    case 'cash': return keys(v, [...REWARD_KEYS, 'matchBaseMultiplier']) && number(v.matchBaseMultiplier);
+    case 'reputation': return keys(v, [...REWARD_KEYS, 'amount']) && number(v.amount);
+    case 'honour': return keys(v, [...REWARD_KEYS, 'title']) && text(v.title);
+    case 'capAllowance': return keys(v, [...REWARD_KEYS, 'basisPoints', 'uniqueKey', 'effective']) && integer(v.basisPoints, 0, 10_000) && text(v.uniqueKey) && v.effective === 'next-season';
     default: return false;
   }
 }
@@ -192,6 +235,10 @@ export function validateCompetitionDefinition(v: unknown): string | null {
     || (v.venues.final !== 'neutral' && v.venues.final !== 'same-as-rounds')) return 'definition venues';
   if ((f.kind === 'league' || f.kind === 'group') ? !standings(v.standings) : v.standings !== undefined) return 'definition standings';
   if (!Array.isArray(v.rewards) || !v.rewards.every(r => reward(r, stages)) || !unique(v.rewards.map(r => (r as CompetitionRewardPolicy).id))) return 'definition rewards';
+  if (v.rewards.some(isExecutableCompetitionRewardPolicy) && (!v.rewards.every(isExecutableCompetitionRewardPolicy)
+    || !isOpenCupDefinitionId(v.id) || f.kind !== 'knockout' || stages.length !== 1 || !stages[0]!.slotIds
+    || v.minEntrants !== 2 || (v.eligibility as CompetitionEligibility).kind !== 'open'
+    || v.venues.rounds !== 'drawn-home' || v.venues.final !== 'neutral' || v.drawnKnockout !== 'seeded-draw')) return 'definition rewards';
   return null;
 }
 
@@ -323,8 +370,8 @@ export function completedCompetition(instance: CompetitionInstance): string | nu
 }
 
 /** Returns the first invalid field; callers retain the entire rejected input. */
-export function validateCompetitions(v: unknown, context: { pack: string; season: number; week?: number; clubIds: readonly string[]; clubId?: string }): string | null {
-  if (!record(v) || !keys(v, ['schemaVersion', 'instances', 'calendar', 'world', 'leagueCareer']) || v.schemaVersion !== 1 || !Array.isArray(v.instances)) return 'competitions';
+export function validateCompetitions(v: unknown, context: { pack: string; season: number; week?: number; clubIds: readonly string[]; clubId?: string; runningCamp?: RunningCamp }): string | null {
+  if (!record(v) || !keys(v, ['schemaVersion', 'instances', 'calendar', 'world', 'leagueCareer', 'openCupEntry', 'assignments']) || v.schemaVersion !== 1 || !Array.isArray(v.instances)) return 'competitions';
   const clubIds = new Set(context.clubIds);
   const instanceIds = new Set<string>();
   const fixtureIds = new Set<string>();
@@ -412,5 +459,8 @@ export function validateCompetitions(v: unknown, context: { pack: string; season
     const progress = validateLeagueCareer(v.leagueCareer, v as unknown as CompetitionCareerState, context);
     if (progress) return progress;
   }
-  return null;
+  try { const c = v as unknown as CompetitionCareerState;
+    return validateOpenCupEntry(v.openCupEntry, c, context) ?? validateAssignments(v.assignments,c,context);
+  }
+  catch { return 'Open Cup offer terms'; }
 }

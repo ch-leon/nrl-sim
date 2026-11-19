@@ -1,3 +1,5 @@
+import { runPlayerAssignments } from './e2e-webkit/screens/playerAssignments.mjs';
+import { runOpenCupEntry } from './e2e-webkit/screens/openCupEntry.mjs';
 import { runLeagueSelection } from './e2e-webkit/screens/leagueSelection.mjs';
 import { runCounterText } from './e2e-webkit/match/counterText.mjs';
 import { runTrials } from './e2e-webkit/screens/trials.mjs';
@@ -53,6 +55,7 @@ import { runExpansionIntro } from './e2e-webkit/screens/expansionIntro.mjs';
 // just that). Exits 1 on any failure.
 //
 //   npm run e2e:webkit
+//   npm run e2e:webkit -- --open-cup-entry-only    (public cup entry, draw, rewards and trophies)
 //   npm run e2e:webkit -- --league-selection-only   (#574 production entry, reload and annual choices)
 //   npm run e2e:webkit -- --size 956x330           (or E2E_SIZES="956x330 844x390")
 //   WEBKIT_PATH=/path/to/pw_run.sh npm run e2e:webkit
@@ -100,6 +103,8 @@ import { runMatchPlays } from './e2e-webkit/match/plays.mjs';
 // under e2e-output/webkit, so a section plays the same alone as after the others.
 const SECTIONS = [
   ['runLeagueSelection', (b) => runLeagueSelection(b)],
+  ['runOpenCupEntry', (b) => runOpenCupEntry(b)],
+  ['runPlayerAssignments', (b) => runPlayerAssignments(b)],
   ['runCounterText', (b) => runCounterText(b)],
   ['runTrials', (b) => runTrials(b)],
   ['runExpansionIntro', (b) => runExpansionIntro(b)],
@@ -137,7 +142,7 @@ const SECTIONS = [
 const GROUPS = {
   match: ['runPlaytest', 'runPauseSettings', 'runTutorialWalk', 'runCoachCalls', 'runLabsControls', 'runMatchPlays'],
   text: ['runCounterText', 'runLargeTextTargets', 'runLadderForm'],
-  screens: ['runLeagueSelection', 'runPlayerSales', 'runContentPacks', 'runTrials', 'runExpansionIntro', 'runDerby', 'runOfficeUnlocks', 'runUnlocks', 'runRecruit', 'runScreens', 'runTownSetup', 'runFlow', 'runCoachName', 'runDifficulty', 'runCoachVoice', 'runCoachSays', 'runPlaybook'],
+  screens: ['runLeagueSelection', 'runOpenCupEntry', 'runPlayerAssignments', 'runPlayerSales', 'runContentPacks', 'runTrials', 'runExpansionIntro', 'runDerby', 'runOfficeUnlocks', 'runUnlocks', 'runRecruit', 'runScreens', 'runTownSetup', 'runFlow', 'runCoachName', 'runDifficulty', 'runCoachVoice', 'runCoachSays', 'runPlaybook'],
   portrait: ['runSize', 'runPortrait', 'runDockTextSize', 'runDevSettings'],
 };
 
@@ -162,6 +167,8 @@ const GROUPS = {
   }
 }
 
+const ASSIGNMENTS_ONLY = argv.includes('--player-assignments-only');
+const OPEN_CUP_ONLY = argv.includes('--open-cup-entry-only');
 const LEAGUE_ONLY = argv.includes('--league-selection-only');
 const SALES_ONLY = argv.includes('--player-sales-only');
 const SCREENS_ONLY = argv.includes('--screens-only');
@@ -175,12 +182,16 @@ if (argv.includes('--group') && !GROUPS[GROUP]) {
   console.error(`bad --group "${GROUP ?? ''}": want one of ${Object.keys(GROUPS).join(', ')}`);
   process.exit(2);
 }
-if (GROUP && (LEAGUE_ONLY || SALES_ONLY || SCREENS_ONLY || CONTROLS_ONLY || CALLS_ONLY || PLAYBOOK_ONLY || PLAYS_ONLY || DEV_ONLY)) {
-  console.error('--group does not combine with --screens-only, --controls-only, --coach-calls-only, --playbook-only or --match-plays-only');
+if (GROUP && (ASSIGNMENTS_ONLY || OPEN_CUP_ONLY || LEAGUE_ONLY || SALES_ONLY || SCREENS_ONLY || CONTROLS_ONLY || CALLS_ONLY || PLAYBOOK_ONLY || PLAYS_ONLY || DEV_ONLY)) {
+  console.error('--group does not combine with a dedicated --*-only option');
   process.exit(2);
 }
 /** [name, run] pairs this invocation plays, in the full run's order. */
-const plan = LEAGUE_ONLY
+const plan = ASSIGNMENTS_ONLY
+  ? SECTIONS.filter(([n]) => n === 'runPlayerAssignments')
+  : OPEN_CUP_ONLY
+  ? SECTIONS.filter(([n]) => n === 'runOpenCupEntry')
+  : LEAGUE_ONLY
   ? SECTIONS.filter(([n]) => n === 'runLeagueSelection')
   : SALES_ONLY
   ? SECTIONS.filter(([n]) => n === 'runPlayerSales')

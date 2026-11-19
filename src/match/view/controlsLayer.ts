@@ -78,7 +78,7 @@ export class ControlsLayer {
     this.styles.textContent = `
       .nrl-labs-badge { position:fixed; right:calc(12px + var(--nrl-safe-r)); top:calc(76px + var(--nrl-safe-t)); z-index:14; pointer-events:none; color:var(--nrl-accent); background:var(--nrl-navy); font:700 10px var(--nrl-f-label); padding:3px 5px; border-radius:4px; }
       .nrl-mo-controls .nrl-btn.nrl-mo-labs-skip { width:auto; max-width:104px; min-height:44px; padding:0 6px; font-size:0.75rem; white-space:normal; line-height:1.05; }
-      .nrl-labs-hint { position:fixed; inset:0; z-index:24; display:flex; align-items:center; justify-content:center; padding:24px; background:rgba(14,22,48,0.78); color:var(--nrl-text); font:1rem var(--nrl-f-body); line-height:1.5; border:0; }
+      .nrl-labs-hint { position:fixed; inset:0; z-index:24; display:flex; align-items:center; justify-content:center; padding:24px; background:rgba(5,7,13,0.78); color:var(--nrl-text); font:1rem var(--nrl-f-body); line-height:1.5; border:0; }
       @media(max-width:720px) {
         .nrl-mo-controls:has(.nrl-mo-labs-skip) { gap:0; padding:0; }
         .nrl-mo-controls:has(.nrl-mo-labs-skip) .nrl-mo-pill-div { display:none; }

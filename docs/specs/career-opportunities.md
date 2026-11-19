@@ -2,17 +2,25 @@
 
 Product design v0.2 · 16 November 2026 (Australia/Brisbane).
 
-Execution update, 17 November: #323/#574/#578/#582 now reflect this design.
-Assignments are [#708](https://github.com/ch-leon/nrl-sim/issues/708), the individual
-challenge is [#710](https://github.com/ch-leon/nrl-sim/issues/710), and the distinct
-small-sided event is [#711](https://github.com/ch-leon/nrl-sim/issues/711).
-Implementation begins with prerequisite #572 player continuity; these tickets
-and the design do not establish runtime completion.
+Execution update, 18 November: player continuity shipped through
+[PR #716](https://github.com/ch-leon/nrl-sim/pull/716), and league selection #574
+shipped through [PR #719](https://github.com/ch-leon/nrl-sim/pull/719), merged at
+`a448210c`. The live League career includes permanent title unlocks, deliberate
+annual entry and retained club cap capacity. [Release evidence](../status/2026-11-league-selection.md)
+records independent review, CI/full QA and public confirmation/reload verification.
+The normal optional Open Cup, prizes and receipt-backed views are implemented in
+[PR #736](https://github.com/ch-leon/nrl-sim/pull/736). The [Open Cup evidence record](../status/2026-11-open-cup.md)
+records local verification and the required PR release gates.
+Its initial prize values are for testing, with wider #582 balance still open. Assignments [#708](https://github.com/ch-leon/nrl-sim/issues/708),
+the watched/coached individual challenge [#710](https://github.com/ch-leon/nrl-sim/issues/710),
+the distinct small-sided event [#711](https://github.com/ch-leon/nrl-sim/issues/711)
+and gear are later work.
 
 **Status:** Leon approved the direction and requested this specification. This
-records that agreement; event names, numerical balance and the delivery slices
-below are working designs, not separately approved implementation details or
-evidence of shipped gameplay. This is a documentation change, not a runtime release.
+records that agreement; event names, numerical balance and unimplemented delivery
+slices remain working designs, not separately approved implementation details.
+The execution update above identifies what has shipped; it does not claim that
+the full opportunities catalogue is delivered or balanced.
 
 Canonical product record: [Notion competition specification](https://app.notion.com/p/4150870d4c44810c880ae3395086e9d0).
 This repository copy supplies the design to developers alongside the
@@ -62,8 +70,8 @@ competes for a permanent league place.
 | Rewards mainly mean club cash/cap/honours | Include player development, traits, personal badges, sponsors and invitation chains; equipment follows later. |
 
 The v0.1 automatic promotion/relegation rules remain historical prototype context,
-not instructions for the revised player career. AI league allocation and legal
-field construction need reconciliation before selectable entry ships (§10).
+not instructions for the revised player career. The first selectable world's AI
+allocation and legal fields shipped in #574 under the explicit policy in §10.
 Existing finance, player continuity, deterministic results and recovery requirements
 continue to apply unless explicitly changed here.
 
@@ -101,6 +109,14 @@ Keep at least one accessible entry route each season. Time cannot advance past
 the initial league-choice gate without a deliberate valid selection. Once confirmed,
 snapshot the field and rules; no mid-season league shopping or rerolled opponents.
 
+The shipped first profile has three eight-club leagues per region, 14 regular
+rounds, top-four finals and a 25-slot calendar. A fresh career stops at initial
+choice; season end closes the completed year before the next choice. Annual
+confirmation applies people/contract updates and accepts the next field once. No cup is
+registered implicitly in this League career. These are current authored values,
+not a limit on later profiles or proof of wider pacing/balance. Income follows
+the selected sporting division independently of retained club capacity.
+
 ## 4. A calendar with meaningful trade-offs
 
 Use game time, not real-world dates, login streaks or waiting timers. A calendar
@@ -137,6 +153,14 @@ create a plan for next season, not permanently remove a large part of the game.
 Rest and declining remain valid choices. No obligatory stream of event pop-ups.
 
 ## 5. Sending players on assignments
+
+The first approved implementation is [Skills Camp](player-assignments.md), tracked
+in [#708](https://github.com/ch-leon/nrl-sim/issues/708). Book one free place in
+Weeks 1–4; the player misses the opening league fixture in Week 5 and returns
+before Week 6 selection. Its starting award is 70 base XP replacing ordinary
+training, with existing progression modifiers and ceilings. Leon chose this
+opportunity and requested the early window on 19 November. Implementation and
+recovery/balance evidence are in progress; this is not a shipped-feature claim.
 
 An assignment belongs to real player IDs in the existing squad. It does not
 create a second copy, transfer their club ownership or generate a replacement star.
@@ -206,7 +230,8 @@ boundary and retain already committed rewards; do not leave a player away foreve
 
 ## 7. Working event catalogue and connected opportunities
 
-Names, formats and rewards below are design candidates. This is a broad catalogue,
+The Open Cup uses the initial test policy in §10. The remaining names, formats
+and rewards below are design candidates. This is a broad catalogue,
 not a promise that every row ships together. Each event needs authored rules,
 eligibility, calendar load, finite outcomes and measured rewards before activation.
 
@@ -307,10 +332,11 @@ browse the catalogue without hiding essential details behind surprise pop-ups.
 
 ## 10. Implementation boundaries and unresolved design gates
 
-The local source audit for this revision is `85dcd195`: developer-only regional
+Historical source audit for the 16 November revision (`85dcd195`): developer-only regional
 worlds and Open Cup sporting flow exist; normal selectable league entry, player
 assignments, event coaching and rewards described here are not established by
-that source. Historical PR/QA status in the delivery record is not revalidated here.
+that source. Current delivery is described in the execution update above, not
+this historical snapshot.
 
 Reuse the single GameState, persistent club/player registry, versioned definition
 snapshots, stable IDs, guarded result finalisation and separate idempotent reward
@@ -330,17 +356,19 @@ can serve existing cups, but beach/fives and individual contests need their own
 specified rules and playback. Do not assume changing on-field player count alone
 makes the current match engine support them. No generic plugin framework is required.
 
-The following details must be resolved in their scoped implementation designs:
+The first League career resolves the scoped entry rules below. Remaining event
+details must be resolved in their own implementation designs:
 
 | Gate | Required decision before enabling dependent behaviour |
 | --- | --- |
-| Selectable-league world | How willing AI clubs fill each legal league field, maintain persistent rivals and avoid duplicate membership when the player stays or switches. The old one-up/one-down algorithm is not the answer by default. |
-| Calendar profiles | Authored entry windows, registration gates, simultaneous-event phase order, deadlines and measurable season length. |
-| Finance transition | Current approved finance values, league-choice cap basis and lawful handling of commitments when selecting a lower-budget league. |
+| Selectable-league world — implemented in #574 | Staying keeps fields unchanged. An upward choice moves the lowest-ranked AI in each crossed higher field down the vacancy chain; a downward choice moves the highest-ranked AI in each crossed lower field up. Use the original completed fields and published regular standings/frozen tiebreak. These are administrative allocations, not forced player promotion or player transfers; preserve unique membership and disclose movements. Broader invitation/willingness policies remain future design. |
+| Calendar profiles — league phases implemented | Initial choice, active calendar, completed-season choice and once-only annual acceptance are implemented for the authored 25-slot League profile. The Open Cup adds a Week 6 registration cutoff and Weeks 7/10/13/16/19. Other registration windows, concurrent-event phase order and wider pacing still require scoped decisions. |
+| Finance transition — League rule implemented | Retain highest attained club capacity for player and AI clubs, including purchased/earned additions and lawful exact-term protection. Downward entry creates no new protection. Validate dated commitments before acceptance; income follows sporting division. Future event prices/rewards remain with the finance owners. |
+| Open Cup — initial test policy | Free annual enter/decline/change through Week 6; deterministic 24-club or 23-AI draw. A queued withdrawal forfeits the next actual tie on its date. Played-win prizes 1/1/2/3/5× saved sporting match base, +1 reputation per win and +2 more for a played-final title, with the full registered-squad honour. No cap entitlement. Release status is in the Open Cup evidence record. |
 | Assignment operations | Recall/withdrawal, injuries, training substitution, return phases and sale/release handling per assignment family. |
 | Individual challenge | Round count, abilities, coaching trade-offs, finite decider, auto-coach, recovery and result presentation. |
 | Beach/fives | Team size, field/rules, substitutions, fatigue, scheduling and presentation; validate match-engine support before offering entry. |
-| Rewards | Actual XP/cash/cap amounts, trait compatibility, sponsor terms, first/repeat payouts and cross-event limits. |
+| Further rewards | Open Cup cash/reputation/honours have an initial supported test policy. Other XP/cash/cap amounts, trait compatibility, sponsor terms, first/repeat payouts and cross-event limits need scoped designs and balance evidence. |
 | Gear | Later equipment slots, effects, acquisition, display and interactions; excluded from the first delivery. |
 
 These are explicit delivery gates, not missing approval for the agreed direction.
@@ -356,7 +384,7 @@ No delivery dates or owners are invented.
 
 | Slice | Scope | Done when |
 | --- | --- | --- |
-| A — Choose a league and a cup | Reconcile league-world construction, title unlocks, annual choice, calendar, entry/prizes and Open Cup | Win an entry league, unlock a harder one, deliberately stay or move next year, and complete or decline a cup without breaking finances, people or history. |
+| A — Choose a league and a cup | League selection shipped in #719; Open Cup entry/rewards/views implemented in #736; wider integrated balance remains | Win an entry league, unlock a harder one, deliberately stay or move next year, and complete or decline a cup without breaking finances, people or history. |
 | B — Send players away | Assignment reservations, absence/return, lineup integration and one training/community opportunity | A player leaves, a reserve covers an overlapping club fixture, the player returns once with the correct result, and reload/skip cannot duplicate effects. |
 | C — Watch and coach a challenge | Big Mick's-style individual event, distinct venue, coaching decisions, personal award and a supported club reward | Complete a meaningful animated contest, see the effect of coaching, return with earned rewards and unlock a further goal; auto-coach and recovery work. |
 | D — Play a different team event | Beach or floodlit fives, selected travelling group, dedicated rules, recurring opponents and a short invitation chain | The event plays visibly differently from Nines, its absence/calendar costs matter, and success opens a correctly saved next opportunity. |
@@ -364,9 +392,10 @@ No delivery dates or owners are invented.
 | Later — Equip the squad | Separate gear specification and release | Equipment is visible, understandable and balanced against the established trait/progression systems. |
 
 Existing #570/#571/#573/#575 foundations are reusable, not grounds to restart the
-project. Re-scope #574 from forced movement to unlock/selection/rollover;
-extend #578 presentation and #582 validation. #576/#577 retain reward/finance
-ownership; #579–#581 remain relevant content with sequencing to be reconciled.
+project. #574 now delivers unlock/selection/rollover; its league presentation and
+validation do not close the broader #578 opportunity views or #582 integrated
+league-and-cup balance validation. The Open Cup implements #576 cash/reputation/
+honours; future entitlement records and #577 capacity effects remain separate.  #579–#581 remain relevant content with sequencing to be reconciled.
 Assignments and bespoke event engines have their own scoped delivery work in
 #708/#710/#711; do not silently absorb them into already-reviewed foundation tickets.
 

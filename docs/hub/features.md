@@ -1,6 +1,6 @@
 # Features
 
-Last updated: 2026-11-18
+Last updated: 2026-11-19
 
 What's in the game, with the PR that added each.
 
@@ -64,7 +64,31 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
-- **League career in the local release candidate.** Start in Local in Australia or the UK. A finals title unlocks the next league permanently. At season review, choose where to play next year. Moving down preserves the club’s salary-cap capacity, and each match pays at the chosen division’s rate. Final review and release checks are pending. [Draft PR #719](https://github.com/ch-leon/nrl-sim/pull/719) · [Verification](../status/2026-11-league-selection.md)
+- **iPhone app, Phase 5 (club widgets):** a **Big Coach** widget for the iPhone's lock screen (rectangular and inline) and home screen (small and medium): your next match as the game words it, the best player you have injured and how many rounds until he is back, and the points you have banked to spend. It counts in game rounds and only changes when you play; the game writes it when the week advances, a match is played, points are spent or an injury changes. Tapping it opens the game. Needs the shared App Group (still to prove on a free-signed phone). Website and Android unchanged. [docs/ios-test-build.md](../ios-test-build.md#widgets) · [spec](../specs/ios.md)
+
+- **iPhone app, Phase 4 (captain icon):** the Live Activity's ball is now a little captain in the brand colours, in four poses: carrying the ball, diving for a try, wrapped up after a big hit, and arms up at full time. It changes only when an update arrives and holds until the next; on a squeezed Dynamic Island it shows alone in a small circle. Built and compiled, not yet seen on a phone. Website and Android unchanged. [docs/ios-test-build.md](../ios-test-build.md#lock-screen-and-dynamic-island) · [spec](../specs/ios.md)
+
+- **iPhone app, Phase 3 (lock screen and Dynamic Island):** a match you are playing shows on the iPhone's lock screen and in the Dynamic Island as a Live Activity: both clubs (yours starred), the score, the half and minute as of the last big moment, that moment in one line, and live, paused, half-time or full time. It updates on tries, goals, big hits, sin bins and the breaks; only full time lights the screen. Leaving the app should show it paused and tapping it should return you to the match; leaving the match ends it. The app updates it itself, so nothing paid is needed. Not yet seen on a phone or in the Simulator (compiled only). Website and Android unchanged. [docs/ios-test-build.md](../ios-test-build.md#lock-screen-and-dynamic-island) · [spec](../specs/ios.md)
+
+- **SuperCOOKED look, Phase 3 (Club):** the decisions card on the grounds shows the count in an orange disc over the first one waiting, and the dock labels the money CASH. Build tiles and the building card take the new look; the card shows the level as three bars and Now beside the next level (a training facility's XP boost as the big figure). The League sheet heads its ladder "LADDER" with the round and the finals cut, shows form as lettered dots, and puts the next opponent in a card over your fixtures (a tap opens the full preview). Nothing else changed ([docs/specs/ui-supercooked.md](../specs/ui-supercooked.md)).
+
+- **SuperCOOKED look, Phase 1 (Squad & player):** Squad opens on the pitch: your nine as player cards in their lanes, the bench and reserves beside them; tap a card for his page, or Swap (or a long press) then a card to choose who goes there. List shows the squad by position group with each group's four stats, stars, fitness and where he is in the side. Plan, Plays and the training focus are in the ⋯ at the top right. The player page has four tabs: Stats (spend level points here when "Spend points myself" is on in Settings), Traits, Deal (goal-kicker and captain, the contract, Renew / Sell / Release) and Record (level, potential, morale, injury risk, tallies and club history). Recruit gains a position filter, faces, stars and what a young player grows to. Nothing was taken out ([docs/specs/ui-supercooked.md](../specs/ui-supercooked.md)).
+
+- **SuperCOOKED look, Phase 4 (Office):** the Office sheet gets a head and rings the tiles that want you. Finance shows its tiles on ringed panels and says what cash pays for. Staff & Board shows patience as five pips, each objective as a card with its chip, each role's weekly wage, and outlined Hire buttons. News is a flat feed with a dot for each kind and the coach's lines in italics; History shows each season as a card; Kit puts each preview on its own panel; a decision's choices are cards with Sure and risk pills. Nothing else changed ([docs/specs/ui-supercooked.md](../specs/ui-supercooked.md)).
+
+- **Skills Camp:** book one free annual place in Weeks 1–4, send a squad player away for the Week 5 league opener, and get him back before Week 6 with a saved development report. The League view shows named cover, the chosen focus, XP and cancellation terms. Automatic cover keeps the preferred team; actual awards use existing age/trait modifiers, point spending and ceilings. Release checks are tracked in the [evidence record](../status/2026-11-player-assignments.md) for [PR #742](https://github.com/ch-leon/nrl-sim/pull/742).
+
+- **iPhone app, Phase 2 (durable saves):** in the iPhone app every save is also kept as a native file, so a career survives iOS clearing the web view's storage. It comes back at the next launch, and a deleted slot stays deleted. Export opens the share sheet (Files, AirDrop). The website and Android are unchanged. [docs/ios-test-build.md](../ios-test-build.md#saves-on-iphone) · [spec](../specs/commercial-saves.md)
+
+- **iPhone app, Phase 1 (the shell):** the game now builds as an iPhone app, **Big Coach**, from the same code as the website and the Android test build. Landscape only, iPhone only, full screen with no status bar, the home bar dimmed while you play, no page bounce, the ball icon and a launch screen in the brand's ink. Leon runs it on his own iPhone from Xcode with a free Apple ID (re-run every 7 days). Analytics and the store rules now know the iPhone app from the website and Android. [docs/ios-test-build.md](../ios-test-build.md) · [spec](../specs/ios.md)
+
+- **SuperCOOKED look, Phase 2 (Match):** the score bar sits top centre with the clock between the scores, and a chip under it says whose ball and the tackle. One bottom bar holds Coach, the latest commentary line (tap it for the full log) and pause / speed / skip; speed is one button that steps 1× → 2× → 4× → 8×, and the LOG on/off switch is gone. The coach tray, the half-time sheet (with the Analyst, where the other side goes when behind), the pre-match Game plan, the full-time card (your Player of the Match with his face and stars) and the match report (five numbers, All stats for the rest) take the new look. Nothing else about the match changed ([docs/specs/ui-supercooked.md](../specs/ui-supercooked.md)).
+
+- **Optional Open Cup:** AU and UK League coaches can enter free through Week 6, change their choice before the draw, or sit out while the AI cup continues. Played wins earn separate cash prizes and reputation; a played-final title preserves the full registered squad in History. Withdrawal forfeits the next actual tie on its date and keeps earlier winnings. The League card publishes the dates and rules, and reports read saved income/prize receipts. Club cap capacity stays unchanged. Initial prize values remain for testing. [PR #736](https://github.com/ch-leon/nrl-sim/pull/736) · [Implementation and release checks](../status/2026-11-open-cup.md)
+
+- **SuperCOOKED look, Phase 0 (Foundations):** the game is now **Big Coach** ("a SuperCOOKED game"): the SuperCOOKED palette (navy and ink, one orange primary a screen, green good / amber watch / red bad), self-hosted Oswald, Inter, JetBrains Mono and Archivo Black, the text wordmark on the title and the rotate card, an ink dock and toasts, white selected tabs inside sheets, and PLAY WEEK turning navy while a sheet has its own primary. Adds the shared parts later phases build screens from (status pill, stars, stat tile, player card, confirm dialog, empty state, locked tile). Layout and behaviour are unchanged ([docs/specs/ui-supercooked.md](../specs/ui-supercooked.md)).
+
+- **League career is live.** Start in Local in Australia or the UK. A finals title unlocks the next league permanently. At season review, choose where to play next year. Moving down preserves the club’s salary-cap capacity, and each match pays at the chosen division’s rate. Existing Classic careers keep their format. [Merged PR #719](https://github.com/ch-leon/nrl-sim/pull/719) · [Verification](../status/2026-11-league-selection.md)
 
 - **Back-door support (unmerged draft).** The forward starts on the heel and the fullback sweeps out from depth before the half passes. Default Lab seed 5 shows the fullback catching on the run 10.4 m outside the lead. The published on/off comparison used an earlier draft. [PR #722](https://github.com/ch-leon/nrl-sim/pull/722)
 
@@ -159,7 +183,7 @@ What's in the game, with the PR that added each.
   ([PR #595](https://github.com/ch-leon/nrl-sim/pull/595)). New careers now use
   the cash and cap split described above.
 
-- The isolated developer regional career includes an optional cross-division
+- The original isolated developer regional prototype includes a cross-division
   Open Cup, with a saved deterministic draw, implicit byes, profile-based dates,
   a neutral final and a finite seeded tie decider. Existing match/result hooks
   draw each later round before the week settles, so a cup that is still going is

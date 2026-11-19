@@ -6,88 +6,30 @@
 // deflate, IEND, correct CRC32 per chunk) using only Node builtins.
 // Idempotent: overwrites public/icons/icon-192.png and icon-512.png, and the Android
 // launcher icons under android/app/src/main/res (#622): the same ball, as legacy square
-// and round icons and as the adaptive icon's foreground. Those are committed, so a
-// checkout builds without this script, and this script keeps them in step with the brand.
+// and round icons and as the adaptive icon's foreground. And the iPhone app's (docs/specs/ios.md
+// §2) under ios/App/App/Assets.xcassets: the 1024px App Store icon with no alpha channel, and
+// the launch screen's ball and colour. Those are committed, so a checkout builds without this
+// script, and this script keeps them in step with the brand.
 //
 // Run via the `predev`/`prebuild` npm scripts with vite-node (it reads the brand's
 // TypeScript). `--dry-run` prints what it would write and writes nothing.
 
 import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { deflateSync } from 'node:zlib';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BRAND } from '../src/brand';
 import { renderIcon, hexRgb } from '../src/art/appIcon';
+import { encodePng } from './lib/png.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = join(__dirname, '..', 'public', 'icons');
 const RES_DIR = join(__dirname, '..', 'android', 'app', 'src', 'main', 'res');
+const XCASSETS = join(__dirname, '..', 'ios', 'App', 'App', 'Assets.xcassets');
 const DRY_RUN = process.argv.includes('--dry-run');
 
-// --- CRC32 (PNG polynomial 0xEDB88320) ---
-const CRC_TABLE = (() => {
-  const t = new Uint32Array(256);
-  for (let n = 0; n < 256; n++) {
-    let c = n;
-    for (let k = 0; k < 8; k++) {
-      c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-    }
-    t[n] = c >>> 0;
-  }
-  return t;
-})();
-
-function crc32(buf) {
-  let c = 0xffffffff;
-  for (let i = 0; i < buf.length; i++) {
-    c = CRC_TABLE[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
-  }
-  return (c ^ 0xffffffff) >>> 0;
-}
-
-/** Build one PNG chunk: length(4) + type(4) + data + crc(4). */
-function chunk(type, data) {
-  const typeBuf = Buffer.from(type, 'ascii');
-  const len = Buffer.alloc(4);
-  len.writeUInt32BE(data.length, 0);
-  const crc = Buffer.alloc(4);
-  crc.writeUInt32BE(crc32(Buffer.concat([typeBuf, data])), 0);
-  return Buffer.concat([len, typeBuf, data, crc]);
-}
-
-/** Encode RGBA (size x size) to a PNG Buffer (8-bit, colour type 6). */
-function encodePng(size, rgba) {
-  const SIG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(size, 0); // width
-  ihdr.writeUInt32BE(size, 4); // height
-  ihdr[8] = 8; // bit depth
-  ihdr[9] = 6; // colour type: RGBA
-  ihdr[10] = 0; // compression
-  ihdr[11] = 0; // filter
-  ihdr[12] = 0; // interlace
-
-  // Prepend a filter byte (0 = None) to each scanline.
-  const stride = size * 4;
-  const raw = Buffer.alloc((stride + 1) * size);
-  for (let y = 0; y < size; y++) {
-    raw[y * (stride + 1)] = 0;
-    raw.set(rgba.subarray(y * stride, y * stride + stride), y * (stride + 1) + 1);
-  }
-  const idat = deflateSync(raw, { level: 9 });
-
-  return Buffer.concat([
-    SIG,
-    chunk('IHDR', ihdr),
-    chunk('IDAT', idat),
-    chunk('IEND', Buffer.alloc(0)),
-  ]);
-}
-
 function writeIcon(size) {
-  const png = encodePng(size, renderIcon(size, BRAND));
+  const png = encodePng(size, size, renderIcon(size, BRAND));
   const path = join(OUT_DIR, `icon-${size}.png`);
   if (!DRY_RUN) writeFileSync(path, png);
   return { path, bytes: png.length, sha: createHash('sha256').update(png).digest('hex').slice(0, 12) };
@@ -125,8 +67,8 @@ function roundIcon(size, rgba) {
  * the seam are the brand's field colour, which is also the adaptive background, so both
  * are left transparent and show it.
  */
-function foregroundIcon(size) {
-  const inner = Math.round(size * SAFE_ZONE);
+function foregroundIcon(size, zone = SAFE_ZONE) {
+  const inner = Math.round(size * zone);
   const icon = renderIcon(inner, BRAND);
   const [r, g, b] = hexRgb(BRAND.colors.app);
   const out = new Uint8Array(size * size * 4);
@@ -142,7 +84,7 @@ function foregroundIcon(size) {
 }
 
 function writeAndroid(path, size, rgba) {
-  const png = encodePng(size, rgba);
+  const png = encodePng(size, size, rgba);
   if (!DRY_RUN) writeFileSync(path, png);
   console.log(`[gen-icons] ${DRY_RUN ? 'would write' : 'wrote'} ${path} (${png.length} bytes)`);
 }
@@ -160,4 +102,35 @@ if (existsSync(RES_DIR)) {
   // The adaptive icon's background colour; the launch screen reads it too.
   const xml = `<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <color name="ic_launcher_background">${BRAND.colors.app}</color>\n</resources>\n`;
   if (!DRY_RUN) writeFileSync(join(RES_DIR, 'values', 'ic_launcher_background.xml'), xml);
+}
+
+// --- iPhone app icon and launch screen (docs/specs/ios.md §2) ---
+// One 1024px icon, opaque: App Store Connect rejects an icon with an alpha channel. The
+// launch screen (ios/App/App/Base.lproj/LaunchScreen.storyboard) is the field colour with
+// the ball centred at 160pt, as Android's splash is the field colour with its foreground.
+const LAUNCH_BALL_PT = 160;
+
+function writeIos(path, size, rgba, opaque = false) {
+  const png = encodePng(size, size, rgba, opaque);
+  if (!DRY_RUN) writeFileSync(path, png);
+  console.log(`[gen-icons] ${DRY_RUN ? 'would write' : 'wrote'} ${path} (${png.length} bytes)`);
+}
+
+if (existsSync(XCASSETS)) {
+  writeIos(join(XCASSETS, 'AppIcon.appiconset', 'AppIcon-512@2x.png'), 1024, renderIcon(1024, BRAND), true);
+  for (const scale of [1, 2, 3]) {
+    const size = LAUNCH_BALL_PT * scale;
+    writeIos(join(XCASSETS, 'Splash.imageset', `splash@${scale}x.png`), size, foregroundIcon(size, 1));
+  }
+  // The launch screen's background, a named colour the storyboard reads; tests/brand.test.ts pins it.
+  const [r, g, b] = hexRgb(BRAND.colors.app).map((n) => `0x${n.toString(16).padStart(2, '0').toUpperCase()}`);
+  const colorset = {
+    colors: [{ color: { 'color-space': 'srgb', components: { alpha: '1.000', red: r, green: g, blue: b } }, idiom: 'universal' }],
+    info: { author: 'xcode', version: 1 },
+  };
+  const dir = join(XCASSETS, 'LaunchBackground.colorset');
+  if (!DRY_RUN) {
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'Contents.json'), `${JSON.stringify(colorset, null, 2)}\n`);
+  }
 }

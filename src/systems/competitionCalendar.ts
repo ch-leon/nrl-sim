@@ -1,4 +1,7 @@
-import { freezeMatchIncome, reconcileMatchIncome } from './matchIncome';
+import { runningCampContext } from '../core/time';
+import type { RunningCamp } from '../data/playerAssignments';
+import { CompetitionRewardError } from './competitionRewards';
+import { freezeMatchEffects, reconcileMatchEffects } from './matchIncome';
 // Regional calendar and results for League careers and isolated competition prototypes.
 import { stateInstallation, type Fixture, type GameState, type LadderRow } from '../core/state';
 import { leagueCareerStateProblem } from './leagueEntryValidation';
@@ -63,12 +66,12 @@ export function structuralPolicyProblem(state: GameState): string | null {
 // Match hooks keep that receipt while applying individual results to the calendar.
 const admitted = new WeakMap<object, {installation: number; world: unknown}>();
 
-function normalLeagueProblem(state: GameState): string | null {
+function normalLeagueProblem(state: GameState, runningCamp?: RunningCamp): string | null {
   const progress = state.competitions?.leagueCareer;
   if (!progress || typeof progress !== 'object' || careerNamespace() !== null) return 'This League career is unsupported.';
   const cached = admitted.get(progress);
   if (cached?.installation === stateInstallation() && cached.world === state.competitions!.world) return null;
-  const problem = leagueCareerStateProblem(state);
+  const problem = leagueCareerStateProblem(state,runningCamp);
   if (problem) return problem.message;
   admitted.set(progress, {installation: stateInstallation(), world: state.competitions!.world});
   return null;
@@ -77,7 +80,7 @@ function normalLeagueProblem(state: GameState): string | null {
 export function structuralAdvanceProblem(state: GameState): string | null {
   if (state.competitions && 'leagueCareer' in state.competitions) {
     if (!structuralRuntimeAllowed()) {
-      const problem = normalLeagueProblem(state);
+      const problem = normalLeagueProblem(state,runningCampContext(state));
       if (problem) return problem;
     }
     if (!isPlayableLeagueCareer(state)) return 'The League career progression snapshot is invalid or unsupported.';
@@ -95,7 +98,7 @@ export function structuralAdvanceProblem(state: GameState): string | null {
 /** Check the live lifecycle shape during interval settlement. */
 export function isPlayableLeagueCareer(state: GameState): boolean {
   return !!state.competitions?.leagueCareer && state.boardLoan?.owed === 0
-    && !validateInput(state as unknown as Record<string, unknown>, state.version);
+    && !validateInput(state as unknown as Record<string, unknown>, state.version,runningCampContext(state));
 }
 
 /** Activation is an explicit local developer operation, never an imported flag. */
@@ -177,24 +180,39 @@ export function __blockCalendarResults(block: boolean): void {
 }
 
 /** The sole structural result commit. Duplicate/stale/cancelled deliveries are no-ops. */
-export function finaliseCalendarFixture(state: GameState, bridge: Fixture, score: { homeScore: number; awayScore: number }, forfeit = false): GameState {
+export function finaliseCalendarFixture(state: GameState, bridge: Fixture, score: { homeScore: number; awayScore: number }, forfeit = false, fulfilment?: {kind: 'open-cup-withdrawal'; offerId: string}): GameState {
   if (blockCalendarResults) throw new Error('Invalid result transition: result commit failed');
   if (!hasStructuralCalendar(state) || structuralAdvanceProblem(state) || ![score.homeScore, score.awayScore].every(n => Number.isSafeInteger(n) && n >= 0)) return state;
   const context = calendarFixtureContext(state, bridge);
-  if (!context) return state;
+  if (!context) {
+    const instance = state.competitions!.instances.find(i => i.id === bridge.competitionId && i.season === state.season);
+    const accepted = instance?.fixtures.find(f => f.id === bridge.id && (f.status === 'completed' || f.status === 'cancelled'));
+    return instance && accepted && sameFixtureIdentity(bridge, fixtureBridge({instance, fixture: accepted}))
+      ? reconcileMatchEffects(state) : state;
+  }
   const { instance, fixture } = context;
-  state = freezeMatchIncome(state, bridge);
+  state = freezeMatchEffects(state, bridge);
   const result = resolvedResult(instance, fixture, score, forfeit);
   const updated = progressInstance({ ...instance, stageId: fixture.stageId,
     fixtures: instance.fixtures.map(f => f.id === fixture.id ? { ...f, status: 'completed', result } : f) });
   const competitions = { ...state.competitions!, instances: state.competitions!.instances.map(i => i.id === instance.id ? updated : i) };
-  const problem = validateCompetitions(competitions, { pack: state.pack ?? 'au', season: state.season, week: state.week, clubIds: state.league.clubs.map(c => c.id) });
+  if (fulfilment) {
+    const entry = competitions.openCupEntry, offer = entry?.current;
+    if (!entry || !offer || offer.offerId !== fulfilment.offerId || offer.instanceId !== instance.id || !offer.withdrawal
+      || offer.withdrawal.fulfilled || offer.withdrawal.requestSlot > state.week || fixture.slot !== state.week
+      || ![fixture.homeId,fixture.awayId].includes(state.clubId) || result.decider !== 'forfeit' || result.winnerId === state.clubId)
+      throw Error('Invalid Open Cup withdrawal fulfilment.');
+    competitions.openCupEntry = {...entry,current:{...offer,withdrawal:{...offer.withdrawal,
+      fulfilled:{fixtureId:fixture.id,slot:state.week,result:{...result}}}}};
+  }
+  const runningCamp = runningCampContext(state);
+  const problem = validateCompetitions(competitions, { pack: state.pack ?? 'au', season: state.season, week: state.week, clubIds: state.league.clubs.map(c => c.id), ...(runningCamp ? {runningCamp} : {}) });
   if (problem) throw new Error(`Invalid result transition: ${problem}`);
   const stage = instance.definition.stages.find(s => s.id === fixture.stageId)!;
   // A compatibility read model for the player's own league. Cup results never change it.
   const ladder = stage.kind === 'league' && instance.entrantIds.includes(state.clubId)
     ? competitionLadder(updated) : state.league.ladder;
-  return reconcileMatchIncome({ ...state, competitions, league: ladder === state.league.ladder ? state.league : { ...state.league, ladder } });
+  return reconcileMatchEffects({ ...state, competitions, league: ladder === state.league.ladder ? state.league : { ...state.league, ladder } });
 }
 
 export function competitionLadder(instance: CompetitionInstance): LadderRow[] {
@@ -240,9 +258,10 @@ function withdrawInstance(instance: CompetitionInstance): CompetitionInstance {
 }
 
 function applyInstances(state: GameState, instances: CompetitionInstance[]): GameState | null {
+  const runningCamp = runningCampContext(state);
   const competitions = { ...state.competitions!, instances };
   const problem = validateCompetitions(competitions, {
-    pack: state.pack ?? 'au', season: state.season, week: state.week, clubIds: state.league.clubs.map(c => c.id),
+    pack: state.pack ?? 'au', season: state.season, week: state.week, clubIds: state.league.clubs.map(c => c.id), ...(runningCamp ? {runningCamp} : {}),
   });
   if (problem) {
     recoveryLog(`left unchanged (${problem})`);
@@ -319,6 +338,8 @@ function withdrawUnresolved(state: GameState): GameState {
  * that is still to be played is not a leftover forfeit.
  */
 export function settleStructuralCalendar(state: GameState, week: number): GameState {
+  if (state.competitions?.openCupEntry && !isPlayableLeagueCareer(state))
+    throw new CompetitionRewardError('The normal Cup interval contains invalid or unsettled evidence.');
   let next = recoverUnfinishableCompetitions(state);
   for (const ref of currentCalendarFixtures(next)) {
     const live = currentCalendarFixtures(next).find(item => item.instance.id === ref.instance.id && item.fixture.id === ref.fixture.id);
@@ -329,11 +350,12 @@ export function settleStructuralCalendar(state: GameState, week: number): GameSt
       recoveryLog(`forfeited ${live.instance.id} ${live.fixture.id}`);
       next = settled;
     } catch (err) {
+      if (err instanceof CompetitionRewardError) throw err;
       next = abandonFixture(next, live.instance.id, live.fixture.id, err);
     }
   }
   if (week >= next.competitions!.calendar!.slots.length && !structuralSeasonResolved(next)) next = withdrawUnresolved(next);
-  return next;
+  return reconcileMatchEffects(next);
 }
 
 /** Missing actual rival players produce a walkover, never a generated substitute sheet. */

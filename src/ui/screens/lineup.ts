@@ -17,9 +17,10 @@ import { roundLabel } from '../../systems/matchday';
 import { el, button, hintScroll, openScreen, openModal, closeModal, screenHead, segmented } from '../dom';
 import { getState, type Player, type Position } from '../../core/state';
 import { bus } from '../../core/events';
-import { overallRating } from '../../data/player';
+import { overallRating, playerStars } from '../../data/player';
 import { BENCH, ROTATIONS, type Rotation } from '../../match/league/bench';
 import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL, type AttackPreset, type DefencePreset } from '../../match/league/presets';
+import { PLAN_SHEET_CSS } from '../planSheet';
 import { renderPlanFit, PLAN_FIT_CSS } from '../planFit';
 import { TACTIC_BLURB, styleLine } from '../tacticsBlurbs';
 import { nextFixture } from '../../systems/league';
@@ -27,33 +28,26 @@ import { PLAYER_ID } from '../../systems/fixtures';
 import { playerRivalContext, rivalStyle } from '../../systems/rivalRound';
 import { kickerAndCaptain } from '../../match/league/sheets';
 import {
-  LINEUP_SLOTS, POSITION_SHORT, autoPickKeepingPlan, commitLineup, setRotation, describeFills, effectiveRating, lineupAverage, lineupChanges, occupant, placeAt, positionFit,
-  resolveLineup, sameSpot, setCaptain, setKicker, setTactics, spotOf, statsAt, swapSpots, validTactics, type Spot,
+  LINEUP_SLOTS, POSITION_SHORT, autoPickKeepingPlan, commitLineup, setRotation, describeFills, effectiveRating, isSelectable, lineupAverage, lineupChanges, occupant, placeAt, positionFit,
+  resolveLineup, sameSpot, setTactics, spotOf, statsAt, swapSpots, validTactics, type Spot,
 } from '../../systems/lineup';
+import { squadMore, squadTabs, squadViewSeg } from './squad';
 import { ensureScreenStyles } from './recruit';
-import { squadTabs } from './squad';
 import { PLAYS_BY_ID } from '../../data/plays';
 import { PLAYS } from '../../match/league/plays';
 import { ownedPlays, takePlay, validPlays } from '../../systems/playbook';
 import { playFitLine, playFitShort, playWhenLine, playsButtonLabel, todaysNine } from '../playbookText';
 import { openPlaybookScreen } from './playbook';
+import { fitnessPct, openPlayerPage } from './player';
+import { DEFAULT_PLAYER_COLORS } from '../../config';
+import { kitFromColors, type Kit } from '../../art/match/kit';
+import { portraitDataUrl } from '../../art/portrait';
+import { ensurePartsStyles, fitnessTone, playerCard, starsEl, statusPill } from '../parts';
+import { awayPlayerIds } from '../../systems/playerAssignments';
+import { campAbsenceText, campAvailability } from './playerAssignments';
 
 const STYLE_ID = 'nrl-lineup-styles';
-/** Tiles are a finger tall (#342) and 72 wide where the pitch has room (3e). */
-const TILE_H = 44;
-const TILE_W = 72;
-const GAP = 4;
 
-/**
- * The field's three lines, left to right, by slot (LINEUP_SLOTS order): the
- * prop and hooker at the ruck, the line behind them, the fullback deepest;
- * roughly the live sim's roles (match/league/roles.ts).
- */
-const FIELD_LINES: readonly (readonly number[])[] = [
-  [7, 6], // prop, hooker
-  [1, 3, 4, 5, 8, 2], // winger, centre, five-eighth, halfback, second-row, winger
-  [0], // fullback
-];
 
 const ROTATION_LABEL: Readonly<Record<Rotation, string>> = { off: 'Off', standard: 'Standard', heavy: 'Heavy' };
 const ROTATION_TIP: Readonly<Record<Rotation, string>> = {
@@ -72,193 +66,79 @@ function ensureLineupStyles(): void {
 }
 
 const LINEUP_CSS = `
-/* Two columns (3e): the bench strip and the pitch, and the list beside them. Where the sheet is
-   shorter than the bench and the pitch at their least (568×320 at a larger text size, or with the
-   first-visit hint up) the two scroll together inside the sheet rather than lose the fullback (#422). */
-.nrl-lineup-body {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(200px, 34%, 270px);
-  gap: 12px;
-}
-.nrl-lineup-left { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: ${GAP}px; }
-/* The bench (#351 L3): a strip across the top of the pitch. */
-.nrl-lineup-bench {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: ${GAP}px;
-  padding: 3px;
-  border-radius: 8px;
-  background: var(--nrl-raised);
-}
-.nrl-lineup-bench-label {
-  flex: 0 0 44px;
-  text-align: center;
-  font-family: var(--nrl-f-label);
-  font-size: 0.8125rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--nrl-muted);
-}
-.nrl-lineup-bench .nrl-lineup-tile { flex: 1 1 0; max-width: none; height: 40px; padding: 0 8px; }
-/* The pitch fits its box (#342): the lines share its height, the tiles its width. */
+/* SuperCOOKED 30: the pitch (four lanes of cards) and, beside it, the bench and the reserves, or
+   while a man is being swapped (32), who can go there. */
+.nrl-lineup-body { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 13.5rem; gap: 12px; }
 .nrl-lineup-field {
-  flex: 1 1 auto;
-  min-height: ${3 * TILE_H + 2 * GAP + 8}px;
-  box-sizing: border-box;
-  display: grid;
-  grid-template-rows: repeat(3, minmax(0, 1fr));
-  gap: ${GAP}px;
-  padding: 4px;
-  border-radius: 8px;
-  background: repeating-linear-gradient(90deg, #2f7a36 0px, #2f7a36 60px, #337f3a 60px, #337f3a 120px);
+  position: relative; min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 4px; padding: 6px 8px;
+  border-radius: 12px; box-shadow: inset 0 0 0 1px #23573a;
+  background: repeating-linear-gradient(180deg, #164029 0, #164029 28px, #1a4830 28px, #1a4830 56px);
 }
-.nrl-lineup-line { display: flex; align-items: center; justify-content: center; gap: ${GAP}px; min-width: 0; }
-.nrl-lineup-line[data-line="1"] { justify-content: space-between; }
-/* A slot: the slot and his rating there, his surname under it. */
-.nrl-lineup-tile {
-  pointer-events: auto;
-  cursor: pointer;
-  position: relative;
-  flex: 0 1 ${TILE_W}px;
-  min-width: 0;
-  max-width: ${TILE_W}px;
-  height: ${TILE_H}px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: 0 6px;
-  box-sizing: border-box;
-  border: 0;
-  border-radius: 6px;
-  background: var(--nrl-raised);
-  color: var(--nrl-text);
-  font-family: var(--nrl-f-body);
-  line-height: 1.15;
-  text-align: left;
-}
-/* #422: a tile drawn lower than a finger (40px on the pitch, 36 on the bench on a short phone) is tapped over a
-   44px band: its hit area reaches into the gaps round it, never as far as the next tile's. */
-.nrl-lineup-tile::after { content: ''; position: absolute; left: 0; right: 0; top: min(0px, calc(50% - 22px)); bottom: min(0px, calc(50% - 22px)); }
-@media (hover: hover) and (pointer: fine) { .nrl-lineup-tile:hover { background: #22305c; } }
-.nrl-lineup-tile:active { background: #22305c; }
-.nrl-lineup-tile:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 1px; }
-.nrl-lineup-tile[data-selected] { box-shadow: 0 0 0 2px var(--nrl-accent); z-index: 2; }
-.nrl-lineup-tile[data-empty] { background: rgba(232, 224, 200, 0.12); }
-.nrl-lineup-tile[data-out], .nrl-lineup-tile[data-banned] { background: var(--nrl-injured); }
-.nrl-lineup-tile-top { font-family: var(--nrl-f-label); font-size: 0.8125rem; font-weight: 700; white-space: nowrap; overflow: hidden; }
-.nrl-lineup-tile-top .nrl-num { font-weight: 600; font-size: 0.75rem; }
-.nrl-lineup-tile-name { font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.nrl-lineup-tile[data-empty] .nrl-lineup-tile-name { color: var(--nrl-muted); }
-/* Out of position: amber; out of his kind of position: red; hurt or banned: OUT / BAN in red. */
-.nrl-lineup-fit-related { color: var(--nrl-fit-ok); }
-.nrl-lineup-fit-unrelated, .nrl-lineup-tile-out { color: var(--nrl-neg); }
-/* K and C (N11): small yellow letters top-right of the tile. */
-.nrl-lineup-roles { position: absolute; top: 2px; right: 3px; display: flex; gap: 3px; pointer-events: none; }
-.nrl-lineup-role { font-family: var(--nrl-f-label); font-size: 0.6875rem; font-weight: 700; line-height: 1; color: var(--nrl-accent); }
-.nrl-lineup-right { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 4px; }
-.nrl-lineup-pick { flex: 0 0 auto; font-family: var(--nrl-f-label); font-size: 0.875rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--nrl-accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* Kicker and Captain (#349 L4): a switch for the picked man, naming who holds the job now. */
-.nrl-lineup-kc { flex: 0 0 auto; display: flex; gap: 4px; }
-.nrl-lineup-kc[hidden] { display: none; }
-.nrl-lineup-kc .nrl-btn {
-  flex: 1 1 0;
-  min-width: 0;
-  min-height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px;
-  padding: 0 8px;
-  border-radius: 8px;
-  font-size: 0.875rem;
-  text-align: left;
-}
-@media (pointer: coarse) { .nrl-lineup-kc .nrl-btn { min-height: 44px; } }
-.nrl-lineup-kc-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.1; }
-.nrl-lineup-kc-text small { font-family: var(--nrl-f-body); font-size: 0.6875rem; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--nrl-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.nrl-lineup-kc-state { flex: 0 0 auto; color: var(--nrl-muted); }
-.nrl-lineup-kc .nrl-btn[aria-pressed="true"] .nrl-lineup-kc-state { color: var(--nrl-accent); }
-.nrl-lineup-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 3px; }
-/* A candidate: name and "Position · age", his rating for the picked slot, where he is now. */
+.nrl-pitch-halfway { position: absolute; left: 0; right: 0; top: 50%; height: 2px; background: rgba(255, 255, 255, 0.18); pointer-events: none; }
+.nrl-pitch-lane { position: relative; flex: 1 0 48px; display: flex; align-items: center; gap: 8px; }
+.nrl-pitch-lane-label { flex: 0 0 4.5rem; font-family: var(--nrl-f-label); font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255, 255, 255, 0.7); }
+.nrl-pitch-cards { flex: 1 1 auto; min-width: 0; display: flex; justify-content: center; gap: 8px; }
+.nrl-pitch-cards > .nrl-pcard { flex: 0 1 7.5rem; min-width: 0; width: auto; box-shadow: inset 0 0 0 1px var(--nrl-line-2), 0 4px 12px rgba(0, 0, 0, 0.35); }
+.nrl-btn.nrl-pitch-empty { flex: 0 1 7.5rem; min-width: 0; min-height: 52px; border-radius: 10px; background: rgba(11, 18, 32, 0.6); border: 1px dashed var(--nrl-outline); font-size: 0.8125rem; }
+/* A swap under way (32): the picked card wears the accent ring, the rest dim. */
+.nrl-pcard[data-selected], .nrl-btn.nrl-pitch-empty[data-selected] { box-shadow: 0 0 0 2px var(--nrl-accent), 0 4px 12px rgba(0, 0, 0, 0.35); }
+.nrl-pcard[data-dim] { opacity: 0.5; }
+.nrl-pcard[data-out], .nrl-pcard[data-banned] { opacity: 0.7; }
+/* The side: Bench n / Reserves n, then the cards; or the swap's candidates. */
+.nrl-lineup-side { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
+.nrl-lineup-side > .nrl-seg { align-self: stretch; }
+.nrl-lineup-side > .nrl-seg > .nrl-btn { flex: 1 1 0; padding: 0 8px; font-size: 0.875rem; }
+.nrl-side-cards { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 6px; padding: 2px; }
+.nrl-side-cards > .nrl-pcard, .nrl-side-cards > .nrl-pitch-empty { flex: 0 0 auto; width: 100%; min-height: 48px; }
+.nrl-swap-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 36px; }
+.nrl-swap-title { font-family: var(--nrl-f-label); font-size: 0.875rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.nrl-btn.nrl-swap-x { width: 36px; min-width: 36px; min-height: 36px; height: 36px; padding: 0; border-radius: 8px; font-family: var(--nrl-f-body); position: relative; }
+.nrl-btn.nrl-swap-x::after { content: ''; position: absolute; inset: -4px; }
+.nrl-lineup-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 6px; }
 .nrl-lineup-row {
-  pointer-events: auto;
-  cursor: pointer;
-  flex: 0 0 auto;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 30px 46px;
-  align-items: center;
-  gap: 6px;
-  min-height: 40px;
-  padding: 0 8px;
-  border: 0;
-  border-radius: 6px;
-  background: var(--nrl-raised);
-  color: var(--nrl-text);
-  font-family: var(--nrl-f-body);
-  text-align: left;
+  pointer-events: auto; cursor: pointer; flex: 0 0 auto; display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: 8px;
+  min-height: 48px; padding: 4px 8px; border: 0; border-radius: 10px; background: var(--nrl-navy); box-shadow: inset 0 0 0 1px var(--nrl-line-2);
+  color: var(--nrl-text); font: inherit; text-align: left;
 }
-/* N14 (#263): 44px rows on a touch screen (the list scrolls; the field is unchanged). */
-@media (pointer: coarse) { .nrl-lineup-row { min-height: 44px; } }
-@media (hover: hover) and (pointer: fine) { .nrl-lineup-row:hover { background: #22305c; } }
-.nrl-lineup-row:active { background: #22305c; }
+@media (hover: hover) and (pointer: fine) { .nrl-lineup-row:hover { background: var(--nrl-raised-hover); } }
+.nrl-lineup-row:active { background: var(--nrl-raised-hover); }
 .nrl-lineup-row:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: -2px; }
-.nrl-lineup-row[data-selected] { background: var(--nrl-me); }
-.nrl-lineup-row[data-injured], .nrl-lineup-row[data-banned] { opacity: 0.55; cursor: default; }
-.nrl-lineup-row-id { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
-.nrl-lineup-row-name { font-size: 0.8125rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.nrl-lineup-row-meta { font-size: 0.6875rem; color: var(--nrl-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.nrl-lineup-row-eff { font-family: var(--nrl-f-num); font-size: 0.8125rem; font-weight: 600; text-align: right; }
-.nrl-lineup-where {
-  height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 5px;
-  background: var(--nrl-button);
-  font-family: var(--nrl-f-label);
-  font-size: 0.75rem;
-  font-weight: 700;
-  white-space: nowrap;
-}
-.nrl-lineup-where[data-bench] { background: var(--nrl-bench); }
-.nrl-lineup-where[data-injured], .nrl-lineup-where[data-banned] { background: var(--nrl-out); }
-.nrl-lineup-where[data-free] { background: transparent; color: var(--nrl-muted); }
-.nrl-sq .nrl-screen-tools [data-plan] { max-width: 18rem; overflow: hidden; text-overflow: ellipsis; }
-.nrl-sq .nrl-screen-tools [data-plays] { max-width: 16rem; overflow: hidden; text-overflow: ellipsis; }
+.nrl-lineup-row[data-injured], .nrl-lineup-row[data-banned], .nrl-lineup-row[data-away] { opacity: 0.55; cursor: default; }
+.nrl-swap-face { width: 28px; height: 32px; border-radius: 6px; background: var(--nrl-raised); image-rendering: pixelated; }
+.nrl-lineup-row-id { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.nrl-lineup-row-name { font-family: var(--nrl-f-label); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nrl-swap-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.nrl-swap-meta .nrl-pill { min-height: 1.25rem; padding: 0 7px; font-family: var(--nrl-f-label); font-size: 0.625rem; letter-spacing: 0.06em; text-transform: uppercase; }
+.nrl-lineup-where { font-family: var(--nrl-f-num); font-size: 0.5625rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); white-space: nowrap; }
+.nrl-lineup-where[data-away] { color: var(--nrl-alert); }
+.nrl-lineup-pick { flex: 0 0 auto; margin: 0; font-size: 0.6875rem; line-height: 1.35; color: var(--nrl-muted); }
+/* The header (30): Squad / Recruit, the line, Pitch / List, Swap, Auto pick, ⋯. */
+.nrl-sq .nrl-squad-view > .nrl-btn { padding: 0 12px; font-size: 0.8125rem; }
+.nrl-btn.nrl-squad-more { width: 44px; min-width: 44px; padding: 0; font-size: 1.125rem; letter-spacing: 0; }
+.nrl-btn[data-swap-start][aria-pressed="true"] { box-shadow: inset 0 0 0 1px var(--nrl-accent); color: var(--nrl-accent); }
+/* The ⋯ tray: the plan, the plays, and the training focus's choices. */
+.nrl-squad-more-tray { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important; width: min(26rem, calc(100vw - 48px)); max-height: calc(100% - 64px); overflow-y: auto; overscroll-behavior: contain; }
+.nrl-squad-more-tray > .nrl-btn { justify-content: flex-start; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nrl-squad-more-tray > :not(.nrl-btn) { grid-column: 1 / -1; }
+.nrl-squad-more-label { padding: 4px 4px 0; font-family: var(--nrl-f-label); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); }
+.nrl-squad-focus { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+.nrl-squad-focus > .nrl-btn { min-height: 40px; padding: 0 6px; border-radius: 8px; font-size: 0.8125rem; }
+@media (pointer: coarse) { .nrl-squad-focus > .nrl-btn { min-height: 44px; } }
 .nrl-lineup-plays-short { display: none; }
-@media (max-width: 1000px) {
-  .nrl-lineup-plays-full { display: none; }
-  .nrl-lineup-plays-short { display: inline; }
-  .nrl-sq.nrl-lineup .nrl-screen-tools { gap: 6px; }
-  .nrl-sq .nrl-screen-tools [data-plan] { max-width: 9.5rem; }
+/* A narrow phone (667): the side panel gives the pitch a little, the lane labels shrink. */
+@media (max-width: 760px) {
+  .nrl-lineup-body { grid-template-columns: minmax(0, 1fr) 11rem; gap: 8px; }
+  .nrl-pitch-lane-label { flex-basis: 3.4rem; font-size: 0.5625rem; letter-spacing: 0.08em; }
+  .nrl-pitch-cards { gap: 5px; }
+  .nrl-sq .nrl-squad-view > .nrl-btn { padding: 0 8px; }
 }
-@media (max-width: 760px) { .nrl-sq .nrl-screen-tools [data-plan] { max-width: 8rem; } .nrl-lineup-auto-more { display: none; } }
-/* A big screen (1280×800): bigger tiles on a pitch that does not run to the floor. */
-@media (min-width: 1000px) and (min-height: 600px) {
-  .nrl-lineup-field { flex: 0 1 auto; height: 100%; max-height: 420px; }
-  .nrl-lineup-tile { flex-basis: 104px; max-width: 104px; height: 56px; padding: 0 8px; }
-  .nrl-lineup-tile-top { font-size: 0.9375rem; }
-  .nrl-lineup-tile-name { font-size: 0.8125rem; }
+/* Short sheets (667×375, 956×330): the lanes share less height; the cards keep 44px to tap. */
+@media (max-height: 400px) {
+  .nrl-lineup-field { padding: 4px 6px; gap: 2px; }
+  .nrl-pitch-cards > .nrl-pcard, .nrl-btn.nrl-pitch-empty { min-height: 44px; }
+  .nrl-pitch-cards > .nrl-pcard .nrl-pcard-body { padding: 3px 7px; }
+  .nrl-side-cards > .nrl-pcard { min-height: 44px; }
 }
-/* Short sheets (956×330, 667×375): the bench strip and tiles a touch lower so three lines fit. */
-@media (max-height: 380px) {
-  .nrl-lineup-bench { padding: 4px 3px; } /* room for the 36px seats' 44px hit areas (#422) */
-  .nrl-lineup-bench .nrl-lineup-tile { height: 36px; }
-  .nrl-lineup-tile { height: 40px; }
-  .nrl-lineup-field { min-height: ${3 * 40 + 2 * GAP + 8}px; }
-}
-/* 956×330: the list's gaps close up so four whole 44px rows show beside the pitch. */
-@media (max-height: 340px) {
-  .nrl-lineup-right { gap: 2px; }
-  .nrl-lineup-list { gap: 2px; }
-}
-
 /* The plan (#342): a bottom sheet over the dimmed Lineup, the half-time sheet's look (3r). */
 .nrl-dialog-region .nrl-modal.nrl-lineup-plan-modal {
   align-self: flex-end;
@@ -309,7 +189,7 @@ ${PLAN_FIT_CSS}
 .nrl-lineup-play { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 4px 10px; border: 0; border-radius: 10px; background: var(--nrl-button); color: var(--nrl-text); text-align: left; cursor: pointer; min-width: 0; font: inherit; }
 .nrl-lineup-play[aria-pressed="true"] { background: var(--nrl-me); }
 /* Pressed (#604): a button's pressed fill, so it shows under reduced motion too (dom.ts adds the scale). */
-.nrl-lineup-play:not([aria-pressed="true"]):active { background: #283669; }
+.nrl-lineup-play:not([aria-pressed="true"]):active { background: var(--nrl-raised-hover); }
 .nrl-lineup-play[data-full] { opacity: 0.55; }
 .nrl-lineup-play:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: -2px; }
 .nrl-lineup-play-tick { flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--nrl-line); display: flex; align-items: center; justify-content: center; font-family: var(--nrl-f-num); font-size: 0.875rem; font-weight: 700; box-sizing: border-box; }
@@ -326,10 +206,9 @@ ${PLAN_FIT_CSS}
   .nrl-dialog-region .nrl-modal.nrl-lineup-plan-modal { padding: 8px 14px 12px; }
   .nrl-lineup-plan .nrl-seg > .nrl-btn { font-size: 0.9375rem; padding: 0 4px; }
 }
+${PLAN_SHEET_CSS}
 `;
 
-const surname = (name: string): string => name.trim().split(/\s+/).pop() ?? name;
-const fitClass = (f: number): string => (f >= 1 ? '' : f >= 0.9 ? 'nrl-lineup-fit-related' : 'nrl-lineup-fit-unrelated');
 /** Human label for a position (title-cased, hyphens kept). */
 const positionLabel = (pos: string): string => pos.replace(/(^|-)([a-z])/g, (_m, sep: string, ch: string) => sep + ch.toUpperCase());
 
@@ -339,54 +218,337 @@ export function autoPickNote(changes: number): string {
 }
 
 let unsub: (() => void) | null = null;
-let selected: Spot | null = null;
+/** The spot being swapped (SuperCOOKED 32): the right panel lists who can go there. */
+let swapping: Spot | null = null;
+/** "Swap" tapped: the next card tapped is the one to swap. */
+let choosing = false;
+/** The right panel's tab when nobody is being swapped (SuperCOOKED 33). */
+let sideTab: 'bench' | 'reserves' = 'bench';
 
 function onLineupClosed(): void {
   if (unsub) {
     unsub();
     unsub = null;
   }
-  selected = null;
-  closeModal(); // the plan sheet, if it is open
+  swapping = null;
+  choosing = false;
+  closeModal(); // the plan or plays sheet, if it is open
+}
+
+/** The pitch's four lanes, top to bottom (SuperCOOKED 30), by the slot's position. */
+const LANES: readonly { label: string; positions: readonly Position[] }[] = [
+  { label: 'Forwards', positions: ['prop', 'hooker', 'second-row', 'lock'] },
+  { label: 'Halves', positions: ['five-eighth', 'halfback'] },
+  { label: 'Outside backs', positions: ['winger', 'centre'] },
+  { label: 'Fullback', positions: ['fullback'] },
+];
+
+/** Hold this long on a card to start a swap with it (SuperCOOKED §5: long-press or Swap). */
+const LONG_PRESS_MS = 450;
+
+/** What a man is to a slot (SuperCOOKED 32): his slot, one he plays, or out of position. Pure. */
+export function swapFit(fit: number): { tag: string; tone: 'pos' | 'muted' | 'neg' } {
+  return fit >= 1 ? { tag: 'fits', tone: 'pos' } : fit >= 0.9 ? { tag: 'plays it', tone: 'muted' } : { tag: 'out of pos', tone: 'neg' };
+}
+
+/** Where a candidate comes from (SuperCOOKED 32): RESERVE, BENCH, or NOW <slot>. Pure. */
+export function swapFrom(where: Spot | null): string {
+  if (!where) return 'Reserve';
+  return where.kind === 'bench' ? 'Bench' : `Now ${POSITION_SHORT[LINEUP_SLOTS[where.slot]!]}`;
 }
 
 /**
- * Open the Lineup screen as a sheet above the dock (ui/dom.ts openScreen).
- * Re-renders on 'state:changed' (a tap, an injury, a signing); taps go through
- * the pure rules in systems/lineup.ts and are saved at once.
+ * Open the squad's pitch view as a sheet above the dock (SuperCOOKED 30–33; it is the
+ * Lineup screen of old, under the Squad tab). The nine in four lanes, the bench and the
+ * reserves at the side. A tap on a card opens his page; a long press, or Swap then a card,
+ * starts a swap: the side panel lists who can go there, best fit first, and a tap puts him
+ * in (whoever was there takes his place). Re-renders on 'state:changed'; every change goes
+ * through the pure rules in systems/lineup.ts and is saved at once.
  */
 export function openLineupScreen(): void {
   ensureLineupStyles();
-  selected = null;
+  ensurePartsStyles();
+  swapping = null;
+  choosing = false;
 
   const sub = el('div', { class: 'nrl-screen-sub' });
   const field = el('div', { class: 'nrl-lineup-field' });
-  const bench = el('div', { class: 'nrl-lineup-bench' });
-  const pick = el('div', { class: 'nrl-lineup-pick' });
-  // Kicker and captain (N11): for the starter in the selected slot.
-  const chosen = (): string | null => (selected && selected.kind === 'starter' ? getState().lineup.starters[selected.slot] ?? null : null);
-  const kcSwitch = (job: string, onTap: () => void, attr: string): { btn: HTMLButtonElement; holder: HTMLElement; state: HTMLElement } => {
-    const holder = el('small');
-    const state = el('span', { class: 'nrl-lineup-kc-state' });
-    const btn = button('', onTap);
-    btn.append(el('span', { class: 'nrl-lineup-kc-text' }, el('span', { text: job }), holder), state);
-    btn.setAttribute(attr, '');
-    return { btn, holder, state };
-  };
-  const { btn: kBtn, holder: kHolder, state: kState } = kcSwitch('Kicker', () => {
-    const id = chosen();
-    if (id) commitLineup(setKicker(getState().lineup, id));
-  }, 'data-make-kicker');
-  const { btn: cBtn, holder: cHolder, state: cState } = kcSwitch('Captain', () => {
-    const id = chosen();
-    if (id) commitLineup(setCaptain(getState().lineup, id));
-  }, 'data-make-captain');
-  const kcRow = el('div', { class: 'nrl-lineup-kc' }, kBtn, cBtn);
-  kcRow.hidden = true;
-  const list = el('div', { class: 'nrl-lineup-list' });
-  hintScroll(list); // the squad runs past the sheet's foot (#610)
+  hintScroll(field); // on a short screen (956×330) the fullback's lane runs under the sheet's foot
+  const side = el('div', { class: 'nrl-lineup-side' });
 
-  // The plan (N11): attack and defence presets and the bench rotation, as the half-time sheet has them (3r).
+  // An injury or a ban keeps the man out of the side: red (#339). A hint is neutral.
+  const toast = (text: string, kind: 'info' | 'danger' = 'info'): void => bus.emit('ui:notify', { text, kind });
+
+  /** Start swapping `spot`, or swap it with the one being swapped. */
+  const swapSpot = (spot: Spot): void => {
+    choosing = false;
+    if (swapping && sameSpot(swapping, spot)) swapping = null;
+    else if (swapping) {
+      const s = getState();
+      const away = awayPlayerIds(s);
+      const next = swapSpots(s.lineup, swapping, spot, away);
+      const swappingAway = [occupant(s.lineup, swapping), occupant(s.lineup, spot)].some((id) => id !== null && away.has(id));
+      swapping = null;
+      if (next !== s.lineup) { commitLineup(next); return; }
+      if (swappingAway) toast('Tap a slot and choose an available player from the squad list.');
+    } else swapping = spot;
+    render();
+  };
+
+  /** A tap on a candidate in the swap panel: into the spot being swapped. */
+  const tapPlayer = (p: Player): void => {
+    const s = getState();
+    const away = awayPlayerIds(s);
+    if (away.has(p.id)) {
+      const absence = campAbsenceText(campAvailability(s), p.id);
+      toast(`${p.name} · ${absence ?? 'Away at Skills Camp'}`, 'danger');
+      return;
+    }
+    if (p.injuredWeeks > 0) {
+      toast(`${p.name} is injured — out ${p.injuredWeeks}w.`, 'danger');
+      return;
+    }
+    if ((p.suspendedWeeks ?? 0) > 0) {
+      toast(`${p.name} is suspended — banned ${p.suspendedWeeks}w.`, 'danger');
+      return;
+    }
+    const lineup = s.lineup;
+    if (!swapping) return;
+    const next = placeAt(lineup, swapping, p.id, away);
+    swapping = null;
+    if (next !== lineup) commitLineup(next);
+    else render();
+  };
+
+  // Who kicks and who captains today (N11): the coach's picks, or the defaults.
+  let roles: { kicker?: string; captain?: string } = {};
+  // The spot the swap list was last drawn for (#614).
+  let swapFor: Spot | null = null;
+  // A long press that just opened a swap. It re-renders the field, so on touch the press's own
+  // click lands on a new card whose closure never saw the hold: the screen keeps the flag, the
+  // next click uses it up, and the next pointerdown drops it (a mouse hold sends no click).
+  let heldOpen = false;
+  const kit = (): Kit => kitFromColors(getState().league.clubs.find((c) => c.id === PLAYER_ID)?.colors ?? DEFAULT_PLAYER_COLORS, PLAYER_ID);
+
+  /** A card for `p` in `spot` (or a reserve, spot null): tap opens his page, a long press swaps. */
+  const card = (p: Player | null, spot: Spot | null, slotPos: Position | null, cover?: Player | null): HTMLElement => {
+    const label = spot?.kind === 'starter' ? POSITION_SHORT[slotPos!] : spot ? `B${spot.index + 1}` : '';
+    if (!p) {
+      // An empty slot or seat: a dashed card that starts the swap for it.
+      const empty = button(`Pick ${label}`, () => spot && swapSpot(spot), { class: 'nrl-pitch-empty' });
+      if (spot) empty.setAttribute('data-spot', spot.kind === 'starter' ? `s${spot.slot}` : `b${spot.index}`);
+      empty.setAttribute('data-empty', '');
+      empty.title = spot?.kind === 'starter' ? `${positionLabel(slotPos!)}: nobody picked` : 'Bench seat: nobody picked';
+      if (swapping && spot && sameSpot(swapping, spot)) empty.setAttribute('data-selected', '');
+      return empty;
+    }
+    const injured = p.injuredWeeks > 0;
+    const banned = (p.suspendedWeeks ?? 0) > 0;
+    const pct = fitnessPct(p);
+    const camp = awayPlayerIds(getState()).has(p.id);
+    const word = camp ? `away at Skills Camp${cover ? `, ${cover.name} covers` : ''}` : injured ? `injured, out ${p.injuredWeeks} weeks` : banned ? `banned ${p.suspendedWeeks} weeks` : `fit ${pct}%`;
+    const c = playerCard({
+      portrait: portraitDataUrl(p.id, kit()),
+      name: shortName(p.name),
+      stars: playerStars(p),
+      position: slotPos ? POSITION_SHORT[slotPos] : POSITION_SHORT[p.position],
+      fitness: { tone: camp || injured || banned ? 'alert' : fitnessTone(pct), word },
+      captain: spot?.kind === 'starter' && roles.captain === p.id,
+      kicker: spot?.kind === 'starter' && roles.kicker === p.id,
+    });
+    if (spot) c.setAttribute('data-spot', spot.kind === 'starter' ? `s${spot.slot}` : `b${spot.index}`);
+    c.setAttribute('data-player-open', p.id);
+    if (camp || injured) c.setAttribute('data-out', '');
+    else if (banned) c.setAttribute('data-banned', '');
+    if (swapping && spot && sameSpot(swapping, spot)) c.setAttribute('data-selected', '');
+    if (swapping && !(spot && sameSpot(swapping, spot))) c.setAttribute('data-dim', '');
+    const fit = slotPos ? positionFit(p.position, slotPos) : 1;
+    c.title = `${p.name} · ${positionLabel(p.position)}${slotPos && fit < 1 ? ` · at ${positionLabel(slotPos)} ×${fit}` : ''}${camp ? ` · Away at Skills Camp${cover ? ` · ${cover.name} covers` : ''}` : injured ? ` · injured, out ${p.injuredWeeks}w` : banned ? ` · suspended, banned ${p.suspendedWeeks}w` : ''}`;
+    // A tap opens his page; while choosing or swapping, it picks the card for the swap.
+    let pressed = 0;
+    let held = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    c.addEventListener('pointerdown', () => {
+      held = false;
+      heldOpen = false;
+      pressed = Date.now();
+      if (spot) timer = setTimeout(() => { held = true; heldOpen = true; swapSpot(spot); }, LONG_PRESS_MS);
+    });
+    const cancel = (): void => { if (timer) { clearTimeout(timer); timer = null; } };
+    c.addEventListener('pointerup', cancel);
+    c.addEventListener('pointerleave', cancel);
+    c.addEventListener('contextmenu', (e) => e.preventDefault());
+    c.addEventListener('click', () => {
+      cancel();
+      if (held || heldOpen || (pressed && Date.now() - pressed >= LONG_PRESS_MS)) { held = false; heldOpen = false; return; }
+      if (spot && (choosing || swapping)) { swapSpot(spot); return; }
+      openPlayerPage(p, { kind: 'squad' });
+    });
+    return c;
+  };
+
+  const render = (): void => {
+    const s = getState();
+    // A man who has left the club is replaced in the saved lineup as soon as the screen sees it.
+    const away = awayPlayerIds(s);
+    const camp = campAvailability(s);
+    const today = resolveLineup(s.lineup, s.squad, away);
+    if (today.changed) {
+      commitLineup(today.lineup);
+      return; // state:changed renders again
+    }
+    const lineup = s.lineup;
+    const nine = today.starters.flatMap((p, slot) => (p ? [{ ...p, position: LINEUP_SLOTS[slot]!, stats: statsAt(p, LINEUP_SLOTS[slot]!) }] : []));
+    roles = kickerAndCaptain(nine, lineup);
+    const byId = new Map(s.squad.map((p) => [p.id, p] as const));
+    const at = (id: string | null): Player | null => (id ? byId.get(id) ?? null : null);
+
+    // A man away at camp keeps his place on the sheet; the card says who covers him on the day.
+    const coverCard = (slot: number, pos: Position): HTMLElement => {
+      const p = at(lineup.starters[slot] ?? null);
+      return card(p, { kind: 'starter', slot }, pos, p && away.has(p.id) ? today.starters[slot] ?? null : undefined);
+    };
+    // The pitch: the nine in four lanes (SuperCOOKED 30), in LINEUP_SLOTS order within each.
+    field.replaceChildren(
+      el('span', { class: 'nrl-pitch-halfway', attrs: { 'aria-hidden': 'true' } }),
+      ...LANES.map((lane) => el('div', { class: 'nrl-pitch-lane', attrs: { 'data-lane': lane.label } },
+        el('span', { class: 'nrl-pitch-lane-label', text: lane.label }),
+        el('div', { class: 'nrl-pitch-cards' },
+          ...LINEUP_SLOTS.flatMap((pos, slot) => (lane.positions.includes(pos) ? [coverCard(slot, pos)] : []))))));
+    field.toggleAttribute('data-swapping', swapping !== null);
+
+    // The side: who is being swapped and who can go there, or the bench and the reserves.
+    const picked = new Set([...lineup.starters, ...lineup.bench].filter((id): id is string => id !== null));
+    const reserves = s.squad.filter((p) => !picked.has(p.id))
+      .sort((a, b) => overallRating(b) - overallRating(a) || a.name.localeCompare(b.name));
+    if (swapping) {
+      const target = swapping;
+      const slotPos = target.kind === 'starter' ? LINEUP_SLOTS[target.slot]! : null;
+      const what = slotPos ? positionLabel(slotPos) : `bench seat ${(target as { index: number }).index + 1}`;
+      const occupantId = occupant(lineup, target);
+      const rows = s.squad.filter((p) => p.id !== occupantId).sort((a, b) => {
+        const fa = slotPos ? positionFit(a.position, slotPos) : 1;
+        const fb = slotPos ? positionFit(b.position, slotPos) : 1;
+        const ea = slotPos ? effectiveRating(a, slotPos) : overallRating(a);
+        const eb = slotPos ? effectiveRating(b, slotPos) : overallRating(b);
+        return fb - fa || eb - ea || overallRating(b) - overallRating(a) || a.name.localeCompare(b.name);
+      });
+      const close = button('✕', () => { swapping = null; render(); }, { class: 'nrl-swap-x' });
+      close.setAttribute('aria-label', 'Cancel the swap');
+      close.setAttribute('data-swap-cancel', '');
+      const list = el('div', { class: 'nrl-lineup-list nrl-swap-list' }, ...rows.map((p) => {
+        const where = spotOf(lineup, p.id);
+        const absence = campAbsenceText(camp, p.id);
+        const isAway = away.has(p.id);
+        const injured = p.injuredWeeks > 0;
+        const banned = (p.suspendedWeeks ?? 0) > 0;
+        const fit = slotPos ? swapFit(positionFit(p.position, slotPos)) : null;
+        const row = el('button', { class: 'nrl-lineup-row nrl-swap-row', attrs: { type: 'button', 'data-player': p.id }, onClick: () => tapPlayer(p) },
+          el('img', { class: 'nrl-swap-face', attrs: { src: portraitDataUrl(p.id, kit()), alt: '', width: '28', height: '32' } }),
+          el('span', { class: 'nrl-lineup-row-id' },
+            el('span', { class: 'nrl-lineup-row-name', text: shortName(p.name) }),
+            absence && camp ? el('span', { class: 'nrl-lineup-row-meta', text: `Skills Camp · Back W${camp.rules.returnWeek}` })
+              : starsEl(playerStars(p), { size: 11 })),
+          el('span', { class: 'nrl-swap-meta' },
+            isAway ? statusPill('Camp', 'alert') : injured ? statusPill(`Out ${p.injuredWeeks}w`, 'alert') : banned ? statusPill(`Ban ${p.suspendedWeeks}w`, 'alert')
+              : fit ? statusPill(fit.tag === 'fits' ? `${POSITION_SHORT[slotPos!]} ✓` : fit.tag === 'plays it' ? `Plays ${POSITION_SHORT[slotPos!]}` : 'Out of pos', fit.tone)
+                : statusPill(POSITION_SHORT[p.position], 'muted'),
+            el('span', { class: 'nrl-lineup-where', text: swapFrom(where), attrs: isAway ? { 'data-away': '' } : {} })));
+        if (isAway) row.setAttribute('data-away', '');
+        else if (injured) row.setAttribute('data-injured', '');
+        else if (banned) row.setAttribute('data-banned', '');
+        if (absence) row.setAttribute('data-camp-absence', p.id);
+        row.title = absence ?? (slotPos ? `Rating at ${positionLabel(slotPos)}: ${effectiveRating(p, slotPos)} (overall ${Math.round(overallRating(p))})` : `Overall ${Math.round(overallRating(p))}`);
+        return row;
+      }));
+      hintScroll(list);
+      // The same spot drawn again (a kicker, an injury) leaves the list where it was; another spot
+      // starts it at the top, where the best man for it is (#614).
+      const prev = side.querySelector<HTMLElement>('.nrl-swap-list');
+      const keep = prev && swapFor && sameSpot(swapFor, target) ? prev.scrollTop : 0;
+      swapFor = target;
+      const leaving = occupantId ? byId.get(occupantId) : undefined;
+      side.replaceChildren(
+        el('div', { class: 'nrl-swap-head' }, el('span', { class: 'nrl-swap-title', text: `Swap ${what}` }), close),
+        list,
+        el('p', { class: 'nrl-lineup-pick', text: leaving ? `Tap a man to swap him in. ${shortName(leaving.name)} goes where he came from.` : 'Tap a man to put him there.' }));
+      if (keep) list.scrollTop = keep;
+    } else {
+      swapFor = null;
+      const tabs = segmented<'bench' | 'reserves'>([
+        { id: 'bench', label: `Bench ${lineup.bench.filter((id) => id !== null).length}` },
+        { id: 'reserves', label: `Reserves ${reserves.length}` },
+      ], sideTab, (id) => { sideTab = id; render(); }, { class: 'nrl-side-tabs', label: 'Bench and reserves' });
+      for (const [id, b] of tabs.buttons) b.setAttribute('data-side-tab', id);
+      const cards = sideTab === 'bench'
+        ? Array.from({ length: BENCH.size }, (_, i) => {
+          const p = at(lineup.bench[i] ?? null);
+          const cover = p && away.has(p.id) ? today.bench.find((b) => !lineup.bench.includes(b.id)) ?? null : undefined;
+          return card(p, { kind: 'bench', index: i }, null, cover);
+        })
+        : reserves.map((p) => card(p, null, null));
+      const list = el('div', { class: 'nrl-lineup-bench nrl-side-cards' }, ...cards);
+      hintScroll(list);
+      side.replaceChildren(tabs.el, list);
+    }
+
+    const fitCount = s.squad.filter((p) => isSelectable(p, away)).length;
+    const starters = away.size ? today.starters.map((p) => p?.id ?? null) : lineup.starters;
+    const pickedN = starters.filter((id) => id !== null).length;
+    const notes = today.fills.length ? ` · on the day: ${describeFills(today.fills).replace(/^Lineup: /, '')}` : '';
+    const avg = lineupAverage({ ...lineup, starters }, s.squad);
+    if (swapping) {
+      const slotPos = swapping.kind === 'starter' ? LINEUP_SLOTS[swapping.slot]! : null;
+      sub.textContent = slotPos ? `Pick who plays ${positionLabel(slotPos).toLowerCase()}` : `Pick who sits on bench seat ${(swapping as { index: number }).index + 1}`;
+      sub.title = sub.textContent;
+    } else if (choosing) {
+      sub.textContent = 'Tap the card to swap';
+      sub.title = sub.textContent;
+    } else {
+      sub.textContent = `${pickedN}/${LINEUP_SLOTS.length} picked · rated ${avg} · ${fitCount}/${s.squad.length} fit${notes}`;
+      sub.title = `${pickedN}/${LINEUP_SLOTS.length} picked · nine rated ${avg} as they play · ${fitCount} fit of ${s.squad.length}${notes}`;
+    }
+    swapBtn.setAttribute('aria-pressed', String(choosing || swapping !== null));
+  };
+
+  const autoBtn = button('Auto pick', () => {
+    swapping = null;
+    choosing = false;
+    const cur = getState().lineup;
+    const best = autoPickKeepingPlan(getState().squad, cur, awayPlayerIds(getState()));
+    commitLineup(best);
+    toast(autoPickNote(lineupChanges(cur, best)));
+  }, { class: 'nrl-btn-outline' });
+  autoBtn.title = 'Today’s best nine by slot and the next four';
+  autoBtn.setAttribute('data-auto-pick', '');
+  // A swap without a long press: Swap, then the card (SuperCOOKED §5).
+  const swapBtn = button('Swap', () => {
+    if (choosing || swapping) { choosing = false; swapping = null; } else choosing = true;
+    render();
+  }, { class: 'nrl-btn-outline' });
+  swapBtn.setAttribute('data-swap-start', '');
+  swapBtn.title = 'Tap Swap, then the card to swap (or hold a card)';
+
+  const head = screenHead('', { lead: [squadTabs('lineup')], sub, controls: [squadViewSeg('pitch'), swapBtn, autoBtn, squadMore()] });
+  const body = el('div', { class: 'nrl-lineup-body' }, field, side);
+  const screen = el('div', { class: 'nrl-screen nrl-sq nrl-lineup' }, head, body);
+  openScreen(screen, onLineupClosed, 'lineup');
+  render();
+  unsub = bus.on('state:changed', render);
+}
+
+/** "J. Mere": the first initial and the surname, for a card (SuperCOOKED 30). */
+function shortName(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  return parts.length > 1 ? `${parts[0]![0]}. ${parts[parts.length - 1]}` : name;
+}
+
+/**
+ * The game plan sheet (N11, #342): attack, defence and the bench rotation, over whatever is
+ * open. Its state follows the save while it is open. Opened from the Squad's ⋯ menu.
+ */
+export function openPlanSheet(): void {
+  ensureLineupStyles();
   const rotation = segmented<Rotation>(ROTATIONS.map((r) => ({ id: r, label: ROTATION_LABEL[r], title: ROTATION_TIP[r] })), null,
     (r) => commitLineup(setRotation(getState().lineup, r)), { class: 'nrl-lineup-rot', label: 'Bench' });
   for (const [r, b] of rotation.buttons) b.setAttribute('data-rotation', r);
@@ -400,124 +562,23 @@ export function openLineupScreen(): void {
   const hint = el('p', { class: 'nrl-lineup-tac-hint' });
   const planSub = el('span', { class: 'nrl-lineup-plan-sub' });
   const oppLine = el('span', { class: 'nrl-lineup-opp', attrs: { 'data-plan-opponent': '' } });
-  const planBtn = button('PLAN', () => {});
-  planBtn.setAttribute('data-plan', '');
-  planBtn.setAttribute('aria-haspopup', 'dialog');
-  // The set plays taken into the match (#326): their own sheet, beside the plan's (which is full at 440px).
-  const playsBtn = button('PLAYS', () => {});
-  playsBtn.setAttribute('data-plays', '');
-  playsBtn.setAttribute('aria-haspopup', 'dialog');
-  const playsSub = el('span', { class: 'nrl-lineup-plan-sub' });
-  const playsList = el('div', { class: 'nrl-lineup-plays-list', attrs: { 'data-plays-list': '' } });
-
-  // An injury or a ban keeps the man out of the side: red (#339). A hint is neutral.
-  const toast = (text: string, kind: 'info' | 'danger' = 'info'): void => bus.emit('ui:notify', { text, kind });
-
-  /** A tap on a slot or a seat: pick it, unpick it, or swap it with the one picked before. */
-  const tapSpot = (spot: Spot): void => {
-    if (selected && sameSpot(selected, spot)) selected = null;
-    else if (selected) {
-      const next = swapSpots(getState().lineup, selected, spot);
-      selected = null;
-      if (next !== getState().lineup) commitLineup(next);
-      else render();
-    } else selected = spot;
-    render();
-  };
-
-  /** A tap on a player in the squad list: into the picked spot, or pick his own spot. */
-  const tapPlayer = (p: Player): void => {
-    if (p.injuredWeeks > 0) {
-      toast(`${p.name} is injured — out ${p.injuredWeeks}w.`, 'danger');
-      return;
-    }
-    if ((p.suspendedWeeks ?? 0) > 0) {
-      toast(`${p.name} is suspended — banned ${p.suspendedWeeks}w.`, 'danger');
-      return;
-    }
-    const lineup = getState().lineup;
-    if (selected) {
-      const next = placeAt(lineup, selected, p.id);
-      selected = null;
-      if (next !== lineup) commitLineup(next);
-      else render();
-      return;
-    }
-    const spot = spotOf(lineup, p.id);
-    if (spot) {
-      selected = spot;
-      render();
-    } else toast('Tap a slot or a bench seat first, then the player to put there.');
-  };
-
-  // Who kicks and who captains today (N11): the coach's picks, or the defaults.
-  let roles: { kicker?: string; captain?: string } = {};
-  // The spot the list was last sorted for (#614).
-  let listFor: Spot | null = null;
-  const tile = (p: Player | null, spot: Spot, slotPos: Position | null): HTMLElement => {
-    const label = spot.kind === 'starter' ? POSITION_SHORT[slotPos!] : `B${spot.index + 1}`;
-    const injured = p !== null && p.injuredWeeks > 0;
-    const banned = p !== null && (p.suspendedWeeks ?? 0) > 0;
-    const fit = p && slotPos ? positionFit(p.position, slotPos) : 1;
-    // A bench seat has no slot: his overall, in whole numbers like the list beside it (#600).
-    const rating = p ? (slotPos ? effectiveRating(p, slotPos) : Math.round(overallRating(p))) : null;
-    const top = el('span', { class: 'nrl-lineup-tile-top' }, `${label} `);
-    if (injured) top.append(el('span', { class: 'nrl-lineup-tile-out', text: 'OUT' }));
-    else if (banned) top.append(el('span', { class: 'nrl-lineup-tile-out', text: 'BAN' }));
-    else if (rating !== null) top.append(el('span', { class: `nrl-num ${fitClass(fit)}`.trim(), text: String(rating) }));
-    const t = el(
-      'button',
-      {
-        class: 'nrl-lineup-tile',
-        attrs: {
-          type: 'button',
-          'data-spot': spot.kind === 'starter' ? `s${spot.slot}` : `b${spot.index}`,
-          title: p
-            ? `${p.name} · ${positionLabel(p.position)} · OVR ${Math.round(overallRating(p))}${slotPos && fit < 1 ? ` · at ${positionLabel(slotPos)} ${rating} (×${fit})` : ''}${injured ? ` · injured, out ${p.injuredWeeks}w` : banned ? ` · suspended, banned ${p.suspendedWeeks}w` : ''}`
-            : spot.kind === 'starter'
-              ? `${positionLabel(slotPos!)}: nobody picked`
-              : 'Bench seat: nobody picked',
-        },
-        onClick: () => tapSpot(spot),
-      },
-      top,
-      el('span', { class: 'nrl-lineup-tile-name', text: p ? surname(p.name) : 'empty' }),
-    );
-    if (!p) t.setAttribute('data-empty', '');
-    if (injured) t.setAttribute('data-out', '');
-    else if (banned) t.setAttribute('data-banned', '');
-    // K and C (N11): letters at the tile's top-right.
-    if (p && spot.kind === 'starter' && (roles.kicker === p.id || roles.captain === p.id)) {
-      const badges = el('span', { class: 'nrl-lineup-roles' });
-      if (roles.captain === p.id) badges.append(el('span', { class: 'nrl-lineup-role nrl-lineup-role-c', text: 'C', attrs: { 'data-captain': '', title: 'Captain' } }));
-      if (roles.kicker === p.id) badges.append(el('span', { class: 'nrl-lineup-role nrl-lineup-role-k', text: 'K', attrs: { 'data-kicker': '', title: 'Goal-kicker' } }));
-      t.append(badges);
-    }
-    if (sameSpot(selected, spot)) t.setAttribute('data-selected', '');
-    return t;
-  };
-
+  // SuperCOOKED §6: "Save plan" (each pick is kept as it is tapped; this puts the sheet away).
+  const done = button('Save plan', () => closeModal(), { class: 'nrl-btn-primary' });
+  done.setAttribute('data-plan-done', '');
+  const plan = el('div', { class: 'nrl-lineup nrl-lineup-plan' },
+    el('span', { class: 'nrl-lineup-plan-grab', attrs: { 'aria-hidden': 'true' } }),
+    el('div', { class: 'nrl-lineup-plan-head' }, el('span', { class: 'nrl-lineup-plan-title', text: 'Game plan' }), planSub, oppLine),
+    el('div', { class: 'nrl-lineup-plan-rows' },
+      el('span', { class: 'nrl-lineup-plan-label', text: 'Attack' }), attack.el,
+      el('span', { class: 'nrl-lineup-plan-label', text: 'Defence' }), defence.el,
+      el('span', { class: 'nrl-lineup-plan-label', text: 'Bench' }), el('div', { class: 'nrl-lineup-rot-row' }, rotation.el, rotTip)),
+    el('div', { class: 'nrl-lineup-plan-foot' }, hint, done),
+  );
   const render = (): void => {
     const s = getState();
-    // A man who has left the club is replaced in the saved lineup as soon as the screen sees it.
-    const today = resolveLineup(s.lineup, s.squad);
-    if (today.changed) {
-      commitLineup(today.lineup);
-      return; // state:changed renders again
-    }
+    const today = resolveLineup(s.lineup, s.squad, awayPlayerIds(s));
     const lineup = s.lineup;
     const nine = today.starters.flatMap((p, slot) => (p ? [{ ...p, position: LINEUP_SLOTS[slot]!, stats: statsAt(p, LINEUP_SLOTS[slot]!) }] : []));
-    roles = kickerAndCaptain(nine, lineup);
-    const byId = new Map(s.squad.map((p) => [p.id, p] as const));
-    const at = (id: string | null): Player | null => (id ? byId.get(id) ?? null : null);
-
-    // The field: nine tiles in the formation's three lines.
-    field.replaceChildren(...FIELD_LINES.map((slots, i) => el('div', { class: 'nrl-lineup-line', attrs: { 'data-line': String(i) } },
-      ...slots.map((slot) => tile(at(lineup.starters[slot] ?? null), { kind: 'starter', slot }, LINEUP_SLOTS[slot]!)))));
-    bench.replaceChildren(el('span', { class: 'nrl-lineup-bench-label', text: 'Bench' }));
-    for (let i = 0; i < BENCH.size; i++) bench.append(tile(at(lineup.bench[i] ?? null), { kind: 'bench', index: i }, null));
-
-    // The plan sheet's state (it may be open over the screen).
     const tactics = validTactics(lineup.tactics);
     for (const seg of [attack, defence]) for (const [p, b] of seg.buttons) renderPlanFit(b, nine, p);
     attack.set(tactics.attack);
@@ -537,99 +598,31 @@ export function openLineupScreen(): void {
       oppLine.textContent = `${opp.name} play ${styleLine(rivalStyle(opp, playerRivalContext(s)))}`;
       oppLine.title = oppLine.textContent;
     }
-    planBtn.textContent = `Plan: ${PRESET_LABEL[tactics.attack]} · ${PRESET_LABEL[tactics.defence]}`;
-    planBtn.title = `Attack, defence and the bench (${ROTATION_LABEL[lineup.rotation]}): the coach’s plan for the match`;
-    renderPlays(s);
-
-    const fit = s.squad.filter((p) => p.injuredWeeks <= 0 && (p.suspendedWeeks ?? 0) <= 0).length;
-    const picked = lineup.starters.filter((id) => id !== null).length;
-    const notes = today.fills.length ? ` · on the day: ${describeFills(today.fills).replace(/^Lineup: /, '')}` : '';
-    const avg = lineupAverage(lineup, s.squad);
-    sub.textContent = `${picked}/${LINEUP_SLOTS.length} picked · rated ${avg} · ${fit}/${s.squad.length} fit${notes}`;
-    sub.title = `${picked}/${LINEUP_SLOTS.length} picked · nine rated ${avg} as they play · ${fit} fit of ${s.squad.length}${notes}`;
-
-    // The squad list, best for the picked slot first.
-    const slotPos = selected && selected.kind === 'starter' ? LINEUP_SLOTS[selected.slot]! : null;
-    // The selected starter can be made the goal-kicker or the captain (N11); tapping again goes back to the default.
-    const chosenId = selected && selected.kind === 'starter' ? lineup.starters[selected.slot] ?? null : null;
-    kcRow.hidden = chosenId === null;
-    if (chosenId) {
-      const holderName = (id: string | undefined): string => {
-        const who = id ? byId.get(id) : undefined;
-        return who ? `now ${surname(who.name)}` : 'nobody';
-      };
-      kBtn.setAttribute('aria-pressed', String(roles.kicker === chosenId));
-      cBtn.setAttribute('aria-pressed', String(roles.captain === chosenId));
-      kState.textContent = roles.kicker === chosenId ? 'ON' : 'OFF';
-      cState.textContent = roles.captain === chosenId ? 'ON' : 'OFF';
-      kHolder.textContent = holderName(roles.kicker);
-      cHolder.textContent = holderName(roles.captain);
-      kBtn.title = lineup.kicker === chosenId ? 'Your goal-kicker: tap to go back to the default' : 'Make him the goal-kicker';
-      cBtn.title = lineup.captain === chosenId ? 'Your captain: tap to go back to the default' : 'Make him captain';
-    }
-    pick.textContent = selected
-      ? slotPos
-        ? `For ${positionLabel(slotPos)}: tap a player`
-        : `For bench seat ${(selected as { index: number }).index + 1}: tap a player`
-      : 'Tap a slot, then a player';
-    const rows = [...s.squad].sort((a, b) => {
-      const ea = slotPos ? effectiveRating(a, slotPos) : overallRating(a);
-      const eb = slotPos ? effectiveRating(b, slotPos) : overallRating(b);
-      return eb - ea || overallRating(b) - overallRating(a) || a.name.localeCompare(b.name);
-    });
-    list.replaceChildren();
-    const occupantId = selected ? occupant(lineup, selected) : null;
-    for (const p of rows) {
-      const where = spotOf(lineup, p.id);
-      const injured = p.injuredWeeks > 0;
-      const banned = (p.suspendedWeeks ?? 0) > 0;
-      const whereEl = el('span', {
-        class: 'nrl-lineup-where',
-        text: injured ? `OUT ${p.injuredWeeks}w` : banned ? `BAN ${p.suspendedWeeks}w` : where ? (where.kind === 'starter' ? POSITION_SHORT[LINEUP_SLOTS[where.slot]!] : `B${where.index + 1}`) : '·',
-      });
-      if (injured) whereEl.setAttribute('data-injured', '');
-      else if (banned) whereEl.setAttribute('data-banned', '');
-      else if (where?.kind === 'bench') whereEl.setAttribute('data-bench', '');
-      else if (!where) whereEl.setAttribute('data-free', '');
-      const effText = slotPos ? `${effectiveRating(p, slotPos)}` : `${Math.round(overallRating(p))}`;
-      const eff = el('span', { class: `nrl-lineup-row-eff ${slotPos ? fitClass(positionFit(p.position, slotPos)) : ''}`.trim(), text: effText });
-      eff.title = slotPos ? `Rating at ${positionLabel(slotPos)} (overall ${Math.round(overallRating(p))})` : 'Overall rating';
-      const row = el(
-        'button',
-        {
-          class: 'nrl-lineup-row',
-          attrs: { type: 'button', 'data-player': p.id },
-          onClick: () => tapPlayer(p),
-        },
-        el(
-          'div',
-          { class: 'nrl-lineup-row-id' },
-          el('span', { class: 'nrl-lineup-row-name', text: p.name }),
-          el('span', { class: 'nrl-lineup-row-meta', text: `${positionLabel(p.position)} · ${p.age}` }),
-        ),
-        eff,
-        whereEl,
-      );
-      if (injured) row.setAttribute('data-injured', '');
-      else if (banned) row.setAttribute('data-banned', '');
-      if (occupantId === p.id) row.setAttribute('data-selected', '');
-      list.append(row);
-    }
-    // Another spot picked (or none now) sorts the list afresh: back to its top, where the best man for
-    // the spot is (#614). The same spot drawn again (a kicker, an injury) leaves the list where it was.
-    if (selected ? !sameSpot(selected, listFor) : listFor !== null) list.scrollTop = 0;
-    listFor = selected;
   };
+  render();
+  const off = bus.on('state:changed', () => { if (plan.isConnected) render(); else off(); });
+  openModal(plan, { class: 'nrl-lineup-plan-modal', region: true, onRemove: () => off() });
+}
 
-  /** The Plays button and sheet (#326): the plays owned, ticked in the order taken, three at most. */
-  const renderPlays = (s: ReturnType<typeof getState>): void => {
+/** The Plays sheet (#326): the plays owned, tap to take or leave out; a way to the Playbook. */
+export function openPlaysSheet(): void {
+  ensureLineupStyles();
+  const playsSub = el('span', { class: 'nrl-lineup-plan-sub' });
+  const playsList = el('div', { class: 'nrl-lineup-plays-list', attrs: { 'data-plays-list': '' } });
+  const playsDone = button('Done', () => closeModal(), { class: 'nrl-btn-primary' });
+  playsDone.setAttribute('data-plays-done', '');
+  const toBook = button('Playbook ▸', () => { closeModal(); openPlaybookScreen(); });
+  toBook.setAttribute('data-plays-playbook', '');
+  const sheet = el('div', { class: 'nrl-lineup nrl-lineup-plan nrl-lineup-plays', attrs: { 'data-plays-sheet': '' } },
+    el('span', { class: 'nrl-lineup-plan-grab', attrs: { 'aria-hidden': 'true' } }),
+    el('div', { class: 'nrl-lineup-plan-head' }, el('span', { class: 'nrl-lineup-plan-title', text: 'Set plays' }), playsSub),
+    playsList,
+    el('div', { class: 'nrl-lineup-plan-foot' }, toBook, el('span', { class: 'nrl-lineup-plays-gap' }), playsDone),
+  );
+  const render = (): void => {
+    const s = getState();
     const owned = ownedPlays(s);
     const taken = validPlays(s.lineup.plays, owned);
-    // The names, or on a phone held sideways "Plays 1/3" so Plan, Plays and Auto pick all fit the header.
-    playsBtn.replaceChildren(
-      el('span', { class: 'nrl-lineup-plays-full', text: playsButtonLabel(taken) }),
-      el('span', { class: 'nrl-lineup-plays-short', text: `Plays ${taken.length}/${PLAYS.takeMax}` }));
-    playsBtn.title = `${playsButtonLabel(taken)}: the set plays you take into the match; your half calls them when they’re on`;
     playsSub.textContent = owned.length === 0 ? 'None bought yet' : `${taken.length} of ${PLAYS.takeMax} · your half calls them in this order`;
     if (owned.length === 0) {
       playsList.replaceChildren(el('p', { class: 'nrl-lineup-plays-empty', text: 'Buy plays on the Playbook: hire an attack coach and he opens a family of them.' }));
@@ -655,56 +648,20 @@ export function openLineupScreen(): void {
       return [row];
     }));
   };
-
-  const autoBtn = button('AUTO PICK', () => {
-    selected = null;
-    const cur = getState().lineup;
-    const best = autoPickKeepingPlan(getState().squad, cur);
-    commitLineup(best);
-    toast(autoPickNote(lineupChanges(cur, best)));
-  });
-  autoBtn.title = 'Today’s best nine by slot and the next four';
-  autoBtn.setAttribute('data-auto-pick', '');
-  // A narrow phone held sideways (667×375): "AUTO", so it stays on screen beside Plan and Plays (#326).
-  autoBtn.replaceChildren(el('span', { text: 'AUTO' }), el('span', { class: 'nrl-lineup-auto-more', text: ' PICK' }));
-
-  // The plan sheet (N11, #342): over the screen so the field and the list keep their height.
-  // The bench rotation is part of the plan: how hard the four are used.
-  const done = button('Done', () => closeModal(), { class: 'nrl-btn-primary' });
-  done.setAttribute('data-plan-done', '');
-  const plan = el('div', { class: 'nrl-lineup nrl-lineup-plan' },
-    el('span', { class: 'nrl-lineup-plan-grab', attrs: { 'aria-hidden': 'true' } }),
-    el('div', { class: 'nrl-lineup-plan-head' }, el('span', { class: 'nrl-lineup-plan-title', text: 'Game plan' }), planSub, oppLine),
-    el('div', { class: 'nrl-lineup-plan-rows' },
-      el('span', { class: 'nrl-lineup-plan-label', text: 'Attack' }), attack.el,
-      el('span', { class: 'nrl-lineup-plan-label', text: 'Defence' }), defence.el,
-      el('span', { class: 'nrl-lineup-plan-label', text: 'Bench' }), el('div', { class: 'nrl-lineup-rot-row' }, rotation.el, rotTip)),
-    el('div', { class: 'nrl-lineup-plan-foot' }, hint, done),
-  );
-  planBtn.onclick = () => openModal(plan, { class: 'nrl-lineup-plan-modal', region: true });
-
-  // The Plays sheet (#326): the plays owned, tap to take or leave out; a way to the Playbook.
-  const playsDone = button('Done', () => closeModal(), { class: 'nrl-btn-primary' });
-  playsDone.setAttribute('data-plays-done', '');
-  const toBook = button('Playbook ▸', () => { closeModal(); openPlaybookScreen(); });
-  toBook.setAttribute('data-plays-playbook', '');
-  const playsSheet = el('div', { class: 'nrl-lineup nrl-lineup-plan nrl-lineup-plays', attrs: { 'data-plays-sheet': '' } },
-    el('span', { class: 'nrl-lineup-plan-grab', attrs: { 'aria-hidden': 'true' } }),
-    el('div', { class: 'nrl-lineup-plan-head' }, el('span', { class: 'nrl-lineup-plan-title', text: 'Set plays' }), playsSub),
-    playsList,
-    el('div', { class: 'nrl-lineup-plan-foot' }, toBook, el('span', { class: 'nrl-lineup-plays-gap' }), playsDone),
-  );
-  playsBtn.onclick = () => openModal(playsSheet, { class: 'nrl-lineup-plan-modal nrl-lineup-plays-modal', region: true });
-
-  const head = screenHead('', { lead: [squadTabs('lineup')], sub, controls: [planBtn, playsBtn, autoBtn] });
-  const body = el(
-    'div',
-    { class: 'nrl-lineup-body' },
-    el('div', { class: 'nrl-lineup-left' }, bench, field),
-    el('div', { class: 'nrl-lineup-right' }, pick, kcRow, list),
-  );
-  const screen = el('div', { class: 'nrl-screen nrl-sq nrl-lineup' }, head, body);
-  openScreen(screen, onLineupClosed, 'lineup');
   render();
-  unsub = bus.on('state:changed', render);
+  const off = bus.on('state:changed', () => { if (sheet.isConnected) render(); else off(); });
+  openModal(sheet, { class: 'nrl-lineup-plan-modal nrl-lineup-plays-modal', region: true, onRemove: () => off() });
+}
+
+/** The Plan item's words: "Plan: Attack · Defence". */
+export function planLabel(): string {
+  const t = validTactics(getState().lineup.tactics);
+  return `Plan: ${PRESET_LABEL[t.attack]} · ${PRESET_LABEL[t.defence]}`;
+}
+
+/** The Plays item's words, full and short ("Plays: A · B · —", "Plays 2/3"). */
+export function playsLabels(): { full: string; short: string } {
+  const s = getState();
+  const taken = validPlays(s.lineup.plays, ownedPlays(s));
+  return { full: playsButtonLabel(taken), short: `Plays ${taken.length}/${PLAYS.takeMax}` };
 }

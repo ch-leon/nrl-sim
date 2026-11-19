@@ -205,6 +205,11 @@ Each row: mockup → current source → what changes. Anything not listed keeps 
   - **Moved off the page:** XP bar and level text, potential text, morale reasons, injury-risk word, season and career tallies. Keep them reachable later if wanted, but not on the first view.
   - **Sell** ("No buyer") is hidden until there is a buyer.
   - Free agents: Deal shows Sign instead. A rival's player: read-only, no Deal actions.
+- **Decided in Phase 1 (Leon, 18 Nov):**
+  - Plan, Plays and the training focus sit in a **⋯ menu** at the right of the Squad header (pitch and list), each opening what it did before.
+  - The player page has a **fourth tab, Record**: level and XP, potential, morale and its reasons, injury risk, season and career tallies, club history.
+  - The list view has **no To / Wage / Morale columns**; the contract-ending dot stays on the name, and the figures are on the player page's Deal tab and in Contracts.
+  - The pitch is opened as the `lineup` screen and the list as `squad`, so links, hints and the dock that lead to the Lineup still land on it.
 
 ### Match (Phase 2)
 
@@ -218,6 +223,13 @@ Each row: mockup → current source → what changes. Anything not listed keeps 
 - **`42-match-half-time`**: bottom sheet. Score and a one-line read first, the opponent's tendency on the right, then Attack / Defence / Bench as three segmented rows (white selected), a line explaining the picked option, the plays line, and **Start 2nd half ▸**. The same sheet is the pre-match plan sheet (§6).
 - **`43-match-full-time`**: centred card. Result tag, big score, one line, three effect pills (ladder move, gate, injuries), player of the match with portrait and stars, Report (outline) and **Back to club ▸**.
 - **`44-match-report`**: both teams with tries and goals, a one-line story, the plan change, **Back to club ▸**; right column five stats with split bars (home white, away green) and **All stats ▸** for the rest.
+- **Built in Phase 2 on the build plan's defaults** ([ui-supercooked-phase-2-plan.md](ui-supercooked-phase-2-plan.md) Q2–Q5; one PR for the phase, as asked):
+  - The report's five are possession, line breaks, tackles, errors and big hits: completion, run metres and missed tackles are not tracked by the match. Kicks, scrambles won and calls paid off are behind All stats.
+  - No Bench row at half-time: the bench is fixed once the match starts. The pre-match Game plan keeps it, and its primary reads **Save plan**.
+  - The LOG switch is gone; a stored `'hidden'` log mode reads as the line.
+  - The full-time card's three stat rows are gone (they are in the report).
+  - Speed is one button that cycles 1× → 2× → 4× → 8×.
+  - The ball chip keeps the tackle count for both sides ("Their ball · tackle 3/5"); the read at half-time is the score line, plus where the other side goes when behind once the Analyst is hired.
 
 ### Club (Phase 3)
 
@@ -225,6 +237,11 @@ Each row: mockup → current source → what changes. Anything not listed keeps 
 - **`21-building-popup`** → `screens/build.ts` (facility popup): name + ✕, level as three bars, **Now / Next level** boxes side by side (the effect values), upkeep line "on the salary cap", **Upgrade to Ln · $X**, then Move and Demolish.
 - **`22-build`** → `screens/build.ts`: All / Training / Club; tiles show name, price (accent), one plain line of what it does, footprint and upkeep on the cap. Built: "BUILT · Ln · tap it on the grounds". One-only already built: amber "ONE ONLY · ALREADY BUILT".
 - **`23-league`** → `screens/fixtures.ts` and the ladder: ladder with last-5 form as lettered dots (W green, L amber), your row highlighted, dashed accent line under the finals cut; right column **next opponent card** (home/away, their stars, ladder spot, record, last meeting), then your run of fixtures.
+- **Built in Phase 3** (what the code has decides what shows):
+  - No facility has upkeep, so the cards and tiles show none. The building card keeps "No recurring upkeep", and the Build tiles say "one-off cost".
+  - CASH is a small word before the money, and the week stays "WK 2/27 · S1": the season stays on show, and the dock's tabs keep their room.
+  - The next-opponent card opens the full preview (the NEXT row still does too). On a phone on its side it is one line, their name and when.
+  - The ladder keeps its W and L columns, and its form column hides under 760px wide, as before.
 
 ### Office (Phase 4)
 
@@ -235,6 +252,13 @@ Each row: mockup → current source → what changes. Anything not listed keeps 
 - **`54-history`** → `screens/history.ts`: summary line, Seasons / Records; each season a card row (best finish highlighted green), Review and Books buttons.
 - **`55-kit`** → `screens/kit.ts`: big home and away previews left; club name + Rename, home pattern and trim, away jersey and trim on the right; Club default and **Save kit**.
 - **`56-decision`** → `decisions.ts`: "Decision · 1 of n", title, the deadline line, story, coach line, then the choices as three big cards, each with its **Sure** and **n% risk** lines as tinted pills.
+- **Built in Phase 4** (what the code has decides what shows):
+  - The Finance note says what the game does: player wages sit on the salary cap; cash pays signing fees, staff (their fee and their wage, in the running costs) and buildings. It hides on a phone on its side, where This week's lines need the room.
+  - Staff rows keep the code's words ("Analyst · $12,000 once", "wages paid with running costs") and add the week's wage beside the button. The attack coach's choices show the wage and the one-off fee on two lines.
+  - The coach's lines in News keep his portrait and his name (as the tag), with the line in italics.
+  - History keeps its Retired players and Trophies tabs. The best finish is green and its card ringed green, with no "· best" word.
+  - The Kit screen keeps three previews (home, alternate, card), and swatches stay 44px tap targets (round, not 28px).
+  - On a decision, the green **Sure** pill shows only beside a risk; a choice with no gamble has the plain pill, gain or cost.
 
 ### App (Phase 5)
 
@@ -281,7 +305,7 @@ Decide these before or during the phase noted; until then use the default.
 
 | # | Question | Phase | Default |
 |---|---|---|---|
-| 1 | **Decided: players can spend level points by hand.** Tap **Spend n points**: the stat tiles get a **+**; each tap puts one point into that stat, up to its ceiling (a tile at its ceiling shows "At ceiling" and no +). Done or ✕ closes it; unspent points stay banked. Points not spent by hand keep going where the game sends them today (the training focus). | 1 | First check whether the code already has a manual spend (the persona playtesters had "manual point spending"); if so, wire to it. If not, add the smallest function that does exactly the above, in its own PR before Phase 1, with tests, and don't change how many points a level gives or how the focus spends them. |
+| 1 | **Decided: players can spend level points by hand.** Tap **Spend n points**: the stat tiles get a **+**; each tap puts one point into that stat, up to its ceiling (a tile at its ceiling shows "At ceiling" and no +). Done or ✕ closes it; unspent points stay banked. The coach opts in with Settings › "spend points myself": while it is on, points bank until spent by hand; while it is off, the training focus spends them as they are earned, as before. | 1 | **Decided (Leon, 18 Nov): opt-in.** The game spent points by focus the moment they were earned and had no manual spend (only the persona harness's), so a Settings switch "spend points myself" (`settings.spendPointsMyself`, off by default) makes points bank for the player page; off, the focus spends them as today, banked ones included at the next award. Logic: `spendPoint` / `spendSquadPoint` / `setSpendPointsMyself` in `src/systems/training.ts`, in its own PR before Phase 1; the switch and the Spend button come with Phase 1. Was: first check whether the code already has a manual spend (the persona playtesters had "manual point spending"); if so, wire to it. If not, add the smallest function that does exactly the above, in its own PR before Phase 1, with tests, and don't change how many points a level gives or how the focus spends them. |
 | 2 | **Decided: no verdict labels.** The brand book's LOCK / ELITE / MID / FADE / COOKED / RAW words are not used anywhere in the game: they'd be extra terms for players to learn. | — | Don't build them. |
 | 3 | Half-time "read" and opponent tendency lines need a rule. | 2 | Use the Analyst's existing rival-switch info when hired; otherwise show only the score line |
 | 4 | Match report's five stats (possession, completion, run metres, line breaks, missed tackles). | 2 | Use these |

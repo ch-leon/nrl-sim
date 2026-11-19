@@ -64,10 +64,11 @@ describe('colour by meaning (#339)', () => {
     expect(stopToastKind('busy')).toBe('info');
     expect(stopToastKind('target')).toBe('info');
   });
-  it('info is neutral, success green, danger red', () => {
-    expect(rule(CSS, '.nrl-toast-info')).toContain('background: rgba(14, 22, 48, 0.97)');
-    expect(rule(CSS, '.nrl-toast-success')).toContain('background: #1d5a33');
-    expect(rule(CSS, '.nrl-toast-danger')).toContain('background: #7a2a24');
+  it('info is neutral, success green, danger red: an ink toast, its bar the kind (SuperCOOKED §4)', () => {
+    expect(rule(CSS, '.nrl-toast:is(.nrl-toast-info, .nrl-toast-success, .nrl-toast-danger)')).toContain('background: rgba(5, 7, 13, 0.97)');
+    expect(rule(CSS, '.nrl-toast-info')).toContain('border-left-color: var(--nrl-muted)');
+    expect(rule(CSS, '.nrl-toast-success')).toContain('border-left-color: var(--nrl-pos)');
+    expect(rule(CSS, '.nrl-toast-danger')).toContain('border-left-color: var(--nrl-alert)');
   });
 });
 

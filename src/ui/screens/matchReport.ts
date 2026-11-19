@@ -1,17 +1,20 @@
-// src/ui/screens/matchReport.ts — full time and the match report (N9.5; Broadcast
-// Quiet 3s and 3t, docs/specs/ui-broadcast-quiet.md). Built from the MatchResult
-// (the live sim's events as recorded), so it agrees with the overlay's tallies.
+// src/ui/screens/matchReport.ts — full time and the match report (N9.5; SuperCOOKED
+// 43 and 44, docs/specs/ui-supercooked.md). Built from the MatchResult (the live
+// sim's events as recorded), so it agrees with the overlay's tallies.
 //
-// At full time in the match (3s) a card over the dimmed pitch: the result, the
-// score, what the match did to the club (ladder, gate, injuries), the Player of
-// the Match, and REPORT / BACK TO CLUB. Back to Club is its one exit (#351 P2):
-// no ✕, so the card stays until the club is back. REPORT opens the report (3t), a
-// full sheet over the pitch: both sides with their tries, minutes and goals, a
+// At full time in the match (43) a card over the dimmed pitch: the round and the
+// result pill, both clubs either side of the score, the summary's first line, what
+// the match did to the club (ladder, gate, injuries) as pills, the Player of the
+// Match, and REPORT / BACK TO CLUB. Back to Club is its one exit (#351 P2): no ✕,
+// so the card stays until the club is back. REPORT opens the report (44), a full
+// sheet over the pitch: a card per side with its tries, minutes and goals, the
 // summary in the ticker's voice (N15.2, match/view/commentary.ts), the plan
-// changes folded into one line (#351 P0), and the stats column. A match finished
-// with no match screen up (the soak) opens the report on its own.
+// changes (#351 P0), and "The numbers": five rows, the rest a tap away. A match
+// finished with no match screen up (the soak) opens the report on its own.
 import { bus } from '../../core/events';
-import { getState } from '../../core/state';
+import { getState, type Fixture, type GameState } from '../../core/state';
+import type { MatchCashQuote } from '../../data/financeRules';
+import { competitionRewardPromiseId } from '../../data/competitionRewards';
 import type { MatchEvent, MatchResult, TeamSheet } from '../../sim/events';
 import { SEASON_ROUNDS } from '../../config';
 import { PLAYER_ID, ladderPosition } from '../../systems/fixtures';
@@ -20,12 +23,16 @@ import { roundLabel } from '../../systems/matchday';
 import { recordMatchAward, playerOfTheMatch, type PlayerOfMatch } from '../../systems/stats';
 import { leagueFixtureView, type LeagueFixtureView } from '../../systems/leagueSeasonView';
 import { hasStructuralCalendar, sameFixtureIdentity } from '../../systems/competitionCalendar';
-import type { Fixture } from '../../core/state';
 import { lossReasons, type LossReason, type ReasonScreen } from '../../systems/lossReasons';
 import { el, button, mount, openModal, closeModal, getRoot } from '../dom';
 import { fmtMoney, ordinal } from '../hud';
 import { MATCH_ACTIVE_CLASS, injectOverlayStyles, matchColours, statTable, teamCodes } from './matchOverlay';
 import { fmtPotmShort } from './potm';
+import { ensurePartsStyles, infoPill, starsEl } from '../parts';
+import { playerStars } from '../../data/player';
+import { portraitDataUrl } from '../../art/portrait';
+import { kitFromColors } from '../../art/match/kit';
+import { DEFAULT_PLAYER_COLORS } from '../../config';
 import { shortName, summaryLines } from '../../match/view/commentary';
 import { PRESET_LABEL, isAttackPreset, isDefencePreset } from '../../match/league/presets';
 
@@ -60,6 +67,7 @@ export interface MatchReport {
   /** Saved stage decides whether this result can move the regular ladder. */
   regularLeagueMatch?: boolean;
   title: string;
+  payments?: MatchReportIncome;
   /** "Round 3", "Grand Final": the full-time card's head. */
   round: string;
   /** Your result (#351 P2): "WIN by 12", "LOSS by 4", "DRAW"; null for a match the player is not in. */
@@ -106,6 +114,42 @@ function side(result: MatchResult, id: string, name: string, score: number): Rep
   };
 }
 
+interface MatchReportIncome {
+  ordinary?: MatchCashQuote;
+  cup?: {
+    matchBase: number;
+    quotedCash: number;
+    cash: number;
+    reputation: number;
+    advertisedReputation: number;
+    title?: string;
+  };
+}
+
+/** Snapshot the club's stored payments for the exact accepted fixture. */
+export function readMatchReportIncome(state: GameState, saved: LeagueFixtureView): MatchReportIncome | undefined {
+  const { bridge, instance, fixture } = saved;
+  if (saved.status !== 'completed' || (bridge.homeId !== state.clubId && bridge.awayId !== state.clubId)) return undefined;
+  const receipt = state.matchIncome.find(r => r.season === instance.season && sameFixtureIdentity(r.fixture, bridge))?.receipt;
+  const ordinary = bridge.homeId === state.clubId ? receipt?.home : receipt?.away;
+  const id = competitionRewardPromiseId(instance.season, instance.id, fixture.id);
+  const reward = state.competitionRewards.find(r => r.id === id && r.status === 'settled');
+  const extra = reward?.status === 'settled' && reward.resolution.kind === 'result' ? reward : undefined;
+  if (!ordinary && !extra) return undefined;
+  const mine = extra?.receipts.filter(r => r.clubId === state.clubId) ?? [];
+  return {
+    ...(ordinary ? { ordinary: { ...ordinary } } : {}),
+    ...(extra ? { cup: {
+      matchBase: extra.matchBase,
+      quotedCash: extra.policies.reduce((sum, p) => sum + (p.cash ?? 0), 0),
+      cash: mine.reduce((sum, r) => sum + (r.kind === 'cash' ? r.delta : 0), 0),
+      reputation: mine.reduce((sum, r) => sum + (r.kind === 'reputation' ? r.delta : 0), 0),
+      advertisedReputation: mine.reduce((sum, r) => sum + (r.kind === 'reputation' ? r.advertisedDelta : 0), 0),
+      ...mine.flatMap(r => r.kind === 'honour' ? [{ title: r.title }] : [])[0],
+    } } : {}),
+  };
+}
+
 /** The report for a finished match. `names` maps club ids to display names. */
 export function buildMatchReport(
   result: MatchResult,
@@ -114,6 +158,7 @@ export function buildMatchReport(
   potm: PlayerOfMatch | null,
   reasons: readonly LossReason[] = [],
   saved?: LeagueFixtureView,
+  payments?: MatchReportIncome,
 ): MatchReport {
   const official = saved?.status === 'completed' ? saved.fixture.result : undefined;
   const home = side(result, fixture.homeId, names[fixture.homeId] ?? fixture.homeId, official?.homeScore ?? result.homeScore);
@@ -157,6 +202,7 @@ export function buildMatchReport(
   return {
     title: `${label} · Full time`,
     round: label,
+    ...(payments ? { payments } : {}),
     ...(saved ? { regularLeagueMatch: saved.stageKind === 'league' && saved.status === 'completed' } : {}),
     headline,
     home,
@@ -231,7 +277,10 @@ export function countUpValue(target: number, progress: number): number {
   return Math.min(target, Math.round(target * (1 - (1 - progress) ** 3)));
 }
 
-/** The three stat rows on the full-time card (#640), the player's side first (home first in a match he is not in). */
+/**
+ * Three stat rows (#640), the player's side first (home first in a match he is not in). SuperCOOKED 43
+ * takes them off the full-time card (the report has them, one tap away); kept for anything that wants the trio.
+ */
 export function fullTimeStats(r: MatchReport, result: MatchResult): { label: string; first: string; second: string }[] {
   const flip = r.away.id === PLAYER_ID;
   const row = (label: string): { home: string; away: string } => r.rows.find((x) => x.label === label) ?? { home: '–', away: '–' };
@@ -248,10 +297,14 @@ const reducedMotion = (): boolean => typeof window !== 'undefined' && !!window.m
 
 /** Count a score pair up from 0–0 on the card (#640). Reduced motion, or no animation frames (the soak): it is the final score at once. */
 function countUpScore(pts: HTMLElement, first: number, second: number): void {
-  pts.textContent = `${first}–${second}`;
+  // Each side's points, and the dash muted between them (SuperCOOKED 43); the text still reads "24–18".
+  const a = el('span', { text: String(first) });
+  const b = el('span', { text: String(second) });
+  pts.replaceChildren(a, el('span', { class: 'nrl-ft-dash', text: '–' }), b);
   if (reducedMotion() || typeof requestAnimationFrame === 'undefined' || (first === 0 && second === 0)) return;
   const show = (p: number): void => {
-    pts.textContent = `${countUpValue(first, p)}–${countUpValue(second, p)}`;
+    a.textContent = String(countUpValue(first, p));
+    b.textContent = String(countUpValue(second, p));
   };
   show(0);
   const t0 = performance.now();
@@ -259,7 +312,7 @@ function countUpScore(pts: HTMLElement, first: number, second: number): void {
     const p = (now - t0) / COUNT_UP_MS;
     show(p);
     if (p < 1 && pts.isConnected) requestAnimationFrame(step);
-    else pts.textContent = `${first}–${second}`;
+    else show(1);
   };
   requestAnimationFrame(step);
 }
@@ -316,13 +369,41 @@ function whyLost(reasons: readonly LossReason[], onReason?: (screen: ReasonScree
     }));
 }
 
-/** The result tag (WIN BY 6 green; a loss or a draw neutral: losing is not an error). */
-function resultTag(h: NonNullable<MatchReport['headline']>): HTMLElement {
-  return el('span', { class: 'nrl-rp-tag', text: h.text, attrs: { 'data-kind': h.kind } });
+/** The result pill (Win by 6 green; a loss or a draw neutral: losing is not an error). `also` follows it ("· Round 2"). */
+function resultTag(h: NonNullable<MatchReport['headline']>, also = ''): HTMLElement {
+  return el('span', { class: 'nrl-rp-tag', attrs: { 'data-kind': h.kind } },
+    el('span', { class: 'nrl-rp-tag-word', text: h.text }), ...(also ? [el('span', { text: `\u00a0· ${also}` })] : []));
 }
 
-function chip(...parts: (string | Node)[]): HTMLElement {
-  return el('span', { class: 'nrl-ft-chip' }, ...parts);
+/** A pill on the full-time card (43): no dot; its class kept for the checks that look for one. */
+function chip(tone: Parameters<typeof infoPill>[0], ...parts: (string | Node)[]): HTMLElement {
+  const c = infoPill(tone, ...parts);
+  c.classList.add('nrl-ft-chip');
+  return c;
+}
+
+/** The ladder pill: up green, down amber, held plain. */
+export function ladderPill(m: ReturnType<typeof ladderMove>): { tone: 'pos' | 'neg' | 'plain'; text: string; to?: string } {
+  if ('held' in m) return { tone: 'plain', text: `Ladder: still ${m.held}` };
+  const up = parseInt(m.to, 10) < parseInt(m.from, 10);
+  return { tone: up ? 'pos' : 'neg', text: `${up ? '▲' : '▼'} Ladder ${m.from} → `, to: m.to };
+}
+
+/**
+ * Your Player of the Match from the squad, for his face and stars: only when his name is
+ * one of yours and no other's. A rival, or a name two of yours share, keeps the initials.
+ */
+function potmPlayer(potm: NonNullable<MatchReport['potm']>): { face: string; stars: number } | null {
+  if (potm.teamId !== PLAYER_ID) return null;
+  try {
+    const s = getState();
+    const men = s.squad.filter((p) => p.name === potm.name);
+    if (men.length !== 1) return null;
+    const kit = kitFromColors(s.league.clubs.find((c) => c.id === PLAYER_ID)?.colors ?? DEFAULT_PLAYER_COLORS, PLAYER_ID);
+    return { face: portraitDataUrl(men[0]!.id, kit), stars: playerStars(men[0]!) };
+  } catch {
+    return null; // no game loaded
+  }
 }
 
 /** Remove `node` once the match view goes (Back to Club), and run `also` then. */
@@ -352,20 +433,27 @@ function closeWithMatch(node: HTMLElement, also?: () => void): void {
  */
 export function showFullTime(r: MatchReport, result: MatchResult, fixture: Fixture, opts: ReportOpts = {}): HTMLElement {
   injectOverlayStyles();
+  ensurePartsStyles();
   ensureReportStyles();
   document.querySelector('.nrl-mo-ft')?.remove();
   const mine = r.home.id === PLAYER_ID ? r.home : r.away.id === PLAYER_ID ? r.away : null;
   const theirs = mine === r.home ? r.away : r.home;
+  const first = mine ?? r.home;
+  const second = mine ? theirs : r.away;
   const head = el('div', { class: 'nrl-ft-head' }, el('span', { class: 'nrl-ft-title', text: `Full time · ${r.round}` }), ...(r.headline ? [resultTag(r.headline)] : []));
-  const pts = el('span', { class: 'nrl-ft-pts', attrs: { 'aria-label': `${mine ? mine.score : r.home.score} to ${mine ? theirs.score : r.away.score}` } });
-  countUpScore(pts, mine ? mine.score : r.home.score, mine ? theirs.score : r.away.score);
-  const score = el('div', { class: 'nrl-ft-score' }, pts, el('span', { class: 'nrl-ft-vs', text: mine ? `v ${theirs.name}` : `${r.home.name} v ${r.away.name}` }));
-  // Three stats on the card itself (#640): the report has the rest.
-  const stats = el('div', { class: 'nrl-ft-stats' }, ...fullTimeStats(r, result).map((s) => el('div', { class: 'nrl-ft-stat' }, el('span', { class: 'nrl-ft-stat-v', text: s.first }), el('span', { class: 'nrl-ft-stat-l', text: s.label }), el('span', { class: 'nrl-ft-stat-v', text: s.second }))));
+  const pts = el('span', { class: 'nrl-ft-pts', attrs: { 'aria-label': `${first.score} to ${second.score}` } });
+  countUpScore(pts, first.score, second.score);
+  // 43: your club (★) on the left, the score between, theirs on the right.
+  const score = el('div', { class: 'nrl-ft-score' },
+    el('span', { class: 'nrl-ft-club', text: mine ? `${first.name} ★` : first.name }),
+    pts,
+    el('span', { class: 'nrl-ft-club nrl-ft-vs', text: second.name }));
+  // One line from the summary (the ticker's voice): no new words written for the card.
+  const line = r.summary[0] ? el('p', { class: 'nrl-ft-line', text: r.summary[0] }) : null;
 
   // What the match did to the club: only what can be said for sure.
   const chips = el('div', { class: 'nrl-ft-chips' });
-  if (r.note) chips.append(chip(r.note));
+  if (r.note) chips.append(chip('plain', r.note));
   if (mine) {
     let gate = 0;
     let gateLabel = 'Gate';
@@ -381,11 +469,12 @@ export function showFullTime(r: MatchReport, result: MatchResult, fixture: Fixtu
     } catch {
       gate = 0; // no game loaded
     }
-    if (gate > 0) chips.append(chip(`${gateLabel} `, el('b', { text: `+${fmtMoney(gate)}` })));
+    if (gate > 0) chips.append(chip('plain', `${gateLabel} `, el('b', { text: `+${fmtMoney(gate)}` })));
   }
   const hurt = mine ? result.injuries.filter((i) => i.teamId === mine.id) : [];
-  for (const i of hurt.slice(0, 2)) chips.append(el('span', { class: 'nrl-ft-chip nrl-ft-chip-neg', text: injuryChip(i.playerName, i.weeks) }));
-  if (hurt.length > 2) chips.append(el('span', { class: 'nrl-ft-chip nrl-ft-chip-neg', text: `+${hurt.length - 2} more injured` }));
+  for (const i of hurt.slice(0, 2)) chips.append(chip('neg', injuryChip(i.playerName, i.weeks)));
+  if (hurt.length > 2) chips.append(chip('neg', `+${hurt.length - 2} more injured`));
+  for (const c of chips.querySelectorAll('[data-tone="neg"]')) c.classList.add('nrl-ft-chip-neg');
   chips.hidden = chips.childElementCount === 0;
 
   // The ladder after the round: it moves once the week has finished.
@@ -403,20 +492,28 @@ export function showFullTime(r: MatchReport, result: MatchResult, fixture: Fixtu
         offWeek = null;
         const after = ladderPosition(getState(), PLAYER_ID);
         if (after <= 0) return;
-        const m = ladderMove(before, after);
-        chips.prepend('held' in m ? chip(`Ladder: still ${m.held}`) : chip(`Ladder ${m.from} → `, el('b', { text: m.to })));
+        const l = ladderPill(ladderMove(before, after));
+        chips.prepend(chip(l.tone, l.text, ...(l.to ? [el('b', { text: l.to })] : [])));
         chips.hidden = false;
       });
     }
   }
 
-  const potm = r.potm
-    ? el('div', { class: 'nrl-ft-potm' },
-      el('span', { class: 'nrl-ft-badge', text: initials(r.potm.name), attrs: { 'aria-hidden': 'true' } }),
+  let potm: HTMLElement | null = null;
+  if (r.potm) {
+    const him = potmPlayer(r.potm);
+    const face = him?.face
+      ? el('img', { class: 'nrl-ft-face', attrs: { src: him.face, alt: '', width: '44', height: '50', 'aria-hidden': 'true' } })
+      : el('span', { class: 'nrl-ft-badge', text: initials(r.potm.name), attrs: { 'aria-hidden': 'true' } });
+    potm = el('div', { class: 'nrl-ft-potm' },
+      face,
       el('span', { class: 'nrl-ft-potm-text' },
         el('span', { class: 'nrl-ft-potm-label', text: 'Player of the match' }),
-        el('span', { class: 'nrl-ft-potm-line', text: `${r.potm.name}${r.potm.teamId === PLAYER_ID ? '' : ` (${r.potm.short})`} · ${r.potm.line}` })))
-    : null;
+        el('span', { class: 'nrl-ft-potm-who' },
+          el('span', { class: 'nrl-ft-potm-name', text: `${r.potm.name}${r.potm.teamId === PLAYER_ID ? '' : ` (${r.potm.short})`}` }),
+          ...(him ? [starsEl(him.stars, { size: 13 })] : [])),
+        el('span', { class: 'nrl-ft-potm-line', text: r.potm.line })));
+  }
 
   const report = button('Report', () => {
     wrap.hidden = true;
@@ -430,21 +527,30 @@ export function showFullTime(r: MatchReport, result: MatchResult, fixture: Fixtu
       wrap.hidden = false;
     });
     watch.observe(getRoot(), { childList: true });
-  });
+  }, { class: 'nrl-btn-outline' });
   report.setAttribute('data-report', '');
-  const back = button('Back to Club ▸', backToClub, { class: 'nrl-btn-primary' });
+  const back = button('Back to club ▸', backToClub, { class: 'nrl-btn-primary' });
   back.setAttribute('data-back-to-club', '');
-  const card = el('div', { class: 'nrl-ft-card nrl-potm-modal' }, head, score, chips, stats, ...(potm ? [potm] : []), el('div', { class: 'nrl-ft-actions' }, report, back));
+  const card = el('div', { class: 'nrl-ft-card nrl-potm-modal' }, head, score, ...(line ? [line] : []), chips, ...(potm ? [potm] : []), el('div', { class: 'nrl-ft-actions' }, report, back));
   const wrap = el('div', { class: 'nrl-mo-ft', attrs: { role: 'dialog', 'aria-label': `Full time, ${r.round}` } }, card);
   mount(wrap);
   closeWithMatch(wrap, () => offWeek?.());
   return wrap;
 }
 
-// ── The report (3t) ────────────────────────────────────────────────────────────
+// ── The report (44) ────────────────────────────────────────────────────────────
 
-function sideBlock(s: ReportSide, colour: string, lead: boolean): HTMLElement[] {
-  const stripe = el('i', { class: 'nrl-rp-stripe' });
+/** "The numbers" shows these first (SuperCOOKED 44, §7 #4: the five the match records); All stats ▸ the rest. */
+export const REPORT_FIRST_STATS: readonly string[] = ['Possession', 'Line breaks', 'Tackles', 'Errors', 'Big hits'];
+
+/** The report's rows in two: the five first, in that order, and the rest in the report's order. Pure. */
+export function splitReportRows(rows: readonly ReportRow[]): { first: ReportRow[]; rest: ReportRow[] } {
+  const first = REPORT_FIRST_STATS.map((l) => rows.find((r) => r.label === l)).filter((r): r is ReportRow => !!r);
+  return { first, rest: rows.filter((r) => !first.includes(r)) };
+}
+
+function sideBlock(s: ReportSide, colour: string, lead: boolean, mine: boolean): HTMLElement {
+  const stripe = el('i', { class: 'nrl-rp-stripe', attrs: { 'aria-hidden': 'true' } });
   stripe.style.background = colour;
   const scoring: string[] = [];
   if (s.tries.length) scoring.push(`Tries: ${s.tries.join(' · ')}`);
@@ -454,10 +560,12 @@ function sideBlock(s: ReportSide, colour: string, lead: boolean): HTMLElement[] 
   const lines = [scoring.join(' · ')];
   if (s.sinBins.length) lines.push(`Sin bin: ${s.sinBins.join(', ')}`);
   if (s.injuries.length) lines.push(`Injured: ${s.injuries.join(', ')}`);
-  return [
-    el('div', { class: lead ? 'nrl-rp-team nrl-rp-lead' : 'nrl-rp-team' }, stripe, el('span', { class: 'nrl-rp-name', text: s.name }), el('span', { class: 'nrl-rp-pts', text: String(s.score) })),
-    ...lines.map((t, i) => el('p', { class: i === 0 ? 'nrl-rp-detail' : 'nrl-rp-detail nrl-rp-detail-more', text: t })),
-  ];
+  return el('div', { class: lead ? 'nrl-rp-team nrl-rp-lead' : 'nrl-rp-team' },
+    stripe,
+    el('span', { class: 'nrl-rp-body' },
+      el('span', { class: 'nrl-rp-name', text: mine ? `${s.name} ★` : s.name }),
+      ...lines.map((t, i) => el('span', { class: i === 0 ? 'nrl-rp-detail' : 'nrl-rp-detail nrl-rp-detail-more', text: t }))),
+    el('span', { class: 'nrl-rp-pts', text: String(s.score) }));
 }
 
 /** What the report's "Why did I lose?" buttons open, once the club is back (#368). */
@@ -465,37 +573,82 @@ export interface ReportOpts {
   onReason?: (screen: ReasonScreen) => void;
 }
 
+function paymentSections({ ordinary, cup }: MatchReportIncome): HTMLElement[] {
+  const line = (label: string, value: string) => el('li', {}, el('span', { text: label }),
+    el('strong', { class: 'nrl-num', text: value }));
+  const section = (title: string, kind: string, ...rows: HTMLElement[]) =>
+    el('section', { class: 'nrl-report-payments', attrs: { 'data-match-payment': kind } },
+      el('h3', { text: title }), el('ul', {}, ...rows));
+  const result: HTMLElement[] = [];
+  if (ordinary) result.push(section('Ordinary match income', 'ordinary',
+    line('Total received', fmtMoney(ordinary.total)), line('Base payment', fmtMoney(ordinary.base)),
+    ...(ordinary.home ? [line('Gate receipts', fmtMoney(ordinary.home))] : []),
+    ...(ordinary.performance ? [line('Performance', fmtMoney(ordinary.performance))] : []),
+    ...(ordinary.sponsor ? [line('Sponsor', fmtMoney(ordinary.sponsor))] : [])));
+  if (cup) result.push(section('Extra Open Cup prize', 'cup',
+    line('Cash received', fmtMoney(cup.cash)),
+    ...(cup.advertisedReputation ? [line('Reputation gained', `+${cup.reputation}${cup.reputation < cup.advertisedReputation ? ' (limited by reputation cap)' : ''}`)] : []),
+    ...(cup.title ? [line('Trophy', cup.title)] : []),
+    line('Base payment for this match', fmtMoney(cup.matchBase)),
+    line('Win prize offered', fmtMoney(cup.quotedCash))));
+  return result;
+}
+
 export function openMatchReport(r: MatchReport, opts: ReportOpts = {}): HTMLElement {
   injectOverlayStyles();
   ensureReportStyles();
   const colours = matchColours(r.home.id, r.away.id);
   const codes = teamCodes(r.home.name, r.away.name);
+  const changes: HTMLElement[] = r.changes.length === 1
+    // 44: one change is one plain line.
+    ? [el('p', { class: 'nrl-report-change-one', text: r.changes[0]! })]
+    // #351 P0: more fold into one line, so they never push the scorers down.
+    : r.changes.length ? [el('details', { class: 'nrl-report-changes' },
+      el('summary', { text: planChangesSummary(r.changes.length) }),
+      ...r.changes.map((t) => el('p', { class: 'nrl-report-change', text: t })))] : [];
   const scroll = el(
     'div',
     { class: 'nrl-rp-scroll' },
-    el('div', { class: 'nrl-rp-head' }, ...(r.headline ? [resultTag(r.headline)] : []), el('span', { class: 'nrl-rp-title', text: r.title })),
-    ...sideBlock(r.home, colours.home, r.home.score >= r.away.score),
-    ...sideBlock(r.away, colours.away, r.away.score >= r.home.score),
+    sideBlock(r.home, colours.home, r.home.score >= r.away.score, r.home.id === PLAYER_ID),
+    sideBlock(r.away, colours.away, r.away.score >= r.home.score, r.away.id === PLAYER_ID),
     ...(r.note ? [el('p', { class: 'nrl-report-note', text: r.note })] : []),
+    ...(r.payments ? paymentSections(r.payments) : []),
     ...(r.summary.length ? [el('p', { class: 'nrl-report-summary', text: r.summary.join(' ') })] : []),
-    // #351 P0: the plan changes fold into one line, so they never push the scorers down.
-    ...(r.changes.length ? [el('details', { class: 'nrl-report-changes' },
-      el('summary', { text: planChangesSummary(r.changes.length) }),
-      ...r.changes.map((t) => el('p', { class: 'nrl-report-change', text: t })))] : []),
+    ...changes,
     // #368: on a loss, "Why did I lose?" folds under them, so the scorers stay above the fold.
     ...(r.reasons.length ? [whyLost(r.reasons, opts.onReason)] : []),
   );
-  const back = button('Back to Club ▸', backToClub, { class: 'nrl-btn-primary nrl-rp-back' });
+  const back = button('Back to club ▸', backToClub, { class: 'nrl-btn-primary nrl-rp-back' });
   back.setAttribute('data-back-to-club', '');
+  // The numbers (44): five rows, home white and away green, then All stats ▸ shows the rest in place.
+  const { first, rest } = splitReportRows(r.rows);
+  const bars = { home: 'var(--nrl-text)', away: 'var(--nrl-pos)' };
+  const numbers = el('div', { class: 'nrl-rp-stats' },
+    el('div', { class: 'nrl-rp-stats-head' },
+      el('span', { class: 'nrl-rp-stats-title', text: 'The numbers' }),
+      el('span', { class: 'nrl-rp-stats-codes', text: `${codes[0]} · ${codes[1]}` })),
+    statTable(first, codes, bars));
+  if (rest.length) {
+    const all = button('All stats ▸', () => {
+      numbers.querySelector('.nrl-mo-stattable')?.replaceWith(statTable([...first, ...rest], codes, bars));
+      all.remove();
+    }, { class: 'nrl-btn-outline nrl-rp-all' });
+    all.setAttribute('data-all-stats', '');
+    numbers.append(all);
+  }
   const content = el(
     'div',
     { class: 'nrl-report' },
     // Changed match outcomes can add scorer/injury/reason rows (#465). Keep the
     // Player of the Match beside the fixed exit while those details scroll.
-    el('div', { class: 'nrl-rp-left' }, scroll,
+    el('div', { class: 'nrl-rp-left' },
+      el('div', { class: 'nrl-rp-head' },
+        el('span', { class: 'nrl-rp-title', text: 'Match report' }),
+        r.headline ? resultTag(r.headline, r.round) : el('span', { class: 'nrl-rp-round', text: r.round })),
+      scroll,
       ...(r.potm ? [el('p', { class: 'nrl-report-potm' }, el('span', { class: 'nrl-rp-potm-label', text: 'Player of the match ' }), `${r.potm.who} · ${r.potm.line}`)] : []),
       back),
-    el('div', { class: 'nrl-rp-stats' }, statTable(r.rows, codes, colours)),
+    numbers,
   );
   const backdrop = openModal(content, { class: 'nrl-report-modal', region: true });
   backdrop.classList.add('nrl-report-backdrop');
@@ -534,12 +687,14 @@ export function initMatchReport(opts: ReportOpts = {}): () => void {
     const sheets = kickOff && sameFixtureIdentity(kickOff.fixture, fixture) ? kickOff : null;
     const reasons = sheets ? lossReasons(result, fixture, sheets, getState()) : [];
     // Committed fixtures are no longer returned by the scheduled-match query.
-    const competitions = getState().competitions;
+    const state = getState();
+    const { competitions } = state;
     const instance = competitions?.leagueCareer ? competitions.instances.find(i => i.id === fixture.competitionId) : undefined;
     const actual = instance?.fixtures.find(f => f.id === fixture.id);
     const saved = instance && actual ? leagueFixtureView(instance, actual) : undefined;
-    const report = buildMatchReport(result, fixture, clubNames(), p, reasons,
-      saved && sameFixtureIdentity(saved.bridge, fixture) ? saved : undefined);
+    const accepted = saved && sameFixtureIdentity(saved.bridge, fixture) ? saved : undefined;
+    const report = buildMatchReport(result, fixture, clubNames(), p, reasons, accepted,
+      accepted ? readMatchReportIncome(state, accepted) : undefined);
     if (typeof document !== 'undefined' && document.body?.classList.contains(MATCH_ACTIVE_CLASS)) showFullTime(report, result, fixture, opts);
     else openMatchReport(report, opts);
   };
@@ -562,107 +717,130 @@ function ensureReportStyles(): void {
   document.head.appendChild(style);
 }
 
-// Broadcast Quiet 3s / 3t: the full-time card centred on the dimmed pitch; the
-// report a full sheet (inset 12) with the stats column on the right.
+// SuperCOOKED 43 / 44: the full-time card centred on the darkened pitch; the report a
+// full sheet (inset 12) with "The numbers" on the right. Type to the mockups: Archivo
+// for the score and the title, Oswald for names and buttons, JetBrains Mono for labels.
 export const REPORT_CSS = `
 .nrl-mo-ft {
   position: fixed; inset: 0; z-index: 62; display: flex; align-items: center; justify-content: center; pointer-events: auto;
   padding: calc(12px + var(--nrl-safe-t)) calc(12px + var(--nrl-safe-r)) calc(12px + var(--nrl-safe-b)) calc(12px + var(--nrl-safe-l));
-  background: rgba(5, 9, 22, 0.55); box-sizing: border-box;
+  background: rgba(5, 7, 13, 0.62); box-sizing: border-box;
 }
 .nrl-mo-ft[hidden] { display: none; }
 .nrl-ft-card {
-  width: min(540px, 100%); max-height: 100%; overflow-y: auto; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px;
-  padding: 20px 24px; border-radius: 18px; background: var(--nrl-navy); color: var(--nrl-text); box-shadow: var(--nrl-shadow-modal);
-  font-family: var(--nrl-f-body); animation: nrl-sheet-up var(--nrl-dur-sheet) var(--nrl-ease-out);
+  width: min(560px, 100%); max-height: 100%; overflow-y: auto; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px;
+  padding: 18px 22px; border-radius: 18px; background: var(--nrl-navy); box-shadow: inset 0 0 0 1px var(--nrl-line), 0 12px 40px rgba(0, 0, 0, 0.45);
+  color: var(--nrl-text); font-family: var(--nrl-f-body); animation: nrl-sheet-up var(--nrl-dur-sheet) var(--nrl-ease-out);
 }
-.nrl-ft-head, .nrl-rp-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.nrl-ft-title { font-family: var(--nrl-f-label); font-size: 0.9375rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-accent); }
+.nrl-ft-head, .nrl-rp-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.nrl-ft-title { font-family: var(--nrl-f-num); font-size: 0.6875rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--nrl-muted); }
+/* The result pill: green for a win; a loss or a draw plain (losing is not an error). Written "Win by 6". */
 .nrl-rp-tag {
-  padding: 2px 10px; border-radius: 6px; font-family: var(--nrl-f-label); font-size: 0.875rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
-  background: var(--nrl-line); color: var(--nrl-text-2);
+  --nrl-tone-rgb: 143, 152, 171; display: inline-flex; align-items: center; min-height: 28px; padding: 0 11px; box-sizing: border-box; border-radius: 14px;
+  background: var(--nrl-panel); box-shadow: inset 0 0 0 1px var(--nrl-line); color: var(--nrl-text-2);
+  font-family: var(--nrl-f-body); font-size: 0.8125rem; font-weight: 600; white-space: nowrap;
 }
-.nrl-rp-tag[data-kind="win"] { background: var(--nrl-win); color: #fff; }
-.nrl-ft-score { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
-.nrl-ft-pts { font-family: var(--nrl-f-num); font-size: 2.625rem; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
-.nrl-ft-vs { font-family: var(--nrl-f-label); font-size: 1.375rem; font-weight: 600; color: var(--nrl-text-2); }
-.nrl-ft-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.nrl-rp-tag[data-kind="win"] { background: rgba(20, 195, 142, 0.14); box-shadow: inset 0 0 0 1px rgba(20, 195, 142, 0.5); color: var(--nrl-pos); }
+.nrl-rp-tag-word { display: inline-block; text-transform: lowercase; }
+.nrl-rp-tag-word::first-letter { text-transform: uppercase; }
+.nrl-ft-score { display: flex; align-items: center; justify-content: center; gap: 18px; min-width: 0; }
+.nrl-ft-club { flex: 0 1 auto; min-width: 0; font-family: var(--nrl-f-label); font-size: 1.25rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nrl-ft-vs { color: var(--nrl-text-2); }
+.nrl-ft-pts { flex: 0 0 auto; font-family: var(--nrl-f-display); font-size: 3.375rem; line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.nrl-ft-dash { margin: 0 0.25em; color: var(--nrl-star-empty); }
+.nrl-ft-line { margin: 0; text-align: center; font-size: 0.9375rem; line-height: 1.35; color: #e6e9ef; }
+.nrl-ft-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
 .nrl-ft-chips[hidden] { display: none; }
-.nrl-ft-chip { padding: 6px 10px; border-radius: 8px; background: var(--nrl-raised); font-size: 0.8125rem; }
-.nrl-ft-chip b { font-family: var(--nrl-f-num); font-weight: 600; }
-.nrl-ft-chip-neg { color: var(--nrl-neg); }
-.nrl-ft-potm { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--nrl-line); border-bottom: 1px solid var(--nrl-line); }
+.nrl-ft-potm { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px; background: var(--nrl-panel); box-shadow: inset 0 0 0 1px var(--nrl-line); }
+.nrl-ft-face { flex: 0 0 44px; width: 44px; height: 50px; border-radius: 8px; background: var(--nrl-raised); image-rendering: pixelated; }
 .nrl-ft-badge {
   flex: 0 0 44px; width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
   background: var(--nrl-accent); color: var(--nrl-on-accent); font-family: var(--nrl-f-label); font-size: 1.125rem; font-weight: 700;
 }
-.nrl-ft-potm-text { display: flex; flex-direction: column; min-width: 0; }
-.nrl-ft-potm-label { font-family: var(--nrl-f-label); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); }
-.nrl-ft-potm-line { font-size: 0.9375rem; font-weight: 600; }
-.nrl-ft-stats { display: flex; flex-direction: column; gap: 2px; }
-.nrl-ft-stat { display: grid; grid-template-columns: minmax(0, 1fr) 8.5em minmax(0, 1fr); align-items: baseline; gap: 8px; font-size: 0.9375rem; }
-.nrl-ft-stat-v { font-family: var(--nrl-f-num); font-weight: 600; font-variant-numeric: tabular-nums; }
-.nrl-ft-stat-v:first-child { text-align: right; }
-.nrl-ft-stat-l { text-align: center; font-family: var(--nrl-f-label); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); }
+.nrl-ft-potm-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.nrl-ft-potm-label { font-family: var(--nrl-f-num); font-size: 0.625rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--nrl-muted); }
+.nrl-ft-potm-who { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.nrl-ft-potm-name { min-width: 0; font-family: var(--nrl-f-label); font-size: 1.125rem; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nrl-ft-potm-line { font-size: 0.8125rem; color: var(--nrl-text-2); }
 /* The Player of the Match comes in a beat after the card, on the motion tokens (#597): reduced motion keeps the fade and drops the travel. */
 .nrl-ft-potm { animation: nrl-ft-slide var(--nrl-dur-sheet) var(--nrl-ease-out) calc(var(--nrl-dur-sheet) * 3) backwards; }
 @keyframes nrl-ft-slide { from { opacity: 0; transform: translateX(var(--nrl-rise)); } to { opacity: 1; transform: none; } }
-/* The actions stay in reach when a short screen makes the card scroll (956×330: the stat rows took Back to Club off the bottom). */
+/* The actions stay in reach when a short screen makes the card scroll. */
 .nrl-ft-actions { display: flex; justify-content: flex-end; gap: 8px; position: sticky; bottom: 0; background: var(--nrl-navy); }
-.nrl-ft-actions .nrl-btn { height: 48px; font-size: 1.125rem; padding: 0 16px; }
-.nrl-ft-actions .nrl-btn-primary { padding: 0 22px; font-size: 1.1875rem; }
+.nrl-ft-actions .nrl-btn { height: 48px; font-size: 0.9375rem; padding: 0 20px; border-radius: 10px; }
+.nrl-ft-actions .nrl-btn-primary { padding: 0 22px; font-size: 1.0625rem; }
 @media (max-height: 400px) {
-  .nrl-ft-card { gap: 10px; padding: 16px 20px; }
-  .nrl-ft-pts { font-size: 2.375rem; }
+  .nrl-ft-card { gap: 10px; padding: 14px 20px; }
+  .nrl-ft-pts { font-size: 3rem; }
 }
-/* Under 360px tall (a phone in landscape with Safari's bars) the three stats share one line, so the card fits unscrolled. */
+/* Under 360px tall (a phone in landscape with Safari's bars): tighter still, so the card fits unscrolled. */
 @media (max-height: 360px) {
-  .nrl-ft-card { gap: 8px; padding: 12px 20px; }
-  .nrl-ft-stats { flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 2px 16px; }
-  .nrl-ft-stat { grid-template-columns: auto auto auto; gap: 5px; font-size: 0.875rem; }
-  .nrl-ft-stat-l { font-size: 0.75rem; letter-spacing: 0.06em; }
-  .nrl-ft-potm { padding: 8px 0; }
+  .nrl-ft-card { gap: 7px; padding: 12px 18px; }
+  .nrl-ft-pts { font-size: 2.5rem; }
+  .nrl-ft-line { font-size: 0.8125rem; }
+  .nrl-ft-potm { padding: 6px 10px; }
+  .nrl-ft-actions .nrl-btn { height: 44px; }
 }
-/* The report (3t): a full sheet over the dimmed pitch, the stats column on the right. */
+/* The report (44): a full sheet over the darkened pitch, The numbers on the right. */
 .nrl-modal-backdrop.nrl-report-backdrop {
-  top: 0; bottom: 0; background: rgba(5, 9, 22, 0.55);
+  top: 0; bottom: 0; background: rgba(5, 7, 13, 0.62);
   padding: calc(12px + var(--nrl-safe-t)) calc(12px + var(--nrl-safe-r)) calc(12px + var(--nrl-safe-b)) calc(12px + var(--nrl-safe-l));
 }
 .nrl-report-backdrop .nrl-modal.nrl-report-modal {
-  width: 100%; height: 100%; max-width: 1000px; max-height: 560px; padding: 12px 16px; border-radius: 16px; background: var(--nrl-navy);
+  width: 100%; height: 100%; max-width: 1000px; max-height: 560px; padding: 14px 18px; border-radius: 16px; background: var(--nrl-navy); box-shadow: inset 0 0 0 1px var(--nrl-line);
 }
-.nrl-report { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 340px; grid-template-rows: minmax(0, 1fr); gap: 20px; }
+.nrl-report { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 320px; grid-template-rows: minmax(0, 1fr); gap: 20px; }
 .nrl-rp-left { display: flex; flex-direction: column; gap: 10px; min-height: 0; min-width: 0; }
-.nrl-rp-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 8px; }
-.nrl-rp-title { font-family: var(--nrl-f-label); font-size: 0.9375rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); }
-.nrl-rp-team { display: flex; align-items: center; gap: 10px; color: var(--nrl-text-2); }
-.nrl-rp-stripe { flex: 0 0 6px; width: 6px; height: 30px; }
-.nrl-rp-name { flex: 1 1 auto; min-width: 0; font-family: var(--nrl-f-label); font-size: 1.5rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.nrl-rp-pts { font-family: var(--nrl-f-num); font-size: 1.75rem; font-weight: 500; font-variant-numeric: tabular-nums; }
+.nrl-rp-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 10px; }
+.nrl-rp-title { font-family: var(--nrl-f-display); font-size: 1.375rem; letter-spacing: -0.02em; text-transform: uppercase; color: var(--nrl-text); }
+.nrl-rp-round { font-size: 0.8125rem; font-weight: 600; color: var(--nrl-text-2); }
+.nrl-rp-team {
+  flex: 0 0 auto; display: grid; grid-template-columns: 6px minmax(0, 1fr) auto; column-gap: 12px; align-items: center;
+  padding: 10px 12px 10px 0; border-radius: 12px; background: var(--nrl-panel); box-shadow: inset 0 0 0 1px var(--nrl-line); overflow: hidden; color: var(--nrl-text-2);
+}
+.nrl-rp-stripe { align-self: stretch; width: 6px; margin: -10px 0; }
+.nrl-rp-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.nrl-rp-name { min-width: 0; font-family: var(--nrl-f-label); font-size: 1.0625rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nrl-rp-pts { font-family: var(--nrl-f-display); font-size: 1.875rem; line-height: 1; font-variant-numeric: tabular-nums; }
 .nrl-rp-lead { color: var(--nrl-text); }
-.nrl-rp-lead .nrl-rp-name { font-weight: 700; }
-.nrl-rp-lead .nrl-rp-pts { font-weight: 600; }
-.nrl-rp-detail { margin: 0; padding-left: 16px; font-size: 0.75rem; line-height: 1.4; color: var(--nrl-text-2); }
-.nrl-rp-detail-more { margin-top: -6px; }
+.nrl-rp-detail { font-size: 0.75rem; line-height: 1.4; color: var(--nrl-text-2); }
+.nrl-rp-team:not(.nrl-rp-lead) .nrl-rp-detail { color: var(--nrl-muted); }
+/* What the match paid (#736): a ringed panel per kind of payment, the label left and the sum in JetBrains Mono right. */
+.nrl-report-payments { flex: 0 0 auto; padding: 8px 12px; border-radius: 12px; background: var(--nrl-panel); box-shadow: inset 0 0 0 1px var(--nrl-line); font-size: 0.75rem; color: var(--nrl-text-2); }
+.nrl-report-payments h3, .nrl-report-payments ul { margin: 0; }
+.nrl-report-payments h3 { margin-bottom: 2px; font-family: var(--nrl-f-num); font-size: 0.625rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--nrl-muted); }
+.nrl-report-payments ul { padding: 0; list-style: none; }
+.nrl-report-payments li { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; }
+.nrl-report-payments strong { text-align: right; color: var(--nrl-text); }
 .nrl-report-note { margin: 0; font-size: 0.8125rem; color: var(--nrl-accent); }
-.nrl-report-summary { margin: 0; font-size: 0.8125rem; font-style: italic; line-height: 1.45; color: var(--nrl-text-2); }
+.nrl-report-summary { margin: 0; font-size: 0.875rem; line-height: 1.45; color: #e6e9ef; }
+.nrl-report-change-one { margin: 0; font-size: 0.75rem; color: var(--nrl-muted); }
 .nrl-report-changes { font-size: 0.75rem; color: var(--nrl-muted); }
 .nrl-report-changes summary { cursor: pointer; list-style: none; min-height: 28px; display: flex; align-items: center; }
 .nrl-report-changes summary::-webkit-details-marker { display: none; }
 .nrl-report-changes summary::before { content: '▸'; margin-right: 6px; }
 .nrl-report-changes[open] summary::before { content: '▾'; }
 .nrl-report-why summary { color: var(--nrl-accent); font-family: var(--nrl-f-label); font-size: 0.875rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
-.nrl-report-why-row { display: flex; align-items: center; gap: 10px; padding: 4px 0; border-top: 1px solid var(--nrl-button); font-size: 0.75rem; color: var(--nrl-text-2); }
+.nrl-report-why-row { display: flex; align-items: center; gap: 10px; padding: 4px 0; border-top: 1px solid var(--nrl-line); font-size: 0.75rem; color: var(--nrl-text-2); }
 .nrl-report-why-row > span { flex: 1 1 auto; min-width: 0; line-height: 1.35; }
 .nrl-btn.nrl-report-why-go { flex: 0 0 auto; min-height: 36px; padding: 0 10px; font-size: 0.875rem; border-radius: 8px; }
 @media (pointer: coarse) { .nrl-btn.nrl-report-why-go { min-height: 44px; } }
 .nrl-report-change { margin: 2px 0 0 14px; }
 .nrl-report-potm { margin: 0; font-size: 0.8125rem; color: var(--nrl-text-2); }
-.nrl-rp-potm-label { font-family: var(--nrl-f-label); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); }
-.nrl-btn.nrl-rp-back { flex: 0 0 auto; width: 100%; height: 48px; font-size: 1.1875rem; }
-.nrl-rp-stats { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-/* Eight rows (Scrambles won and Calls paid off, #99) fit unscrolled at 956×330. */
-@media (max-height: 340px) { .nrl-rp-stats .nrl-mo-statrow { height: 31px; } }
-@media (max-width: 720px) { .nrl-report { grid-template-columns: minmax(0, 1fr) 280px; gap: 14px; } }
-@media (max-width: 560px) { .nrl-report { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; overflow-y: auto; } }
+.nrl-rp-potm-label { font-family: var(--nrl-f-num); font-size: 0.6875rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--nrl-muted); }
+.nrl-btn.nrl-rp-back { flex: 0 0 auto; align-self: flex-start; height: 48px; padding: 0 22px; border-radius: 10px; font-size: 1.0625rem; }
+/* The numbers (44): a column of split bars beside the story, its own scroll on a short screen. */
+.nrl-rp-stats { min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 12px; padding-left: 20px; box-shadow: inset 1px 0 0 var(--nrl-line); }
+.nrl-rp-stats-head { display: flex; justify-content: space-between; align-items: center; }
+.nrl-rp-stats-title { font-family: var(--nrl-f-label); font-size: 0.8125rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--nrl-muted); }
+.nrl-rp-stats-codes { font-family: var(--nrl-f-num); font-size: 0.625rem; letter-spacing: 0.12em; color: var(--nrl-muted); }
+.nrl-rp-stats .nrl-mo-stathead { display: none; }
+.nrl-rp-stats .nrl-mo-stattable { gap: 12px; }
+.nrl-rp-stats .nrl-mo-statrow { height: auto; grid-template-columns: 52px minmax(0, 1fr) 52px; column-gap: 10px; border-top: 0; font-weight: 700; }
+.nrl-rp-stats .nrl-mo-stat-a { color: var(--nrl-text-2); }
+.nrl-rp-stats .nrl-mo-stat-bar { height: 5px; gap: 2px; }
+.nrl-btn.nrl-rp-all { margin-top: auto; align-self: flex-start; min-height: 44px; padding: 0 14px; border-radius: 10px; font-size: 0.875rem; }
+@media (max-height: 340px) { .nrl-rp-stats, .nrl-rp-stats .nrl-mo-stattable { gap: 8px; } }
+@media (max-width: 720px) { .nrl-report { grid-template-columns: minmax(0, 1fr) 270px; gap: 14px; } .nrl-rp-stats { padding-left: 14px; } }
+@media (max-width: 560px) { .nrl-report { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; overflow-y: auto; } .nrl-rp-stats { padding-left: 0; box-shadow: none; } }
 `;

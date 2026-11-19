@@ -2,10 +2,12 @@
 // module-singleton store. See ARCHITECTURE §4 and BAK-172. No Phaser, no class
 // instances in state (must JSON round-trip).
 
+import { awaitingCampReplay } from '../systems/parkedLeagueFixture';
 import type { PlayerCareerHistory, PlayerPopulation } from '../data/playerCareer';
 import { initialPlayerPopulation, installPlayerHistory } from '../systems/playerCareer';
 import type { TeamTactics } from '../match/league/presets';
 import type { CompetitionCareerState } from '../data/competition';
+import type { CompetitionRewardRecord } from '../data/competitionRewards';
 import { bus } from './events';
 import { activePack, packForCountry, selectPack } from '../content';
 import { makeRng } from '../utils/rng';
@@ -109,6 +111,8 @@ export interface RivalClub {
   home?: { town: string; country?: string; lat: number; lon: number };
   /** Transfer wallet. The player's cash is GameState.money, not this copy. */
   cash?: number;
+  /** Materialized when this rival receives a competition reputation award. */
+  reputation?: number;
   /** The rival's salary-cap account. The player's account is GameState.capAccount. */
   capAccount?: CapAccount;
 }
@@ -126,8 +130,8 @@ export interface LeagueState {
 export type WeatherKind = 'clear' | 'rain' | 'wind';
 
 /** v30 adds player histories, v31 optional league progression, and v32 exact
- * protected agreements. Finance state migrates from v28; v27 requires a new career. */
-export const SAVE_VERSION = 32;
+ * protected agreements. v33 adds Open Cup entry and v34 optional Skills Camp records. Finance state migrates from v28; v27 requires a new career. */
+export const SAVE_VERSION = 34;
 
 /** The hires the facilities don't cover (N14.5), and the attack coach who opens set plays to buy (#326). */
 export type StaffRole = 'assistantCoach' | 'analyst' | 'welfare' | 'attackCoach';
@@ -319,7 +323,9 @@ export interface GameState {
    * teamLetters: each side's letter over its players on the pitch (#371); off when absent.
    * (An old save's liveMatch flag is ignored: every match is live since BAK-207 Phase 4.)
    */
-  settings: { muted: boolean; volume: number; tutorialDone: boolean; difficulty: Difficulty; coachCalls?: boolean; liveRivals?: boolean; playbackSpeed?: 1 | 2 | 4 | 8; keyMoments?: boolean; weekSummary?: boolean; hintsSeen?: string[]; textSize?: TextSize; teamLetters?: boolean };
+  settings: { muted: boolean; volume: number; tutorialDone: boolean; difficulty: Difficulty; coachCalls?: boolean; liveRivals?: boolean; playbackSpeed?: 1 | 2 | 4 | 8; keyMoments?: boolean; weekSummary?: boolean; hintsSeen?: string[]; textSize?: TextSize; teamLetters?: boolean;
+    /** SuperCOOKED §7 #1: level points bank on the player page for the coach to spend; off (unset), the training focus spends them as they are earned. */
+    spendPointsMyself?: boolean };
   history: SeasonRecord[];
   boardPatience: number; // 0..BOARD.MAX_PATIENCE; zero = sacked (#47)
   objectives: Objective[]; // this season's board objectives (#47)
@@ -334,6 +340,8 @@ export interface GameState {
    * just played.
    */
   matchIncome: import('../systems/matchIncome').MatchIncomeRecord[];
+  /** Frozen competition reward promises and their settlement evidence. */
+  competitionRewards: CompetitionRewardRecord[];
   finance: SeasonFinance[];
   /** The coach's nine, bench and rotation (#69); old saves get today's auto pick. */
   lineup: Lineup;
@@ -377,6 +385,7 @@ export function getState(): GameState {
  */
 export function setState(patch: Partial<GameState>): void {
   const current = getState();
+  if (awaitingCampReplay(current)) return;
   if ('pack' in patch) selectPack(patch.pack);
   state = { ...current, ...patch };
   bus.emit('state:changed', state);
@@ -490,6 +499,7 @@ export function buildNewGameState(
     objectives: [],
     eventDeck: newEventDeck(seed),
     matchIncome: [],
+    competitionRewards: [],
     finance: [emptyFinance(1)],
     // The opening side: today's best nine by slot and the next four (#69). No dice: the squad is unchanged.
     lineup: autoPick(squad),

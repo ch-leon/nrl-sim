@@ -13,6 +13,7 @@
 //    pointer/key listener that resume()s it on the first user gesture.
 
 import { openAllUnlocks } from '../systems/unlocks';
+import { setSpendPointsMyself } from '../systems/training';
 import { devSettingsEntryVisible } from '../labs/flags';
 import { bus } from '../core/events';
 import type { MatchEvent } from '../sim/events';
@@ -1224,6 +1225,10 @@ export function initAudioUi(): () => void {
   // #371: a letter over each side's players, so the sides read apart without their colours; off when absent.
   const teamLetters = toggle('Team letters on players', 'Each side’s letter over its players in a match.',
     () => getState().settings.teamLetters === true, (on) => setSetting({ teamLetters: on }), 'nrl-letters-toggle');
+  // SuperCOOKED §7 #1 (Leon: opt-in): level points bank on the player page for the coach to spend;
+  // off when absent, as every career before it, and the training focus spends them as they come.
+  const spendPoints = toggle('Spend points myself', 'Level points wait on the player page for you to spend. Off, your training focus spends them.',
+    () => getState().settings.spendPointsMyself === true, (on) => { setSpendPointsMyself(on); save(getState()); }, 'nrl-points-toggle');
   // #371: Normal, Large, Larger: main.ts puts the save's size on <html> when it changes.
   const textSize = segmented(TEXT_SIZES.map((t) => ({ id: t.id, label: t.label })), textSizeOf(settings.textSize), (id) => {
     textSize.set(id);
@@ -1328,7 +1333,7 @@ export function initAudioUi(): () => void {
     el('div', { class: 'nrl-settings-cols' },
       el('div', { class: 'nrl-settings-col' },
         el('label', { class: 'nrl-audio-row' }, el('b', { text: 'Volume' }), slider),
-        mute.row, coachCalls.row, liveRivals.row, teamLetters.row),
+        mute.row, coachCalls.row, liveRivals.row, spendPoints.row, teamLetters.row),
       el('div', { class: 'nrl-settings-col' },
         textSizeRow,
         // One row for the two, so the key-moments and weekly-summary switches (#366, #368) cost no height.
@@ -1349,7 +1354,7 @@ export function initAudioUi(): () => void {
     labs.remove();
     if (devSettingsEntryVisible()) content.querySelector('.nrl-settings-col:last-child')?.append(labs);
     syncInstallVisibility();
-    for (const t of [mute, coachCalls, keyMoments, liveRivals, weekSummary, teamLetters]) t.sync();
+    for (const t of [mute, coachCalls, keyMoments, liveRivals, weekSummary, teamLetters, spendPoints]) t.sync();
     textSize.set(textSizeOf(getState().settings.textSize));
     slider.value = String(Math.round(clampVolume(getState().settings.volume) * 100));
     importIdle();
@@ -1433,7 +1438,7 @@ function ensureAudioStyles(): void {
   .nrl-settings-pair > .nrl-btn { padding: 0 4px; letter-spacing: 0.02em; white-space: normal; line-height: 1.05; }
 }
 /* A switch a finger can hit (N14, #263; X3): 52×44, the 28×16 track and its knob drawn in its background
-   (the match LOG toggle's look: yellow on, #26325c off). */
+   (the match LOG toggle's look: the accent on, the line colour off). */
 .nrl-switch {
   -webkit-appearance: none;
   appearance: none;
@@ -1445,21 +1450,21 @@ function ensureAudioStyles(): void {
   pointer-events: auto;
   background:
     radial-gradient(circle, #fff 5px, transparent 5.5px) no-repeat 13px 50% / 16px 16px,
-    linear-gradient(#26325c, #26325c) no-repeat 50% 50% / 32px 18px;
+    linear-gradient(var(--nrl-line), var(--nrl-line)) no-repeat 50% 50% / 32px 18px;
   border-radius: 10px;
 }
 .nrl-switch:checked {
   background:
-    radial-gradient(circle, #0e1630 5px, transparent 5.5px) no-repeat 25px 50% / 16px 16px,
-    linear-gradient(#f4d03f, #f4d03f) no-repeat 50% 50% / 32px 18px;
+    radial-gradient(circle, var(--nrl-on-accent) 5px, transparent 5.5px) no-repeat 25px 50% / 16px 16px,
+    linear-gradient(var(--nrl-accent), var(--nrl-accent)) no-repeat 50% 50% / 32px 18px;
 }
-.nrl-switch:focus-visible { outline: 2px solid #f4d03f; outline-offset: -2px; }
+.nrl-switch:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: -2px; }
 /* The volume slider (#349 E1), 44px tall to take a thumb. */
 .nrl-audio-slider { -webkit-appearance: none; appearance: none; flex: 1 1 auto; min-width: 120px; height: 44px; margin: 0; background: transparent; pointer-events: auto; }
-.nrl-audio-slider::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: #26325c; }
-.nrl-audio-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; margin-top: -8px; border-radius: 11px; background: #f4d03f; }
-.nrl-audio-slider::-moz-range-track { height: 6px; border-radius: 3px; background: #26325c; }
-.nrl-audio-slider::-moz-range-thumb { width: 22px; height: 22px; border: 0; border-radius: 11px; background: #f4d03f; }
+.nrl-audio-slider::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: var(--nrl-line); }
+.nrl-audio-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; margin-top: -8px; border-radius: 11px; background: var(--nrl-accent); }
+.nrl-audio-slider::-moz-range-track { height: 6px; border-radius: 3px; background: var(--nrl-line); }
+.nrl-audio-slider::-moz-range-thumb { width: 22px; height: 22px; border: 0; border-radius: 11px; background: var(--nrl-accent); }
 `;
   document.head.appendChild(style);
 }

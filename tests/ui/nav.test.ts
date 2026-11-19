@@ -182,12 +182,12 @@ describe('the dock at every text size (#344)', () => {
     return i < 0 ? '' : CSS.slice(i, CSS.indexOf('}', i));
   };
 
-  it("puts a 3px accent bar (the token, not a colour) under the open tab's label and an open tile's name", () => {
+  it("puts a 2px accent bar (the token, not a colour) under the open tab's label and an open tile's name (SuperCOOKED §4)", () => {
     const tab = rule('.nrl-dock-tabs > .nrl-btn[aria-current="page"] .nrl-nav-label::after, .nrl-dock-tabs > .nrl-btn[aria-expanded="true"] .nrl-nav-label::after');
-    expect(tab).toMatch(/height: 3px/);
+    expect(tab).toMatch(/height: 2px/);
     expect(tab).toMatch(/background: var\(--nrl-accent\)/);
     const tile = rule('.nrl-nav-sheet > .nrl-btn[aria-current="page"] .nrl-office-name::after');
-    expect(tile).toMatch(/height: 3px/);
+    expect(tile).toMatch(/height: 2px/);
     expect(tile).toMatch(/background: var\(--nrl-accent\)/);
   });
 

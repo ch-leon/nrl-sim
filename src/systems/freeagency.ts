@@ -1,3 +1,6 @@
+import { awaitingCampReplay } from './parkedLeagueFixture';
+import { awayPlayerIds, campDisposalProblem } from './playerAssignments';
+import { rosterIntervalProblem } from './playerAssignmentCommit';
 import { careerActionClock } from '../core/season';
 import { bookPlayerMovement, closeClubSpell, installPlayerHistory, openClubSpell, reconcileShortlist, refreshMarketShortlist } from './playerCareer';
 // Free-agent discovery + signing/release logic. Refreshes never generate people
@@ -136,6 +139,7 @@ export function signingFeeBasis(state: Pick<GameState, 'facilities'>, agent: Pla
  * without it (the soak, tests) the lineup is left alone.
  */
 export function signPlayer(state: GameState, playerId: string, opts: { toast?: boolean; intoLineup?: boolean } = {}): SignResult {
+  if (awaitingCampReplay(getState())) return {ok:false,reason:'match-active',message:'Resume the saved match before changing the squad.'};
   const s = state;
   const clock = careerActionClock(s);
   const agent = s.freeAgents.find((p) => p.id === playerId);
@@ -159,7 +163,7 @@ export function signPlayer(state: GameState, playerId: string, opts: { toast?: b
   const { junior: _junior, departed: _departed, ...rest } = agent;
   const signed = openClubSpell(signForRestOfSeason({ ...installPlayerHistory(rest, 'unsigned', clock), joinedSeason: clock.season }, clock.season, clock.week, clock.duration), s.clubId, clock, 'signing', fee);
   const squad = [...s.squad, signed];
-  const placed = opts.intoLineup ? placeSigning(s.lineup, squad, signed) : undefined;
+  const placed = opts.intoLineup ? placeSigning(s.lineup, squad, signed, awayPlayerIds(s)) : undefined;
   const next = reconcileShortlist(bookPlayerMovement({ ...s, freeAgents: s.freeAgents.filter(p => p.id !== playerId), squad,
     ...(placed ? { lineup: placed.lineup } : {}) }, -fee, 'transfers', clock));
   setState({ freeAgents: next.freeAgents, squad, money: next.money, finance: next.finance, playerPopulation: next.playerPopulation,
@@ -183,7 +187,13 @@ export function signPlayer(state: GameState, playerId: string, opts: { toast?: b
  * Reasons: 'not-found', 'squad-min', 'insufficient-funds'.
  */
 export function releasePlayer(state: GameState, playerId: string): SignResult {
-  const s = state;
+  const s = getState();
+  const held = rosterIntervalProblem(s);
+  if (held) return {ok:false,reason:'match-active',message:held};
+  const assignment = campDisposalProblem(s,playerId);
+  if (assignment) return {ok:false,reason:'assignment',message:assignment};
+  if (state.squad !== s.squad || state.season !== s.season || state.week !== s.week)
+    return {ok:false,reason:'stale',message:'The squad changed. Review this release again.'};
   const clock = careerActionClock(s);
   const player = s.squad.find((p) => p.id === playerId);
   if (!player) return { ok: false, reason: 'not-found', message: 'Player not found.' };

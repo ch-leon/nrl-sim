@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { afterEach, expect, it, vi } from 'vitest';
 import { bus } from '../../src/core/events';
 import { activePack, selectPack } from '../../src/content';
@@ -69,10 +70,11 @@ it('keeps the original slot, parked match and installed career on refused replac
   expect(bytes.get(liveMatchKey(1))).toBe('parked');
 });
 
-it('refuses old, future and invalid marked snapshots before normalization', async () => {
+it('refuses unsupported, future and invalid marked snapshots before normalization', async () => {
   const { bytes } = storage();
   const candidate = await prepareLeagueCareer(options);
-  for(const bad of [{...candidate,version:SAVE_VERSION-1},{...candidate,version:SAVE_VERSION+1},
+  // v32/v33 League saves have supported migrations; v31 marked careers do not.
+  for(const bad of [{...candidate,version:31},{...candidate,version:SAVE_VERSION+1},
     {...candidate,pack:'au'}, {...candidate,competitions:{...candidate.competitions,leagueCareer:null}}]){
     const raw=JSON.stringify(bad);
     bytes.set(slotKey(1),raw);
@@ -87,7 +89,7 @@ it('publishes only after a confirmed historical replacement retains the old save
   const classic = createNewGame('Before', 24);
   expect(writeSlot(1,classic)).toBe(true);
   const revision = getSlotMeta(1)!.revision;
-  const original = JSON.stringify({...classic,version:SAVE_VERSION - 1});
+  const original = readFileSync(new URL('../fixtures/saves/league-career/v32-au-active.json', import.meta.url), 'utf8');
   bytes.set(slotKey(1),original);
   bytes.set(liveMatchKey(1),'parked');
   const seen = vi.fn();
