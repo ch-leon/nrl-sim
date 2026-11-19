@@ -99,6 +99,16 @@ full time covering the next coach-control click. The harness explicitly restores
 before or during coach-speed selection. Replay, call, persistence and timeout
 assertions are retained; no game-speed or match behavior changes are involved.
 
+An automatic browser run then lost the first Finish confirmation in Larger text.
+The same head passed a separate complete run; focused tracing reproduced the
+visible failure when inherited toast spacing disappeared. The confirmation card
+shrank by 92px and moved its button by 46px, so a pointer aimed at the old position
+hit the backdrop and closed the dialog. The contest stayed at its saved coaching
+checkpoint with no award or extra clash. Confirmation cards now retain a bounded
+height and anchor their action footer while their content spacing changes. The
+browser regression checks the original button target across that layout change;
+it does not change career data, gameplay probabilities or reward assertions.
+
 ## Reproduce
 
 ```sh

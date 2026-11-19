@@ -90,9 +90,30 @@ async function startDue(page) {
   await page.locator('[data-challenge-start]').click();
   await page.locator('[data-challenge-call]').first().waitFor();
 }
-async function finish(page) {
+async function finish(page, checkToastReserve = false) {
   await page.locator('[data-challenge-finish]').click();
-  await confirm(page);
+  if (checkToastReserve) {
+    // Layout-only regression: the real toast system left an 86px reserve in
+    // this confirmation, then removed it. Reproduce that spacing change in one
+    // task, without changing any career data or contest command.
+    const aim = await page.evaluate(() => {
+      const body = document.querySelector('[data-challenge-dialog] .duel-body');
+      const button = document.querySelector('[data-challenge-confirm]');
+      body.classList.add('nrl-toast-reserve');
+      body.style.setProperty('--nrl-toast-pad', '86px');
+      const before = button.getBoundingClientRect();
+      const x = before.x + before.width / 2, y = before.y + before.height / 2;
+      body.classList.remove('nrl-toast-reserve');
+      body.style.removeProperty('--nrl-toast-pad');
+      const after = button.getBoundingClientRect();
+      return { x, y, movement: Math.max(...['x','y','width','height'].map(k => Math.abs(before[k] - after[k]))),
+        hittable: button.contains(document.elementFromPoint(x, y)) };
+    });
+    assert(aim.movement <= 1, `Toast reserve moved Confirm by ${aim.movement}px`);
+    assert(aim.hittable, 'Original confirmation aim no longer hits Confirm');
+    await page.mouse.click(aim.x, aim.y);
+    await page.waitForFunction(() => !document.querySelector('[data-challenge-confirm]'));
+  } else await confirm(page);
   await page.locator('[data-challenge-podium]').waitFor();
 }
 
@@ -217,7 +238,7 @@ export async function runIndividualChallenges(browser) {
     await open(page); await book(page, p.id); await controls(page); await shot('larger-booked');
     await leave(page); await advance(page); await startDue(page);
     for (let i = 0; i < 12; i++) { await page.keyboard.press('Tab'); assert(await page.locator(DIALOG).evaluate(el => el.contains(document.activeElement)), 'Focus left contest dialog'); }
-    await controls(page); await shot('larger-coaching'); await finish(page);
+    await controls(page); await shot('larger-coaching'); await finish(page, true);
     assert(record(await state(page)).contest.progress.result === 'won', 'Qualification fixture did not win');
     await leave(page); await advance(page);
     while ((await state(page)).week < 9) await advance(page);
