@@ -46,6 +46,15 @@ function policyFor(c:ChallengeContest) {
 // retaining all its DP tables would instead grow much heavier with each season.
 // Canonical contents survive cloned saves and cannot bless an in-place mutation.
 let contestProofs = new Map<string,ChallengeEngineVersion['replay']>();
+// JSON would omit undefined fields or replace non-finite values with null. Those
+// in-memory mutations must go through strict replay, not borrow a saved proof.
+function jsonProofSafe(value:unknown):boolean {
+  if (value===null || typeof value==='string' || typeof value==='boolean') return true;
+  if (typeof value==='number') return Number.isFinite(value);
+  if (Array.isArray(value)) return Object.keys(value).length===value.length
+    && Array.from(value).every(jsonProofSafe);
+  return object(value) && Object.values(value).every(jsonProofSafe);
+}
 function validContest(contest: ChallengeContest, r: IndividualChallengeRecord, careerSeed:number, proofs:typeof contestProofs):boolean {
   if (!fields(contest,['actor','edition','engineVersion','policyVersion','eventSeed','autoCoach','titleProbability','clashes','commands','progress'])
     || !integer(contest.engineVersion,1) || contest.policyVersion!==CHALLENGE_POLICY_VERSION || !validActor(contest.actor,r)
@@ -53,8 +62,8 @@ function validContest(contest: ChallengeContest, r: IndividualChallengeRecord, c
     || contest.eventSeed!==challengeEventSeed(careerSeed,r.id)) return false;
   const engine = challengeEngines[contest.engineVersion];
   if (!engine || !same(contest.edition,engine.editions[r.editionId])) return false;
-  const proof = canonicalLeagueJson([careerSeed,r.id,r.editionId,r.participantId,r.participantName,contest]);
-  if (contestProofs.get(proof)===engine.replay) {
+  const proof = jsonProofSafe(contest) ? canonicalLeagueJson([careerSeed,r.id,r.editionId,r.participantId,r.participantName,contest]) : null;
+  if (proof!==null && contestProofs.get(proof)===engine.replay) {
     proofs.set(proof,engine.replay);
     return true;
   }
@@ -80,7 +89,7 @@ function validContest(contest: ChallengeContest, r: IndividualChallengeRecord, c
     } while (cmd.kind==='finish' && !progress.result);
   }
   if (auto!==contest.autoCoach || progress.clashIndex!==contest.clashes.length) return false;
-  proofs.set(proof,engine.replay);
+  if (proof!==null) proofs.set(proof,engine.replay);
   return true;
 }
 

@@ -88,3 +88,14 @@ it('drops proofs absent from the latest validated history instead of retaining o
   expect(validateIndividualChallenges(records,c,ctx)).toBeNull();
   expect(replay.mock.calls.length).toBe(0);
 });
+
+it('does not let non-JSON mutations reuse an otherwise identical JSON proof',()=>{
+  const {records,c,ctx} = history();
+  expect(validateIndividualChallenges(records,c,ctx)).toBeNull();
+  const altered = structuredClone(records);
+  Object.assign(altered[0]!.contest!.clashes[0]!,{extra:undefined});
+  expect(validateIndividualChallenges(altered,c,ctx)).toBe('challenge replay');
+  const changedNull = structuredClone(records);
+  Object.assign(changedNull[0]!.contest!.clashes[0]!,{attackTrait:NaN});
+  expect(validateIndividualChallenges(changedNull,c,ctx)).toBe('challenge replay');
+});
