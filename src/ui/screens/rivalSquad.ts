@@ -1,6 +1,7 @@
 import { matchupRead, counterRead, fitRead } from '../matchupRead';
 import { teamSheetFromSquad } from '../../match/league/sheets';
 import { resolveLineup, validTactics } from '../../systems/lineup';
+import { awayPlayerIds } from '../../systems/playerAssignments';
 // src/ui/screens/rivalSquad.ts — read-only view of a rival club's squad, opened
 // from the Ladder (GitHub #74). A sheet over the League (Broadcast Quiet, like
 // the Squad table 3d): the club and how it plays in the header row, the squad
@@ -220,7 +221,8 @@ export function openRivalSquad(opened: RivalClub): HTMLElement {
     const club = live();
     const rows = rivalSquadRows(club);
     const state = getState();
-    const ours = teamSheetFromSquad(state.squad, state.clubId, state.clubName, ['#000000', '#ffffff'], resolveLineup(state.lineup, state.squad)).roster ?? [];
+    const away = awayPlayerIds(state);
+    const ours = teamSheetFromSquad(state.squad, state.clubId, state.clubName, ['#000000', '#ffffff'], resolveLineup(state.lineup, state.squad, away), away).roster ?? [];
     const context = playerRivalContext(state, ours);
     const style = rivalStyle(club, context);
     const theirs = rivalSheet(club, context).roster ?? [];

@@ -38,9 +38,19 @@ describe('playerOfTheMatch', () => {
 });
 
 describe('applyMatchStats / tenure', () => {
+  it('attributes named events only to players on the frozen sheet, including the bench', () => {
+    const [starter, bench, absent] = createNewGame('T', 1).squad.slice(0, 3).map((p, i) => ({ ...p, name: i === 0 ? 'Ann' : 'Bob' }));
+    const squad = [absent!, starter!, bench!];
+    const onSheet = new Set([starter!.id, bench!.id]);
+    const out = applyMatchStats(squad, log, 'player', [starter!.id], 1, onSheet);
+    expect(out[0]).toBe(absent);
+    expect(out[1]!.career).toEqual({ games: 1, tries: 2, tackles: 0, lineBreaks: 1 });
+    expect(out[2]!.career).toEqual({ games: 0, tries: 0, tackles: 3, lineBreaks: 0 });
+  });
+
   it('adds games, career and season tallies; legend after 3 seasons', () => {
     const squad = createNewGame('T', 1).squad.slice(0, 2).map((p, i) => ({ ...p, name: ['Ann', 'Bob'][i]! }));
-    const out = applyMatchStats(squad, log, 'player', [squad[0]!.id], 1);
+    const out = applyMatchStats(squad, log, 'player', [squad[0]!.id], 1, new Set(squad.map((p) => p.id)));
     expect(out[0]!.career).toEqual({ games: 1, tries: 2, tackles: 0, lineBreaks: 1 });
     expect(out[1]!.career).toEqual({ games: 0, tries: 0, tackles: 3, lineBreaks: 0 });
     expect(topTryScorer(out, 1)).toEqual({ name: 'Ann', tries: 2 });

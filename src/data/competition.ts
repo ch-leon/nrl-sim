@@ -1,5 +1,6 @@
 // Competition metadata only (#570). The existing match/time systems remain
 // authoritative until the calendar and result-lifecycle work wires this in.
+import { validateAssignments, type CampRecord, type RunningCamp } from './playerAssignments';
 import { validateOpenCupEntry, type OpenCupEntryState } from './openCupEntry';
 import { validateLeagueCareer, type LeagueProgress } from './leagueCareer';
 import type { MatchRules } from '../content/pack';
@@ -99,6 +100,7 @@ export interface CompetitionInstance {
   winnerId?: string;
 }
 export interface CompetitionCareerState {
+  assignments?: CampRecord[];
   openCupEntry?: OpenCupEntryState;
   schemaVersion: 1;
   instances: CompetitionInstance[];
@@ -368,8 +370,8 @@ export function completedCompetition(instance: CompetitionInstance): string | nu
 }
 
 /** Returns the first invalid field; callers retain the entire rejected input. */
-export function validateCompetitions(v: unknown, context: { pack: string; season: number; week?: number; clubIds: readonly string[]; clubId?: string }): string | null {
-  if (!record(v) || !keys(v, ['schemaVersion', 'instances', 'calendar', 'world', 'leagueCareer', 'openCupEntry']) || v.schemaVersion !== 1 || !Array.isArray(v.instances)) return 'competitions';
+export function validateCompetitions(v: unknown, context: { pack: string; season: number; week?: number; clubIds: readonly string[]; clubId?: string; runningCamp?: RunningCamp }): string | null {
+  if (!record(v) || !keys(v, ['schemaVersion', 'instances', 'calendar', 'world', 'leagueCareer', 'openCupEntry', 'assignments']) || v.schemaVersion !== 1 || !Array.isArray(v.instances)) return 'competitions';
   const clubIds = new Set(context.clubIds);
   const instanceIds = new Set<string>();
   const fixtureIds = new Set<string>();
@@ -457,6 +459,8 @@ export function validateCompetitions(v: unknown, context: { pack: string; season
     const progress = validateLeagueCareer(v.leagueCareer, v as unknown as CompetitionCareerState, context);
     if (progress) return progress;
   }
-  try { return validateOpenCupEntry(v.openCupEntry, v as unknown as CompetitionCareerState, context); }
+  try { const c = v as unknown as CompetitionCareerState;
+    return validateOpenCupEntry(v.openCupEntry, c, context) ?? validateAssignments(v.assignments,c,context);
+  }
   catch { return 'Open Cup offer terms'; }
 }

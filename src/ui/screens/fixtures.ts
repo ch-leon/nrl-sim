@@ -35,6 +35,8 @@ import { shortName } from './matchReport';
 import { buildOpenCupCard } from './openCupEntry';
 import { starsForOverall } from '../../data/player';
 import { ensurePartsStyles, starsEl } from '../parts';
+import { buildSkillsCampCard } from './playerAssignments';
+import { awayPlayerIds } from '../../systems/playerAssignments';
 
 // ── Pure view helpers (unit-tested) ───────────────────────────────────────────
 
@@ -368,7 +370,8 @@ function openLeagueScreen(key: 'fixtures' | 'ladder', opts: LeagueScreenOptions)
         }
       }
       const cup = buildOpenCupCard(state, () => sheet.querySelector('[data-open-cup-details]'));
-      cols[0]!.el.prepend(heading, ...(cup ? [cup] : []));
+      const camp = buildSkillsCampCard(state, () => sheet.querySelector('[data-camp-details]'));
+      cols[0]!.el.prepend(heading, ...(camp ? [camp] : []), ...(cup ? [cup] : []));
     }
     sheet.replaceChildren(...cols.map((c) => c.el));
   };
@@ -714,7 +717,8 @@ function nextMatchCard(state: GameState, card: HTMLElement = el('div', { class: 
   };
   // How they play (N11): the style of the nine they would field today; the Guide's Tactics page explains the words.
   if (oppClub) {
-    const ours = teamSheetFromSquad(state.squad, state.clubId, state.clubName, ['#000000', '#ffffff'], resolveLineup(state.lineup, state.squad)).roster ?? [];
+    const away = awayPlayerIds(state);
+    const ours = teamSheetFromSquad(state.squad, state.clubId, state.clubName, ['#000000', '#ffffff'], resolveLineup(state.lineup, state.squad, away), away).roster ?? [];
     const context = playerRivalContext(state, ours);
     const style = rivalStyle(oppClub, context);
     const theirs = rivalSheet(oppClub, context).roster ?? [];
