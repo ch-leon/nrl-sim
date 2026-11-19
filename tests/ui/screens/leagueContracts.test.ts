@@ -11,6 +11,10 @@ import { validateInput } from '../../../src/core/saveValidation';
 import { bus } from '../../../src/core/events';
 import { contractsEndingSoon } from '../../../src/systems/contracts';
 import { openSquadScreen } from '../../../src/ui/screens/squad';
+import { openPlayerPage } from '../../../src/ui/screens/player';
+import { closeModal } from '../../../src/ui/dom';
+// The Squad views draw portraits (SuperCOOKED 30–31); the stand-in DOM has no canvas.
+vi.mock('../../../src/art/portrait', async original => ({ ...await original<typeof import('../../../src/art/portrait')>(), portraitDataUrl: () => '' }));
 import { openContractsScreen } from '../../../src/ui/screens/contracts';
 import { saleConfirmation } from '../../../src/ui/saleConfirmation';
 import { closeScreen } from '../../../src/ui/dom';
@@ -41,6 +45,15 @@ function install(s: GameState): void {
 }
 const body = (): StubNode => document.body as unknown as StubNode;
 const row = (id: string): StubNode => body().querySelector(`[data-row-player="${id}"]`)!;
+/** SuperCOOKED Phase 1: the Squad list has no To column (Leon, 18 Nov); his contract is on the player page's Deal tab. */
+const dealLine = (id: string): StubNode => {
+  closeModal();
+  openPlayerPage(getState().squad.find((p) => p.id === id)!, { kind: 'squad' });
+  body().querySelector('[data-player-tab="deal"]')!.click();
+  return body().querySelector('.nrl-player-deal')!;
+};
+/** The list's red contract-ending dot on his name (#369). */
+const alertDot = (id: string): StubNode | null => row(id).querySelector('[data-row-alert]');
 
 beforeEach(() => { isolateMiniatureLeagueProgression(); bus.clear(); stubDocument(); });
 afterEach(() => { closeScreen(); bus.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
@@ -48,18 +61,20 @@ afterEach(() => { closeScreen(); bus.clear(); vi.restoreAllMocks(); vi.unstubAll
 describe('League Squad contracts and dock alert', () => {
   it('shows the last authored active interval and alerts despite a stale stored countdown', () => {
     const s = fixture(false); const p = s.squad[0]!; p.deal!.endSeason = 1;
-    install(s); openSquadScreen();
-    expect(row(p.id).children[5]!.textContent).toBe('1 wk');
-    expect(row(p.id).children[5]!.getAttribute('title')).toBe('Contract running down');
+    install(s); openSquadScreen('list');
+    expect(alertDot(p.id)).not.toBeNull();
+    expect(dealLine(p.id).textContent).toMatch(/^Contract: 1 week left · /);
+    expect(dealLine(p.id).classList.contains('nrl-player-expiring')).toBe(true); // running down
     expect(contractsEndingSoon(getState()).map(p => [p.id, p.contractWeeks])).toEqual([[p.id, 1]]);
     expect(getState().squad[0]!.contractWeeks).toBe(27);
   });
   it('shows a queued target-year agreement as current and keeps the dock alert clear', () => {
     const s = fixture(true); const p = s.squad[0]!;
     p.deal = { salary: 1000, startSeason: 1, endSeason: 1, renewal: { salary: 2000, startSeason: 2, endSeason: 2 } };
-    install(s); openSquadScreen();
-    expect(row(p.id).children[5]!.textContent).toBe('25 wk');
-    expect(row(p.id).children[5]!.getAttribute('title')).toBe('Weeks left on his contract');
+    install(s); openSquadScreen('list');
+    expect(alertDot(p.id)).toBeNull();
+    expect(dealLine(p.id).textContent).toMatch(/^Contract: 25 weeks left · /);
+    expect(dealLine(p.id).classList.contains('nrl-player-expiring')).toBe(false);
     expect(contractsEndingSoon(getState())).toEqual([]);
     expect(getState().squad[0]!.deal!.renewal!.salary).toBe(2000);
   });
@@ -67,12 +82,12 @@ describe('League Squad contracts and dock alert', () => {
     const s = fixture(false); const p = s.squad[0]!;
     p.deal!.renewal = { salary: 2000, startSeason: 3, endSeason: 3 };
     delete s.competitions!.leagueCareer;
-    setState(s); openSquadScreen();
-    expect(row(p.id).children[5]!.textContent).toBe('27 wk');
-    expect(row(p.id).children[5]!.getAttribute('title')).toBe('Renewal queued from season 3');
+    setState(s); openSquadScreen('list');
+    expect(alertDot(p.id)).toBeNull();
+    expect(dealLine(p.id).textContent).toMatch(/^Contract: 27 weeks left on this deal · renewed from season 3 /);
     expect(contractsEndingSoon(getState())).toEqual([]);
-    closeScreen(); delete s.competitions; setState(s); openSquadScreen();
-    expect(row(p.id).children[5]!.textContent).toBe('27 wk');
+    closeModal(); closeScreen(); delete s.competitions; setState(s); openSquadScreen('list');
+    expect(dealLine(p.id).textContent).toMatch(/^Contract: 27 weeks left on this deal · /);
   });
 });
 

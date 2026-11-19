@@ -185,7 +185,7 @@ async function playCounterText(browser, out, width, height, textSize, seed) {
       }));
       await page.screenshot({ path: join(out, `${tag}-report.png`) });
       await row.locator('button').tap();
-      await page.waitForSelector('.nrl-lineup-row');
+      await page.waitForSelector('.nrl-lineup-field .nrl-pcard');
       if (await page.locator('.nrl-report').count()) rec.problems.push('report still open after CTA');
     } catch (e) {
       rec.problems.push(e.message);

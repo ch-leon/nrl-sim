@@ -205,6 +205,11 @@ Each row: mockup → current source → what changes. Anything not listed keeps 
   - **Moved off the page:** XP bar and level text, potential text, morale reasons, injury-risk word, season and career tallies. Keep them reachable later if wanted, but not on the first view.
   - **Sell** ("No buyer") is hidden until there is a buyer.
   - Free agents: Deal shows Sign instead. A rival's player: read-only, no Deal actions.
+- **Decided in Phase 1 (Leon, 18 Nov):**
+  - Plan, Plays and the training focus sit in a **⋯ menu** at the right of the Squad header (pitch and list), each opening what it did before.
+  - The player page has a **fourth tab, Record**: level and XP, potential, morale and its reasons, injury risk, season and career tallies, club history.
+  - The list view has **no To / Wage / Morale columns**; the contract-ending dot stays on the name, and the figures are on the player page's Deal tab and in Contracts.
+  - The pitch is opened as the `lineup` screen and the list as `squad`, so links, hints and the dock that lead to the Lineup still land on it.
 
 ### Match (Phase 2)
 
