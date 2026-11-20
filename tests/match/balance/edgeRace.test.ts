@@ -13,11 +13,12 @@ import type { SideSpec } from '../../../src/match/balance/plan';
 
 /** Every #322 lever off (the shipped defaults), and every one on. */
 const OFF: Overrides = { 'race.on': 0, 'counters.slide.expansiveSigned': 0, 'counters.compressed.expansiveRelative': 0 };
-// #672's 30-seed sample gave +0.747 busts/14 min. The exact same default-lead scenario
-// at 100 seeds/orientation gives 2.85 (SE .138) → 3.35 (.152), +1.40/14 min (SE .575).
-// Keep the original margin and default DH path; use the larger sample to reduce seed noise.
-// Harness run: receiver-call-edge-check, 20261117-042420.
-const SEEDS = 100;
+// #672's 30-seed sample gave +0.747 busts/14 min; 100 seeds/orientation gave +1.40 (SE .575),
+// under one SE above the margin, so ordinary seed noise could fail it (#722's back door read
+// +0.77 at 100 seeds and +1.62 at 400). At 400 seeds/orientation main gives 2.869 (SE .065)
+// → 3.401 (.073) tracked busts per five minutes, +1.49/14 min (SE .272): nearly two SE clear.
+// The margin stays 1: the larger fixed sample roughly halves the SE, it does not move the bar.
+const SEEDS = 400;
 /** Extra busts per fourteen minutes for the tracked side; keep the historical rate threshold. */
 const MARGIN = 1;
 const ON: Overrides = { 'race.on': 1, 'race.single': 0, 'counters.slide.expansiveSigned': 1, 'counters.compressed.expansiveRelative': 1 };
@@ -68,5 +69,5 @@ describe('the #322 Speed levers', () => {
     // fourteen-minute rate so shortening the clock does not dilute the physics threshold.
     const extraBustsPer14Minutes = (on.trackedCounts!.busts.mean - off.trackedCounts!.busts.mean) * 14 / MATCH_MINUTES;
     expect(extraBustsPer14Minutes).toBeGreaterThan(MARGIN);
-  }, 120_000);
+  }, 420_000);
 });
