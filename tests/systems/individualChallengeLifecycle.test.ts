@@ -11,13 +11,14 @@ import { bootNativeMirror } from '../../src/core/storage/native';
 import * as native from '../../src/core/storage/nativeCheckpoint';
 import { fileForKey, type NativeFiles } from '../../src/core/storage/nativeMirror';
 import { liveMatchKey, slotKey } from '../../src/core/storageKeys';
-import { advanceWeek, advanceWeeks, clearHeldWeek, clearSeasonHooks, clearTickHooks, weekHeld, withFastForward } from '../../src/core/time';
+import { advanceWeek, advanceWeeks, clearHeldWeek, clearSeasonHooks, clearTickHooks, failedIntervalProblem, weekHeld, withFastForward } from '../../src/core/time';
 import { addFacility, spendMoney } from '../../src/data/club';
 import { CHALLENGE_RATINGS, type ChallengeActor, type ChallengeEditionId } from '../../src/data/individualChallengeRules';
 import { advanceChallengeProgress, challengeCheckpoint, challengeClashRoll, initialChallengeProgress, replayChallenge, resolveChallengeAction } from '../../src/systems/individualChallengeEngine';
 import { validateIndividualChallenges } from '../../src/systems/individualChallengeEvidence';
 import { createChallengePolicy } from '../../src/systems/individualChallengePolicy';
 import { challengeEngines } from '../../src/data/individualChallenges';
+import { NINES } from '../../src/match/league/rules';
 import { registerAllSystems } from '../../src/qa/soak';
 import { confirmPlayerSale, quotePlayerSale } from '../../src/systems/playerTransfers';
 import { signPlayer } from '../../src/systems/freeagency';
@@ -29,6 +30,8 @@ import { changeChallenge, challengeHonours, challengeQualified, currentIndividua
 import { previewLeagueEntry } from '../../src/systems/leagueEntry';
 import { confirmLeagueEntry } from '../../src/systems/leagueEntryCommit';
 import { commitLineup } from '../../src/systems/lineup';
+import { liveMatchSameRules, type LiveMatchRecord } from '../../src/systems/liveMatchRecord';
+import { matchEngineIdentity } from '../../src/systems/matchEngineIdentity';
 import { awayPlayerIds, campDisposalProblem } from '../../src/systems/playerAssignments';
 import { hireStaff } from '../../src/systems/staff';
 import { registerTrainingSystem, spendSquadPoint } from '../../src/systems/training';
@@ -124,7 +127,7 @@ function storage() {
   setActiveSlot(1);
   return {bytes,store};
 }
-function sidecar(pack = 'au', week = 6) {
+function sidecar(pack = 'au', week = 6): LiveMatchRecord {
   return JSON.parse(readFileSync(new URL(`../fixtures/saves/v34-challenges/live-matches/v34-${pack}-week-${week}.json`,import.meta.url),'utf8'));
 }
 afterEach(()=>{
@@ -375,18 +378,46 @@ it.each([['au',6],['au',14],['uk',6],['uk',14]] as const)(
     const {bytes} = storage();
     const raw = fixture(week,pack);
     const live = sidecar(pack,week);
+    const originalSidecar = JSON.stringify(live);
     const imported = installImportedSave(JSON.stringify({...raw,nrlLiveMatch:live}),1);
     if (!imported.ok) throw Error(imported.message);
     expect(imported.repairs).toEqual([]);
     expect(imported.state).toEqual({...raw,version:35});
+    expect(bytes.get(liveMatchKey(1))).toBe(originalSidecar);
     loadState(imported.state);
+    const compatible = liveMatchSameRules(live);
     registerAllSystems();
     const kickoffs: Events['match:started'][] = [];
     bus.on('match:started',event => kickoffs.push(event));
     advanceWeek();
+    expect(failedIntervalProblem()).toBeNull();
     expect(weekHeld()).toBe(true);
-    expect(kickoffs.map(e => [e.fixture.id,e.live.seed])).toEqual([[live.fixtureId,live.seed]]);
-    expect(bytes.get(liveMatchKey(1))).toBe(JSON.stringify(live));
+    expect(getState()).toMatchObject({season:raw.season,week:raw.week});
+    expect(getState().competitions?.individualChallenges).toBeUndefined();
+    expect(kickoffs).toHaveLength(1);
+    const kickoff = kickoffs[0]!;
+    expect(kickoff.fixture).toMatchObject({
+      id:live.fixtureId,competitionId:live.competitionId,slot:live.slot,
+      round:live.round,homeId:live.homeId,awayId:live.awayId,
+    });
+    expect(kickoff.live.seed).toBe(live.seed);
+    const heldSidecar = bytes.get(liveMatchKey(1));
+    if (compatible) {
+      expect(kickoff.live.resumeAt).toBe(live.tick);
+      expect(kickoff.live.calls).toEqual(live.calls);
+      expect(kickoff.live.plans).toEqual(live.plans);
+      expect(heldSidecar).toBe(originalSidecar);
+    } else {
+      // An engine upgrade preserves the held fixture and seed, and starts it from kick-off.
+      expect(kickoff.live.resumeAt).toBeUndefined();
+      expect(kickoff.live.calls).toEqual([]);
+      expect(kickoff.live.plans).toEqual([]);
+      expect(kickoff.live.controls).toBeUndefined();
+      const {controls:_controls,...identity} = live;
+      expect(JSON.parse(heldSidecar!)).toEqual({...identity,
+        calls:[],plans:[],tick:0,halfMinutes:NINES.halfMinutes,engineId:matchEngineIdentity(),
+      });
+    }
   }
 );
 

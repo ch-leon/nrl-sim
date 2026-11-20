@@ -41,9 +41,9 @@ interface Played {
   refusals: Set<string>;
 }
 
-/** Current-default witness: seed 11 has a home penalty in range and offers both
- * captain overrides in this six-minute match. */
-const PENALTY_SEEDS = [11];
+/** Seed 41 has a home penalty in range and offers both captain overrides in
+ * this six-minute match after the centre shoulder read. */
+const PENALTY_SEEDS = [41];
 
 /** Play with the home coach making `call` whenever he may (as a player at the tray does: a tap, in on the next tick). */
 function play(seed: number, call: CoachCall | null, minutes = 6, side: 'home' | 'away' = 'home'): Played {
