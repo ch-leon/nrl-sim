@@ -3,7 +3,7 @@
 // support runners hold their lines, where a kick is aimed. No state; the
 // live sim feeds positions in and gets targets out.
 import { FIELD_LENGTH, FIELD_WIDTH, MID_Y } from '../core/field';
-import { clamp, type Vec } from '../core/vec';
+import { clamp, dist, type Vec } from '../core/vec';
 
 /** The carrier aims this far ahead of himself. */
 export const LOOKAHEAD_M = 10;
@@ -138,6 +138,8 @@ export function intercept(from: Vec, speed: number, pos: Vec, vel: Vec, maxT = 1
   return { x: pos.x + vel.x * t, y: pos.y + vel.y * t };
 }
 
+const LONG_KICK_SCATTER_M = 16;
+
 /**
  * Last-tackle kick: long, down the middle-ish toward the fullback, never dead.
  * `boot` scales the distance and shrinks the scatter (Big Boot, §3).
@@ -145,8 +147,31 @@ export function intercept(from: Vec, speed: number, pos: Vec, vel: Vec, maxT = 1
 export function kickTarget(kicker: Vec, dir: 1 | -1, fullback: Vec, jitter01: number, boot = { dist: 1, acc: 1 }): Vec {
   const goal = dir > 0 ? FIELD_LENGTH : 0;
   const x = clamp(kicker.x + dir * 32 * boot.dist, Math.min(goal - 4, kicker.x + dir * 8), Math.max(goal - 4, kicker.x + dir * 8));
-  const y = clamp(fullback.y * 0.6 + MID_Y * 0.4 + (jitter01 - 0.5) * 16 * boot.acc, 6, FIELD_WIDTH - 6);
+  const y = clamp(fullback.y * 0.6 + MID_Y * 0.4 + (jitter01 - 0.5) * LONG_KICK_SCATTER_M * boot.acc, 6, FIELD_WIDTH - 6);
   return { x: dir > 0 ? Math.min(x, goal - 4) : Math.max(x, goal + 4), y };
+}
+
+/** A territory punt into space (#650), overridable in the balance harness. */
+export const LONG_KICK = {
+  on: 1,
+  centreM: 6,
+  laneM: 12,
+  touchM: 12,
+  crossFieldM: 42,
+  coverM: 10,
+};
+
+/** Change the landing lane if the fullback has shaded to one side and his opposite lane is open. */
+export function longKickTarget(kicker: Vec, dir: 1 | -1, fullback: Vec, jitter01: number, boot: { dist: number; acc: number }, defenders: readonly Vec[]): Vec {
+  const stock = kickTarget(kicker, dir, fullback, jitter01, boot);
+  const shade = fullback.y - MID_Y;
+  if (LONG_KICK.on <= 0 || Math.abs(shade) <= LONG_KICK.centreM) return stock;
+  const lane = MID_Y - Math.sign(shade) * LONG_KICK.laneM;
+  const y = clamp(lane + (jitter01 - 0.5) * LONG_KICK_SCATTER_M * boot.acc,
+    Math.max(LONG_KICK.touchM, kicker.y - LONG_KICK.crossFieldM),
+    Math.min(FIELD_WIDTH - LONG_KICK.touchM, kicker.y + LONG_KICK.crossFieldM));
+  const target = { x: stock.x, y };
+  return (y - MID_Y) * shade < 0 && !defenders.some((p) => dist(p, target) < LONG_KICK.coverM) ? target : stock;
 }
 
 // ── Attacking kicks (BAK-208 §4.4, first slice) ──────────────────────────────
