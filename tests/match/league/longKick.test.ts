@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SET_TACKLES } from '../../../src/config';
+import type { BallState } from '../../../src/match/core/ball';
 import { FIELD_LENGTH, FIELD_WIDTH, MID_Y } from '../../../src/match/core/field';
 import type { Side } from '../../../src/match/core/snapshot';
 import type { Vec } from '../../../src/match/core/vec';
@@ -47,12 +48,13 @@ class KickSim extends LiveSim {
     this.stepPlay();
     this.tick += LIVE.kickContactTicks;
     this.launchPendingKick();
-    if (this.ball.kind !== 'flight') throw new Error('No kick launched');
+    const flight = this.ball as BallState;
+    if (flight.kind !== 'flight') throw new Error('No kick launched');
     expect(rolls).toHaveLength(0);
-    const event = this.events.at(-1);
+    const event = this.events[this.events.length - 1];
     expect(event).toMatchObject({ side, kind: 'kick', detail: 'long' });
-    expect(this.ball.receiver).toBe(this.indexOf(fullback));
-    return { from: this.ball.from, to: this.ball.to, peak: this.ball.peak, text: event?.text, draws: this.draws };
+    expect(flight.receiver).toBe(this.indexOf(fullback));
+    return { from: flight.from, to: flight.to, peak: flight.peak, text: event?.text, draws: this.draws };
   }
 }
 

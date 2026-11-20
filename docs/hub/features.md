@@ -64,7 +64,7 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
-- **Long punts into space**: kickers can aim across from a fullback who has shaded to one side. On ordinary punts, they look for an open landing with room inside the touchline. [Tracker #650](https://github.com/ch-leon/nrl-sim/issues/650)
+- **Long punts into space.** On ordinary punts, kickers look for an open landing across from a fullback who has shaded to one side, with room inside the touchline. [Tracker #650](https://github.com/ch-leon/nrl-sim/issues/650)
 
 - **Events on the club home** ([PR #752](https://github.com/ch-leon/nrl-sim/pull/752)): the Events card names Big Mick, Skills Camp and Open Cup, shows the nearest deadline and opens their booking screens. Play Week and fast-forward warn before unentered opportunities close, including the later-opening Invitational. Coaches can review or deliberately continue without entering; missed entries explain when they return.
 

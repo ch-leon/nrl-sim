@@ -342,20 +342,27 @@ describe('measuring and reporting', () => {
     // The timed back-door runs (#722, engine revision 7) re-pin these event trajectories;
     // before them: plays-on 0-4:134:d93f46a7e35ffb6c / plays-on-hard 0-0:139:e3df2859485cf187.
     { name: 'plays-on', aiCoach: false, expected: '12-0:143:b08a6399d81219bc' },
-    { name: 'plays-on-hard', aiCoach: true, expected: '1-0:144:74a11af0f394ead7' },
-  ])('pins $name: an even Balanced / Slide match with set plays (seed 1)', async ({ aiCoach, expected }) => {
-    const home = { ...sideSheet('H', { rating: 60 }), plays: ['block-play' as const, 'cut-out-winger' as const, 'kick-pass' as const] };
-    const sim = new LiveSim(home, sideSheet('A', { rating: 60 }), 1, aiCoach ? { aiCoach: ['home'] } : {});
-    const parts: string[] = [];
-    while (!sim.finished && sim.tick < 100_000) {
-      sim.step();
-      for (const e of sim.tickEvents) parts.push(`${e.tick}:${e.kind}:${e.side ?? ''}:${e.detail ?? ''}`);
-    }
+    // #650 changes the ordinary territory kick's landing in the Hard coach match.
+    { name: 'plays-on-hard', aiCoach: true, expected: '1-0:146:2652be8270891c73' },
+    { name: 'plays-on-hard with legacy punts', aiCoach: true, expected: '1-0:144:74a11af0f394ead7', legacyPunts: true },
+  ])('pins $name: an even Balanced / Slide match with set plays (seed 1)', async ({ aiCoach, expected, legacyPunts }) => {
     const spec = 'node:crypto';
     const { createHash } = await import(spec);
-    const hash = createHash('sha256').update(parts.join('|')).digest('hex').slice(0, 16);
-    expect(parts.some((p) => p.includes(':set-play:home:'))).toBe(true);
-    expect(parts.some((p) => p.includes(':coach-call:home:set-play:'))).toBe(aiCoach);
-    expect(`${sim.points.home}-${sim.points.away}:${parts.length}:${hash}`).toBe(expected);
+    const restore = applyTuning(legacyPunts ? { 'longKick.on': 0 } : {});
+    try {
+      const home = { ...sideSheet('H', { rating: 60 }), plays: ['block-play' as const, 'cut-out-winger' as const, 'kick-pass' as const] };
+      const sim = new LiveSim(home, sideSheet('A', { rating: 60 }), 1, aiCoach ? { aiCoach: ['home'] } : {});
+      const parts: string[] = [];
+      while (!sim.finished && sim.tick < 100_000) {
+        sim.step();
+        for (const e of sim.tickEvents) parts.push(`${e.tick}:${e.kind}:${e.side ?? ''}:${e.detail ?? ''}`);
+      }
+      const hash = createHash('sha256').update(parts.join('|')).digest('hex').slice(0, 16);
+      expect(parts.some((p) => p.includes(':set-play:home:'))).toBe(true);
+      expect(parts.some((p) => p.includes(':coach-call:home:set-play:'))).toBe(aiCoach);
+      expect(`${sim.points.home}-${sim.points.away}:${parts.length}:${hash}`).toBe(expected);
+    } finally {
+      restore();
+    }
   });
 });
