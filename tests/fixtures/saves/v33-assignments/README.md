@@ -26,3 +26,5 @@ To reconstruct the original held export, parse the Week 5 slot and matching
 sidecar, attach the latter as `nrlLiveMatch`, then stringify with two-space
 indentation. Migration tests must preserve the original slot/sidecar bytes and
 recover the same match; migration must not invent a camp booking or award.
+
+The byte-for-byte rule holds only on match-engine revision 6, the one these saves were recorded under. On a later revision the tests still check migration exactly, but a week's results and the held match are re-played (`tests/core/assignmentMigration.test.ts`, #747).
