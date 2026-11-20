@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- **Centre carries out wide (draft).** A centre catching a pass near touch can cut back inside a defender sliding out or straighten past a defender caught infield. He takes the lane only when he has room to run through it. [PR #755](https://github.com/ch-leon/nrl-sim/pull/755)
+
 - **Events on the club home** ([PR #752](https://github.com/ch-leon/nrl-sim/pull/752)): the Events card names Big Mick, Skills Camp and Open Cup, shows the nearest deadline and opens their booking screens. Play Week and fast-forward warn before unentered opportunities close, including the later-opening Invitational. Coaches can review or deliberately continue without entering; missed entries explain when they return.
 
 - **Readable player details on small phones** ([PR #745](https://github.com/ch-leon/nrl-sim/pull/745)): the narrow player header stacks its status pills; on short, narrow screens the whole player sheet scrolls so long names, every tab and Deal actions remain readable at Larger text.

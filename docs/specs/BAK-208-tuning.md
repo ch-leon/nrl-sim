@@ -1896,3 +1896,25 @@ advance uses the authored depth and retains its 3 m minimum. Lateral fitting
 preserves packet lane order near touch; a centre-field tie alternates by tackle
 and attack direction, independent of the weighted roll. Spread retains existing
 support priority. Snapshot/target reads never choose or consume dice.
+
+## Centre carries out wide (#649, draft)
+
+Defaults for the catch-time read in `src/match/league/live/centreCarry.ts`
+are in `src/match/league/live/knobs.ts`. The read uses the closest eligible
+defender by distance within the forward and lateral window. The projection
+divides the forward gap by closing speed (floored at 1 m/s) and caps the
+resulting time. Each defender in reach of the run projects using his own
+closing time. This changes the run target and uses no extra random draw.
+[PR #755](https://github.com/ch-leon/nrl-sim/pull/755)
+
+| Knob | Draft default | Meaning |
+|---|---:|---|
+| `LIVE.centreShoulderTicks` | 18 ticks (0.9 s) | Maximum time from catch to use the target. Zero disables the read. |
+| `LIVE.centreEdgeM` / `LIVE.centreTouchM` | 22 / 3 m | Catch must be 3–22 m from the nearer touchline. The target also keeps the 3 m margin. |
+| `LIVE.centreReadNearM` / `LIVE.centreReadM` | 2.6 / 12 m | Minimum and maximum forward gap to the defender at the catch. |
+| `LIVE.centreReadWidthM` | 6 m | Maximum lateral gap to the defender at the catch. |
+| `LIVE.centreReadS` | 0.65 s | Maximum time to project a defender's movement. |
+| `LIVE.centreSlideMps` | 1.5 m/s | Minimum outward defender speed for the inside cut. |
+| `LIVE.centreOffsetM` | 0.6 m | Inside cut needs the defender projected at least this far outside. Outside run needs him at least this far inside both now and at the projected meeting point. |
+| `LIVE.centreClearanceM` | 1.7 m | Minimum lateral room at each projected defender along the run, including defenders up to this distance beyond the target. |
+| `LIVE.centreDriftM` | 3.2 m | Infield shift on the inside cut. The outside run adds only the width needed to clear the projected defender by the clearance plus half a body radius. |

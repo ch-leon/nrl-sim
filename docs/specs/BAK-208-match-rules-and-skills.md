@@ -347,6 +347,25 @@ weights/distances are in tuning's **Ordinary attacking structures** section.
 Back-door balls, decoys and carrier-line contests remain separate work. This is
 an initial review default, subject to browser and standard-harness comparison.
 
+### Centre carries out wide (#649, draft)
+
+On an ordinary completed pass in open play, a centre near touch reads the
+nearest eligible defender ahead. Tacklers still recovering, held ruck
+markers and defenders still retreating are out of the read. If the defender
+is sliding toward touch and will be outside the centre's line, the centre
+angles back infield off his
+inside shoulder. If the defender is caught infield and is projected to stay
+there, the centre straightens past his outside shoulder, drifting wider only
+as needed for clearance. The read checks the projected run against other
+eligible defenders and leaves room inside touch. A square defender or a
+covered lane sends the centre back to the usual gap-seeking carry.
+
+The read uses the catch position and defender movement once. It applies
+briefly to a free carry, with manual and scripted play, kicks, and tackle
+or step responses taking priority. The normal pass choice, sprint rules and
+contact contests still apply. See tuning's **Centre carries out wide** section.
+[PR #755](https://github.com/ch-leon/nrl-sim/pull/755)
+
 ### 5.2 Defence presets
 
 The two ruck markers stand square with the play-the-ball, one behind the other
