@@ -185,15 +185,17 @@ export const RUN_IT_ZONE_M = 40;
 export const RUN_IT_CHANCE = 0.2;
 /** Beyond this the last-tackle kick is for territory. */
 export const ATTACK_KICK_M = 50;
+/** Inside this the last-tackle kick is aimed into or near the in-goal. */
+export const CLOSE_ATTACK_KICK_M = 22;
 
 const KICK_ORDER: readonly KickChoice[] = ['long', 'bomb', 'cross-field', 'grubber', 'chip'];
 
 /** Weights of each kick on the last tackle, by distance to the line (BAK-208 §4.4). */
-export function kickWeights(toLine: number): Record<KickChoice, number> {
+export function kickWeights(toLine: number, closeBombWeight = 0): Record<KickChoice, number> {
   if (toLine > ATTACK_KICK_M) return { long: 0.85, bomb: 0.15, 'cross-field': 0, grubber: 0, chip: 0 };
   if (toLine > RUN_IT_ZONE_M) return { long: 0.2, bomb: 0.5, 'cross-field': 0.3, grubber: 0, chip: 0 };
-  if (toLine > 22) return { long: 0, bomb: 0.3, 'cross-field': 0.35, grubber: 0.2, chip: 0.15 };
-  return { long: 0, bomb: 0, 'cross-field': 0.3, grubber: 0.5, chip: 0.2 };
+  if (toLine > CLOSE_ATTACK_KICK_M) return { long: 0, bomb: 0.3, 'cross-field': 0.35, grubber: 0.2, chip: 0.15 };
+  return { long: 0, bomb: closeBombWeight, 'cross-field': 0.3, grubber: 0.5, chip: 0.2 };
 }
 
 /**
@@ -202,8 +204,8 @@ export function kickWeights(toLine: number): Record<KickChoice, number> {
  * a grubber the closer he gets. A team's style scales the weights (`bias`).
  * Pure: `roll` is one draw in [0, 1).
  */
-export function chooseKick(toLine: number, roll: number, bias: Partial<Record<KickChoice, number>> = {}): KickChoice {
-  const w = kickWeights(toLine);
+export function chooseKick(toLine: number, roll: number, bias: Partial<Record<KickChoice, number>> = {}, closeBombWeight = 0): KickChoice {
+  const w = kickWeights(toLine, closeBombWeight);
   let total = 0;
   for (const k of KICK_ORDER) total += w[k] * (bias[k] ?? 1);
   let r = roll * total;
@@ -252,6 +254,7 @@ export const WING_BOMB = {
   scatterM: 4,
   wingM: 18,
   turnS: 0.35,
+  closeWeight: 0.2,
 };
 
 /** Stock bomb: high and short, onto the fullback's patch, never into the in-goal. */
