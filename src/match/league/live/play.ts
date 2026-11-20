@@ -139,7 +139,7 @@ export abstract class LivePlay extends LiveKicks {
           return;
         }
       } else if (this.kickCall !== 'run' && (this.tick - h.catchTick >= LIVE.kickRunTicks || nearD < LIVE.engageM)) {
-        this.pendingKick = this.planKick(h, this.kickCall);
+        this.pendingKick = this.planKick(h, this.kickCall, undefined, true);
         this.lock(h, 'kick', LIVE.kickLockTicks);
         return;
       }
@@ -363,7 +363,7 @@ export abstract class LivePlay extends LiveKicks {
   }
 
   /** Where the kick goes and who it is for, by type (BAK-208 §4.4). */
-  private planKick(h: Player, kind: KickChoice, aim?: Vec): PendingKick {
+  private planKick(h: Player, kind: KickChoice, aim?: Vec, ordinary = false): PendingKick {
     const def = other(this.attacking);
     const fb = this.fullback(def);
     const boot0 = bootMult(h.traits);
@@ -396,9 +396,13 @@ export abstract class LivePlay extends LiveKicks {
         const far = wingers.sort((a, b) => Math.abs(b.body.pos.y - h.body.pos.y) - Math.abs(a.body.pos.y - h.body.pos.y))[0] ?? h;
         return { ...base, to: crossFieldTarget(h.body.pos, this.dir, far.body.pos, this.rng.next()), receiver: this.indexOf(far), peak: 13 };
       }
-      case 'bomb':
+      case 'bomb': {
+        const roll = this.rng.next();
         // Big Boot puts it higher (#99): more hang, and the chase is under it.
-        return { ...base, to: controlAim(bombTarget(h.body.pos, this.dir, fb.body.pos, this.rng.next()), aim, bombTarget(h.body.pos, this.dir, fb.body.pos, 0), bombTarget(h.body.pos, this.dir, fb.body.pos, 1)), receiver: this.indexOf(fb), peak: bombPeak(traitBoost(h.traits, 'bigBoot')), ...trait };
+        const stock = bombTarget(h.body.pos, this.dir, fb.body.pos, roll);
+        const to = aim ? controlAim(stock, aim, bombTarget(h.body.pos, this.dir, fb.body.pos, 0), bombTarget(h.body.pos, this.dir, fb.body.pos, 1)) : stock;
+        return { ...base, to, receiver: this.indexOf(fb), peak: bombPeak(traitBoost(h.traits, 'bigBoot')), ...trait, ...(ordinary && !aim ? { wingBombRoll: roll } : {}) };
+      }
       default: {
         // Labs: match controls (Leon, 30 Oct). Territory aims keep the normal
         // wind / boot target and its scatter; only the intent chooses the kick.

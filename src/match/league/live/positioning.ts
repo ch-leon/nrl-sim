@@ -501,7 +501,7 @@ export abstract class LivePositioning extends LiveContact {
         const pk = this.pendingKick;
         p.wantsSprint = broken;
         if (pk && this.players[pk.kicker]!.side === atk && !pk.kickoff) {
-          p.target = { ...pk.to };
+          p.target = { ...this.kickLanding(pk) };
           p.wantsSprint = true;
         } else {
           let deep = this.lastPlay ? LIVE.fullbackLastM : LIVE.fullbackDeepM;

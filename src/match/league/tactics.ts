@@ -244,7 +244,17 @@ export function crossFieldTarget(kicker: Vec, dir: 1 | -1, winger: Vec, jitter01
   return { x, y: clamp(winger.y + (jitter01 - 0.5) * 4, 2, FIELD_WIDTH - 2) };
 }
 
-/** Bomb: high and short, onto the fullback's patch, never into the in-goal. */
+/** An attacking bomb into a winger's corner (#650), overridable in the balance harness. */
+export const WING_BOMB = {
+  on: 1,
+  fromM: 38,
+  cornerM: 10,
+  scatterM: 4,
+  wingM: 18,
+  turnS: 0.35,
+};
+
+/** Stock bomb: high and short, onto the fullback's patch, never into the in-goal. */
 export function bombTarget(kicker: Vec, dir: 1 | -1, fullback: Vec, jitter01: number): Vec {
   const goal = goalLine(dir);
   const x = towardGoal(dir, kicker.x + dir * (22 + jitter01 * 6), goal - dir * 3);
