@@ -141,6 +141,8 @@ export interface PendingKick {
   peak: number;
   kickoff: boolean;
   kind: KickChoice;
+  /** Ordinary bomb's existing aim roll, reused if a winger can chase at the boot. */
+  wingBombRoll?: number;
   /** The trait behind the kick, if one shaped it. */
   trait?: string;
   /** A territory kick going for touch, or for the 40/20 (2d). */

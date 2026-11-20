@@ -348,7 +348,7 @@ describe('measuring and reporting', () => {
   ])('pins $name: an even Balanced / Slide match with set plays (seed 1)', async ({ aiCoach, expected, legacyPunts }) => {
     const spec = 'node:crypto';
     const { createHash } = await import(spec);
-    const restore = applyTuning(legacyPunts ? { 'longKick.on': 0 } : {});
+    const restore = applyTuning(legacyPunts ? { 'longKick.on': 0, 'wingBomb.on': 0 } : {});
     try {
       const home = { ...sideSheet('H', { rating: 60 }), plays: ['block-play' as const, 'cut-out-winger' as const, 'kick-pass' as const] };
       const sim = new LiveSim(home, sideSheet('A', { rating: 60 }), 1, aiCoach ? { aiCoach: ['home'] } : {});

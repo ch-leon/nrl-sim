@@ -45,7 +45,9 @@ afterEach(() => {
   Reflect.deleteProperty(globalThis, 'localStorage');
 });
 
-const badIds = [undefined, 'bad identity', 'nrl-live-999-00000000000000'] as const;
+// The preceding engine on the default AU field, recorded before attacking wing bombs.
+const REVISION_12_ID = 'nrl-live-12-0a1b2b2c68eb48';
+const badIds = [undefined, 'bad identity', 'nrl-live-999-00000000000000', REVISION_12_ID] as const;
 describe.each([null, DEV_TEST_PREFIX])('recovery namespace %s', namespace => {
   it.each(badIds)('restarts only this fixture on reload with identity %s, preserving once-only effects', engineId => {
     // The other namespace and another slot must remain byte-for-byte untouched.

@@ -1,14 +1,19 @@
-import { FIELD_LENGTH, FIELD_WIDTH, MID_Y } from '../../core/field';
-import { grubberFlight, kickFlight, landed, type BallState } from '../../core/ball';
+import { FIELD_LENGTH, FIELD_WIDTH, MID_X, MID_Y, inPlay } from '../../core/field';
+import { KICK_SPEED, grubberFlight, hangTime, kickFlight, landed, type BallState } from '../../core/ball';
 import type { Side } from '../../core/snapshot';
-import { clamp, dist, sub, type Vec } from '../../core/vec';
+import { clamp, dist, dot, norm, sub, type Vec } from '../../core/vec';
 import { knockOnChance } from '../contest';
+import { legsSpeed } from '../fatigue';
+import { GAS, canSprint, paceMult } from '../gas';
 import { KICKOFF, kickoffLanding, pinnedDeep, regatherChance, type KickoffCall } from '../kickoff';
 import { KICK_CONTEST, fieldingRead, grubberRace, highBall } from '../kickContest';
 import { TOUCH, exitPoint, inOwnInGoal, outOfPlay, ownLineX, touchRestartSpot } from '../touch';
 import { ROLES } from '../roles';
+import { WING_BOMB } from '../tactics';
+import { speedMult } from '../traits';
+import { WEATHER } from '../weather';
 import { LIVE } from './knobs';
-import { other, AIM_TEXT, KICK_TEXT, type Player, type Phase } from './types';
+import { other, AIM_TEXT, KICK_TEXT, type Player, type Phase, type PendingKick } from './types';
 import { LiveClock } from './clock';
 
 export abstract class LiveKicks extends LiveClock {
@@ -19,7 +24,8 @@ export abstract class LiveKicks extends LiveClock {
     this.offloadReceiver = null;
     this.pendingKick = null;
     const kicker = this.players[k.kicker]!;
-    let to = k.to;
+    const landing = this.kickLanding(k);
+    let to = landing;
     if (k.kind === 'grubber') {
       // A grubber that would roll dead stops at the line it crosses (2d).
       const ex = exitPoint(kicker.body.pos, to);
@@ -41,7 +47,7 @@ export abstract class LiveKicks extends LiveClock {
     this.dir = this.dirOf(receiving);
     this.tackles = 0;
     this.lastPlay = false;
-    this.lineX = k.to.x + this.dir * LIVE.onsideM;
+    this.lineX = landing.x + this.dir * LIVE.onsideM;
     if (k.dropOut) this.emit('drop-out', `${kicker.name} kicks the goal-line drop-out`, kicker);
     else if (k.kickoff) this.emit('kickoff', `${kicker.name} kicks off`, kicker);
     else {
@@ -49,6 +55,56 @@ export abstract class LiveKicks extends LiveClock {
       this.events[this.events.length - 1]!.detail = k.kind;
     }
     if (this.phase.kind !== 'play') this.phase = { kind: 'play' };
+  }
+
+  /** Read the aim during the wind-up, then check the same read at the boot. */
+  protected kickLanding(kick: PendingKick): Vec {
+    if (WING_BOMB.on <= 0 || kick.wingBombRoll === undefined) return kick.to;
+    return this.wingBombTarget(this.players[kick.kicker]!, kick.wingBombRoll, kick.peak) ?? kick.to;
+  }
+
+  /** At the boot, look for an onside winger who can get under a bomb in his corner. */
+  protected wingBombTarget(kicker: Player, roll: number, peak: number): Vec | null {
+    const dir = this.dirOf(kicker.side);
+    const goal = dir > 0 ? FIELD_LENGTH : 0;
+    const from = kicker.body.pos;
+    const toLine = (goal - from.x) * dir;
+    const depth = WING_BOMB.cornerM - (roll - 0.5) * WING_BOMB.scatterM;
+    if (LIVE.wingerChase <= 0 || toLine > Math.min(WING_BOMB.fromM, MID_X) || toLine <= depth) return null;
+
+    const wingers = this.side(kicker.side).filter(p => ROLES[p.slot]!.name === 'winger' && !this.locked(p));
+    const infield = WING_BOMB.cornerM + (roll - 0.5) * WING_BOMB.scatterM;
+    let best: Vec | null = null;
+    let bestRoom = 0;
+    for (const wing of wingers) {
+      const body = wing.body;
+      const near = body.pos.y < MID_Y;
+      const offTouch = near ? body.pos.y : FIELD_WIDTH - body.pos.y;
+      if (wing === kicker || wing.subFor !== null || !inPlay(body.pos) || offTouch > WING_BOMB.wingM || (body.pos.x - from.x) * dir > 0) continue;
+      const to = { x: goal - dir * depth, y: near ? infield : FIELD_WIDTH - infield };
+      const chaseM = dist(body.pos, to);
+      // Targeting sends the nearest winger. A different winger can be closer if the pair has crossed over.
+      const nearerWing = wingers.some(p => {
+        if (p === wing) return false;
+        const d = dist(p.body.pos, to);
+        return d < chaseM || (d === chaseM && p.slot < wing.slot);
+      });
+      if (nearerWing) continue;
+      // Budget the hang time at sprint pace until his gas goes, allowing for the turn onto the target.
+      const seconds = Math.max(0, Math.max(hangTime(peak), dist(from, to) / KICK_SPEED) - WING_BOMB.turnS);
+      const sprintS = canSprint(wing.gas) ? Math.min(seconds, wing.gas.gas * wing.tankS) : 0;
+      const pace = body.maxSpeed * legsSpeed(wing.energy) * speedMult(wing.traits, 'jets') * (wing.hurt ? WEATHER.hurtSpeed : 1);
+      const restPace = sprintS > 0 ? GAS.blown : paceMult(wing.gas, false);
+      const runM = pace * (sprintS + (seconds - sprintS) * restPace);
+      const startingPace = dot(body.vel, norm(sub(to, body.pos)));
+      const lostM = Math.max(0, pace - startingPace) ** 2 / (2 * body.accel);
+      const room = runM - lostM + KICK_CONTEST.bomb.contestM - chaseM;
+      if (room > bestRoom) {
+        best = to;
+        bestRoom = room;
+      }
+    }
+    return best;
   }
 
   protected landings(): void {
