@@ -1,0 +1,39 @@
+{
+  "name": "centre shoulder carry",
+  "description": "Does a centre choosing a shoulder at reception change completion, line breaks or tries? Compare the default with the same engine using ordinary gap running, in even Balanced teams and Expansive versus Balanced.",
+  "seedStart": 1,
+  "seeds": 40,
+  "scenarios": [
+    {
+      "name": "even 60 v 60",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "expansive v balanced",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive"
+        }
+      },
+      "away": {
+        "rating": 60
+      },
+      "bothWays": true,
+      "track": "home"
+    }
+  ],
+  "variants": [
+    {
+      "name": "ordinary gap running",
+      "tuning": {
+        "live.centreShoulderTicks": 0
+      }
+    }
+  ]
+}
