@@ -156,6 +156,9 @@ Weighting only open play (`live.receiverAtRuck` 0) leaves the first receiver as 
 | `kickWeights(toLine)` | `tactics.ts` | table (§4.4) | Long / bomb / cross-field / grubber / chip weights by zone, × preset `kickBias`. |
 | `live.earlyKickM` + preset `earlyKick` | `live/knobs.ts` / `presets.ts` | 25 m, 35% Balanced | Early grubber / chip on the second-last tackle (× `lastTackle.earlyScale` with the call on). |
 | Targets | `tactics.ts` | grubber: inside 16 m, 3 m into the in-goal, else 8 m short; aimed on a winger's lane · chip 10–13 m · cross-field 2 m short, far winger · bomb 22–28 m · long 32 m (× Big Boot) | Where each kick lands. |
+| `longKick.on` | `tactics.ts` / `live/play.ts` | 1 (0 = legacy aim) | Applies to autonomous early and last-tackle territory punts after the 40/20 and touch branches. The usual depth, nominated fullback and single accuracy roll still apply. |
+| `longKick.centreM` / `longKick.laneM` | `tactics.ts` | 6 / 12 m | A fullback more than 6 m from centre opens the lane 12 m beyond centre on the other side. The same `LONG_KICK_SCATTER_M` (±8 m × Boot accuracy) scatters both that aim and the stock target. |
+| `longKick.touchM` / `longKick.crossFieldM` / `longKick.coverM` | `tactics.ts` | 12 / 42 / 10 m | The new landing is at least 12 m inside touch and at most 42 m across from the kicker. Use the stock target if that keeps the new aim out of the opposite half or if an on-field defender is already within 10 m of the proposed landing. |
 | `live.kickCatchReach` | `live/knobs.ts` | 2.5 m | Whoever is nearest within this takes a kick (nominated man −0.3 m). |
 | `live.dropChance` / `live.dropPressured` | `live/knobs.ts` | 6% / 18% − (Skill − 50)/300 | Spill under a kick. |
 | `live.fullbackDeepM` / `live.fullbackLastM` | `live/knobs.ts` | 16 / 24 m | Fullback depth behind the line; he goes to the landing spot as the kicker shapes. |
@@ -168,7 +171,8 @@ Weighting only open play (`live.receiverAtRuck` 0) leaves the first receiver as 
 | `kickoff.short` (#397) | `kickoff.ts` | 12 m past halfway, peak 20 · regather 25% + 0.5%/pt (best of the 3 nearest chasers' Speed − the catcher's Skill), 15–40% | The Short kick-off call. One draw, only when called. A regather is the kicking side's ball near halfway; a miss is theirs about 12 m from halfway. Measured: 25% over 1,000 even kicks (`kickoff.test.ts`). |
 | `kickoff.long` (#397) | `kickoff.ts` | receivers' 5 m line at Skill ≤ 30 to the try line at ≥ 90, peak 20 · dead on the full 10% (3 m past the dead-ball line) · paid off inside 10 m | The Long kick-off call. One draw, only when called. Dead on the full is a penalty to the receivers at halfway (no sin bin). |
 
-Tests: `tests/match/league/kicks.test.ts`, `tests/match/league/lastTackle.test.ts` (the weights, the
+Tests: `tests/match/league/kicks.test.ts`, `tests/match/league/longKick.test.ts` (landing lanes,
+cover and protected targets), `tests/match/league/lastTackle.test.ts` (the weights, the
 style order, the late read, off equals a65edf9 with its roll count).
 
 **More options on the last (#650 part 1).** One new roll per last-tackle call while
