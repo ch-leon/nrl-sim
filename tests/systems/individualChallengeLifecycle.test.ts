@@ -32,6 +32,10 @@ import { commitLineup } from '../../src/systems/lineup';
 import { awayPlayerIds, campDisposalProblem } from '../../src/systems/playerAssignments';
 import { hireStaff } from '../../src/systems/staff';
 import { registerTrainingSystem, spendSquadPoint } from '../../src/systems/training';
+import { MATCH_ENGINE_REVISION, matchEngineIdentity } from '../../src/systems/matchEngineIdentity';
+
+/** The match-engine revision a captured sidecar was saved under ("nrl-live-6-…" → 6). */
+const recordedRevision = (engineId: string) => Number(/^nrl-live-(\d+)-/.exec(engineId)![1]);
 
 function fixture(week: number, pack = 'au', suffix = ''): GameState {
   return JSON.parse(readFileSync(new URL(`../fixtures/saves/v34-challenges/v34-${pack}-week-${week}${suffix}.json`, import.meta.url), 'utf8'));
@@ -386,7 +390,12 @@ it.each([['au',6],['au',14],['uk',6],['uk',14]] as const)(
     advanceWeek();
     expect(weekHeld()).toBe(true);
     expect(kickoffs.map(e => [e.fixture.id,e.live.seed])).toEqual([[live.fixtureId,live.seed]]);
-    expect(bytes.get(liveMatchKey(1))).toBe(JSON.stringify(live));
+    // The held match is the same fixture and seed, recorded under the engine now running. On
+    // the engine it was saved under (nrl-live-6-…) the original file is kept byte for byte; a
+    // later MATCH_ENGINE_REVISION restarts it from kickoff, so only those fields are checked.
+    const held = bytes.get(liveMatchKey(1));
+    expect(JSON.parse(held!)).toMatchObject({fixtureId:live.fixtureId,seed:live.seed,engineId:matchEngineIdentity()});
+    if (recordedRevision(live.engineId) === MATCH_ENGINE_REVISION) expect(held).toBe(JSON.stringify(live));
   }
 );
 
