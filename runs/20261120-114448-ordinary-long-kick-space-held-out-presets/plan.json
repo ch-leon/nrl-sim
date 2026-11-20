@@ -1,0 +1,46 @@
+{
+  "name": "ordinary long kick space held-out presets",
+  "description": "#650 held-out check: rerun the standard Kick-chase v Balanced and Rush v Slide fixtures, with unchanged gameplay, on disjoint seeds 1001–1200 both ways for default versus longKick.on 0.",
+  "seeds": 200,
+  "scenarios": [
+    {
+      "name": "kick-chase v balanced",
+      "seeds": 200,
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "rush v slide",
+      "seeds": 200,
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "open-side target off",
+      "tuning": {
+        "longKick.on": 0
+      }
+    }
+  ],
+  "seedStart": 1001
+}

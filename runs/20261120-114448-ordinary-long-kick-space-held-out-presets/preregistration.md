@@ -1,0 +1,7 @@
+# #650 held-out Kick-chase and Rush balance check
+
+Registered on 2026-11-20 after the first standard sample and before the held-out simulations. The gameplay commit remains `f5474ea4ef450bb13750452db19753ee0a43daa1`.
+
+In the original standard run with 100 seeds per orientation, Rush v Slide points share moved from 46.25% disabled to 41.25% default. The default landed below the revised 42% flat preset floor. Kick-chase v Balanced moved from 50.25% disabled to 45.75% default. Kick-chase is the tactic most directly tied to territory kicking. These first-sample estimates were within two combined harness standard errors of no change. The first report and estimates remain part of the evidence. [Original standard results](../20261120-113829-ordinary-long-kick-space-on-v-off-standard/report.md)
+
+Repeat the exact two standard fixtures on held-out seeds 1001–1200, in both orientations. Run one default variant and one `longKick.on=0` variant, with 400 matches per preset and variant, 1,600 matches total. Record the distributions as a separate sample. Report points share, outright wins, draws, combined SE and whether each point estimate is inside the revised 42–58% points-share band. The standard harness provides aggregate uncertainty. Report material uncertainty for the point estimates and the changes. Alongside the full standard tables, summarize the standard §7 bands with the two 2.5-minute halves in view, with any crossing and the relevant count contrasts. No additional geometry runs, parameter changes, pooling, or seed extension.

@@ -374,3 +374,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261120-011122-centre-shoulder-carry | centre shoulder carry | 02a6dec5 | feat/centre-shoulder | [report](runs/20261120-011122-centre-shoulder-carry/report.md) |
 | 20261120-015711-standard | standard | d70989b | main | [report](runs/20261120-015711-standard/report.md) |
 | 20261120-113829-ordinary-long-kick-space-on-v-off-standard | ordinary long kick space on v off (standard) | f5474ea4 | HEAD | [report](runs/20261120-113829-ordinary-long-kick-space-on-v-off-standard/report.md) |
+| 20261120-114448-ordinary-long-kick-space-held-out-presets | ordinary long kick space held-out presets | f5474ea4 | HEAD | [report](runs/20261120-114448-ordinary-long-kick-space-held-out-presets/report.md) |
