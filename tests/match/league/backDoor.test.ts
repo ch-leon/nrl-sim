@@ -203,7 +203,8 @@ describe('ordinary back-door option (#649)',()=>{
   });
 
   it('off preserves the preceding ordinary-shapes event and RNG fingerprint exactly',async()=>{
-    restores.push(applyTuning({'shapes.backDoor.on':0}));
+    // Punts into space were also absent from the engine that recorded this fingerprint.
+    restores.push(applyTuning({'shapes.backDoor.on':0,'longKick.on':0}));
     const sim=new LiveSim(sideSheet('H',{rating:60}),sideSheet('A',{rating:60}),1),parts:string[]=[];
     const rng=(sim as unknown as {rng:{next:()=>number}}).rng,next=rng.next.bind(rng);let draws=0;
     rng.next=()=>{draws++;return next();};
