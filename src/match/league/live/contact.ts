@@ -23,6 +23,7 @@ import { FIT, derivedRatings } from '../fit';
 import { COUNTERS, allOutRecoveryTicks, compressedCommitReach, rushBroken } from '../counters';
 import { BACKS, PACK } from '../presets';
 import { LIVE, runOn } from './knobs';
+import { backDoorTarget, behindLead } from '../attackingShapes';
 import { other, type Player, type Phase } from './types';
 import { LivePenalties } from './penalties';
 
@@ -83,6 +84,27 @@ export abstract class LiveContact extends LivePenalties {
     from.poseUntil = this.tick + LIVE.passPoseTicks;
     from.catchTick = this.tick;
     this.visualPass = { tick: this.tick, player: { side: from.side, slot: from.slot, who: from.key }, headX: from.body.heading.x, headY: from.body.heading.y, speed: Math.hypot(from.body.vel.x, from.body.vel.y), odometer: from.odometer, legs: from.energy, blown: from.gas.blown };
+    this.finishBackDoorPass(from,to);
+  }
+
+  /** Keep the real lead's finish through the actual second catch; interceptions/cancellation win. */
+  protected finishBackDoorPass(from: Player, to: Player): void {
+    const ph=this.phase, shape=ph.kind==='play'?ph.shape:null, b=shape?.backDoor;
+    if (shape?.kind!=='back-door' || !b) return;
+    const lead=this.at(b.lead.side,b.lead.slot), flight=this.ball.kind==='flight'?this.ball:null;
+    if (from.side!==b.caller.side || from.key!==b.caller.who || from.slot!==b.caller.slot || to.side!==b.support.side || to.key!==b.support.who || to.slot!==b.support.slot
+      || lead.key!==b.lead.who || !flight || flight.via!=='pass' || flight.receiver!==this.indexOf(to)
+      || (flight.to.y - lead.body.pos.y) * shape.edge <= 0
+      || !behindLead(from.body.pos,flight.to,lead.body.pos,this.dir)) {
+      if (ph.kind==='play') ph.shape=null;
+      return;
+    }
+    shape.secondPass = {
+      startedTick: this.tick,
+      leadTo: backDoorTarget(shape, lead.slot, from.body.pos)!,
+      // Run through the arrived ball along the fullback's existing line.
+      supportTo: add(flight.to, scale(to.body.heading, LIVE.runOnM)),
+    };
   }
 
   /**

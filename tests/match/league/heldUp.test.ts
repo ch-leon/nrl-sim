@@ -123,8 +123,8 @@ describe('held up: in the sim', () => {
     const count = (over: Record<string, number>): { same: number; moved: number } => {
       let same = 0;
       let moved = 0;
-      // Early DH choice (#672): seed 41 supplies the rare first-rule witness instead of old seed 31.
-      for (const seed of [1, 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 41]) {
+      // After the timed back-door runs (#722), seed 20 supplies the rare first-rule witness (41 before).
+      for (const seed of [1, 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 20]) {
         const off = withTuning({ 'heldUp.on': 0 }, () => play(seed));
         const on = withTuning(over, () => play(seed));
         if (on.draws === off.draws && on.events === off.events && on.home === off.home && on.away === off.away) same++;

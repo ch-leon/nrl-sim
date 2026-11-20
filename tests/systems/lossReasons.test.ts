@@ -151,7 +151,8 @@ describe('lossReasons: ranking (#368)', () => {
 });
 
 describe('out-schemed (#468)', () => {
-  const ended = (over: Partial<MatchResult> = {}) => result({ events: [{ t: 18, kind: 'full-time', teamId: PLAYER_ID }], ...over });
+  const ended = (over: Partial<MatchResult> = {}, stats: Partial<MatchResult['stats']> = {}) =>
+    result({ events: [{ t: 18, kind: 'full-time', teamId: PLAYER_ID }], ...over }, stats);
   const countered = (s: GameState) => ({ us: ours(s, { tactics: { attack: 'grind', defence: 'slide' } }),
     them: theirs(s, { tactics: { attack: 'balanced', defence: 'compressed' } }) });
   const hasReason = (rs: ReturnType<typeof why>) => rs.some(r => r.cta === 'Try a different plan');
@@ -181,6 +182,30 @@ describe('out-schemed (#468)', () => {
       stats: { speed: rating, strength: rating, stamina: rating, handling: rating, kicking: rating, footyIQ: rating } }));
     expect(hasReason(why(s, ended(), { ...us, roster: roster(59) }, them))).toBe(false);
     expect(hasReason(why(s, ended(), { ...us, roster: roster(0) }, them))).toBe(false);
+  });
+
+  it('keeps a strong counter behind three higher-priority reasons when the list is full', () => {
+    const s = club(), { us, them } = countered(s);
+    expect(hasReason(why(s, ended(), us, them))).toBe(true);
+    const events: MatchEvent[] = [
+      { t: 4, kind: 'try', teamId: PLAYER_ID },
+      { t: 5, kind: 'conversion', teamId: PLAYER_ID, detail: 'good' },
+      { t: 8, kind: 'try', teamId: rivalId(s) },
+      { t: 9, kind: 'conversion', teamId: rivalId(s), detail: 'good' },
+      { t: 12, kind: 'penalty-goal', teamId: rivalId(s), detail: 'good' },
+      { t: 15, kind: 'penalty-goal', teamId: rivalId(s), detail: 'good' },
+      { t: 18, kind: 'full-time', teamId: PLAYER_ID },
+    ];
+    const crowded = why(s, ended({ homeScore: 6, awayScore: 10, events }, {
+      errors: [5 + ERROR_GAP, 5], possession: [38, 62],
+    }), us, { ...them, attack: 60 + OUTGUNNED_GAP * 4 });
+    expect(crowded).toHaveLength(MAX_REASONS);
+    expect(crowded.map((reason) => reason.text)).toEqual([
+      'Their attack rated 84 to your 60',
+      'You had 38% of the ball',
+      'You kicked 1 from 1 at goal, they kicked 3 from 3',
+    ]);
+    expect(hasReason(crowded)).toBe(false);
   });
 
   it('nets both matchups: equally countered sides do not explain a loss', () => {
@@ -215,22 +240,12 @@ describe('out-schemed (#468)', () => {
     const us = sideSheet(PLAYER_ID, { rating: 60, tactics: { attack: 'grind', defence: 'slide' } });
     const them = sideSheet(rivalId(s), { rating: 60, tactics: { attack: 'balanced', defence: 'compressed' } });
     let losses = 0;
+    // After the timed back-door runs (#722), seeds 1–3 are countered losses and 4–6 wins.
     for (const seed of [1, 2, 3, 4, 5, 6]) {
-      // The deterministic 1–6 cohort still has real countered losses. Seed 1 is
-      // also a loss, but its three higher-priority reasons fill the display cap.
       const r = runMatch(us, them, { seed, length: { halves: 2, halfMinutes: 7 } });
       const lost = r.awayScore > r.homeScore;
       const reasons = why(s, r, us, them);
-      if (seed === 1) {
-        expect(lost).toBe(true);
-        expect(reasons).toHaveLength(MAX_REASONS);
-        expect(reasons.map((reason) => reason.text)).toEqual([
-          'Your fullback Marley Ashgrove missed it injured (and 8 more)',
-          'You had 41% of the ball',
-          'You kicked 1 from 1 at goal, they kicked 4 from 4',
-        ]);
-        expect(hasReason(reasons)).toBe(false);
-      } else expect(hasReason(reasons)).toBe(lost);
+      expect(hasReason(reasons)).toBe(lost);
       if (lost) losses++;
     }
     expect(losses).toBeGreaterThan(0);

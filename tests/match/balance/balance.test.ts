@@ -300,8 +300,10 @@ describe('measuring and reporting', () => {
     // with the last-tackle call alone; 12-0:118:c104b852219f311c was Balanced with held up alone).
     // Early ordinary-DH commitment (#672) moves receiver/dart rolls four ticks earlier.
     // Ordinary structures (#649) add a once-per-contact/PTB roll and real setup movement.
-    { attack: 'balanced' as const, expected: '0-8:138:a3c50b2b797e77b1' },
-    { attack: 'expansive' as const, expected: '6-6:141:efe82ee10feba754' },
+    // The timed back-door runs (#722, engine revision 7) re-pin these; before them:
+    // balanced 0-8:138:a3c50b2b797e77b1 / expansive 6-6:141:efe82ee10feba754.
+    { attack: 'balanced' as const, expected: '12-6:141:82d97834a1c52696' },
+    { attack: 'expansive' as const, expected: '10-4:150:975213c1842aa58e' },
   ])('pins an even $attack / Slide match (seed 1)', async ({ attack, expected }) => {
     const sim = new LiveSim(sideSheet('H', { rating: 60, tactics: { attack } }), sideSheet('A', { rating: 60 }), 1);
     const parts: string[] = [];
@@ -337,8 +339,10 @@ describe('measuring and reporting', () => {
     // 6-12:146:855a4325e4eb4fc5 and 10-6:155:e32ad1bdf721a1a7).
     // #672 leaves scripted selection untouched; the opposing ordinary DH still commits earlier.
     // Ordinary structures (#649) still leave scripted selection alone; the opponent prepares its packet.
-    { name: 'plays-on', aiCoach: false, expected: '0-4:134:d93f46a7e35ffb6c' },
-    { name: 'plays-on-hard', aiCoach: true, expected: '0-0:139:e3df2859485cf187' },
+    // The timed back-door runs (#722, engine revision 7) re-pin these event trajectories;
+    // before them: plays-on 0-4:134:d93f46a7e35ffb6c / plays-on-hard 0-0:139:e3df2859485cf187.
+    { name: 'plays-on', aiCoach: false, expected: '12-0:143:b08a6399d81219bc' },
+    { name: 'plays-on-hard', aiCoach: true, expected: '1-0:144:74a11af0f394ead7' },
   ])('pins $name: an even Balanced / Slide match with set plays (seed 1)', async ({ aiCoach, expected }) => {
     const home = { ...sideSheet('H', { rating: 60 }), plays: ['block-play' as const, 'cut-out-winger' as const, 'kick-pass' as const] };
     const sim = new LiveSim(home, sideSheet('A', { rating: 60 }), 1, aiCoach ? { aiCoach: ['home'] } : {});

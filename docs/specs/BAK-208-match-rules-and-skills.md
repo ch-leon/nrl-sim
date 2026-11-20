@@ -344,8 +344,43 @@ renderers continue drawing the real positions.
 `shapes.on:0` draws nothing and retains the prior simulation exactly. Enabled
 choices change movement and RNG timing, so recovery engine revision is 6. All
 weights/distances are in tuning's **Ordinary attacking structures** section.
-Back-door balls, decoys and carrier-line contests remain separate work. This is
+Decoys that influence defenders and carrier-line contests remain separate work. This is
 an initial review default, subject to browser and standard-harness comparison.
+
+### Ordinary back-door support (#649)
+
+`shapes.backDoor.on:1` adds one ordinary structure without changing the existing
+spread/pod/edge weights. A reachable free half, forward lead and fullback prepare
+during contact/PTB under the same 12/7 m reach limits. Their exact identities and
+lateral origin are chosen once; no player is moved into place. The fullback stays
+inside and behind the half during setup. The forward sets up outside the half.
+The fullback starts sweeping behind both players as the tackled carrier gets up
+and continues if the dummy-half passes to the chosen half. The forward starts
+his lead run on the heel. Both runners use ordinary acceleration, pace and
+fatigue. A pass to another recipient, manual or coach input, or a scripted play
+ends the option without a redraw.
+
+The half keeps his ordinary carrier line and engagement decision. His support
+must really be behind him, available and in the usual passing window to be
+selected by the existing weighted receiver choice. Pass probability, intercept
+reads, catch/spill checks and contact odds are unchanged. A lead can still receive
+an ordinary pass when eligible: this adds no defender-deception or paid-play bonus.
+The option carries on only when the half's actual pass goes behind the exact lead
+runner to the fullback beyond him on the packet's edge; any other pass ends it.
+The pass leads the fullback from his real position and velocity. He runs through the reception
+along his existing heading, with the usual catch reach and handling checks.
+An intercepted flight retains its real defender recipient.
+
+The lead finishes his bounded run through the actual second catch, then the
+structure ends. Invalid identities, a locked/binned/interchanging participant,
+another pass choice, contact, kick, loose ball, turnover or dead phase also ends
+it. The fullback returns to ordinary carrier steering on receipt and carries
+his momentum into the next step.
+
+The shape's participants are copied on snapshot reads, so reading cannot change
+play. With `shapes.backDoor.on:0`, the prior three-structure simulation and RNG
+stream remain exact. Live-match recovery uses engine revision 7, so a match saved
+under revision 6 is not replayed with the back door.
 
 ### 5.2 Defence presets
 

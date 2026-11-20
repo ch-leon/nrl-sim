@@ -20,7 +20,7 @@ import { ownLineX } from '../touch';
 import { LIVE } from './knobs';
 import { other, type Player } from './types';
 import { LiveContact } from './contact';
-import { SHAPES, chooseShape, shapeEdge, shapeTarget, packetSlots, type ShapeKind } from '../attackingShapes';
+import { SHAPES, chooseShape, shapeEdge, shapeTarget, packetSlots, backDoorTarget, type AttackingShape, type ShapeKind } from '../attackingShapes';
 
 export abstract class LivePositioning extends LiveContact {
   /** Prepare during actual contact, then retain through its ruck; null latches overrides/endings. */
@@ -35,9 +35,9 @@ export abstract class LivePositioning extends LiveContact {
       || this.pendingControl[this.attacking] || this.callState[this.attacking].attack) { ph.shape = null; return; }
     const origin = ph.kind === 'tackle' ? this.players[ph.carrier]!.body.pos : this.mark;
     const reach = ph.kind === 'tackle' ? SHAPES.contactReachM : SHAPES.setupReachM;
-    const cost = (kind: ShapeKind, edge = shapeEdge(kind, origin.y, this.dir, tackle), linkSlot?: 4 | 5) => {
-      const shape = { kind, edge, dir: this.dir, side: this.attacking, startedTick: this.tick, ...(linkSlot ? {linkSlot} : {}) };
-      const packet = packetSlots(kind, edge, linkSlot).map(slot => this.at(this.attacking, slot));
+    const cost = (kind: ShapeKind, edge = shapeEdge(kind, origin.y, this.dir, tackle), linkSlot?: 4 | 5, backDoor?: AttackingShape['backDoor']) => {
+      const shape = { kind, edge, dir: this.dir, side: this.attacking, startedTick: this.tick, ...(linkSlot ? {linkSlot} : {}), ...(backDoor ? {backDoor} : {}) };
+      const packet = packetSlots(kind, edge, linkSlot, backDoor).map(slot => this.at(this.attacking, slot));
       if (packet.some(p => !this.onField(p) || p.subFor !== null || this.locked(p)
         || p === this.holder() || p === this.dummyHalf(this.attacking))) return Infinity;
       const travel = Math.max(...packet.map(p => dist(p.body.pos, shapeTarget(shape,p.slot,origin))));
@@ -46,10 +46,20 @@ export abstract class LivePositioning extends LiveContact {
     // Either free half may link the same two forwards; choose the nearest feasible packet, no dice.
     const pods = ([-1,1] as const).flatMap(edge => ([4,5] as const).map(linkSlot => ({edge,linkSlot,cost:cost('pod',edge,linkSlot)})));
     const pod = pods.sort((a,b)=>a.cost-b.cost)[0]!;
-    const feasible = { pod: Number.isFinite(pod.cost), edge: Number.isFinite(cost('edge')) };
+    const ref = (p: Player) => ({side:p.side,slot:p.slot,who:p.key});
+    const backs = SHAPES.backDoor.on <= 0 ? [] : ([4,5] as const).flatMap(slot => ([7,8] as const).map(lead => {
+      const caller = this.at(this.attacking,slot);
+      const edge: 1 | -1 = caller.body.pos.y < origin.y ? -1 : caller.body.pos.y > origin.y ? 1 : shapeEdge('back-door',origin.y,this.dir,tackle);
+      const backDoor = {caller:ref(caller),lead:ref(this.at(this.attacking,lead)),support:ref(this.at(this.attacking,0)),
+        originY:clamp(origin.y,SHAPES.marginM+SHAPES.backDoor.sweepWidthM,FIELD_WIDTH-SHAPES.marginM-SHAPES.backDoor.sweepWidthM)};
+      return {edge,backDoor,cost:cost('back-door',edge,undefined,backDoor)};
+    }));
+    const back = backs.sort((a,b)=>a.cost-b.cost)[0];
+    const feasible = { pod: Number.isFinite(pod.cost), edge: Number.isFinite(cost('edge')), backDoor: !!back && Number.isFinite(back.cost) };
     const choice = chooseShape(this.tactics[this.attacking].attack, tackle,
       this.toLineFor(this.attacking, origin), origin.y, this.rng.next(), this.dir, feasible);
     ph.shape = { ...choice, ...(choice.kind === 'pod' ? {edge:pod.edge,linkSlot:pod.linkSlot} : {}),
+      ...(choice.kind === 'back-door' && back ? {edge:back.edge,backDoor:back.backDoor} : {}),
       side: this.attacking, dir: this.dir, startedTick: this.tick };
   }
 
@@ -57,12 +67,25 @@ export abstract class LivePositioning extends LiveContact {
     const ph = this.phase;
     if (SHAPES.on <= 0 || (ph.kind !== 'tackle' && ph.kind !== 'ruck' && ph.kind !== 'play') || !ph.shape
       || ph.shape.side !== this.attacking || ph.shape.dir !== this.dir || this.scripted) return null;
-    if (packetSlots(ph.shape.kind, ph.shape.edge, ph.shape.linkSlot).some(slot => {
+    if (packetSlots(ph.shape.kind, ph.shape.edge, ph.shape.linkSlot, ph.shape.backDoor).some(slot => {
       const p = this.at(this.attacking, slot);
       return !this.onField(p) || p.subFor !== null;
     })) return null;
     if (ph.kind === 'play' && (this.pendingKick || this.ball.kind === 'loose'
       || (this.ball.kind === 'flight' && this.ball.via !== 'pass'))) return null;
+    if (ph.shape.kind === 'back-door') {
+      const b = ph.shape.backDoor;
+      if (SHAPES.backDoor.on <= 0 || !b) return null;
+      const men = [b.caller,b.lead,b.support].map(r => this.side(r.side).find(p => p.slot===r.slot && p.key===r.who));
+      if (men.some(p => !p || this.locked(p) || p.subFor!==null)) return null;
+      if (ph.kind === 'play') {
+        const h = this.holder(), flight = this.ball.kind === 'flight' ? this.ball : null;
+        if (ph.shape.secondPass) {
+          if (!(flight?.via==='pass' && flight.t0===ph.shape.secondPass.startedTick && flight.receiver===this.indexOf(men[2]!))
+            && !(h===men[2] && h.catchTick===this.tick)) return null;
+        } else if (!(h===men[0] && !h.decided) && !(flight?.via==='pass' && flight.receiver===this.indexOf(men[0]!))) return null;
+      }
+    }
     return ph.shape;
   }
 
@@ -356,15 +379,34 @@ export abstract class LivePositioning extends LiveContact {
           p.wantsSprint = this.tick < p.burstUntil || broken || this.laneClear(p);
         } else p.target = { ...p.body.pos };
       } else if (p === receiver) {
-        // A pass thrown in front of him is run onto, through the catch point;
-        // one at or behind him (or a kick) he checks and gets under.
-        const onto = flight!.via === 'pass' && (flight!.to.x - p.body.pos.x) * this.dir > 0.5;
-        p.target = onto ? clampToGround(add(flight!.to, { x: this.dir * LIVE.runOnM, y: 0 }), 1) : { ...flight!.to };
-        p.through = onto;
-        // Under a kick he goes; onto a pass he runs at pace but keeps his gas for the line.
-        p.wantsSprint = flight!.via === 'kick';
+        const sweep = shape?.secondPass?.supportTo;
+        if (sweep) {
+          p.target = clampToGround(sweep, 1);
+          p.through = true;
+        } else {
+          // A pass thrown in front of him is run onto, through the catch point;
+          // one at or behind him (or a kick) he checks and gets under.
+          const onto = flight!.via === 'pass' && (flight!.to.x - p.body.pos.x) * this.dir > 0.5;
+          p.target = onto ? clampToGround(add(flight!.to, { x: this.dir * LIVE.runOnM, y: 0 }), 1) : { ...flight!.to };
+          p.through = onto;
+          p.wantsSprint = flight!.via === 'kick';
+        }
       } else if (p === this.dummyHalf(atk) && (ph.kind === 'tackle' || ph.kind === 'ruck')) {
         p.target = this.dummyHalfSpot();
+      } else if (shape?.kind === 'back-door' && ph.kind === 'ruck'
+        && (ph.stage !== 'down' || this.tick >= ph.t0 + ph.down - SHAPES.backDoor.sweepLeadTicks)
+        && p.slot === shape.backDoor!.support.slot) {
+        // The fullback starts winding out from depth as the tackled man gets up.
+        const caller = this.at(atk, shape.backDoor!.caller.slot);
+        p.target = clampToGround(backDoorTarget(shape, p.slot, caller.body.pos)!, 1);
+        p.through = true;
+      } else if (shape?.kind === 'back-door' && ph.kind === 'ruck' && ph.stage === 'dh'
+        && p.slot === shape.backDoor!.lead.slot) {
+        // Start the lead on the heel, before the half runs onto the pass. The
+        // DH's retreat to collect the ball must not turn the lead back with him.
+        const caller = this.at(atk, shape.backDoor!.caller.slot);
+        p.target = clampToGround(backDoorTarget(shape, p.slot, caller.body.pos)!, 1);
+        p.wantsSprint = true;
       } else if (ph.kind === 'ruck' && ph.stage === 'dh' && !this.locked(p) && !this.anticipatingGrubber(p)) {
         // The ball is heeled: the backline comes onto it, so the first receiver
         // hits the pass at pace instead of standing flat-footed. The forwards
@@ -378,7 +420,12 @@ export abstract class LivePositioning extends LiveContact {
         p.target = this.grubberChaseSpot(p);
         p.wantsSprint = this.pendingKick?.kind === 'grubber' || dist(p.body.pos, p.target) > 8;
         p.through = true;
-      } else if (shape && packetSlots(shape.kind,shape.edge,shape.linkSlot).includes(p.slot) && (ph.kind === 'tackle' || ph.kind === 'ruck') && !this.locked(p)) {
+      } else if (shape?.kind==='back-door' && ph.kind==='play' && !this.locked(p)
+        && (p.slot===shape.backDoor!.lead.slot || p.slot===shape.backDoor!.support.slot)) {
+        p.target=clampToGround(backDoorTarget(shape,p.slot,anchor)!,1);
+        p.through=!shape.secondPass;
+        p.wantsSprint=!shape.secondPass && (p.slot===shape.backDoor!.lead.slot || carrier?.sprinting===true);
+      } else if (shape && packetSlots(shape.kind,shape.edge,shape.linkSlot,shape.backDoor).includes(p.slot) && (ph.kind === 'tackle' || ph.kind === 'ruck') && !this.locked(p)) {
         p.target = clampToGround(shapeTarget(shape, p.slot, anchor), 1);
       } else if (supports.includes(p)) {
         const s = spots[supports.indexOf(p) as 0 | 1];

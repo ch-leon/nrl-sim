@@ -59,7 +59,7 @@ describe('ordinary attacking structures (#649)', () => {
     expect(shapeWeights('grind', 1, 90, 34).pod).toBeGreaterThan(shapeWeights('expansive', 1, 90, 34).pod);
     expect(shapeWeights('balanced', 4, 15, 34).edge).toBeGreaterThan(shapeWeights('balanced', 1, 90, 34).edge);
     expect(shapeWeights('expansive', 4, 10, 3).edge).toBe(0);
-    expect(new Set(Array.from({ length: 100 }, (_, i) => chooseShape('balanced', 3, 30, 34, i / 100).kind))).toEqual(new Set(['spread','pod','edge']));
+    expect(new Set(Array.from({ length: 100 }, (_, i) => chooseShape('balanced', 3, 30, 34, i / 100).kind))).toEqual(new Set(['spread','pod','edge','back-door']));
     expect(shapeEdge('edge', 34, 1, 1)).toBe(-shapeEdge('edge', 34, 1, 2));
     expect(listKnobs().map(k => k.path)).toContain('shapes.setupReachM');
   });
@@ -127,7 +127,8 @@ describe('ordinary attacking structures (#649)', () => {
     const spec='node:crypto',{createHash}=await import(spec);
     expect(`${sim.points.home}-${sim.points.away}:${parts.length}:${createHash('sha256').update(parts.join('|')).digest('hex').slice(0,16)}`).toBe('6-0:137:a3aab7b7c35c2c99');
   });
-  it('observes actual default structures and packet setup on the lab sides without reads changing play', () => {
+  it('preserves the original three structures with back-door off, without reads changing play', () => {
+    restore.push(applyTuning({'shapes.backDoor.on':0}));
     class Probe extends LiveSim { packet() { return this.players.map(p=>({slot:p.slot,side:p.side,who:p.key,x:p.body.pos.x,y:p.body.pos.y,target:p.target,free:!this.locked(p)})); } }
     const home=labSheet(DEFAULT_HOME),away=labSheet(DEFAULT_AWAY),sim=new Probe(home,away,1),control=new LiveSim(home,away,1);
     const choices=new Map<number,NonNullable<ReturnType<typeof sim.snapshot>['attackShape']>>();

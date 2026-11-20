@@ -33,8 +33,24 @@ Together, the two samples give 40.2% off versus 39.1% on over 1,600 games each.
 This does not prove balance parity; it does not justify retuning to the initial
 sample. Defaults remain unchanged. Leon approved merging #714/#715 on 17 November;
 the branches integrate the newer career work before their final checks. The PRs
-record the merge outcome. Back-door passing and support runs are next; their new
-PR stays open for review.
+record the merge outcome. Back-door support runs followed in #722 (below).
+
+## Back-door support runs (#722)
+
+The back door is a fourth ordinary attacking shape, built on #715's pods and edge
+shifts in `attackingShapes.ts`. When it is chosen, a half, a forward lead and the
+fullback are picked once from the players who can reach their spots. The forward
+starts his lead run as the ball is heeled. The fullback starts his wide sweep from
+depth a few ticks before the tackled player plays the ball, and runs through the
+catch at pace if the half passes behind the lead to him. Who gets the ball is still
+the ordinary weighted receiver choice. Pass, interception, catch and contact odds
+are unchanged. A different pass, a coach call or a set play ends the option without
+a new roll.
+
+`shapes.backDoor.on:0` restores #715's three-shape match and RNG stream exactly.
+Live-match recovery uses engine revision 7. BAK-208 and the tuning reference list
+the rules and values. The PR records the balance comparison and the #322 edge-race
+check.
 
 Status: stages 1–4 presentation and the first stage-5 pass are implemented in
 five linked PRs. Leon reviewed the clip and approved merging on 17 November
