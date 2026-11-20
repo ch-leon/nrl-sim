@@ -1,0 +1,142 @@
+diff --git a/src/match/balance/measure.ts b/src/match/balance/measure.ts
+index 0d76ca05..979d40fb 100644
+--- a/src/match/balance/measure.ts
++++ b/src/match/balance/measure.ts
+@@ -28,6 +28,36 @@ import { labSheet, starTraits } from '../lab/sheets';
+ import { POSITION_GROUPS, type Cell, type SideSpec } from './plan';
+ import { FLOW, FirstReceivers, LAST_TACKLES, ORIGINS, PlayWatch, RECEIVERS, ScoreLine, TERRITORY, Territory, type FlowKey, type LastTackleKey, type OriginKey, type ReceiverKey, type TerritoryKey } from './watch';
+ 
++import { appendFileSync } from 'node:fs';
++import { landed, type BallState } from '../core/ball';
++import { FIELD_LENGTH, MID_Y } from '../core/field';
++import { dist, type Vec } from '../core/vec';
++import { other } from '../league/live/types';
++import { ROLES } from '../league/roles';
++
++type KickFlight = Extract<BallState, { kind: 'flight' }>;
++interface OrdinaryLongKick {
++  tick: number;
++  kickerSide: Side;
++  attack: string;
++  launchX: number;
++  launchY: number;
++  targetX: number;
++  targetY: number;
++  forwardM: number;
++  centreOffsetM: number;
++  receivingBackAtLaunchM: number | null;
++  landing: {
++    x: number;
++    y: number;
++    receivingBackM: number | null;
++    receivingAnyM: number | null;
++    chasingM: number | null;
++    chaseMinusReceiveM: number | null;
++    outcome: string;
++  } | null;
++}
++
+ /** Exact fit fixtures belong to the headless harness, never the live game or saved sheets. */
+ export class BalanceSim extends LiveSim {
+   constructor(home: TeamSheet, away: TeamSheet, seed: number, options: LiveOptions = {},
+@@ -46,6 +76,84 @@ export class BalanceSim extends LiveSim {
+     if (changed) this.setForKickoff(this.firstReceiver === 'home' ? 'away' : 'home');
+   }
+ 
++  // Passive experiment instrumentation. A BalanceSim observer does not drive play.
++  readonly longKickObservations: OrdinaryLongKick[] = [];
++  readonly excludedKicks: Record<string, number> = {};
++  pensTouchObserved = 0;
++  private observedLongFlight: { flight: KickFlight; ordinary: OrdinaryLongKick } | null = null;
++
++  protected override launchPendingKick(): void {
++    const pending = this.pendingKick;
++    if (!pending || this.tick < pending.at) return super.launchPendingKick();
++    const kicker = this.players[pending.kicker]!;
++    const kickEarly = !this.lastPlay && this.callState[kicker.side].attack === 'kick-early';
++    const scripted = this.playKick !== null;
++    super.launchPendingKick();
++    const excluded = pending.dropOut ? 'drop-out' : pending.kickoff ? 'kickoff'
++      : pending.kind !== 'long' ? pending.kind : pending.aim ?? (scripted ? 'scripted' : kickEarly ? 'coach-kick-early' : null);
++    if (excluded) {
++      this.excludedKicks[excluded] = (this.excludedKicks[excluded] ?? 0) + 1;
++      return;
++    }
++    if (this.controlList.length > 0) throw new Error('Manual intents are outside this observation fixture');
++    const flight = this.ball;
++    if (flight.kind !== 'flight' || flight.via !== 'kick' || flight.t0 !== this.tick) {
++      throw new Error(`Ordinary kick did not launch its expected flight at ${this.tick}`);
++    }
++    const dir = this.dirOf(kicker.side);
++    const receiving = other(kicker.side);
++    const along = (x: number): number => dir > 0 ? x : FIELD_LENGTH - x;
++    const ordinary: OrdinaryLongKick = {
++      tick: this.tick, kickerSide: kicker.side, attack: this.tactics[kicker.side].attack,
++      launchX: along(flight.from.x), launchY: flight.from.y,
++      targetX: along(flight.to.x), targetY: flight.to.y,
++      forwardM: (flight.to.x - flight.from.x) * dir, centreOffsetM: Math.abs(flight.to.y - MID_Y),
++      receivingBackAtLaunchM: this.nearestAtFlight(flight.to, receiving, true),
++      landing: null,
++    };
++    this.longKickObservations.push(ordinary);
++    this.observedLongFlight = { flight, ordinary };
++  }
++
++  protected override landings(): void {
++    if (this.penaltyKickUp && this.ball.kind === 'flight' && landed(this.ball, this.tick)) this.pensTouchObserved++;
++    const sample = this.observedLongFlight;
++    if (!sample || this.ball !== sample.flight || !landed(sample.flight, this.tick)) return super.landings();
++    this.observedLongFlight = null;
++    const { flight, ordinary } = sample;
++    const receiving = other(ordinary.kickerSide);
++    const receivingBackM = this.nearestAtFlight(flight.to, receiving, true);
++    const receivingAnyM = this.nearestAtFlight(flight.to, receiving, false);
++    const chasingM = this.nearestAtFlight(flight.to, ordinary.kickerSide, false);
++    const prior = this.tickEvents.length;
++    super.landings();
++    const events = this.tickEvents.slice(prior);
++    const currentBall = this.ball as BallState;
++    const outcome = events.some((event) => event.kind === 'drop') ? 'spill'
++      : events.some((event) => event.kind === 'regather') ? 'kicking regather'
++      : events.some((event) => event.kind === 'dead-ball' || event.kind === 'touch' || event.kind === 'on-full') ? 'out/dead'
++      : currentBall.kind === 'held' ? 'receiving catch'
++      : currentBall.kind === 'loose' || currentBall.via === 'bounce' ? 'bounce' : 'other';
++    ordinary.landing = {
++      x: ordinary.targetX, y: ordinary.targetY, receivingBackM, receivingAnyM, chasingM,
++      chaseMinusReceiveM: chasingM !== null && receivingAnyM !== null ? chasingM - receivingAnyM : null,
++      outcome,
++    };
++  }
++
++  private nearestAtFlight(at: Vec, side: Side, backsOnly: boolean): number | null {
++    // Kicking resets retreat. retreatLine is intentionally not called because it mutates eligibility.
++    if (this.retreat !== null) throw new Error('Unexpected active retreat during an ordinary kick flight');
++    const back = this.fullback(side);
++    let nearest = Infinity;
++    for (const man of this.side(side)) {
++      const role = ROLES[man.slot]!.name;
++      if (this.locked(man) || (backsOnly && man !== back && role !== 'fullback' && role !== 'winger' && role !== 'centre')) continue;
++      nearest = Math.min(nearest, dist(at, man.body.pos));
++    }
++    return Number.isFinite(nearest) ? nearest : null;
++  }
++
+   // Read-only views for the watchability counts (#648); they touch nothing in the sim.
+   /** The play now (or about to be) the one on the set's last tackle. */
+   get lastTackleUp(): boolean {
+@@ -636,6 +744,15 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
+           nextLegs += 3;
+         }
+       }
++      const observingPath = process.env.NRL_LONG_KICK_OBSERVATIONS;
++      if (observingPath) {
++        const excluded = { ...sim.excludedKicks };
++        if (sim.pensTouchObserved) excluded['penalty-touch'] = sim.pensTouchObserved;
++        appendFileSync(observingPath, JSON.stringify({
++          variant: cell.variant.name, scenario: cell.scenario.name, seed, flip,
++          excluded, observations: sim.longKickObservations, points: sim.points,
++        }) + '\n');
++      }
+       if (track) {
+         const trackedSide = onSim(track);
+         const sideCounts = (side: 'home' | 'away'): SideCounts => {

@@ -1,0 +1,39 @@
+{
+  "name": "ordinary long kick space geometry",
+  "description": "#650: Passive launch and first-landing telemetry on actual ordinary long kicks over 20 even seeds and 40 Kick-chase v Balanced seeds each orientation, defaults against longKick.on 0.",
+  "seeds": 20,
+  "scenarios": [
+    {
+      "name": "even 60 v 60",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "kick-chase v balanced",
+      "seeds": 40,
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "open-side target off",
+      "tuning": {
+        "longKick.on": 0
+      }
+    }
+  ]
+}
