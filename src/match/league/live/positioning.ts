@@ -160,6 +160,17 @@ export abstract class LivePositioning extends LiveContact {
     return { x, y: clamp(ROLES[p.slot]!.lane, 3, FIELD_WIDTH - 3) };
   }
 
+  private centreCarryTarget(p: Player): Vec | null {
+    const carry = this.centreCarry;
+    if (!carry) return null;
+    if (carry.carrier === p && carry.catchTick === p.catchTick && this.tick < carry.untilTick
+      && !this.locked(p) && !p.jink && this.tick >= p.immuneUntil && !this.pendingControl[p.side]
+      && !this.scripted && !this.pendingKick && !this.pendingGoal && p.subFor === null
+      && (carry.target.x - p.body.pos.x) * this.dir > BODY_RADIUS) return carry.target;
+    this.centreCarry = null;
+    return null;
+  }
+
   protected assignTargets(): void {
     const ph = this.phase;
     const shape = this.currentAttackShape();
@@ -349,8 +360,8 @@ export abstract class LivePositioning extends LiveContact {
           p.through = false;
           p.wantsSprint = true;
         } else if (ph.kind === 'play') {
-          const defs = this.side(def).filter((d) => !this.locked(d)).map((d) => d.body.pos);
-          p.target = gapTarget(p.body.pos, this.dir, defs);
+          p.target = this.centreCarryTarget(p)
+            ?? gapTarget(p.body.pos, this.dir, this.side(def).filter((d) => !this.locked(d)).map((d) => d.body.pos));
           p.through = true;
           // Space ahead, just beaten a man, or through the line: go.
           p.wantsSprint = this.tick < p.burstUntil || broken || this.laneClear(p);
