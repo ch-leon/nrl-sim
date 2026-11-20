@@ -10,7 +10,7 @@ function raw() {
 }
 it('upgrades a genuine v33 booked-free League save and refuses assignment injection before the marked-save migration', () => {
   const s = raw();
-  expect(migrateState(s)).toMatchObject({ ok: true, state: { version: 34, squad: s.squad } });
+  expect(migrateState(s)).toMatchObject({ ok: true, state: { version: SAVE_VERSION, squad: s.squad } });
   expect(migrateState({ ...s, competitions: { ...s.competitions, assignments: [] } })).toMatchObject({ ok: false });
 });
 it('rejects unknown record keys, invalid revisions, late reservations, absent owners and half-ticked Away imports', () => {

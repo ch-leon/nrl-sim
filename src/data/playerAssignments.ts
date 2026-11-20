@@ -5,6 +5,7 @@ import type { CompetitionCareerState } from './competition';
 import { canonicalLeagueJson } from './leagueCareer';
 import type { CampAwardReceipt } from '../systems/assignmentTraining';
 
+export const CAMP_BASE_XP = 70;
 export const CAMP_RULES = {
   definitionId: 'skills-camp',
   version: 1,
@@ -16,7 +17,7 @@ export const CAMP_RULES = {
   minSquad: 13,
   onField: 9,
   bench: 4,
-  baseXp: 70,
+  baseXp: CAMP_BASE_XP,
   fee: 0,
   eligibility: 'owned-fit-unbanned',
   substitution: 'replace-weekly-xp',
@@ -102,7 +103,7 @@ export function supportedCampCalendar(c: CompetitionCareerState, pack: string) {
     same(c.openCupEntry.current.dates, [7, 10, 13, 16, 19])
   );
 }
-function validAward(a: CampAwardReceipt): boolean {
+export function validAssignmentAward(a: CampAwardReceipt, maximumXp = 210): boolean {
   if (
     !fields(a, [
       'effectiveXp',
@@ -124,7 +125,7 @@ function validAward(a: CampAwardReceipt): boolean {
     ![a.xpBefore, a.xpAfter].every((n) => Number.isFinite(n) && n >= 0 && n < PROGRESSION.XP_PER_LEVEL) ||
     !Number.isFinite(a.effectiveXp) ||
     a.effectiveXp <= 0 ||
-    a.effectiveXp > 210 ||
+    a.effectiveXp > maximumXp ||
     Math.abs(a.effectiveXp - (a.levelsGained * PROGRESSION.XP_PER_LEVEL + a.xpAfter - a.xpBefore)) > 1e-8 ||
     a.newPoints !== a.levelsGained * PROGRESSION.POINTS_PER_LEVEL ||
     a.bankedAfter !== a.bankedBefore + a.newPoints - a.pointsSpent ||
@@ -139,7 +140,7 @@ function validAward(a: CampAwardReceipt): boolean {
   );
 }
 
-function validBasis(b: CampAwardBasis | null): boolean {
+export function validAssignmentBasis(b: CampAwardBasis | null): boolean {
   if (
     !b ||
     !fields(b, ['age', 'xpTraits', 'stats', 'clubFocus']) ||
@@ -213,7 +214,7 @@ export function validateAssignments(value: unknown, c: CompetitionCareerState, c
       r.opponentId === r.clubId
     )
       return 'assignment terms';
-    if (r.status === 'completed' ? !validBasis(r.awardBasis) : r.awardBasis !== null) return 'assignment development inputs';
+    if (r.status === 'completed' ? !validAssignmentBasis(r.awardBasis) : r.awardBasis !== null) return 'assignment development inputs';
     seen.add(r.id);
     const hasSeason = c.instances.some((i) => i.season === r.season);
     const opening = openingCampFixture(c, r.season, r.clubId);
@@ -260,7 +261,7 @@ export function validateAssignments(value: unknown, c: CompetitionCareerState, c
         (week !== undefined && week < 6) ||
         r.reason !== null ||
         !r.award ||
-        !validAward(r.award) ||
+        !validAssignmentAward(r.award) ||
         (opening && !['completed', 'cancelled'].includes(opening.fixture.status))
       )
         return 'assignment completion';

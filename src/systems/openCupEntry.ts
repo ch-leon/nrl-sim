@@ -1,3 +1,4 @@
+import { runningChallengeContext } from '../core/time';
 import { FORFEIT_SCORE } from '../config';
 import type { GameState } from '../core/state';
 import { validateCompetitions, type CompetitionCareerState } from '../data/competition';
@@ -56,6 +57,7 @@ export function createOpenCupOffer(state: GameState): GameState {
 
 function checked(state: GameState, competitions: CompetitionCareerState): GameState {
   const problem = validateCompetitions(competitions, {
+    runningChallenge: runningChallengeContext(state),
     pack: state.pack ?? 'au',
     season: state.season,
     week: state.week,

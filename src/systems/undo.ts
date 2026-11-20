@@ -1,3 +1,4 @@
+import { awaitingCampReplay } from './parkedLeagueFixture';
 import { careerActionClock, type CareerActionClock } from '../core/season';
 // src/systems/undo.ts — the 5-second Undo after a build, a signing or a demolish
 // (#370). It replaces the confirm taps: the action happens at once, and a toast
@@ -74,6 +75,7 @@ export function offerUndo(offer: UndoOffer, kind: 'info' | 'success' = 'success'
 
 /** Take the open offer back. False (and the offer gone) when there is none or it can't be reversed. */
 export function undoNow(now = Date.now()): boolean {
+  if (awaitingCampReplay(getState())) return false;
   const o = currentOffer(now);
   open = null;
   if (weekHeld() || !o || !o.canRevert(getState())) return false;

@@ -26,6 +26,13 @@ import { fmtMoney } from '../utils/money';
 import { el, button, openModal, closeModal, activeScreen, dialogOpen } from './dom';
 import { ADVANCE_FAILED_TEXT } from './hud';
 import { demoBlocked } from '../commercial/demo';
+import { dueIndividualChallenge } from '../systems/individualChallenges';
+import { challengeAdvanceProblem } from '../systems/individualChallengeCommit';
+import { CHALLENGE_EDITIONS } from '../data/individualChallengeRules';
+import { openIndividualChallenge } from './screens/individualChallenges';
+import { weekHeld } from '../core/time';
+import { closingEventOpportunities } from '../systems/eventOpportunities';
+import { remindClosingEvents } from './eventOpportunities';
 
 // ── View-model (pure) ─────────────────────────────────────────────────────────
 
@@ -89,15 +96,27 @@ export function decisionViews(state: GameState): DecisionView[] {
 
 /** The decisions chip's list (3a): soonest due first, each with when it is due. Pure. */
 export function decisionChipItems(state: GameState): { title: string; note: string }[] {
-  return decisionViews(state)
+  const challenge = dueIndividualChallenge(state);
+  const challengeProblem = challenge && !weekHeld() ? challengeAdvanceProblem(state) : null;
+  const event = challenge && challengeProblem
+    ? [{ title: CHALLENGE_EDITIONS[challenge.editionId].name, note: challengeProblem }] : [];
+  return [...event, ...decisionViews(state)
     .slice()
     .sort((a, b) => a.advancesLeft - b.advancesLeft)
-    .map((v) => ({ title: v.title, note: v.advancesLeft === 1 ? 'due now' : `${v.advancesLeft} wks left` }));
+    .map((v) => ({ title: v.title, note: v.advancesLeft === 1 ? 'due now' : `${v.advancesLeft} wks left` }))];
 }
 
 /** Number of cards waiting for a choice (the News and Advance Week badges). */
 export function pendingDecisionCount(state: GameState): number {
-  return state.eventDeck.pending.length;
+  return state.eventDeck.pending.length + Number(!weekHeld() && !!dueIndividualChallenge(state) && !!challengeAdvanceProblem(state));
+}
+
+/** A contest never supplies a default coaching decision to an advance. */
+function openRequiredChallenge(): HTMLElement | null {
+  const state = getState();
+  const challenge = dueIndividualChallenge(state);
+  return !weekHeld() && challenge && challengeAdvanceProblem(state)
+    ? openIndividualChallenge(challenge.editionId) : null;
 }
 
 /** The card's deadline, in advances rather than calendar weeks. */
@@ -183,6 +202,8 @@ export function decisionCard(view: DecisionView, onChoose: (id: string, index: n
  * answers), offers its button. A region dialog: the HUD and nav stay usable.
  */
 export function openDecisions(opts: { then?: { label: string; run: () => void } } = {}): HTMLElement | null {
+  const challenge = openRequiredChallenge();
+  if (challenge) return challenge;
   const content = el('div', { class: 'nrl-decisions', attrs: { 'data-decisions': '' } });
   const render = (): void => {
     const views = decisionViews(getState());
@@ -223,10 +244,16 @@ export function openDecisions(opts: { then?: { label: string; run: () => void } 
  * weeks would take by default, and offers Answer now (the decisions popup, then
  * Keep advancing) or going ahead, which takes the defaults that fall due.
  */
-export function askBeforeAdvance(span: number, proceed: () => void): void {
+export function askBeforeAdvance(span: number, proceed: (acknowledged: ReadonlySet<string>) => void, acknowledged: ReadonlySet<string> = new Set()): void {
+  if (openRequiredChallenge()) return;
+  const closing = demoBlocked() ? [] : closingEventOpportunities(getState(), span, acknowledged);
+  if (closing.length) {
+    remindClosingEvents(closing, () => askBeforeAdvance(span, proceed, new Set([...acknowledged, ...closing.map(e => e.key)])));
+    return;
+  }
   const ask = demoBlocked() ? null : advanceAsk(getState(), span);
   if (!ask) {
-    proceed();
+    proceed(acknowledged);
     return;
   }
   const list = el('ul', { class: 'nrl-ask-list' });
@@ -234,9 +261,9 @@ export function askBeforeAdvance(span: number, proceed: () => void): void {
     list.append(el('li', { class: `nrl-ask-row${r.due ? ' nrl-ask-due' : ''}`, attrs: { 'data-ask-row': r.id } },
       el('span', { class: 'nrl-ask-title', text: r.title }), el('span', { class: 'nrl-ask-note', text: r.note })));
   }
-  const answer = button('Answer now', () => openDecisions({ then: { label: 'Keep advancing', run: () => askBeforeAdvance(span, proceed) } }), { class: 'nrl-ask-answer nrl-btn-primary' });
+  const answer = button('Answer now', () => openDecisions({ then: { label: 'Keep advancing', run: () => askBeforeAdvance(span, proceed, acknowledged) } }), { class: 'nrl-ask-answer nrl-btn-primary' });
   answer.setAttribute('data-ask-answer', '');
-  const go = button(ask.proceed, () => { closeModal(); proceed(); }, { class: 'nrl-ask-proceed' });
+  const go = button(ask.proceed, () => { closeModal(); proceed(acknowledged); }, { class: 'nrl-ask-proceed' });
   go.setAttribute('data-ask-proceed', '');
   const n = ask.rows.length;
   const content = el('div', { class: 'nrl-ask', attrs: { 'data-advance-ask': '' } },
@@ -254,28 +281,34 @@ export function askBeforeAdvance(span: number, proceed: () => void): void {
  * the badge and News say the card is there. Errors in the run are posted, as
  * the HUD does for its own runs.
  */
-export function advanceUntilAsked(target: AdvanceTarget, run: (t: AdvanceTarget) => Promise<AdvanceRun>, opts: { confirmed?: boolean } = {}): void {
+export function advanceUntilAsked(target: AdvanceTarget, run: (t: AdvanceTarget, acknowledged?: ReadonlySet<string>) => Promise<AdvanceRun>, opts: { confirmed?: boolean; acknowledged?: ReadonlySet<string> } = {}): void {
+  if (openRequiredChallenge()) return;
   const span = targetSpan(target, getState().week, getState().preseason);
   // With a card waiting, the ask below puts this question instead (one dialog, not two).
   const question = pendingDecisionCount(getState()) === 0 && !opts.confirmed && !demoBlocked() ? longAdvanceQuestion(span) : null;
   if (question) {
-    confirmLongAdvance(question, () => advanceUntilAsked(target, run, { confirmed: true }));
+    confirmLongAdvance(question, () => advanceUntilAsked(target, run, { ...opts, confirmed: true }));
     return;
   }
-  askBeforeAdvance(span, () => {
+  askBeforeAdvance(span, (acknowledged) => {
     const startSeason = getState().season;
-    run(target).then((r) => {
-      if (r.stop.kind !== 'decision') return;
+    run(target, acknowledged).then((r) => {
+      if (r.stop.kind === 'challenge-decision') { if (!dialogOpen()) openRequiredChallenge(); return; }
+      if (r.stop.kind !== 'decision' && r.stop.kind !== 'event-deadline') return;
       const s = getState();
       const rest = remainingTarget(target, { weeksPlayed: r.weeksPlayed, week: s.week, startSeason, season: s.season,
         seasonClosed: s.competitions?.leagueCareer?.phase === 'next-season-choice' });
       if (!rest || activeScreen() || dialogOpen()) return;
-      openDecisions({ then: { label: keepAdvancingLabel(rest), run: () => advanceUntilAsked(rest, run, { confirmed: true }) } });
+      if (r.stop.kind === 'event-deadline') {
+        advanceUntilAsked(rest, run, { confirmed: true, acknowledged });
+        return;
+      }
+      openDecisions({ then: { label: keepAdvancingLabel(rest), run: () => advanceUntilAsked(rest, run, { confirmed: true, acknowledged }) } });
     }).catch((err: unknown) => {
       console.error(err);
       bus.emit('ui:notify', { text: ADVANCE_FAILED_TEXT, kind: 'danger' });
     });
-  });
+  }, opts.acknowledged);
 }
 
 /** #350 H3: one slip on the ▾ menu must not play out a season. */

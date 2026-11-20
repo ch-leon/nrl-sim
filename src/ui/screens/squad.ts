@@ -24,7 +24,8 @@ import { PLAYER_ID } from '../../systems/fixtures';
 import { kitFromColors } from '../../art/match/kit';
 import { portraitDataUrl } from '../../art/portrait';
 import { ensurePartsStyles, fitnessTone, starsEl, statusDot } from '../parts';
-import { campAbsenceText, campAvailability } from './playerAssignments';
+import { clubReservations } from '../../systems/playerAvailability';
+import { nextReservation, reservationText, tripLabel } from '../playerReservations';
 
 // ── Squad's segments ────────────────────────────────────────────────────────
 
@@ -240,7 +241,7 @@ function openSquadList(): void {
       return;
     }
     const numbers = squadNumbers(s);
-    const camp = campAvailability(s);
+    const trips = clubReservations(s);
     const onBench = new Set(s.lineup.bench.filter((id): id is string => id !== null));
     const focus = s.training?.focus ?? 'balanced';
     const kit = kitFromColors(s.league.clubs.find((c) => c.id === PLAYER_ID)?.colors ?? DEFAULT_PLAYER_COLORS, PLAYER_ID);
@@ -268,11 +269,12 @@ function openSquadList(): void {
           return el('span', { class: `nrl-num nrl-squad-stat ${tone}`.trim(), text: String(v), attrs: { title: focus === k ? `${STAT_HEAD[k]}: this week's training focus` : STAT_HEAD[k] } });
         });
         const injured = p.injuredWeeks > 0;
-        const absence = campAbsenceText(camp, p.id);
-        const inSide = absence ? 'Camp' : no ? (no <= 9 ? `#${no}` : 'Bench') : onBench.has(p.id) ? 'Bench' : '—';
+        const absence = reservationText(trips, p.id);
+        const trip = nextReservation(trips,p.id);
+        const inSide = trip ? tripLabel(trip) : no ? (no <= 9 ? `#${no}` : 'Bench') : onBench.has(p.id) ? 'Bench' : '—';
         const row = tableRow(p, [
           el('img', { class: 'nrl-squad-face', attrs: { src: portraitDataUrl(p.id, kit), alt: '', width: '28', height: '32' } }),
-          whoCell(p.name, absence && camp ? `Camp · Back W${camp.rules.returnWeek}` : availabilityNote(p), traitChips(p), ending.has(p.id) ? `contract ${endsInTag(p)}` : undefined),
+          whoCell(p.name, trip ? `${tripLabel(trip)} · Back W${trip.week+1}` : availabilityNote(p), traitChips(p), ending.has(p.id) ? `contract ${endsInTag(p)}` : undefined),
           el('span', { class: 'nrl-row-pos', text: posShort(p.position), attrs: { title: positionLabel(p.position) } }),
           starsEl(playerStars(p), { size: 12, class: 'nrl-row-ovr' }),
           ...statCells,
@@ -282,7 +284,7 @@ function openSquadList(): void {
           el('span', { class: 'nrl-num nrl-squad-inside', text: inSide, attrs: { title: no ? (no <= 9 ? 'Starting this week' : 'On the bench this week') : 'Not in the side this week' } }),
         ], () => openPlayerPage(p, { kind: 'squad' }));
         if (absence) {
-          row.setAttribute('data-camp-absence', p.id);
+          row.setAttribute(trip && tripLabel(trip)==='Contest' ? 'data-challenge-absence' : 'data-camp-absence', p.id);
           row.setAttribute('aria-label', `${p.name}, ${absence}. Open player page.`);
           row.title = absence;
         }

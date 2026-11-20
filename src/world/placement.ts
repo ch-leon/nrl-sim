@@ -21,6 +21,7 @@ import { GRID_W, GRID_H } from '../config';
 import { isFacilityOpen, unlockReason } from '../systems/unlocks';
 import { getState, setState, type GameState, type PlacedFacility } from '../core/state';
 import { bus } from '../core/events';
+import { awaitingCampReplay } from '../systems/parkedLeagueFixture';
 import { addFacility } from '../data/club';
 import { FACILITY_CATALOG, upgradeCost, type FacilityDef, type FacilityDefId } from '../data/facility';
 import { GROUNDS } from '../config';
@@ -248,7 +249,7 @@ export type MoveResult = PlaceValidation & { fee?: number };
 export function moveFacility(facilityId: string, x: number, y: number): MoveResult {
   const s = getState();
   const facility = s.facilities.find((f) => f.id === facilityId);
-  if (weekHeld()) return { ok: false, reason: 'busy' };
+  if (weekHeld() || awaitingCampReplay(getState())) return { ok: false, reason: 'busy' };
   if (!facility) return { ok: false, reason: 'missing' };
   if (facility.x === x && facility.y === y) return { ok: true, fee: 0 };
   const v = validateMove(s, facility, x, y);
@@ -265,7 +266,7 @@ export function moveFacility(facilityId: string, x: number, y: number): MoveResu
 export function upgradeFacility(facilityId: string): boolean {
   const s = getState();
   const facility = s.facilities.find((f) => f.id === facilityId);
-  if (weekHeld() || !facility || facility.level >= 3) return false;
+  if (weekHeld() || awaitingCampReplay(s) || !facility || facility.level >= 3) return false;
   const def = FACILITY_CATALOG[facility.defId];
   const nextLevel = (facility.level + 1) as 2 | 3;
   const cost = upgradeCost(def, nextLevel);
@@ -284,7 +285,7 @@ export function upgradeFacility(facilityId: string): boolean {
 export function demolishFacility(facilityId: string): number | null {
   const s = getState();
   const facility = s.facilities.find((f) => f.id === facilityId);
-  if (weekHeld() || !facility) return null;
+  if (weekHeld() || awaitingCampReplay(s) || !facility) return null;
   const def = FACILITY_CATALOG[facility.defId];
   const refund = demolishRefund(def, facility.level, facility.constructionSpend ?? 0);
   const balance = s.money + refund;
@@ -541,7 +542,7 @@ export class PlacementController {
    * and emits a neutral ui:notify (a refusal, not a problem: #339). Returns the validation result either way.
    */
   confirm(): PlaceValidation {
-    if (weekHeld()) return { ok: false, reason: 'busy' };
+    if (weekHeld() || awaitingCampReplay(getState())) return { ok: false, reason: 'busy' };
     if (this.defId === null) return { ok: false, reason: 'out-of-bounds' };
     const defId = this.defId;
     const def = FACILITY_CATALOG[defId];

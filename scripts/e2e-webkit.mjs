@@ -1,3 +1,5 @@
+import { runEventOpportunities } from './e2e-webkit/screens/eventOpportunities.mjs';
+import { runIndividualChallenges } from './e2e-webkit/screens/individualChallenges.mjs';
 import { runPlayerAssignments } from './e2e-webkit/screens/playerAssignments.mjs';
 import { runOpenCupEntry } from './e2e-webkit/screens/openCupEntry.mjs';
 import { runLeagueSelection } from './e2e-webkit/screens/leagueSelection.mjs';
@@ -105,6 +107,8 @@ const SECTIONS = [
   ['runLeagueSelection', (b) => runLeagueSelection(b)],
   ['runOpenCupEntry', (b) => runOpenCupEntry(b)],
   ['runPlayerAssignments', (b) => runPlayerAssignments(b)],
+  ['runIndividualChallenges', (b) => runIndividualChallenges(b)],
+  ['runEventOpportunities', (b) => runEventOpportunities(b)],
   ['runCounterText', (b) => runCounterText(b)],
   ['runTrials', (b) => runTrials(b)],
   ['runExpansionIntro', (b) => runExpansionIntro(b)],
@@ -142,7 +146,7 @@ const SECTIONS = [
 const GROUPS = {
   match: ['runPlaytest', 'runPauseSettings', 'runTutorialWalk', 'runCoachCalls', 'runLabsControls', 'runMatchPlays'],
   text: ['runCounterText', 'runLargeTextTargets', 'runLadderForm'],
-  screens: ['runLeagueSelection', 'runOpenCupEntry', 'runPlayerAssignments', 'runPlayerSales', 'runContentPacks', 'runTrials', 'runExpansionIntro', 'runDerby', 'runOfficeUnlocks', 'runUnlocks', 'runRecruit', 'runScreens', 'runTownSetup', 'runFlow', 'runCoachName', 'runDifficulty', 'runCoachVoice', 'runCoachSays', 'runPlaybook'],
+  screens: ['runLeagueSelection', 'runOpenCupEntry', 'runPlayerAssignments', 'runIndividualChallenges', 'runEventOpportunities', 'runPlayerSales', 'runContentPacks', 'runTrials', 'runExpansionIntro', 'runDerby', 'runOfficeUnlocks', 'runUnlocks', 'runRecruit', 'runScreens', 'runTownSetup', 'runFlow', 'runCoachName', 'runDifficulty', 'runCoachVoice', 'runCoachSays', 'runPlaybook'],
   portrait: ['runSize', 'runPortrait', 'runDockTextSize', 'runDevSettings'],
 };
 
@@ -167,6 +171,8 @@ const GROUPS = {
   }
 }
 
+const EVENTS_ONLY = argv.includes('--event-opportunities-only');
+const CHALLENGES_ONLY = argv.includes('--individual-challenges-only');
 const ASSIGNMENTS_ONLY = argv.includes('--player-assignments-only');
 const OPEN_CUP_ONLY = argv.includes('--open-cup-entry-only');
 const LEAGUE_ONLY = argv.includes('--league-selection-only');
@@ -182,12 +188,16 @@ if (argv.includes('--group') && !GROUPS[GROUP]) {
   console.error(`bad --group "${GROUP ?? ''}": want one of ${Object.keys(GROUPS).join(', ')}`);
   process.exit(2);
 }
-if (GROUP && (ASSIGNMENTS_ONLY || OPEN_CUP_ONLY || LEAGUE_ONLY || SALES_ONLY || SCREENS_ONLY || CONTROLS_ONLY || CALLS_ONLY || PLAYBOOK_ONLY || PLAYS_ONLY || DEV_ONLY)) {
+if (GROUP && (EVENTS_ONLY || CHALLENGES_ONLY || ASSIGNMENTS_ONLY || OPEN_CUP_ONLY || LEAGUE_ONLY || SALES_ONLY || SCREENS_ONLY || CONTROLS_ONLY || CALLS_ONLY || PLAYBOOK_ONLY || PLAYS_ONLY || DEV_ONLY)) {
   console.error('--group does not combine with a dedicated --*-only option');
   process.exit(2);
 }
 /** [name, run] pairs this invocation plays, in the full run's order. */
-const plan = ASSIGNMENTS_ONLY
+const plan = EVENTS_ONLY
+  ? SECTIONS.filter(([n]) => n === 'runEventOpportunities')
+  : CHALLENGES_ONLY
+  ? SECTIONS.filter(([n]) => n === 'runIndividualChallenges')
+  : ASSIGNMENTS_ONLY
   ? SECTIONS.filter(([n]) => n === 'runPlayerAssignments')
   : OPEN_CUP_ONLY
   ? SECTIONS.filter(([n]) => n === 'runOpenCupEntry')

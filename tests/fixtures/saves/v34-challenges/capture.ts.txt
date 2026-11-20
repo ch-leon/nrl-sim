@@ -1,0 +1,337 @@
+import { deepStrictEqual, equal, ok } from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { preparePack, selectPack } from '../src/content';
+import { bus, type Events } from '../src/core/events';
+import { __setStorage, __unlockSaves, exportSave, importSave, installImportedSave, loadSlot, saveIfChanged, setActiveSlot } from '../src/core/save';
+import { getState, loadState, SAVE_VERSION } from '../src/core/state';
+import { careerNamespace, setCareerNamespace } from '../src/core/storage/local';
+import { liveMatchKey, slotKey } from '../src/core/storageKeys';
+import { advanceWeek, failedIntervalProblem, weekHeld } from '../src/core/time';
+import { LiveSim } from '../src/match/league/live';
+import { MatchRecorder } from '../src/match/league/match';
+import { advanceWeekAsTapped, checkState, measuredMatch, registerAllSystems } from '../src/qa/soak';
+import { currentCalendarFixtures } from '../src/systems/competitionCalendar';
+import { startLeagueCareer } from '../src/systems/leagueCareerSetup';
+import { previewLeagueEntry } from '../src/systems/leagueEntry';
+import { confirmLeagueEntry } from '../src/systems/leagueEntryCommit';
+import { leagueCareerStateProblem } from '../src/systems/leagueEntryValidation';
+import { captureCampAction, confirmCampAction } from '../src/systems/playerAssignmentCommit';
+import { awayPlayerIds, currentSkillsCamp, projectCampDeparture } from '../src/systems/playerAssignments';
+import { LIVE_MATCH_EXPORT_FIELD, belongsToFixture, readLiveMatch, type LiveMatchRecord } from '../src/systems/liveMatchRecord';
+
+const [mode, pack, directory] = process.argv.slice(2);
+ok(mode === 'capture' || mode === 'verify' || mode === 'capture-camp' || mode === 'verify-camp', 'Expected capture, verify, capture-camp or verify-camp.');
+ok(pack === 'au' || pack === 'uk', 'Expected au or uk.');
+ok(directory, 'Provide the fixture directory.');
+equal(SAVE_VERSION, 34);
+
+const seed = 573;
+const pauseTick = 720;
+const slot = 1;
+const clubName = 'QA ' + pack.toUpperCase() + ' League';
+const home = pack === 'au' ? { town: 'Brisbane', country: 'AU' as const } : { town: 'Leeds', country: 'GB' as const };
+const weeks = [5, 6, 13, 14] as const;
+const dueRounds = new Map([[6, 2], [14, 7]]);
+const campFilename = 'v34-au-week-6-camp-completed.json';
+const bytes = new Map<string, string>();
+const storage = {
+  getItem: (key: string) => bytes.get(key) ?? null,
+  setItem: (key: string, value: string) => { bytes.set(key, value); },
+  removeItem: (key: string) => { bytes.delete(key); },
+};
+Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage });
+setCareerNamespace(null);
+__setStorage(storage);
+__unlockSaves();
+setActiveSlot(slot);
+await preparePack(pack);
+selectPack(pack);
+const match = measuredMatch();
+equal(match.fieldLength, 100);
+equal(match.halves, 2);
+equal(match.halfMinutes, 2.5);
+
+const filename = (week: number) => 'v34-' + pack + '-week-' + week + '.json';
+const sideName = (week: number) => 'live-matches/' + filename(week);
+const read = (name: string) => readFileSync(join(directory, name), 'utf8');
+const write = (name: string, text: string) => writeFileSync(join(directory, name), text);
+const sha256 = (text: string) => createHash('sha256').update(text).digest('hex');
+const describeFile = (name: string, text: string) => ({ filename: name, bytes: Buffer.byteLength(text), sha256: sha256(text) });
+
+function assertSettled(week: number) {
+  equal(failedIntervalProblem(), null);
+  equal(weekHeld(), false);
+  equal(getState().week, week);
+  equal(getState().competitions!.calendar!.elapsedIntervals, week - 1);
+  equal(bytes.has(liveMatchKey(slot)), false);
+}
+
+function checkBoundary(week: number, raw: string, campCompleted = false) {
+  const imported = importSave(raw);
+  if (!imported.ok) throw new Error(imported.message);
+  deepStrictEqual(imported.repairs, []);
+  const state = imported.state;
+  equal(JSON.stringify(state), raw);
+  equal(state.pack, pack);
+  equal(state.version, SAVE_VERSION);
+  equal(state.season, 1);
+  equal(state.week, week);
+  equal(state.settings.difficulty, 'normal');
+  equal(careerNamespace(), null);
+  equal(state.competitions!.calendar!.elapsedIntervals, week - 1);
+  equal(state.competitions!.leagueCareer!.phase, 'active');
+  equal(state.competitions!.leagueCareer!.scheduleSeed, seed);
+  equal(state.settings.liveRivals ?? false, false);
+  equal(state.competitions!.assignments?.length ?? 0, campCompleted ? 1 : 0);
+  if (campCompleted) equal(currentSkillsCamp(state)?.status, 'completed');
+  deepStrictEqual(checkState(state), []);
+  equal(leagueCareerStateProblem(state), null);
+  const now = currentCalendarFixtures(state).filter(({ fixture }) =>
+    fixture.homeId === state.clubId || fixture.awayId === state.clubId);
+  if (dueRounds.has(week)) {
+    equal(now.length, 1);
+    equal(now[0]!.fixture.round, dueRounds.get(week));
+  }
+  return state;
+}
+
+function boundaryReport(week: number, raw: string, campCompleted = false) {
+  const state = checkBoundary(week, raw, campCompleted);
+  const cup = state.competitions!.openCupEntry!.current;
+  return {
+    week,
+    elapsed_intervals: state.competitions!.calendar!.elapsedIntervals,
+    rng_state: state.rngSeed,
+    open_cup: { lifecycle: cup.lifecycle, choice: cup.choice, resolution: cup.resolution },
+    slot: describeFile(campCompleted ? campFilename : filename(week), raw),
+  };
+}
+
+function heldExport(raw: string, live: LiveMatchRecord) {
+  return JSON.stringify({ ...JSON.parse(raw), [LIVE_MATCH_EXPORT_FIELD]: live }, null, 2);
+}
+
+function openHeldMatch(week: number) {
+  const started: Events['match:started'][] = [];
+  const off = bus.on('match:started', event => started.push(event));
+  try { advanceWeek(); }
+  finally { off(); }
+  equal(failedIntervalProblem(), null);
+  equal(weekHeld(), true);
+  equal(getState().week, week);
+  equal(started.length, 1);
+  const kickoff = started[0]!;
+  equal(kickoff.fixture.round, dueRounds.get(week));
+
+  // Use the same options and recorder as live playback, with no coaching inputs.
+  const { fixture, home, away, live } = kickoff;
+  const sim = new LiveSim(home, away, live.seed, live);
+  const recorder = new MatchRecorder({ home: home.clubId, away: away.clubId });
+  function step() {
+    sim.step();
+    if (sim.tickEvents.length) recorder.add(sim.tickEvents, sim.snapshot());
+    recorder.clock(sim.matchSeconds);
+  }
+  return { kickoff, sim, recorder, step, fixture };
+}
+
+function playToPause(playback: ReturnType<typeof openHeldMatch>) {
+  const { sim, step } = playback;
+  while (sim.tick < pauseTick && !sim.finished) step();
+  equal(sim.finished, false);
+  equal(sim.tick, pauseTick);
+  ok(sim.matchSeconds > 0, 'The live match clock did not start.');
+  return { tick: sim.tick, match_seconds: sim.matchSeconds, snapshot_sha256: sha256(JSON.stringify(sim.snapshot())) };
+}
+
+function finishHeldMatch(playback: ReturnType<typeof openHeldMatch>) {
+  const { sim, recorder, step, fixture } = playback;
+  while (!sim.finished) {
+    ok(sim.tick < 100_000, 'The match did not reach full time.');
+    step();
+  }
+  const result = recorder.result(sim);
+  bus.emit('match:finished', { fixture, result });
+  assertSettled(fixture.slot! + 1);
+  const state = getState();
+  const played = state.competitions!.instances.find(instance => instance.id === fixture.competitionId)!
+    .fixtures.find(candidate => candidate.id === fixture.id)!;
+  equal(played.status, 'completed');
+  equal(played.result?.homeScore, result.homeScore);
+  equal(played.result?.awayScore, result.awayScore);
+  const saved = bytes.get(slotKey(slot));
+  ok(saved);
+  equal(saved, JSON.stringify(state));
+  return {
+    home_score: result.homeScore,
+    away_score: result.awayScore,
+    event_count: result.events.length,
+    result_sha256: sha256(JSON.stringify(result)),
+    settled_slot_sha256: sha256(saved),
+  };
+}
+
+function describeHeld(week: number, raw: string, sidecar: string, playback: ReturnType<typeof openHeldMatch>, pause: ReturnType<typeof playToPause>) {
+  const live = readLiveMatch();
+  ok(live && belongsToFixture(live, getState(), playback.fixture));
+  equal(live.tick, pause.tick);
+  equal(live.seed, playback.kickoff.live.seed);
+  equal(sidecar, JSON.stringify(live));
+  equal(bytes.get(slotKey(slot)), raw);
+  equal(exportSave(getState()), heldExport(raw, live));
+  const finished = finishHeldMatch(playback);
+  return {
+    sidecar: describeFile(sideName(week), sidecar),
+    fixture_id: live.fixtureId,
+    competition_id: live.competitionId,
+    round: live.round,
+    match_seed: live.seed,
+    engine_id: live.engineId,
+    pause,
+    finished,
+  };
+}
+
+function install(text: string, expectedSlot: string, expectedLive: string | null = null) {
+  const installed = installImportedSave(text, slot);
+  if (!installed.ok) throw new Error(installed.message);
+  const loaded = loadSlot(slot);
+  if (loaded.status !== 'ok') throw new Error(loaded.status);
+  deepStrictEqual(installed.repairs, []);
+  deepStrictEqual(loaded.repairs, []);
+  equal(bytes.get(slotKey(slot)), expectedSlot);
+  equal(bytes.get(liveMatchKey(slot)) ?? null, expectedLive);
+  loadState(loaded.state);
+}
+
+async function createLeague() {
+  const created = await startLeagueCareer({ clubName, seed, home }, { slot, expectedOriginal: null });
+  if (!created.ok) throw new Error(created.message);
+  registerAllSystems();
+  const state = getState();
+  const preview = previewLeagueEntry(state, state.competitions!.world!.profile.startingDivisionId);
+  if (!preview.ok) throw new Error(preview.message);
+  const accepted = confirmLeagueEntry(preview.preview);
+  if (!accepted.ok) throw new Error(accepted.message);
+}
+
+if (mode === 'capture') {
+  await createLeague();
+  mkdirSync(join(directory, 'live-matches'), { recursive: true });
+  const boundaries: object[] = [];
+  const clubMatches: number[] = [];
+  bus.on('match:started', event => clubMatches.push(event.fixture.slot!));
+  for (let week = 1; week <= 14; week++) {
+    assertSettled(week);
+    if (!weeks.some(boundary => boundary === week)) {
+      advanceWeekAsTapped();
+      assertSettled(week + 1);
+      continue;
+    }
+    ok(saveIfChanged(getState(), true));
+    const raw = bytes.get(slotKey(slot));
+    ok(raw);
+    const report = boundaryReport(week, raw);
+    write(filename(week), raw);
+    if (!dueRounds.has(week)) {
+      boundaries.push(report);
+      advanceWeekAsTapped();
+      assertSettled(week + 1);
+      continue;
+    }
+    const playback = openHeldMatch(week);
+    equal(playback.kickoff.live.resumeAt, undefined);
+    const pause = playToPause(playback);
+    const live = playback.kickoff.live;
+    ok(live.onProgress?.(live.calls ?? [], pause.tick, live.plans ?? [], live.controls));
+    const sidecar = bytes.get(liveMatchKey(slot));
+    ok(sidecar);
+    const held = describeHeld(week, raw, sidecar, playback, pause);
+    write(sideName(week), sidecar);
+    boundaries.push({ ...report, ...held });
+  }
+  console.log(JSON.stringify({ mode, pack, club_name: clubName, home, match_length: match.halfMinutes, club_matches: clubMatches, boundaries }));
+} else if (mode === 'verify') {
+  const boundaries: object[] = [];
+  for (const week of [6, 14]) {
+    const before = read(filename(week - 1));
+    const due = read(filename(week));
+    const sidecar = read(sideName(week));
+    const live = JSON.parse(sidecar) as LiveMatchRecord;
+    checkBoundary(week - 1, before);
+    const report = boundaryReport(week, due);
+
+    install(before, before);
+    registerAllSystems();
+    advanceWeekAsTapped();
+    assertSettled(week);
+    equal(bytes.get(slotKey(slot)), due);
+
+    install(heldExport(due, live), due, sidecar);
+    const playback = openHeldMatch(week);
+    equal(playback.kickoff.live.resumeAt, live.tick);
+    equal(bytes.get(liveMatchKey(slot)), sidecar);
+    const pause = playToPause(playback);
+    boundaries.push({ ...report, ...describeHeld(week, due, sidecar, playback, pause) });
+  }
+  console.log(JSON.stringify({ mode, pack, boundaries }));
+} else {
+  equal(pack, 'au', 'The completed Skills Camp path was captured for AU.');
+  function reportCamp(raw: string) {
+    const report = boundaryReport(6, raw, true);
+    const imported = importSave(raw);
+    if (!imported.ok) throw new Error(imported.message);
+    const state = imported.state;
+    const camp = currentSkillsCamp(state);
+    ok(camp?.booking && camp.award);
+    equal(camp.booking.bookedWeek, 4);
+    equal(camp.award.mode, 'auto');
+    equal(camp.award.focus, 'balanced');
+    ok(camp.award.effectiveXp > 0);
+    ok(state.squad.some(player => player.id === camp.booking!.participantId));
+    equal(awayPlayerIds(state).size, 0);
+    console.log(JSON.stringify({ mode, pack, ...report, camp }));
+  }
+
+  if (mode === 'capture-camp') {
+    await createLeague();
+    for (let week = 1; week < 4; week++) {
+      advanceWeekAsTapped();
+      assertSettled(week + 1);
+    }
+    const state = getState();
+    const player = state.squad.find(candidate => {
+      const cover = projectCampDeparture(state, { participantId: candidate.id });
+      return cover.role === 'starter' && !cover.reason && !!cover.cover;
+    });
+    ok(player, 'No eligible starter with legal opening-round cover.');
+    const preview = captureCampAction({ kind: 'book', participantId: player.id, focus: 'balanced' });
+    if (!preview.ok) throw new Error(preview.message);
+    const booked = confirmCampAction(preview.selection);
+    if (!booked.ok) throw new Error(booked.message);
+    advanceWeekAsTapped();
+    assertSettled(5);
+    equal(currentSkillsCamp(getState())?.status, 'booked');
+    const opening: Events['match:started'][] = [];
+    const off = bus.on('match:started', event => opening.push(event));
+    try { advanceWeekAsTapped(); }
+    finally { off(); }
+    assertSettled(6);
+    equal(opening.length, 1);
+    const kickoff = opening[0]!;
+    const own = kickoff.home.clubId === state.clubId ? kickoff.home : kickoff.away;
+    ok([...(own.roster ?? []), ...(own.bench ?? [])].every(entry => entry.id !== player.id));
+    const raw = bytes.get(slotKey(slot));
+    ok(raw);
+    equal(raw, JSON.stringify(getState()));
+    reportCamp(raw);
+    mkdirSync(directory, { recursive: true });
+    write(campFilename, raw);
+  } else {
+    const raw = read(campFilename);
+    install(raw, raw);
+    reportCamp(raw);
+  }
+}

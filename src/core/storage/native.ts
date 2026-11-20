@@ -5,26 +5,43 @@
 // import sits behind IOS_CODE (platform.ts), so a build where it is false drops them.
 
 import { browserStorage, browserStorageKeys, setMirroredStorage } from './local';
-import { startNativeMirror, type MirrorStart } from './nativeMirror';
+import { startNativeMirror, type MirrorBoot, type MirrorStart } from './nativeMirror';
+import { beginNativeCheckpointBoot } from './nativeCheckpoint';
 import { IOS_CODE, isIosNative } from './platform';
 
 const noIosCode = (): Promise<never> => Promise.reject(new Error('not an iOS build'));
 
-/**
- * main.ts awaits this before anything reads a save, and only in the iOS app (on
- * the web it is not even awaited, so boot is unchanged). Restores what the web
- * view lost, refreshes stale native copies, then mirrors every storage-layer
- * write. Never rejects.
- */
-export async function bootNativeMirror(): Promise<MirrorStart> {
-  const { start } = await startNativeMirror({
-    ios: isIosNative(),
-    storage: browserStorage(),
-    keys: browserStorageKeys,
+function browserMirrorBoot(): MirrorBoot {
+  const ios = isIosNative();
+  if (ios) setMirroredStorage(null); // read the raw store when reinstalling
+  return {
+    ios, storage: browserStorage(), keys: browserStorageKeys,
     loadFiles: () => IOS_CODE ? import('./capacitorFiles').then((m) => m.capacitorFiles()) : noIosCode(),
     install: setMirroredStorage,
-  });
-  return start;
+  };
+}
+
+let previousBoot: ReturnType<typeof startNativeMirror> | undefined;
+
+/**
+ * main.ts awaits this before anything reads a save, and only in the iOS app.
+ * A repeated boot immediately invalidates old outcome confirmations and syncs
+ * after the previous writer drains. Production boots once: this is not a hot-swap
+ * protocol for callers that keep writing through an old storage reference.
+ */
+export async function bootNativeMirror(boot = browserMirrorBoot()): Promise<MirrorStart> {
+  const attach = beginNativeCheckpointBoot(boot.ios);
+  if (!boot.ios) return 'inactive';
+  const previous = previousBoot;
+  previousBoot = (async () => {
+    const prior = await previous;
+    await prior?.mirror?.idle();
+    return startNativeMirror({...boot, install: (storage, mirror) => {
+      if (!attach(storage, mirror)) return false;
+      return boot.install(storage, mirror);
+    }});
+  })();
+  return (await previousBoot).start;
 }
 
 /** How a file the player exports leaves the game. */

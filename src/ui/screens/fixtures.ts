@@ -35,6 +35,7 @@ import { shortName } from './matchReport';
 import { buildOpenCupCard } from './openCupEntry';
 import { starsForOverall } from '../../data/player';
 import { ensurePartsStyles, starsEl } from '../parts';
+import { buildIndividualChallengeCards } from './individualChallenges';
 import { buildSkillsCampCard } from './playerAssignments';
 import { awayPlayerIds } from '../../systems/playerAssignments';
 
@@ -371,7 +372,7 @@ function openLeagueScreen(key: 'fixtures' | 'ladder', opts: LeagueScreenOptions)
       }
       const cup = buildOpenCupCard(state, () => sheet.querySelector('[data-open-cup-details]'));
       const camp = buildSkillsCampCard(state, () => sheet.querySelector('[data-camp-details]'));
-      cols[0]!.el.prepend(heading, ...(camp ? [camp] : []), ...(cup ? [cup] : []));
+      cols[0]!.el.prepend(heading, ...(camp ? [camp] : []), ...(cup ? [cup] : []), ...buildIndividualChallengeCards(state));
     }
     sheet.replaceChildren(...cols.map((c) => c.el));
   };

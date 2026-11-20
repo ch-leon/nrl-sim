@@ -5,6 +5,8 @@ import { createNewGame, getState, loadState } from '../../src/core/state';
 import { advanceWeek } from '../../src/core/time';
 import { awaitingCampReplay } from '../../src/systems/parkedLeagueFixture';
 import { showAssignmentRecovery } from '../../src/ui/assignmentRecovery';
+import { dueIndividualChallenge } from '../../src/systems/individualChallenges';
+import { acknowledgeChallengeOutcome, challengeOutcomeVisible } from '../../src/systems/individualChallengeCommit';
 import { StubNode, stubDocument } from './stubDom';
 
 vi.mock('../../src/core/time', async original => ({
@@ -12,6 +14,13 @@ vi.mock('../../src/core/time', async original => ({
 }));
 vi.mock('../../src/systems/parkedLeagueFixture', async original => ({
   ...await original<typeof import('../../src/systems/parkedLeagueFixture')>(), awaitingCampReplay: vi.fn(),
+}));
+vi.mock('../../src/systems/individualChallenges', async original => ({
+  ...await original<typeof import('../../src/systems/individualChallenges')>(), dueIndividualChallenge: vi.fn(() => null),
+}));
+vi.mock('../../src/systems/individualChallengeCommit', async original => ({
+  ...await original<typeof import('../../src/systems/individualChallengeCommit')>(),
+  acknowledgeChallengeOutcome: vi.fn(), challengeOutcomeVisible: vi.fn(() => true),
 }));
 
 function element(id: string): HTMLElement {
@@ -26,6 +35,8 @@ const by = (attr: string) => document.querySelector(`[data-camp-recovery${attr}]
 beforeEach(() => {
   bus.clear();
   vi.clearAllMocks();
+  vi.mocked(dueIndividualChallenge).mockReturnValue(null);
+  vi.mocked(challengeOutcomeVisible).mockReturnValue(true);
   vi.stubGlobal('HTMLElement', StubNode);
   stubDocument();
   createNewGame('Recovery FC', 708);
@@ -94,6 +105,41 @@ it('never resumes a different slot from a deferred readiness callback', () => {
   const ready = showAssignmentRecovery(vi.fn())!;
   setActiveSlot(2);
   ready();
+  expect(advanceWeek).not.toHaveBeenCalled();
+  expect(by('')).toBeNull();
+});
+
+it('waits for native outcome confirmation before replay, and keeps a failed attempt retryable', async () => {
+  const record = { status: 'ready-for-interval', editionId: 'showground' } as NonNullable<ReturnType<typeof dueIndividualChallenge>>;
+  vi.mocked(dueIndividualChallenge).mockReturnValue(record);
+  vi.mocked(challengeOutcomeVisible).mockReturnValue(false);
+  let finish!: (value: Awaited<ReturnType<typeof acknowledgeChallengeOutcome>>) => void;
+  vi.mocked(acknowledgeChallengeOutcome).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  const ready = showAssignmentRecovery(vi.fn())!;
+  ready();
+  expect(acknowledgeChallengeOutcome).toHaveBeenCalledWith('showground');
+  expect(advanceWeek).not.toHaveBeenCalled();
+  finish({ ok: false, reason: 'native', message: 'Retry device confirmation.' });
+  await Promise.resolve();
+  expect(by('-status')?.textContent).toBe('Retry device confirmation.');
+  expect(by('-retry')?.disabled).toBe(false);
+  vi.mocked(acknowledgeChallengeOutcome).mockResolvedValueOnce({ ok: true, state: getState() });
+  vi.mocked(advanceWeek).mockImplementationOnce(() => vi.mocked(awaitingCampReplay).mockReturnValue(false));
+  by('-retry')!.click();
+  await Promise.resolve();
+  expect(advanceWeek).toHaveBeenCalledOnce();
+  expect(by('')).toBeNull();
+});
+
+it('does not replay another career when native confirmation arrives late', async () => {
+  vi.mocked(dueIndividualChallenge).mockReturnValue({ status: 'ready-for-interval', editionId: 'showground' } as NonNullable<ReturnType<typeof dueIndividualChallenge>>);
+  vi.mocked(challengeOutcomeVisible).mockReturnValue(false);
+  let finish!: (value: Awaited<ReturnType<typeof acknowledgeChallengeOutcome>>) => void;
+  vi.mocked(acknowledgeChallengeOutcome).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  showAssignmentRecovery(vi.fn())!();
+  setActiveSlot(2);
+  finish({ ok: true, state: getState() });
+  await Promise.resolve();
   expect(advanceWeek).not.toHaveBeenCalled();
   expect(by('')).toBeNull();
 });

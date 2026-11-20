@@ -79,6 +79,10 @@ jobs:
       - run: npm ci
       # Every player match is a whole live match since BAK-207 Phase 4 (about 15 s a
       # season headless), so the nightly soak is 3 seasons × 10 seeds over every core.
+      - name: Individual challenge balance and paired careers
+        run: |
+          npx vite-node scripts/qa-individual-challenges.ts -- --strict-balance
+          npx vite-node scripts/qa-individual-challenge-careers.ts
       - name: Skills Camp paired careers (AU/UK, difficulty, cover and spending)
         run: npx vite-node scripts/qa-player-assignments.ts
       - name: Soak (3 seasons × 10 seeds, idle, managed, Hard, old saves)

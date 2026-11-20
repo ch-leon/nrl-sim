@@ -1269,20 +1269,54 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
 @keyframes nrl-sheet-up { from { opacity: 0; transform: translateY(var(--nrl-rise)); } }
 
 /* ── Hub chips: the club home's only things on the grounds (3a) ──────────
-   The decisions waiting, and (#368) the board objective most at risk under it. */
+   Decisions, optional events and the board objective; scroll clear of the dock and install hint. */
 .nrl-hub-chips {
   pointer-events: none;
   position: fixed;
   top: calc(12px + var(--nrl-safe-t));
   left: calc(16px + var(--nrl-safe-l));
   max-width: calc(100vw - 32px - var(--nrl-safe-l) - var(--nrl-safe-r));
+  max-height: calc(100dvh - var(--nrl-nav-h, 0px) - var(--nrl-toast-lift, 0px) - var(--nrl-safe-t) - 24px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 8px;
   z-index: 45;
 }
+.nrl-hub-chips[hidden] { display: none; }
+.nrl-hub-chips:has(> :not([hidden])) { pointer-events: auto; }
+.nrl-hub-chips > * { flex-shrink: 0; }
+.nrl-hub-chips:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
 body.nrl-match-active .nrl-hub-chips { display: none; }
+.nrl-home-events {
+  pointer-events: auto; width: 340px; max-width: 100%; min-width: 0;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
+  padding: 9px 12px; text-align: left; white-space: normal;
+  background: rgba(5, 7, 13, 0.95); border: 1px solid var(--nrl-line); border-radius: 14px;
+  color: var(--nrl-text); font: inherit; cursor: pointer;
+}
+.nrl-home-events[hidden] { display: none; }
+.nrl-home-events-title { color: var(--nrl-accent); font-weight: 700; font-size: .875rem; }
+.nrl-home-events-names { font-size: .8125rem; }
+.nrl-home-events-detail { font-size: .75rem; color: var(--nrl-text-2); }
+.nrl-home-events:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
+.nrl-opportunities-modal { max-width: min(520px, calc(100vw - 24px)); max-height: calc(100dvh - 110px); overflow: auto; }
+.nrl-opportunities { padding: 16px; overflow-wrap: anywhere; }
+.nrl-opportunities h2 { margin: 0 0 10px; font-size: 1.25rem; }
+.nrl-opportunities p, .nrl-opportunities li { font-size: .875rem; line-height: 1.4; }
+.nrl-opportunities li + li { margin-top: 10px; }
+.nrl-opportunities-list { display: grid; gap: 12px; }
+.nrl-opportunity { padding: 12px; border: 1px solid var(--nrl-line); border-radius: 10px; }
+.nrl-opportunity h3 { margin: 0; font-size: 1rem; }
+.nrl-opportunity p { margin: 8px 0; }
+.nrl-opportunities .nrl-decisions-actions { flex-wrap: wrap; }
+.nrl-opportunities .nrl-btn { white-space: normal; height: auto; min-height: 44px; }
+@media (max-height: 380px) {
+  .nrl-home-events { gap: 2px; padding: 6px 10px; }
+  .nrl-home-events-names { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}
 .nrl-decisions-chip {
   pointer-events: auto;
   height: 44px;
@@ -1897,8 +1931,8 @@ body:has(.nrl-update-toast) .nrl-hub-chips { max-width: calc(100vw - 32px - 310p
 /* Disabled with its reason inside (SuperCOOKED §3.2): the raised fill so the amber line reads; the label dims. */
 .nrl-btn.nrl-btn-primary.nrl-placebar-go:disabled { background: var(--nrl-raised); color: var(--nrl-text-2); opacity: 1; }
 .nrl-btn.nrl-placebar-go:disabled .nrl-placebar-go-label { opacity: 0.55; }
-/* The bar spans the top while placing; the HUD's top chips (board, decisions) wait under it. */
-body:has(.nrl-placebar:not([hidden])) .nrl-decisions-chip { visibility: hidden; }
+/* The bar spans the top while placing; the HUD's top chips wait under it. */
+body:has(.nrl-placebar:not([hidden])) .nrl-hub-chips { visibility: hidden; }
 
 /* ── Kit & colours (#79), under Office ───────────────────────────────────── */
 .nrl-kit { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }

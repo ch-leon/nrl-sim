@@ -178,7 +178,7 @@ export function setSpendPointsMyself(on: boolean): void {
 /** The coach spends one of a squad player's banked points (the player page's +). Returns whether it was spent. */
 export function spendSquadPoint(playerId: string, stat: keyof PlayerStats): boolean {
   const s = getState();
-  if (awaitingCampReplay(s)) return false;
+  if (awaitingCampReplay(s) || awayPlayerIds(s).has(playerId)) return false;
   const at = s.squad.findIndex((p) => p.id === playerId);
   if (at < 0) return false;
   const next = spendPoint(s.squad[at]!, stat);

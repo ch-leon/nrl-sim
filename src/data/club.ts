@@ -1,3 +1,4 @@
+import { awaitingCampReplay } from '../systems/parkedLeagueFixture';
 // src/data/club.ts — squad / facility / money helpers operating on the store.
 // See BAK-172. Mutate via setState and emit the relevant bus event. No Phaser.
 // The club is embedded in GameState (§1.2) — there is no separate Club class.
@@ -34,6 +35,7 @@ export function addFacility(
   purchaseCost?: number,
 ): PlacedFacility | null {
   const s = getState();
+  if (awaitingCampReplay(s)) return null;
   const def = FACILITY_CATALOG[defId];
   const { w, h } = def.footprint;
 
@@ -59,7 +61,7 @@ export function addFacility(
  */
 export function spendMoney(amount: number, reason: string): boolean {
   const s = getState();
-  if (s.money < amount) return false;
+  if (awaitingCampReplay(s) || s.money < amount) return false;
   const balance = s.money - amount;
   setState({ money: balance });
   bus.emit('money:changed', { delta: -amount, reason, balance });
@@ -69,6 +71,7 @@ export function spendMoney(amount: number, reason: string): boolean {
 /** Credit `amount` to money and emit money:changed. */
 export function earnMoney(amount: number, reason: string): void {
   const s = getState();
+  if (awaitingCampReplay(s)) return;
   const balance = s.money + amount;
   setState({ money: balance });
   bus.emit('money:changed', { delta: amount, reason, balance });

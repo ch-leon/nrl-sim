@@ -1,3 +1,4 @@
+import { awaitingCampReplay } from './parkedLeagueFixture';
 // Staff appointments are one-off cash investments; salaries never drain cash.
 import { bus } from '../core/events';
 import { getState, setState, type AttackCoachSpeciality, type GameState, type StaffMember, type StaffRole } from '../core/state';
@@ -105,7 +106,7 @@ export function staffWages(state: Pick<GameState, 'staff'>): number {
 /** Hire `role` for its upfront fee. Refuses duplicate or unaffordable appointments. */
 export function hireStaff(role: HireRole): StaffMember | null {
   const s = getState();
-  if (weekHeld() || hasStaff(s, role) || !(role in STAFF) || s.money < STAFF_APPOINTMENT_PRICES[role]) return null;
+  if (awaitingCampReplay(s) || weekHeld() || hasStaff(s, role) || !(role in STAFF) || s.money < STAFF_APPOINTMENT_PRICES[role]) return null;
   const rng = makeRng(s.rngSeed);
   const member: StaffMember = { role, name: randomName(rng), wage: staffWage(s, role), hiredSeason: s.season };
   const fee = STAFF_APPOINTMENT_PRICES[role];
@@ -122,7 +123,7 @@ export function hireStaff(role: HireRole): StaffMember | null {
  */
 export function hireAttackCoach(speciality: AttackCoachSpeciality): StaffMember | null {
   const s = getState();
-  if (weekHeld() || !(speciality in ATTACK_COACHES) || attackCoachRefusal(s, speciality) !== null || s.money < STAFF_APPOINTMENT_PRICES[speciality]) return null;
+  if (awaitingCampReplay(s) || weekHeld() || !(speciality in ATTACK_COACHES) || attackCoachRefusal(s, speciality) !== null || s.money < STAFF_APPOINTMENT_PRICES[speciality]) return null;
   const rng = makeRng(s.rngSeed);
   const member: StaffMember = { role: 'attackCoach', name: randomName(rng), wage: attackCoachWage(s, speciality), hiredSeason: s.season, speciality };
   const fee = STAFF_APPOINTMENT_PRICES[speciality];
@@ -137,7 +138,7 @@ export function hireAttackCoach(speciality: AttackCoachSpeciality): StaffMember 
 export function releaseStaff(role: StaffRole): boolean {
   const s = getState();
   const member = s.staff.find((m) => m.role === role);
-  if (weekHeld() || !member) return false;
+  if (awaitingCampReplay(s) || weekHeld() || !member) return false;
   setState({ staff: s.staff.filter((m) => m !== member) });
   bus.emit('ui:notify', { text: `${member.name} has left the ${staffTitle(member)} job.`, kind: 'info' });
   return true;

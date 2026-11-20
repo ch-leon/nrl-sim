@@ -1,6 +1,6 @@
 # Roadmap
 
-Last updated: 2026-11-19
+Last updated: 2026-11-20
 
 Status checked against GitHub on 7 Nov 2026. Merged tooling is not the same as a
 live gameplay change; work still open below has not shipped.
@@ -34,7 +34,14 @@ live gameplay change; work still open below has not shipped.
   The first assignment, [Skills Camp](../specs/player-assignments.md), is implemented in
   [PR #742](https://github.com/ch-leon/nrl-sim/pull/742): book during Weeks 1–4, miss the Week 5 opener, return
   before Week 6 with development. [Delivery evidence](../status/2026-11-player-assignments.md).
-  Further assignments, coached challenges, other formats and their rewards remain later work.
+  [Big Mick's Break the Line](../specs/individual-challenges.md) now has both Showground
+  and Invitational editions implemented in [PR #745](https://github.com/ch-leon/nrl-sim/pull/745), with six coached carry/defend clashes, watched
+  action, real club absence, saved rewards and permanent qualification.
+  [Verification and release evidence](../status/2026-11-individual-challenges.md).
+  [PR #752](https://github.com/ch-leon/nrl-sim/pull/752) surfaces optional events on the club home
+  and warns before entry deadlines, including during multi-week advances, after
+  Leon missed Showground registration. [Reminder behavior](../plans/2026-11-20-event-reminders.md).
+  Further assignments, other challenge formats, small-sided events, sponsors and gear remain later work.
   Earlier structural execution context follows:
   [#569](https://github.com/ch-leon/nrl-sim/issues/569) publishes the
   [technical contract](../specs/career-competitions.md) against current main;

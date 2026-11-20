@@ -44,7 +44,8 @@ import { kitFromColors, type Kit } from '../../art/match/kit';
 import { portraitDataUrl } from '../../art/portrait';
 import { ensurePartsStyles, fitnessTone, playerCard, starsEl, statusPill } from '../parts';
 import { awayPlayerIds } from '../../systems/playerAssignments';
-import { campAbsenceText, campAvailability } from './playerAssignments';
+import { clubReservations } from '../../systems/playerAvailability';
+import { nextReservation, reservationText, tripLabel } from '../playerReservations';
 
 const STYLE_ID = 'nrl-lineup-styles';
 
@@ -300,8 +301,8 @@ export function openLineupScreen(): void {
     const s = getState();
     const away = awayPlayerIds(s);
     if (away.has(p.id)) {
-      const absence = campAbsenceText(campAvailability(s), p.id);
-      toast(`${p.name} · ${absence ?? 'Away at Skills Camp'}`, 'danger');
+      const absence = reservationText(clubReservations(s), p.id);
+      toast(`${p.name} · ${absence ?? 'Away from the club'}`, 'danger');
       return;
     }
     if (p.injuredWeeks > 0) {
@@ -345,25 +346,25 @@ export function openLineupScreen(): void {
     const injured = p.injuredWeeks > 0;
     const banned = (p.suspendedWeeks ?? 0) > 0;
     const pct = fitnessPct(p);
-    const camp = awayPlayerIds(getState()).has(p.id);
-    const word = camp ? `away at Skills Camp${cover ? `, ${cover.name} covers` : ''}` : injured ? `injured, out ${p.injuredWeeks} weeks` : banned ? `banned ${p.suspendedWeeks} weeks` : `fit ${pct}%`;
+    const away = clubReservations(getState()).find(t=>t.away && t.playerId===p.id);
+    const word = away ? `away at ${away.title}${cover ? `, ${cover.name} covers` : ''}` : injured ? `injured, out ${p.injuredWeeks} weeks` : banned ? `banned ${p.suspendedWeeks} weeks` : `fit ${pct}%`;
     const c = playerCard({
       portrait: portraitDataUrl(p.id, kit()),
       name: shortName(p.name),
       stars: playerStars(p),
       position: slotPos ? POSITION_SHORT[slotPos] : POSITION_SHORT[p.position],
-      fitness: { tone: camp || injured || banned ? 'alert' : fitnessTone(pct), word },
+      fitness: { tone: away || injured || banned ? 'alert' : fitnessTone(pct), word },
       captain: spot?.kind === 'starter' && roles.captain === p.id,
       kicker: spot?.kind === 'starter' && roles.kicker === p.id,
     });
     if (spot) c.setAttribute('data-spot', spot.kind === 'starter' ? `s${spot.slot}` : `b${spot.index}`);
     c.setAttribute('data-player-open', p.id);
-    if (camp || injured) c.setAttribute('data-out', '');
+    if (away || injured) c.setAttribute('data-out', '');
     else if (banned) c.setAttribute('data-banned', '');
     if (swapping && spot && sameSpot(swapping, spot)) c.setAttribute('data-selected', '');
     if (swapping && !(spot && sameSpot(swapping, spot))) c.setAttribute('data-dim', '');
     const fit = slotPos ? positionFit(p.position, slotPos) : 1;
-    c.title = `${p.name} · ${positionLabel(p.position)}${slotPos && fit < 1 ? ` · at ${positionLabel(slotPos)} ×${fit}` : ''}${camp ? ` · Away at Skills Camp${cover ? ` · ${cover.name} covers` : ''}` : injured ? ` · injured, out ${p.injuredWeeks}w` : banned ? ` · suspended, banned ${p.suspendedWeeks}w` : ''}`;
+    c.title = `${p.name} · ${positionLabel(p.position)}${slotPos && fit < 1 ? ` · at ${positionLabel(slotPos)} ×${fit}` : ''}${away ? ` · Away at ${away.title}${cover ? ` · ${cover.name} covers` : ''}` : injured ? ` · injured, out ${p.injuredWeeks}w` : banned ? ` · suspended, banned ${p.suspendedWeeks}w` : ''}`;
     // A tap opens his page; while choosing or swapping, it picks the card for the swap.
     let pressed = 0;
     let held = false;
@@ -391,7 +392,7 @@ export function openLineupScreen(): void {
     const s = getState();
     // A man who has left the club is replaced in the saved lineup as soon as the screen sees it.
     const away = awayPlayerIds(s);
-    const camp = campAvailability(s);
+    const trips = clubReservations(s);
     const today = resolveLineup(s.lineup, s.squad, away);
     if (today.changed) {
       commitLineup(today.lineup);
@@ -438,7 +439,7 @@ export function openLineupScreen(): void {
       close.setAttribute('data-swap-cancel', '');
       const list = el('div', { class: 'nrl-lineup-list nrl-swap-list' }, ...rows.map((p) => {
         const where = spotOf(lineup, p.id);
-        const absence = campAbsenceText(camp, p.id);
+        const trip = nextReservation(trips,p.id);
         const isAway = away.has(p.id);
         const injured = p.injuredWeeks > 0;
         const banned = (p.suspendedWeeks ?? 0) > 0;
@@ -447,18 +448,18 @@ export function openLineupScreen(): void {
           el('img', { class: 'nrl-swap-face', attrs: { src: portraitDataUrl(p.id, kit()), alt: '', width: '28', height: '32' } }),
           el('span', { class: 'nrl-lineup-row-id' },
             el('span', { class: 'nrl-lineup-row-name', text: shortName(p.name) }),
-            absence && camp ? el('span', { class: 'nrl-lineup-row-meta', text: `Skills Camp · Back W${camp.rules.returnWeek}` })
+            trip ? el('span', { class: 'nrl-lineup-row-meta', text: `${trip.title} · Back W${trip.week+1}` })
               : starsEl(playerStars(p), { size: 11 })),
           el('span', { class: 'nrl-swap-meta' },
-            isAway ? statusPill('Camp', 'alert') : injured ? statusPill(`Out ${p.injuredWeeks}w`, 'alert') : banned ? statusPill(`Ban ${p.suspendedWeeks}w`, 'alert')
+            isAway && trip ? statusPill(tripLabel(trip), 'alert') : injured ? statusPill(`Out ${p.injuredWeeks}w`, 'alert') : banned ? statusPill(`Ban ${p.suspendedWeeks}w`, 'alert')
               : fit ? statusPill(fit.tag === 'fits' ? `${POSITION_SHORT[slotPos!]} ✓` : fit.tag === 'plays it' ? `Plays ${POSITION_SHORT[slotPos!]}` : 'Out of pos', fit.tone)
                 : statusPill(POSITION_SHORT[p.position], 'muted'),
             el('span', { class: 'nrl-lineup-where', text: swapFrom(where), attrs: isAway ? { 'data-away': '' } : {} })));
         if (isAway) row.setAttribute('data-away', '');
         else if (injured) row.setAttribute('data-injured', '');
         else if (banned) row.setAttribute('data-banned', '');
-        if (absence) row.setAttribute('data-camp-absence', p.id);
-        row.title = absence ?? (slotPos ? `Rating at ${positionLabel(slotPos)}: ${effectiveRating(p, slotPos)} (overall ${Math.round(overallRating(p))})` : `Overall ${Math.round(overallRating(p))}`);
+        if (trip) row.setAttribute(tripLabel(trip)==='Contest' ? 'data-challenge-absence' : 'data-camp-absence', p.id);
+        row.title = reservationText(trips,p.id) ?? (slotPos ? `Rating at ${positionLabel(slotPos)}: ${effectiveRating(p, slotPos)} (overall ${Math.round(overallRating(p))})` : `Overall ${Math.round(overallRating(p))}`);
         return row;
       }));
       hintScroll(list);
