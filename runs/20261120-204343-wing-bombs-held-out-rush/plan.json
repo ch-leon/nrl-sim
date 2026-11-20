@@ -1,0 +1,23 @@
+{
+  "seedStart": 1001,
+  "seeds": 200,
+  "name": "wing bombs held-out rush",
+  "description": "Repeat the published #756 Rush v Slide default fixture on the current wing-bomb commit, using identical held-out seeds 1001–1200 in both orientations.",
+  "scenarios": [
+    {
+      "name": "rush v slide",
+      "seeds": 200,
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    }
+  ]
+}

@@ -375,3 +375,6 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261120-015711-standard | standard | d70989b | main | [report](runs/20261120-015711-standard/report.md) |
 | 20261120-113829-ordinary-long-kick-space-on-v-off-standard | ordinary long kick space on v off (standard) | f5474ea4 | HEAD | [report](runs/20261120-113829-ordinary-long-kick-space-on-v-off-standard/report.md) |
 | 20261120-114448-ordinary-long-kick-space-held-out-presets | ordinary long kick space held-out presets | f5474ea4 | HEAD | [report](runs/20261120-114448-ordinary-long-kick-space-held-out-presets/report.md) |
+| 20261120-203130-ordinary-wing-bombs-on-v-off-standard | ordinary wing bombs on v off standard | fcb5f4e4 | HEAD | [report](runs/20261120-203130-ordinary-wing-bombs-on-v-off-standard/report.md) |
+| 20261120-203708-ordinary-wing-bombs-on-v-off-standard-close-range | ordinary wing bombs on v off standard close range | 93589210 | HEAD | [report](runs/20261120-203708-ordinary-wing-bombs-on-v-off-standard-close-range/report.md) |
+| 20261120-204343-wing-bombs-held-out-rush | wing bombs held-out rush | 93589210 | HEAD | [report](runs/20261120-204343-wing-bombs-held-out-rush/report.md) |
