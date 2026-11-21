@@ -22,6 +22,7 @@ import { BOARD, WEEKS_PER_SEASON } from '../config';
 import { RISK_WORD, type ObjectiveRisk } from '../systems/board';
 import { el, button, hintScroll, openModal, closeModal, activeScreen, dialogOpen } from './dom';
 import { boardChip, fmtMoney, fmtMoneyShort } from './hud';
+import { infoPill, type Tone } from './parts';
 import { MATCH_ACTIVE_CLASS } from './screens/matchOverlay';
 import { FINANCE_LINE_LABELS } from './screens/finance';
 import { isTutorialActive } from './tutorial';
@@ -210,43 +211,71 @@ export function summaryCanShow(p: {
 }
 
 const MOOD_WORD: Readonly<Record<BoardMood, string>> = { happy: 'happy', watching: 'watching', worried: 'worried' };
+const MOOD_TONE: Readonly<Record<BoardMood, Tone>> = { happy: 'pos', watching: 'neg', worried: 'alert' };
 
-function section(title: string, lines: readonly string[], empty: string): HTMLElement {
-  return el('div', { class: 'nrl-summary-sec' },
-    el('h3', { text: title }),
-    ...(lines.length ? lines.map((t) => el('p', { text: t })) : [el('p', { class: 'nrl-summary-none', text: empty })]));
+/** One line of a block: the name on the left, what happened to him on the right (a plain line when it has no right-hand side). */
+function row(left: string, right: string, tone = ''): HTMLElement {
+  if (!right) return el('p', { text: left });
+  return el('p', { class: 'nrl-summary-ln' }, el('span', { text: left }), ' ', el('span', { class: `nrl-summary-val ${tone}`.trim(), text: right }));
 }
 
-/** The card: two columns (the squad, then the money and the board) over Advance Week and Close. */
+/** "Smith +0.8 speed" → Smith | +0.8 speed. */
+function gainRow(t: string): HTMLElement {
+  const m = /^(.*?) (\+[\d.]+ .+)$/.exec(t);
+  return m ? row(m[1], m[2], 'nrl-summary-up') : row(t, '');
+}
+
+/** "Smith out 3 wks" / "Smith banned 2 wks" / "Back: A, B" → name | what; "+n more" stays whole. */
+function sidelineRow(t: string): HTMLElement {
+  const back = /^(Back:) (.*)$/.exec(t);
+  if (back) return row(back[1], back[2], 'nrl-summary-up');
+  const m = /^(.*?) ((?:out|banned) \d+ wks?)$/.exec(t);
+  return m ? row(m[1], m[2], m[2].startsWith('out') ? 'nrl-summary-out' : 'nrl-summary-down') : row(t, '');
+}
+
+function section(title: string, lines: readonly HTMLElement[], empty: string): HTMLElement {
+  return el('div', { class: 'nrl-summary-sec' },
+    el('h3', { text: title }),
+    ...(lines.length ? lines : [el('p', { class: 'nrl-summary-none', text: empty })]));
+}
+
+/** The card (SuperCOOKED 60): four blocks (Training, Money, Injuries & bans, Board) over Close and Play week. */
 export function openWeekSummary(v: WeekSummary, opts: { onAdvance: () => void; coach?: CoachSuggestion }): HTMLElement {
   const squad = sidelineLines(v);
   const moneyIn = v.money.filter((m) => m.amount > 0).map((m) => `${m.label} ${fmtMoneyShort(m.amount)}`);
   const moneyOut = v.money.filter((m) => m.amount < 0).map((m) => `${m.label} ${fmtMoneyShort(-m.amount)}`);
   const money = el('div', { class: 'nrl-summary-sec' },
-    el('h3', {}, 'Money ', el('span', { class: `nrl-summary-net ${v.net < 0 ? 'nrl-summary-down' : 'nrl-summary-up'}`, text: `${fmtSigned(v.net)} net` })),
+    el('h3', { text: 'Money' }),
+    el('span', { class: `nrl-summary-net ${v.net < 0 ? 'nrl-summary-down' : 'nrl-summary-up'}`, text: `${fmtSigned(v.net)} net` }),
     el('p', { text: `In ${fmtMoneyShort(v.moneyIn)}${moneyIn.length ? `: ${capList(moneyIn).join(' · ')}` : ''}` }),
     el('p', { text: `Out ${fmtMoneyShort(-v.moneyOut)}${moneyOut.length ? `: ${capList(moneyOut).join(' · ')}` : ''}` }),
   );
+  // The board's line is "why · patience a/b": the why reads first, the patience under it, muted.
+  const cut = v.board.text.lastIndexOf(' · patience ');
+  const why = cut < 0 ? v.board.text : v.board.text.slice(0, cut);
+  const patience = cut < 0 ? '' : v.board.text.slice(cut + 3);
   const board = el('div', { class: `nrl-summary-sec nrl-summary-board nrl-summary-${v.board.mood}`, attrs: { 'data-mood': v.board.mood } },
-    el('h3', {}, 'Board: ', el('span', { class: 'nrl-summary-mood', text: MOOD_WORD[v.board.mood] })),
-    el('p', { text: v.board.text }));
+    el('h3', {}, 'Board', infoPill(MOOD_TONE[v.board.mood], el('span', { class: 'nrl-summary-mood', text: MOOD_WORD[v.board.mood] }))),
+    el('p', { text: why }),
+    ...(patience ? [el('p', { class: 'nrl-summary-patience', text: patience })] : []));
 
   const advance = button('Play week ▸', () => { closeModal(); opts.onAdvance(); }, { class: 'nrl-summary-advance nrl-btn-primary' });
   advance.setAttribute('data-summary-advance', '');
-  const close = button('Close', () => closeModal());
+  const close = button('Close', () => closeModal(), { class: 'nrl-btn-outline' });
   close.setAttribute('data-summary-close', '');
   const cols = el('div', { class: 'nrl-summary-cols' },
-    el('div', { class: 'nrl-summary-col' },
-      section('Training', v.gains, 'No gains to speak of.'),
-      section('Injuries & bans', squad, 'Nobody new on the sidelines.')),
-    el('div', { class: 'nrl-summary-col' }, money, board));
+    section('Training', v.gains.map(gainRow), 'No gains to speak of.'),
+    money,
+    section('Injuries & bans', squad.map(sidelineRow), 'Nobody new on the sidelines.'),
+    board);
   // What a short phone or a larger text still cuts off fades at the foot (#610): a line was cut through its letters with no cue.
   hintScroll(cols);
-  const content = el('div', { class: 'nrl-summary', attrs: { 'data-week-summary': '' } },
-    el('h2', { text: `${v.title} summary` }),
-    coachLine(opts.coach?.screen ? opts.coach.text : summaryRemark(v)),
+  const content = el('div', { class: 'nrl-summary', attrs: { 'data-week-summary': '', 'aria-label': `${v.title} summary` } },
+    el('div', { class: 'nrl-summary-head' },
+      el('h2', { text: v.title }),
+      coachLine(opts.coach?.screen ? opts.coach.text : summaryRemark(v))),
     cols,
-    el('div', { class: 'nrl-decisions-actions' }, advance, close));
+    el('div', { class: 'nrl-decisions-actions' }, close, advance));
   return openModal(content, { class: 'nrl-summary-modal', region: true, closeButton: true });
 }
 

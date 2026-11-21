@@ -1,6 +1,6 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, skipFromPill, setMatchSpeed } from '../common.mjs';
+import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, skipFromPill, setMatchSpeed, setupStep } from '../common.mjs';
 
 /**
  * Developer settings (#519), the real route on an iPhone, in landscape:
@@ -73,6 +73,7 @@ export async function runDevSettings(browser) {
     // 1. Settings shows Developer settings with no ?labs=1. Nothing is on, so no tag,
     //    and the career just started is unchanged.
     await page.goto(BASE);
+    await setupStep(page);
     await page.locator('[data-nrl-start]').tap();
     await page.locator('[data-expansion-work]').tap();
     if (await page.locator('.nrl-tutorial-skip').count()) await page.locator('.nrl-tutorial-skip').tap();

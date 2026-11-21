@@ -24,6 +24,7 @@ import { spawn } from 'node:child_process';
 import { gunzipSync } from 'node:zlib';
 import { join } from 'node:path';
 import { chromium, webkit } from 'playwright-core';
+import { setupStep } from './e2e-webkit/newClub.mjs';
 
 const argv = process.argv.slice(2);
 const WEBKIT = argv.includes('--webkit');
@@ -109,7 +110,9 @@ const phStorage = (page) => page.evaluate(() => {
 });
 
 async function newCareer(page) {
+  await setupStep(page, 2);
   await page.fill('[data-nrl-clubname]', 'Analytics Test FC');
+  await setupStep(page, 3);
   await page.click('[data-nrl-start]');
   await page.click('[data-expansion-work]');
   await page.waitForSelector('.nrl-dock');
@@ -128,7 +131,7 @@ async function main() {
     {
       const { ctx, page, seen } = await open(browser);
       await page.goto(ROOT);
-      await page.waitForSelector('[data-nrl-start]');
+      await page.waitForSelector('[data-nrl-town]');
       // Genuine uncaught error and rejected promise on the title: queue only.
       await page.evaluate(() => {
         const url = document.querySelector('script[type=module]').src;
@@ -192,7 +195,7 @@ async function main() {
       const { ctx, page, seen } = await open(browser);
       await ctx.addInitScript(() => Object.defineProperty(Navigator.prototype, 'doNotTrack', { get: () => '1' }));
       await page.goto(ROOT);
-      await page.waitForSelector('[data-nrl-start]');
+      await page.waitForSelector('[data-nrl-town]');
       await newCareer(page);
       await page.evaluate(() => { void Promise.reject(new Error('analytics-548-probe DNT')); });
       await wait(5000);
@@ -205,7 +208,7 @@ async function main() {
     for (const [label, opts] of [['PostHog unreachable', { blockHost: true }], ['SDK chunk fails to load', { blockChunk: true }]]) {
       const { ctx, page, seen } = await open(browser, opts);
       await page.goto(ROOT);
-      await page.waitForSelector('[data-nrl-start]');
+      await page.waitForSelector('[data-nrl-town]');
       await newCareer(page);
       await wait(5000);
       await page.click('.nrl-nav [data-screen="squad"]');
@@ -221,7 +224,7 @@ async function main() {
       await page.goto(url);
       if (label === 'match lab') await wait(6000);
       else {
-        await page.waitForSelector('[data-nrl-start]');
+        await page.waitForSelector('[data-nrl-town]');
         await newCareer(page);
         await wait(6000);
       }

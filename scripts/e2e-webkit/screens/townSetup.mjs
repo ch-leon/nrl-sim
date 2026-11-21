@@ -2,7 +2,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
-import { BASE, OUT_ROOT, IPHONE_UA, log } from '../common.mjs';
+import { BASE, OUT_ROOT, IPHONE_UA, log, setupStep } from '../common.mjs';
 
 export async function runTownSetup(browser) {
   const out = join(OUT_ROOT, 'webkit', 'town-setup');
@@ -23,7 +23,7 @@ export async function runTownSetup(browser) {
       try {
         await page.goto(BASE);
         const start = page.locator('[data-nrl-start]');
-        await start.waitFor();
+        await page.locator('[data-nrl-town]').waitFor();
         await page.waitForFunction(() => !document.querySelector('[data-nrl-start]')?.disabled);
         const chunkBytes = gzipSync(await (await chunk).body()).length;
         if (chunkBytes >= 100_000) throw new Error(`Town chunk exceeds budget: ${chunkBytes} gzip bytes`);
@@ -37,6 +37,12 @@ export async function runTownSetup(browser) {
         if (mode === 'picked' && !ground.startsWith(`${pick.name} `)) throw new Error('Picking a town did not fill the ground name');
         if (!town || !club || !ground) throw new Error('Town, club and ground must be filled before Start');
         if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)) throw new Error('Horizontal overflow');
+        // The Club and Start steps (SuperCOOKED 13, 14) with what the town filled in, then Start.
+        await setupStep(page, 2);
+        await page.screenshot({ path: join(out, `${tag}-club.png`) });
+        if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)) throw new Error('Horizontal overflow on Club');
+        await setupStep(page, 3);
+        await page.screenshot({ path: join(out, `${tag}-start.png`) });
         await start.tap();
         await page.locator('[data-expansion-work]').tap();
         await page.waitForFunction(() => window.__nrlState?.()?.home);

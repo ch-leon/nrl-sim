@@ -9,12 +9,13 @@
 // stays whole; closing it goes back to the club with the demo still gated.
 //
 // Commercial flag on only: with it off nothing calls in here and the stylesheet
-// is never added. Styled with the Broadcast Quiet tokens (--nrl-*) and dom.ts's
-// buttons and dialog frame only.
+// is never added. Styled with the SuperCOOKED tokens (--nrl-*) and dom.ts's buttons and
+// dialog frame only (SuperCOOKED 64: a reskin; the layout is as it was).
 
 import { button, closeModal, el, openModal } from '../dom';
 import { bus } from '../../core/events';
 import { BRAND, type Brand } from '../../brand';
+import { wordmarkParts } from '../wordmark';
 import {
   CROSS_BUY_INCLUDED, PLATFORM, getEntitlementService, hasFullGame, type EntitlementService, type Entitlements, type Tier,
 } from '../../commercial/entitlements';
@@ -85,6 +86,12 @@ export interface PaywallOptions {
   brand?: Brand;
   /** Our web checkout once it exists (VITE_WEB_CHECKOUT_URL); unset, its button says it isn't open yet. */
   webCheckoutUrl?: string | undefined;
+}
+
+/** The brand's name as the wordmark: its last word in the accent, the whole still one name to read. */
+function brandHead(brand: Brand): HTMLElement {
+  const [lead, last] = wordmarkParts(brand.name);
+  return el('h2', { class: 'nrl-paywall-brand' }, ...(lead ? [lead] : []), el('span', { class: 'nrl-paywall-brand-accent', text: last }));
 }
 
 /** A status line, and a guard so a second tap waits for the first to finish. */
@@ -213,7 +220,7 @@ export function buildPaywall(opts: PaywallOptions, close: () => void): HTMLEleme
     }
 
     root.replaceChildren(
-      el('h2', { text: brand.name }),
+      brandHead(brand),
       el('p', { class: 'nrl-paywall-lead', text: opts.reason === 'demo' ? PAYWALL_TEXT.demoEnded : PAYWALL_TEXT.fromTitle }),
       el('div', { class: 'nrl-paywall-grid' },
         el('ul', { class: 'nrl-paywall-includes' }, ...PAYWALL_TEXT.includes.map((t) => el('li', { text: t }))),
@@ -282,36 +289,47 @@ export function ensurePaywallStyles(): void {
 
 // Tokens only (dom.ts's --nrl-*). At the title there is no dock under the dialog,
 // so its bottom clears the safe area itself; over the club the dock already does.
+// SuperCOOKED 64: Archivo wordmark, Oswald tiers, JetBrains Mono prices, a ringed first tier,
+// an outline second Buy, text-link Restore / Log in. The same boxes as before.
 export const PAYWALL_CSS = `
-.nrl-dialog-region .nrl-paywall-modal { width: min(100%, 760px); }
+.nrl-dialog-region .nrl-paywall-modal { width: min(100%, 760px); border-radius: 18px; }
 .nrl-paywall-backdrop { padding-bottom: max(12px, calc(12px + var(--nrl-safe-b) - var(--nrl-nav-h, 0px))); }
 .nrl-paywall { display: flex; flex-direction: column; gap: 10px; }
 .nrl-paywall h2 { margin: 0; }
-.nrl-paywall-lead { margin: 0; color: var(--nrl-text-2); }
-.nrl-paywall-note { margin: 0; color: var(--nrl-muted); font-size: 13px; }
+.nrl-paywall-brand { font-family: var(--nrl-f-display); font-size: 1.875rem; font-weight: 400; line-height: 0.95; letter-spacing: -0.02em; text-transform: uppercase; color: var(--nrl-text); }
+.nrl-paywall-brand-accent { color: var(--nrl-accent); }
+.nrl-paywall-lead { margin: 0; font-size: 1rem; line-height: 1.4; color: var(--nrl-text); }
+.nrl-paywall-note { margin: 0; color: var(--nrl-muted); font-size: 0.8125rem; }
 .nrl-paywall-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: 10px; align-items: stretch; }
-.nrl-paywall-includes { margin: 0; padding: 10px 12px 10px 28px; border-radius: 10px; background: var(--nrl-panel);
-  color: var(--nrl-text-2); font-size: 13px; line-height: 1.35; display: flex; flex-direction: column; gap: 6px; }
+.nrl-paywall-includes { margin: 0; padding: 10px 12px; list-style: none; border-radius: 14px; background: var(--nrl-panel); border: 1px solid var(--nrl-line);
+  color: var(--nrl-text-2); font-size: 0.8125rem; line-height: 1.35; display: flex; flex-direction: column; gap: 6px; }
+.nrl-paywall-includes li { display: flex; gap: 8px; }
+.nrl-paywall-includes li::before { content: '✓'; flex: 0 0 auto; color: var(--nrl-pos); }
 .nrl-paywall-tiers { display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr)); gap: 8px; }
-.nrl-paywall-tier { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 10px 12px; border-radius: 10px;
-  background: var(--nrl-raised); }
-.nrl-paywall-tier-name { font-family: var(--nrl-f-label); font-size: 18px; font-weight: 700; letter-spacing: 0.02em;
+.nrl-paywall-tier { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 10px 12px; border-radius: 14px;
+  background: var(--nrl-panel); border: 1px solid var(--nrl-line); }
+.nrl-paywall-tier:first-child { border-color: color-mix(in srgb, var(--nrl-accent) 60%, transparent); }
+.nrl-paywall-tier-name { font-family: var(--nrl-f-label); font-size: 1.0625rem; font-weight: 700; letter-spacing: 0.06em;
   text-transform: uppercase; color: var(--nrl-text); }
-.nrl-paywall-tier-line { font-size: 12px; color: var(--nrl-muted); }
-.nrl-paywall-price { margin-top: 4px; font-size: 20px; color: var(--nrl-text); }
-.nrl-paywall-webprice { font-size: 12px; color: var(--nrl-muted); }
-/* Buy sits at the card's foot, so the cards' buttons line up whatever their words. */
-.nrl-paywall-tier .nrl-btn { margin-top: auto; width: 100%; }
+.nrl-paywall-tier-line { font-size: 0.75rem; color: var(--nrl-text-2); }
+.nrl-paywall-price { margin-top: 4px; font-family: var(--nrl-f-num); font-size: 1.125rem; font-weight: 700; color: var(--nrl-text); }
+.nrl-paywall-webprice { font-family: var(--nrl-f-num); font-size: 0.75rem; color: var(--nrl-muted); }
+/* Buy sits at the card's foot, so the cards' buttons line up whatever their words; the one that is not
+   the primary is an outline. */
+.nrl-paywall-tier .nrl-btn { margin-top: auto; width: 100%; border-radius: 10px; font-weight: 700; }
+.nrl-paywall-tier .nrl-btn:not(.nrl-btn-primary) { background: transparent; box-shadow: inset 0 0 0 1px var(--nrl-outline); }
 .nrl-paywall-tier > :nth-last-child(2) { margin-bottom: 8px; }
-.nrl-paywall-foot { display: flex; flex-wrap: wrap; gap: 8px; }
-.nrl-paywall-foot .nrl-btn { flex: 1 1 auto; }
-.nrl-paywall-status { margin: 0; color: var(--nrl-accent); font-size: 13px; }
+.nrl-paywall-foot { display: flex; flex-wrap: wrap; gap: 4px 8px; }
+.nrl-paywall-foot .nrl-btn { flex: 0 1 auto; }
+.nrl-paywall-foot .nrl-btn:not(.nrl-btn-primary) { background: transparent; color: var(--nrl-text-2); padding: 0 8px; font-size: 0.75rem; }
+.nrl-paywall-status { margin: 0; color: var(--nrl-neg); font-size: 0.8125rem; }
 .nrl-paywall-status:empty { display: none; }
 @media (max-height: 500px) {
   .nrl-paywall { gap: 8px; }
-  .nrl-paywall-includes { padding: 8px 10px 8px 24px; font-size: 12px; gap: 4px; }
+  .nrl-paywall-brand { font-size: 1.5rem; }
+  .nrl-paywall-includes { padding: 8px 10px; font-size: 0.75rem; gap: 4px; }
   .nrl-paywall-tier { padding: 8px 10px; }
-  .nrl-paywall-price { margin-top: 2px; font-size: 18px; }
+  .nrl-paywall-price { margin-top: 2px; font-size: 1rem; }
   .nrl-paywall-tier > :nth-last-child(2) { margin-bottom: 6px; }
 }
 @media (max-width: 560px) { .nrl-paywall-grid { grid-template-columns: minmax(0, 1fr); } }

@@ -47,6 +47,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
 import { bundleSize, reportBundle } from './bundle-size.mjs';
 import { weeksAdvanced } from './e2e-week-count.mjs';
+import { setupStep } from './e2e-webkit/newClub.mjs';
 
 const argv = process.argv.slice(2);
 const flag = (name, dflt) => (argv.includes(`--${name}`) ? argv[argv.indexOf(`--${name}`) + 1] : dflt);
@@ -336,12 +337,15 @@ async function run() {
 
   await timed('load → title', async () => {
     await page.goto(BASE);
-    await page.waitForSelector('[data-nrl-start]');
+    await page.waitForSelector('[data-nrl-town]');
     const t = await page.evaluate(() => Math.round(performance.now()));
     return `${t} ms since navigation start in-page`;
   });
+  // The new club's Club and Start steps (SuperCOOKED 13, 14), outside the timings.
+  await setupStep(page, 2);
+  await page.fill('[data-nrl-clubname]', 'Budget FC');
+  await setupStep(page, 3);
   await timed('Start → grounds (textures painted, HUD up)', async () => {
-    await page.fill('[data-nrl-clubname]', 'Budget FC');
     // Start is disabled ("Loading towns…") until the town list is in (#613); a DOM click before that does nothing.
     await page.waitForFunction(() => !document.querySelector('[data-nrl-start]')?.disabled);
     await clickTimed('[data-nrl-start]');

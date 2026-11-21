@@ -1,7 +1,7 @@
 // Real trial and league simulation, production camp commands and durable reports.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { BASE, OUT_ROOT, IPHONE_UA, closeWeekSummary, openNav, skipFromPill, log } from '../common.mjs';
+import { BASE, OUT_ROOT, IPHONE_UA, closeWeekSummary, openNav, skipFromPill, log, setupStep } from '../common.mjs';
 
 const SAVE = 'nrl-sim-save-slot-1';
 const SIDECAR = 'nrl-live-match-1';
@@ -127,6 +127,7 @@ export async function runPlayerAssignments(browser) {
     await page.clock.setFixedTime(new Date(573 * 4294967296 + 7));
     await page.goto(BASE);
     await page.locator('[data-nrl-town]').fill(`${town.name}, ${town.region}, ${town.country}`);
+    await setupStep(page);
     await page.locator('[data-nrl-career-mode-league]').click();
     await page.locator('[data-nrl-start]').click();
     await page.locator('[data-nrl-league-selection]').waitFor({ timeout: 60000 });

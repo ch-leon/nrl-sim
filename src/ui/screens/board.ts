@@ -189,20 +189,22 @@ export function openSackedScreen(state: GameState = getState()): HTMLElement {
   closeScreen();
   const sum = sackedSummary(state);
   const ord = (n: number): string => `${n}${['th', 'st', 'nd', 'rd'][(n % 100 >= 11 && n % 100 <= 13) || n % 10 > 3 ? 0 : n % 10]}`;
-  const chip = (label: string, value: string): HTMLElement =>
-    el('div', { class: 'nrl-sacked-chip' }, el('span', { class: 'nrl-label', text: label }), el('b', { class: 'nrl-num', text: value }));
-  const content = el('div', { class: 'nrl-sacked' });
+  // SuperCOOKED 63: four career tiles, each from sackedSummary (state.history, reputation).
+  const tile = (label: string, value: string): HTMLElement =>
+    el('div', { class: 'nrl-sacked-chip' }, el('span', { class: 'nrl-label', text: label }), el('b', { class: 'nrl-display', text: value }));
+  const content = el('div', { class: 'nrl-sacked', attrs: { role: 'alertdialog', 'aria-label': 'You have been sacked' } });
+  const head = el('h2', { text: "You're " });
+  head.append(el('span', { class: 'nrl-sacked-hot', text: 'cooked.' }));
   content.append(
-    el('div', { class: 'nrl-sacked-tag', text: `Sacked · end of season ${sum.season}` }),
-    el('h2', { text: 'You have been sacked' }),
-    el('p', { class: 'nrl-sacked-reason', text: sum.reason }),
-    el('p', { class: 'nrl-sacked-club', text: state.clubName }),
+    el('div', { class: 'nrl-sacked-tag nrl-num', text: `Sacked · end of season ${sum.season}` }),
+    head,
+    el('p', { class: 'nrl-sacked-reason', text: `${state.clubName} have let you go. ${sum.reason}` }),
     el('div', { class: 'nrl-sacked-chips' },
-      chip('Seasons', String(sum.seasons)),
-      chip('Premierships', String(sum.premierships)),
-      chip('Best finish', sum.bestFinish ? ord(sum.bestFinish) : '—'),
-      chip('Reputation', String(sum.reputation))),
-    el('p', { class: 'nrl-sacked-note', text: `Your save in slot ${getActiveSlot()} has been kept. Choose a slot on the title screen to start a new club.` }),
+      tile('Seasons', String(sum.seasons)),
+      tile('Titles', String(sum.premierships)),
+      tile('Best', sum.bestFinish ? ord(sum.bestFinish) : '—'),
+      tile('Rep', String(sum.reputation))),
+    el('p', { class: 'nrl-sacked-note', text: `Your save in slot ${getActiveSlot()} is kept. Start a new club in any slot.` }),
     el('div', { class: 'nrl-sacked-actions' }, button('New club ▸', () => {
       if (typeof location !== 'undefined') location.reload(); // back to the title/slot flow (#34)
     }, { class: 'nrl-btn-primary' })),
@@ -285,25 +287,26 @@ export const BOARD_CSS = `
 .nrl-staff-hire[data-locked] small { color: var(--nrl-neg); }
 @media (max-width: 700px) { .nrl-screen.nrl-staff { grid-template-columns: 230px minmax(0, 1fr); gap: 12px; } }
 
-/* The sacked card: centred, navy, like full time (3s). */
-.nrl-modal.nrl-sacked-modal { width: min(540px, calc(100vw - 24px)); max-width: none; border-radius: 18px; padding: 20px 24px; }
+/* SuperCOOKED 63: the sacked card, navy with a red edge, centred. */
+.nrl-modal.nrl-sacked-modal { width: min(540px, calc(100vw - 24px)); max-width: none; border-radius: 18px; padding: 18px 22px; border: 1px solid color-mix(in srgb, var(--nrl-alert) 45%, transparent); }
 .nrl-sacked { display: flex; flex-direction: column; gap: 10px; }
-.nrl-sacked-tag { font-family: var(--nrl-f-label); font-size: 0.9375rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-neg); }
-.nrl-sacked h2 { margin: 0; font-size: 1.875rem; line-height: 1.05; }
+.nrl-sacked-tag { align-self: flex-start; font-size: 0.625rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; padding: 4px 9px; border-radius: 10px;
+  background: color-mix(in srgb, var(--nrl-alert) 15%, transparent); border: 1px solid color-mix(in srgb, var(--nrl-alert) 50%, transparent); color: color-mix(in srgb, var(--nrl-alert) 80%, #fff); }
+.nrl-sacked h2 { margin: 0; font-size: 2.875rem; line-height: 0.95; }
+.nrl-sacked-hot { color: var(--nrl-accent); }
 .nrl-sacked p { margin: 0; }
-.nrl-sacked-reason { font-size: 0.875rem; color: var(--nrl-text-2); line-height: 1.4; }
-.nrl-sacked-club { font-family: var(--nrl-f-label); font-size: 1.125rem; font-weight: 600; color: var(--nrl-text-2); }
-.nrl-sacked-chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 0; border-top: 1px solid var(--nrl-line); border-bottom: 1px solid var(--nrl-line); }
-.nrl-sacked-chip { display: flex; flex-direction: column; padding: 6px 10px; border-radius: 8px; background: var(--nrl-raised); }
-.nrl-sacked-chip .nrl-label { font-size: 0.6875rem; }
-.nrl-sacked-chip b { font-size: 1rem; }
+.nrl-sacked-reason { font-size: 0.9375rem; color: var(--nrl-text-2); line-height: 1.45; }
+.nrl-sacked-chips { display: flex; gap: 6px; }
+.nrl-sacked-chip { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 12px; background: var(--nrl-panel); border: 1px solid var(--nrl-line); }
+.nrl-sacked-chip .nrl-label { font-family: var(--nrl-f-num); font-size: 0.625rem; letter-spacing: 0.14em; }
+.nrl-sacked-chip b { font-size: 1.25rem; font-weight: 400; }
 .nrl-sacked-note { font-size: 0.75rem; color: var(--nrl-muted); }
-.nrl-sacked-actions { display: flex; justify-content: flex-end; }
-.nrl-sacked-actions .nrl-btn { min-height: 48px; padding: 0 22px; font-size: 1.1875rem; }
+.nrl-sacked-actions { display: flex; }
+.nrl-sacked-actions .nrl-btn { flex: 1; min-height: 50px; border-radius: 10px; font-size: 1.0625rem; }
 @media (max-height: 420px) {
-  .nrl-modal.nrl-sacked-modal { padding: 12px 18px; }
+  .nrl-modal.nrl-sacked-modal { padding: 10px 18px; }
   .nrl-sacked { gap: 6px; }
-  .nrl-sacked h2 { font-size: 1.5rem; }
-  .nrl-sacked-chips { padding: 6px 0; }
+  .nrl-sacked h2 { font-size: 1.875rem; }
+  .nrl-sacked-actions .nrl-btn { min-height: 44px; }
 }
 `;

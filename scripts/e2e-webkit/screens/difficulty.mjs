@@ -2,7 +2,7 @@
 // Screenshots stay in the existing CI artifact, never in git.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { OUT_ROOT, BASE, IPHONE_UA } from '../common.mjs';
+import { OUT_ROOT, BASE, IPHONE_UA, setupStep } from '../common.mjs';
 
 export async function runDifficulty(browser) {
   const out = join(OUT_ROOT, 'webkit', 'difficulty');
@@ -23,7 +23,8 @@ export async function runDifficulty(browser) {
       await page.evaluate(() => localStorage.clear());
       await page.reload();
       for (const saved of [false, true]) {
-        await page.waitForSelector('[data-nrl-start]');
+        // Difficulty, its guidance and Start are the new club's third step (SuperCOOKED 14).
+        await setupStep(page);
         await page.locator('[data-nrl-clubname]').blur();
         if (await page.locator('[data-nrl-difficulty-normal]').getAttribute('aria-pressed') !== 'true') record.problems.push('Normal is not the default');
         for (const [difficulty, text] of Object.entries(blurbs)) {
@@ -59,6 +60,7 @@ export async function runDifficulty(browser) {
         if (!saved) {
           // Reopen a fresh setup, then Start without touching any difficulty.
           await page.reload();
+          await setupStep(page);
           await page.locator('[data-nrl-start]').tap();
           await page.locator('[data-expansion-work]').tap();
           await page.waitForSelector('.nrl-tutorial-skip');
