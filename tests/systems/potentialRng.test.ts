@@ -45,14 +45,17 @@ import { contractsEndingSoon } from '../../src/systems/contracts';
 // structures moved the season seed to 3236754777. Career persistence and the
 // merged main career work move it again; compare UI-read/no-read in both AI modes.
 // Main's career-only pin: 3782523015; the combined pin before #722 was 119391389.
-// The timed back-door runs (#722, engine revision 7) change match outcomes and the
-// season stream; measured: 1950957202. Both AI modes still compare UI-read and
-// no-read runs, and AI=0 pins this measured stream.
-const MAIN_SEED_AFTER_SEASON = 1950957202;
+// The timed back-door runs (#722, engine revision 7) brought the season seed to
+// 1950957202. The second-kicker setup (#650, revision 14) shifts match outcomes
+// and brings it back to 3782523015. Keep both fingerprints with habit AI off.
 
 describe('the rng stream (#369)', () => {
-  it.each([0, 1])('weekly potential and dot reads preserve the season stream with habit AI=%i', (ai) => {
-    const restore = applyTuning({ 'counters.ai.on': ai });
+  it.each([
+    { ai: 0, mode: 'default', expectedSeed: 3782523015 },
+    { ai: 1, mode: 'default' },
+    { ai: 0, mode: 'previous engine', expectedSeed: 1950957202 },
+  ])('weekly potential and dot reads preserve the season stream with habit AI=$ai ($mode)', ({ ai, mode, expectedSeed }) => {
+    const restore = applyTuning({ 'counters.ai.on': ai, ...(mode === 'previous engine' ? { 'secondKicker.on': 0 } : {}) });
     try {
       const season = (readPages: boolean) => {
         bus.clear();
@@ -76,7 +79,7 @@ describe('the rng stream (#369)', () => {
       expect(viewed.season).toBe(2);
       expect(viewed.looked).toBe(WEEKS_PER_SEASON);
       expect(viewed.seed).toBe(control.seed);
-      if (ai === 0) expect(viewed.seed).toBe(MAIN_SEED_AFTER_SEASON);
+      if (expectedSeed !== undefined) expect(viewed.seed).toBe(expectedSeed);
     } finally { restore(); }
   });
 });
