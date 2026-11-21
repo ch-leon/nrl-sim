@@ -17,10 +17,11 @@ import {
 } from '../../core/state';
 import { registerSeasonReview } from '../../systems/stats';
 import { BOARD, FINALS_WEEKS, SEASON_ROUNDS } from '../../config';
-import { backButton, button, closeScreen, el, openScreen, screenHead } from '../dom';
+import { backButton, button, closeScreen, el, openScreen } from '../dom';
+import { ordinal } from '../hud';
 import { whenNoMatch } from '../updatePrompt';
 import { fmtMoney, seasonBooks } from './finance';
-import { ensureHistoryStyles, fmtSeasonEndToast, fmtSeasonSummary, openHistoryScreen, seasonEndToastKind } from './history';
+import { ensureHistoryStyles, fmtFinalsOutcome, fmtSeasonEndToast, openHistoryScreen, seasonEndToastKind } from './history';
 
 // ── Pure builders ───────────────────────────────────────────────────────────
 
@@ -96,7 +97,7 @@ export function openSeasonReview(entry: SeasonRecord, opts: { back?: () => void;
     el('div', { class: `nrl-review-line ${cls}`.trim() }, el('span', { class: 'nrl-label', text: label }), el('span', { text }));
 
   const toHistory = (): void => { closeScreen(); (opts.back ?? openHistoryScreen)(); };
-  const history = opts.back ? backButton('History', toHistory) : button('History', toHistory);
+  const history = opts.back ? backButton('History', toHistory) : button('History', toHistory, { class: 'nrl-btn-outline' });
   history.classList.add('nrl-review-history');
   const installation = stateInstallation();
   const canChoose = (): boolean => {
@@ -111,13 +112,18 @@ export function openSeasonReview(entry: SeasonRecord, opts: { back?: () => void;
     closeScreen(); opts.onChooseLeague!();
   }, { class: 'nrl-btn-primary nrl-review-done' }) : button('Carry on ▸', () => closeScreen(), { class: 'nrl-btn-primary nrl-review-done' });
   if (canChoose()) done.setAttribute('data-review-choose-league', '');
-  const head = opts.back
-    ? screenHead(`Season ${entry.season} review`, { lead: [history] })
-    : screenHead(`Season ${entry.season} review`, { controls: [history, done] });
-  head.classList.add('nrl-review-head');
 
-  body.append(el('div', { class: `nrl-review-finish${entry.premiership ? ' nrl-review-premiers' : ''}`, text: fmtSeasonSummary(entry).replace(/^Season \d+ — /, '') }));
-  if (entry.season === 1) body.append(el('p', { text: EXPANSION_COPY.review, attrs: { 'data-expansion-review': '' } }));
+  // The finish banner: the big finish, how the season ended, History and the one primary beside it.
+  const pos = entry.ladderPosition > 0 ? ordinal(entry.ladderPosition) : 'unranked';
+  const ended = entry.premiership ? `Premiers · ladder ${pos}` : fmtFinalsOutcome(entry);
+  const what = el('div', { class: 'nrl-review-what' },
+    el('span', { class: 'nrl-review-kicker', text: `Season ${entry.season} review` }),
+    el('span', { class: 'nrl-review-finish', text: ended ? ended.charAt(0).toUpperCase() + ended.slice(1) : `Finished ${pos}` }));
+  if (entry.season === 1) what.append(el('span', { class: 'nrl-review-note', text: EXPANSION_COPY.review, attrs: { 'data-expansion-review': '' } }));
+  const head = el('div', { class: `nrl-review-head${entry.premiership ? ' nrl-review-premiers' : ''}` },
+    el('span', { class: 'nrl-review-big', text: entry.premiership ? 'Premiers' : entry.ladderPosition > 0 ? pos : '–' }),
+    what,
+    el('div', { class: 'nrl-review-tools' }, history, ...(opts.back ? [] : [done])));
   // Two columns on a landscape phone: how the club did, then the club around it.
   const season = el('div', { class: 'nrl-review-col' });
   const club = el('div', { class: 'nrl-review-col' });
