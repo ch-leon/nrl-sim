@@ -626,7 +626,7 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
     await openNav(page, 'ladder');
     await tap('.nrl-ladder-table .nrl-ladder-club');
     await page.waitForSelector('.nrl-rival-modal');
-    return check(rec, { box: '.nrl-rival-modal', rows: '.nrl-rival-row' }, null);
+    return check(rec, { box: '.nrl-rival-modal', rows: '.nrl-rival-row, .nrl-pitch-cards .nrl-pcard', card: '.nrl-pitch-cards .nrl-pcard' }, null);
   });
   // Settings (#349 E1): an Office tile (the gear is gone), every switch whole; Import asks on its own row first.
   await step('popup-settings', async (rec) => {
