@@ -468,8 +468,10 @@ export abstract class LivePositioning extends LiveContact {
     const rushDepth = this.tactics[atk].attack === 'kick-chase' ? Math.min(1, this.rushEffect()) : 0;
     const compressed = this.tactics[atk].attack === 'expansive' ? Math.min(1, this.compressedEffect()) : 0;
     const coverDepth = Math.min(1, kickCover);
-    if (ph.kind === 'play' && carrier) {
-      const want = carrier.body.pos.x + this.dir * 2.5;
+    const heelLive = splitSpot && ph.kind === 'ruck' && ph.stage === 'dh';
+    if ((ph.kind === 'play' && carrier) || heelLive) {
+      // The heel puts the ball in play; only defenders who completed their retreat can come up.
+      const want = (carrier?.body.pos.x ?? splitSpot!.x) + this.dir * 2.5;
       const stepM = dplan.lineSpeed * (GAS.cruise / LIVE.lineCruiseRef) * TICK_S;
       // Rush up toward the carrier, never past him.
       if (this.dir > 0) this.lineX = Math.max(want, this.lineX - stepM);

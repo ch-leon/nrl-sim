@@ -4,7 +4,7 @@ import { traitBoost } from '../../../data/traits';
 import { FIELD_LENGTH, MID_Y, clampToGround } from '../../core/field';
 import { bounceFlight, kickFlight, landed, rollFlight, type BallState } from '../../core/ball';
 import type { Side } from '../../core/snapshot';
-import { clamp, dist, type Vec } from '../../core/vec';
+import { add, clamp, dist, scale, type Vec } from '../../core/vec';
 import { FIVE_EIGHTH, FULLBACK, KICKER } from '../roles';
 import { SECOND_KICKER } from '../lastTackle';
 import { MAX_LAT_M, pickReceiver, pickReceiverWeighted } from '../tactics';
@@ -132,11 +132,14 @@ export abstract class LiveRestarts extends LivePlay {
   }
 
   /** The markers stay at the ruck during this read, while the onside line can close on a half. */
-  protected kickerSpace(p: Player): number {
+  protected kickerSpace(p: Player, pressure = false): number {
     let space = Infinity;
     for (const d of this.side(other(p.side))) {
       if (this.locked(d) || this.tick < d.cooldownUntil || this.markers.includes(this.indexOf(d)) || this.retreatLine(d) !== null) continue;
-      space = Math.min(space, dist(p.body.pos, d.body.pos));
+      const now = dist(p.body.pos, d.body.pos);
+      const next = dist(p.body.pos, add(d.body.pos, scale(d.body.vel, SECOND_KICKER.lookAheadS)));
+      if (pressure && now > LIVE.sprintCloseM && (d.body.vel.x * this.dir > -SECOND_KICKER.closingSpeed || next >= now)) continue;
+      space = Math.min(space, next);
     }
     return space;
   }
@@ -147,7 +150,7 @@ export abstract class LiveRestarts extends LivePlay {
     if (!this.secondKickerAvailable(h, fiveEighth)) return null;
     if ((fiveEighth.body.pos.y - h.body.pos.y) * (halfback.body.pos.y - h.body.pos.y) >= 0
       || (halfback.body.pos.x - fiveEighth.body.pos.x) * this.dir <= 0) return null;
-    const space = this.kickerSpace(halfback);
+    const space = this.kickerSpace(halfback, true);
     if (space > SECOND_KICKER.pressureM) return null;
     const boot = (fiveEighth.stats.kicking - halfback.stats.kicking) * SECOND_KICKER.kickingPerPointM
       + (traitBoost(fiveEighth.traits, 'bigBoot') - traitBoost(halfback.traits, 'bigBoot')) * SECOND_KICKER.bigBootM;

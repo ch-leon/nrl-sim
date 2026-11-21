@@ -14,8 +14,10 @@ export const SECOND_KICKER = {
   laneM: 6,
   halfbackDepthM: 3,
   fiveEighthDepthM: 6,
-  /** Nearest eligible defender inside this distance pressures the halfback. */
-  pressureM: 14,
+  /** The pressure read looks this far ahead for a defender coming up at the halfback. */
+  lookAheadS: 0.4,
+  closingSpeed: 0.6,
+  pressureM: 17,
   /** The five-eighth needs this much more room. The better boot can move that bar by at most half. */
   extraSpaceM: 3,
   kickingPerPointM: 0.06,
