@@ -115,6 +115,7 @@ ${MOTION_CSS}
 
 /* Loading (SuperCOOKED 10): the wordmark, the parent line, the bar, what it is doing, and a tip at the foot. */
 .nrl-title-main-loading { align-items: center; gap: 14px; }
+.nrl-title-main-loading h1 { font-size: min(4.75rem, 13vw); }
 .nrl-title-main-loading .nrl-title-parent :is(.nrl-parent-lead, .nrl-wordmark-accent) { font-size: 0.8125rem; }
 /* No percentage: the work says nothing of how far along it is, so the bar runs without one. */
 .nrl-title-bar { position: relative; width: min(280px, 70vw); height: 4px; margin-top: 18px; border-radius: 2px; background: ${C.raised}; overflow: hidden; }
@@ -183,7 +184,8 @@ ${MOTION_CSS}
   white-space: normal; line-height: 1; }
 .nrl-title-btn-small { font-size: 0.875rem; padding: 0 10px; }
 .nrl-title-more { width: 44px; padding: 0; font-size: 1rem; letter-spacing: 0; color: ${C.text2}; background: ${C.raised}; }
-.nrl-title-more[aria-expanded="true"], .nrl-title-more[aria-expanded="true"]:hover { background: ${C.text}; color: ${C.onAccent}; }
+.nrl-title-more[aria-expanded="true"], .nrl-title-more[aria-expanded="true"]:hover, .nrl-title-more[aria-expanded="true"]:active:not(:disabled) {
+  background: ${C.text}; color: ${C.onAccent}; }
 /* A quiet word for a button: Import save, Edit. */
 .nrl-title-btn-text, .nrl-title-btn-text:hover { background: transparent; color: ${C.text2}; font-size: 0.8125rem; padding: 0 6px; }
 /* Destructive (SuperCOOKED §3): amber words on the navy button, never the orange. */
@@ -202,13 +204,14 @@ ${MOTION_CSS}
 .nrl-title-head .nrl-title-btn { flex: 0 0 auto; font-size: 0.8125rem; padding: 0 12px; }
 .nrl-title-head h2 { margin: 0; font-family: 'Archivo Black', 'Arial Black', sans-serif; font-size: 1.25rem; font-weight: 400; line-height: 1.1;
   letter-spacing: -0.02em; text-transform: uppercase; flex: 1; min-width: 0; }
-.nrl-title-slottag { margin-left: 0.5em; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.625rem; letter-spacing: 0.14em; color: ${C.muted}; }
+.nrl-title-slottag { margin-left: 0.5em; white-space: nowrap; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.625rem; letter-spacing: 0.14em; color: ${C.muted}; }
 .nrl-title-steps { display: flex; gap: 6px; flex: 0 0 auto; }
 .nrl-title-stepchip { display: flex; align-items: center; min-height: 1.875rem; padding: 0 12px; border-radius: 999px; white-space: nowrap;
   font-family: 'Oswald', 'Arial Narrow', sans-serif; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
   color: ${C.muted}; background: ${C.panel}; border: 1px solid ${C.line}; }
 .nrl-title-stepchip[data-state="done"] { color: ${C.pos}; }
 .nrl-title-stepchip[aria-current="step"] { background: ${C.text}; color: ${C.onAccent}; border-color: ${C.text}; }
+.nrl-title-stepchip > span { white-space: pre; }
 .nrl-title-setup { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 .nrl-title-setup > .nrl-title-panel { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .nrl-title-setup[data-nrl-setup-step="1"] > :not([data-nrl-panel="1"]),
@@ -345,6 +348,10 @@ ${MOTION_CSS}
 }
 @media (max-width: 760px) {
   .nrl-title-main-slots { gap: 24px; }
+}
+/* A narrow phone: the steps not on show are their number (or ✓), so the head keeps one line. */
+@media (max-width: 600px) {
+  .nrl-title-stepchip:not([aria-current="step"]) .nrl-title-stepname { display: none; }
 }
 @media (max-width: 520px) {
   .nrl-title-main-slots { flex-direction: column; align-items: stretch; gap: 16px; }
@@ -722,7 +729,6 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
       townFoot.appendChild(mk('span', '', "Not listed? Type any name. It just won't be on the map."));
       const townNote = mk('span', 'nrl-title-townstatus', 'Loading offline towns…');
       townNote.setAttribute('data-nrl-town-status', '');
-      townNote.setAttribute('aria-live', 'polite');
       townFoot.appendChild(townNote);
       search.appendChild(townFoot);
       townPanel.appendChild(search);
@@ -957,7 +963,9 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
         setup.setAttribute('data-nrl-setup-step', String(n));
         for (const [i, { chip, name }] of chips.entries()) {
           const at = i + 1;
-          chip.textContent = `${at < n ? '✓' : at} ${name}`;
+          chip.replaceChildren();
+          chip.appendChild(mk('span', '', `${at < n ? '✓' : at} `));
+          chip.appendChild(mk('span', 'nrl-title-stepname', name));
           chip.setAttribute('data-state', at < n ? 'done' : at === n ? 'now' : 'next');
           chip.setAttribute('aria-current', at === n ? 'step' : 'false');
         }
