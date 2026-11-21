@@ -1,7 +1,7 @@
 import { playTrials } from '../common.mjs';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav } from '../common.mjs';
+import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, setupStep } from '../common.mjs';
 
 // ── The ladder's form column at every text size (#426) ──────────────────────
 /**
@@ -48,7 +48,7 @@ export async function runLadderForm(browser) {
 
   await step('new-game', async () => {
     await page.goto(BASE);
-    await page.waitForSelector('[data-nrl-start]');
+    await setupStep(page);
     await page.locator('[data-nrl-start]').tap();
     await page.locator('[data-expansion-work]').tap();
     await page.locator('.nrl-tutorial-skip').tap();

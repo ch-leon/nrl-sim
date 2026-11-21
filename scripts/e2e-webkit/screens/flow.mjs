@@ -1,7 +1,7 @@
 import { playTrials } from '../common.mjs';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav } from '../common.mjs';
+import { OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, setupStep, slotMenu } from '../common.mjs';
 
 // ── The flow fixes, end to end (#350) ────────────────────────────────────────
 // At 667×375 and at an iPhone SE's 568×320, with Settings › Text size on Larger
@@ -114,10 +114,16 @@ export async function runFlow(browser, { w: W, h: H, text }) {
 
   await step('t1-setup', async () => {
     await page.goto(BASE);
-    await page.waitForSelector('[data-nrl-start]');
+    // The new club in three steps (SuperCOOKED 12–14): the town and Next, the names and Next, then Start.
+    await page.waitForSelector('[data-nrl-town]');
+    const out = await flowReach(page, ['[data-nrl-town]', '[data-nrl-next]']);
+    await setupStep(page, 2);
+    out.push(...await flowReach(page, ['[data-nrl-clubname]', '[data-nrl-next]', '[data-nrl-back]']));
+    await page.fill('[data-nrl-clubname]', 'Flow FC');
+    await setupStep(page, 3);
     await page.locator('[data-nrl-open-all]').check();
     await page.waitForTimeout(250);
-    const out = await flowReach(page, ['[data-nrl-clubname]', '[data-nrl-start]']);
+    out.push(...await flowReach(page, ['[data-nrl-start]']));
     out.push(...await page.evaluate(() => {
       const b = document.querySelector('[data-nrl-build]')?.getBoundingClientRect();
       const p = document.querySelector('.nrl-title-setup')?.getBoundingClientRect();
@@ -125,7 +131,6 @@ export async function runFlow(browser, { w: W, h: H, text }) {
       return b.right > p.left && b.left < p.right && b.bottom > p.top && b.top < p.bottom ? ['the build label overlaps the setup panel'] : [];
     }));
     await shot('t1-at-check');
-    await page.fill('[data-nrl-clubname]', 'Flow FC');
     await tap('[data-nrl-start]');
     await page.locator('[data-expansion-work]').tap();
     await page.waitForSelector('.nrl-tutorial-skip');
@@ -366,8 +371,10 @@ export async function runFlow(browser, { w: W, h: H, text }) {
   await step('t2-overwrite-confirm', async (rec) => {
     await page.waitForTimeout(1500); // the autosave
     await page.reload();
-    await page.waitForSelector('[data-nrl-new-1]');
+    // New club over a season is in its slot's ⋯ (SuperCOOKED 11).
+    await slotMenu(page, 1);
     await tap('[data-nrl-new-1]');
+    await setupStep(page);
     await tap('[data-nrl-start]');
     await page.waitForSelector('[data-nrl-confirm]');
     const ask = (await page.locator('[data-nrl-confirm]').textContent()) ?? '';
@@ -377,7 +384,7 @@ export async function runFlow(browser, { w: W, h: H, text }) {
     await shot('t2-at-check');
     await tap('[data-nrl-start-cancel]');
     if (!(await page.locator('[data-nrl-start]').count())) out.push('Cancel did not bring Start back');
-    await tap('[data-nrl-back]');
+    await setupStep(page, 0);
     await page.waitForSelector('[data-nrl-continue-1]');
     if (!/Flow FC/.test(await page.locator('[data-nrl-slot-label-1]').textContent())) out.push('the career is gone after Cancel');
     return out;

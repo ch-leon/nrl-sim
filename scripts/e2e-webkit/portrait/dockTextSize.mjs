@@ -1,6 +1,6 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, reachProblems, SHEET_EXIT, NO_INSETS } from '../common.mjs';
+import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, reachProblems, SHEET_EXIT, NO_INSETS, setupStep } from '../common.mjs';
 
 // ── The dock at every text size (#344) ──────────────────────────────────────
 /**
@@ -173,13 +173,15 @@ export async function runDockTextSize(browser) {
 
     await step('setup', async (rec) => {
       await page.goto(BASE);
-      await page.waitForSelector('[data-nrl-start]');
-    await page.locator('[data-nrl-open-all]').check();
+      await page.waitForSelector('[data-nrl-town]');
       await page.evaluate((s) => {
         const st = document.documentElement.style;
         for (const k of ['l', 't', 'r', 'b']) st.setProperty(`--nrl-safe-${k}`, `${s[k]}px`);
       }, safe);
+      await setupStep(page, 2);
       await page.fill('[data-nrl-clubname]', 'Dock FC');
+      await setupStep(page, 3);
+      await page.locator('[data-nrl-open-all]').check();
       await press('[data-nrl-start]');
       await press('[data-expansion-work]');
       await page.waitForSelector('.nrl-tutorial-skip');

@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { BASE, IPHONE_UA, OUT_ROOT, openNav } from '../common.mjs';
+import { BASE, IPHONE_UA, OUT_ROOT, openNav, setupStep } from '../common.mjs';
 
 async function reviewGeometry(page) {
   return page.evaluate(() => {
@@ -84,8 +84,10 @@ export async function runPlayerSales(browser) {
     page.on('pageerror', error => rec.problems.push(error.message));
     try {
       await page.goto(BASE);
-      await page.locator('[data-nrl-open-all]').check();
+      await setupStep(page, 2);
       await page.locator('[data-nrl-clubname]').fill('Continuity FC');
+      await setupStep(page, 3);
+      await page.locator('[data-nrl-open-all]').check();
       await page.locator('[data-nrl-start]').tap();
       await page.locator('[data-expansion-work]').tap();
       await page.locator('.nrl-tutorial-skip').tap();

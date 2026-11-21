@@ -2,7 +2,7 @@
 // Evidence goes to the existing screens CI artifact, never into git.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { OUT_ROOT, BASE, IPHONE_UA, reachProblems, skipFromPill } from '../common.mjs';
+import { OUT_ROOT, BASE, IPHONE_UA, reachProblems, skipFromPill, setupStep } from '../common.mjs';
 
 export async function runCoachSays(browser) {
   const out = join(OUT_ROOT, 'webkit', 'coach-says');
@@ -20,6 +20,7 @@ export async function runCoachSays(browser) {
     };
     try {
       await page.goto(BASE);
+      await setupStep(page);
       await page.locator('[data-nrl-start]').tap();
       await page.locator('[data-expansion-work]').tap();
       await page.locator('.nrl-tutorial-skip').tap();
