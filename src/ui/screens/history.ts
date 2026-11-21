@@ -432,23 +432,35 @@ export const HISTORY_CSS = `
   .nrl-history-actions { gap: 4px; }
   .nrl-history-actions .nrl-btn { padding: 0 8px; font-size: 0.75rem; }
 }
-.nrl-history-records { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); column-gap: 24px; }
-.nrl-history-record { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 32px; border-top: 1px solid var(--nrl-button); font-size: 0.8125rem; }
-.nrl-history-record > span:last-child { text-align: right; }
+.nrl-history-records { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); column-gap: 24px; align-content: start; }
+/* SuperCOOKED 51 (THIS WEEK's rows): 28px label / value lines, the label in the muted body face, the value in Mono. */
+.nrl-history-record { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 28px; border-top: 1px solid var(--nrl-button); font-size: 0.8125rem; }
+.nrl-history-record > .nrl-label { font-family: var(--nrl-f-body); font-size: 0.8125rem; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--nrl-text-2); line-height: 1.3; min-width: 0; }
+.nrl-history-record > span:last-child { text-align: right; font-family: var(--nrl-f-num); font-weight: 500; font-variant-numeric: tabular-nums; }
+/* Retired players: each a ringed card like a season's row, his lines under his name. */
+.nrl-history-records[data-retired-records] { gap: 8px 12px; }
+.nrl-history-retired { padding: 8px 12px; background: var(--nrl-panel); border: 1px solid var(--nrl-line); border-radius: 12px; overflow-wrap: anywhere; font-size: 0.8125rem; color: var(--nrl-text-2); }
+.nrl-history-retired h3 { margin: 0 0 2px; font-family: var(--nrl-f-label); font-size: 0.9375rem; font-weight: 700; letter-spacing: 0.06em; color: var(--nrl-text); }
+.nrl-history-retired p { margin: 0; line-height: 1.4; }
+.nrl-history-retired section { margin-top: 4px; }
+.nrl-history-retired section h3 { font-family: var(--nrl-f-num); font-size: 0.625rem; font-weight: 500; letter-spacing: 0.12em; color: var(--nrl-muted); }
 
-.nrl-history-trophies { display: grid; gap: 10px; padding: 4px 0; }
-.nrl-history-trophy { padding: 10px 14px; border-radius: 10px; background: var(--nrl-raised); overflow-wrap: anywhere; }
-.nrl-history-trophy h2 { margin: 0; color: var(--nrl-accent); font-size: 1.125rem; }
-.nrl-history-trophy p { margin: 3px 0 12px; }
-.nrl-history-trophy h3 { margin: 0 0 4px; font-size: 0.875rem; }
-.nrl-history-trophy-squad { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr)); gap: 4px 12px; margin: 0; padding: 0; list-style: none; }
+.nrl-history-trophies { display: grid; gap: 8px; padding: 4px 0; }
+.nrl-history-trophy { padding: 10px 14px; border-radius: 12px; background: var(--nrl-panel); border: 1px solid var(--nrl-line); overflow-wrap: anywhere; }
+.nrl-history-trophy h2 { margin: 0; color: var(--nrl-accent); font-family: var(--nrl-f-display); font-size: 1.125rem; font-weight: 400; letter-spacing: -0.02em; text-transform: uppercase; line-height: 1.15; }
+.nrl-history-trophy p { margin: 3px 0 10px; font-size: 0.8125rem; color: var(--nrl-text-2); }
+.nrl-history-trophy h3 { margin: 0 0 4px; font-family: var(--nrl-f-num); font-size: 0.625rem; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: var(--nrl-muted); }
+.nrl-history-trophy-squad { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr)); gap: 0 12px; margin: 0; padding: 0; list-style: none; font-size: 0.8125rem; }
+.nrl-history-trophy-squad li { min-height: 28px; display: flex; align-items: center; border-top: 1px solid var(--nrl-button); }
 
 /* A season's books: the table scrolls, the net and the closing balance beside it. */
 .nrl-books-body { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 460px) minmax(180px, 240px); gap: 16px; }
 .nrl-books-scroll { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .nrl-books-keys { display: flex; flex-direction: column; gap: 6px; }
 .nrl-books-summary { font-size: 0.75rem; color: var(--nrl-muted); margin: 0; }
-.nrl-books-closing td { border-top: 1px solid var(--nrl-line); font-weight: 600; }
+/* The closing balance under the net's 2px rule: a label / value row like THIS WEEK's, the figure in Mono. */
+.nrl-books-closing td { border-top: 1px solid var(--nrl-button); font-weight: 600; }
+.nrl-books-closing td:first-child { color: var(--nrl-text); font-family: var(--nrl-f-label); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
 
 /* The season review (N7, #190): the finish, then the season in labelled lines, two columns. */
 .nrl-review-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
