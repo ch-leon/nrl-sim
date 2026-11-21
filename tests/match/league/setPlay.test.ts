@@ -122,9 +122,7 @@ describe('no plays: the match it always was', () => {
 
 describe('the launch and the script (plan §3.3)', () => {
   it('a block play launches at tackle 2 in the attacking half and the second-row takes the pass', () => {
-    // The first seed whose launch there completes. It was pinned (seed 7 after #625, then seed 3 after the
-    // weighted receiver, #649, at tick 1791 before the last-tackle call, #650); held up at the line (#652)
-    // on top left seed 3 without such a launch, so it is searched for, as on the attack-shapes branch.
+    // Find a completed attacking-half launch after an earlier home play in the same match.
     let checked = false;
     for (let seed = 1; seed <= 20 && !checked; seed++) {
       const sim = new PlaySim(flat(['block-play']), A, seed);
@@ -132,7 +130,8 @@ describe('the launch and the script (plan §3.3)', () => {
       while (!launch) {
         const e = until(sim, (x) => x.kind === 'set-play');
         if (!e) break;
-        if (sim.tackleCount === 1 && zoneOf(sim.toLineNow('home')) === 'attackingHalf' && sim.script?.outcome === 'ok') launch = e;
+        if (sim.tackleCount === 1 && zoneOf(sim.toLineNow('home')) === 'attackingHalf' && sim.script?.outcome === 'ok'
+          && sim.playsRun.launched.home > 1) launch = e;
       }
       if (!launch) continue;
       expect(launch.detail).toBe('block-play');

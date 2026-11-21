@@ -293,15 +293,18 @@ describe('five more calls (#396): each does what it says', () => {
   it('Offload: more offloads, and some spilled', () => {
     let withCall = 0;
     let without = 0;
-    // Seeds 1–8 tie (17 offloads each way) after the timed back-door runs (#722); a fixed contiguous cohort of 32.
-    for (let seed = 1; seed <= 32; seed++) {
-      const called = play(seed, 'offload').events.filter((e) => e.kind === 'offload' && e.side === 'home').length;
-      const plain = play(seed, null).events.filter((e) => e.kind === 'offload' && e.side === 'home').length;
-      withCall += called;
-      without += plain;
+    let spilled = 0;
+    // The first 32 seeds produce 61 offloads with calls and 62 without calls. Use a larger
+    // contiguous cohort of paired six-minute matches to reduce sampling noise from rare events.
+    for (let seed = 1; seed <= 128; seed++) {
+      const called = play(seed, 'offload').events.filter(e => e.side === 'home');
+      withCall += called.filter(e => e.kind === 'offload').length;
+      spilled += called.filter(e => e.kind === 'error' && e.text.includes('wild offload')).length;
+      without += play(seed, null).events.filter(e => e.kind === 'offload' && e.side === 'home').length;
     }
     expect(withCall).toBeGreaterThan(without);
-  });
+    expect(spilled).toBeGreaterThan(0);
+  }, 120_000);
 
   it('Gang tackle: the next two tackles, then the line is its own again; the rucks are slower', () => {
     const calls: CallInput[] = [];

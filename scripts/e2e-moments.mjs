@@ -1,5 +1,5 @@
 // Actual engine moments, replay consistency and grounded shadows. No forced outcomes.
-// Default-Lab seed 5 supplies all seven actual moments by tick 3369,
+// Default-Lab seed 5 supplies all seven actual moments by tick 2391,
 // including a grubber at tick 891.
 // E2E_URL=http://localhost:4176/ CHROMIUM_PATH=/usr/bin/chromium node scripts/e2e-moments.mjs
 import assert from 'node:assert/strict';
