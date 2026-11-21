@@ -57,7 +57,7 @@ const ROTATION_TIP: Readonly<Record<Rotation, string>> = {
   heavy: 'Heavy: men come off under 70% legs, three at a stoppage',
 };
 
-function ensureLineupStyles(): void {
+export function ensureLineupStyles(): void {
   ensureScreenStyles();
   if (document.getElementById(STYLE_ID)) return;
   const style = document.createElement('style');
@@ -237,7 +237,7 @@ function onLineupClosed(): void {
 }
 
 /** The pitch's four lanes, top to bottom (SuperCOOKED 30), by the slot's position. */
-const LANES: readonly { label: string; positions: readonly Position[] }[] = [
+export const LANES: readonly { label: string; positions: readonly Position[] }[] = [
   { label: 'Forwards', positions: ['prop', 'hooker', 'second-row', 'lock'] },
   { label: 'Halves', positions: ['five-eighth', 'halfback'] },
   { label: 'Outside backs', positions: ['winger', 'centre'] },
@@ -539,7 +539,7 @@ export function openLineupScreen(): void {
 }
 
 /** "J. Mere": the first initial and the surname, for a card (SuperCOOKED 30). */
-function shortName(name: string): string {
+export function shortName(name: string): string {
   const parts = name.trim().split(/\s+/);
   return parts.length > 1 ? `${parts[0]![0]}. ${parts[parts.length - 1]}` : name;
 }

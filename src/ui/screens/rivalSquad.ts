@@ -1,17 +1,19 @@
 import { matchupRead, counterRead, fitRead } from '../matchupRead';
 import { teamSheetFromSquad } from '../../match/league/sheets';
-import { resolveLineup, validTactics } from '../../systems/lineup';
+import { LINEUP_SLOTS, POSITION_SHORT, autoPick, isFieldable, resolveLineup, validTactics } from '../../systems/lineup';
 import { awayPlayerIds } from '../../systems/playerAssignments';
 // src/ui/screens/rivalSquad.ts — read-only view of a rival club's squad, opened
 // from the Ladder (GitHub #74). A sheet over the League (Broadcast Quiet, like
-// the Squad table 3d): the club and how it plays in the header row, the squad
-// as a table, a row opening the player page. Edit club (#398) swaps the table
+// the Squad pitch, SuperCOOKED 30): the club and how it plays in the header row, then the
+// side it would field on the pitch in the club's kit (the starting nine in four lanes, the
+// bench and the reserves beside them) or, under List, the whole squad as a table. A card or
+// a row opens the read-only player page; there is no swap and no auto pick. Edit club (#398) swaps the table
 // for the club's name and its two kit colours. The rows and the colour options
 // come from pure view-models that are unit-tested without the DOM. No Phaser.
 import type { RivalClub } from '../../core/state';
-import { overallRating, ratingText } from '../../data/player';
+import { overallRating, playerStars, ratingText } from '../../data/player';
 import { traitLabel } from '../../data/traits';
-import { button, el, ensureStyles, openModal } from '../dom';
+import { button, el, ensureStyles, hintScroll, openModal, segmented } from '../dom';
 import { playerRivalContext, rivalSheet, rivalStyle } from '../../systems/rivalRound';
 import { hasStaff } from '../../systems/staff';
 import { getState, setState } from '../../core/state';
@@ -22,7 +24,13 @@ import { nameField } from '../rename';
 import { KIT_COLORS } from './kit';
 import { tacticsLabel } from '../../match/league/presets';
 import { whenBehindLine } from '../tacticsBlurbs';
-import { openPlayerPage, positionLabel } from './player';
+import { fitnessPct, openPlayerPage, positionLabel } from './player';
+import { ensureLineupStyles, LANES, shortName } from './lineup';
+import { kitFromColors } from '../../art/match/kit';
+import { portraitDataUrl } from '../../art/portrait';
+import { ensurePartsStyles, fitnessTone, playerCard } from '../parts';
+import { BENCH } from '../../match/league/bench';
+import type { Player } from '../../core/state';
 import { ensureScreenStyles, posShort } from './recruit';
 
 export interface RivalSquadRow {
@@ -72,6 +80,8 @@ const RIVAL_STYLE_ID = 'nrl-rival-styles';
 function ensureRivalStyles(): void {
   ensureStyles();
   ensureScreenStyles();
+  ensureLineupStyles();
+  ensurePartsStyles();
   if (document.getElementById(RIVAL_STYLE_ID)) return;
   const style = document.createElement('style');
   style.id = RIVAL_STYLE_ID;
@@ -118,6 +128,19 @@ const RIVAL_CSS = `
 .nrl-rival-editor .nrl-kit-label:first-child { margin-top: 0; }
 .nrl-rival-chip { display: inline-block; width: 28px; height: 14px; border-radius: 4px; vertical-align: middle; margin-left: 8px; }
 @media (max-width: 760px) { .nrl-rival-editor { grid-template-columns: minmax(0, 15rem) minmax(0, 1fr); gap: 4px 12px; } }
+/* Pitch / List beside Edit club, and the pitch under the header row (the lineup's own classes). */
+.nrl-rival-view { flex: 0 0 auto; }
+.nrl-rival-view > .nrl-btn { min-height: 44px; padding: 0 10px; font-size: 0.8125rem; }
+.nrl-rival-head h2 .nrl-rival-chip { margin: 0 8px 0 0; }
+/* A narrow sheet (667): the view switch is its two glyphs, and the club's name takes less, so the lines keep their room. */
+@media (max-width: 760px) {
+  .nrl-rival-view-word { display: none; }
+  .nrl-rival-view > .nrl-btn { min-width: 44px; padding: 0 8px; font-size: 1rem; }
+  .nrl-rival-head h2 { flex-basis: 8rem; font-size: 1rem; }
+}
+.nrl-rival-squad > .nrl-lineup-body { flex: 1 1 auto; }
+/* Read-only: a card is only a way to his page, with no ring or dimming from a swap. */
+.nrl-rival-squad .nrl-pcard[data-out] { opacity: 0.7; }
 /* 956×330: the club's lines tighter so five rows show. */
 @media (max-height: 340px) { .nrl-rival-head h2 { font-size: 1.1875rem; } .nrl-rival-head p { font-size: 0.75rem; } }
 /* …and four whole rows (Wave 3): a slimmer frame round the sheet and its header row; the rows keep 44. */
@@ -126,6 +149,24 @@ const RIVAL_CSS = `
   .nrl-rival-head { margin-bottom: 4px; }
 }
 `;
+
+/**
+ * The side a rival would field, as the match builds it for a squad with 13 fit men
+ * (rivalSheet): the best nine by slot and the next four. Pure.
+ */
+export function rivalSide(club: RivalClub): { starters: (Player | null)[]; bench: Player[]; reserves: Player[] } {
+  const squad = club.squad ?? [];
+  const fit = squad.filter(isFieldable);
+  const side = resolveLineup(autoPick(fit), fit);
+  const used = new Set([...side.starters, ...side.bench].flatMap((p) => (p ? [p.id] : [])));
+  const reserves = squad.filter((p) => !used.has(p.id)).sort((a, b) => overallRating(b) - overallRating(a) || a.name.localeCompare(b.name));
+  return { starters: side.starters, bench: side.bench.slice(0, BENCH.size), reserves };
+}
+
+/** Pitch (the side in their kit) or List (the whole squad), kept between visits as Squad's is. */
+type RivalView = 'pitch' | 'list';
+let rivalView: RivalView = 'pitch';
+let rivalSideTab: 'bench' | 'reserves' = 'bench';
 
 /** The club editor's draft (#398): what is typed and the two colours picked so far. */
 export interface ClubDraft { name: string; colors: [string, string] }
@@ -217,6 +258,54 @@ export function openRivalSquad(opened: RivalClub): HTMLElement {
       : el('p', { class: 'nrl-screen-empty', text: 'No squad on record.' });
   };
 
+  /** The side in their kit: four lanes and, beside them, the bench and the reserves; a card opens his page. */
+  const rivalPitch = (club: RivalClub): HTMLElement => {
+    const { starters, bench, reserves } = rivalSide(club);
+    const kit = kitFromColors(club.colors, club.id);
+    const card = (p: Player, code: string): HTMLElement => {
+      const injured = p.injuredWeeks > 0;
+      const banned = (p.suspendedWeeks ?? 0) > 0;
+      const pct = fitnessPct(p);
+      const c = playerCard({
+        portrait: portraitDataUrl(p.id, kit),
+        name: shortName(p.name),
+        stars: playerStars(p),
+        position: code,
+        fitness: { tone: injured || banned ? 'alert' : fitnessTone(pct), word: injured ? `injured, out ${p.injuredWeeks} weeks` : banned ? `banned ${p.suspendedWeeks} weeks` : `fit ${pct}%` },
+        onClick: () => { openPlayerPage(p, { kind: 'rival', club }, { onClose: () => openRivalSquad(live()) }); },
+      });
+      c.setAttribute('data-player-open', p.id);
+      if (injured || banned) c.setAttribute('data-out', '');
+      c.title = `${p.name} · ${positionLabel(p.position)}${injured ? ` · out ${p.injuredWeeks} wk` : banned ? ` · banned ${p.suspendedWeeks} wk` : ''}`;
+      return c;
+    };
+    const empty = (code: string): HTMLElement => {
+      const e = button(`No ${code}`, () => {}, { class: 'nrl-pitch-empty' });
+      e.disabled = true;
+      return e;
+    };
+    const field = el('div', { class: 'nrl-lineup-field', attrs: { 'data-rival-pitch': '' } },
+      el('span', { class: 'nrl-pitch-halfway', attrs: { 'aria-hidden': 'true' } }),
+      ...LANES.map((lane) => el('div', { class: 'nrl-pitch-lane', attrs: { 'data-lane': lane.label } },
+        el('span', { class: 'nrl-pitch-lane-label', text: lane.label }),
+        el('div', { class: 'nrl-pitch-cards' },
+          ...LINEUP_SLOTS.flatMap((pos, slot) => {
+            if (!lane.positions.includes(pos)) return [];
+            const p = starters[slot];
+            return [p ? card(p, POSITION_SHORT[pos]) : empty(POSITION_SHORT[pos])];
+          })))));
+    hintScroll(field);
+    const tabs = segmented<'bench' | 'reserves'>([
+      { id: 'bench', label: `Bench ${bench.length}` },
+      { id: 'reserves', label: `Reserves ${reserves.length}` },
+    ], rivalSideTab, (id) => { rivalSideTab = id; render(); }, { class: 'nrl-side-tabs', label: 'Bench and reserves' });
+    for (const [id, b] of tabs.buttons) { b.setAttribute('data-rival-side', id); b.removeAttribute('data-seg'); }
+    const list = el('div', { class: 'nrl-lineup-bench nrl-side-cards' },
+      ...(rivalSideTab === 'bench' ? bench : reserves).map((p) => card(p, POSITION_SHORT[p.position])));
+    hintScroll(list);
+    return el('div', { class: 'nrl-lineup-body' }, field, el('div', { class: 'nrl-lineup-side' }, tabs.el, list));
+  };
+
   const render = (): void => {
     const club = live();
     const rows = rivalSquadRows(club);
@@ -229,10 +318,22 @@ export function openRivalSquad(opened: RivalClub): HTMLElement {
     const behind = hasStaff(getState(), 'analyst') ? whenBehindLine(style) : null;
     const line = (text: string, attrs: Record<string, string>): HTMLElement => el('p', { text, attrs: { ...attrs, title: text } });
     const title = el('h2', { class: 'nrl-name-wrap', text: club.name });
-    if (draft) {
-      const chip = el('span', { class: 'nrl-rival-chip', attrs: { 'aria-hidden': 'true' } });
-      chip.style.background = `linear-gradient(90deg, ${draft.colors[0]} 60%, ${draft.colors[1]} 60%)`;
-      title.append(chip);
+    // Their kit beside the name (the editor shows the draft's).
+    const shown = draft ? draft.colors : club.colors;
+    const chip = el('span', { class: 'nrl-rival-chip', attrs: { 'aria-hidden': 'true' } });
+    chip.style.background = `linear-gradient(90deg, ${shown[0]} 60%, ${shown[1]} 60%)`;
+    title.prepend(chip);
+    const views = segmented<RivalView>([
+      { id: 'pitch', label: 'Pitch ⊞', title: 'The side they would field' },
+      { id: 'list', label: 'List ☰', title: 'Their whole squad' },
+    ], rivalView, (id) => { rivalView = id; render(); }, { class: 'nrl-rival-view', label: 'Squad view' });
+    for (const [id, b] of views.buttons) {
+      // The word gives way to the glyph on a narrow sheet (the label stays for a screen reader).
+      const [word, glyph] = (b.textContent ?? '').split(' ');
+      b.replaceChildren(el('span', { class: 'nrl-rival-view-word', text: `${word} ` }), glyph ?? '');
+      b.setAttribute('aria-label', word ?? id);
+      b.setAttribute('data-rival-view', id);
+      b.removeAttribute('data-seg');
     }
     const edit = button('Edit club', () => {
       draft = { name: club.name, colors: [club.colors[0], club.colors[1]] };
@@ -251,7 +352,7 @@ export function openRivalSquad(opened: RivalClub): HTMLElement {
           ...(!draft ? [line(matchupRead(ours, theirs, validTactics(state.lineup.tactics), style), { 'data-matchup': '' }), line(counterRead(ours, style.defence), { 'data-counters': '' })] : []),
           ...(!draft && behind ? [line(`When behind: ${behind}`, { 'data-when-behind': '' })] : []),
         ),
-        ...(draft ? [] : [edit]),
+        ...(draft ? [] : [views.el, edit]),
       ),
       draft ? rivalClubEditor(club, draft, {
         changed: render,
@@ -268,7 +369,7 @@ export function openRivalSquad(opened: RivalClub): HTMLElement {
           render();
           return null;
         },
-      }) : squadTable(club, rows),
+      }) : rivalView === 'pitch' && rows.length > 0 ? rivalPitch(club) : squadTable(club, rows),
     );
   };
   render();
