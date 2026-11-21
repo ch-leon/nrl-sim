@@ -3,9 +3,10 @@
 // your plays, each with who it needs against today's nine and a switch to take
 // it into the match (three at most), then the plays your coach opens to buy,
 // then the other coaches' plays, folded away. The rules are
-// systems/playbook.ts and systems/staff.ts; the words playbookText.ts. One
-// column that scrolls upright, two side by side when there's room.
+// systems/playbook.ts and systems/staff.ts; the words playbookText.ts. Plays are
+// Build-style tiles (three across, two upright), the page scrolls.
 import { el, button, ensureStyles, guardDoubleTap, openScreen, screenHead } from '../dom';
+import { infoPill } from '../parts';
 import { getState, type GameState } from '../../core/state';
 import { bus } from '../../core/events';
 import { save } from '../../core/save';
@@ -37,9 +38,18 @@ function playTop(play: Play, price: boolean): HTMLElement {
     ...(price ? [el('span', { class: 'nrl-pb-price nrl-num', text: fmtMoney(play.price) })] : []));
 }
 
+/** The IQ check as a pill: "✓ IQ" in green when every man he needs is up to it, else the man furthest short, in amber. */
+function fitPill(play: Play, nine: readonly PlayMan[]): HTMLElement {
+  const short = playFitShort(play, nine);
+  const pill = infoPill(short.ok ? 'pos' : 'neg', short.text);
+  pill.classList.add('nrl-pb-pill');
+  return pill;
+}
+
 function playWords(play: Play, nine: readonly PlayMan[]): HTMLElement[] {
   const short = playFitShort(play, nine);
   return [
+    fitPill(play, nine),
     el('p', { class: 'nrl-pb-blurb', text: play.blurb }),
     el('p', { class: 'nrl-pb-when' }, el('span', { class: 'nrl-label', text: 'When' }), ` ${playWhenLine(play)}`),
     el('p', { class: `nrl-pb-fit${short.ok ? '' : ' nrl-pb-fit-short'}`, attrs: { 'data-play-fit': short.ok ? 'met' : 'short' }, text: playFitLine(play, nine) }),
@@ -50,7 +60,7 @@ function playWords(play: Play, nine: readonly PlayMan[]): HTMLElement[] {
 function ownedRow(play: Play, nine: readonly PlayMan[], taken: readonly PlayId[], onTake: (id: PlayId) => void): HTMLElement {
   const at = taken.indexOf(play.id);
   const full = at < 0 && taken.length >= PLAYS.takeMax;
-  const take = button(at >= 0 ? `Taken · ${at + 1}` : 'Take into the match', () => onTake(play.id), { class: at >= 0 ? 'nrl-btn-primary nrl-pb-take' : 'nrl-pb-take' });
+  const take = button(at >= 0 ? `Taken · ${at + 1}` : 'Take into the match', () => onTake(play.id), { class: at >= 0 ? 'nrl-pb-take nrl-pb-taken' : 'nrl-pb-take' });
   take.setAttribute('data-play-take', play.id);
   take.setAttribute('aria-pressed', String(at >= 0));
   if (full) {
@@ -63,9 +73,10 @@ function ownedRow(play: Play, nine: readonly PlayMan[], taken: readonly PlayId[]
 }
 
 /** A play the club's coach opens: its price and Buy. A refusal (the money) is said when tapped. */
-function buyRow(play: Play, nine: readonly PlayMan[], state: GameState, onBuy: (id: PlayId) => void): HTMLElement {
+function buyRow(play: Play, nine: readonly PlayMan[], state: GameState, onBuy: (id: PlayId) => void, primary: boolean): HTMLElement {
   const why = buyRefusal(state, play.id);
-  const buy = button(`Buy · ${fmtMoney(play.price)}`, () => onBuy(play.id), { class: why ? 'nrl-pb-buy' : 'nrl-btn-primary nrl-pb-buy' });
+  // One orange a screen: the first Buy the club can afford is the next thing to do.
+  const buy = button(`Buy · ${fmtMoney(play.price)}`, () => onBuy(play.id), { class: primary && !why ? 'nrl-btn-primary nrl-pb-buy' : 'nrl-pb-buy' });
   buy.setAttribute('data-play-buy', play.id);
   if (why) { buy.setAttribute('data-refused', ''); buy.title = why; }
   return el('li', { class: 'nrl-pb-play', attrs: { 'data-play': play.id, 'data-to-buy': '' } },
@@ -119,7 +130,7 @@ export function playbookBody(state: GameState, h: PlaybookHandlers): HTMLElement
     coach ? 'None yet. Buy one of your coach’s plays.' : 'None yet. Hire an attack coach to buy plays.', takenLine);
   const cols = el('div', { class: 'nrl-pb-cols' }, ownedSec);
   if (coach?.speciality) {
-    cols.append(section('To buy', 'data-playbook-buy', toBuy.map((p) => buyRow(p, nine, state, h.onBuy)), 'You have every play your coach teaches.'));
+    cols.append(section('To buy', 'data-playbook-buy', toBuy.map((p, i) => buyRow(p, nine, state, h.onBuy, toBuy.findIndex((q) => !buyRefusal(state, q.id)) === i)), 'You have every play your coach teaches.'));
   }
   const otherLines = others.map((p) =>
     el('li', { class: 'nrl-pb-other', attrs: { 'data-play': p.id, 'data-other': p.family } },
@@ -181,32 +192,42 @@ function ensurePlaybookStyles(): void {
 }
 
 export const PLAYBOOK_CSS = `
-/* The Playbook (#326): the coach card, your plays and the ones to buy (side by side when there's room), the others folded; only the body scrolls. */
+/* The Playbook (#326, SuperCOOKED 22's tiles): the coach card, then your plays and the ones to buy as tiles three across, the others folded; only the body scrolls. */
 .nrl-pb-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; }
-.nrl-pb-body { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.nrl-pb-body { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .nrl-pb-coach { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: var(--nrl-raised); border-radius: 10px; padding: 8px 10px; font-size: 0.8125rem; line-height: 1.35; }
 .nrl-pb-coach > b, .nrl-pb-coach-text { flex: 1 1 220px; min-width: 0; }
 .nrl-pb-coach p { margin: 2px 0 0; color: var(--nrl-text-2); font-size: 0.75rem; flex: 1 1 100%; }
 .nrl-pb-coach-text p { flex: none; }
 .nrl-pb-coach .nrl-btn { flex: 0 0 auto; min-height: 44px; padding: 0 16px; border-radius: 8px; }
-.nrl-pb-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 8px; align-items: start; }
-.nrl-pb-section, .nrl-pb-others { background: var(--nrl-raised); border-radius: 10px; padding: 8px 10px; min-width: 0; }
-.nrl-pb-section .nrl-pb-title { margin: 0 0 2px; font-family: var(--nrl-f-label); font-size: 1.0625rem; font-weight: 700; letter-spacing: 0.03em; line-height: 1.2; }
-.nrl-pb-sub, .nrl-pb-empty { margin: 0 0 4px; font-size: 0.75rem; color: var(--nrl-text-2); line-height: 1.35; }
-.nrl-pb-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
-.nrl-pb-play, .nrl-pb-other { padding: 6px 0; border-top: 1px solid var(--nrl-line); min-width: 0; }
-.nrl-pb-top { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-.nrl-pb-name { font-family: var(--nrl-f-label); font-size: 0.9375rem; font-weight: 700; letter-spacing: 0.02em; }
-.nrl-pb-style { font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--nrl-accent); }
-.nrl-pb-play p { margin: 1px 0 0; font-size: 0.75rem; line-height: 1.35; color: var(--nrl-text-2); overflow-wrap: anywhere; }
+.nrl-pb-cols { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.nrl-pb-section { min-width: 0; }
+.nrl-pb-section .nrl-pb-title { margin: 0; padding: 0 2px 6px; font-family: var(--nrl-f-label); font-size: 1.0625rem; font-weight: 700; letter-spacing: 0.04em; line-height: 1.2; text-transform: uppercase; }
+.nrl-pb-sub { margin: 0; padding: 0 2px 6px; font-size: 0.75rem; color: var(--nrl-text-2); line-height: 1.35; }
+.nrl-pb-empty { margin: 0; padding: 8px 12px; border-radius: 12px; background: var(--nrl-panel); box-shadow: inset 0 0 0 1px var(--nrl-line); font-size: 0.8125rem; color: var(--nrl-text-2); line-height: 1.35; }
+.nrl-pb-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+@media (max-width: 600px) { .nrl-pb-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1100px) { .nrl-pb-list { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.nrl-pb-play { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; background: var(--nrl-panel); box-shadow: inset 0 0 0 1px var(--nrl-line); border-radius: 12px; padding: 8px 12px; box-sizing: border-box; min-width: 0; }
+.nrl-pb-play[data-taken] { box-shadow: inset 0 0 0 1px var(--nrl-accent); }
+.nrl-pb-top { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.nrl-pb-name { font-family: var(--nrl-f-label); font-size: 1.0625rem; font-weight: 700; letter-spacing: 0.04em; line-height: 1.15; text-transform: uppercase; }
+.nrl-pb-style { font-family: var(--nrl-f-num); font-size: 0.625rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--nrl-muted); }
+.nrl-pb-pill { min-height: 1.5rem; font-size: 0.75rem; max-width: 100%; box-sizing: border-box; overflow: hidden; text-overflow: ellipsis; }
+.nrl-pb-play p { margin: 0; font-size: 0.8125rem; line-height: 1.3; color: var(--nrl-text-2); overflow-wrap: anywhere; }
+.nrl-pb-when { font-size: 0.75rem; }
 .nrl-pb-when .nrl-label { font-size: 0.6875rem; }
-.nrl-pb-play .nrl-pb-fit { color: var(--nrl-pos); }
-.nrl-pb-play .nrl-pb-fit.nrl-pb-fit-short { color: var(--nrl-accent); }
-.nrl-pb-actions { display: flex; align-items: center; gap: 10px; margin-top: 4px; flex-wrap: wrap; }
-.nrl-pb-actions .nrl-btn { min-height: 44px; padding: 0 14px; border-radius: 8px; }
+.nrl-pb-play .nrl-pb-fit { font-size: 0.75rem; color: var(--nrl-pos); }
+.nrl-pb-play .nrl-pb-fit.nrl-pb-fit-short { color: var(--nrl-neg); }
+.nrl-pb-actions { display: flex; flex-direction: column; align-items: stretch; gap: 4px; margin-top: auto; padding-top: 4px; width: 100%; }
+.nrl-pb-actions .nrl-btn { min-height: 44px; padding: 0 14px; border-radius: 10px; width: 100%; }
 .nrl-pb-buy[data-refused] { opacity: 0.7; }
+.nrl-btn.nrl-pb-taken { color: var(--nrl-accent); box-shadow: inset 0 0 0 1px var(--nrl-accent); }
 .nrl-pb-note { font-size: 0.75rem; color: var(--nrl-muted); }
-.nrl-pb-other { font-size: 0.8125rem; line-height: 1.35; display: flex; flex-wrap: wrap; gap: 0 4px; align-items: baseline; }
+.nrl-pb-buy[data-refused] + .nrl-pb-note { color: var(--nrl-neg); }
+.nrl-pb-others { background: var(--nrl-panel); box-shadow: inset 0 0 0 1px var(--nrl-line); border-radius: 12px; padding: 0 12px 8px; min-width: 0; }
+.nrl-pb-other { padding: 6px 0; border-top: 1px solid var(--nrl-line); min-width: 0; font-size: 0.8125rem; line-height: 1.35; display: flex; flex-wrap: wrap; gap: 0 4px; align-items: baseline; }
+.nrl-pb-others .nrl-pb-list { display: flex; flex-direction: column; }
 .nrl-pb-other .nrl-pb-note { flex-basis: 100%; }
 .nrl-pb-others-head { min-height: 44px; display: flex; align-items: center; cursor: pointer; list-style: none; font-family: var(--nrl-f-label); font-size: 1rem; font-weight: 700; letter-spacing: 0.03em; }
 .nrl-pb-others-head::-webkit-details-marker { display: none; }
