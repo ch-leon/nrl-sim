@@ -16,6 +16,7 @@ import {
 import { registerAllSystems, advanceWeekAsTapped } from '../../src/qa/soak';
 import { LIVE_MATCH_EXPORT_FIELD } from '../../src/systems/liveMatchRecord';
 import { MATCH_ENGINE_REVISION, matchEngineIdentity } from '../../src/systems/matchEngineIdentity';
+import { completedCompetition, type CompetitionInstance } from '../../src/data/competition';
 
 const capture = (name: string) =>
   readFileSync(new URL('../fixtures/saves/v33-assignments/' + name + '.json', import.meta.url), 'utf8');
@@ -26,7 +27,7 @@ const recordedRevision = (sidecar: string): number =>
 
 type Save = Record<string, unknown> & {
   squad: Record<string, unknown>[];
-  competitions: Record<string, unknown> & { instances: (Record<string, unknown> & { fixtures: Record<string, unknown>[] })[] };
+  competitions: Record<string, unknown> & { instances: CompetitionInstance[] };
 };
 
 /**
@@ -47,15 +48,10 @@ const squadIdentity = (save: Save) => save.squad.map(p => ({
   contractWeeks: p.contractWeeks, deal: p.deal, joinedSeason: p.joinedSeason,
 }));
 
-/**
- * Every competition, and every fixture's teams, round and played/scheduled status, without
- * its score. A finished competition's winner is a result too: it must still have one, and
- * one of its own entrants.
- */
-const fixtureCalendar = (save: Save) => save.competitions.instances.map(({ fixtures, winnerId, ...instance }) => ({
+/** Competition and fixture metadata, excluding the sporting results. */
+const fixtureCalendar = (save: Save) => save.competitions.instances.map(({ fixtures, winnerId: _winnerId, ...instance }) => ({
   ...instance,
-  decided: winnerId !== undefined && (instance.entrantIds as unknown[]).includes(winnerId),
-  fixtures: fixtures.map(f => ({ id: f.id, round: f.round, homeId: f.homeId, awayId: f.awayId, status: f.status })),
+  fixtures: fixtures.map(({ result: _result, ...fixture }) => fixture),
 }));
 
 afterEach(() => {
@@ -103,6 +99,15 @@ it.each(['au', 'uk'] as const)(
     expect(withoutMatchResults(replayed)).toEqual(withoutMatchResults(w5));
     expect(squadIdentity(replayed)).toEqual(squadIdentity(w5));
     expect(fixtureCalendar(replayed)).toEqual(fixtureCalendar(w5));
+    // Exhibition outcomes can change from a win to a draw on a newer engine.
+    for (const instance of replayed.competitions.instances.filter(i => i.status === 'completed')) {
+      expect(completedCompetition(instance), instance.id).toBeNull();
+      const trial = instance.definition.format.kind === 'exhibition' ? instance.fixtures[0]?.result : undefined;
+      if (trial?.decider === 'draw') {
+        expect(trial.homeScore).toBe(trial.awayScore);
+        expect(instance.winnerId).toBeUndefined();
+      } else expect(instance.entrantIds).toContain(instance.winnerId);
+    }
     // The slot holds what was played, in the current save version.
     expect(bytes.get(slotKey(1))).toBe(JSON.stringify({ ...replayed, version: SAVE_VERSION }));
     if (sameEngine) {
@@ -112,6 +117,7 @@ it.each(['au', 'uk'] as const)(
     const parked = installImportedSave(JSON.stringify({ ...w5, [LIVE_MATCH_EXPORT_FIELD]: live }), 1);
     if (!parked.ok) throw Error(parked.message);
     loadState(parked.state);
+    expect(getState().competitions?.instances).toEqual(w5.competitions.instances);
     const kickoffs: Events['match:started'][] = [];
     bus.on('match:started', (e) => kickoffs.push(e));
     advanceWeek();

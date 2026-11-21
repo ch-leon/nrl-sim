@@ -164,7 +164,7 @@ describe('Fresh legs in the live sim', () => {
     const restore = applyTuning({ 'calls.freshLegs.offBelow': 0.95 });
     let game: ReturnType<typeof play>;
     try {
-      game = play(2, { energy: 0.3, length: { halves: 2, halfMinutes: 1 } });
+      game = play(1, { energy: 0.3, length: { halves: 2, halfMinutes: 1 } });
     } finally {
       restore();
     }
@@ -174,7 +174,10 @@ describe('Fresh legs in the live sim', () => {
     expect(halfTime).toBeGreaterThan(0);
     expect(calls[0]!.tick).toBeLessThan(ticks[Math.max(0, halfTime)]!.tick);
     expect(calls[1]!.tick).toBeGreaterThan(ticks[Math.max(0, halfTime)]!.tick);
-    expect(ticks.filter((t) => t.events.some(fresh))).toHaveLength(2);
+    const landed = ticks.filter((t) => t.events.some(fresh));
+    expect(landed).toHaveLength(2);
+    expect(landed[0]!.tick).toBeLessThan(ticks[halfTime]!.tick);
+    expect(landed[1]!.tick).toBeGreaterThan(ticks[halfTime]!.tick);
   });
 
   it('a call still waiting at the siren lands in the sheds', () => {

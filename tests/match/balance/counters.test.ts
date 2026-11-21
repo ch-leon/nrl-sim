@@ -6,6 +6,7 @@ import { reportMarkdown } from '../../../src/match/balance/report';
 
 const even = { name: 'balanced v slide', home: { rating: 60 }, away: { rating: 60 }, track: 'home' as const };
 const plan = (home: SideSpec): Plan => ({ name: 'counters', seeds: 2, scenarios: [{ ...even, home }] });
+const ONE_MINUTE_DRAW_SEED = 4;
 
 describe('position stat overrides', () => {
   const overrides: SideSpec = {
@@ -78,16 +79,14 @@ describe('tracked counter measurements', () => {
     expect(both.trackedCounts!.pointsFor).toEqual(both.opponentCounts!.pointsAgainst);
   });
   it('calculates wins plus half draws and its sample SE on a two-seed cell', () => {
-    // After the timed back-door runs (#722), seed 8 is a draw and seed 9 is a win in this cell.
-    // Seed 3 supplies a neutral one-minute draw (seed 2 before #649).
-    // This two-sample fixture checks aggregation mechanics, not match balance.
+    // This cell draws on seed 5 and wins on seed 6 under the current match rules.
     const tiny = cell;
-    const first = measureCell(tiny, 1, 4, 8);
-    const second = measureCell(tiny, 1, 4, 9);
-    const both = measureCell(tiny, 2, 4, 8);
+    const first = measureCell(tiny, 1, 4, 5);
+    const second = measureCell(tiny, 1, 4, 6);
+    const both = measureCell(tiny, 2, 4, 5);
     const xs = [first, second].map((r) => r.trackedWin! + r.trackedDraw! / 2);
     expect(xs).toEqual([0.5, 1]);
-    expect(measureCell({ ...cell, scenario: even }, 1, 1, 3).pointsShare).toEqual({ mean: 0.5, se: 0 });
+    expect(measureCell({ ...cell, scenario: even }, 1, 1, ONE_MINUTE_DRAW_SEED).pointsShare).toEqual({ mean: 0.5, se: 0 });
     expect(new Set(xs).size).toBe(2);
     const mean = (xs[0]! + xs[1]!) / 2;
     expect(both.pointsShare!.mean).toBe(mean);
@@ -95,8 +94,7 @@ describe('tracked counter measurements', () => {
     expect(first.pointsShare!.se).toBe(0);
   });
   it('opts into matrix and per-side tables, leaving the legacy report unchanged', () => {
-    // Seed 3: a one-minute draw (seed 2 before the weighted receiver, #649).
-    const result = measureCell(cellsOf(plan({}))[0]!, 1, 1, 3);
+    const result = measureCell(cellsOf(plan({}))[0]!, 1, 1, ONE_MINUTE_DRAW_SEED);
     const input = { plan: plan({}), meta: {}, results: [result] };
     const legacy = reportMarkdown(input);
     const { pointsShare: _share, trackedCounts: _tracked, opponentCounts: _opponent, ...old } = result;
