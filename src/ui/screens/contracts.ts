@@ -304,6 +304,9 @@ export const CONTRACTS_CSS = `
 /* A Renew that is off: the reason in amber, never grey, and kept when the other line folds away. */
 .nrl-contract-meta.nrl-contract-why { color: var(--nrl-neg); font-weight: 600; }
 @container (max-width: 47.5rem) {
+  /* finance.ts's narrow padding again: the head above is later in the page, and a taller sticky
+     head covered the middle of a SELL scrolled to the top of a 568×320 Larger sheet. */
+  .nrl-contracts-table th { padding: 0 4px; }
   .nrl-contracts-table .nrl-contracts-col-rating { width: 4.5rem; }
   .nrl-contract-ovr { display: none; }
   .nrl-contract-meta.nrl-contract-why { display: block; }
