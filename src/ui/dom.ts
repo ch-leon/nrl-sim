@@ -1033,7 +1033,10 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
 /* An alert: an 8px dot after the label (the count is in its spoken label). */
 .nrl-nav-dot { width: 8px; height: 8px; border-radius: 4px; background: var(--nrl-alert); flex: 0 0 auto; }
 .nrl-dock-spacer { flex: 1 1 auto; min-width: 4px; }
-.nrl-dock-play { position: relative; display: flex; align-items: stretch; flex: 0 100 auto; height: 50px; }
+/* 10000, not 100: shrink is shared by flex-shrink × width, so at 100 the tabs still took 1% of it, and at
+   667 Larger a long opponent's sub-line ("v Woolloomooloo · home") cost OFFICE ▴ 1px and its label an
+   ellipsis. Now their share is under a pixel until PLAY WEEK is down to its label. */
+.nrl-dock-play { position: relative; display: flex; align-items: stretch; flex: 0 10000 auto; height: 50px; }
 .nrl-dock-play:empty { display: none; }
 .nrl-dock-play-group { display: flex; align-items: stretch; border-radius: 10px; overflow: hidden; background: var(--nrl-accent); color: var(--nrl-on-accent); }
 .nrl-dock-play-group > .nrl-btn {
