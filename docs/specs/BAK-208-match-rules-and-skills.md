@@ -215,6 +215,19 @@ counted in the match report. Between even sides about one bomb in five is contes
 back, 12% spilled). Tuning §31.
 
 ### 4.4 Kicks — *first slice implemented: long, bomb, grubber, chip, cross-field*
+On the ordinary last-tackle play-the-ball (#650), the halfback sets up flatter on the open
+side and the five-eighth drops deeper on the other side. The halfback is the usual option.
+Once the heel is played, the defenders who have completed their retreat can move up at
+their side's usual line speed. The dummy-half can go to the five-eighth when an eligible
+defender is close to the halfback or closing on him and the five-eighth offers more room
+within passing range. The halves' Kicking and Big Boot adjust how much extra room he needs.
+The chosen half makes the ordinary kick, run or pass decision with his own stats and traits.
+Specific coach calls, set plays and manual passes keep their precedence. Named goal-kickers
+and restart kickers retain their duties.
+
+The live-match engine is revision 14. An in-progress fixture recorded by an earlier
+revision restarts from kick-off through the usual week-start recovery path.
+
 The kicker makes **one call** for the last tackle. **More options on the last (#650 part 1,
 `lastTackle.on`, awaiting lab sign-off):** one roll among **kick**, **run it** and **shift it
 wide** (to the widest man behind him in reach, who plays on), weighted by zone (own 20 kick
@@ -711,6 +724,7 @@ makes the break but can't finish it, the workhorse who is never quick and never 
 | #649.1 | The weighted receiver: the pass goes to one of the near-best options by weight, not always the best — *awaiting lab sign-off*. Tuning §5 | §4.2 |
 | #650.1 | More options on the last: kick, run it or shift it wide by zone, style, the late score and who is on the field; the second-last's early kick leans the same way — *awaiting lab sign-off*. Tuning §6 | §4.4 |
 | #650 | Attacking bombs can go to either winger's corner when the chase can reach it — *awaiting lab sign-off*. Tuning §6 | §4.4 |
+| #650 | The dummy-half can find the deeper five-eighth in space when the halfback is pressured on the last tackle — *awaiting lab sign-off*. Tuning §6 | §4.4 |
 | #652.1 | Held up over the line: any defender on a carrier in contact at the line can hold him up (a lone tackler too, Leon 13 Nov 2026); play-the-ball 10 m out, the tackle counted — *awaiting lab sign-off*. Tuning §11 | §8.1 |
 
 Then BAK-207 Phase 2 (full match, scoring, halves) and Phase 3 (balance).

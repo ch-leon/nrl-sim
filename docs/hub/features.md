@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- **A second kicking option on the last tackle.** The five-eighth drops deeper on the other side of the ruck. If the defence closes on the halfback, the dummy-half can find the five-eighth in space to kick, run or pass. [Tracker #650](https://github.com/ch-leon/nrl-sim/issues/650)
+
 - **Attacking bombs to the corner.** When an onside winger has time to chase, the kicker can put up a bomb to either corner and force the defence to cover it. [Tracker #650](https://github.com/ch-leon/nrl-sim/issues/650)
 
 - **Long punts into space.** On ordinary punts, kickers look for an open landing across from a fullback who has shaded to one side, with room inside the touchline. [Tracker #650](https://github.com/ch-leon/nrl-sim/issues/650)
