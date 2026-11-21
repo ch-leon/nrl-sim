@@ -1,8 +1,8 @@
 import { careerActionClock } from '../../core/season';
 // src/ui/screens/contracts.ts — Contracts screen (GitHub #40, part of #49), under
-// Finance (its "contracts end … VIEW ▸" tile). A sheet in the Broadcast Quiet
-// look: "◂ FINANCE", a summary line, and one table row a player, soonest to end
-// first, with renew / release / sell. The numbers come from systems/contracts.ts;
+// Finance (its "contracts end … VIEW ▸" tile). A sheet in the SuperCOOKED
+// look: "◂ FINANCE", a summary line, and one Recruit-style row a player (face, name,
+// stars, time left, cap a season), soonest to end first, with renew / release / sell. The numbers come from systems/contracts.ts;
 // this file only renders them.
 //
 // No yellow on this screen: it is a list of 20-odd equal choices, and a yellow
@@ -11,17 +11,29 @@ import { careerActionClock } from '../../core/season';
 
 import { bus } from '../../core/events';
 import { getState, type Player } from '../../core/state';
-import { overallRating } from '../../data/player';
+import { overallRating, playerStars } from '../../data/player';
+import { DEFAULT_PLAYER_COLORS, SQUAD_MIN } from '../../config';
+import { kitFromColors } from '../../art/match/kit';
+import { portraitDataUrl } from '../../art/portrait';
+import { POSITION_SHORT } from '../../systems/lineup';
+import { PLAYER_ID } from '../../systems/fixtures';
+import { ensurePartsStyles, starsEl } from '../parts';
 import { releasePlayer } from '../../systems/freeagency';
 import { activeSalary, releaseTerms, renewalAsk } from '../../systems/cap';
 import { contractRows, renewEarly, renewalRefusal } from '../../systems/contracts';
 import { quotePlayerSale } from '../../systems/playerTransfers';
 import { saleConfirmation } from '../saleConfirmation';
 import { hasStaff } from '../../systems/staff';
-import { SQUAD_MIN } from '../../config';
 import { fmtMoneyShort } from '../../utils/money';
 import { ARMED_CLASS, armGuard, armedTap, el, button, openScreen, screenHead, backButton } from '../dom';
 import { EXPIRY_WINDOW_WEEKS, ensureFinanceStyles, fmtMoney, openFinanceScreen } from './finance';
+
+/** Why a Renew is off, short enough for the row's second line (the long reason stays in the button's title). */
+function whyRenewOff(blocked: { reason: string; message: string }): string {
+  if (blocked.reason === 'not-final-season') return 'Renew in his last season';
+  if (blocked.reason === 'over-cap') return 'Over the cap';
+  return blocked.message;
+}
 
 const REASONS: Record<string, string> = {
   'insufficient-funds': 'Not enough cash.',
@@ -116,6 +128,7 @@ function render(sub: HTMLElement, tbody: HTMLElement, saleHost: HTMLElement): vo
   const rows: HTMLElement[] = [];
   const rerender = (): void => render(sub, tbody, saleHost);
   atRest = null;
+  const kit = kitFromColors(s.league.clubs.find((c) => c.id === PLAYER_ID)?.colors ?? DEFAULT_PLAYER_COLORS, PLAYER_ID);
   for (const row of heldRows(order, contractRows(s), gone)) {
     if (row.kind === 'gone') {
       const done = button(row.done, () => {});
@@ -138,10 +151,18 @@ function render(sub: HTMLElement, tbody: HTMLElement, saleHost: HTMLElement): vo
       : blocked
         ? `age ${p.age} · ${blocked.message}`
         : `age ${p.age} · morale ${p.morale} · renews from season ${start} at ${fmtMoney(ask.salary)}/season, no fee${changed}`;
-    const who = el('td', { class: 'nrl-contract-info', attrs: { title: meta } }, el('div', { class: 'nrl-contract-who' },
-      el('span', { class: 'nrl-contract-name', text: p.name }),
-      el('span', { class: 'nrl-contract-meta', text: meta }),
-      el('span', { class: 'nrl-contract-pos', text: p.position })));
+    // A Renew that is off says why in amber, on a line that stays when the others fold away (§3.2).
+    const metaLine = blocked && !queued
+      ? el('span', { class: 'nrl-contract-meta nrl-contract-why', text: whyRenewOff(blocked), attrs: { 'data-contract-why': p.id } })
+      : el('span', { class: 'nrl-contract-meta', text: meta });
+    const who = el('td', { class: 'nrl-contract-info', attrs: { title: meta } }, el('div', { class: 'nrl-contract-id' },
+      el('img', { class: 'nrl-contract-face', attrs: { src: portraitDataUrl(p.id, kit), alt: '', width: '28', height: '32' } }),
+      el('div', { class: 'nrl-contract-who' },
+        el('span', { class: 'nrl-contract-name', text: p.name }),
+        metaLine,
+        el('span', { class: 'nrl-contract-sub' },
+          el('span', { class: 'nrl-contract-pos', text: p.position }),
+          starsEl(playerStars(p), { size: 11, class: 'nrl-contract-stars' })))));
 
     let renew: HTMLButtonElement;
     if (queued) {
@@ -209,8 +230,10 @@ function render(sub: HTMLElement, tbody: HTMLElement, saleHost: HTMLElement): vo
 
     rows.push(el('tr', { attrs: { 'data-contract': p.id } },
       who,
-      el('td', { text: p.position }),
-      el('td', { class: 'nrl-num', text: String(Math.round(overallRating(p))) }),
+      el('td', { class: 'nrl-contract-code', text: POSITION_SHORT[p.position], attrs: { title: p.position } }),
+      el('td', { class: 'nrl-contract-rating', attrs: { title: `Overall ${Math.round(overallRating(p))}` } },
+        starsEl(playerStars(p), { size: 12 }),
+        el('span', { class: 'nrl-num nrl-contract-ovr', text: String(Math.round(overallRating(p))) })),
       el('td', { class: `nrl-num${weeks <= EXPIRY_WINDOW_WEEKS && !queued ? ' nrl-contract-soon' : ''}`, text: `${weeks} wk${weeks === 1 ? '' : 's'}` }),
       el('td', { class: 'nrl-num', text: fmtMoney(careerActionClock(s).structural ? activeSalary(p, careerActionClock(s).season) : p.deal?.salary ?? 0), attrs: { title: 'Annual salary on the cap' } }),
       el('td', {}, el('div', { class: 'nrl-contract-actions' }, renew, release, sell)),
@@ -222,6 +245,7 @@ function render(sub: HTMLElement, tbody: HTMLElement, saleHost: HTMLElement): vo
 /** Open the Contracts sheet (lights Finance, which holds it). Re-renders on state changes until closed. */
 export function openContractsScreen(): HTMLElement {
   ensureFinanceStyles();
+  ensureContractsStyles();
   arm(null);
   order = contractRows(getState()).map((p) => p.id);
   renewed.clear();
@@ -230,10 +254,10 @@ export function openContractsScreen(): HTMLElement {
   const sub = el('span', { class: 'nrl-screen-sub' });
   const tbody = el('tbody');
   const table = el('table', { class: 'nrl-table nrl-contracts-table' },
-    el('colgroup', {}, el('col'), el('col', { attrs: { style: 'width:44px' } }), el('col', { attrs: { style: 'width:44px' } }),
+    el('colgroup', {}, el('col'), el('col', { attrs: { style: 'width:44px' } }), el('col', { class: 'nrl-contracts-col-rating' }),
       el('col', { attrs: { style: 'width:64px' } }), el('col', { attrs: { style: 'width:76px' } }), el('col', { class: 'nrl-contracts-col-actions' })),
     el('thead', {}, el('tr', {},
-      el('th', { text: 'Player' }), el('th', { text: 'Pos' }), el('th', { class: 'nrl-num', text: 'Ovr' }),
+      el('th', { text: 'Player' }), el('th', { text: 'Pos' }), el('th', { text: 'Rating' }),
       el('th', { class: 'nrl-num', text: 'Left' }), el('th', { class: 'nrl-num', text: 'Cap' }), el('th'))),
     tbody);
   render(sub, tbody, saleHost);
@@ -246,3 +270,51 @@ export function openContractsScreen(): HTMLElement {
   });
   return openScreen(sheet, () => { off(); arm(null); }, 'contracts');
 }
+
+// ── Styling ─────────────────────────────────────────────────────────────────
+// The Recruit row look over finance.ts's table: a face, a 14px name and a muted line, stars, the
+// rule between rows in --nrl-button, the column heads small. Loaded after FINANCE_CSS, so these win.
+
+const CONTRACTS_STYLE_ID = 'nrl-contracts-styles';
+
+function ensureContractsStyles(): void {
+  ensurePartsStyles();
+  if (document.getElementById(CONTRACTS_STYLE_ID)) return;
+  const style = document.createElement('style');
+  style.id = CONTRACTS_STYLE_ID;
+  style.textContent = CONTRACTS_CSS;
+  document.head.appendChild(style);
+}
+
+export const CONTRACTS_CSS = `
+.nrl-contracts-table th { font-size: 0.6875rem; padding: 2px 6px; }
+.nrl-contracts-table td { border-top-color: var(--nrl-button); }
+.nrl-contracts-table th.nrl-num, .nrl-contracts-table td.nrl-num { font-size: 0.75rem; }
+.nrl-contracts-table .nrl-contracts-col-rating { width: 6.25rem; }
+.nrl-contract-code { font-family: var(--nrl-f-label); font-size: 0.9375rem; font-weight: 600; }
+/* The stars sit in their own column; the narrowest sheets fold them under the name instead. */
+.nrl-contract-sub { display: none; }
+.nrl-contract-id { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.nrl-contract-face { flex: 0 0 auto; width: 28px; height: 32px; border-radius: 6px; background: var(--nrl-raised); image-rendering: pixelated; }
+.nrl-contract-id > .nrl-contract-who { flex: 1 1 auto; }
+.nrl-contract-name { font-size: 0.875rem; }
+.nrl-contract-rating { white-space: nowrap; }
+.nrl-contract-rating > .nrl-stars { vertical-align: middle; }
+.nrl-contract-ovr { margin-left: 6px; color: var(--nrl-text-2); }
+/* A Renew that is off: the reason in amber, never grey, and kept when the other line folds away. */
+.nrl-contract-meta.nrl-contract-why { color: var(--nrl-neg); font-weight: 600; }
+@container (max-width: 47.5rem) {
+  .nrl-contracts-table .nrl-contracts-col-rating { width: 4.5rem; }
+  .nrl-contract-ovr { display: none; }
+  .nrl-contract-meta.nrl-contract-why { display: block; }
+  .nrl-contract-face { width: 24px; height: 28px; }
+  .nrl-contract-id { gap: 6px; }
+}
+@container (max-width: 38rem) {
+  .nrl-contracts-table .nrl-contracts-col-rating { width: 0 !important; }
+  .nrl-contracts-table tr:not(.nrl-contract-gone) > :is(th, td):nth-child(3) { display: none; }
+  .nrl-contract-sub { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; }
+  .nrl-contract-sub > .nrl-contract-pos { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .nrl-contract-sub > .nrl-stars { flex: 0 0 auto; }
+}
+`;
