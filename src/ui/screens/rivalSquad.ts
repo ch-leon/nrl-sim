@@ -317,12 +317,11 @@ export function openRivalSquad(opened: RivalClub): HTMLElement {
     const theirs = rivalSheet(club, context).roster ?? [];
     const behind = hasStaff(getState(), 'analyst') ? whenBehindLine(style) : null;
     const line = (text: string, attrs: Record<string, string>): HTMLElement => el('p', { text, attrs: { ...attrs, title: text } });
-    const title = el('h2', { class: 'nrl-name-wrap', text: club.name });
     // Their kit beside the name (the editor shows the draft's).
     const shown = draft ? draft.colors : club.colors;
     const chip = el('span', { class: 'nrl-rival-chip', attrs: { 'aria-hidden': 'true' } });
     chip.style.background = `linear-gradient(90deg, ${shown[0]} 60%, ${shown[1]} 60%)`;
-    title.prepend(chip);
+    const title = el('h2', { class: 'nrl-name-wrap' }, chip, club.name);
     const views = segmented<RivalView>([
       { id: 'pitch', label: 'Pitch ⊞', title: 'The side they would field' },
       { id: 'list', label: 'List ☰', title: 'Their whole squad' },
