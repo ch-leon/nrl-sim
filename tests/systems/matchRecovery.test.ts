@@ -45,9 +45,10 @@ afterEach(() => {
   Reflect.deleteProperty(globalThis, 'localStorage');
 });
 
-// The preceding engine on the default AU field, recorded before attacking wing bombs.
+// Previous engine identities recorded on the default AU field.
 const REVISION_12_ID = 'nrl-live-12-0a1b2b2c68eb48';
-const badIds = [undefined, 'bad identity', 'nrl-live-999-00000000000000', REVISION_12_ID] as const;
+const REVISION_13_ID = 'nrl-live-13-0a1b2b2c68eb48';
+const badIds = [undefined, 'bad identity', 'nrl-live-999-00000000000000', REVISION_12_ID, REVISION_13_ID] as const;
 describe.each([null, DEV_TEST_PREFIX])('recovery namespace %s', namespace => {
   it.each(badIds)('restarts only this fixture on reload with identity %s, preserving once-only effects', engineId => {
     // The other namespace and another slot must remain byte-for-byte untouched.
@@ -77,7 +78,8 @@ describe.each([null, DEV_TEST_PREFIX])('recovery namespace %s', namespace => {
     expect(again.live).toMatchObject({ seed: first.live.seed, calls: [], plans: [] });
     expect(again.live.resumeAt).toBeUndefined(); expect(again.live.controls).toBeUndefined();
     expect(notes.filter(n => n === MATCH_RESTARTED_TEXT)).toHaveLength(1);
-    expect(readLiveMatch()).toMatchObject({ engineId: matchEngineIdentity(), tick: 0 });
+    expect(readLiveMatch()).toMatchObject({ engineId: matchEngineIdentity(), tick: 0, calls: [], plans: [] });
+    expect(readLiveMatch()?.controls).toBeUndefined();
     expect(resumePlayerMatch()).toBe(true);
     expect(JSON.stringify(getState())).toBe(once);
     expect(notes.filter(n => n === MATCH_RESTARTED_TEXT)).toHaveLength(1);
@@ -97,11 +99,15 @@ describe.each([null, DEV_TEST_PREFIX])('recovery namespace %s', namespace => {
 it.each(badIds)('Save & exit drops incompatible inputs even at tick zero (%s), explains once and writes current metadata on progress', engineId => {
   advanceWeek();
   const before = JSON.stringify(getState());
-  const record = { ...readLiveMatch()!, engineId, tick: 0, calls: [{ tick: 1, side: 'home', call: 'hit-up' }] };
+  const record = { ...readLiveMatch()!, engineId, tick: 0,
+    calls: [{ tick: 1, side: 'home', call: 'hit-up' }],
+    plans: [{ tick: 2, side: 'home', tactics: { attack: 'grind', defence: 'rush' } }],
+    controls: [{ tick: 3, side: 'home', kind: 'kick' }] };
   bytes.set(liveMatchKey(1), JSON.stringify(record));
   expect(resumePlayerMatch()).toBe(true);
   const live = starts[starts.length - 1]!.live;
-  expect(live.calls).toEqual([]); expect(live.resumeAt).toBeUndefined();
+  expect(live.calls).toEqual([]); expect(live.plans).toEqual([]);
+  expect(live.controls).toBeUndefined(); expect(live.resumeAt).toBeUndefined();
   live.onProgress?.([], 40, []);
   expect(liveMatchSameRules(readLiveMatch()!)).toBe(true);
   expect(resumePlayerMatch()).toBe(true);
@@ -111,7 +117,9 @@ it.each(badIds)('Save & exit drops incompatible inputs even at tick zero (%s), e
 
 it.each([matchEngineIdentity(), ...badIds])('export/import carries compatible identity or accepts fallback identity %s', engineId => {
   save(getState()); advanceWeek();
-  starts[0]!.live.onProgress?.([{ tick: 1, side: 'home', call: 'hit-up' }], 40, []);
+  starts[0]!.live.onProgress?.([{ tick: 1, side: 'home', call: 'hit-up' }], 40,
+    [{ tick: 2, side: 'home', tactics: { attack: 'grind', defence: 'rush' } }],
+    [{ tick: 3, side: 'home', kind: 'kick' }]);
   const exported = JSON.parse(exportSave(getState()));
   expect(exported.nrlLiveMatch.engineId).toBe(matchEngineIdentity());
   exported.nrlLiveMatch.engineId = engineId;
@@ -123,9 +131,11 @@ it.each([matchEngineIdentity(), ...badIds])('export/import carries compatible id
   const live = starts[starts.length - 1]!.live;
   if (engineId === matchEngineIdentity()) {
     expect(live.resumeAt).toBe(40); expect(live.calls).toEqual(exported.nrlLiveMatch.calls);
+    expect(live.plans).toEqual(exported.nrlLiveMatch.plans); expect(live.controls).toEqual(exported.nrlLiveMatch.controls);
     expect(notes).not.toContain(MATCH_RESTARTED_TEXT);
   } else {
     expect(live.resumeAt).toBeUndefined(); expect(live.calls).toEqual([]);
+    expect(live.plans).toEqual([]); expect(live.controls).toBeUndefined();
     expect(notes.filter(n => n === MATCH_RESTARTED_TEXT)).toHaveLength(1);
   }
 });

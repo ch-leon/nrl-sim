@@ -21,7 +21,7 @@ import { LEGS_ENERGY } from '../../../src/match/league/fatigue';
 import { labSheet, withPlays, DEFAULT_AWAY, DEFAULT_HOME } from '../../../src/match/lab/sheets';
 import { labHash, parseLabHash } from '../../../src/match/lab/controller';
 import type { PlayFrom, PlayId } from '../../../src/data/plays';
-import type { Side, SimEvent } from '../../../src/match/core/snapshot';
+import type { ContactPlayer, Side, SimEvent } from '../../../src/match/core/snapshot';
 import type { TeamSheet } from '../../../src/sim/events';
 import type { Player } from '../../../src/match/league/live/types';
 
@@ -193,23 +193,26 @@ describe('the launch and the script (plan §3.3)', () => {
 
   it('an intercept flies to the lane defender', () => {
     let intercepts = 0;
-    // Keep multiple trajectories; seed 6 supplies the real interception at 1134 after attacking structures (#649).
-    for (const seed of [1, 2, 6]) {
+    // Seed 7 puts the real pass into the away fullback's hands at tick 5871.
+    for (const seed of [1, 2, 7]) {
       const sim = new PlaySim(flat(['block-play', 'second-man']), A, seed, { length: { halves: 1, halfMinutes: 7 } });
       sim.force = 0.0001;
-      let thrown = -1;
+      let defender: ContactPlayer | undefined;
       while (!sim.finished) {
         const before = sim.playsRun.intercepted.home;
         sim.step();
         if (sim.playsRun.intercepted.home > before) {
-          thrown = sim.tick;
           // In the air to a defender.
           const snap = sim.snapshot();
           expect(snap.ball.holder).toBeNull();
+          defender = snap.ball.flight?.receiver;
+          expect(defender?.side).toBe('away');
         }
-        if (thrown > 0 && sim.tickEvents.some((e) => e.kind === 'intercept' && e.side === 'away')) {
+        const caught = defender && sim.tickEvents.find((e) => e.kind === 'intercept' && e.side === defender?.side);
+        if (caught) {
+          expect(caught.slot).toBe(defender?.slot);
           intercepts++;
-          thrown = -1;
+          defender = undefined;
         }
       }
     }
@@ -348,20 +351,17 @@ describe('the lab and the harness', () => {
     expect(sheet.plays).toEqual(['block-play', 'inside-ball', 'short-side-raid']);
     expect(withPlays(labSheet(DEFAULT_HOME), false).plays).toBeUndefined();
   });
-  // Seed 1 at tick 1031 and seed 4 at tick 514 before the weighted receiver (#649) reshuffled them; seed 3 at 653
-  // and seed 4's block play breaking down at 991 before the last-tackle call (#650): seed 4's first breakdown is now the
-  // away side's, and seed 9 or 11 the first of 1–12 whose is the home side's.
-  // Punts into space (#650) move seed 3's block play from tick 690 to 714.
-  it('the lab’s named seeds: a block play launched (seed 3, tick 714) and a home play breaking down (seed 11, tick 1579)', () => {
+  // The second-kicker setup changes the lead-up to these two scripted plays.
+  it('the lab’s named seeds: a block play launched (seed 3, tick 688) and a home inside ball breaking down (seed 1, tick 910)', () => {
     const lab = (seed: number): PlaySim =>
       new PlaySim(withPlays({ ...labSheet(DEFAULT_HOME, 'gen', { attack: 'grind' }), rotation: 'standard' }, true), withPlays({ ...labSheet(DEFAULT_AWAY, 'gen', {}), rotation: 'standard' }, true), seed, { energy: LEGS_ENERGY.fresh, weather: 'clear', calls: [] });
-    const one = lab(3);
-    const launch = until(one, (e) => e.kind === 'set-play' && e.side === 'home');
-    expect([launch?.tick, launch?.detail, one.script?.outcome]).toEqual([714, 'block-play', 'ok']);
-    expect(one.script?.decoys.map((d) => d.idx % 9)).toEqual([7]);
-    const eleven = lab(11);
-    const bd = until(eleven, (e) => e.kind === 'play-breaks-down');
-    expect([bd?.tick, bd?.detail, bd?.side]).toEqual([1579, 'inside-ball', 'home']);
+    const three = lab(3);
+    const launch = until(three, (e) => e.kind === 'set-play' && e.side === 'home');
+    expect([launch?.tick, launch?.detail, three.script?.outcome]).toEqual([688, 'block-play', 'ok']);
+    expect(three.script?.decoys.map((d) => d.idx % 9)).toEqual([7]);
+    const one = lab(1);
+    const bd = until(one, (e) => e.kind === 'play-breaks-down');
+    expect([bd?.tick, bd?.detail, bd?.side]).toEqual([910, 'inside-ball', 'home']);
   }, 60_000);
   it('a scenario names its plays (`plays`), a typo fails fast, and the cell plays them', () => {
     const plan = (plays: PlayId[]): Plan => ({ name: 'p', seeds: 1, minutes: 4, scenarios: [{ name: 's', home: { rating: 60, plays }, away: { rating: 60 } }] });

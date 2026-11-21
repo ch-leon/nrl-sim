@@ -198,11 +198,13 @@ describe('ordinary attacking bombs to the winger’s corner (#650)', () => {
 
   it('finds both corners in ordinary seeded play without a coach call or a Lab aim', () => {
     const near = new BombSim(labSheet('rival-brumbies'), labSheet('rival-mariners'), 4).firstCornerBomb(2_500);
-    const far = new BombSim(labSheet('rival-reapers'), labSheet('rival-wolves'), 36).firstCornerBomb(4_800);
+    const far = new BombSim(labSheet('rival-brumbies'), labSheet('rival-mariners'), 19).firstCornerBomb(1_800);
     if (!near || !far) throw new Error('Expected a natural bomb to each corner');
     expect(near.to.y).toBeGreaterThanOrEqual(FIELD_WIDTH - 12);
+    expect(near.to.x).toBeGreaterThanOrEqual(FIELD_LENGTH - 12);
     expect(near.to.x - near.from.x).toBeGreaterThan(0);
     expect(far.to.y).toBeLessThanOrEqual(12);
+    expect(far.to.x).toBeLessThanOrEqual(12);
     expect(far.to.x - far.from.x).toBeLessThan(0);
   }, 15_000);
 });

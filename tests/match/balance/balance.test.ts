@@ -302,8 +302,10 @@ describe('measuring and reporting', () => {
     // Ordinary structures (#649) add a once-per-contact/PTB roll and real setup movement.
     // The timed back-door runs (#722, engine revision 7) re-pin these; before them:
     // balanced 0-8:138:a3c50b2b797e77b1 / expansive 6-6:141:efe82ee10feba754.
-    { attack: 'balanced' as const, expected: '12-6:141:82d97834a1c52696' },
-    { attack: 'expansive' as const, expected: '10-4:150:975213c1842aa58e' },
+    // The second-kicker setup (#650, engine revision 14) changes the seeded match trajectories.
+    // Before it: balanced 12-6:141:82d97834a1c52696 / expansive 10-4:150:975213c1842aa58e.
+    { attack: 'balanced' as const, expected: '13-10:155:57426901f7cbc31f' },
+    { attack: 'expansive' as const, expected: '10-6:134:af359b06b35dd99e' },
   ])('pins an even $attack / Slide match (seed 1)', async ({ attack, expected }) => {
     const sim = new LiveSim(sideSheet('H', { rating: 60, tactics: { attack } }), sideSheet('A', { rating: 60 }), 1);
     const parts: string[] = [];
@@ -341,14 +343,15 @@ describe('measuring and reporting', () => {
     // Ordinary structures (#649) still leave scripted selection alone; the opponent prepares its packet.
     // The timed back-door runs (#722, engine revision 7) re-pin these event trajectories;
     // before them: plays-on 0-4:134:d93f46a7e35ffb6c / plays-on-hard 0-0:139:e3df2859485cf187.
-    { name: 'plays-on', aiCoach: false, expected: '12-0:143:b08a6399d81219bc' },
-    // #650 changes the ordinary territory kick's landing in the Hard coach match.
-    { name: 'plays-on-hard', aiCoach: true, expected: '1-0:146:2652be8270891c73' },
+    // The second-kicker setup changes the lead-up to the scripted plays. Before it:
+    // plays-on 12-0:143:b08a6399d81219bc / plays-on-hard 1-0:146:2652be8270891c73.
+    { name: 'plays-on', aiCoach: false, expected: '4-10:156:73949811f314c3c9' },
+    { name: 'plays-on-hard', aiCoach: true, expected: '0-10:148:ee54e8d79a90e3cf' },
     { name: 'plays-on-hard with legacy punts', aiCoach: true, expected: '1-0:144:74a11af0f394ead7', legacyPunts: true },
   ])('pins $name: an even Balanced / Slide match with set plays (seed 1)', async ({ aiCoach, expected, legacyPunts }) => {
     const spec = 'node:crypto';
     const { createHash } = await import(spec);
-    const restore = applyTuning(legacyPunts ? { 'longKick.on': 0, 'wingBomb.on': 0 } : {});
+    const restore = applyTuning(legacyPunts ? { 'longKick.on': 0, 'wingBomb.on': 0, 'secondKicker.on': 0 } : {});
     try {
       const home = { ...sideSheet('H', { rating: 60 }), plays: ['block-play' as const, 'cut-out-winger' as const, 'kick-pass' as const] };
       const sim = new LiveSim(home, sideSheet('A', { rating: 60 }), 1, aiCoach ? { aiCoach: ['home'] } : {});

@@ -1,12 +1,12 @@
 // Actual engine moments, replay consistency and grounded shadows. No forced outcomes.
-// Default-Lab seed 2 is the first to supply all seven actual moments by tick 3066,
-// including a grubber at tick 2034.
+// Default-Lab seed 5 supplies all seven actual moments by tick 3369,
+// including a grubber at tick 891.
 // E2E_URL=http://localhost:4176/ CHROMIUM_PATH=/usr/bin/chromium node scripts/e2e-moments.mjs
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium, webkit } from 'playwright-core';
 const out=process.env.E2E_OUT ?? 'e2e-output/moments'; await mkdir(out,{recursive:true});
-const seed=2;
+const seed=5;
 const browser=process.env.E2E_BROWSER==='webkit'?await webkit.launch():await chromium.launch({executablePath:process.env.CHROMIUM_PATH ?? '/opt/pw-browsers/chromium',args:['--no-sandbox']});
 try {
  const page=await browser.newPage({viewport:{width:1280,height:800}});const errors=[];page.on('pageerror',e=>errors.push(e.message));

@@ -95,9 +95,8 @@ describe('the referee (#642)', () => {
         if (over) covers++;
       }
     }
-    // Includes heel grace and dead phases. With #650's field positions at 6 m stand-off:
-    // near 6029/178895 (3.37%), covers 13901/178895 (7.77%). At 7 m: near 5210 (2.91%)
-    // and covers 11659 (6.52%) on the same cohort.
+    // Includes heel grace and dead phases. With the second-kicker setup at 7.25 m stand-off:
+    // near 4578/177401 (2.58%), covers 12293/177401 (6.93%) on these same 12 seeds.
     expect(near / held).toBeLessThan(0.03);
     expect(covers / held).toBeLessThan(0.07); // a closer stand-off (#680) puts him over the carrier a little more often; the scene sorts him behind
   });
