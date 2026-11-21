@@ -684,12 +684,16 @@ button.nrl-finance-contracts.nrl-finance-contracts-due { box-shadow: inset 0 0 0
 .nrl-finance-foot { font-size: 0.6875rem; color: var(--nrl-muted); margin: 4px 0 0; }
 /* SEASON P&L and LEDGER: compact Mono tables. */
 .nrl-finance-scroll { overflow-x: auto; overscroll-behavior-x: contain; }
-.nrl-table.nrl-finance-table td { height: 28px; }
-.nrl-table.nrl-finance-table th { background: var(--nrl-navy); }
-.nrl-finance-table td.nrl-num { font-weight: 500; }
+.nrl-table.nrl-finance-table td { height: 28px; border-top-color: var(--nrl-button); }
+/* SuperCOOKED 51: THIS WEEK's list style: column heads in Mono small caps like the tiles' labels, text lines in the muted body face, figures in Mono. */
+.nrl-table.nrl-finance-table th { background: var(--nrl-navy); font-family: var(--nrl-f-num); font-size: 0.625rem; font-weight: 500; letter-spacing: 0.12em; }
+.nrl-finance-table td:first-child { color: var(--nrl-text-2); }
+.nrl-finance-table td.nrl-num { font-weight: 500; color: var(--nrl-text); }
+.nrl-finance-table td.nrl-num.nrl-neg { color: var(--nrl-neg); }
 .nrl-finance-table td.nrl-finance-wk { text-align: left; color: var(--nrl-muted); }
 .nrl-finance-pnl-net td { border-top: 2px solid var(--nrl-line); font-weight: 600; }
-.nrl-finance-table .nrl-finance-pnl-net td.nrl-num { font-weight: 600; }
+.nrl-finance-table .nrl-finance-pnl-net td:first-child { color: var(--nrl-text); font-family: var(--nrl-f-label); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.nrl-finance-table .nrl-finance-pnl-net td.nrl-num { font-family: var(--nrl-f-display); font-size: 1rem; font-weight: 400; }
 .nrl-table .nrl-finance-pnl-sub td { height: auto; padding-bottom: 4px; border-top: 0; font-size: 0.6875rem; color: var(--nrl-muted); white-space: normal; }
 .nrl-btn.nrl-finance-past { margin-top: 8px; min-height: 36px; font-size: 0.875rem; }
 @media (pointer: coarse) { .nrl-btn.nrl-finance-past { min-height: 44px; } }

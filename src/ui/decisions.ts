@@ -24,6 +24,7 @@ import { hasStaff } from '../systems/staff';
 import { NEW_CONTRACT_WEEKS } from '../systems/freeagency';
 import { fmtMoney } from '../utils/money';
 import { el, button, openModal, closeModal, activeScreen, dialogOpen } from './dom';
+import { confirmDialog } from './parts';
 import { ADVANCE_FAILED_TEXT } from './hud';
 import { demoBlocked } from '../commercial/demo';
 import { dueIndividualChallenge } from '../systems/individualChallenges';
@@ -263,14 +264,15 @@ export function askBeforeAdvance(span: number, proceed: (acknowledged: ReadonlyS
   }
   const answer = button('Answer now', () => openDecisions({ then: { label: 'Keep advancing', run: () => askBeforeAdvance(span, proceed, acknowledged) } }), { class: 'nrl-ask-answer nrl-btn-primary' });
   answer.setAttribute('data-ask-answer', '');
-  const go = button(ask.proceed, () => { closeModal(); proceed(acknowledged); }, { class: 'nrl-ask-proceed' });
+  // The confirm look (01): the way that doesn't answer is the outline button on the left, Answer now the primary on the right.
+  const go = button(ask.proceed, () => { closeModal(); proceed(acknowledged); }, { class: 'nrl-ask-proceed nrl-btn-outline' });
   go.setAttribute('data-ask-proceed', '');
   const n = ask.rows.length;
   const content = el('div', { class: 'nrl-ask', attrs: { 'data-advance-ask': '' } },
     el('h2', { text: n === 1 ? 'A decision is waiting' : `${n} decisions are waiting` }),
     list,
     ...(ask.question ? [el('p', { class: 'nrl-decisions-note', text: ask.question, attrs: { 'data-ask-question': '' } })] : []),
-    el('div', { class: 'nrl-decisions-actions' }, answer, go));
+    el('div', { class: 'nrl-decisions-actions' }, go, answer));
   openModal(content, { class: 'nrl-decisions-modal', region: true, closeButton: true });
 }
 
@@ -311,13 +313,16 @@ export function advanceUntilAsked(target: AdvanceTarget, run: (t: AdvanceTarget,
   }, opts.acknowledged);
 }
 
-/** #350 H3: one slip on the ▾ menu must not play out a season. */
+/** #350 H3: one slip on the ▾ menu must not play out a season. The confirm dialog (01): the question's first sentence is the title, the rest its line. */
 function confirmLongAdvance(question: string, go: () => void): void {
-  const yes = button('Play', () => { closeModal(); go(); }, { class: 'nrl-ask-answer nrl-btn-primary' });
-  yes.setAttribute('data-confirm-advance', '');
-  const no = button('Cancel', () => closeModal());
-  const content = el('div', { class: 'nrl-ask', attrs: { 'data-advance-confirm': '' } },
-    el('h2', { text: question }),
-    el('div', { class: 'nrl-decisions-actions' }, yes, no));
-  openModal(content, { class: 'nrl-decisions-modal', region: true, closeButton: true });
+  const cut = question.indexOf('? ');
+  const node = confirmDialog({
+    title: cut < 0 ? question : question.slice(0, cut + 1),
+    line: cut < 0 ? '' : question.slice(cut + 2),
+    cancel: 'Cancel',
+    confirm: 'Play',
+    onConfirm: go,
+  });
+  node.querySelector('.nrl-confirm')?.setAttribute('data-advance-confirm', '');
+  node.querySelector('[data-confirm="yes"]')?.setAttribute('data-confirm-advance', '');
 }

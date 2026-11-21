@@ -626,7 +626,7 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
     await openNav(page, 'ladder');
     await tap('.nrl-ladder-table .nrl-ladder-club');
     await page.waitForSelector('.nrl-rival-modal');
-    return check(rec, { box: '.nrl-rival-modal', rows: '.nrl-rival-row' }, null);
+    return check(rec, { box: '.nrl-rival-modal', rows: '.nrl-rival-row, .nrl-pitch-cards .nrl-pcard', card: '.nrl-pitch-cards .nrl-pcard' }, null);
   });
   // Settings (#349 E1): an Office tile (the gear is gone), every switch whole; Import asks on its own row first.
   await step('popup-settings', async (rec) => {
@@ -706,9 +706,10 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
     await tap('.nrl-hud-menu-toggle');
     await page.locator('.nrl-hud-menu-item', { hasText: 'To season end' }).tap();
     await page.waitForSelector('[data-advance-confirm]');
-    const q = (await page.locator('[data-advance-confirm] h2').textContent()).trim();
+    // The confirm dialog (01): the title is the question, its line the rest.
+    const q = `${(await page.locator('[data-advance-confirm] h2').textContent()).trim()} ${(await page.locator('[data-advance-confirm] .nrl-confirm-line').textContent()).trim()}`;
     rec.notes.push(`"${q}"`);
-    const out = await check(rec, { box: '.nrl-decisions-modal', rows: '[data-confirm-advance]', primary: ['[data-confirm-advance]'] }, null);
+    const out = await check(rec, { box: '.nrl-confirm-modal', rows: '[data-confirm-advance]', primary: ['[data-confirm-advance]'], exit: '[data-confirm="no"]' }, null);
     if (!/^Play \d+ weeks\? It stops for decisions\.$/.test(q)) out.push(`the confirm asks "${q}"`);
     await page.locator('[data-advance-confirm] .nrl-btn', { hasText: 'Cancel' }).tap();
     await page.waitForTimeout(400);
