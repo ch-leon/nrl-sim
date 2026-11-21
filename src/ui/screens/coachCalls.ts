@@ -4,9 +4,10 @@
 // group locked or unlocked for this club, with what each call does and when it
 // can be made; the club's level and what the next one unlocks; and the one-a-set
 // rule. The words are coachCallsPageData's (coachCallsText.ts); this only lays
-// them out. One column that scrolls, two or more side by side when there's room.
+// them out as Build-style tiles, three across, the page scrolling.
 
 import { el, ensureStyles, openScreen, screenHead } from '../dom';
+import { statusPill } from '../parts';
 import { getState } from '../../core/state';
 import { bus } from '../../core/events';
 import { coachsOfficeLevel } from '../../systems/matchday';
@@ -21,11 +22,15 @@ export function coachCallsStatus(level: number): string {
   return d.unlockedCount === d.total ? 'All unlocked' : `${d.unlockedCount} of ${d.total} unlocked`;
 }
 
+/** A group: its Coach's Office level and state, what opens it when locked (amber), then one Build-style tile per call. */
 function groupEl(g: CallGroup): HTMLElement {
+  const state = statusPill(g.unlocked ? 'Unlocked' : 'Locked', g.unlocked ? 'pos' : 'neg');
+  state.classList.add('nrl-calls-state');
   return el('section', { class: 'nrl-calls-group', attrs: { 'data-calls-group': String(g.level), ...(g.unlocked ? {} : { 'data-locked': '' }) } },
     el('div', { class: 'nrl-calls-group-head' },
       el('h3', { class: 'nrl-calls-group-title', text: g.title }),
-      el('span', { class: 'nrl-calls-state', text: g.unlocked ? 'Unlocked' : 'Locked' })),
+      ...(g.unlocked ? [] : [el('span', { class: 'nrl-calls-why', text: `Opens with ${g.title}` })]),
+      state),
     el('ul', { class: 'nrl-calls-list' }, ...g.calls.map((c) =>
       el('li', { class: 'nrl-calls-call', attrs: { 'data-call': c.call } },
         el('div', { class: 'nrl-calls-call-top' },
@@ -77,28 +82,30 @@ function ensureCoachCallsStyles(): void {
 }
 
 export const COACH_CALLS_CSS = `
-/* The Coach calls page: the summary, then the four groups, as many across as fit (one upright); only the body scrolls. */
+/* The Coach calls page (SuperCOOKED 22's tiles): the summary, then a group per Coach's Office level, its calls as tiles three across; only the body scrolls. */
 .nrl-calls-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-.nrl-calls-body { display: flex; flex-direction: column; gap: 8px; }
-.nrl-calls-summary { display: flex; flex-direction: column; gap: 4px; background: var(--nrl-raised); border-radius: 10px; padding: 8px 10px; }
+.nrl-calls-body { display: flex; flex-direction: column; gap: 10px; }
+.nrl-calls-summary { display: flex; flex-direction: column; gap: 4px; background: var(--nrl-panel); box-shadow: inset 0 0 0 1px var(--nrl-line); border-radius: 12px; padding: 8px 12px; }
 .nrl-calls-summary p { margin: 0; font-size: 0.8125rem; line-height: 1.35; }
 .nrl-calls-next { color: var(--nrl-text); font-weight: 500; }
 .nrl-calls-limit { color: var(--nrl-text-2); }
 .nrl-calls-foot { margin: 0; font-size: 0.8125rem; color: var(--nrl-muted); }
-.nrl-calls-groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 8px; align-items: start; }
-.nrl-calls-group { background: var(--nrl-raised); border-radius: 10px; padding: 8px 10px; min-width: 0; }
-.nrl-calls-group-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
-.nrl-calls-group .nrl-calls-group-title { margin: 0; font-family: var(--nrl-f-label); font-size: 1.0625rem; font-weight: 700; letter-spacing: 0.03em; line-height: 1.2; min-width: 0; }
-.nrl-calls-state { flex: 0 0 auto; font-family: var(--nrl-f-label); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--nrl-pos); }
-.nrl-calls-group[data-locked] .nrl-calls-state { color: var(--nrl-accent); }
-.nrl-calls-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
-.nrl-calls-call { padding: 5px 0; border-top: 1px solid var(--nrl-line); min-width: 0; }
-.nrl-calls-call-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
-.nrl-calls-name { font-family: var(--nrl-f-label); font-size: 0.9375rem; font-weight: 700; letter-spacing: 0.02em; }
-.nrl-calls-side { font-size: 0.6875rem; color: var(--nrl-muted); }
-.nrl-calls-call p { margin: 1px 0 0; font-size: 0.75rem; line-height: 1.35; color: var(--nrl-text-2); overflow-wrap: anywhere; }
+.nrl-calls-groups { display: flex; flex-direction: column; gap: 10px; }
+.nrl-calls-group { min-width: 0; }
+.nrl-calls-group-head { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; padding: 0 2px 6px; min-height: 1.75rem; }
+.nrl-calls-group .nrl-calls-group-title { margin: 0; font-family: var(--nrl-f-label); font-size: 1.0625rem; font-weight: 700; letter-spacing: 0.04em; line-height: 1.2; text-transform: uppercase; }
+.nrl-calls-state { flex: 0 0 auto; margin-left: auto; }
+.nrl-calls-why { font-size: 0.75rem; font-weight: 600; color: var(--nrl-neg); }
+.nrl-calls-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+@media (max-width: 600px) { .nrl-calls-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1100px) { .nrl-calls-list { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.nrl-calls-call { display: flex; flex-direction: column; gap: 3px; background: var(--nrl-panel); box-shadow: inset 0 0 0 1px var(--nrl-line); border-radius: 12px; padding: 8px 12px; box-sizing: border-box; min-width: 0; }
+.nrl-calls-call-top { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; flex-wrap: wrap; }
+.nrl-calls-name { font-family: var(--nrl-f-label); font-size: 1.0625rem; font-weight: 700; letter-spacing: 0.04em; line-height: 1.15; text-transform: uppercase; min-width: 0; }
+.nrl-calls-side { font-family: var(--nrl-f-num); font-size: 0.625rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--nrl-muted); }
+.nrl-calls-call p { margin: 0; font-size: 0.8125rem; line-height: 1.3; color: var(--nrl-text-2); overflow-wrap: anywhere; }
+.nrl-calls-when { font-size: 0.75rem; }
 .nrl-calls-when .nrl-label { font-size: 0.6875rem; }
-/* A group the club hasn't unlocked yet: its calls in grey, the group's tag in yellow. */
-.nrl-calls-group[data-locked] .nrl-calls-name { color: var(--nrl-muted); }
-.nrl-calls-group[data-locked] .nrl-calls-call p { color: var(--nrl-muted); }
+/* A group the club hasn't opened yet: its tiles dim like Build's, and the group says in amber what opens it. */
+.nrl-calls-group[data-locked] .nrl-calls-call { opacity: 0.55; }
 `;
