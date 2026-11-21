@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- **SuperCOOKED look, Phase 6 (screens with no mockup):** Contracts in the Recruit row look (a Renew that can't go says why on the row); the rival squad opens on the pitch in their kit, read-only, with the list a tap away; the expansion intro in the season review's layout with one Carry on; Coach calls and the Playbook as tile grids (calls grouped by Coach's Office level, locked groups saying what opens them; each play's IQ check as a pill); the Guide as a topic list beside the page; History's records and season books and Finance's Season P&L and Ledger as label/value rows and mono tables; the long-advance question and the update bar in the confirm and toast looks. Nothing was taken out ([docs/specs/ui-supercooked.md](../specs/ui-supercooked.md)).
+
 - **Events on the club home** ([PR #752](https://github.com/ch-leon/nrl-sim/pull/752)): the Events card names Big Mick, Skills Camp and Open Cup, shows the nearest deadline and opens their booking screens. Play Week and fast-forward warn before unentered opportunities close, including the later-opening Invitational. Coaches can review or deliberately continue without entering; missed entries explain when they return.
 
 - **Readable player details on small phones** ([PR #745](https://github.com/ch-leon/nrl-sim/pull/745)): the narrow player header stacks its status pills; on short, narrow screens the whole player sheet scrolls so long names, every tab and Deal actions remain readable at Larger text.
