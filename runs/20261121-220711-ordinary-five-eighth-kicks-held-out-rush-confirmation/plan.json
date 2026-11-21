@@ -1,0 +1,31 @@
+{
+  "name": "ordinary five-eighth kicks held-out rush confirmation",
+  "description": "A distinct #650 confirmation of the standard Rush v Slide points-share shift at gameplay commit 79417a38. Use seeds 1001–1200 in both orientations to match the earlier #757 held-out Rush v Slide fixture; compare default to secondKicker.on = 0.",
+  "seeds": 200,
+  "scenarios": [
+    {
+      "name": "rush v slide",
+      "seeds": 200,
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "five-eighth option off",
+      "tuning": {
+        "secondKicker.on": 0
+      }
+    }
+  ],
+  "seedStart": 1001
+}

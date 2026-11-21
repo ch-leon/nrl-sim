@@ -378,3 +378,5 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261120-203130-ordinary-wing-bombs-on-v-off-standard | ordinary wing bombs on v off standard | fcb5f4e4 | HEAD | [report](runs/20261120-203130-ordinary-wing-bombs-on-v-off-standard/report.md) |
 | 20261120-203708-ordinary-wing-bombs-on-v-off-standard-close-range | ordinary wing bombs on v off standard close range | 93589210 | HEAD | [report](runs/20261120-203708-ordinary-wing-bombs-on-v-off-standard-close-range/report.md) |
 | 20261120-204343-wing-bombs-held-out-rush | wing bombs held-out rush | 93589210 | HEAD | [report](runs/20261120-204343-wing-bombs-held-out-rush/report.md) |
+| 20261121-215937-ordinary-five-eighth-kicks-on-v-off-standard | ordinary five-eighth kicks on v off standard | 79417a38 | HEAD | [report](runs/20261121-215937-ordinary-five-eighth-kicks-on-v-off-standard/report.md) |
+| 20261121-220711-ordinary-five-eighth-kicks-held-out-rush-confirmation | ordinary five-eighth kicks held-out rush confirmation | 79417a38 | HEAD | [report](runs/20261121-220711-ordinary-five-eighth-kicks-held-out-rush-confirmation/report.md) |

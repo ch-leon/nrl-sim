@@ -1,0 +1,186 @@
+diff --git a/src/match/balance/measure.ts b/src/match/balance/measure.ts
+index 0d76ca05..8963bbd9 100644
+--- a/src/match/balance/measure.ts
++++ b/src/match/balance/measure.ts
+@@ -1,3 +1,7 @@
++import { appendFileSync } from 'node:fs';
++import { SET_TACKLES } from '../../config';
++import type { BallState } from '../core/ball';
++import type { PendingKick, Phase, Player as LivePlayer } from '../league/live/types';
+ // src/match/balance/measure.ts — play one cell of an experiment (a variant on
+ // a scenario) over its seeds, headless, and count what happened per match.
+ // By default each seed is a whole match (two 2:30 halves to full time); a plan
+@@ -65,6 +69,152 @@ export class BalanceSim extends LiveSim {
+   }
+ }
+ 
++interface KickObservation {
++  side: Side;
++  slot: number;
++  who: string;
++  tick: number;
++  tackle: number;
++  kind: string;
++  ordinary: boolean;
++  pressureM: number | null;
++}
++interface Distribution {
++  side: Side;
++  slot: number;
++  who: string;
++  fromSlot?: number;
++  selectTick: number;
++  releaseTick?: number;
++  receiptTick?: number;
++  kickTick?: number;
++  primarySpace: number | null;
++  targetSpace: number | null;
++  alternate: boolean;
++  committed: boolean;
++  targetFlight: boolean;
++  play?: 'kick' | 'run' | 'pass';
++  endTick?: number;
++}
++
++/** Experiment sidecar. The only writes are to observer-owned records. */
++class ObservedBalanceSim extends BalanceSim {
++  readonly observedKicks: KickObservation[] = [];
++  readonly observedDistributions: Distribution[] = [];
++  private calledKick: { pending: PendingKick; ordinary: boolean } | null = null;
++  private ruckSelection: { ruck: Phase; row: Distribution } | null = null;
++  private lastDistribution: { row: Distribution; holders: Set<number>; flight: BallState | null } | null = null;
++
++  protected secondKicker(h: LivePlayer, halfback: LivePlayer): LivePlayer | null {
++    const option = super.secondKicker(h, halfback);
++    if (this.ordinaryCall(h.side) && !this.directedLastPlay()) {
++      const row = this.distribution(option ?? halfback, this.tick, option !== null, halfback);
++      this.ruckSelection = { ruck: this.phase, row };
++    }
++    return option;
++  }
++
++  private distribution(p: LivePlayer, selectTick: number, alternate: boolean, halfback = this.kicker(p.side)): Distribution {
++    const primarySpace = this.kickerSpace(halfback, true);
++    const targetSpace = this.kickerSpace(p);
++    return { side: p.side, slot: p.slot, who: p.key, selectTick, alternate, primarySpace, targetSpace, committed: false, targetFlight: false };
++  }
++
++  protected stepRuck(ph: Extract<Phase, { kind: 'ruck' }>): void {
++    super.stepRuck(ph);
++    const choice = this.ruckSelection;
++    if (!choice || choice.ruck !== ph) return;
++    // If release-time chooseRuck ran, pass() already recorded the actual use.
++    if (ph.decision?.to?.who === choice.row.who) choice.row.committed = true;
++  }
++
++  protected pass(from: LivePlayer, to: LivePlayer, spillExtra = 0, read?: number): void {
++    const ruck = this.phase;
++    const use = ruck.kind === 'ruck' && ruck.stage === 'dh' && this.tackles === SET_TACKLES - 1
++      && !this.scripted && !this.pendingControl[from.side] && this.ordinaryCall(from.side);
++    super.pass(from, to, spillExtra, read);
++    if (!use || (to.slot !== 4 && to.slot !== 5)) return;
++    const choice = this.ruckSelection;
++    const selected = choice?.ruck === ruck && choice.row.who === to.key ? choice.row : null;
++    const row = selected ?? this.distribution(to, ruck.decision?.decidedAt ?? this.tick, false);
++    row.committed = true;
++    row.fromSlot = from.slot;
++    row.releaseTick = this.tick;
++    row.targetFlight = this.ball.kind === 'flight' && this.ball.via === 'pass' && this.ball.receiver === this.indexOf(to);
++    if (!this.observedDistributions.includes(row)) this.observedDistributions.push(row);
++    this.lastDistribution = { row, holders: new Set(), flight: row.targetFlight ? this.ball : null };
++  }
++
++  private ordinaryCall(side: Side): boolean {
++    const called = this.callState[side].attack;
++    return called !== 'kick-early' && called !== 'grubber' && called !== 'forty-twenty' && called !== 'bomb'
++      && called !== 'run-it' && called !== 'field-goal';
++  }
++
++  protected landings(): void {
++    const before = this.ball;
++    super.landings();
++    const d = this.lastDistribution;
++    if (!d || d.flight !== before || this.ball === before) return;
++    d.flight = null;
++    const holder = this.holder();
++    if (holder?.side === d.row.side && holder.slot === d.row.slot && holder.key === d.row.who) d.row.receiptTick = this.tick;
++  }
++
++  protected stepPlay(): void {
++    const pending = this.pendingKick;
++    const h = this.holder();
++    const ordinary = !this.scripted && h !== null && !this.pendingControl[h.side] && this.ordinaryCall(h.side);
++    super.stepPlay();
++    if (this.pendingKick && this.pendingKick !== pending) this.calledKick = { pending: this.pendingKick, ordinary };
++  }
++
++  protected launchPendingKick(): void {
++    const pending = this.pendingKick;
++    if (!pending || this.tick < pending.at) { super.launchPendingKick(); return; }
++    const completed = this.tackles;
++    const tackle = this.lastPlay ? SET_TACKLES : completed + 1;
++    const kicker = this.players[pending.kicker]!;
++    const ordinary = this.calledKick?.pending === pending && this.calledKick.ordinary;
++    const before = this.events.length;
++    const pressureM = this.kickerSpace(kicker);
++    super.launchPendingKick();
++    const e = this.events[before];
++    if (e?.kind !== 'kick' || !e.side || e.slot === undefined || e.detail === undefined) return;
++    this.observedKicks.push({ side: e.side, slot: e.slot, who: kicker.key, tick: e.tick, tackle, kind: e.detail, ordinary, pressureM });
++    const d = this.lastDistribution;
++    if (d && d.row.side === e.side) {
++      if (ordinary && d.row.receiptTick !== undefined && d.row.who === kicker.key) d.row.kickTick = e.tick;
++      d.row.play = 'kick';
++      d.row.endTick = e.tick;
++      this.lastDistribution = null;
++    }
++  }
++
++  step(): void {
++    super.step();
++    const choice = this.ruckSelection;
++    if (choice && choice.ruck !== this.phase) {
++      if (!this.observedDistributions.includes(choice.row)) this.observedDistributions.push(choice.row);
++      this.ruckSelection = null;
++    }
++    const d = this.lastDistribution;
++    if (!d) return;
++    const holder = this.holder();
++    if (holder && holder.side === d.row.side) d.holders.add(this.indexOf(holder));
++    if (this.events.some(e => e.kind === 'drop-goal' && e.side === d.row.side)) this.closeDistribution('kick');
++    else if (this.phase.kind !== 'play' || !this.lastPlay || this.attacking !== d.row.side) this.closeDistribution();
++  }
++
++  closeDistribution(play?: 'kick'): void {
++    const d = this.lastDistribution;
++    if (!d) return;
++    d.row.play = play ?? (d.holders.size >= 2 ? 'pass' : 'run');
++    d.row.endTick = this.tick;
++    this.lastDistribution = null;
++  }
++}
++
+ /** A full match: two halves. Stretches scale their counts up to this. */
+ export const MATCH_MINUTES = 2 * NINES.halfMinutes;
+ const POSITIONS = ['fullback', 'winger', 'winger', 'centre', 'five-eighth', 'halfback', 'hooker', 'prop', 'second-row'] as const;
+@@ -560,7 +710,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
+       const planDone = planRules.map(() => false);
+       const simEdge = edge && flip ? { ...edge, side: flipSide(edge.side) } : edge;
+       const ruleSides = (cell.scenario.breakRule ?? []).map(onSim);
+-      const sim = new BalanceSim(homeSheet, awaySheet, seed, { energy: legsAt, length, ...(cell.scenario.weather ? { weather: cell.scenario.weather } : {}), ...(rules ? { calls: callList } : {}), ...(aiSides.length ? { aiCoach: aiSides } : {}), ...(cell.scenario.finals ? { goldenPoint: true } : {}), ...(planRules.length ? { plans: planList } : {}), ...(ruleSides.length ? { breakRuleSides: ruleSides } : {}), ...(simEdge ? { difficultyEdge: simEdge } : {}) }, {
++      const sim = new ObservedBalanceSim(homeSheet, awaySheet, seed, { energy: legsAt, length, ...(cell.scenario.weather ? { weather: cell.scenario.weather } : {}), ...(rules ? { calls: callList } : {}), ...(aiSides.length ? { aiCoach: aiSides } : {}), ...(cell.scenario.finals ? { goldenPoint: true } : {}), ...(planRules.length ? { plans: planList } : {}), ...(ruleSides.length ? { breakRuleSides: ruleSides } : {}), ...(simEdge ? { difficultyEdge: simEdge } : {}) }, {
+         home: cell.scenario[flip ? 'away' : 'home'].fit,
+         away: cell.scenario[flip ? 'home' : 'away'].fit,
+       });
+@@ -678,6 +828,11 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
+         if (sim.points.home > sim.points.away) wins++;
+         else if (sim.points.home === sim.points.away) draws++;
+       }
++      const observeOut = process.env.NRL_HALVES_OBSERVATIONS;
++      if (observeOut) {
++        sim.closeDistribution();
++        appendFileSync(observeOut, `${JSON.stringify({ variant: cell.variant.name, scenario: cell.scenario.name, seed, flip, minutes, final: { ...sim.points }, kicks: sim.observedKicks, distributions: sim.observedDistributions })}\n`);
++      }
+       return { homePts: sim.points.home, awayPts: sim.points.away };
+     };
+     const noteTracked = (pts: { homePts: number; awayPts: number }, flip: boolean): void => {
