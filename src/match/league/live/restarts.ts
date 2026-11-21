@@ -1,10 +1,12 @@
 import { controlReceiver } from '../controls';
 import { SET_TACKLES } from '../../../config';
+import { traitBoost } from '../../../data/traits';
 import { FIELD_LENGTH, MID_Y, clampToGround } from '../../core/field';
 import { bounceFlight, kickFlight, landed, rollFlight, type BallState } from '../../core/ball';
 import type { Side } from '../../core/snapshot';
-import { dist, type Vec } from '../../core/vec';
-import { FULLBACK } from '../roles';
+import { clamp, dist, type Vec } from '../../core/vec';
+import { FIVE_EIGHTH, FULLBACK, KICKER } from '../roles';
+import { SECOND_KICKER } from '../lastTackle';
 import { MAX_LAT_M, pickReceiver, pickReceiverWeighted } from '../tactics';
 import { NINES } from '../rules';
 import { conversionSpot, goalChance, goalStrikeTick, postsFor } from '../goals';
@@ -98,7 +100,7 @@ export abstract class LiveRestarts extends LivePlay {
     // A cancelled/invalid commitment becomes a carry, never a second unseen receiver draw.
     // A later explicit last-tackle kick call retains its deterministic DH-to-kicker override.
     const calledKick = this.lastPlay && ['grubber', 'forty-twenty'].includes(this.callState[this.attacking].attack ?? '');
-    const kicker = calledKick ? this.kicker(this.attacking) : null;
+    const kicker = calledKick || (decision.secondKicker && this.directedLastPlay()) ? this.kicker(this.attacking) : null;
     const override = kicker && !this.locked(kicker) && this.tick >= kicker.busyUntil ? kicker : null;
     const receiver = decision.cancelled ? override : ph.decision ? this.ruckReceiver(ph)
       : decision.to ? this.at(decision.to.side, decision.to.slot) : null;
@@ -109,15 +111,61 @@ export abstract class LiveRestarts extends LivePlay {
       h.poseUntil = 0;
       this.emit('dart', `${h.name} darts from dummy-half`, h);
     } else this.pass(h, receiver);
-    this.phase = { kind: 'play', ...(ph.shape ? { shape: ph.shape } : {}) };
+    const ball = this.ball;
+    const secondKicker = decision.secondKicker && !decision.cancelled && decision.to && receiver
+      && ball.kind === 'flight' && ball.via === 'pass' && ball.receiver === this.indexOf(receiver)
+      ? { ...decision.to, catchTick: ball.t0 + ball.ticks } : undefined;
+    this.phase = { kind: 'play', ...(ph.shape ? { shape: ph.shape } : {}), ...(secondKicker ? { secondKicker } : {}) };
+  }
+
+  /** A specific last-play instruction retains the side's usual taker. */
+  protected directedLastPlay(): boolean {
+    const call = this.callState[this.attacking].attack;
+    return call === 'grubber' || call === 'forty-twenty' || call === 'bomb' || call === 'field-goal' || call === 'run-it';
+  }
+
+  private secondKickerAvailable(h: Player, p: Player): boolean {
+    return p.slot === FIVE_EIGHTH && p.side === h.side && p !== h && this.onField(p) && p.subFor === null
+      && this.retreatLine(p) === null && pickReceiver(h.body.pos, this.dir, [{
+        idx: p.slot, pos: p.body.pos, busy: this.locked(p) || this.tick < p.busyUntil,
+      }]) !== null;
+  }
+
+  /** The markers stay at the ruck during this read, while the onside line can close on a half. */
+  protected kickerSpace(p: Player): number {
+    let space = Infinity;
+    for (const d of this.side(other(p.side))) {
+      if (this.locked(d) || this.tick < d.cooldownUntil || this.markers.includes(this.indexOf(d)) || this.retreatLine(d) !== null) continue;
+      space = Math.min(space, dist(p.body.pos, d.body.pos));
+    }
+    return space;
+  }
+
+  protected secondKicker(h: Player, halfback: Player): Player | null {
+    if (SECOND_KICKER.on <= 0 || this.directedLastPlay() || halfback.slot !== KICKER || halfback === h || halfback.subFor !== null) return null;
+    const fiveEighth = this.at(h.side, FIVE_EIGHTH);
+    if (!this.secondKickerAvailable(h, fiveEighth)) return null;
+    if ((fiveEighth.body.pos.y - h.body.pos.y) * (halfback.body.pos.y - h.body.pos.y) >= 0
+      || (halfback.body.pos.x - fiveEighth.body.pos.x) * this.dir <= 0) return null;
+    const space = this.kickerSpace(halfback);
+    if (space > SECOND_KICKER.pressureM) return null;
+    const boot = (fiveEighth.stats.kicking - halfback.stats.kicking) * SECOND_KICKER.kickingPerPointM
+      + (traitBoost(fiveEighth.traits, 'bigBoot') - traitBoost(halfback.traits, 'bigBoot')) * SECOND_KICKER.bigBootM;
+    const limit = SECOND_KICKER.extraSpaceM / 2;
+    return this.kickerSpace(fiveEighth) - space >= SECOND_KICKER.extraSpaceM - clamp(boot, -limit, limit) ? fiveEighth : null;
   }
 
   private chooseRuck(h: Player, until: number): RuckDecision {
     const last = this.tackles === SET_TACKLES - 1;
-    let receiver: number | null = null, kicker = false;
+    let receiver: number | null = null, kicker = false, secondKicker = false;
     if (last) {
       const k = this.kicker(this.attacking);
-      if (!this.locked(k) && this.tick >= k.busyUntil) { receiver = this.indexOf(k); kicker = true; }
+      if (!this.locked(k) && this.tick >= k.busyUntil) {
+        const alternate = this.secondKicker(h, k);
+        receiver = this.indexOf(alternate ?? k);
+        kicker = true;
+        secondKicker = alternate !== null;
+      }
     }
     // The coach's Grubber or 40/20 (#396): the dummy-half finds the kicker rather than dart (no roll for it).
     const toKicker = last && receiver !== null && (this.callState[this.attacking].attack === 'grubber' || this.callState[this.attacking].attack === 'forty-twenty');
@@ -131,7 +179,8 @@ export abstract class LiveRestarts extends LivePlay {
       receiver = null;
     }
     const ref = (p: Player) => ({ side: p.side, slot: p.slot, who: p.key });
-    return { from: ref(h), to: receiver === null ? null : ref(this.players[receiver]!), decidedAt: this.tick, until, kicker };
+    return { from: ref(h), to: receiver === null ? null : ref(this.players[receiver]!), decidedAt: this.tick, until, kicker,
+      ...(secondKicker && receiver !== null ? { secondKicker: true } : {}) };
   }
 
   /** Pure identity/eligibility check, also used by snapshot projection. Never recruits a replacement. */
@@ -142,6 +191,7 @@ export abstract class LiveRestarts extends LivePlay {
       || this.pendingControl[this.attacking] || this.pendingPlay[this.attacking]) return null;
     const to = this.side(h.side).find(p => p.side === d.to!.side && p.slot === d.to!.slot && p.key === d.to!.who);
     if (!to) return null;
+    if (d.secondKicker) return !this.directedLastPlay() && this.secondKickerAvailable(h, to) ? to : null;
     if (d.kicker) return to === this.kicker(h.side) && !this.locked(to) && this.tick >= to.busyUntil ? to : null;
     const candidate = this.candidates(h).find(c => this.players[c.idx] === to);
     return candidate && pickReceiver(h.body.pos, this.dir, [candidate]) !== null ? to : null;

@@ -106,7 +106,8 @@ export abstract class LivePlay extends LiveKicks {
     // A field goal late on with the scores close: the kicker's call, once a set.
     // The coach's kick call for the set (#73) comes before the kicker's own.
     const called = this.callState[this.attacking].attack;
-    // Kicks in play are the slot-5 kicker's; a field goal is his or the named goal-kicker's (N11), whoever has the ball.
+    // The usual kicker or the five-eighth who took this last-tackle pass can kick in play.
+    // A field goal stays with the usual kicker or the named goal-kicker (N11).
     const isKicker = h === this.kicker(h.side);
     if (own && (isKicker || h === this.goalKicker(h.side)) && this.fieldGoalOn(h)) {
       if (this.fgCall === null) this.fgCall = called === 'field-goal' || this.rng.next() < GOALS.fieldGoalChance;
@@ -120,7 +121,10 @@ export abstract class LivePlay extends LiveKicks {
     const forLast = called === 'grubber' || called === 'forty-twenty';
     const early = this.tackles === SET_TACKLES - 2 && !forLast && (toLine <= LIVE.earlyKickM || zone === 'own20' || zone === 'ownHalf');
     const kickEarly = called === 'kick-early' && !this.lastPlay;
-    if (own && (this.lastPlay || early || kickEarly) && isKicker) {
+    const alternate = this.phase.kind === 'play' ? this.phase.secondKicker : undefined;
+    const tookLastPass = this.lastPlay && alternate?.side === h.side && alternate.slot === h.slot
+      && alternate.who === h.key && alternate.catchTick === h.catchTick && this.onField(h) && h.subFor === null;
+    if (own && (this.lastPlay || early || kickEarly) && (isKicker || tookLastPass)) {
       // Grubber or 40/20 (#396) sets the last-tackle kick even when it comes after his own choice, till the kick is struck.
       if (this.lastPlay && forLast) this.kickCall = called === 'grubber' ? 'grubber' : 'long';
       else if (this.kickCall === null) {

@@ -7,6 +7,21 @@ import type { AttackPreset, Zone } from './presets';
 
 export type LastPlay = 'kick' | 'run' | 'pass';
 
+/** The last-tackle alternative from dummy-half (#650). At 0 the original ruck and kicker paths apply. */
+export const SECOND_KICKER = {
+  on: 1,
+  /** Lateral space on either side of dummy-half; depth behind him for each half. */
+  laneM: 6,
+  halfbackDepthM: 3,
+  fiveEighthDepthM: 6,
+  /** Nearest eligible defender inside this distance pressures the halfback. */
+  pressureM: 14,
+  /** The five-eighth needs this much more room. The better boot can move that bar by at most half. */
+  extraSpaceM: 3,
+  kickingPerPointM: 0.06,
+  bigBootM: 1,
+};
+
 /**
  * The last-tackle knobs (tuning reference §6). Overridable by name in balance
  * experiments (tuning.ts). `on` 0 is the call as it was before #650: run it
