@@ -192,7 +192,8 @@ describe('the dock at every text size (#344)', () => {
   });
 
   it("gives way PLAY WEEK's sub-line first, never its label, and closes the tabs up at Large and Larger to 900px", () => {
-    expect(rule('.nrl-dock-play')).toMatch(/flex: 0 100 auto/);
+    // 10000: the tabs' share of the shrink stays under a pixel until PLAY WEEK is down to its label.
+    expect(rule('.nrl-dock-play')).toMatch(/flex: 0 10000 auto/);
     expect(rule('.nrl-dock-play')).not.toMatch(/min-width: 0/);
     expect(rule('.nrl-dock-advance-sub')).toMatch(/overflow: hidden;\s*white-space: normal;[^\n]*\n\s*overflow-wrap: anywhere/);
     expect(rule('.nrl-nav-label')).toMatch(/text-overflow: ellipsis/);
