@@ -4,7 +4,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { BASE, OUT_ROOT, IPHONE_UA, closeWeekSummary, openNav, reachProblems, skipFromPill, log } from '../common.mjs';
+import { BASE, OUT_ROOT, IPHONE_UA, closeWeekSummary, openNav, reachProblems, skipFromPill, log, setupStep } from '../common.mjs';
 
 const CHOOSER = '[data-nrl-league-selection]';
 const CONFIRM = '[data-nrl-league-confirm]';
@@ -110,6 +110,7 @@ export async function runLeagueSelection(browser) {
       await page.waitForFunction(() => !document.querySelector('[data-nrl-start]')?.disabled);
       const town = towns.find(t => t.country === (pack === 'uk' ? 'GB' : 'AU'));
       await page.locator('[data-nrl-town]').fill(`${town.name}, ${town.region}, ${town.country}`);
+      await setupStep(page);
       await page.locator('[data-nrl-career-mode-league]').tap();
       await shot('new-game');
       await page.evaluate(() => {

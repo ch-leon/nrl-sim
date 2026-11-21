@@ -1,7 +1,7 @@
 // Public career UI, durable settlement, and presentation at phone and desktop sizes.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { BASE, OUT_ROOT, IPHONE_UA, closeWeekSummary, fitsOrScrolls, openNav, reachProblems, skipFromPill, log } from '../common.mjs';
+import { BASE, OUT_ROOT, IPHONE_UA, closeWeekSummary, fitsOrScrolls, openNav, reachProblems, skipFromPill, log, setupStep } from '../common.mjs';
 
 const SAVE = 'nrl-sim-save-slot-1';
 const SIDECAR = 'nrl-live-match-1';
@@ -51,6 +51,7 @@ async function startCareer(page, town, pack) {
   await page.clock.setFixedTime(new Date(573 * 4294967296 + 7));
   await page.goto(BASE);
   await page.locator('[data-nrl-town]').fill(`${town.name}, ${town.region}, ${town.country}`);
+  await setupStep(page);
   await page.locator('[data-nrl-career-mode-league]').tap();
   await page.locator('[data-nrl-start]').tap();
   await page.locator(CHOOSER).waitFor({ timeout: 60000 });

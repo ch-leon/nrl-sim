@@ -2,7 +2,7 @@
 // Screenshots are kept by the existing CI artifact, never committed.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { BASE, OUT_ROOT, openNav, closeWeekSummary, playTrials, log, skipFromPill } from '../common.mjs';
+import { BASE, OUT_ROOT, openNav, closeWeekSummary, playTrials, log, skipFromPill, setupStep } from '../common.mjs';
 
 export async function runContentPacks(browser) {
   const out = join(OUT_ROOT, 'webkit', 'content-packs');
@@ -30,6 +30,7 @@ export async function runContentPacks(browser) {
         await page.waitForFunction(() => !document.querySelector('[data-nrl-start]')?.disabled);
         if (report.ukRequests) throw new Error('UK fetched before choosing a UK career');
         await page.locator('[data-nrl-town]').fill(`${town.name}, ${town.region}, ${town.country}`);
+        await setupStep(page);
         await page.locator('[data-nrl-start]').tap();
         await page.locator('[data-expansion-work]').tap();
         await page.waitForFunction(() => window.__nrlState);

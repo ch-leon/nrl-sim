@@ -1,6 +1,6 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, reachProblems, openNav, NO_INSETS } from '../common.mjs';
+import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, reachProblems, openNav, NO_INSETS, setupStep } from '../common.mjs';
 
 // ── The tutorial, followed (#344, #337, #370) ────────────────────────────────
 // The three guided taps done the way the bubble says, never skipped: the paddock
@@ -70,7 +70,7 @@ export async function runTutorialWalk(browser, { w: W, h: H, safe }) {
 
   await step('new-game', async () => {
     await page.goto(BASE);
-    await page.waitForSelector('[data-nrl-start]');
+    await page.waitForSelector('[data-nrl-town]');
     if (safe.l || safe.t || safe.r || safe.b) {
       await page.evaluate((s) => {
         const st = document.documentElement.style;
@@ -78,7 +78,9 @@ export async function runTutorialWalk(browser, { w: W, h: H, safe }) {
         st.setProperty('--nrl-safe-r', `${s.r}px`); st.setProperty('--nrl-safe-b', `${s.b}px`);
       }, safe);
     }
+    await setupStep(page, 2);
     await page.fill('[data-nrl-clubname]', 'Tutorial FC');
+    await setupStep(page, 3);
     await page.locator('[data-nrl-start]').tap();
     await page.locator('[data-expansion-work]').tap();
     await atStep('build');

@@ -1,7 +1,7 @@
 // #487: actual new-game trials and round 1; screenshots live only in CI artifacts.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { BASE, OUT_ROOT, closeWeekSummary, openNav, playPhoneWeek, playTrials, reachProblems } from '../common.mjs';
+import { BASE, OUT_ROOT, closeWeekSummary, openNav, playPhoneWeek, playTrials, reachProblems, setupStep } from '../common.mjs';
 
 export async function runTrials(browser) {
   const out = join(OUT_ROOT, 'webkit', 'trials');
@@ -17,7 +17,9 @@ export async function runTrials(browser) {
     const shot = name => page.screenshot({ path: join(out, `${tag}-${name}.png`) });
     try {
       await page.goto(BASE);
+      await setupStep(page, 2);
       await page.locator('[data-nrl-clubname]').fill('Trial Club');
+      await setupStep(page, 3);
       await page.locator('[data-nrl-start]').tap();
       await page.locator('[data-expansion-work]').tap();
       await page.locator('.nrl-tutorial-skip').tap();

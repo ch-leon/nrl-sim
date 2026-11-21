@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium, webkit } from 'playwright-core';
+import { setupStep } from './e2e-webkit/newClub.mjs';
 const out = process.env.E2E_OUT ?? 'e2e-output/live-art';
 await mkdir(out, {recursive:true});
 const browser = process.env.E2E_BROWSER === 'webkit' ? await webkit.launch() : await chromium.launch({executablePath:process.env.CHROMIUM_PATH ?? '/opt/pw-browsers/chromium', args:['--no-sandbox']});
@@ -108,6 +109,7 @@ try {
   career.on('pageerror',e=>errors.push(e.message));
   await career.addInitScript(()=>localStorage.setItem('nrlsim.iosInstallHintShown','1'));
   await career.goto(`${process.env.E2E_URL ?? 'http://localhost:5173/'}?e2e`);
+  await setupStep(career);
   await career.locator('[data-nrl-start]').click();
   await career.locator('[data-expansion-work]').click();
   await career.locator('.nrl-tutorial-skip').click();

@@ -1,7 +1,7 @@
 // #484: real fresh-game and reload paths, with screenshots kept in CI artifacts.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { BASE, IPHONE_UA, OUT_ROOT, reachProblems } from '../common.mjs';
+import { BASE, IPHONE_UA, OUT_ROOT, reachProblems, setupStep } from '../common.mjs';
 
 export async function runExpansionIntro(browser) {
   const out = join(OUT_ROOT, 'webkit', 'expansion-intro');
@@ -15,7 +15,9 @@ export async function runExpansionIntro(browser) {
     page.on('pageerror', (e) => rec.problems.push(e.message));
     try {
       await page.goto(BASE);
+      await setupStep(page, 2);
       await page.locator('[data-nrl-clubname]').fill('Test Club');
+      await setupStep(page, 3);
       await page.locator('[data-nrl-start]').tap();
       await page.locator('[data-expansion-intro]').waitFor();
       await page.evaluate(() => document.fonts.ready);

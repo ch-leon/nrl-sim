@@ -2,7 +2,7 @@
 // Screenshots stay in CI's e2e-webkit-screens artifact.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { BASE, OUT_ROOT, IPHONE_UA, openNav, SHEET_EXIT } from '../common.mjs';
+import { BASE, OUT_ROOT, IPHONE_UA, openNav, SHEET_EXIT, setupStep } from '../common.mjs';
 
 export async function runRecruit(browser) {
   let failures = 0;
@@ -26,8 +26,10 @@ export async function runRecruit(browser) {
       };
       try {
         await page.goto(BASE);
-        await page.locator(`[data-nrl-difficulty-${difficulty}]`).tap();
+        await setupStep(page, 2);
         await page.locator('[data-nrl-clubname]').fill('Shortlist FC');
+        await setupStep(page, 3);
+        await page.locator(`[data-nrl-difficulty-${difficulty}]`).tap();
         await page.locator('[data-nrl-start]').tap();
         await page.locator('[data-expansion-work]').tap();
         await page.locator('.nrl-tutorial-skip').tap();
