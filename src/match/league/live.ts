@@ -249,7 +249,8 @@ export class LiveSim extends LivePositioning implements MatchSim {
       const c = this.players.find(p => p.key === contact.carrier.who && p.side === contact.carrier.side && p.slot === contact.carrier.slot);
       const holding = ((ph.kind === 'tackle' && ph.t0 === contact.startedTick) || (ph.kind === 'ruck' && ph.stage !== 'dh' && ph.contactStartedTick === contact.startedTick)) && this.players[ph.carrier] === c;
       const escaping = ph.kind === 'play' && (contact.outcome === 'strip' || contact.outcome === 'break-tackle') && this.tick - contact.resolvedTick! <= 20;
-      if (holding || escaping) snap.contact = { ...contact,
+      const offloading = ph.kind === 'play' && contact.outcome === 'offload' && c?.side === this.attacking && this.tick < contact.releaseTick!;
+      if (holding || escaping || offloading) snap.contact = { ...contact,
         phaseTick: ph.kind === 'ruck' || ph.kind === 'tackle' ? ph.t0 : contact.resolvedTick ?? contact.startedTick,
         ...(ph.kind === 'ruck' && ph.stage !== 'dh' ? { releaseTick: ph.stage === 'down' ? ph.t0 + ph.down : ph.t0 } : {}),
       };

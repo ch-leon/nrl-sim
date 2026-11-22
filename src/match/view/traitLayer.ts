@@ -17,6 +17,7 @@ import type { TraitId } from '../../data/traits';
 import { toFieldPt } from '../core/field';
 import { impactTier, type ImpactTier } from './impact';
 import { popupFor } from './popups';
+import { currentPass, flightPlayer } from './handling';
 
 /** How long a move stays up, real ms. A second or less at ×1 and ×2. */
 export const TRAIT_MOVE_MS = 1000;
@@ -53,7 +54,7 @@ export type MoveKind =
 /** The moves an event's own trait name draws (traitMoveFor). */
 export type NamedMove = 'fend' | 'step' | 'cut-out' | 'drive' | 'hit';
 
-/** The offload's receiver is the nearest teammate this close (metres): the sim's own reach is LIVE.offloadM + 2. */
+/** Reach for the trait cue in recordings that predate pass metadata. */
 export const OFFLOAD_REACH_M = 9;
 /** A last-man tackle counts as saving a break when the runner has beaten this many of the defence. */
 export const LAST_LINE_BEATEN = 4;
@@ -284,13 +285,17 @@ export function traitCuesFor(e: SimEvent, snap: Snapshot, roster?: TraitRoster |
   };
 
   if (e.kind === 'offload' && (named(e.trait, 'Offload King') || named(e.trait, 'Razzle Dazzle'))) {
-    // The sim does not say who he threw to: the nearest teammate within reach, as pickReceiver does with its candidates.
     let to: { x: number; y: number; slot: number } | undefined;
-    let best = OFFLOAD_REACH_M;
-    for (const p of snap.players) {
-      if (p.side !== who.side || p.slot === who.slot || p.binned) continue;
-      const d = Math.hypot(p.x - who.x, p.y - who.y);
-      if (d < best) { best = d; to = { x: p.x, y: p.y, slot: p.slot }; }
+    if (e.contact?.outcome === 'offload') {
+      const receiver = flightPlayer(snap, currentPass(snap)?.receiver);
+      if (receiver?.side === who.side) to = { x: receiver.x, y: receiver.y, slot: receiver.slot };
+    } else {
+      let best = OFFLOAD_REACH_M;
+      for (const p of snap.players) {
+        if (p.side !== who.side || p.slot === who.slot || p.binned) continue;
+        const d = Math.hypot(p.x - who.x, p.y - who.y);
+        if (d < best) { best = d; to = { x: p.x, y: p.y, slot: p.slot }; }
+      }
     }
     const razz = named(e.trait, 'Razzle Dazzle');
     if (to || razz) out.push({ ...at(razz ? 'razz' : 'offload'), ...(to ? { to } : {}) });
