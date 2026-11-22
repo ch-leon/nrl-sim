@@ -6,7 +6,7 @@ import { speedOf } from '../../core/body';
 import { add, dist, dot, norm, sub, type Vec } from '../../core/vec';
 import { angleFrom, stepChance, type Situation } from '../contest';
 import { PLAYERS, ROLES } from '../roles';
-import { LONG_KICK, MAX_LAT_M, RUN_CLOSE_M, RUN_IT_CHANCE, RUN_IT_ZONE_M, bombTarget, chipTarget, chooseKick, crossFieldTarget, grubberTarget, kickTarget, longKickTarget, pickReceiver, pickReceiverWeighted, type KickChoice } from '../tactics';
+import { CLOSE_ATTACK_KICK_M, LONG_KICK, MAX_LAT_M, RUN_CLOSE_M, RUN_IT_CHANCE, RUN_IT_ZONE_M, WING_BOMB, bombTarget, chipTarget, chooseKick, crossFieldTarget, grubberTarget, kickTarget, longKickTarget, pickReceiver, pickReceiverWeighted, type KickChoice } from '../tactics';
 import { zoneOf, type AttackPlan } from '../presets';
 import { LAST_TACKLE, chooseLastPlay, earlyKickChance, lastTackleWeights, type LastTackleRead } from '../lastTackle';
 import { FINISHER_M, TRAIT_PTS, announce, bootMult, stepTraits } from '../traits';
@@ -140,7 +140,7 @@ export abstract class LivePlay extends LiveKicks {
           return;
         }
       } else if (this.kickCall !== 'run' && (this.tick - h.catchTick >= LIVE.kickRunTicks || nearD < LIVE.engageM)) {
-        this.pendingKick = this.planKick(h, this.kickCall);
+        this.pendingKick = this.planKick(h, this.kickCall, undefined, true);
         this.lock(h, 'kick', LIVE.kickLockTicks);
         return;
       }
@@ -311,11 +311,15 @@ export abstract class LivePlay extends LiveKicks {
   private callLastPlay(toLine: number, plan: AttackPlan, h: Player): 'run' | 'pass' | KickChoice {
     if (LAST_TACKLE.on > 0) {
       const play = chooseLastPlay(lastTackleWeights(this.lastTackleRead(h, toLine)), this.rng.next());
-      return play === 'kick' ? chooseKick(toLine, this.rng.next(), plan.kickBias) : play;
+      if (play !== 'kick') return play;
+    } else {
+      if (toLine <= RUN_CLOSE_M) return 'run';
+      if (toLine <= RUN_IT_ZONE_M && this.rng.next() < RUN_IT_CHANCE) return 'run';
     }
-    if (toLine <= RUN_CLOSE_M) return 'run';
-    if (toLine <= RUN_IT_ZONE_M && this.rng.next() < RUN_IT_CHANCE) return 'run';
-    return chooseKick(toLine, this.rng.next(), plan.kickBias);
+    // In close, add the bomb to his existing kick-type roll only if there is a corner chase.
+    const closeBombWeight = WING_BOMB.on > 0 && toLine <= CLOSE_ATTACK_KICK_M
+      && this.wingBombTarget(h, 0.5, bombPeak(traitBoost(h.traits, 'bigBoot'))) ? WING_BOMB.closeWeight : 0;
+    return chooseKick(toLine, this.rng.next(), plan.kickBias, closeBombWeight);
   }
 
   /** What the kicker reads for the last-tackle call (#650): the zone, the style, the score and the clock, his boot, the edge's pace. */
@@ -364,7 +368,7 @@ export abstract class LivePlay extends LiveKicks {
   }
 
   /** Where the kick goes and who it is for, by type (BAK-208 §4.4). */
-  private planKick(h: Player, kind: KickChoice, aim?: Vec): PendingKick {
+  private planKick(h: Player, kind: KickChoice, aim?: Vec, ordinary = false): PendingKick {
     const def = other(this.attacking);
     const fb = this.fullback(def);
     const boot0 = bootMult(h.traits);
@@ -397,9 +401,13 @@ export abstract class LivePlay extends LiveKicks {
         const far = wingers.sort((a, b) => Math.abs(b.body.pos.y - h.body.pos.y) - Math.abs(a.body.pos.y - h.body.pos.y))[0] ?? h;
         return { ...base, to: crossFieldTarget(h.body.pos, this.dir, far.body.pos, this.rng.next()), receiver: this.indexOf(far), peak: 13 };
       }
-      case 'bomb':
+      case 'bomb': {
+        const roll = this.rng.next();
         // Big Boot puts it higher (#99): more hang, and the chase is under it.
-        return { ...base, to: controlAim(bombTarget(h.body.pos, this.dir, fb.body.pos, this.rng.next()), aim, bombTarget(h.body.pos, this.dir, fb.body.pos, 0), bombTarget(h.body.pos, this.dir, fb.body.pos, 1)), receiver: this.indexOf(fb), peak: bombPeak(traitBoost(h.traits, 'bigBoot')), ...trait };
+        const stock = bombTarget(h.body.pos, this.dir, fb.body.pos, roll);
+        const to = aim ? controlAim(stock, aim, bombTarget(h.body.pos, this.dir, fb.body.pos, 0), bombTarget(h.body.pos, this.dir, fb.body.pos, 1)) : stock;
+        return { ...base, to, receiver: this.indexOf(fb), peak: bombPeak(traitBoost(h.traits, 'bigBoot')), ...trait, ...(ordinary && !aim ? { wingBombRoll: roll } : {}) };
+      }
       default: {
         // Labs: match controls (Leon, 30 Oct). Territory aims keep the normal
         // wind / boot target and its scatter; only the intent chooses the kick.

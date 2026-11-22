@@ -7,6 +7,8 @@ live gameplay change; work still open below has not shipped.
 
 ## Now
 
+- **Attacking bombs to the corner.** An ordinary bomb can land in a winger's corner when that winger can chase it. Ported from draft PR #757, part of [#650](https://github.com/ch-leon/nrl-sim/issues/650).
+
 - **Ordinary long kicks.** A territory punt can land in the open half when the fullback has shaded across. Ported from [draft PR #756](https://github.com/ch-leon/nrl-sim/pull/756), part of [#650](https://github.com/ch-leon/nrl-sim/issues/650). Explicit aims, 40/20s and touch-finders are unchanged.
 
 - **Attacking shapes.** Forward pods and edge shifts ([PR #715](https://github.com/ch-leon/nrl-sim/pull/715)), back-door support runs ([PR #722](https://github.com/ch-leon/nrl-sim/pull/722)), the nearby defender's bounded read of that lead ([PR #762](https://github.com/ch-leon/nrl-sim/pull/762), ported from [draft PR #744](https://github.com/ch-leon/nrl-sim/pull/744)), and a centre's catch-time choice of a defender's shoulder (ported from [draft PR #755](https://github.com/ch-leon/nrl-sim/pull/755)). Wider decoys and balance acceptance remain open. [Tracker #649](https://github.com/ch-leon/nrl-sim/issues/649)

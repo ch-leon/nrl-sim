@@ -367,7 +367,7 @@ describe('measuring and reporting', () => {
     expect(`${sim.points.home}-${sim.points.away}:${parts.length}:${hash}`).toBe(expected);
   });
   it('with punts into space off, plays-on-hard keeps the revision 9 pin', async () => {
-    const restore = applyTuning({ 'longKick.on': 0 });
+    const restore = applyTuning({ 'longKick.on': 0, 'wingBomb.on': 0 });
     try {
       const home = { ...sideSheet('H', { rating: 60 }), plays: ['block-play' as const, 'cut-out-winger' as const, 'kick-pass' as const] };
       const sim = new LiveSim(home, sideSheet('A', { rating: 60 }), 1, { aiCoach: ['home'] });

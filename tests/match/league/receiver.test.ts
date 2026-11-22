@@ -80,7 +80,7 @@ describe('weighted receiver: in the sim', () => {
     // The last-tackle call (#650) came after f02f4fa: off too, for the match as it was then.
     // Early DH commitment (#672), attacking structures (#649), the centre shoulder
     // read and punts into space (#650) also move rolls; disable them for this historical fingerprint.
-    const restore = applyTuning({ 'live.receiverMargin': 0, 'lastTackle.on': 0, 'live.dhDecisionLeadTicks': 0, 'shapes.on': 0, 'live.centreShoulderTicks': 0, 'longKick.on': 0 });
+    const restore = applyTuning({ 'live.receiverMargin': 0, 'lastTackle.on': 0, 'live.dhDecisionLeadTicks': 0, 'shapes.on': 0, 'live.centreShoulderTicks': 0, 'longKick.on': 0, 'wingBomb.on': 0 });
     try {
       expect(play(1)).toEqual({ events: 133, home: 6, away: 11, draws: 634 });
       expect(play(11)).toEqual({ events: 136, home: 0, away: 6, draws: 667 });

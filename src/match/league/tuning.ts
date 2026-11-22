@@ -27,7 +27,7 @@ import { CALLS } from './calls';
 import { KICKOFF } from './kickoff';
 import { KICK_CONTEST } from './kickContest';
 import { LAST_TACKLE } from './lastTackle';
-import { LONG_KICK } from './tactics';
+import { LONG_KICK, WING_BOMB } from './tactics';
 import { HELD_UP, WRESTLE } from './wrestle';
 import { BIN } from './sinbin';
 import { PLAYS } from './plays';
@@ -80,6 +80,7 @@ export const KNOBS = {
   kickContest: KICK_CONTEST,
   lastTackle: LAST_TACKLE,
   longKick: LONG_KICK,
+  wingBomb: WING_BOMB,
   breaks: BREAKS,
   goals: GOALS,
   bin: BIN,

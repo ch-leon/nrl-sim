@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- **Attacking bombs to the corner.** When an onside winger has time to chase, an ordinary attacking bomb can drop in his corner, 8–12 m from the try line and from touch. The fullback reads that aim while the kicker winds up, and the usual contest decides who takes it. Inside 22 m the bomb joins the last-tackle kick choices only if that chase is on. A midfield bomb, a winger who cannot get there, a Lab aim or a scripted kick keeps the fullback's patch. `wingBomb.on:0` turns the corner off. Ported from draft PR #757, part of [#650](https://github.com/ch-leon/nrl-sim/issues/650).
+
 - **Long punts into space.** On an ordinary territory punt, the kicker reads the fullback. If he has shaded more than 6 m off centre and the opposite landing is clear, the kick goes there, still at least 12 m from touch, with the same depth and the same accuracy roll. A centred fullback, a covered lane, a Lab aim, a coach kick call, a 40/20 or a touch-finder keeps the existing target. `longKick.on:0` turns the read off. [PR #773](https://github.com/ch-leon/nrl-sim/pull/773), ported from [draft PR #756](https://github.com/ch-leon/nrl-sim/pull/756), part of [#650](https://github.com/ch-leon/nrl-sim/issues/650).
 
 - **Offloads in contact.** A tackled runner can get one arm free and send the ball to a support runner while the defender holds on. The flight starts at the releasing hand. Ported from [draft PR #766](https://github.com/ch-leon/nrl-sim/pull/766).

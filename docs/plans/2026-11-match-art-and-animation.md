@@ -54,7 +54,9 @@ A centre catching near touch can then choose a defender's open shoulder, which
 moves live-match recovery to engine revision 9; `live.centreShoulderTicks:0`
 keeps the previous carry. An ordinary long punt can then aim away from a shading
 fullback, which moves live-match recovery to engine revision 10; `longKick.on:0`
-keeps the previous landing. BAK-208 and the tuning reference list the rules and
+keeps the previous landing. An attacking bomb can then go to a winger's corner
+when the chase is on, which moves live-match recovery to engine revision 11;
+`wingBomb.on:0` keeps the fullback aim. BAK-208 and the tuning reference list the rules and
 values. The PR records the balance comparison and the #322 edge-race check.
 
 Status: stages 1–4 presentation and the first stage-5 pass are implemented in
