@@ -304,8 +304,10 @@ describe('measuring and reporting', () => {
     // balanced 0-8:138:a3c50b2b797e77b1 / expansive 6-6:141:efe82ee10feba754.
     // The lead read (engine revision 8) moves Balanced; Expansive's pin stays.
     // Before the lead read, Balanced was 12-6:141:82d97834a1c52696.
-    { attack: 'balanced' as const, expected: '6-4:125:3b59450ec3a85edd' },
-    { attack: 'expansive' as const, expected: '10-4:150:975213c1842aa58e' },
+    // The centre shoulder read (engine revision 9) changes both carries. Before it:
+    // balanced 6-4:125:3b59450ec3a85edd / expansive 10-4:150:975213c1842aa58e.
+    { attack: 'balanced' as const, expected: '0-0:137:6c911bf022e28778' },
+    { attack: 'expansive' as const, expected: '4-0:134:443f2da66ba81a8d' },
   ])('pins an even $attack / Slide match (seed 1)', async ({ attack, expected }) => {
     const sim = new LiveSim(sideSheet('H', { rating: 60, tactics: { attack } }), sideSheet('A', { rating: 60 }), 1);
     const parts: string[] = [];
@@ -343,7 +345,9 @@ describe('measuring and reporting', () => {
     // Ordinary structures (#649) still leave scripted selection alone; the opponent prepares its packet.
     // The timed back-door runs (#722, engine revision 7) re-pin these event trajectories;
     // before them: plays-on 0-4:134:d93f46a7e35ffb6c / plays-on-hard 0-0:139:e3df2859485cf187.
-    { name: 'plays-on', aiCoach: false, expected: '12-0:143:b08a6399d81219bc' },
+    // The centre shoulder read (engine revision 9) moves plays-on. plays-on-hard stays.
+    // Before it, plays-on was 12-0:143:b08a6399d81219bc.
+    { name: 'plays-on', aiCoach: false, expected: '10-0:141:fb9bb3ff69ff1592' },
     { name: 'plays-on-hard', aiCoach: true, expected: '1-0:144:74a11af0f394ead7' },
   ])('pins $name: an even Balanced / Slide match with set plays (seed 1)', async ({ aiCoach, expected }) => {
     const home = { ...sideSheet('H', { rating: 60 }), plays: ['block-play' as const, 'cut-out-winger' as const, 'kick-pass' as const] };

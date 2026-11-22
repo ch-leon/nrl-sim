@@ -265,6 +265,11 @@ is still falling. The catch or regather brings the actual holder's hands around 
 ball, then both players land. On a spill, the loose ball falls to its bounce and both
 come down empty-handed.
 
+When a player recovers a loose ball from the turf in open play, he drops his hips and
+reaches to its ground position. The ball moves into his hands on the awarded pickup,
+then he tucks it as he rises into his standing or running carry. A tackle, pass,
+try or whistle takes over at its usual tick.
+
 **Touch and dead ball** (BAK-207 2d): the side that touched the ball last loses it. Into
 touch → TOUCH, a play-the-ball 10 m in from touch for the other side (no scrums); a carrier
 held on the touchline can be bundled out (INTO TOUCH!). Dead in-goal or over the dead-ball
@@ -414,7 +419,28 @@ This is a bounded movement response to the real run. It does not force a pass,
 change receiver selection, or add a pass, catch, interception or carrier-line
 contest bonus. Ordinary pass and catch checks continue. The read is engine state,
 not snapshot presentation. `shapes.leadDecoy.on:0` leaves the revision 7 line
-targets and RNG stream. Live-match recovery uses engine revision 8.
+targets and RNG stream. The lead read landed at engine revision 8. The centre
+shoulder read below moves live-match recovery to engine revision 9.
+
+### Centre carries out wide (#649)
+
+On an ordinary completed pass in open play, a centre near touch reads the
+nearest eligible defender ahead. Tacklers still recovering, held ruck
+markers and defenders still retreating are out of the read. If the defender
+is sliding toward touch and will be outside the centre's line, the centre
+angles back infield off his inside shoulder. If the defender is caught
+infield and is projected to stay there, the centre straightens past his
+outside shoulder, drifting wider only as needed for clearance. The read
+checks the projected run against other eligible defenders and leaves room
+inside touch. A square defender or a covered lane sends the centre back to
+the usual gap-seeking carry.
+
+The read uses the catch position and defender movement once. It applies
+briefly to a free carry. Manual and scripted play, kicks, and tackle or
+step responses take priority. The normal pass choice, sprint rules and
+contact contests still apply. `live.centreShoulderTicks:0` leaves the
+previous carry target and adds no draw. See tuning's **Centre carries out
+wide** section. Ported from [draft PR #755](https://github.com/ch-leon/nrl-sim/pull/755).
 
 ### 5.2 Defence presets
 
