@@ -1,145 +1,178 @@
 import { describe, expect, it } from 'vitest';
-import { KICK_CONTEST } from '../../../src/match/league/kickContest';
-import { LiveSim } from '../../../src/match/league/live';
+import { sideSheet } from '../../../src/match/balance/measure';
+import type { Side, Snapshot } from '../../../src/match/core/snapshot';
 import { DEFAULT_AWAY, DEFAULT_HOME, labSheet } from '../../../src/match/lab/sheets';
+import { highBall, KICK_CONTEST } from '../../../src/match/league/kickContest';
+import { LiveSim } from '../../../src/match/league/live';
+import type { KickChoice } from '../../../src/match/league/tactics';
 import { LiveView, type ActorView } from '../../../src/match/view/liveView';
 import { pictureContext, playerPicture, type PlayerPicture } from '../../../src/match/view/playerPicture';
 import { fieldOffsetX, fieldToWorldPoint } from '../../../src/scenes/matchField';
-import type { Side, Snapshot } from '../../../src/match/core/snapshot';
-import { sideSheet } from '../../../src/match/balance/measure';
 
-function match(seed: number, lastTick: number, home = DEFAULT_HOME, away = DEFAULT_AWAY): Snapshot[] {
-  const sim = new LiveSim(labSheet(home), labSheet(away), seed);
-  const trace = [sim.snapshot()];
-  while (sim.tick < lastTick && !sim.finished) {
-    sim.step();
-    trace.push(sim.snapshot());
+type Outcome = 'caught' | 'contest' | 'knock-on';
+
+/** Fix the positions and the draw so kick-planning changes cannot move these cases to another tick. */
+class KickFixture extends LiveSim {
+  constructor(private readonly lateChaser = false) {
+    super(sideSheet('H', { rating: 60 }), sideSheet('A', { rating: 60 }), 1);
   }
-  return trace;
+
+  protected override assignTargets(): void {}
+  protected override stepPlay(): void {}
+  protected override move(): void {
+    const b = this.ball;
+    if (b.kind !== 'flight' || b.via !== 'kick') return;
+    const left = b.t0 + b.ticks - this.tick;
+    if (left === 4) this.at('home', 0).body.pos.x += .25;
+    if (left === 1 && this.lateChaser) this.at('home', 1).body.pos.x = b.to.x - .2;
+  }
+
+  kick(outcome: Outcome, kind: KickChoice = 'bomb', { lone = false, kickoff = false } = {}) {
+    this.tick = 100;
+    this.phase = { kind: 'play' };
+    const chaser = this.at('home', 0), catcher = this.at('away', 0), kicker = this.at('home', 5);
+    const to = { x: 50, y: 34 };
+    for (const player of this.players) {
+      player.body.pos = { x: 24, y: 6 + player.slot * 6 };
+      player.body.vel = { x: 0, y: 0 };
+      player.pose = 'idle';
+    }
+    kicker.body.pos = { x: 30, y: to.y };
+    catcher.body.pos = { x: to.x + .5, y: to.y };
+    if (!lone) chaser.body.pos = { x: to.x - 1.2, y: to.y };
+    if (this.lateChaser) this.at('home', 1).body.pos = { x: to.x - 2, y: to.y };
+    const peak = kind === 'bomb' ? KICK_CONTEST.bomb.peak : kickoff ? 20 : 12;
+    const odds = highBall(chaser.stats.speed, catcher.stats.handling, peak, false);
+    const rolls = outcome === 'contest' ? [0] : outcome === 'knock-on' ? [odds.won + odds.spill / 2, .2, .8] : [.99];
+    this.rng.next = () => rolls.shift() ?? .99;
+    this.pendingKick = { at: this.tick + 1, kicker: this.indexOf(kicker), to, receiver: this.indexOf(catcher), peak, kickoff, kind };
+    this.step();
+    const launch = this.snapshot();
+    const arrives = launch.ball.flight!.arrivesTick;
+    const frames = new Map([[launch.tick, launch]]);
+    while (this.tick < arrives + 7) {
+      this.step();
+      frames.set(this.tick, this.snapshot());
+    }
+    return (offset: number) => frames.get(arrives + offset)!;
+  }
 }
 
-const diggers = match(19, 2932, 'rival-diggers', 'rival-scorpions');
-const regather = match(20, 2547);
-
-function painted(trace: Snapshot[], tick: number) {
-  const snap = trace[tick]!, previous = trace[tick - 1]!;
+function pictures(snap: Snapshot, previous: Snapshot): PlayerPicture[] {
   const context = pictureContext(snap, previous);
-  return snap.players.map(p => playerPicture(p, previous.players.find(q => q.who === p.who) ?? p, tick, snap.ball.holder, 1, context));
+  return snap.players.map(p => playerPicture(p, previous.players.find(q => q.side === p.side && q.slot === p.slot) ?? p,
+    snap.tick, snap.ball.holder, 1, context));
+}
+
+function jumpers(snap: Snapshot, previous: Snapshot): PlayerPicture[] {
+  return pictures(snap, previous).filter(p => p.action === 'bombContest');
 }
 
 describe('contested open-play bombs', () => {
-  it.each([
-    { trace: diggers, tick: 1049, result: 'caught', side: 'away', slot: 0 },
-    { trace: regather, tick: 2541, result: 'contest', side: 'away', slot: 5 },
-    { trace: diggers, tick: 2925, result: 'knock-on', side: null, slot: null },
-  ])('connects the grounded plant, reach and the actual $result at tick $tick', ({ trace, tick, result, side, slot }) => {
-    const before = trace[tick - 1]!, arrival = trace[tick]!;
-    const cue = before.bombContest!;
-    expect(cue.arrivesTick).toBe(tick);
+  it.each<Outcome>(['caught', 'contest', 'knock-on'])('connects the grounded plant, reach and the actual %s', outcome => {
+    const at = new KickFixture().kick(outcome);
+    const cue = at(-1).bombContest!;
+    expect(cue.arrivesTick).toBe(at(0).tick);
     expect(cue.releasedTick).toBeUndefined();
-    expect(new Set(cue.players.map(p => p.side)).size).toBe(2);
+    expect(cue.players.map(p => [p.side, p.slot])).toEqual([['home', 0], ['away', 0]]);
     expect(cue.players.every(p => Math.hypot(p.x - cue.at.x, p.y - cue.at.y) <= KICK_CONTEST.bomb.contestM)).toBe(true);
-    const planting = painted(trace, cue.plantTick).filter(p => p.action === 'bombContest');
-    expect(planting).toHaveLength(2);
-    expect(planting.every(p => p.frame === 0 && p.lift === 0 && !p.possession)).toBe(true);
-    const reach = painted(trace, tick - 1).filter(p => p.action === 'bombContest');
-    expect(reach).toHaveLength(2);
-    expect(reach.every(p => p.lift! > 0 && !p.possession)).toBe(true);
+    expect(jumpers(at(-5), at(-6))).toEqual(Array.from({ length: 2 }, () => expect.objectContaining({ frame: 0, lift: 0, possession: false })));
+    const reach = jumpers(at(-1), at(-2));
     expect(new Set(reach.map(p => p.frame))).toEqual(new Set([1, 2]));
-    expect(before.ball.holder).toBeNull();
-    expect(arrival.events).toEqual(expect.arrayContaining([expect.objectContaining({ detail: result })]));
-    expect(arrival.ball.holder).toEqual(side ? { side, slot } : null);
-    const land = painted(trace, tick);
-    expect(land.filter(p => p.possession)).toHaveLength(side ? 1 : 0);
-    expect(land.some(p => p.action === 'airCatch')).toBe(false);
-    if (side) {
-      const holder = arrival.players.find(p => p.side === side && p.slot === slot)!;
-      expect(land.find(p => p.who === holder.who)).toMatchObject({ action: 'bombContest', frame: 2, possession: true });
-    }
-    // Regather in seed 20 runs straight into a real tackle. Ordinary catch and spill finish the landing.
-    if (result !== 'contest') {
-      const landed = painted(trace, tick + 3).filter(p => p.action === 'bombContest');
-      expect(landed).toHaveLength(2);
-      expect(landed.every(p => p.frame === 4 && p.lift === 0)).toBe(true);
-      expect(painted(trace, tick + 7).some(p => p.action === 'bombContest')).toBe(false);
-    }
+    expect(reach.every(p => p.lift! > 0 && !p.possession)).toBe(true);
+    expect(at(-1).ball.holder).toBeNull();
+
+    expect(at(0).events).toEqual(expect.arrayContaining([expect.objectContaining({ detail: outcome })]));
+    const holder = outcome === 'caught' ? { side: 'away', slot: 0 } : outcome === 'contest' ? { side: 'home', slot: 0 } : null;
+    expect(at(0).ball.holder).toEqual(holder);
+    const landing = pictures(at(0), at(-1));
+    expect(landing.some(p => p.action === 'airCatch')).toBe(false);
+    const gathers = landing.filter(p => p.possession);
+    if (holder) {
+      const player = at(0).players.find(p => p.side === holder.side && p.slot === holder.slot)!;
+      expect(gathers).toEqual([expect.objectContaining({ who: player.who, action: 'bombContest', frame: 2 })]);
+    } else expect(gathers).toHaveLength(0);
+    expect(jumpers(at(3), at(2))).toEqual(Array.from({ length: 2 }, () => expect.objectContaining({ frame: 4, lift: 0 })));
+    expect(jumpers(at(7), at(6))).toHaveLength(0);
   });
 
-  it('keeps the ball free when both players reach, then draws one ball through the spill or clean gather', () => {
+  it('keeps the feet planted and draws one ball through a catch or spill', () => {
     const fieldToWorld = (x: number, y: number) => fieldToWorldPoint(x, y, fieldOffsetX());
-    const pictures = new Map<string, PlayerPicture>();
+    const poses = new Map<string, PlayerPicture>();
     const ground = new Map<string, { x: number; y: number }>();
     const actors = (side: Side): ActorView[] => Array.from({ length: 9 }, (_, slot) => ({
       place: (x, y) => void ground.set(`${side}/${slot}`, { x, y }),
       play: () => {},
-      paint: picture => void pictures.set(`${side}/${slot}`, picture),
+      paint: picture => void poses.set(`${side}/${slot}`, picture),
     }));
     let visible = false, lift = 0;
     const view = new LiveView({ players: { home: actors('home'), away: actors('away') }, fieldToWorld, ball: {
       place: (_x, _y, l) => { lift = l; }, setRendered: v => { visible = v; },
     } });
-    const draw = (tick: number, alpha = 1) => view.draw(diggers[tick - 1]!, diggers[tick]!, alpha);
-    for (const tick of [1049, 2925]) {
-      const contest = diggers[tick - 1]!.bombContest!;
-      const keys = contest.players.map(({ side, slot }) => `${side}/${slot}`);
-      draw(contest.plantTick);
+    for (const outcome of ['caught', 'knock-on'] as const) {
+      const at = new KickFixture().kick(outcome);
+      const draw = (offset: number) => view.draw(at(offset - 1), at(offset), 1);
+      const keys = ['home/0', 'away/0'];
+      draw(-5);
       const feet = keys.map(key => ground.get(key));
-      draw(contest.plantTick + 1, 0);
+      draw(-4);
       expect(keys.map(key => ground.get(key))).toEqual(feet);
-      draw(tick - 1);
-      expect(keys.every(key => pictures.get(key)!.lift! > 0)).toBe(true);
+      draw(-1);
+      expect(keys.every(key => poses.get(key)!.lift! > 0)).toBe(true);
       expect(visible).toBe(true);
       expect(lift).toBeGreaterThan(30);
-      expect([...pictures.values()].filter(p => p.possession)).toHaveLength(0);
-      draw(tick);
-      expect(visible).toBe(tick === 2925);
-      expect([...pictures.values()].filter(p => p.possession)).toHaveLength(tick === 2925 ? 0 : 1);
-    }
-    const spillLift = lift;
-    draw(2928);
-    expect(visible).toBe(true);
-    expect(lift).toBeLessThan(spillLift);
-  });
-
-  it('shows the actual late taker on his feet if a different eligible player had already jumped', () => {
-    const trace = regather.slice();
-    const tick = 2541;
-    const snap = trace[tick]!;
-    const cue = snap.bombContest!;
-    const previous = trace[tick - 1]!;
-    const earlierChaser = previous.players.find(p => p.side === 'away' && p.slot === 7)!;
-    trace[tick] = { ...snap, bombContest: { ...cue, players: [{ ...earlierChaser, who: earlierChaser.who! }, cue.players[1]] } };
-    const take = painted(trace, tick).find(p => p.possession)!;
-    expect(take).toMatchObject({ who: snap.players.find(p => p.side === 'away' && p.slot === 5)!.who, action: 'catch', lift: 0 });
-    expect(painted(trace, tick).filter(p => p.action === 'bombContest').every(p => !p.possession)).toBe(true);
-  });
-
-  it('retains the ordinary aerial reception on a lone bomb, long kicks and kick-offs, and leaves grubbers on the ground', () => {
-    const lone = match(36, 534, 'rival-diggers', 'rival-scorpions');
-    expect(lone[453]!.events).toEqual(expect.arrayContaining([expect.objectContaining({ kind: 'kick', detail: 'bomb' })]));
-    expect(lone.slice(453).every(s => !s.bombContest)).toBe(true);
-    expect(painted(lone, 534).filter(p => p.possession)).toEqual([expect.objectContaining({ action: 'airCatch' })]);
-
-    const sim = new LiveSim(sideSheet('H', { rating: 62 }), sideSheet('A', { rating: 58 }), 1, { length: { halves: 2, halfMinutes: 7 } });
-    const checked = new Set<string>();
-    let launch: Snapshot['events'][number] | undefined;
-    let prev = sim.snapshot();
-    while (!sim.finished && checked.size < 3) {
-      sim.step();
-      const snap = sim.snapshot();
-      launch = snap.events.find(e => e.kind === 'kick' || e.kind === 'kickoff') ?? launch;
-      const kind = launch?.detail ?? launch?.kind;
-      const flight = prev.ball.flight;
-      if (flight?.via === 'kick' && flight.startedTick === launch?.tick && flight.arrivesTick === snap.tick && kind && ['long', 'kickoff', 'grubber'].includes(kind)) {
-        expect(prev.bombContest).toBeUndefined();
-        expect(snap.bombContest).toBeUndefined();
-        const taker = snap.ball.holder && snap.players.find(p => p.side === snap.ball.holder!.side && p.slot === snap.ball.holder!.slot);
-        const take = taker && playerPicture(taker, taker, snap.tick, snap.ball.holder, 1, pictureContext(snap, prev));
-        if (kind === 'grubber') { expect(take && take.action).not.toBe('airCatch'); checked.add(kind); }
-        else if (take?.action === 'airCatch') checked.add(kind);
+      expect([...poses.values()].filter(p => p.possession)).toHaveLength(0);
+      draw(0);
+      expect(visible).toBe(outcome === 'knock-on');
+      expect([...poses.values()].filter(p => p.possession)).toHaveLength(outcome === 'knock-on' ? 0 : 1);
+      if (outcome === 'knock-on') {
+        const spilledAt = lift;
+        draw(3);
+        expect(visible).toBe(true);
+        expect(lift).toBeLessThan(spilledAt);
       }
-      prev = snap;
     }
-    expect(checked).toEqual(new Set(['long', 'kickoff', 'grubber']));
+  });
+
+  it('lands the pair and shows a late winner on his feet without a third jump', () => {
+    const at = new KickFixture(true).kick('contest');
+    expect(at(-1).bombContest!.players[0]).toMatchObject({ side: 'home', slot: 0 });
+    expect(at(0).ball.holder).toEqual({ side: 'home', slot: 1 });
+    const take = pictures(at(0), at(-1)).find(p => p.possession);
+    expect(take).toMatchObject({ who: at(0).players.find(p => p.side === 'home' && p.slot === 1)!.who, action: 'catch', lift: 0 });
+    expect(jumpers(at(0), at(-1))).toEqual(Array.from({ length: 2 }, () => expect.objectContaining({ possession: false })));
+  });
+
+  it('keeps the ordinary reception on a lone bomb, punts and kick-offs, and leaves grubbers on the ground', () => {
+    for (const [kind, options] of [['bomb', { lone: true }], ['long', {}], ['long', { kickoff: true }], ['grubber', {}]] as const) {
+      const at = new KickFixture().kick('caught', kind, options);
+      expect(at(-1).bombContest).toBeUndefined();
+      expect(at(0).bombContest).toBeUndefined();
+      expect(pictures(at(0), at(-1)).filter(p => p.possession)).toEqual([expect.objectContaining({ action: kind === 'grubber' ? 'catch' : 'airCatch' })]);
+    }
+  });
+
+  it('stages a contested catch in ordinary match play using the sim snapshots', () => {
+    const fixtures = [
+      { home: 'rival-diggers', away: 'rival-scorpions', seed: 19 },
+      { home: DEFAULT_HOME, away: DEFAULT_AWAY, seed: 26 },
+      { home: DEFAULT_HOME, away: DEFAULT_AWAY, seed: 20 },
+    ];
+    for (const { home, away, seed } of fixtures) {
+      const sim = new LiveSim(labSheet(home), labSheet(away), seed);
+      let prev = sim.snapshot();
+      let before = prev;
+      while (!sim.finished && sim.tick < 3000) {
+        sim.step();
+        const snap = sim.snapshot();
+        if (prev.bombContest?.arrivesTick === snap.tick && snap.events.some(e => e.kind === 'set-start' && e.detail === 'caught')) {
+          const reach = jumpers(prev, before);
+          if (reach.length === 2 && reach.every(p => p.lift! > 0) && jumpers(snap, prev).some(p => p.possession)) return;
+        }
+        before = prev;
+        prev = snap;
+      }
+    }
+    throw new Error('No staged contested catch in the seeded fixtures');
   });
 });

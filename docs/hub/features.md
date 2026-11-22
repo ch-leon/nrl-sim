@@ -110,7 +110,7 @@ What's in the game, with the PR that added each.
 
 - **Connected big moments:** kick follow-through lowers into the continuing run or settled stance; aerial landing loads into the same carry pose; try recovery uses palm and knee support before entering celebration. Knee slides settle once, and the empty goal-kick tee stays put as the kicker turns. Uses the connected handling poses with existing event timing and possession ([PR #705](https://github.com/ch-leon/nrl-sim/pull/705)).
 
-- **Contested bombs:** an eligible chaser and receiver plant and leap while an open-play bomb is still dropping. The player who takes it gathers it from the reach and lands into the carry. On a spill, both land empty-handed as the ball falls and bounces. [Match rules](../specs/BAK-208-match-rules-and-skills.md#44-kicks--first-slice-implemented-long-bomb-grubber-chip-cross-field)
+- **Contested bombs.** The chaser and receiver plant and leap as an open-play bomb comes down. The player who takes it gathers it in the air. On a spill, both land empty-handed and the ball bounces free. [PR #761](https://github.com/ch-leon/nrl-sim/pull/761) · [Match rules](../specs/BAK-208-match-rules-and-skills.md#44-kicks--first-slice-implemented-long-bomb-grubber-chip-cross-field)
 
 - **Connected handling:** the actual receiver prepares his hands during an incoming pass, with his running stride continuing underneath. Pickup finishes in the carry pose, the passer turns through release, and flight sprites meet the painted hand anchors. Nearby defenders can brace as they approach the current carrier. This uses actual flight and possession facts; pre-release calls remain separate gameplay work ([PR #703](https://github.com/ch-leon/nrl-sim/pull/703)).
 
