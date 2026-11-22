@@ -106,6 +106,17 @@ export interface BombContestSnap {
   releasedTick?: number;
 }
 
+/** A player has taken a loose ball in open play. These positions only align the picture. */
+export interface GroundPickupSnap {
+  tick: number;
+  at: { x: number; y: number };
+  player: ContactPlayer;
+  feet: { x: number; y: number };
+}
+
+/** Ticks from the take until the player is back in his ordinary carry. */
+export const GROUND_PICKUP_TICKS = 6;
+
 /** Something that happened on this tick, for the lab log / commentary. */
 export interface SimEvent {
   tick: number;
@@ -138,6 +149,7 @@ export interface Snapshot {
   ball: BallSnap;
   /** Short visual reach and landing around a contested bomb. Possession comes from the ball. */
   bombContest?: BombContestSnap;
+  groundPickup?: GroundPickupSnap;
   /** Short state label for the lab readout (phase, set, tackle count...). */
   label: string;
   /** Events emitted on this tick. */
