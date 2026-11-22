@@ -241,7 +241,7 @@ export class LiveSim extends LivePositioning implements MatchSim {
     }
     const shape = this.currentAttackShape();
     if (shape) {
-      const {secondPass:_,backDoor,...choice}=shape;
+      const {secondPass:_,leadRead:_read,backDoor,...choice}=shape;
       snap.attackShape = {...choice,...(backDoor?{backDoor:{originY:backDoor.originY,caller:{...backDoor.caller},lead:{...backDoor.lead},support:{...backDoor.support}}}:{})};
     }
     const contact = this.visualContact;

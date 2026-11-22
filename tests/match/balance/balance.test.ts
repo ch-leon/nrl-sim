@@ -302,7 +302,9 @@ describe('measuring and reporting', () => {
     // Ordinary structures (#649) add a once-per-contact/PTB roll and real setup movement.
     // The timed back-door runs (#722, engine revision 7) re-pin these; before them:
     // balanced 0-8:138:a3c50b2b797e77b1 / expansive 6-6:141:efe82ee10feba754.
-    { attack: 'balanced' as const, expected: '12-6:141:82d97834a1c52696' },
+    // The lead read (engine revision 8) moves Balanced; Expansive's pin stays.
+    // Before the lead read, Balanced was 12-6:141:82d97834a1c52696.
+    { attack: 'balanced' as const, expected: '6-4:125:3b59450ec3a85edd' },
     { attack: 'expansive' as const, expected: '10-4:150:975213c1842aa58e' },
   ])('pins an even $attack / Slide match (seed 1)', async ({ attack, expected }) => {
     const sim = new LiveSim(sideSheet('H', { rating: 60, tactics: { attack } }), sideSheet('A', { rating: 60 }), 1);
