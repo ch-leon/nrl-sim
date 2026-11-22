@@ -341,6 +341,14 @@ export function initToasts(root: HTMLElement, opts: { advancing?: () => boolean 
         return;
       }
     }
+    // The title (no dock): its slots and their Continue sit at the top, so a message there goes to
+    // the foot, over the build label rather than the slot it is about.
+    if (document.querySelector('.nrl-title')) {
+      setLane('title', '');
+      release();
+      setLift(0);
+      return;
+    }
     // Office's tiles sit where the dock lane is: while the sheet is up the toast goes to the top.
     const office = document.querySelector('.nrl-nav-sheet:not([hidden])');
     const dock = document.querySelector('.nrl-dock')?.getBoundingClientRect();

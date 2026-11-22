@@ -1619,6 +1619,7 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
 }
 .nrl-toast-lane[hidden] { display: none; }
 .nrl-toast-lane[data-lane="dock"] { top: auto; bottom: calc(var(--nrl-nav-h, 0px) + 20px); }
+.nrl-toast-lane[data-lane="title"] { top: auto; bottom: calc(12px + var(--nrl-safe-b, 0px)); }
 /* A list under the toast keeps room at its foot while it shows (toasts.ts listReserve), so its last row scrolls clear. */
 .nrl-toast-reserve::after { content: ''; display: block; flex: 0 0 auto; grid-column: 1 / -1; height: var(--nrl-toast-pad, 0px); }
 /* Beside an open dialog (toasts.ts sets the width, and the left when it is the right-hand room): above it, never over it. */
