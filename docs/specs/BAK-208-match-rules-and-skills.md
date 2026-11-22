@@ -41,6 +41,12 @@ equal stats → baseline 10% step, 12% bust, 7% fend, 12% offload (if a support 
 0.22 → **STEP!** with *DANCING FEET II* under it — the defender grasps air, the carrier is
 through, the crowd lifts.
 
+A successful open-play step shows the carrier plant and push in the direction of
+the jink with the ball tucked. The defender he beats reaches toward the vacated
+lane and regathers on his feet through his recovery lock. A manual jink that fails
+the contest still moves the carrier sideways and leaves out the successful-step
+poses.
+
 ## 2. Base stats (every player)
 
 | Stat | What it drives |

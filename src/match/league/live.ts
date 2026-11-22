@@ -174,6 +174,7 @@ export class LiveSim extends LivePositioning implements MatchSim {
   // ── Snapshot ──────────────────────────────────────────────────────────────
   snapshot(): Snapshot {
     const b = this.ball; const ph = this.phase;
+    const live = ph.kind === 'play' || ph.kind === 'tackle' || ph.kind === 'ruck';
     const scorer = ph.kind === 'try' ? this.players[ph.scorer] : undefined;
     const players: PlayerSnap[] = this.players.map((p) => {
       const pending = this.pendingKick && this.players[this.pendingKick.kicker] === p ? this.pendingKick : null;
@@ -185,6 +186,10 @@ export class LiveSim extends LivePositioning implements MatchSim {
         kind: pending?.kind === 'grubber' || (!pending && b.kind === 'flight' && b.bounces > 0) ? 'grubber'
           : goal || this.goalUp || ph.kind === 'conversion' ? 'drop' : 'punt',
       } : undefined;
+      const step = p.visualStep;
+      const stepping = live && step && this.tick < step.untilTick && this.onField(p) && (step.role === 'carrier'
+        ? ph.kind === 'play' && b.kind === 'held' && this.players[b.by] === p && p.catchTick <= step.startedTick && !this.locked(p)
+        : p.pose === 'tackled' && p.slide?.t0 === step.startedTick && p.lockUntil === step.untilTick);
       return {
         side: p.side,
         slot: p.slot,
@@ -203,6 +208,7 @@ export class LiveSim extends LivePositioning implements MatchSim {
         who: p.key,
         poseUntil: p.poseUntil,
         caughtTick: p.catchTick,
+        ...(stepping ? { step: { ...step } } : {}),
         ...(kick ? { kick } : {}),
         // A shot at goal (#669): from his spot to the end of the conversion, for the routine and the tee.
         ...(ph.kind === 'conversion' && ph.readyAt > 0 && this.players[ph.kicker] === p
