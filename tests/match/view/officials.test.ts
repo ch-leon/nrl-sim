@@ -128,8 +128,8 @@ describe('the referee (#642)', () => {
     expect(picture.map(refereeSignal)).toEqual(Array(duration).fill('six-again'));
     expect(refereeSignal(snaps[call.tick + duration]!)).toBeNull();
     expect(picture.every((s) => s.attacking === call.attacking && s.sixAgainTick === call.tick)).toBe(true);
-    const nextPenalty = snaps.slice(call.tick + duration).find((s) => refereeSignal(s) === 'penalty')!;
-    expect(nextPenalty.sixAgainTick).toBeUndefined();
+    const nextStoppage = snaps.slice(call.tick + duration).find((s) => !['play', 'tackle', 'ruck'].includes(s.phase!.kind))!;
+    expect(nextStoppage.sixAgainTick).toBeUndefined();
 
     const mid = picture[9]!;
     expect(mid.events.some((e) => e.kind === 'six-again')).toBe(false);
