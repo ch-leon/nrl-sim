@@ -1033,7 +1033,10 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
 /* An alert: an 8px dot after the label (the count is in its spoken label). */
 .nrl-nav-dot { width: 8px; height: 8px; border-radius: 4px; background: var(--nrl-alert); flex: 0 0 auto; }
 .nrl-dock-spacer { flex: 1 1 auto; min-width: 4px; }
-.nrl-dock-play { position: relative; display: flex; align-items: stretch; flex: 0 100 auto; height: 50px; }
+/* 10000, not 100: shrink is shared by flex-shrink × width, so at 100 the tabs still took 1% of it, and at
+   667 Larger a long opponent's sub-line ("v Woolloomooloo · home") cost OFFICE ▴ 1px and its label an
+   ellipsis. Now their share is under a pixel until PLAY WEEK is down to its label. */
+.nrl-dock-play { position: relative; display: flex; align-items: stretch; flex: 0 10000 auto; height: 50px; }
 .nrl-dock-play:empty { display: none; }
 .nrl-dock-play-group { display: flex; align-items: stretch; border-radius: 10px; overflow: hidden; background: var(--nrl-accent); color: var(--nrl-on-accent); }
 .nrl-dock-play-group > .nrl-btn {
@@ -1849,24 +1852,38 @@ body:has(.nrl-update-toast) .nrl-hub-chips { max-width: calc(100vw - 32px - 310p
 
 /* ── The weekly summary (#368): after each advance, two columns (the squad; the
    money and the board) so a typical week fits a phone on its side unscrolled. ── */
-.nrl-dialog-region .nrl-summary-modal { width: min(100%, 680px); }
-.nrl-summary h2 { margin: 0 0 8px; padding-right: 44px; min-height: 36px; display: flex; align-items: center; }
-.nrl-summary-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 6px 10px; --nrl-scroll-fade: 24px; }
-.nrl-summary-col { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.nrl-summary-sec { padding: 6px 10px; border-radius: 8px; background: var(--nrl-raised); border-left: 3px solid var(--nrl-bench); font-size: 0.8125rem; }
-.nrl-summary-sec h3 { margin: 0 0 2px; }
-.nrl-summary-sec p { margin: 2px 0 0; line-height: 1.35; color: var(--nrl-text-2); overflow-wrap: anywhere; }
+.nrl-dialog-region .nrl-summary-modal { width: min(100%, 660px); border-radius: 18px; padding: 16px 18px; }
+.nrl-summary-head { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; margin: 0 0 8px; padding-right: 44px; min-height: 36px; }
+.nrl-summary h2 { margin: 0; padding-right: 0; min-height: 0; font-size: 1.5rem; line-height: 1.1; }
+.nrl-modal-has-x > .nrl-modal-scroll > .nrl-summary > .nrl-summary-head > h2:first-child { padding-right: 0; }
+.nrl-summary-head .nrl-coach-text { font-style: italic; }
+.nrl-summary-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 8px; --nrl-scroll-fade: 24px; }
+.nrl-summary-sec { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 10px 12px; border-radius: 14px; background: var(--nrl-panel); box-shadow: inset 0 0 0 1px var(--nrl-line); font-size: 0.8125rem; }
+.nrl-summary-sec h3 { margin: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.12em; }
+.nrl-summary-sec p { margin: 0; line-height: 1.35; color: var(--nrl-text); overflow-wrap: anywhere; }
+.nrl-summary-ln { display: flex; justify-content: space-between; gap: 8px; }
+.nrl-summary-val { font-family: var(--nrl-f-num); font-size: 0.75rem; text-align: right; }
+.nrl-summary-ln > .nrl-summary-val:not(.nrl-summary-up):not(.nrl-summary-down):not(.nrl-summary-out) { color: var(--nrl-text-2); }
 .nrl-summary-none { color: var(--nrl-muted); font-style: italic; }
+.nrl-summary-net { font-family: var(--nrl-f-display); font-size: 1.375rem; line-height: 1.15; letter-spacing: -0.02em; text-transform: uppercase; }
+.nrl-summary-sec > .nrl-summary-net ~ p { color: var(--nrl-text-2); font-size: 0.75rem; }
 .nrl-summary-up { color: var(--nrl-pos); }
 .nrl-summary-down { color: var(--nrl-neg); }
-.nrl-summary-board.nrl-summary-happy { border-left-color: var(--nrl-pos); }
-.nrl-summary-board.nrl-summary-watching { border-left-color: var(--nrl-accent); }
-.nrl-summary-board.nrl-summary-worried { border-left-color: var(--nrl-alert); }
-.nrl-summary .nrl-decisions-actions { margin-top: 10px; }
+.nrl-summary-out { color: #ff6a52; }
+.nrl-summary-board .nrl-pill { min-height: 1.25rem; padding: 0 8px; font-size: 0.6875rem; text-transform: none; letter-spacing: 0; }
+.nrl-summary-board .nrl-summary-patience { color: var(--nrl-muted); font-size: 0.75rem; }
+.nrl-summary .nrl-decisions-actions { margin-top: 10px; justify-content: flex-end; flex-wrap: nowrap; }
+.nrl-summary .nrl-decisions-actions .nrl-btn { flex: 0 1 auto; min-height: 46px; padding: 0 20px; }
 @media (max-height: 500px), (max-width: 480px) {
-  .nrl-summary h2 { margin-bottom: 4px; }
-  .nrl-summary-sec { font-size: 0.75rem; padding: 4px 8px; }
-  .nrl-summary-col { gap: 4px; }
+  .nrl-dialog-region .nrl-summary-modal { padding: 8px 12px; }
+  .nrl-summary-head { margin-bottom: 4px; min-height: 28px; gap: 2px 10px; }
+  .nrl-summary h2 { font-size: 1.125rem; }
+  .nrl-summary-sec { font-size: 0.75rem; padding: 5px 10px; gap: 1px; border-radius: 12px; }
+  .nrl-summary-sec p { line-height: 1.25; }
+  .nrl-summary-net { font-size: 1rem; }
+  .nrl-summary-cols { gap: 5px; }
+  .nrl-summary .nrl-decisions-actions { margin-top: 4px; }
+  .nrl-summary .nrl-decisions-actions .nrl-btn { min-height: 44px; }
 }
 
 /* ── #370: the Undo toast and the first-visit hints ─────────────────────── */

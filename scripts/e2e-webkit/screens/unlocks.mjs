@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { playTrials, BASE, OUT_ROOT, openNav, SHEET_EXIT, closeWeekSummary, log, skipFromPill } from '../common.mjs';
+import { playTrials, BASE, OUT_ROOT, openNav, SHEET_EXIT, closeWeekSummary, log, skipFromPill, setupStep } from '../common.mjs';
 
 /** Facility ladder + both veteran exits, played through round 8 on the required phones. */
 export async function runUnlocks(browser) {
@@ -24,7 +24,7 @@ export async function runUnlocks(browser) {
     try {
       await page.addInitScript(closeWeekSummary);
       await page.goto(BASE);
-      await page.waitForSelector('[data-nrl-start]');
+      await setupStep(page);
       const start = await page.locator('[data-nrl-start]').boundingBox();
       check(start && start.y + start.height <= height, 'Start is visible');
       await shot('setup');
@@ -90,7 +90,7 @@ export async function runUnlocks(browser) {
       const veteranContext = await browser.newContext({ viewport: { width, height }, hasTouch: true });
       const veteran = await veteranContext.newPage();
       await veteran.goto(BASE);
-      await veteran.waitForSelector('[data-nrl-start]');
+      await setupStep(veteran);
       await veteran.locator('[data-nrl-open-all]').check();
       await veteran.locator('[data-nrl-start]').tap();
       await veteran.locator('[data-expansion-work]').tap();

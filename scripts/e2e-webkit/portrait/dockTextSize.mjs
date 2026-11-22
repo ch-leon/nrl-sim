@@ -1,6 +1,6 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, reachProblems, SHEET_EXIT, NO_INSETS } from '../common.mjs';
+import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, reachProblems, SHEET_EXIT, NO_INSETS, setupStep } from '../common.mjs';
 
 // ── The dock at every text size (#344) ──────────────────────────────────────
 /**
@@ -173,13 +173,15 @@ export async function runDockTextSize(browser) {
 
     await step('setup', async (rec) => {
       await page.goto(BASE);
-      await page.waitForSelector('[data-nrl-start]');
-    await page.locator('[data-nrl-open-all]').check();
+      await page.waitForSelector('[data-nrl-town]');
       await page.evaluate((s) => {
         const st = document.documentElement.style;
         for (const k of ['l', 't', 'r', 'b']) st.setProperty(`--nrl-safe-${k}`, `${s[k]}px`);
       }, safe);
+      await setupStep(page, 2);
       await page.fill('[data-nrl-clubname]', 'Dock FC');
+      await setupStep(page, 3);
+      await page.locator('[data-nrl-open-all]').check();
       await press('[data-nrl-start]');
       await press('[data-expansion-work]');
       await page.waitForSelector('.nrl-tutorial-skip');
@@ -265,11 +267,14 @@ export async function runDockTextSize(browser) {
     // The longest PLAY WEEKs there are, beside the widest tab (OFFICE ▴ with its count): a parked match
     // with decisions waiting and a long opponent, and a run of weeks with STOP. The sub-line gives way
     // first, then (RESUME MATCH at Larger, 16px short at 667) tab labels ellipsize, noted: nothing
-    // overlaps or leaves the screen, every tab stays 44px, PLAY WEEK's label stays whole.
+    // overlaps or leaves the screen, every tab stays 44px, PLAY WEEK's label stays whole. A plain
+    // PLAY WEEK with a long opponent cuts no tab: its sub-line gives way, all of it (the next
+    // opponent comes from the random town, so the real dock only sometimes draws a long one).
     // Drawn the way hud.ts draws them; the next state change puts the real one back.
-    for (const [name, label, sub, stop] of [
-      ['larger-resume', 'RESUME MATCH ▸<span class="nrl-hud-alert">3</span>', 'v Wentworthville Wanderers · away', false],
-      ['larger-advancing', 'WEEK 27 OF 27…', '', true],
+    for (const [name, label, sub, stop, cut] of [
+      ['larger-long-opponent', 'PLAY WEEK ▸', 'v Woolloomooloo · home', false, false],
+      ['larger-resume', 'RESUME MATCH ▸<span class="nrl-hud-alert">3</span>', 'v Wentworthville Wanderers · away', false, true],
+      ['larger-advancing', 'WEEK 27 OF 27…', '', true, true],
     ]) {
       await step(name, async (rec) => {
         await home();
@@ -283,7 +288,7 @@ export async function runDockTextSize(browser) {
           document.querySelector('.nrl-hud-stop').hidden = !stop;
         }, [label, sub, stop]);
         await page.waitForTimeout(300);
-        const d = await dockProblems(page, 'office', safe, true);
+        const d = await dockProblems(page, 'office', safe, cut);
         rec.notes.push(d.note);
         return d.problems;
       });

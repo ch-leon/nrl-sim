@@ -1,6 +1,6 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, reachProblems } from '../common.mjs';
+import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, reachProblems, setupStep } from '../common.mjs';
 
 // A phone that opens already upright (390×844, the portrait pair of 844×390).
 // The rotate card covers the title, the menus, the grounds and the match, and
@@ -90,12 +90,14 @@ export async function runPortrait(browser) {
 
   await step('portrait-boot', async (rec) => {
     await page.goto(BASE);
-    await page.waitForSelector('[data-nrl-start]');
+    await page.waitForSelector('[data-nrl-town]');
     // press() is a DOM click, which a disabled Start ("Loading towns…", #613) ignores: wait for the town list.
     await page.waitForFunction(() => !document.querySelector('[data-nrl-start]')?.disabled);
     const title = await state();
     if (!title.coarse) throw new Error('WebKit did not report a coarse pointer, so this is not a phone');
     if (!title.card) throw new Error('the rotate card is not over the title');
+    // The new club's three steps (SuperCOOKED 12–14), by DOM clicks under the card like Start.
+    await setupStep(page, 3, { dom: true });
     await press('[data-nrl-start]');
     await press('[data-expansion-work]');
     await page.waitForSelector('.nrl-dock');

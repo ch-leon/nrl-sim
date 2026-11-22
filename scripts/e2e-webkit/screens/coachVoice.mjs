@@ -2,7 +2,7 @@
 // Included in the screens shard so screenshots are PR CI artifacts, never commits.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { OUT_ROOT, BASE, IPHONE_UA, openNav } from '../common.mjs';
+import { OUT_ROOT, BASE, IPHONE_UA, openNav, setupStep } from '../common.mjs';
 
 export async function runCoachVoice(browser) {
   const out = join(OUT_ROOT, 'webkit', 'coach-voice');
@@ -82,6 +82,7 @@ export async function runCoachVoice(browser) {
     };
     try {
       await page.goto(BASE);
+      await setupStep(page);
       await page.locator('[data-nrl-start]').tap();
       await page.locator('[data-expansion-work]').tap();
       await page.waitForSelector('[data-step="build"]');
