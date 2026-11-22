@@ -6,6 +6,7 @@
 import { toFieldPt } from '../core/field';
 import type { PlayerSnap, Snapshot, Side } from '../core/snapshot';
 import type { PlayerAnim } from '../../art/match/players';
+import { PICKUP_BALL_X } from '../../art/match/moments';
 import { pictureContext, playerPicture, strideFor, tiredLevel, type PlayerPicture } from './playerPicture';
 import { tryScene, type TryScene } from './tryMob';
 import { breakMan, breakScene } from './walkOff';
@@ -81,6 +82,8 @@ const BALL_SNAP_M = 6;
 const MOB_STEP_M = 0.12;
 /** Run-cycle rate is 1 at this ground speed (m/s). */
 const CADENCE_SPEED = 7;
+/** The feet blend back to the collector's normal travel during the rise. */
+const PICKUP_RISE_TICKS = 5;
 
 export class LiveView {
   private readonly s: ViewSurface;
@@ -114,6 +117,16 @@ export class LiveView {
     }
     // The whistle (#675): the walk-off, the huddle before golden point and the kick-off after a break.
     const drawn = prev.tick + (cur.tick - prev.tick) * a;
+    const pickup = cur.groundPickup;
+    const age = pickup ? drawn - pickup.tick : 0;
+    const reaching = !!pickup && age < 0 && cur.tick === pickup.tick && prev.tick === pickup.tick - 1 && !prev.ball.holder && !prev.ball.flight
+      && prev.ball.lift === 0 && prev.ball.x === pickup.at.x && prev.ball.y === pickup.at.y;
+    const world = (pos: { x: number; y: number }) => {
+      const f = toFieldPt(pos);
+      return snap(this.s.fieldToWorld(f.fx, f.fy));
+    };
+    const pickupSpot = pickup && world(pickup.at);
+    let looseOnTurf = false;
     const phaseAge = Math.max(0, drawn - (cur.phase?.since ?? drawn));
     const brk = breakScene(cur, phaseAge + heldTicks, phaseAge);
     if (brk) ctx.walkOff = new Map();
@@ -160,6 +173,29 @@ export class LiveView {
       }
       const f = toFieldPt(ground);
       const w = snap(this.s.fieldToWorld(f.fx, f.fy));
+      if (pickup && pickupSpot && ((reaching && p !== c) || age >= 0) && !jumped && !brk && !mobNow && ctx.motionLive !== false
+        && picture?.possession && (picture.action === 'catch' || picture.action === 'carry')
+        && pickup.player.side === c.side && pickup.player.slot === c.slot && pickup.player.who === c.who
+        && !ctx.contactPlayers?.has(`${c.side}/${c.slot}/${c.who}`)) {
+        picture.action = 'groundPickup';
+        picture.possession = !reaching;
+        picture.frame = reaching ? (age < -.5 ? 0 : 1) : Math.min(5, 2 + Math.floor(age * 3 / PICKUP_RISE_TICKS));
+        looseOnTurf = reaching;
+        if (picture.frame < 5) {
+          delete picture.strideFrame;
+          delete picture.movement;
+          delete picture.tired;
+          // The near hand meets the grounded sprite at its last real position. The feet and
+          // shadow take the same small adjustment while the collector's run continues underneath.
+          const feet = world(pickup.feet);
+          const dx = pickupSpot.x - feet.x, dy = pickupSpot.y - feet.y;
+          picture.left = dx === 0 ? picture.left : dx < 0;
+          picture.facing = dy === 0 && picture.facing !== 'side' ? picture.facing : dy < 0 ? 'back' : 'front';
+          const weight = reaching ? 1 + age : 1 - age / PICKUP_RISE_TICKS;
+          w.x = Math.round(w.x + (dx - (picture.left ? -PICKUP_BALL_X : PICKUP_BALL_X)) * weight);
+          w.y = Math.round(w.y + dy * weight);
+        }
+      }
       if (bm && ctx.walkOff) {
         const ahead = bm.toward && toFieldPt({ x: c.x + bm.dx + bm.toward.x, y: c.y + bm.dy + bm.toward.y });
         ctx.walkOff.set(`${c.side}/${c.slot}`, { ...bm, ...(ahead ? { left: this.s.fieldToWorld(ahead.fx, ahead.fy).x < this.s.fieldToWorld(f.fx, f.fy).x } : {}) });
@@ -227,7 +263,10 @@ export class LiveView {
       this.held.set(s.tick, hh ? (screenFacing(hh, s === cur ? this.before(prev, hh) : hh, this.screenDir).left ? -4 : 4) : 0);
     }
     for (const k of this.held.keys()) if (k < cur.tick - 8 || k > cur.tick + 1) this.held.delete(k);
-    if (cb.holder) {
+    if (looseOnTurf && pickupSpot) {
+      this.s.ball.place(pickupSpot.x, pickupSpot.y, 0, pickupSpot.y + 2);
+      this.s.focus?.carrier(null);
+    } else if (cb.holder) {
       const h = cur.players.find((q) => q.side === cb.holder!.side && q.slot === cb.holder!.slot);
       const hand = h && screenFacing(h, this.before(prev, h), this.screenDir).left ? -4 : 4;
       this.s.ball.place(bw.x + hand, bw.y, lift, bw.y + 1.01 + cb.holder.slot * 0.001, motion);
@@ -276,7 +315,7 @@ export class LiveView {
     if (placed >= CUT_BODIES) this.s.cut?.();
     this.faded = !!brk;
     // Held balls are painted once in the player's hands (or the shared tackle).
-    const embedded = !!cb.holder && !!this.s.players[cb.holder.side][cb.holder.slot]?.paint;
+    const embedded = !looseOnTurf && !!cb.holder && !!this.s.players[cb.holder.side][cb.holder.slot]?.paint;
     this.s.ball.setRendered?.(!embedded);
   }
 

@@ -77,6 +77,7 @@ export abstract class LivePlay extends LiveKicks {
       this.pendingControl[this.attacking] = null;
       const target = nearest;
       const way = intent.kind === 'step-up' ? -1 : 1;
+      h.visualStep = null;
       h.jink = { dy: way * LIVE.stepJinkM, ticks: LIVE.stepJinkTicks };
       if (target && nearD <= LIVE.stepRange) {
         h.steppedOn = this.indexOf(target);
@@ -462,6 +463,9 @@ export abstract class LivePlay extends LiveKicks {
     const sideways = way ?? (c.body.pos.y >= t.body.pos.y ? 1 : -1);
     c.jink = { dy: sideways * LIVE.stepJinkM, ticks: LIVE.stepJinkTicks };
     this.lock(t, 'tackled', 12, add(t.body.pos, { x: this.dir * 0.8, y: -sideways * 0.6 }));
+    const reach = sub(c.body.pos, t.body.pos);
+    c.visualStep = { role: 'carrier', startedTick: this.tick, untilTick: this.tick + Math.max(1, Math.ceil(c.jink.ticks)), lateral: c.jink.dy };
+    t.visualStep = { role: 'defender', startedTick: this.tick, untilTick: t.lockUntil, reachX: reach.x, reachY: reach.y };
     t.cooldownUntil = this.tick + LIVE.beatenCooldown;
     this.burst(c);
   }
