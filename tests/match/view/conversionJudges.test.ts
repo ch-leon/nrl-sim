@@ -41,7 +41,8 @@ describe('touch judges at conversions', () => {
     expect(r.cur.score![scoredSide] - before.score![scoredSide]).toBe(good ? NINES.conversionPoints : 0);
     expect(r.cur.clock?.seconds).toBe(before.clock?.seconds);
     expect(r.cur.phase?.kind).toBe('restart');
-    expect(conversionJudges(r.cur)).toMatchObject({ feet: judges.feet, pose: good ? 'raise' : 'ready' });
+    const atDecision = r.cur;
+    expect(conversionJudges(atDecision)).toMatchObject({ feet: judges.feet, pose: good ? 'raise' : 'waveOut' });
 
     const first = before.ball.flight!.startedTick;
     const from = first - 1;
@@ -52,14 +53,26 @@ describe('touch judges at conversions', () => {
       expect(s.conversion?.decision).toBeUndefined();
       expect(conversionJudges(s)?.pose).toBe('watch');
     }
-    const raised = replay[award + 3 - from]!;
-    expect(conversionJudges(raised)?.pose).toBe(good ? 'up' : 'ready');
-    expect(conversionJudges(replay[last - 1 - from]!)?.pose).toBe(good ? 'up' : 'ready');
+    const signal = replay.slice(award - from, last - from).map((s, age) => {
+      const frame = conversionJudges(s);
+      expect(frame).toEqual(conversionJudges(atDecision, age));
+      return frame?.pose;
+    });
+    const changes = signal.filter((pose, age) => age === 0 || pose !== signal[age - 1]);
+    expect(changes).toEqual(good ? ['raise', 'up'] : [
+      'waveOut', 'waveMidOut', 'waveAcross', 'waveMidIn', 'waveIn',
+      'waveMidIn', 'waveAcross', 'waveMidOut', 'waveOut',
+      'waveMidOut', 'waveAcross', 'waveMidIn', 'waveIn',
+      'waveMidIn', 'waveAcross', 'waveMidOut', 'waveOut', 'ready',
+    ]);
+    expect(signal[3]).toBe(good ? 'up' : 'waveMidOut');
+    expect(signal[CONVERSION_SIGNAL_TICKS - 1]).toBe(good ? 'up' : 'ready');
     expect(conversionJudges(replay[last - from]!)).toBeNull();
     expect(CONVERSION_SIGNAL_TICKS).toBeLessThan(LIVE.restartTicks);
 
-    r.seek(raised.tick);
-    expect(conversionJudges(r.cur)).toEqual(conversionJudges(raised));
+    const duringSignal = replay[award + 7 - from]!;
+    r.seek(duringSignal.tick);
+    expect(conversionJudges(r.cur)).toEqual(conversionJudges(duringSignal));
     r.seek(from);
     expect(conversionJudges(r.cur)).toEqual(conversionJudges(replay[0]!));
     r.seek(0);

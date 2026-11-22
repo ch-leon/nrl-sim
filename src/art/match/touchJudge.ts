@@ -1,41 +1,56 @@
 import { PixelBuffer } from '../pixel';
+import { drawPrototypePlayer, HEIGHT, PAINT_H, prototypeUpperAt, WIDTH, type Appearance, type ArmPose, type Facing } from '../prototype/player';
 import { OUTLINE, type Kit } from './kit';
-import { PAINT_H, WIDTH, stand, type Appearance, type Facing } from '../prototype/player';
-import { tiltedHead } from '../prototype/contact';
-import { add, body, contactPainter, type Point } from '../prototype/tackle';
+import { lookUpFrame } from './lookUp';
 
-export const TOUCH_JUDGE_POSES = ['ready', 'watch', 'raise', 'up'] as const;
+export const TOUCH_JUDGE_POSES = ['ready', 'watch', 'raise', 'up', 'waveOut', 'waveMidOut', 'waveAcross', 'waveMidIn', 'waveIn'] as const;
 export type TouchJudgePose = typeof TOUCH_JUDGE_POSES[number];
 
-const ARMS: Record<TouchJudgePose, { elbow: Point; hand: Point; tip: Point }> = {
-  ready: { elbow: [24, 25], hand: [26, 28], tip: [30, 36] },
-  watch: { elbow: [24, 25], hand: [26, 28], tip: [30, 36] },
-  raise: { elbow: [26, 21], hand: [30, 17], tip: [34, 10] },
-  up: { elbow: [26, 15], hand: [28, 10], tip: [29, 1] },
+type Offset = ArmPose['hand'];
+interface FlagPose extends ArmPose {
+  /** The shaft ends at tip. The cloth runs back along the shaft and hangs below it. */
+  tip: Offset;
+  hoist: Offset;
+  fly: Offset;
+}
+
+const LOW: FlagPose = { elbow: [0, 4], hand: [1, 6], tip: [4, 11], hoist: [-2, -4], fly: [7, -1] };
+const ARMS: Record<TouchJudgePose, FlagPose> = {
+  ready: LOW,
+  watch: LOW,
+  raise: { elbow: [3, 3], hand: [6, -1], tip: [10, -10], hoist: [-3, 6], fly: [7, 2] },
+  up: { elbow: [6, -5], hand: [9, -11], tip: [9, -20], hoist: [0, 7], fly: [8, 1] },
+  waveOut: { elbow: [4, 4], hand: [8, 3], tip: [18, 2], hoist: [-7, 1], fly: [0, 6] },
+  waveMidOut: { elbow: [4, 5], hand: [5, 4], tip: [12, 2], hoist: [-5, 1], fly: [0, 6] },
+  waveAcross: { elbow: [4, 5], hand: [0, 5], tip: [2, 2], hoist: [-4, 0], fly: [1, 6] },
+  waveMidIn: { elbow: [3, 5], hand: [-4, 4], tip: [-10, 2], hoist: [5, 1], fly: [0, 6] },
+  waveIn: { elbow: [2, 5], hand: [-7, 4], tip: [-18, 3], hoist: [7, 1], fly: [0, 6] },
 };
 
-/** A touch judge watching the drop kick, then raising a red and yellow hand flag. */
+/** The standing referee/player registration, with a flag attached to the near hand. */
 export function drawTouchJudge(look: Appearance, kit: Kit, facing: Facing, pose: TouchJudgePose): PixelBuffer {
-  const out = new PixelBuffer(WIDTH, PAINT_H);
-  const brush = contactPainter(out);
-  const p = body([19, 27], [19, 20], [12, 3], [23, 32], [23, 35], [16, 32], [15, 35]);
-  const { elbow, hand, tip } = ARMS[pose];
-  brush.legs(p, look, kit);
-  brush.arm([15, 21], [14, 25], [13, 28], look, true);
-  brush.torso(p, look, kit);
-  out.blit(tiltedHead(look, kit, facing, false, pose === 'watch' ? -20 : 0), p.head[0], p.head[1]);
+  const arm = ARMS[pose];
+  const standing = drawPrototypePlayer(look, kit, 'idle', 0, facing, false, undefined, 0, undefined, arm);
+  const body = pose === 'watch' ? lookUpFrame(standing, look, kit, facing, 'idle', 0, undefined, 0, 1) : standing;
+  const { left, shoulderY } = prototypeUpperAt(look.build, 'idle', 0);
+  const bodyWidth = look.build === 'stocky' ? 11 : look.build === 'athletic' ? 9 : 7;
+  const shoulderX = left + bodyWidth - 2;
+  const frameY = shoulderY + 2 + HEIGHT - PAINT_H - look.stature;
+  const tip = { x: shoulderX + arm.tip[0], y: frameY + arm.tip[1] };
+  const hoist = { x: tip.x + arm.hoist[0], y: tip.y + arm.hoist[1] };
+  const fly = (p: typeof tip) => ({ x: p.x + arm.fly[0], y: p.y + arm.fly[1] });
+  const grip = { x: shoulderX + arm.hand[0], y: frameY + arm.hand[1] };
 
-  // Cloth hangs from the last part of the shaft, with the hand painted over its grip.
-  const raised = pose === 'raise' || pose === 'up';
-  const hem = add(tip, raised ? -1 : -3, raised ? 6 : -5);
-  const tipEdge = add(tip, 7, raised ? 1 : -1);
-  const hemEdge = add(hem, 7, raised ? 2 : 0);
-  const polygon = (points: readonly Point[]) => points.map(([x, y]) => ({ x, y }));
-  out.fillPoly(polygon([tip, tipEdge, hemEdge, hem]), 0xf5cd4c);
-  out.fillPoly(polygon([tip, hem, hemEdge]), 0xe45134);
-  out.line(hand[0] + 1, hand[1], tip[0], tip[1], 0xffebbb);
-  brush.arm([22, 21], elbow, hand, look);
-  out.fillRect(22, 20, 3, 2, kit.jersey);
-  out.outline(OUTLINE);
-  return stand(out, look.stature);
+  const flag = new PixelBuffer(WIDTH, HEIGHT);
+  flag.fillPoly([tip, hoist, fly(hoist), fly(tip)], 0xf5cd4c);
+  flag.fillPoly([tip, hoist, fly(tip)], 0xe45134);
+  flag.line(grip.x, grip.y, tip.x, tip.y, 0xffebbb);
+  flag.outline(OUTLINE);
+  // Keep the palm visible where it closes around the shaft.
+  for (let y = grip.y; y < grip.y + 2; y++) for (let x = grip.x; x < grip.x + 2; x++) {
+    const palm = body.get(x, y);
+    flag.set(x, y, palm.color, palm.alpha / 255);
+  }
+  body.blit(flag);
+  return body;
 }

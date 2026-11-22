@@ -8,6 +8,14 @@ import { GOALS, postsFor } from '../league/goals';
 export const CONVERSION_SIGNAL_TICKS = 32;
 const FLAG_LIFT_TICKS = 3;
 const JUDGE_EXIT_TICKS = 5;
+// Two complete sweeps. Give each end of the gesture a beat, then lower the flag.
+const MISS_WAVE: readonly TouchJudgePose[] = [
+  'waveOut', 'waveOut', 'waveOut',
+  'waveMidOut', 'waveAcross', 'waveMidIn', 'waveIn', 'waveIn',
+  'waveMidIn', 'waveAcross', 'waveMidOut', 'waveOut', 'waveOut',
+  'waveMidOut', 'waveAcross', 'waveMidIn', 'waveIn', 'waveIn',
+  'waveMidIn', 'waveAcross', 'waveMidOut', 'waveOut', 'waveOut',
+];
 
 /** Each judge has an upright to sight along, behind the defenders' waiting line. */
 function touchJudgeSpots(toward: 1 | -1): [Vec, Vec] {
@@ -24,8 +32,9 @@ export function conversionJudges(s: Snapshot, heldTicks = 0): { feet: [Vec, Vec]
   if (age >= CONVERSION_SIGNAL_TICKS) return null;
   const feet = touchJudgeSpots(cue.toward);
   const alpha = Math.min(1, (CONVERSION_SIGNAL_TICKS - age) / JUDGE_EXIT_TICKS);
-  const pose = cue.decision
-    ? cue.decision.good ? (age < FLAG_LIFT_TICKS ? 'raise' : 'up') : 'ready'
-    : s.ball.flight?.via === 'kick' ? 'watch' : 'ready';
+  let pose: TouchJudgePose = s.ball.flight?.via === 'kick' ? 'watch' : 'ready';
+  if (cue.decision) {
+    pose = cue.decision.good ? (age < FLAG_LIFT_TICKS ? 'raise' : 'up') : MISS_WAVE[Math.floor(age)] ?? 'ready';
+  }
   return { feet, lookAt: cue.spot, pose, alpha };
 }
