@@ -1682,12 +1682,13 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
   color: var(--nrl-text);
   border-radius: 12px;
   box-shadow: inset 0 0 0 1px var(--nrl-line), var(--nrl-shadow-chip);
-  padding: 4px 4px 4px 14px;
-  font-family: var(--nrl-f-label);
-  font-weight: 700;
-  font-size: 0.9375rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  /* A toast (01): the info bar on the left, the line in the body face; Reload and Later are its two buttons. */
+  border-left: 4px solid var(--nrl-muted);
+  padding: 4px 4px 4px 12px;
+  font-family: var(--nrl-f-body);
+  font-weight: 500;
+  font-size: 0.8125rem;
+  line-height: 1.3;
   white-space: nowrap;
 }
 .nrl-update-toast .nrl-btn { flex: 0 0 auto; }
@@ -1827,6 +1828,10 @@ body:has(.nrl-update-toast) .nrl-hub-chips { max-width: calc(100vw - 32px - 310p
 .nrl-decisions-note { margin: 0 0 12px; color: var(--nrl-text-2); }
 .nrl-decisions-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .nrl-decisions-actions .nrl-btn { flex: 1 1 12rem; }
+/* The ask is the confirm dialog (01) with a list: Archivo title, then the outline way on and the primary side by side. */
+.nrl-ask h2 { font-size: 1.25rem; }
+.nrl-ask .nrl-decisions-actions { flex-wrap: nowrap; margin-top: 12px; }
+.nrl-ask .nrl-decisions-actions .nrl-btn { flex: 1 1 0; min-width: 0; white-space: normal; }
 .nrl-ask-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .nrl-ask-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; padding: 8px 12px; border-radius: 8px; background: var(--nrl-raised); border-left: 3px solid var(--nrl-bench); font-size: 0.8125rem; }
 .nrl-ask-row.nrl-ask-due { border-left-color: var(--nrl-accent); }
@@ -1992,14 +1997,34 @@ body:has(.nrl-placebar:not([hidden])) .nrl-hub-chips { visibility: hidden; }
   .nrl-kit-portrait { width: 42px; }
 }
 /* ── Guide, under Office (N7, #188, #344) ─────────────────────────────────── */
-/* #206: only the page scrolls; the tabs and the foot (Replay) stay in view. */
+/* SuperCOOKED Phase 6: a screen header (title, topic count, Replay at the right), then the topics as News-style rows
+   beside the page. #206: only the topics and the page scroll; the header stays in view. */
 .nrl-guide { font-size: 0.8125rem; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .nrl-guide-tabs, .nrl-guide-foot { flex: 0 0 auto; }
-.nrl-guide-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
-/* One row: the page tabs (a segmented control that swipes sideways), then Replay. */
-.nrl-guide-top { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; min-width: 0; margin-bottom: 10px; }
-.nrl-guide-top .nrl-guide-tabs { flex: 0 1 auto; min-width: 0; }
-.nrl-guide-tabs > .nrl-btn { padding: 0 12px; font-size: 0.9375rem; }
+/* Replay (and the build label) wrap under the title rather than scroll out of the header at a big text size. */
+.nrl-guide .nrl-screen-head { flex-wrap: wrap; row-gap: 4px; }
+.nrl-guide .nrl-screen-tools { overflow: visible; flex-wrap: wrap; justify-content: flex-end; }
+.nrl-guide-split { flex: 1 1 auto; min-height: 0; display: flex; gap: 12px; }
+.nrl-guide-rail { flex: 0 0 min(34%, 15rem); min-width: 0; overflow-y: auto; overscroll-behavior: contain; }
+.nrl-guide-tabs { display: flex; flex-direction: column; gap: 6px; }
+.nrl-guide-body { flex: 1 1 auto; min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
+.nrl-guide-tabs > .nrl-btn.nrl-guide-tab {
+  display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 1px; width: 100%; min-height: 44px; padding: 6px 12px;
+  box-sizing: border-box; border-radius: 12px; text-align: left; text-transform: none; letter-spacing: normal;
+  background: var(--nrl-panel); box-shadow: inset 0 0 0 1px var(--nrl-line); color: var(--nrl-text);
+}
+.nrl-guide-tabs > .nrl-btn.nrl-guide-tab { position: relative; padding-right: 30px; }
+.nrl-guide-tab::after { content: '▸'; position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--nrl-muted); }
+.nrl-guide-tabs > .nrl-btn.nrl-guide-tab[aria-pressed="true"] { background: var(--nrl-raised); box-shadow: inset 0 0 0 1px var(--nrl-accent); }
+.nrl-guide-tab-name { font-family: var(--nrl-f-label); font-size: 1rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; line-height: 1.15; }
+.nrl-guide-tab-title { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.75rem; font-weight: 400; color: var(--nrl-text-2); }
+.nrl-btn.nrl-guide-back { display: none; align-self: flex-start; margin: 0 0 4px; }
+/* A narrow window (a phone upright, a small desktop pane) shows the topics, or the page once one is picked, with ◂ Topics back. */
+@media (max-width: 560px) {
+  .nrl-guide-rail { flex: 1 1 auto; }
+  .nrl-guide[data-view="page"] .nrl-guide-rail, .nrl-guide[data-view="list"] .nrl-guide-body { display: none; }
+  .nrl-btn.nrl-guide-back { display: inline-flex; align-items: center; justify-content: center; }
+}
 .nrl-guide h2 { margin: 0; }
 .nrl-guide h3 { margin: 12px 0 4px; }
 /* N14 (#263): the screen a page describes, one tap away. */
@@ -2014,6 +2039,6 @@ body:has(.nrl-placebar:not([hidden])) .nrl-hub-chips { visibility: hidden; }
 .nrl-guide-figure { border-radius: 10px; overflow: hidden; background: var(--nrl-panel); padding: 6px; }
 .nrl-guide-foot { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 .nrl-guide-build { font-family: var(--nrl-f-num); font-size: 0.6875rem; color: var(--nrl-muted); white-space: nowrap; }
-/* Up to 900px the build label's room goes to the tabs: all eight fit at 844 (#611). */
+/* Up to 900px the build label's room goes to the header's title and topic count. */
 @media (max-width: 900px) { .nrl-guide-build { display: none; } }
 `;

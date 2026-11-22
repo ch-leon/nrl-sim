@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { rivalColorOptions, rivalSquadRows, withJersey } from '../../src/ui/screens/rivalSquad';
+import { rivalColorOptions, rivalSide, rivalSquadRows, withJersey } from '../../src/ui/screens/rivalSquad';
 import { KIT_COLORS } from '../../src/ui/screens/kit';
 import { colorsContrast } from '../../src/config';
 import { generateRivalSquad } from '../../src/systems/rivals';
@@ -40,5 +40,27 @@ describe('the club editor colours (#398)', () => {
     const [jersey, trim] = withJersey(['#1a1a2e', '#f4d03f'], '#f4d03f');
     expect(jersey).toBe('#f4d03f');
     expect(colorsContrast(jersey, trim)).toBe(true);
+  });
+});
+
+describe('rivalSide (Phase 6: the pitch)', () => {
+  const club = (squad: ReturnType<typeof generateRivalSquad>) => ({ id: 'rival-x', name: 'X', colors: ['#000000', '#ffffff'] as [string, string], strength: 60, squad });
+
+  it('splits the squad into nine starters, a bench of four and the reserves, each man once', () => {
+    const squad = generateRivalSquad({ id: 'rival-x', strength: 60 }, 3);
+    const { starters, bench, reserves } = rivalSide(club(squad));
+    expect(starters).toHaveLength(9);
+    expect(bench).toHaveLength(4);
+    const ids = [...starters.map((p) => p!.id), ...bench.map((p) => p.id), ...reserves.map((p) => p.id)];
+    expect(new Set(ids).size).toBe(squad.length);
+    expect([...ids].sort()).toEqual(squad.map((p) => p.id).sort());
+  });
+
+  it('leaves an injured man off the pitch and in the reserves', () => {
+    const squad = generateRivalSquad({ id: 'rival-x', strength: 60 }, 3);
+    squad[0] = { ...squad[0]!, injuredWeeks: 3 };
+    const { starters, bench, reserves } = rivalSide(club(squad));
+    expect([...starters, ...bench].some((p) => p?.id === squad[0]!.id)).toBe(false);
+    expect(reserves.some((p) => p.id === squad[0]!.id)).toBe(true);
   });
 });

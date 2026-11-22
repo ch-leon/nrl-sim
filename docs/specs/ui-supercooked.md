@@ -306,6 +306,17 @@ Build these from the parts in §4 and the nearest mockup. Keep their content as 
 | Decisions-before-advance, long advance | The confirm dialog |
 | Update prompt, newer-save message | Toast or confirm dialog |
 
+- **Built in Phase 6** (what the code has decides what shows):
+  - The pre-match plan sheet was built in Phase 2 (§5 Match), so Phase 6 left it alone.
+  - Contracts stays a table (the e2e flow and the hold-still logic read it), in the Recruit look: portrait in the kit, name over a muted line, position, stars with the rating, weeks left, cap, then Renew / Release / Sell. A Renew that can't go keeps its label and says why in amber on the row. Weeks left stay in weeks, not "Ends season n".
+  - Rival squad opens on the pitch (the side the match would pick for them, in their kit, read-only, with Bench and Reserves beside it) and keeps the old list one tap away (Pitch / List), with Edit club and the club editor. Rivals have no stored captain or kicker, so no C or K tags.
+  - The expansion intro is the season review's banner with the bank as its big number ("IN THE BANK"), Skip intro and one orange **Carry on ▸**; the coach's lines sit under it as ruled rows. "Let's get to work" stays as the button's tooltip.
+  - Coach calls group the calls by Coach's Office level, each group with an Unlocked / Locked pill and, when locked, "Opens with Coach's Office n"; a group opens together, so the reason is on the group, not on each tile. Playbook plays are tiles with the IQ check as a pill beside the "Needs:" line; only the first Buy the club can afford is orange. The attack coach card and "Other coaches' plays" look as they did.
+  - The Guide is a topic list beside the open page on a wide window (its tab hooks stay); under 560px wide it is one or the other, with ◂ Topics. Replay tutorial moved into its header.
+  - History's Records rows, Retired players, Trophies and the season books use the Finance label/value rows and table; Season P&L and Ledger use the This week rules with JetBrains Mono figures. Row heights are unchanged.
+  - The long-advance question is the confirm dialog (title, one line, Cancel and Play); it is now modal, where before the dock stayed usable behind it. The decisions-before-advance ask keeps its list and ✕, in the confirm dialog's look, with **Answer now** the primary on the right.
+  - The update prompt is a toast-style bar with Reload as its primary. The newer-save message stays the title's own notice on the slot (it is title-screen text, Phase 5's file), not a toast.
+
 ---
 
 ## 7. Open questions

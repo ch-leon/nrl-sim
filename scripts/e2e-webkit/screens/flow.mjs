@@ -214,11 +214,12 @@ export async function runFlow(browser, { w: W, h: H, text }) {
     await page.waitForSelector('[data-advance-confirm]');
     await toast('Geelong Gulls sign 61-rated lock Lachie Brimson.');
     await page.waitForTimeout(400);
-    const q = (await page.locator('[data-advance-confirm] h2').textContent()) ?? '';
+    // The confirm dialog (01): the title is the question, its line the rest. It has no ✕ (a tap on
+    // the dim cancels), so Cancel and Play are what must stay clear of the toast.
+    const q = `${((await page.locator('[data-advance-confirm] h2').textContent()) ?? '').trim()} ${((await page.locator('[data-advance-confirm] .nrl-confirm-line').textContent()) ?? '').trim()}`;
     rec.notes.push(`"${q}"`);
     const out = /^Play \d+ weeks\? It stops for decisions\.$/.test(q) ? [] : [`the confirm reads "${q}"`];
     out.push(...await flowReach(page, ['[data-confirm-advance]', '[data-advance-confirm] .nrl-btn:not([data-confirm-advance])']));
-    out.push(...await flowReach(page, ['.nrl-decisions-modal .nrl-screen-x'], false));
     await shot('h3-confirm-at-check');
     await tap('[data-advance-confirm] .nrl-btn:not([data-confirm-advance])');
     await page.waitForTimeout(400);

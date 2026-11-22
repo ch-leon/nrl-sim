@@ -85,8 +85,8 @@ export async function runSize(browser, W, H) {
     await page.waitForSelector('[data-guide]');
     return reachProblems(page, ...GUIDE);
   });
-  // #611: the Guide reopens on the page it was left on, and the eight tabs can outrun their
-  // track (they do at 956 beside the build label): that page's tab must be whole in the track.
+  // #611: the Guide reopens on the page it was left on, and the eight topics can outrun their
+  // list on a short screen: that page's row must be whole in the list.
   await step('guide-reopens-on-its-tab', async () => {
     await tap('[data-guide-tab="nines"]');
     await tap('.nrl-nav [data-nav-home]');
@@ -95,12 +95,12 @@ export async function runSize(browser, W, H) {
     await page.waitForSelector('[data-guide-page="nines"]');
     await page.waitForTimeout(300);
     const out = await page.evaluate(() => {
-      const track = document.querySelector('.nrl-guide-tabs').getBoundingClientRect();
+      const track = document.querySelector('.nrl-guide-rail').getBoundingClientRect();
       const on = document.querySelector('.nrl-guide-tab[aria-pressed="true"]').getBoundingClientRect();
-      return on.left >= track.left - 1 && on.right <= track.right + 1 ? []
-        : [`the open page's tab is cut by its track (${Math.round(on.left)}–${Math.round(on.right)} in ${Math.round(track.left)}–${Math.round(track.right)})`];
+      return on.top >= track.top - 1 && on.bottom <= track.bottom + 1 ? []
+        : [`the open page's row is cut by its list (${Math.round(on.top)}–${Math.round(on.bottom)} in ${Math.round(track.top)}–${Math.round(track.bottom)})`];
     });
-    // Back to the first page for the steps below; its tab glides back into the track.
+    // Back to the first page for the steps below.
     await tap('[data-guide-tab="week"]');
     await page.waitForTimeout(700);
     return out;
@@ -108,7 +108,7 @@ export async function runSize(browser, W, H) {
   await step('guide-boosted', async () => {
     await boostFonts(page, '.nrl-guide-modal', BOOST);
     const out = await reachProblems(page, ...GUIDE);
-    if (!(await scrolls(page, '.nrl-guide-body'))) out.push('the Guide page does not scroll between its tabs and foot');
+    if (!(await scrolls(page, '.nrl-guide-body'))) out.push('the Guide page does not scroll under its header');
     return out;
   });
   await step('replay-boosted', async () => {

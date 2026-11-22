@@ -7,7 +7,7 @@
 // touching this file. No Phaser.
 
 import { buildLabel } from '../buildInfo';
-import { button, closeScreen, el, openModal, revealSeg, watchSeg } from '../dom';
+import { button, closeScreen, el, openModal, screenHead } from '../dom';
 import { startTutorial } from '../tutorial';
 import { reloadForUpdate, updateReady } from '../../fx/pwa';
 import { CLUB_PAGES, guidePageForCareer, type GuideFigure, type GuidePage, type GuideScreen, type GuideSection } from './pages';
@@ -83,30 +83,40 @@ export function renderGuidePage(page: GuidePage): HTMLElement {
 
 /** Open the Guide on `pageId` (else where it was last, else the first page). */
 export function openGuideScreen(pageId?: string): HTMLElement {
-  const content = el('div', { class: 'nrl-guide', attrs: { 'data-guide': '' } });
-  const tabs = el('div', { class: 'nrl-seg nrl-guide-tabs', attrs: { role: 'tablist' } });
+  // data-view says which half a narrow window shows (the topics or the page); a wide one shows both side by side.
+  const picked = pageId ?? lastPageId;
+  const content = el('div', { class: 'nrl-guide', attrs: { 'data-guide': '', 'data-view': picked ? 'page' : 'list' } });
+  const tabs = el('div', { class: 'nrl-guide-tabs', attrs: { role: 'tablist', 'aria-label': 'Topics' } });
   const body = el('div', { class: 'nrl-guide-body' });
+  const back = button('◂ Topics', () => content.setAttribute('data-view', 'list'), { class: 'nrl-back nrl-guide-back' });
 
   const show = (id: string): void => {
     const page = guidePage(id);
     lastPageId = page.id;
-    body.replaceChildren(renderGuidePage(page));
-    for (const b of tabs.querySelectorAll<HTMLButtonElement>('.nrl-btn')) {
-      b.setAttribute('aria-pressed', String(b.getAttribute('data-guide-tab') === page.id));
+    content.setAttribute('data-view', 'page');
+    body.replaceChildren(back, renderGuidePage(page));
+    for (const b of tabs.querySelectorAll<HTMLButtonElement>('.nrl-guide-tab')) {
+      const on = b.getAttribute('data-guide-tab') === page.id;
+      b.setAttribute('aria-pressed', String(on));
+      b.setAttribute('aria-selected', String(on));
     }
-    // #611: the eight tabs outrun a 667px phone (and any phone at Larger text); the picked one comes into the track.
-    revealSeg(tabs);
     body.scrollTop = 0;
+    revealTab();
   };
+  // The open topic's row comes into the list's view (a long list on a short screen; the sheet is on the page a frame later).
+  const revealTab = (): void => {
+    tabs.querySelector<HTMLElement>('.nrl-guide-tab[aria-pressed="true"]')?.scrollIntoView?.({ block: 'nearest' });
+  };
+  // News-style rows: a topic's name and the screen it is about, a ▸ at the right.
   for (const p of GUIDE_PAGES) {
-    const b = button(p.short, () => show(p.id), { class: 'nrl-guide-tab' });
+    const b = button('', () => show(p.id), { class: 'nrl-guide-tab' });
+    b.append(el('span', { class: 'nrl-guide-tab-name', text: p.short }));
+    if (p.title.toLowerCase() !== p.short.toLowerCase()) b.append(el('span', { class: 'nrl-guide-tab-title', text: p.title }));
     b.setAttribute('aria-pressed', 'false');
     b.setAttribute('data-guide-tab', p.id);
     b.setAttribute('role', 'tab');
     tabs.append(b);
   }
-  // The page it reopens on is brought into the track once the sheet is on the page (show() below runs before that).
-  watchSeg(tabs);
 
   const foot = el('div', { class: 'nrl-guide-foot' });
   foot.append(el('span', { class: 'nrl-guide-build', text: `Build ${buildLabel()}`, attrs: { 'data-nrl-build': '' } }));
@@ -120,7 +130,22 @@ export function openGuideScreen(pageId?: string): HTMLElement {
     }, { class: 'nrl-guide-replay' }),
   );
 
-  content.append(el('div', { class: 'nrl-guide-top' }, tabs, foot), body);
-  show(pageId ?? lastPageId ?? GUIDE_PAGES[0]!.id);
-  return openModal(content, { class: 'nrl-guide-modal', screen: true, key: 'help' });
+  const rail = el('div', { class: 'nrl-guide-rail' }, tabs);
+  const sub = el('span', { class: 'nrl-screen-sub', text: `${GUIDE_PAGES.length} topics` });
+  content.append(
+    screenHead('Guide', { sub, controls: [foot] }),
+    el('div', { class: 'nrl-guide-split' }, rail, body));
+  // A wide window always has a page open beside the topics; a narrow one opens on the topics until one is picked.
+  show(picked ?? GUIDE_PAGES[0]!.id);
+  if (!picked) content.setAttribute('data-view', 'list');
+  const sheet = openModal(content, { class: 'nrl-guide-modal', screen: true, key: 'help' });
+  // The sheet may be mounted, and sized, a moment later (the Guide loads lazily): keep the open row in view as the list
+  // settles, until the first touch on it.
+  if (typeof ResizeObserver !== 'undefined') {
+    const watch = new ResizeObserver(() => { if (rail.clientHeight > 0) revealTab(); });
+    watch.observe(rail);
+    rail.addEventListener('pointerdown', () => watch.disconnect(), { once: true });
+    tabs.addEventListener('click', () => watch.disconnect(), { once: true });
+  }
+  return sheet;
 }

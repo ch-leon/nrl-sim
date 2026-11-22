@@ -45,6 +45,8 @@ describe('temporary stars on existing screens (#537)', () => {
     const club = getState().league.clubs.find(c => c.id !== getState().clubId)!;
     openRivalSquad(club);
     const root = slot.modal as StubNode;
+    // SuperCOOKED Phase 6: the squad opens on the pitch (stars only); the list is the table with the numbers.
+    root.querySelector('[data-rival-view="list"]')!.click();
     for (const p of club.squad!) expect(root.textContent).toContain(ratingText(overallRating(p)));
   });
   it('renders his rating as five stars, no number (SuperCOOKED §3.5), and his four stats on the player screen', () => {
