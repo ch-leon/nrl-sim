@@ -380,3 +380,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261120-204343-wing-bombs-held-out-rush | wing bombs held-out rush | 93589210 | HEAD | [report](runs/20261120-204343-wing-bombs-held-out-rush/report.md) |
 | 20261121-215937-ordinary-five-eighth-kicks-on-v-off-standard | ordinary five-eighth kicks on v off standard | 79417a38 | HEAD | [report](runs/20261121-215937-ordinary-five-eighth-kicks-on-v-off-standard/report.md) |
 | 20261121-220711-ordinary-five-eighth-kicks-held-out-rush-confirmation | ordinary five-eighth kicks held-out rush confirmation | 79417a38 | HEAD | [report](runs/20261121-220711-ordinary-five-eighth-kicks-held-out-rush-confirmation/report.md) |
+| 20261122-044303-standard | standard | 7809de1 | main | [report](runs/20261122-044303-standard/report.md) |
