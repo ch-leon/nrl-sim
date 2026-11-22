@@ -1907,7 +1907,8 @@ All three exact participants must pass the existing reach/availability gates;
 no packet is assembled by teleporting a player. The half/lead/fullback hold a
 lateral origin captured at choice time. Ordinary carrier, actual receiver,
 retreat and explicit coach/script priorities win. The packet landed at engine
-revision 7. The lead read below moves live-match recovery to engine revision 8.
+revision 7. The lead read below landed at engine revision 8. The centre shoulder
+read further down moves live-match recovery to engine revision 9.
 
 | Knob | Default | Meaning |
 |---|---:|---|
@@ -1943,3 +1944,26 @@ Recovery engine revision 8 includes the read.
 | `shapes.leadDecoy.reachM` | 8 m | Maximum lead-to-defender distance to begin or maintain the read. |
 | `shapes.leadDecoy.shadeM` | 2 m | Maximum lateral target offset toward the lead per update; the defender holds his current depth. |
 | `shapes.leadDecoy.readTicks` | 8 ticks | Maximum duration of the read before normal line targeting resumes. |
+
+## Centre carries out wide (#649)
+
+Defaults for the catch-time read in `src/match/league/live/centreCarry.ts`
+are in `src/match/league/live/knobs.ts`. The read uses the closest eligible
+defender by distance within the forward and lateral window. The projection
+divides the forward gap by closing speed (floored at 1 m/s) and caps the
+resulting time. Each defender in reach of the run projects using his own
+closing time. This changes the run target and uses no extra random draw.
+`live.centreShoulderTicks:0` keeps the previous carry. Recovery engine
+revision 9 includes the read. Ported from [draft PR #755](https://github.com/ch-leon/nrl-sim/pull/755).
+
+| Knob | Default | Meaning |
+|---|---:|---|
+| `live.centreShoulderTicks` | 18 ticks (0.9 s) | Maximum time from catch to use the target. Zero disables the read. |
+| `live.centreEdgeM` / `live.centreTouchM` | 22 / 3 m | Catch must be 3–22 m from the nearer touchline. The target also keeps the 3 m margin. |
+| `live.centreReadNearM` / `live.centreReadM` | 2.6 / 12 m | Minimum and maximum forward gap to the defender at the catch. |
+| `live.centreReadWidthM` | 6 m | Maximum lateral gap to the defender at the catch. |
+| `live.centreReadS` | 0.65 s | Maximum time to project a defender's movement. |
+| `live.centreSlideMps` | 1.5 m/s | Minimum outward defender speed for the inside cut. |
+| `live.centreOffsetM` | 0.6 m | Inside cut needs the defender projected at least this far outside. Outside run needs him at least this far inside both now and at the projected meeting point. |
+| `live.centreClearanceM` | 1.7 m | Minimum lateral room at each projected defender along the run, including defenders up to this distance beyond the target. |
+| `live.centreDriftM` | 3.2 m | Infield shift on the inside cut. The outside run adds only the width needed to clear the projected defender by the clearance plus half a body radius. |

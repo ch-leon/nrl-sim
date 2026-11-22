@@ -65,6 +65,18 @@ export const LIVE = {
   passPoseTicks: 5,
   /** Ordinary DH commits this many ticks before his existing release. 0: legacy release-time decision. */
   dhDecisionLeadTicks: 4,
+  /** After an edge catch, keep the centre's shoulder read for at most this long. 0: off. */
+  centreShoulderTicks: 18,
+  centreEdgeM: 22,
+  centreTouchM: 3,
+  centreReadNearM: 2.6,
+  centreReadM: 12,
+  centreReadWidthM: 6,
+  centreReadS: 0.65,
+  centreSlideMps: 1.5,
+  centreOffsetM: 0.6,
+  centreClearanceM: 1.7,
+  centreDriftM: 3.2,
 
   // Distances (metres)
   /** Who sprints (§8.2): the carrier with no defender this far ahead and this close to his lane; a defender closing the last stretch; support within reach of a break. */

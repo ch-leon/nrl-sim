@@ -49,9 +49,11 @@ a new roll.
 
 `shapes.backDoor.on:0` restores #715's three-shape match and RNG stream exactly.
 The back-door packet landed at engine revision 7. The nearby defender's lead read
-moves live-match recovery to engine revision 8; `shapes.leadDecoy.on:0` keeps the
-revision 7 line. BAK-208 and the tuning reference list the rules and values. The
-PR records the balance comparison and the #322 edge-race check.
+landed at engine revision 8; `shapes.leadDecoy.on:0` keeps the revision 7 line.
+A centre catching near touch can then choose a defender's open shoulder, which
+moves live-match recovery to engine revision 9; `live.centreShoulderTicks:0`
+keeps the previous carry. BAK-208 and the tuning reference list the rules and
+values. The PR records the balance comparison and the #322 edge-race check.
 
 Status: stages 1–4 presentation and the first stage-5 pass are implemented in
 five linked PRs. Leon reviewed the clip and approved merging on 17 November

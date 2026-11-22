@@ -101,8 +101,10 @@ describe('held up: in the sim', () => {
   it('off (heldUp.on 0) plays exactly as before it existed: same events, points and rolls (pinned from main at 5b7d08c3)', () => {
     // Re-pinned against main at 5b7d08c3 (the last-tackle call, #650, on), which this branch carries; before #650 the
     // pins were a65edf9's, and with the last-tackle call off too the match is still a65edf9's (below).
-    // Early DH commitment (#672) and attacking structures (#649) are off for the historical event/roll fingerprints.
-    withTuning({ 'heldUp.on': 0, 'live.dhDecisionLeadTicks': 0, 'shapes.on': 0 }, () => {
+    // Early DH commitment (#672), attacking structures (#649) and the centre shoulder
+    // read are off for the historical event/roll fingerprints.
+    const historical = { 'heldUp.on': 0, 'live.dhDecisionLeadTicks': 0, 'shapes.on': 0, 'live.centreShoulderTicks': 0 };
+    withTuning(historical, () => {
       expect(play(31)).toEqual({ events: 122, home: 4, away: 10, draws: 813, heldUp: 0 });
       expect(play(13)).toEqual({ events: 147, home: 10, away: 10, draws: 725, heldUp: 0 });
       // Its other knobs do nothing while it is off.
@@ -110,7 +112,7 @@ describe('held up: in the sim', () => {
         expect(play(13)).toEqual({ events: 147, home: 10, away: 10, draws: 725, heldUp: 0 });
       });
     });
-    withTuning({ 'heldUp.on': 0, 'lastTackle.on': 0, 'live.dhDecisionLeadTicks': 0, 'shapes.on': 0 }, () => {
+    withTuning({ ...historical, 'lastTackle.on': 0 }, () => {
       expect(play(31)).toEqual({ events: 122, home: 0, away: 12, draws: 752, heldUp: 0 });
       expect(play(13)).toEqual({ events: 148, home: 19, away: 18, draws: 772, heldUp: 0 });
     });
