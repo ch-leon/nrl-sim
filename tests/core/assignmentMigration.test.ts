@@ -47,14 +47,23 @@ const squadIdentity = (save: Save) => save.squad.map(p => ({
   contractWeeks: p.contractWeeks, deal: p.deal, joinedSeason: p.joinedSeason,
 }));
 
+/** A drawn exhibition names no winner. A league or a cup without one has not been decided. */
+function exhibitionDraw(instance: Record<string, unknown>, fixtures: Record<string, unknown>[]): boolean {
+  const format = (instance.definition as { format?: { kind?: string } } | undefined)?.format?.kind;
+  const result = fixtures[0]?.result as { decider?: string; homeScore?: number; awayScore?: number } | undefined;
+  return format === 'exhibition' && result?.decider === 'draw' && result.homeScore === result.awayScore;
+}
+
 /**
  * Every competition, and every fixture's teams, round and played/scheduled status, without
- * its score. A finished competition's winner is a result too: it must still have one, and
- * one of its own entrants.
+ * its score. A winner, when the result names one, is one of that competition's entrants.
+ * Only an exhibition may finish drawn, and only with equal scores.
  */
 const fixtureCalendar = (save: Save) => save.competitions.instances.map(({ fixtures, winnerId, ...instance }) => ({
   ...instance,
-  decided: winnerId !== undefined && (instance.entrantIds as unknown[]).includes(winnerId),
+  decided: winnerId !== undefined
+    ? (instance.entrantIds as unknown[]).includes(winnerId)
+    : exhibitionDraw(instance, fixtures),
   fixtures: fixtures.map(f => ({ id: f.id, round: f.round, homeId: f.homeId, awayId: f.awayId, status: f.status })),
 }));
 
@@ -100,6 +109,7 @@ it.each(['au', 'uk'] as const)(
     advanceWeekAsTapped();
     const replayed = { ...getState(), version: 33 } as unknown as Save;
     // Migration, Skills Camp, the cup offer, money and the calendar: exact on any engine.
+    // The five-eighth option draws the captured player trial. That exhibition draw is a result.
     expect(withoutMatchResults(replayed)).toEqual(withoutMatchResults(w5));
     expect(squadIdentity(replayed)).toEqual(squadIdentity(w5));
     expect(fixtureCalendar(replayed)).toEqual(fixtureCalendar(w5));
