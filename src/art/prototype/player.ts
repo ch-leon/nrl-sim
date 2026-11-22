@@ -171,7 +171,7 @@ function interceptArm(frame: number, left: number, shX: number, shY: number) {
   const dir = frame < 3 ? 1 : -1;
   const beat = frame % 3;
   const shoulder = dir > 0 || beat === 2 ? shX : left + 1;
-  const x = Math.min(WIDTH - 6, shoulder + (dir > 0 ? [8, 5, 4] : [-8, 0, 0])[beat]!);
+  const x = Math.min(WIDTH - 6, shoulder + (dir > 0 ? [8, 5, 4] : [-8, -4, -3])[beat]!);
   const y = shY + [-2, 0, 3][beat]!;
   const elbow = shoulder + dir * [4, 2, 1][beat]!;
   const elbowY = shY + [0, 2, 4][beat]!;
