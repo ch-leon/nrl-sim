@@ -382,3 +382,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261121-220711-ordinary-five-eighth-kicks-held-out-rush-confirmation | ordinary five-eighth kicks held-out rush confirmation | 79417a38 | HEAD | [report](runs/20261121-220711-ordinary-five-eighth-kicks-held-out-rush-confirmation/report.md) |
 | 20261122-044303-standard | standard | 7809de1 | main | [report](runs/20261122-044303-standard/report.md) |
 | 20261122-130719-standard | standard | a38a6bb | main | [report](runs/20261122-130719-standard/report.md) |
+| 20261122-135847-standard | standard | 671359b | main | [report](runs/20261122-135847-standard/report.md) |
