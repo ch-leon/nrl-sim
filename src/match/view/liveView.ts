@@ -52,7 +52,10 @@ export interface ViewSurface {
   /** Bodies were put somewhere new in one tick (a half's restart): the camera goes with them instead of panning. */
   cut?(): void;
   focus?: { carrier(t: { side: Side; x: number; y: number } | null): void };
-  contact?: { paint(state: ContactAnimation | null, layout: ContactLayout | null, facing: 'front' | 'back'): void };
+  contact?: {
+    paint(state: ContactAnimation | null, layout: ContactLayout | null, facing: 'front' | 'back'): void;
+    offloadAnchor?(state: ContactAnimation, layout: ContactLayout): { x: number; y: number } | undefined;
+  };
   /** The referee, benches and sin bin (#642): where a binned man sits, and drawn from the same two ticks. */
   officials?: { spot(p: PlayerSnap, s: Snapshot): { x: number; y: number } | null; draw(prev: Snapshot, cur: Snapshot, alpha: number): void };
 }
@@ -172,6 +175,7 @@ export class LiveView {
     }
     let layout: ContactLayout | null = null;
     let contactFacing: 'front' | 'back' = 'front';
+    let offloadFrom: PlayerSnap | undefined;
     if (this.s.contact) {
       // A retained tackle picture belongs to live play. Whistle scenes move
       // the players independently, so clear the shared pile before laying
@@ -181,7 +185,16 @@ export class LiveView {
         const carrier = cur.players.find(p => p.side === this.contactState!.contact.carrier.side && p.slot === this.contactState!.contact.carrier.slot)!;
         const facing = screenFacing(carrier, this.before(prev, carrier), this.screenDir);
         contactFacing = facing.facing;
-        layout = contactLayout(this.contactState, points, facing.left);
+        const facts = this.contactState.contact;
+        let throwAt: { x: number; y: number; gather: number } | undefined;
+        if (facts.offload) {
+          const from = toFieldPt(carrier), to = toFieldPt(facts.offload.to);
+          const p0 = this.s.fieldToWorld(from.fx, from.fy), p1 = this.s.fieldToWorld(to.fx, to.fy);
+          if (prev.tick + 1 === cur.tick && cur.tick === facts.startedTick
+            && prev.ball.holder?.side === carrier.side && prev.ball.holder.slot === carrier.slot) offloadFrom = flightPlayer(prev, facts.carrier);
+          throwAt = { x: p1.x - p0.x, y: p1.y - p0.y, gather: offloadFrom ? a : 1 };
+        }
+        layout = contactLayout(this.contactState, points, facing.left, throwAt);
         if (layout) for (const p of layout.feet) {
           const actor = this.s.players[p.player.side][p.player.slot];
           actor?.place(p.x, p.y, p.y + 1); actor?.setSpriteVisible?.(false);
@@ -221,9 +234,16 @@ export class LiveView {
       const drawn = layout?.feet.find(p => p.player.side === cb.holder!.side && p.player.slot === cb.holder!.slot);
       this.s.focus?.carrier(brk ? null : { side: cb.holder.side, x: drawn?.x ?? bw.x, y: drawn?.y ?? bw.y });
     } else {
-      const offset = passSpriteOffset(cur, motion.t, (ref, endpoint, flight) => {
+      const contact = this.contactState;
+      const offload = contact?.kind === 'offload' && layout ? this.s.contact?.offloadAnchor?.(contact, layout) : undefined;
+      const flightTick = offload ? (cur.tick - prev.tick <= 1 ? drawn : cur.tick) : motion.t;
+      const offset = passSpriteOffset(cur, flightTick, (ref, endpoint, flight) => {
         const player = flightPlayer(cur, ref)!;
         const actor = this.s.players[ref.side]?.[ref.slot];
+        if (endpoint === 'release' && offload) {
+          const carried = offloadFrom && actor?.ballAnchor?.(playerPicture(offloadFrom, offloadFrom, prev.tick, prev.ball.holder, this.screenDir));
+          return carried ? { x: carried.x + (offload.x - carried.x) * a, y: carried.y + (offload.y - carried.y) * a } : offload;
+        }
         if (!actor?.ballAnchor) return undefined;
         if (endpoint === 'release') {
           const heading = flight.source!;
@@ -240,7 +260,12 @@ export class LiveView {
         const target = toFieldPt(flight.to), aimed = this.s.fieldToWorld(target.fx, target.fy);
         return { x: anchor.x + actual.x - aimed.x, y: anchor.y + actual.y - aimed.y };
       }, LIFT_PX_PER_M);
-      if (offset) this.s.ball.place(bw.x, bw.y, lift, bw.y + 2, { ...motion, offsetX: offset.x, offsetY: offset.y });
+      if (offset) {
+        // The release is in front of the shared bodies even when the defender's feet sort lower.
+        const depth = offload && flightTick < contact!.contact.startedTick + 2
+          ? Math.max(bw.y + 2, ...layout!.feet.map(p => p.y + 1.03)) : bw.y + 2;
+        this.s.ball.place(bw.x, bw.y, lift, depth, { ...motion, offsetX: offset.x, offsetY: offset.y });
+      }
       else {
         const hand = this.handAt(prev.tick) * (1 - a) + this.handAt(cur.tick) * a;
         this.s.ball.place(bw.x + hand, bw.y, lift, bw.y + 2, motion);
