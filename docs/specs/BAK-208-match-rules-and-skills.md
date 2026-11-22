@@ -402,7 +402,28 @@ This is a bounded movement response to the real run. It does not force a pass,
 change receiver selection, or add a pass, catch, interception or carrier-line
 contest bonus. Ordinary pass and catch checks continue. The read is engine state,
 not snapshot presentation. `shapes.leadDecoy.on:0` leaves the revision 7 line
-targets and RNG stream. Live-match recovery uses engine revision 8.
+targets and RNG stream. The lead read landed at engine revision 8. The centre
+shoulder read below moves live-match recovery to engine revision 9.
+
+### Centre carries out wide (#649)
+
+On an ordinary completed pass in open play, a centre near touch reads the
+nearest eligible defender ahead. Tacklers still recovering, held ruck
+markers and defenders still retreating are out of the read. If the defender
+is sliding toward touch and will be outside the centre's line, the centre
+angles back infield off his inside shoulder. If the defender is caught
+infield and is projected to stay there, the centre straightens past his
+outside shoulder, drifting wider only as needed for clearance. The read
+checks the projected run against other eligible defenders and leaves room
+inside touch. A square defender or a covered lane sends the centre back to
+the usual gap-seeking carry.
+
+The read uses the catch position and defender movement once. It applies
+briefly to a free carry. Manual and scripted play, kicks, and tackle or
+step responses take priority. The normal pass choice, sprint rules and
+contact contests still apply. `live.centreShoulderTicks:0` leaves the
+previous carry target and adds no draw. See tuning's **Centre carries out
+wide** section. Ported from [draft PR #755](https://github.com/ch-leon/nrl-sim/pull/755).
 
 ### 5.2 Defence presets
 
