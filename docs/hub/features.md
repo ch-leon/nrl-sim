@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- **Loose-ball pickups.** The player who gets to a loose ball in open play drops his hips, scoops it from the turf and tucks it into his running or standing carry. Ported from [draft PR #764](https://github.com/ch-leon/nrl-sim/pull/764). [Match rules](../specs/BAK-208-match-rules-and-skills.md#44-kicks--first-slice-implemented-long-bomb-grubber-chip-cross-field)
+
 - **Contested bombs.** The chaser and receiver plant and leap as an open-play bomb comes down. The player who takes it gathers it in the air. On a spill, both land empty-handed and the ball bounces free. Ported from [draft PR #761](https://github.com/ch-leon/nrl-sim/pull/761). [Match rules](../specs/BAK-208-match-rules-and-skills.md#44-kicks--first-slice-implemented-long-bomb-grubber-chip-cross-field)
 
 - **SuperCOOKED look, Phase 6 (screens with no mockup):** Contracts in the Recruit row look (a Renew that can't go says why on the row); the rival squad opens on the pitch in their kit, read-only, with the list a tap away; the expansion intro in the season review's layout with one Carry on; Coach calls and the Playbook as tile grids (calls grouped by Coach's Office level, locked groups saying what opens them; each play's IQ check as a pill); the Guide as a topic list beside the page; History's records and season books and Finance's Season P&L and Ledger as label/value rows and mono tables; the long-advance question and the update bar in the confirm and toast looks. Nothing was taken out ([docs/specs/ui-supercooked.md](../specs/ui-supercooked.md)).
