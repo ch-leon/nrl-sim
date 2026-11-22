@@ -85,7 +85,11 @@ describe('penalties and six-again in the live sim', () => {
     restore = applyTuning({ 'penalty.offside.slide': 0.2, 'penalty.shotHalfEndS': 9999, 'penalty.shotMin': 0 });
     let good = 0;
     for (const seed of [1, 2]) {
-      for (const { e } of play(seed)) if (e.kind === 'penalty-goal' && e.detail === 'good') good++;
+      for (const { e, snap } of play(seed)) {
+        if (e.kind !== 'penalty-goal') continue;
+        expect(snap.conversion).toBeUndefined();
+        if (e.detail === 'good') good++;
+      }
     }
     expect(good).toBeGreaterThan(0);
     expect(PENALTY.goalPoints).toBe(2);

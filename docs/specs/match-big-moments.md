@@ -132,6 +132,17 @@ the gap, the routine ends exactly on the strike for any gap; over 40 seeds (327 
 the gap was always 30 ticks, so every beat holds for at least three ticks.
 Nines takes its goals as drop kicks; the tee is the picture asked for in #669, not a rule.
 
+### Touch judges at conversions
+
+Two touch judges stand behind the uprights at the end the try-scoring side attacks.
+They use the same standing stance as the referee. They look up as the ball flies
+with their flags at their sides. On the result tick they start lifting their flags
+vertically on a make, or start two side-to-side sweeps at the waist on a miss before
+lowering their flags. The snapshot carries the decision briefly into the existing
+dead-ball interval so the judges can be read before the kick-off. The automatic
+camera includes both judges and respects manual zoom and replay framing. The score,
+clock and restart keep their existing timing.
+
 ## The whistle: walk-offs and the golden-point huddle (#675)
 
 `Snapshot.phase` reports the phase of play, the tick it began (`since`, kept by

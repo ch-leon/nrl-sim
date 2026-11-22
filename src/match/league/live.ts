@@ -247,6 +247,11 @@ export class LiveSim extends LivePositioning implements MatchSim {
     const showPickup = pickup && kind === 'play' && this.tick <= pickup.tick + GROUND_PICKUP_TICKS
       && collector?.key === pickup.player.who && collector.side === pickup.player.side && collector.slot === pickup.player.slot
       && collector.catchTick === pickup.tick;
+    const decision = this.conversionDecision;
+    const conversion = ph.kind === 'conversion' && ph.what === undefined
+      ? { toward: this.dirOf(ph.side), spot: { ...ph.spot } }
+      : decision && decision.decision.tick === this.phaseSince
+        && (ph.kind === 'restart' || ph.kind === 'half-time' || ph.kind === 'full-time') ? decision : undefined;
     const snap: Snapshot = {
       tick: this.tick,
       attacking: this.attacking,
@@ -254,6 +259,7 @@ export class LiveSim extends LivePositioning implements MatchSim {
       ball,
       ...(this.visualBombContest ? { bombContest: this.visualBombContest } : {}),
       ...(showPickup ? { groundPickup: pickup } : {}),
+      ...(conversion ? { conversion } : {}),
       label: `${this.names[this.attacking]} ball · ${state} · ${this.points.home}–${this.points.away} · ${clockText(this.half, this.clockTicks * TICK_S)}${this.siren && (kind === 'play' || kind === 'tackle' || kind === 'ruck') ? ' · siren' : ''} · ${legs}${short}`,
       events: this.events,
       clock: { half: this.half, seconds: this.clockTicks * TICK_S, minute: Math.floor(this.matchSeconds / 60), siren: this.siren, finished: this.finished },

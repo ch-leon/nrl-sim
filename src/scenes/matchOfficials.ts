@@ -1,5 +1,5 @@
 // src/scenes/matchOfficials.ts — the match's people and furniture off the ball (#642):
-// the referee, the interchange benches, the sin bin and the corner flags. Where they
+// the officials, the interchange benches, the sin bin and the corner flags. Where they
 // stand is decided by src/match/view/officials.ts (pure functions of the snapshot);
 // this draws them. Every texture is made once at build and repainted in place (the
 // bench after an interchange, the referee when his frame changes), so a match makes
@@ -8,7 +8,7 @@ import type Phaser from 'phaser';
 import { PixelBuffer } from '../art/pixel';
 import type { Kit } from '../art/match/kit';
 import type { Appearance, Facing } from '../art/prototype/player';
-import { CENTRE, FOOT, HEIGHT, WIDTH } from '../art/prototype/player';
+import { CENTRE, FOOT, HEIGHT, WIDTH, appearanceFor } from '../art/prototype/player';
 import { drawLivePlayer, type LivePlayerAction } from '../art/match/livePlayer';
 import {
   BIN_SPOT_X,
@@ -24,6 +24,9 @@ import {
   refereeKit,
   refereeLook,
 } from '../art/match/bench';
+import { TOUCH_JUDGE_POSES, drawTouchJudge } from '../art/match/touchJudge';
+import { conversionJudges } from '../match/view/conversionJudges';
+import type { Vec } from '../match/core/vec';
 import { toFieldPt } from '../match/core/field';
 import type { PlayerSnap, Side, Snapshot } from '../match/core/snapshot';
 import { BENCH, REF, benchSeat, benchSeated, binSeat, binnedSpot, refCoversCarrier, refereeSignal, refereeSpot, type BenchSheet } from '../match/view/officials';
@@ -93,6 +96,11 @@ interface BenchView {
   card: Phaser.GameObjects.Image;
 }
 
+interface TouchJudgeView {
+  image: Phaser.GameObjects.Image;
+  shadow: Phaser.GameObjects.Image;
+}
+
 export class MatchOfficials {
   private readonly opts: OfficialsOptions;
   private readonly refKit: Kit;
@@ -102,6 +110,9 @@ export class MatchOfficials {
   private readonly refCanvas: Canvas;
   private readonly refFrames = new Map<string, PixelBuffer>();
   private refShown = '';
+  private readonly judges: readonly TouchJudgeView[];
+  /** Framing points for the current conversion picture, in world pixels. */
+  conversionFocus: Vec[] | null = null;
   private readonly benches: Record<Side, BenchView>;
   private readonly seated = new Map<string, PixelBuffer>();
 
@@ -151,6 +162,19 @@ export class MatchOfficials {
     this.refCanvas = new Canvas(scene, art, 'referee', WIDTH, HEIGHT);
     this.ref = scene.add.sprite(0, 0, this.refCanvas.key).setOrigin(CENTRE / WIDTH, FOOT / HEIGHT);
     this.refShadow = scene.add.image(0, 0, opts.shadowKey).setDepth(-80_000);
+    this.judges = [0, 1].map(i => {
+      const look: Appearance = { ...appearanceFor(`touch-judge-${i}`), tape: false, boots: this.refLook.boots };
+      const atlas = new PixelBuffer(WIDTH * TOUCH_JUDGE_POSES.length, HEIGHT * 2);
+      const frames = (['front', 'back'] as const).flatMap((facing, row) => TOUCH_JUDGE_POSES.map((pose, col) => {
+        atlas.blit(drawTouchJudge(look, this.refKit, facing, pose), col * WIDTH, row * HEIGHT);
+        return { name: `${facing}/${pose}`, x: col * WIDTH, y: row * HEIGHT, w: WIDTH, h: HEIGHT };
+      }));
+      const key = art.atlas(`touch-judge-${i}`, atlas, frames);
+      return {
+        image: scene.add.image(0, 0, key).setVisible(false),
+        shadow: scene.add.image(0, 0, opts.shadowKey).setDepth(-80_000).setVisible(false),
+      };
+    });
     // The scoreboard on the grandstand roof (#673): one texture, repainted when what it shows changes.
     this.boardColors = [boardColor(opts.kits.home), boardColor(opts.kits.away)];
     this.board = new Canvas(scene, art, 'scoreboard', BOARD_TEX_W, BOARD_TEX_H);
@@ -199,16 +223,47 @@ export class MatchOfficials {
   latest: Snapshot | null = null;
 
   /** Draw everyone for the frame between `prev` and `cur` at `alpha` (LiveView calls this after the players). */
-  draw(prev: Snapshot, cur: Snapshot, alpha: number): void {
+  draw(prev: Snapshot, cur: Snapshot, alpha: number, heldTicks = 0): void {
     this.latest = cur;
     if (cur.score) this.drawBoard([cur.score.home, cur.score.away]);
     this.drawReferee(prev, cur, alpha);
+    this.drawTouchJudges(cur, heldTicks);
     for (const side of ['home', 'away'] as const) this.drawBench(side, cur);
   }
 
   private world(p: { x: number; y: number }): { x: number; y: number } {
     const f = toFieldPt(p);
     return this.opts.toWorld(f.fx, f.fy);
+  }
+
+  private drawTouchJudges(cur: Snapshot, heldTicks: number): void {
+    const cue = conversionJudges(cur, heldTicks);
+    this.conversionFocus = null;
+    if (!cue) {
+      for (const judge of this.judges) {
+        judge.image.setVisible(false);
+        judge.shadow.setVisible(false);
+      }
+      return;
+    }
+    const kicker = this.world(cue.lookAt);
+    const [far, near] = cue.feet;
+    const feet = [this.world(far), this.world(near)] as const;
+    for (const [i, judge] of this.judges.entries()) {
+      const at = feet[i]!;
+      const x = Math.round(at.x);
+      const y = Math.round(at.y);
+      const left = kicker.x < at.x;
+      const facing = kicker.y < at.y - 4 ? 'back' : 'front';
+      judge.image.setPosition(x, y).setDepth(y + 1.0007).setVisible(true).setAlpha(cue.alpha)
+        .setFrame(`${facing}/${cue.pose}`).setOrigin((left ? WIDTH - CENTRE : CENTRE) / WIDTH, FOOT / HEIGHT).setFlipX(left);
+      judge.shadow.setPosition(x, y).setVisible(true).setAlpha(cue.alpha);
+    }
+    const [a, b] = feet;
+    // Centre on the two flags, with room for their full height. Include the tee while the kick is on.
+    this.conversionFocus = [{ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 - 20 },
+      { x: a.x, y: a.y - 36 }, { x: b.x, y: b.y },
+      ...(!cur.conversion?.decision ? [{ x: kicker.x, y: kicker.y - 18 }] : [])];
   }
 
   private drawReferee(prev: Snapshot, cur: Snapshot, a: number): void {
