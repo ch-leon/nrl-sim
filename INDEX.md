@@ -383,3 +383,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261122-044303-standard | standard | 7809de1 | main | [report](runs/20261122-044303-standard/report.md) |
 | 20261122-130719-standard | standard | a38a6bb | main | [report](runs/20261122-130719-standard/report.md) |
 | 20261122-135847-standard | standard | 671359b | main | [report](runs/20261122-135847-standard/report.md) |
+| 20261122-143159-standard | standard | 0b5abb1 | main | [report](runs/20261122-143159-standard/report.md) |
