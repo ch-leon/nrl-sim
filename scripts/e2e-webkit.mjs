@@ -239,7 +239,14 @@ try {
   log(`sections${GROUP ? ` (--group ${GROUP})` : ''}: ${plan.map(([n]) => n).join(', ')}`);
   for (const [name, run] of plan) {
     const t0 = Date.now(), ok0 = okLines, fail0 = failLines;
-    const f = await run(browser);
+    let f = await run(browser);
+    // A section returns how many of its checks failed. Anything else (a section that forgot its
+    // return gave undefined) would make `failed` NaN, which reads as none: every later section's
+    // FAIL lines were dropped and the run exited 0. Count it as a failure of the harness instead.
+    if (!Number.isInteger(f) || f < 0) {
+      log(`FAIL section ${name} returned ${f}, not a count of failed checks`);
+      f = 1;
+    }
     failed += f;
     tally.push({ name, s: Math.round((Date.now() - t0) / 1000), ok: okLines - ok0, fail: failLines - fail0, failed: f });
     log(`section ${name}: ${tally.at(-1).s}s, ${tally.at(-1).ok} ok, ${tally.at(-1).fail} FAIL`);

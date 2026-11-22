@@ -344,8 +344,9 @@ renderers continue drawing the real positions.
 `shapes.on:0` draws nothing and retains the prior simulation exactly. Enabled
 choices change movement and RNG timing, so recovery engine revision is 6. All
 weights/distances are in tuning's **Ordinary attacking structures** section.
-Decoys that influence defenders and carrier-line contests remain separate work. This is
-an initial review default, subject to browser and standard-harness comparison.
+The initial slice added no decoy or carrier-line contest. The bounded lead read
+for the back-door packet is described below; carrier-line contests remain separate
+work. The initial structures remain subject to browser and standard-harness comparison.
 
 ### Ordinary back-door support (#649)
 
@@ -364,7 +365,9 @@ The half keeps his ordinary carrier line and engagement decision. His support
 must really be behind him, available and in the usual passing window to be
 selected by the existing weighted receiver choice. Pass probability, intercept
 reads, catch/spill checks and contact odds are unchanged. A lead can still receive
-an ordinary pass when eligible: this adds no defender-deception or paid-play bonus.
+an ordinary pass when eligible. On a back-door packet, the separate lead read below
+can move one free line defender toward that real runner; it adds no pass, catch or
+carrier-line contest bonus.
 The option carries on only when the half's actual pass goes behind the exact lead
 runner to the fullback beyond him on the packet's edge; any other pass ends it.
 The pass leads the fullback from his real position and velocity. He runs through the reception
@@ -379,8 +382,27 @@ his momentum into the next step.
 
 The shape's participants are copied on snapshot reads, so reading cannot change
 play. With `shapes.backDoor.on:0`, the prior three-structure simulation and RNG
-stream remain exact. Live-match recovery uses engine revision 7, so a match saved
-under revision 6 is not replayed with the back door.
+stream remain exact. The back-door packet landed at engine revision 7, so a match
+saved under revision 6 is not replayed with the back door.
+
+### Back-door lead read (#649)
+
+During the back-door play, one available line defender can read the actual lead
+runner while other defenders are committed to the carrier. The lead must be ahead
+and moving toward the goal, with his actual position outside the half on the packet
+edge, and remain within the carrier's engagement range. The nearest eligible defender
+within 8 m of the lead is selected. The opposing fullback, committed defenders,
+markers, retreating, locked, substituting or cooling-down players are ineligible.
+That defender holds his depth while his lateral target shifts toward the lead by
+at most 2 m per update, for up to 8 ticks while eligibility holds. If the read
+expires or becomes invalid, normal line targeting resumes; that packet does not
+select a replacement reader.
+
+This is a bounded movement response to the real run. It does not force a pass,
+change receiver selection, or add a pass, catch, interception or carrier-line
+contest bonus. Ordinary pass and catch checks continue. The read is engine state,
+not snapshot presentation. `shapes.leadDecoy.on:0` leaves the revision 7 line
+targets and RNG stream. Live-match recovery uses engine revision 8.
 
 ### 5.2 Defence presets
 
