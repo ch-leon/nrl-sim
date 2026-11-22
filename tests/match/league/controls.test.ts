@@ -92,7 +92,7 @@ describe('timed decisions', () => {
     expect(s.ball.kind).toBe('held');
   });
   it.each(['step-up', 'step-down'] as const)('%s bypasses the attempt roll but keeps the success roll', (kind) => {
-    const { s, carrier } = moment();
+    const { sim, s, carrier } = moment();
     const defender = s.players.find((p) => p.side !== carrier.side)!;
     defender.body.pos = { x: 50 + s.dir * (LIVE.stepRange - 0.1), y: 34 };
     s.pendingControl[carrier.side] = { tick: s.tick, side: carrier.side, kind };
@@ -102,6 +102,37 @@ describe('timed decisions', () => {
     expect(Math.sign(carrier.jink!.dy)).toBe(kind === 'step-up' ? -1 : 1);
     expect(carrier.steppedOn).toBe(s.players.indexOf(defender));
     expect(s.pendingControl[carrier.side]).toBeNull();
+    const picture = sim.snapshot();
+    const stepped = picture.players.filter(p => p.step);
+    expect(stepped).toHaveLength(2);
+    expect(picture.events.find(e => e.kind === 'step')?.text).toBe(`${stepped.find(p => p.step?.role === 'carrier')!.who} steps ${stepped.find(p => p.step?.role === 'defender')!.who}!`);
+    expect(stepped.find(p => p.step?.role === 'carrier')).toMatchObject({ ...picture.ball.holder, step: { startedTick: s.tick, untilTick: s.tick + LIVE.stepJinkTicks, lateral: carrier.jink!.dy } });
+    expect(picture.players[s.players.indexOf(defender)]).toMatchObject({ pose: 'tackled', step: { role: 'defender', startedTick: s.tick, untilTick: defender.lockUntil, reachX: carrier.body.pos.x - defender.body.pos.x, reachY: 0 } });
+    roll.mockRestore();
+  });
+  it('keeps the defender recovering through a pass and shows no success pose on a failed manual attempt', () => {
+    const { sim, s, carrier } = moment();
+    const defender = s.players.find(p => p.side !== carrier.side)!;
+    defender.body.pos = { x: 50 + s.dir * (LIVE.stepRange - 0.1), y: 34 };
+    const step = () => {
+      s.pendingControl[carrier.side] = { tick: s.tick, side: carrier.side, kind: 'step-up' };
+      s.stepPlay();
+    };
+    const roll = vi.spyOn(s.rng, 'next').mockReturnValue(.999);
+    step();
+    expect(carrier.jink?.dy).toBe(-LIVE.stepJinkM);
+    expect(sim.snapshot().players.every(p => !p.step)).toBe(true);
+
+    roll.mockReturnValue(0);
+    step();
+    const receiver = s.players.find(p => p !== carrier && p.side === carrier.side)!;
+    receiver.body.pos = { x: 50 - s.dir * 3, y: 29 };
+    s.pendingControl[carrier.side] = { tick: s.tick, side: carrier.side, kind: 'pass-left' };
+    s.stepPlay();
+    const release = sim.snapshot();
+    expect(release.ball).toMatchObject({ holder: null, flight: { via: 'pass' } });
+    expect(release.players.filter(p => p.step)).toEqual([release.players[s.players.indexOf(defender)]]);
+    expect(release.players[s.players.indexOf(carrier)]?.pose).toBe('pass');
     roll.mockRestore();
   });
   it.each(['step-up', 'kick'] as const)('retains %s through ruck stages and a locked catch', (kind) => {

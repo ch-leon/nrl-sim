@@ -1,17 +1,18 @@
-import type { PlayerSnap, Side, Snapshot } from '../core/snapshot';
+import type { BombContestSnap, PlayerSnap, Side, Snapshot } from '../core/snapshot';
 import type { Facing, Movement } from '../../art/prototype/player';
 import { PLAYER_ANIMS, type PlayerAnim } from '../../art/match/players';
 import { LIVE } from '../league/live/knobs';
 import type { LivePlayerAction, Reaction } from '../../art/match/livePlayer';
 import { hashString } from '../../art/match/kit';
 import { MOMENT_ACTIONS, TRAVEL_ENDINGS, momentLift, type MomentAction } from '../../art/match/moments';
-import { screenFacing, screenPlayerFacing } from './screenFacing';
+import { screenFacing, screenHeading, screenPlayerFacing } from './screenFacing';
 import { legsBand } from './legsLayer';
 import { FATIGUE } from '../league/fatigue';
 import { eyesUp, type EyesUp } from './eyesUp';
 import { goalKickPicture } from './goalKick';
 import { callingPass, receivingPass, type ReceivePicture } from './handling';
 import { playerMotion, movementStride, type MotionContext } from './playerMotion';
+import { bombPlayer, bombPose } from './bombContest';
 
 export interface PlayerPicture {
   /** Terminal tee-kick body can turn while the empty tee stays on its original posts side. */
@@ -63,6 +64,7 @@ export interface PictureContext extends MotionContext {
   tryScene?: { side: Side; age: number; mob: Map<string, { moving: boolean; left: boolean }> };
   /** A bomb in the air (#671): the few men under it, looking up. */
   eyesUp?: EyesUp;
+  bombContest?: BombContestSnap;
   /** The whistle (#675): each man's walk-off, reaction or huddle picture (walkOff.ts), and which way he walks on screen. */
   walkOff?: Map<string, { action: LivePlayerAction | null; frame: number; gait: number; slump: boolean; left?: boolean }>;
 }
@@ -118,6 +120,7 @@ export function pictureContext(s: Snapshot, prev?: Snapshot): PictureContext {
   if (s.contact) ctx.contactPlayers = new Set([s.contact.carrier, ...s.contact.defenders].map(p => `${p.side}/${p.slot}/${p.who}`));
   const up = prev && eyesUp(prev, s);
   if (up) ctx.eyesUp = up;
+  if (s.bombContest) ctx.bombContest = s.bombContest;
   const h = s.ball.holder && s.players.find(p => p.side === s.ball.holder!.side && p.slot === s.ball.holder!.slot);
   if (h) ctx.carrier = { side: h.side, x: h.x, y: h.y };
   if (r) {
@@ -193,6 +196,17 @@ export function playerPicture(p: PlayerSnap, previous: PlayerSnap, tick: number,
     && catchAge >= 0 && catchAge < 6 && ['catch', 'run', 'idle'].includes(p.pose)) {
     action = 'airCatch'; frame = clampFrame(catchAge);
   }
+  const contest = ctx.bombContest;
+  const jumper = bombPlayer(contest, p);
+  const wonBomb = contest && p.aerialCatchTick === contest.arrivesTick && p.caughtTick === contest.arrivesTick;
+  const aerial = contest && jumper && !p.binned && ctx.motionLive !== false && !ctx.contactPlayers?.has(`${p.side}/${p.slot}/${p.who}`)
+    && (!possession || wonBomb) && (p.pose === 'idle' || p.pose === 'run' || p.pose === 'catch')
+    ? bombPose(contest, tick, jumper === contest.players[0], possession) : undefined;
+  if (aerial) { action = 'bombContest'; frame = aerial.frame; }
+  // A different player can arrive first. He takes it on his feet while the two who jumped settle.
+  else if (action === 'airCatch' && wonBomb && !jumper) {
+    action = catchAge < 4 ? 'catch' : 'carry'; frame = catchAge < 4 ? clampFrame(catchAge * 5 / 3) : Math.max(0, stride) % 6;
+  }
   const tryAge = p.tryTick === undefined ? -1 : tick - p.tryTick;
   if (['dive', 'celebrate'].includes(p.pose) && tryAge >= 0 && tryAge < 20) {
     action = tryAge < 10 ? 'dive' : 'tryRise';
@@ -208,12 +222,17 @@ export function playerPicture(p: PlayerSnap, previous: PlayerSnap, tick: number,
   // After a try (#668): the mates the view gathers round the scorer run in, cheer on their own, run back;
   // the side that conceded slumps, hands on hips, or trudges back head down.
   const travelEnd = frame === 5 && !possession && !!p.kick && TRAVEL_ENDINGS.includes(action as MomentAction);
-  const landing = action === 'airCatch' && frame >= 4;
+  const landing = (action === 'airCatch' || action === 'bombContest') && frame >= 4;
+  const bombEnd = action === 'bombContest' && frame === 5;
   let gait = stride;
   // Profiles belong to everyday movement/handling; shared contact, ruck and kicks
   // retain their authored front/back poses until their own art pass.
   let facing: { facing: Facing; left: boolean } = (['idle', 'run', 'carry', 'catch', 'pass', 'call', 'receive', 'guard', 'fend'].includes(action) || landing || travelEnd)
     ? screenPlayerFacing(p, previous, screenDir) : screenFacing(p, previous, screenDir);
+  if (aerial && jumper && contest && !landing) {
+    const toward = { headX: contest.at.x - jumper.x, headY: contest.at.y - jumper.y };
+    facing = screenFacing(toward, toward, screenDir);
+  }
   let slump = false;
   const scene = ctx.tryScene;
   const member = scene?.mob.get(`${p.side}/${p.slot}`);
@@ -239,20 +258,39 @@ export function playerPicture(p: PlayerSnap, previous: PlayerSnap, tick: number,
     if (shot.action === 'teeKick' && shot.frame === 5) teeFlip = facing.left !== shot.left;
     else facing = { facing: shot.facing, left: shot.left };
   }
-  const lift = MOMENT_ACTIONS.includes(action as MomentAction) ? momentLift(action as MomentAction, frame) : 0;
-  let strideFrame = travelEnd || ['run', 'carry', 'catch', 'pass', 'call', 'receive', 'guard', 'airCatch', 'fend', 'handsOnHead', 'handsOnHips', 'armsFolded'].includes(action)
+  const lift = aerial?.lift ?? (MOMENT_ACTIONS.includes(action as MomentAction) ? momentLift(action as MomentAction, frame) : 0);
+  let strideFrame = travelEnd || bombEnd || ['run', 'carry', 'catch', 'pass', 'call', 'receive', 'guard', 'airCatch', 'fend', 'handsOnHead', 'handsOnHips', 'armsFolded'].includes(action)
     ? gait : undefined;
   // Only free movement uses these poses. Handling keeps its hand timing over the same legs;
   // a shared contact/ruck/kick, whistle or celebration never inherits a movement pose.
   let movement: Movement | undefined;
-  if (!scene && !off?.action && !shot && (['idle', 'run', 'carry', 'catch', 'pass', 'call', 'receive', 'guard', 'fend'].includes(action) || landing || travelEnd)) {
+  if (!scene && !off?.action && !shot && (['idle', 'run', 'carry', 'catch', 'pass', 'call', 'receive', 'guard', 'fend'].includes(action) || (landing && action === 'airCatch') || bombEnd || travelEnd)) {
     const motion = playerMotion(p, previous, screenDir, ctx);
     movement = motion.movement;
     // A ball-holder and his handling follow-through always keep the ball-side silhouette.
-    if (!possession && action === 'run' && motion.facing) facing = { facing: motion.facing, left: motion.left! };
+    if (!possession && (action === 'run' || (bombEnd && gait >= 0)) && motion.facing) facing = { facing: motion.facing, left: motion.left! };
     else if (movement === 'shuffleBack' || movement === 'shuffleForward' || movement === 'backpedal') movement = undefined;
     if (movement && strideFrame !== undefined) strideFrame = movementStride(strideFrame, movement, p.odometer, p.slot);
     if (movement && (action === 'run' || action === 'carry')) frame = Math.max(0, strideFrame ?? stride) % 6;
+  }
+  const step = p.step;
+  if (step && !p.binned && ctx.motionLive !== false && !scene && !off?.action && !shot && tick >= step.startedTick && tick < step.untilTick) {
+    const progress = (tick - step.startedTick) / (step.untilTick - step.startedTick);
+    if (step.role === 'carrier' && possession && (action === 'carry' || action === 'catch') && step.lateral !== 0) {
+      // The jink is added to the body's position, separately from its steering heading.
+      const cutX = screenHeading(0, step.lateral, screenDir).x;
+      action = 'carry';
+      movement = cutX * (facing.left ? -1 : 1) < 0 ? 'cutBack' : 'cutForward';
+      frame = strideFrame = progress < .5 ? 0 : 3;
+    } else if (step.role === 'defender' && !possession && action === 'tackled') {
+      action = 'wrongFoot';
+      frame = clampFrame(progress * 6);
+      // Reach where the runner was at the contest, then turn back onto his own heading.
+      if (frame < 4) {
+        const reach = { headX: step.reachX, headY: step.reachY };
+        facing = screenPlayerFacing(reach, p, screenDir);
+      }
+    }
   }
   // Eyes on the bomb (#671): standing or running, ball elsewhere, one of the few under it.
   const lookUp = ctx.eyesUp?.who.has(`${p.side}/${p.slot}`) && (action === 'idle' || action === 'run') && !possession && !p.binned ? ctx.eyesUp.level : 0;

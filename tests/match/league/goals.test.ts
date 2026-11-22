@@ -99,7 +99,8 @@ describe('field goals in the live sim', () => {
     const results: Seen[] = [];
     let after: Seen[] = [];
     // Early DH choice (#672): seed 6 drops at 1853/5238; old seed 5 no longer drops.
-    for (const seed of [1, 2, 3, 4, 6]) {
+    // The five-eighth option leaves seeds 1–6 with three drops. Seed 10 adds three more.
+    for (const seed of [1, 2, 3, 4, 6, 10]) {
       const { sim, events } = play(seed, { halves: 1, halfMinutes: 6 });
       drops.push(...events.filter((x) => x.e.kind === 'drop-goal'));
       const fgs = events.filter((x) => x.e.kind === 'field-goal');

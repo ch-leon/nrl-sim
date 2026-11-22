@@ -6,8 +6,8 @@ import { add, body, contactPainter, type Body, type Point } from '../prototype/t
 import { tiltedHead } from '../prototype/contact';
 import { fitLegs, bentContactArm } from './limbs';
 
-export type MomentAction = 'kick' | 'grubberKick' | 'dropKick' | 'airCatch' | 'dive' | 'tryRise' | 'celebrate' | 'fistPump' | 'point' | 'kneeSlide' | 'chestBump' | 'blowing' | 'goalRoutine' | 'teeKick';
-export const MOMENT_ACTIONS: readonly MomentAction[] = ['kick', 'grubberKick', 'dropKick', 'airCatch', 'dive', 'tryRise', 'celebrate', 'fistPump', 'point', 'kneeSlide', 'chestBump', 'blowing', 'goalRoutine', 'teeKick'];
+export type MomentAction = 'kick' | 'grubberKick' | 'dropKick' | 'airCatch' | 'bombContest' | 'groundPickup' | 'dive' | 'tryRise' | 'celebrate' | 'fistPump' | 'point' | 'kneeSlide' | 'chestBump' | 'blowing' | 'goalRoutine' | 'teeKick';
+export const MOMENT_ACTIONS: readonly MomentAction[] = ['kick', 'grubberKick', 'dropKick', 'airCatch', 'bombContest', 'groundPickup', 'dive', 'tryRise', 'celebrate', 'fistPump', 'point', 'kneeSlide', 'chestBump', 'blowing', 'goalRoutine', 'teeKick'];
 export interface MomentPose { pose: Body; ball: Point; near: Point; far: Point; tilt: number; lift: number }
 const stand = (crouch = 0, lean = 0) => body([19, 27 + crouch], [19 + lean, 20 + crouch], [12 + lean, 3 + crouch], [23, 31], [24, 35], [16, 31], [15, 35]);
 /** The same body `dx` pixels along (the goal kicker stepping back from his tee). */
@@ -52,16 +52,39 @@ export const KICK_POSES = {
     knee: [[20, 31], [22, 31], [24, 30], [25, 28], [23, 31], [23, 31]],
     ball: [[23, 24], [23, 24], [23, 24], [23, 24], [23, 24], [23, 24]] },
 } as const;
-export const TRAVEL_ENDINGS: readonly MomentAction[] = ['kick', 'grubberKick', 'dropKick', 'teeKick', 'airCatch'];
+export const TRAVEL_ENDINGS: readonly MomentAction[] = ['kick', 'grubberKick', 'dropKick', 'teeKick', 'airCatch', 'bombContest', 'groundPickup'];
 /** Stopped players return to idle; no run pose or ball is invented at a kick's end. */
 export function momentHandoff(action: MomentAction, frame: number, possession: boolean, strideFrame?: number): 'idle' | 'run' | 'carry' | null {
   if (frame !== 5 || !TRAVEL_ENDINGS.includes(action)) return null;
-  if (action === 'airCatch' && possession) return 'carry';
+  if ((action === 'airCatch' || action === 'bombContest' || action === 'groundPickup') && possession) return 'carry';
   if (possession) return null;
   return strideFrame === undefined || strideFrame === -1 ? 'idle' : 'run';
 }
 
 const landing = body([15, 32], [24, 30], [23, 16], [12, 33], [9, 35], [11, 32], [8, 33]);
+
+/** Braced feet, one reaching hand, both hands at the take, then knees and arms absorb the fall. */
+const BOMB_POSES = [
+  { pose: body([19, 29], [20, 24], [12, 7], [25, 32], [25, 35], [15, 32], [14, 35]), near: [27, 30], far: [14, 29], ball: [21, 24], tilt: -15 },
+  { pose: body([19, 27], [22, 20], [8, 4], [24, 30], [25, 33], [16, 32], [13, 35]), near: [32, 10], far: [12, 24], ball: [21, 10], tilt: -25 },
+  { pose: body([20, 27], [20, 20], [10, 5], [25, 30], [24, 34], [16, 32], [15, 35]), near: [30, 10], far: [10, 10], ball: [17, 9], tilt: -18 },
+  { pose: body([19, 28], [20, 22], [12, 5], [24, 31], [24, 35], [16, 31], [15, 34]), near: [27, 22], far: [12, 21], ball: [19, 20], tilt: -5 },
+  { pose: stand(3, 1), near: [26, 28], far: [14, 27], ball: [19, 24], tilt: 0 },
+] as const;
+
+/** The low hand gathers the same ball at the same height as the flat turf sprite. */
+const TURF_BALL: Point = [19, 30];
+export const PICKUP_BALL_X = TURF_BALL[0] + 4.5 - CENTRE;
+const LOW_PICKUP = {
+  pose: body([17, 31], [21, 27], [21, 13], [24, 32], [24, 35], [13, 33], [11, 35]),
+  ball: TURF_BALL, near: [26, 34], far: [22, 32], tilt: 49,
+} as const;
+const PICKUP_POSES = [
+  { pose: body([18, 29], [20, 23], [17, 8], [22, 32], [24, 35], [13, 32], [11, 35]), ball: TURF_BALL, near: [25, 30], far: [16, 28], tilt: 28 },
+  LOW_PICKUP, LOW_PICKUP,
+  { pose: body([18, 30], [20, 24], [16, 8], [23, 32], [24, 35], [14, 32], [12, 35]), ball: [20, 26], near: [27, 30], far: [21, 29], tilt: 27 },
+  { pose: stand(1, 1), ball: [19, 24], near: [26, 28], far: [20, 27], tilt: 10 },
+] as const;
 const diveKeys: readonly Body[] = [
   stand(1, 2),
   body([17, 28], [23, 23], [17, 7], [14, 31], [11, 34], [13, 30], [10, 32]),
@@ -106,6 +129,12 @@ export function momentPoseAt(action: MomentAction, frame: number, possession = f
     pose = stand([0, 0, 1, 3, 1, 0][f]!);
     ball = [23, [11, 11, 16, 22, 26, 25][f]!];
     near = add(ball, 4, 2); far = add(ball, 0, 2);
+  } else if (action === 'bombContest') {
+    const reach = BOMB_POSES[Math.min(4, f)]!;
+    ({ pose, ball, near, far, tilt } = reach);
+    if (possession) { near = add(ball, 7, 4); far = add(ball, 1, 4); }
+  } else if (action === 'groundPickup') {
+    ({ pose, ball, near, far, tilt } = PICKUP_POSES[Math.min(4, f)]!);
   } else if (action === 'dive' || action === 'tryRise') {
     if (action === 'tryRise') {
       const r = TRY_RISE_POSES[f]!;
@@ -149,24 +178,35 @@ export function drawMomentPlayer(look: Appearance, kit: Kit, action: MomentActio
   if (action === 'airCatch' && frame === 4) return drawPrototypePlayer(look, kit, 'land', 0, facing, possession, strideFrame, tired, movement);
   const out = new PixelBuffer(WIDTH, PAINT_H); const brush = contactPainter(out);
   const { pose: p, ball, near, far, tilt } = momentPoseAt(action, frame, possession);
-  const arm = (start: Point, target: Point, dark: boolean) => {
+  const reach = action === 'bombContest' && (frame === 1 || frame === 2);
+  const arm = (start: Point, target: Point, dark: boolean, open = false) => {
     const a = bentContactArm(start, target, target[1] < start[1] ? -1 : 1);
     brush.arm(a.shoulder, a.elbow, a.hand, look, dark);
+    if (open) out.set(a.hand[0] + 1, a.hand[1] - 1, look.skin);
+  };
+  const sleeve = (side: number, color: number) => {
+    for (let x = 0; x < 3; x++) out.line(p.shoulder[0] + side * 3 + x, p.shoulder[1] + 1, p.shoulder[0] + side * 5 + x, p.shoulder[1] - 2, color);
   };
   brush.legs(p, look, kit);
-  arm(add(p.shoulder, -3, 1), far, true);
+  if (!reach || frame === 1) arm(add(p.shoulder, -3, 1), far, true);
   brush.torso(p, look, kit);
   out.blit(tiltedHead(look, kit, facing, false, tilt), Math.round(p.head[0] - 6), Math.round(p.head[1] - 6));
+  if (reach && frame === 2) {
+    arm(add(p.shoulder, -5, -2), far, true, !possession);
+    sleeve(-1, kit.jerseyShade);
+  }
   const teed = action === 'goalRoutine' || action === 'teeKick';
   if (possession && !teed) out.blit(ballPixels(), Math.round(ball[0]), Math.round(ball[1]));
-  arm(add(p.shoulder, 3, 1), near, false);
+  arm(add(p.shoulder, reach ? 5 : 3, reach ? -2 : 1), near, false, !possession && (reach || (action === 'groundPickup' && frame === 1)));
+  if (reach) sleeve(1, kit.jersey);
   if (action === 'dive' && frame >= 2 && frame <= 4) {
     out.fillRect(4, 35, 2, 1, 0x98b765); out.fillRect(6, 32, 2, 1, 0xc0b77b);
   }
   out.outline(OUTLINE);
   // Height lives in the shins: it goes as he leaves his feet and comes back as he rises.
   const f = Math.max(0, Math.min(5, Math.floor(frame)));
-  const upright = action === 'dive' ? [1, .5, 0, 0, 0, 0][f]! : action === 'tryRise' ? f / 5 : 1;
+  const upright = action === 'dive' ? [1, .5, 0, 0, 0, 0][f]! : action === 'tryRise' ? f / 5
+    : action === 'groundPickup' ? [.5, 0, 0, .5, 1, 1][f]! : 1;
   const framed = standFrame(out, Math.round(look.stature * upright));
   // On the ground, after the legs take his height: the tee, and through the routine the ball stood on it.
   if (teed) framed.blit(action === 'goalRoutine' ? TEED_BALL : TEE, TEE_X, FOOT - 8);

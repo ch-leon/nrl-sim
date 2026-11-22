@@ -79,12 +79,13 @@ describe('tracked counter measurements', () => {
   });
   it('calculates wins plus half draws and its sample SE on a two-seed cell', () => {
     // After the lead read (engine revision 8), seed 8 is a tracked loss and seed 9 a win.
-    // Before it, seed 8 was a draw (#722). Seed 3 supplies a neutral one-minute draw
+    // Before it, seed 8 was a draw (#722). The five-eighth option draws both, so the
+    // loss/win pair is seeds 11 and 12. Seed 3 supplies a neutral one-minute draw
     // (seed 2 before #649). This two-sample fixture checks aggregation mechanics, not match balance.
     const tiny = cell;
-    const first = measureCell(tiny, 1, 4, 8);
-    const second = measureCell(tiny, 1, 4, 9);
-    const both = measureCell(tiny, 2, 4, 8);
+    const first = measureCell(tiny, 1, 4, 11);
+    const second = measureCell(tiny, 1, 4, 12);
+    const both = measureCell(tiny, 2, 4, 11);
     const xs = [first, second].map((r) => r.trackedWin! + r.trackedDraw! / 2);
     expect(xs).toEqual([0, 1]);
     expect(measureCell({ ...cell, scenario: even }, 1, 1, 3).pointsShare).toEqual({ mean: 0.5, se: 0 });

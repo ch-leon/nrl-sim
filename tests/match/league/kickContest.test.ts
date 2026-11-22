@@ -122,9 +122,10 @@ function bombEnds(es: readonly SimEvent[]): string[] {
 describe('kick contests in the live sim (#99)', () => {
   // Whole Kick-chase matches until every outcome has been seen: bombs and grubbers aplenty. Named seeds, not a
   // wide scan (CI's 10-minute check). Seeds 1 to 24 hold the contests, in-goal balls and scrambles.
-  // With ordinary attacking structures (#649), seed 42 supplies the real backwards spill:
-  // away bomb 2493, home fullback spills at 2574. No contest roll is forced.
-  const { es, matches } = play([...Array.from({ length: 24 }, (_, i) => i + 1), 42, 114], (all) => {
+  // Seed 34 supplies the spill with punts into space (#650): the away fullback drops the
+  // bomb at 2389 with the home halfback under it. Previously seed 42, away bomb at 2493
+  // and home fullback spill at 2574. No contest roll is forced.
+  const { es, matches } = play([...Array.from({ length: 24 }, (_, i) => i + 1), 34, 114], (all) => {
     const ends = bombEnds(all);
     return ends.includes('won-contest') && ends.includes('spilled') && ends.includes('caught') && all.filter((e) => e.kind === 'loose-ball' && e.detail === 'in-goal').length >= 6 && all.filter((e) => e.kind === 'set-start' && e.detail === 'scramble').length >= 3;
   });

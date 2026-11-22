@@ -33,6 +33,20 @@ describe('movement pose artwork (#698)', () => {
       expect(a.data).not.toEqual(b.data);
     }
   });
+  it('keeps the beaten defender on his boots from the empty reach into his standing pose', () => {
+    for (const build of ['lean', 'athletic', 'stocky'] as const) for (const facing of ['front', 'back', 'side'] as const) for (const stature of [-2, 2]) {
+      const look = { ...base, build, stature, tape: true };
+      const [reach, gather, stand] = [0, 2, 4].map(frame => drawLivePlayer(look, kit, 'wrongFoot', frame, facing, false));
+      for (const pixels of [reach!, gather!, stand!]) {
+        const bounds = opaqueBounds(pixels)!;
+        expect(bounds.x0).toBeGreaterThan(0);
+        expect(bounds.x1).toBeLessThan(pixels.w - 1);
+        expect(bounds.y1).toBe(38);
+      }
+      expect(opaqueBounds(reach!)!.x1).toBeGreaterThan(opaqueBounds(gather!)!.x1);
+      expect(stand!.data).toEqual(drawLivePlayer(look, kit, 'idle', 0, facing, false).data);
+    }
+  });
   it('carries a continuous movement pose through the last catch, pass and aerial landing beats', () => {
     for (const build of ['lean', 'athletic', 'stocky'] as const) for (const movement of movements) for (const gait of [0, 3]) for (const facing of ['front', 'back', 'side'] as const) {
       const look = { ...base, build };

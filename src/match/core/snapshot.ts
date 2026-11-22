@@ -16,11 +16,28 @@ export interface ContactSnap {
   defenders: ContactPlayer[];
   /** Self-contained timing so seeking and fast playback do not lose a join or result. */
   joinedTicks?: number[];
-  outcome?: 'tackle' | 'big-hit' | 'break-tackle' | 'strip';
+  outcome?: 'tackle' | 'big-hit' | 'break-tackle' | 'strip' | 'offload';
   resolvedTick?: number;
   phaseTick?: number;
   releaseTick?: number;
+  /** The flight that actually left this contact, including a lane intercept. */
+  offload?: { to: BallFlightSnap['to']; arrivesTick: number };
 }
+
+/** A successful open-play step, timed to the jink or the beaten defender's lock. */
+export type StepSnap = {
+  startedTick: number;
+  untilTick: number;
+} & ({
+  role: 'carrier';
+  /** The carrier's across-field jink, in metres. */
+  lateral: number;
+} | {
+  role: 'defender';
+  /** Direction from the defender to the carrier before the jink, in field metres. */
+  reachX: number;
+  reachY: number;
+});
 
 export interface PlayerSnap {
   side: Side;
@@ -42,6 +59,7 @@ export interface PlayerSnap {
   poseUntil?: number;
   caughtTick?: number;
   /** Presentation facts only; deadlines and outcomes still belong to the sim. */
+  step?: StepSnap;
   kick?: { startedTick: number; strikeTick: number; untilTick: number; kind: 'punt' | 'grubber' | 'drop' };
   /**
    * A shot at goal (#669), on the kicker from the tick he is on his spot (`readyTick`) to the end of the
@@ -91,6 +109,32 @@ export interface BallSnap {
   holder: { side: Side; slot: number } | null;
 }
 
+/** Presentation timing around the tick an open-play bomb comes down (20 Hz). */
+export const BOMB_PLANT_TICKS = 5;
+export const BOMB_TAKEOFF_LEAD = 3;
+export const BOMB_RECOVERY_TICKS = 6;
+
+export interface BombContestSnap {
+  at: { x: number; y: number };
+  plantTick: number;
+  arrivesTick: number;
+  /** The chaser and catcher at the plant, with their feet on that step. */
+  players: [ContactPlayer & { x: number; y: number }, ContactPlayer & { x: number; y: number }];
+  /** One of the players left reach before the ball came down. */
+  releasedTick?: number;
+}
+
+/** A player has taken a loose ball in open play. These positions only align the picture. */
+export interface GroundPickupSnap {
+  tick: number;
+  at: { x: number; y: number };
+  player: ContactPlayer;
+  feet: { x: number; y: number };
+}
+
+/** Keep the cue through the last interpolation into the ordinary carry. */
+export const GROUND_PICKUP_TICKS = 6;
+
 /** Something that happened on this tick, for the lab log / commentary. */
 export interface SimEvent {
   tick: number;
@@ -121,6 +165,9 @@ export interface Snapshot {
   attacking?: Side;
   players: PlayerSnap[];
   ball: BallSnap;
+  /** Short visual reach and landing around a contested bomb. Possession comes from the ball. */
+  bombContest?: BombContestSnap;
+  groundPickup?: GroundPickupSnap;
   /** Short state label for the lab readout (phase, set, tackle count...). */
   label: string;
   /** Events emitted on this tick. */

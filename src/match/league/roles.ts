@@ -41,6 +41,7 @@ export const ROLES: readonly Role[] = [
 
 export const PLAYERS = ROLES.length;
 export const FULLBACK = 0;
+export const FIVE_EIGHTH = 4;
 export const KICKER = 5;
 export const HOOKER = 6;
 

@@ -98,8 +98,9 @@ describe('the referee (#642)', () => {
         if (over) covers++;
       }
     }
-    // Includes heel grace and dead phases, as before. Current seeds 1–12: near 4717/173704
-    // (2.72%), covers 9697/173704 (5.58%); the original 3%/7% bounds remain.
+    // Includes heel grace and dead phases. The original 3%/7% bounds remain.
+    // Before punts into space, the 6 m stand-off read near 4717/173704 (2.72%) and
+    // covers 9697/173704 (5.58%). He now stands 7 m off.
     expect(near / held).toBeLessThan(0.03);
     expect(covers / held).toBeLessThan(0.07); // a closer stand-off (#680) puts him over the carrier a little more often; the scene sorts him behind
   });

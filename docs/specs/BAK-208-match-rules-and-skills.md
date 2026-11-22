@@ -41,6 +41,12 @@ equal stats → baseline 10% step, 12% bust, 7% fend, 12% offload (if a support 
 0.22 → **STEP!** with *DANCING FEET II* under it — the defender grasps air, the carrier is
 through, the crowd lifts.
 
+A successful open-play step shows the carrier plant and push in the direction of
+the jink with the ball tucked. The defender he beats reaches toward the vacated
+lane and regathers on his feet through his recovery lock. A manual jink that fails
+the contest still moves the carrier sideways and leaves out the successful-step
+poses.
+
 ## 2. Base stats (every player)
 
 | Stat | What it drives |
@@ -215,6 +221,19 @@ counted in the match report. Between even sides about one bomb in five is contes
 back, 12% spilled). Tuning §31.
 
 ### 4.4 Kicks — *first slice implemented: long, bomb, grubber, chip, cross-field*
+
+On the ordinary last-tackle play-the-ball (#650), the halfback sets up flatter on the open
+side and the five-eighth drops deeper on the other side. The halfback is the usual option.
+Once the heel is played, the defenders who have completed their retreat can move up at
+their side's usual line speed. The dummy-half can go to the five-eighth when an eligible
+defender is close to the halfback or closing on him and the five-eighth offers more room
+within passing range. The halves' Kicking and Big Boot adjust how much extra room he needs.
+The chosen half makes the ordinary kick, run or pass decision with his own stats and traits.
+Specific coach calls, set plays and manual passes keep their precedence. Named goal-kickers
+and restart kickers retain their duties. `secondKicker.on:0` restores the single kicker,
+the previous ruck and the previous line, with no extra roll. Live-match recovery is engine
+revision 12. Ported from draft PR #760.
+
 The kicker makes **one call** for the last tackle. **More options on the last (#650 part 1,
 `lastTackle.on`, awaiting lab sign-off):** one roll among **kick**, **run it** and **shift it
 wide** (to the widest man behind him in reach, who plays on), weighted by zone (own 20 kick
@@ -235,8 +254,8 @@ type. On the second-last tackle inside 25 m he goes early 35% of the time (grubb
 
 | Kick | When the AI chooses it | Resolution |
 |---|---|---|
-| **Territory** (long) | Beyond 50 m (85%), or 40–50 m (20%) | Distance from Boot; lands in front of the fullback; chase sets the line |
-| **Bomb** | Beyond 50 m (15%), 40–50 m (50%), 22–40 m (30%) | Peak 20 m, 22–28 m long, onto the fullback's patch; catch contest (§4.3) |
+| **Territory** (long) | Beyond 50 m (85%), or 40–50 m (20%) | Distance from Boot and wind. The kicker looks for space across from a fullback who has shaded to one side. The chase sets the line |
+| **Bomb** | Beyond 50 m (15%), 40–50 m (50%), 22–40 m (30%). Inside 22 m the kicker considers it when a winger can chase | Peak 20 m. A chaseable attacking bomb goes to a winger's corner. The usual 22–28 m kick goes to the fullback's patch. Both use the catch contest (§4.3) |
 | **Cross-field** | 40–50 m (30%), 22–40 m (35%), inside 22 m (30%) | Peak 13 m, to the far winger, 2 m short of the line; winger vs winger under it |
 | **Grubber** | 22–40 m (20%), inside 22 m (50%) | From inside 16 m, skids about 3 m into the in-goal; from further out, about 8 m short of the line, aimed at a winger's lane pulled back toward the kicker. The wingers start their run on the second-last. A try or a repeat set sometimes; usually the defence gets it |
 | **Chip** | 22–40 m (15%), inside 22 m (20%) | 10–13 m over the rushing line, the kicker chases his own |
@@ -244,6 +263,29 @@ type. On the second-last tackle inside 25 m he goes early 35% of the time (grubb
 | **Touch-finder** | Territory kick from deep: own 20 60%, own half 50%, midfield 35%, attacking half 15% | *Implemented in BAK-207 2d:* aims to land 4 m in from the nearer touchline (± 5 m × Boot), rolls 9–13 m for the line; out on the full → the other side's play-the-ball level with the kick |
 | **Field goal** | Last 3 minutes, his side level or a point behind, inside 30 m, tackle 3 or later | *Implemented in BAK-207 2c:* a drop kick, odds by angle, distance, Skill and Boot; charge-down 8%; a miss is a 20 m restart |
 | **Conversion** | After every try | *Implemented in BAK-207 2c:* a Nines drop kick in line with the try, from where the posts look widest; GOAL! / MISSED! |
+
+On an ordinary long punt, the kicker reads the fullback's position as he shapes to kick
+(#650). If the fullback has shifted more than 6 m from the centre, the kicker can aim
+into the opposite half using the usual accuracy scatter. The landing stays in range
+and at least 12 m inside touch. A centred fullback or another defender already covering
+the proposed landing brings back the usual target in front of the fullback. The read
+applies to the kicker's own early and last-tackle punts. Explicit Lab aim, the coach's
+kick calls, 40/20 attempts and touch-finders use their existing targets. `longKick.on:0`
+keeps the previous landing and adds no draw. The long punt landed at engine revision 10.
+Ported from [draft PR #756](https://github.com/ch-leon/nrl-sim/pull/756).
+
+On an ordinary attacking bomb (#650), the kicker looks for an onside winger already
+wide who can reach a landing 8–12 m short of the try line and 8–12 m inside touch.
+If both wingers can get there, the kicker picks the one with more time to spare.
+Inside 22 m, an eligible corner adds the bomb to the options once the kicker has
+already chosen to kick. It has a weight of 0.20 against 1.00 for the other kicks
+combined, before the usual preset lean and using the same kick-type roll.
+The fullback reads the aim during the wind-up. He and the nearest defensive cover
+can still get under it, and the usual bomb contest decides who takes it. A bomb
+from midfield or one without a viable chase keeps the usual fullback aim. Explicit
+Lab aims and scripted kicks use their existing targets. `wingBomb.on:0` keeps the
+fullback aim and adds no draw. Live-match recovery is engine revision 11.
+Ported from [draft PR #757](https://github.com/ch-leon/nrl-sim/pull/757).
 
 Every kick pop-ups its type (BOMB!, GRUBBER!, CHIP!, CROSS-FIELD!, plain KICK! for
 territory); REGATHER! and DROPPED! follow. **The camera goes wide** (N15.3, #297): from the kick's
@@ -253,6 +295,17 @@ zoom that holds them; a trail follows the ball from the boot and fades after the
 the bounce, and the framing is back on the ball within a second. A bomb or a cross-field
 kick rings the two under it as it comes down and lights the one who takes it; a grubber
 leaves a skid mark at each hop (`src/match/view/kickLayer.ts`, tuning reference §9).
+
+On a contested open-play bomb, the chaser and receiver plant and reach while the ball
+is still falling. The catch or regather brings the actual holder's hands around the
+ball, then both players land. On a spill, the loose ball falls to its bounce and both
+come down empty-handed.
+
+When a player recovers a loose ball from the turf in open play, he drops his hips and
+reaches to its ground position. The ball moves into his hands on the awarded pickup,
+then he tucks it as he rises into his standing or running carry. A tackle, pass,
+try or whistle takes over at its usual tick.
+
 **Touch and dead ball** (BAK-207 2d): the side that touched the ball last loses it. Into
 touch → TOUCH, a play-the-ball 10 m in from touch for the other side (no scrums); a carrier
 held on the touchline can be bundled out (INTO TOUCH!). Dead in-goal or over the dead-ball
@@ -402,7 +455,28 @@ This is a bounded movement response to the real run. It does not force a pass,
 change receiver selection, or add a pass, catch, interception or carrier-line
 contest bonus. Ordinary pass and catch checks continue. The read is engine state,
 not snapshot presentation. `shapes.leadDecoy.on:0` leaves the revision 7 line
-targets and RNG stream. Live-match recovery uses engine revision 8.
+targets and RNG stream. The lead read landed at engine revision 8. The centre
+shoulder read below moves live-match recovery to engine revision 9.
+
+### Centre carries out wide (#649)
+
+On an ordinary completed pass in open play, a centre near touch reads the
+nearest eligible defender ahead. Tacklers still recovering, held ruck
+markers and defenders still retreating are out of the read. If the defender
+is sliding toward touch and will be outside the centre's line, the centre
+angles back infield off his inside shoulder. If the defender is caught
+infield and is projected to stay there, the centre straightens past his
+outside shoulder, drifting wider only as needed for clearance. The read
+checks the projected run against other eligible defenders and leaves room
+inside touch. A square defender or a covered lane sends the centre back to
+the usual gap-seeking carry.
+
+The read uses the catch position and defender movement once. It applies
+briefly to a free carry. Manual and scripted play, kicks, and tackle or
+step responses take priority. The normal pass choice, sprint rules and
+contact contests still apply. `live.centreShoulderTicks:0` leaves the
+previous carry target and adds no draw. See tuning's **Centre carries out
+wide** section. Ported from [draft PR #755](https://github.com/ch-leon/nrl-sim/pull/755).
 
 ### 5.2 Defence presets
 
@@ -450,7 +524,7 @@ and Tight kicks long more often and steps less; Kick-chase kicks more and bombs 
 | Step / fend / bust / offload | word + player surname over his head, 1.2 s | a bust is impact tier 2 (freeze, shake, dust); a clean line break shows LINE BREAK! (tier 1: 0.9 s eased slow-mo and the close-up, as do tries and 40/20s) |
 | Big hit | BIG HIT! | 90 ms freeze, camera shake (same size on screen at any zoom), dust at the contact, crowd roar (impact tier 2, #631) |
 | Intercept / strip | word + name | camera snaps to the ball |
-| Trait firing | "SIDESTEP II!" in the trait colour under the word | commentary names the trait; every on-field trait draws a cue on the pitch when it fires (N15.4, #654; `traitLayer.ts`, `sprintLayer.ts`; the player page's "You will see it as …" is each trait's `seen`): the fend's arm, the step's cut, Big Boot's wider trail, the Playmaker's line, the Wrecking Ball's drive, the Hitman's shock, **Offload King** the ball arcing out the back of the tackle to the nearest teammate, **Razzle Dazzle** sparkles and a wobbling arc on the flick (offload event, whether or not it is later spilled), **Pickpocket** a spark on the carrier and a line to the thief (strip), **Poacher** the pass lane back to the passer and a spark at the thief (intercept; a read that misses emits nothing, so only the success shows), **Gambler** a lunge and a tumbling die, gold on the intercept and red on the `gamble` miss, **Hothead** a red temper mark and flare after a penalty against him, **Jets** a longer streak in the trait colour and dust laid by his stride while he sprints, **Brick Wall** a brick wall and a shock where a two-man tackle stops the carrier, **Last Line** a marker and ring on the last line's tackle of a runner who has beaten four of his defence, with a held frame (impact tier 2, only when the moment has no beat of its own), **Workhorse** a horseshoe on his third tackle of a set (counted in the view from tackle events, reset on any change of possession). Brick Wall, Last Line, Workhorse and Jets are never named by a sim event (the sim only moves odds, speed or drain), so their cues read the tackle or sprint plus the sheets' traits; nothing was added to the sim |
+| Trait firing | "SIDESTEP II!" in the trait colour under the word | commentary names the trait; every on-field trait draws a cue on the pitch when it fires (N15.4, #654; `traitLayer.ts`, `sprintLayer.ts`; the player page's "You will see it as …" is each trait's `seen`): the fend's arm, the step's cut, Big Boot's wider trail, the Playmaker's line, the Wrecking Ball's drive, the Hitman's shock, **Offload King** an arc out the back of the tackle to the actual support receiver, **Razzle Dazzle** sparkles and a wobbling arc on the flick (offload event, whether or not it is later spilled), **Pickpocket** a spark on the carrier and a line to the thief (strip), **Poacher** the pass lane back to the passer and a spark at the thief (intercept; a read that misses emits nothing, so only the success shows), **Gambler** a lunge and a tumbling die, gold on the intercept and red on the `gamble` miss, **Hothead** a red temper mark and flare after a penalty against him, **Jets** a longer streak in the trait colour and dust laid by his stride while he sprints, **Brick Wall** a brick wall and a shock where a two-man tackle stops the carrier, **Last Line** a marker and ring on the last line's tackle of a runner who has beaten four of his defence, with a held frame (impact tier 2, only when the moment has no beat of its own), **Workhorse** a horseshoe on his third tackle of a set (counted in the view from tackle events, reset on any change of possession). Brick Wall, Last Line, Workhorse and Jets are never named by a sim event (the sim only moves odds, speed or drain), so their cues read the tackle or sprint plus the sheets' traits; nothing was added to the sim |
 | Kick | type (BOMB!, 40/20!) | wide camera, trail |
 | Try | existing banner (#82) | scorer's traits listed |
 | Wrestle (§8.1) | bar over the carrier: fight left, green → yellow → red, a pip per man on him | BROKE FREE! on a late bust |
@@ -713,6 +787,8 @@ makes the break but can't finish it, the workhorse who is never quick and never 
 | N13.5 | A side's plan can change at half-time and after a try, by a rule the match opts into — *shipped* (off unless a side is named; N14 wires the rivals). Tuning §30 | §5 |
 | #649.1 | The weighted receiver: the pass goes to one of the near-best options by weight, not always the best — *awaiting lab sign-off*. Tuning §5 | §4.2 |
 | #650.1 | More options on the last: kick, run it or shift it wide by zone, style, the late score and who is on the field; the second-last's early kick leans the same way — *awaiting lab sign-off*. Tuning §6 | §4.4 |
+| #650 | Attacking bombs can go to either winger's corner when the chase can reach it — *awaiting lab sign-off*. Tuning §6 | §4.4 |
+| #650 | The dummy-half can find the deeper five-eighth in space when the halfback is pressured on the last tackle — *awaiting lab sign-off*. Tuning §6 | §4.4 |
 | #652.1 | Held up over the line: any defender on a carrier in contact at the line can hold him up (a lone tackler too, Leon 13 Nov 2026); play-the-ball 10 m out, the tackle counted — *awaiting lab sign-off*. Tuning §11 | §8.1 |
 
 Then BAK-207 Phase 2 (full match, scoring, halves) and Phase 3 (balance).

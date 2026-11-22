@@ -26,7 +26,8 @@ import { BREAKS } from './breaks';
 import { CALLS } from './calls';
 import { KICKOFF } from './kickoff';
 import { KICK_CONTEST } from './kickContest';
-import { LAST_TACKLE } from './lastTackle';
+import { LAST_TACKLE, SECOND_KICKER } from './lastTackle';
+import { LONG_KICK, WING_BOMB } from './tactics';
 import { HELD_UP, WRESTLE } from './wrestle';
 import { BIN } from './sinbin';
 import { PLAYS } from './plays';
@@ -78,6 +79,9 @@ export const KNOBS = {
   kickoff: KICKOFF,
   kickContest: KICK_CONTEST,
   lastTackle: LAST_TACKLE,
+  secondKicker: SECOND_KICKER,
+  longKick: LONG_KICK,
+  wingBomb: WING_BOMB,
   breaks: BREAKS,
   goals: GOALS,
   bin: BIN,
