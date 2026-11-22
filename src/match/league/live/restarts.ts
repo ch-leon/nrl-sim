@@ -3,7 +3,7 @@ import { SET_TACKLES } from '../../../config';
 import { traitBoost } from '../../../data/traits';
 import { FIELD_LENGTH, MID_Y, clampToGround } from '../../core/field';
 import { bounceFlight, kickFlight, landed, rollFlight, type BallState } from '../../core/ball';
-import type { Side } from '../../core/snapshot';
+import type { ConversionSnap, Side } from '../../core/snapshot';
 import { add, clamp, dist, scale, type Vec } from '../../core/vec';
 import { FIVE_EIGHTH, FULLBACK, KICKER } from '../roles';
 import { SECOND_KICKER } from '../lastTackle';
@@ -17,6 +17,9 @@ import { other, type Player, type Phase, type RuckDecision } from './types';
 import { LivePlay } from './play';
 
 export abstract class LiveRestarts extends LivePlay {
+  /** The last conversion's decision, carried into the dead-ball picture. The sim never reads it. */
+  protected conversionDecision?: ConversionSnap & { decision: NonNullable<ConversionSnap['decision']> };
+
   protected stepRuck(ph: Extract<Phase, { kind: 'ruck' }>): void {
     const c = this.players[ph.carrier]!;
     if (ph.stage === 'down') {
@@ -445,13 +448,14 @@ export abstract class LiveRestarts extends LivePlay {
   /** The kicker walks to his spot, lines it up, drops it; the flight shows over or wide, then the restart. */
   protected stepConversion(ph: Extract<Phase, { kind: 'conversion' }>): void {
     const k = this.players[ph.kicker]!;
-    const posts = postsFor(this.dirOf(ph.side), FIELD_LENGTH, MID_Y);
+    const toward = this.dirOf(ph.side);
+    const posts = postsFor(toward, FIELD_LENGTH, MID_Y);
     if (ph.good === null) {
       if (ph.readyAt === 0 && dist(k.body.pos, ph.spot) < 1) ph.readyAt = this.tick;
       if (this.tick < goalStrikeTick(ph)) return;
       ph.good = this.rng.next() < goalChance(k.body.pos, posts, k.stats.kicking, this.goalAcc(k));
       this.lock(k, 'kick', LIVE.kickLockTicks);
-      this.ball = kickFlight(k.body.pos, this.goalAim(posts, this.dirOf(ph.side), ph.good), this.tick, null, 7);
+      this.ball = kickFlight(k.body.pos, this.goalAim(posts, toward, ph.good), this.tick, null, 7);
       return;
     }
     if (this.ball.kind !== 'flight' || !landed(this.ball, this.tick)) return;
@@ -459,7 +463,10 @@ export abstract class LiveRestarts extends LivePlay {
     if (ph.good) this.points[ph.side] += pen ? PENALTY.goalPoints : NINES.conversionPoints;
     const score = `${this.names.home} ${this.points.home} – ${this.points.away} ${this.names.away}`;
     if (pen) this.emit('penalty-goal', ph.good ? `${k.name} kicks the penalty goal — ${score}` : `${k.name} misses the penalty goal`, k);
-    else this.emit('conversion', ph.good ? `${k.name} converts — ${score}` : `${k.name} misses the conversion`, k);
+    else {
+      this.emit('conversion', ph.good ? `${k.name} converts — ${score}` : `${k.name} misses the conversion`, k);
+      this.conversionDecision = { toward, spot: { ...ph.spot }, decision: { tick: this.tick, good: ph.good } };
+    }
     this.events[this.events.length - 1]!.detail = ph.good ? 'good' : 'missed';
     if (!ph.good) this.react(k, 'miss');
     if (pen && !ph.good) {

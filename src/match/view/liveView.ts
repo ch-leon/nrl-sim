@@ -57,8 +57,8 @@ export interface ViewSurface {
     paint(state: ContactAnimation | null, layout: ContactLayout | null, facing: 'front' | 'back'): void;
     offloadAnchor?(state: ContactAnimation, layout: ContactLayout): { x: number; y: number } | undefined;
   };
-  /** The referee, benches and sin bin (#642): where a binned man sits, and drawn from the same two ticks. */
-  officials?: { spot(p: PlayerSnap, s: Snapshot): { x: number; y: number } | null; draw(prev: Snapshot, cur: Snapshot, alpha: number): void };
+  /** Officials, benches and sin bin: drawn from the same ticks as the players. */
+  officials?: { spot(p: PlayerSnap, s: Snapshot): { x: number; y: number } | null; draw(prev: Snapshot, cur: Snapshot, alpha: number, heldTicks: number): void };
 }
 
 /** World px per metre of lift (the ball sprite rises this much per metre). */
@@ -311,7 +311,7 @@ export class LiveView {
       }
       this.s.focus?.carrier(null);
     }
-    this.s.officials?.draw(prev, cur, a);
+    this.s.officials?.draw(prev, cur, a, heldTicks);
     if (placed >= CUT_BODIES) this.s.cut?.();
     this.faded = !!brk;
     // Held balls are painted once in the player's hands (or the shared tackle).

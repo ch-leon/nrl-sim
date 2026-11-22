@@ -132,6 +132,13 @@ export interface GroundPickupSnap {
   feet: { x: number; y: number };
 }
 
+/** A try's conversion at the end it attacks. The outcome appears only on the official decision tick. */
+export interface ConversionSnap {
+  readonly toward: 1 | -1;
+  readonly spot: Readonly<{ x: number; y: number }>;
+  readonly decision?: Readonly<{ tick: number; good: boolean }>;
+}
+
 /** Keep the cue through the last interpolation into the ordinary carry. */
 export const GROUND_PICKUP_TICKS = 6;
 
@@ -168,6 +175,7 @@ export interface Snapshot {
   /** Short visual reach and landing around a contested bomb. Possession comes from the ball. */
   bombContest?: BombContestSnap;
   groundPickup?: GroundPickupSnap;
+  conversion?: ConversionSnap;
   /** Short state label for the lab readout (phase, set, tackle count...). */
   label: string;
   /** Events emitted on this tick. */

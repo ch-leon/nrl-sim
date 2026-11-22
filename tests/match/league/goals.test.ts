@@ -115,11 +115,13 @@ describe('field goals in the live sim', () => {
     }
     expect(drops.length).toBeGreaterThan(3);
     for (const d of drops) {
+      expect(d.snap.conversion).toBeUndefined();
       const toPosts = d.snap.players.find((p) => p.side === d.e.side && p.slot === d.e.slot)!;
       const px = d.e.side === 'home' ? 100 : 0;
       expect(Math.hypot(toPosts.x - px, toPosts.y - 34)).toBeLessThanOrEqual(GOALS.fieldGoalRangeM + 3);
     }
     expect(results.length).toBeGreaterThan(0);
+    for (const result of results) expect(result.snap.conversion).toBeUndefined();
     for (const a of after) if (a.e.kind === 'set-start') expect(a.e.text).toMatch(/20-metre restart/);
   });
 

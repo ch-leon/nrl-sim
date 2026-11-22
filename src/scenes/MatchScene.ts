@@ -43,7 +43,7 @@ import {
   type PlaybackBall,
   type PlaybackSpeed,
 } from '../match/view/livePlayback';
-import { KICK_BACK_PER_S, KICK_OUT_PER_S, KICK_PAN_MAX_PX_PER_MS, KICK_RETURN_MS, FRAME_MARGIN, cameraFrame, type Frame } from '../match/view/kickLayer';
+import { KICK_BACK_PER_S, KICK_OUT_PER_S, KICK_PAN_MAX_PX_PER_MS, KICK_RETURN_MS, FRAME_MARGIN, cameraFrame, kickFrame, type Frame } from '../match/view/kickLayer';
 import { NINES } from '../match/league/rules';
 import { ON_FIELD, SET_TACKLES } from '../config';
 import type { LiveMatchData } from '../core/events';
@@ -271,7 +271,7 @@ export class MatchScene extends Phaser.Scene {
   public readonly players: { home: MatchActor[]; away: MatchActor[] } = { home: [], away: [] };
   public ball!: MatchBall;
   public contact?: MatchContactLayer;
-  /** The referee, benches, sin bin and corner flags (#642), drawn by LiveView from the same ticks as the players. */
+  /** Officials, benches and flags, drawn by LiveView from the same ticks as the players. */
   public officials?: MatchOfficials;
   private playerFrames: PlayerFrameCache | null = null;
   /** Readability hooks driven by playback (#17): name tags + carrier ring. */
@@ -646,11 +646,14 @@ export class MatchScene extends Phaser.Scene {
     // A kick goes wide (N15.3): the camera holds the kicker and where the ball comes down
     // while it is up, then comes back to the ball within a second of the catch or the bounce.
     const cam0 = this.cameras.main;
-    // A try's replay (N15.5) frames the ball wide, ahead of a kick's own framing.
+    // A try's replay (N15.5) frames the ball wide, ahead of the live camera's framing.
     const replay = this.playback?.replayFraming() ?? null;
     // The replay's zoom is a CSS one (REPLAY_ZOOM); the camera's is canvas px per art px.
     const replayFrame = replay && { ...replay, zoom: Math.max(1, Math.round(replay.zoom * screenDensity())) };
-    const kick = this.playback?.kickFraming({ width: cam0.width, height: cam0.height }, this.zoomTarget) ?? null;
+    const viewport = { width: cam0.width, height: cam0.height };
+    const judges = this.officials?.conversionFocus;
+    const kick = judges ? kickFrame(judges, viewport, this.zoomTarget)
+      : this.playback?.kickFraming(viewport, this.zoomTarget) ?? null;
     // A pinch or a wheel has the camera: a kick does not pan it off the ball (note 10).
     this.kickFrame = cameraFrame(replayFrame, kick, this.autoZoom === null);
     if (this.kickFrame) this.kickBackUntil = time + KICK_RETURN_MS;
