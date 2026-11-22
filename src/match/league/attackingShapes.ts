@@ -1,14 +1,16 @@
-// Ordinary PTB structures (#649). Real movement targets, never decoy/receiver predictions.
+// Ordinary PTB structures (#649) and the defender's read of a real lead run.
 import { FIELD_WIDTH } from '../core/field';
 import { clamp, type Vec } from '../core/vec';
 import { formationTarget, ROLES } from './roles';
 import type { AttackPreset } from './presets';
-import type { AttackShapeSnap } from '../core/snapshot';
+import type { AttackShapeSnap, ContactPlayer } from '../core/snapshot';
 
 export type ShapeKind = AttackShapeSnap['kind'];
 export interface AttackingShape extends AttackShapeSnap {
   /** Engine-owned continuation of the actual second flight; never projected into snapshots. */
   secondPass?: { startedTick: number; leadTo: Vec; supportTo: Vec };
+  /** One line defender's brief read. Null closes it for the rest of this packet. */
+  leadRead?: { defender: ContactPlayer; until: number } | null;
 }
 /** Weights/multipliers and authored metres; exposed to the harness as shapes.*. */
 export const SHAPES = {
@@ -23,6 +25,7 @@ export const SHAPES = {
   pod: { propDepth: 3.5, propWidth: -3, rowDepth: 4.5, rowWidth: 4, linkDepth: 7, linkWidth: 2 },
   edge: { halfDepth: 4, halfWidth: 6, linkDepth: 5.5, linkWidth: 12, wingDepth: 7, wingWidth: 18 },
   backDoor: { on: 1, callerDepth: 4, callerWidth: 6, leadDepth: 3, leadWidth: 8, supportDepth: 6, supportWidth: 0, leadAheadM: 3, trailDepthM: 2, leadClearM: 0.5, sweepWidthM: 15, sweepLeadTicks: 5 },
+  leadDecoy: { on: 1, reachM: 8, shadeM: 2, readTicks: 8 },
 };
 export function shapeWeights(preset: AttackPreset, tackle: number, toLine: number, y: number): Record<ShapeKind, number> {
   const w = { ...SHAPES.weights[preset] };
