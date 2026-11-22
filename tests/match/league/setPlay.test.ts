@@ -146,9 +146,9 @@ describe('the launch and the script (plan §3.3)', () => {
         if (h && h.side === 'home' && h.slot === 8) took = sim.tick;
       }
       if (took < 0) continue;
-      // The five-eighth option moves which seed completes first. Keep the same
-      // requirements: another home play already launched, and the away side has not.
-      if (sim.playsRun.launched.home <= 1 || sim.playsRun.launched.away !== 0) continue;
+      // The five-eighth option moves which seed completes first. Keep looking until
+      // another home play has already launched. The away side still must not have.
+      if (sim.playsRun.launched.home <= 1) continue;
       expect(took).toBeGreaterThan(launch.tick);
       expect(sim.playsRun.launched.home).toBeGreaterThan(1);
       expect(sim.playsRun.launched.away).toBe(0);
