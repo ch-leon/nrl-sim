@@ -22,6 +22,21 @@ export interface ContactSnap {
   releaseTick?: number;
 }
 
+/** A successful open-play step, timed to the jink or the beaten defender's lock. */
+export type StepSnap = {
+  startedTick: number;
+  untilTick: number;
+} & ({
+  role: 'carrier';
+  /** The carrier's across-field jink, in metres. */
+  lateral: number;
+} | {
+  role: 'defender';
+  /** Direction from the defender to the carrier before the jink, in field metres. */
+  reachX: number;
+  reachY: number;
+});
+
 export interface PlayerSnap {
   side: Side;
   slot: number;
@@ -42,6 +57,7 @@ export interface PlayerSnap {
   poseUntil?: number;
   caughtTick?: number;
   /** Presentation facts only; deadlines and outcomes still belong to the sim. */
+  step?: StepSnap;
   kick?: { startedTick: number; strikeTick: number; untilTick: number; kind: 'punt' | 'grubber' | 'drop' };
   /**
    * A shot at goal (#669), on the kicker from the tick he is on his spot (`readyTick`) to the end of the
@@ -106,6 +122,17 @@ export interface BombContestSnap {
   releasedTick?: number;
 }
 
+/** A player has taken a loose ball in open play. These positions only align the picture. */
+export interface GroundPickupSnap {
+  tick: number;
+  at: { x: number; y: number };
+  player: ContactPlayer;
+  feet: { x: number; y: number };
+}
+
+/** Keep the cue through the last interpolation into the ordinary carry. */
+export const GROUND_PICKUP_TICKS = 6;
+
 /** Something that happened on this tick, for the lab log / commentary. */
 export interface SimEvent {
   tick: number;
@@ -138,6 +165,7 @@ export interface Snapshot {
   ball: BallSnap;
   /** Short visual reach and landing around a contested bomb. Possession comes from the ball. */
   bombContest?: BombContestSnap;
+  groundPickup?: GroundPickupSnap;
   /** Short state label for the lab readout (phase, set, tackle count...). */
   label: string;
   /** Events emitted on this tick. */

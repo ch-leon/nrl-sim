@@ -2,7 +2,7 @@ import type { ControlInput } from '../controls';
 import type { RosterEntry, TeamSheet } from '../../../sim/events';
 import type { Position } from '../../../core/state';
 import type { Body } from '../../core/body';
-import type { ContactPlayer, Side } from '../../core/snapshot';
+import type { ContactPlayer, Side, StepSnap } from '../../core/snapshot';
 import type { Vec } from '../../core/vec';
 import { AVERAGE, type ContestStats } from '../contest';
 import { FULLBACK, HOOKER, KICKER } from '../roles';
@@ -85,6 +85,8 @@ export interface Player {
   steppedOn: number;
   /** A sidestep in progress: lateral metres still to cover, over this many ticks. */
   jink: { dy: number; ticks: number } | null;
+  /** Render-only timing for a successful step. */
+  visualStep: StepSnap | null;
   target: Vec;
   through: boolean;
   /** Coming off for this bench man (2b): he jogs to `subSpot` on the touchline first. */

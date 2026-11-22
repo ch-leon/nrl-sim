@@ -41,6 +41,12 @@ equal stats → baseline 10% step, 12% bust, 7% fend, 12% offload (if a support 
 0.22 → **STEP!** with *DANCING FEET II* under it — the defender grasps air, the carrier is
 through, the crowd lifts.
 
+A successful open-play step shows the carrier plant and push in the direction of
+the jink with the ball tucked. The defender he beats reaches toward the vacated
+lane and regathers on his feet through his recovery lock. A manual jink that fails
+the contest still moves the carrier sideways and leaves out the successful-step
+poses.
+
 ## 2. Base stats (every player)
 
 | Stat | What it drives |
@@ -268,6 +274,11 @@ On a contested open-play bomb, the chaser and receiver plant and reach while the
 is still falling. The catch or regather brings the actual holder's hands around the
 ball, then both players land. On a spill, the loose ball falls to its bounce and both
 come down empty-handed.
+
+When a player recovers a loose ball from the turf in open play, he drops his hips and
+reaches to its ground position. The ball moves into his hands on the awarded pickup,
+then he tucks it as he rises into his standing or running carry. A tackle, pass,
+try or whistle takes over at its usual tick.
 
 **Touch and dead ball** (BAK-207 2d): the side that touched the ball last loses it. Into
 touch → TOUCH, a play-the-ball 10 m in from touch for the other side (no scrums); a carrier
