@@ -5,7 +5,7 @@ import { LIVE } from '../league/live/knobs';
 import type { LivePlayerAction, Reaction } from '../../art/match/livePlayer';
 import { hashString } from '../../art/match/kit';
 import { MOMENT_ACTIONS, TRAVEL_ENDINGS, momentLift, type MomentAction } from '../../art/match/moments';
-import { screenFacing, screenPlayerFacing } from './screenFacing';
+import { screenFacing, screenHeading, screenPlayerFacing } from './screenFacing';
 import { legsBand } from './legsLayer';
 import { FATIGUE } from '../league/fatigue';
 import { eyesUp, type EyesUp } from './eyesUp';
@@ -253,6 +253,25 @@ export function playerPicture(p: PlayerSnap, previous: PlayerSnap, tick: number,
     else if (movement === 'shuffleBack' || movement === 'shuffleForward' || movement === 'backpedal') movement = undefined;
     if (movement && strideFrame !== undefined) strideFrame = movementStride(strideFrame, movement, p.odometer, p.slot);
     if (movement && (action === 'run' || action === 'carry')) frame = Math.max(0, strideFrame ?? stride) % 6;
+  }
+  const step = p.step;
+  if (step && !p.binned && ctx.motionLive !== false && !scene && !off?.action && !shot && tick >= step.startedTick && tick < step.untilTick) {
+    const progress = (tick - step.startedTick) / (step.untilTick - step.startedTick);
+    if (step.role === 'carrier' && possession && (action === 'carry' || action === 'catch') && step.lateral !== 0) {
+      // The jink is added to the body's position, separately from its steering heading.
+      const cutX = screenHeading(0, step.lateral, screenDir).x;
+      action = 'carry';
+      movement = cutX * (facing.left ? -1 : 1) < 0 ? 'cutBack' : 'cutForward';
+      frame = strideFrame = progress < .5 ? 0 : 3;
+    } else if (step.role === 'defender' && !possession && action === 'tackled') {
+      action = 'wrongFoot';
+      frame = clampFrame(progress * 6);
+      // Reach where the runner was at the contest, then turn back onto his own heading.
+      if (frame < 4) {
+        const reach = { headX: step.reachX, headY: step.reachY };
+        facing = screenPlayerFacing(reach, p, screenDir);
+      }
+    }
   }
   // Eyes on the bomb (#671): standing or running, ball elsewhere, one of the few under it.
   const lookUp = ctx.eyesUp?.who.has(`${p.side}/${p.slot}`) && (action === 'idle' || action === 'run') && !possession && !p.binned ? ctx.eyesUp.level : 0;

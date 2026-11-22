@@ -192,6 +192,7 @@ export abstract class LiveClock extends LiveSetPlays {
     const wasHurt = p.hurt;
     p.name = b.name;
     p.key = b.key;
+    p.visualStep = null;
     if (b.id) p.id = b.id;
     else delete p.id;
     p.injuryRisk = b.injuryRisk;

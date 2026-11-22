@@ -9,10 +9,11 @@ import { lookUpFrame } from './lookUp';
 
 /** `ready`: a defender set for the play-the-ball (#665). The reactions (#667): standing or on the run. */
 export type Reaction = 'handsOnHead' | 'handsOnHips' | 'armsFolded';
-export type LivePlayerAction = PlayerAnim | 'carry' | 'ready' | 'call' | 'receive' | 'guard' | Reaction | MomentAction;
+export type LivePlayerAction = PlayerAnim | 'carry' | 'ready' | 'call' | 'receive' | 'guard' | 'wrongFoot' | Reaction | MomentAction;
 const BASIC: Partial<Record<LivePlayerAction, Action | ReactAction>> = {
   idle: 'idle', run: 'run', carry: 'carry', pass: 'pass', catch: 'catch', call: 'call', receive: 'receive', guard: 'guard',
   tackle: 'wrap', tackled: 'brace', down: 'ground', dive: 'ground', ptb: 'ptb', fend: 'fend',
+  wrongFoot: 'wrongFoot',
   handsOnHead: 'headHands', handsOnHips: 'hips', armsFolded: 'fold',
 };
 
