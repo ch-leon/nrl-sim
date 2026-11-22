@@ -197,11 +197,11 @@ describe('ordinary attacking bombs to the winger’s corner (#650)', () => {
   });
 
   it('finds both corners in ordinary seeded play without a coach call or a Lab aim', () => {
-    // Current main: Mariners v Brumbies seed 25 bombs to the high corner at 1117,
-    // and Brumbies v Mariners seed 8 bombs to the low corner at 4551. The draft's
-    // seeds 4 and 36 were recorded before the later match changes.
-    const near = new BombSim(labSheet('rival-mariners'), labSheet('rival-brumbies'), 25).firstCornerBomb(1_500);
-    const far = new BombSim(labSheet('rival-brumbies'), labSheet('rival-mariners'), 8).firstCornerBomb(4_800);
+    // The five-eighth option moves the previous witnesses (Mariners v Brumbies seed 25
+    // at 1117, Brumbies v Mariners seed 8 at 4551). Brumbies v Mariners seed 96 bombs
+    // to the high corner at 5327, and Mariners v Brumbies seed 33 to the low corner at 2088.
+    const near = new BombSim(labSheet('rival-brumbies'), labSheet('rival-mariners'), 96).firstCornerBomb(5_600);
+    const far = new BombSim(labSheet('rival-mariners'), labSheet('rival-brumbies'), 33).firstCornerBomb(2_500);
     if (!near || !far) throw new Error('Expected a natural bomb to each corner');
     expect(near.to.y).toBeGreaterThanOrEqual(FIELD_WIDTH - 12);
     expect(near.to.x - near.from.x).toBeGreaterThan(0);

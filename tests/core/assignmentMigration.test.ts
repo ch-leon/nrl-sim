@@ -49,12 +49,14 @@ const squadIdentity = (save: Save) => save.squad.map(p => ({
 
 /**
  * Every competition, and every fixture's teams, round and played/scheduled status, without
- * its score. A finished competition's winner is a result too: it must still have one, and
- * one of its own entrants.
+ * its score. A winner, when the result names one, is one of that competition's entrants.
+ * A draw names none (`decider: 'draw'`), and a draw is a match result.
  */
 const fixtureCalendar = (save: Save) => save.competitions.instances.map(({ fixtures, winnerId, ...instance }) => ({
   ...instance,
-  decided: winnerId !== undefined && (instance.entrantIds as unknown[]).includes(winnerId),
+  decided: winnerId !== undefined
+    ? (instance.entrantIds as unknown[]).includes(winnerId)
+    : fixtures.some(f => (f.result as { decider?: string } | undefined)?.decider === 'draw'),
   fixtures: fixtures.map(f => ({ id: f.id, round: f.round, homeId: f.homeId, awayId: f.awayId, status: f.status })),
 }));
 
@@ -100,6 +102,7 @@ it.each(['au', 'uk'] as const)(
     advanceWeekAsTapped();
     const replayed = { ...getState(), version: 33 } as unknown as Save;
     // Migration, Skills Camp, the cup offer, money and the calendar: exact on any engine.
+    // The five-eighth option draws the captured player trial. A draw is a result and names no winner.
     expect(withoutMatchResults(replayed)).toEqual(withoutMatchResults(w5));
     expect(squadIdentity(replayed)).toEqual(squadIdentity(w5));
     expect(fixtureCalendar(replayed)).toEqual(fixtureCalendar(w5));

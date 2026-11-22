@@ -56,7 +56,10 @@ keeps the previous carry. An ordinary long punt can then aim away from a shading
 fullback, which moves live-match recovery to engine revision 10; `longKick.on:0`
 keeps the previous landing. An attacking bomb can then go to a winger's corner
 when the chase is on, which moves live-match recovery to engine revision 11;
-`wingBomb.on:0` keeps the fullback aim. BAK-208 and the tuning reference list the rules and
+`wingBomb.on:0` keeps the fullback aim. On the last tackle the dummy-half can
+find the deeper five-eighth when the halfback is under pressure, which moves
+live-match recovery to engine revision 12; `secondKicker.on:0` keeps the
+previous ruck. BAK-208 and the tuning reference list the rules and
 values. The PR records the balance comparison and the #322 edge-race check.
 
 Status: stages 1–4 presentation and the first stage-5 pass are implemented in

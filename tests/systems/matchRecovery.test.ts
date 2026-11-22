@@ -46,7 +46,7 @@ afterEach(() => {
 });
 
 // A held match from the engine before wing bombs (revision 10) is not this engine.
-const previousEngine = matchEngineIdentity().replace(/^nrl-live-11-/, 'nrl-live-10-');
+const previousEngine = matchEngineIdentity().replace(/^nrl-live-12-/, 'nrl-live-11-');
 const badIds = [undefined, 'bad identity', 'nrl-live-999-00000000000000', previousEngine] as const;
 describe.each([null, DEV_TEST_PREFIX])('recovery namespace %s', namespace => {
   it.each(badIds)('restarts only this fixture on reload with identity %s, preserving once-only effects', engineId => {

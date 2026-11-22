@@ -7,6 +7,8 @@ live gameplay change; work still open below has not shipped.
 
 ## Now
 
+- **A second kicker on the last.** Dummy-half can find the deeper five-eighth when the halfback is under pressure. Ported from draft PR #760, part of [#650](https://github.com/ch-leon/nrl-sim/issues/650).
+
 - **Attacking bombs to the corner.** An ordinary bomb can land in a winger's corner when that winger can chase it. Ported from draft PR #757, part of [#650](https://github.com/ch-leon/nrl-sim/issues/650).
 
 - **Ordinary long kicks.** A territory punt can land in the open half when the fullback has shaded across. Ported from [draft PR #756](https://github.com/ch-leon/nrl-sim/pull/756), part of [#650](https://github.com/ch-leon/nrl-sim/issues/650). Explicit aims, 40/20s and touch-finders are unchanged.

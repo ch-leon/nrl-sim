@@ -120,12 +120,13 @@ export interface BenchMan {
 export interface RuckDecision {
   from: ContactPlayer; to: ContactPlayer | null;
   decidedAt: number; until: number; kicker: boolean; cancelled?: true;
+  secondKicker?: true;
 }
 
 export type Phase =
   | { kind: 'restart'; t0: number; kicking: Side; from?: 'goal-line' }
   | { kind: 'set-piece'; t0: number; side: Side; spot: Vec; how: 'ptb' | 'tap'; player: number }
-  | { kind: 'play'; shape?: AttackingShape | null }
+  | { kind: 'play'; shape?: AttackingShape | null; secondKicker?: ContactPlayer & { catchTick: number } }
   | { kind: 'tackle'; t0: number; carrier: number; tackler: number; big: boolean; wrestle: WrestleState | null; wreck: number; shape?: AttackingShape | null }
   | { kind: 'ruck'; t0: number; carrier: number; tackler: number; stage: 'down' | 'ptb' | 'dh'; handover: boolean; heldAt: number; down: number; pace: 'quick' | 'slow' | null; contactStartedTick?: number; decision?: RuckDecision; shape?: AttackingShape | null }
   | { kind: 'try'; t0: number; scorer: number }
