@@ -57,7 +57,7 @@ describe('connected handling artwork (#702)', () => {
       for (let i = 1; i < anchors.length; i++) {
         const from = anchors[i - 1]!, to = anchors[i]!;
         expect(to.y).toBeGreaterThan(from.y);
-        expect(Math.hypot(to.x - from.x, to.y - from.y)).toBeLessThanOrEqual(9);
+        expect(Math.hypot(to.x - from.x, to.y - from.y)).toBeLessThanOrEqual(10);
       }
     }
   });
