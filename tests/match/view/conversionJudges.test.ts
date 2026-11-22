@@ -54,8 +54,8 @@ describe('touch judges at conversions', () => {
     }
     const raised = replay[award + 3 - from]!;
     expect(conversionJudges(raised)?.pose).toBe(good ? 'up' : 'ready');
-    expect(conversionJudges(replay.at(-2)!)?.pose).toBe(good ? 'up' : 'ready');
-    expect(conversionJudges(replay.at(-1)!)).toBeNull();
+    expect(conversionJudges(replay[last - 1 - from]!)?.pose).toBe(good ? 'up' : 'ready');
+    expect(conversionJudges(replay[last - from]!)).toBeNull();
     expect(CONVERSION_SIGNAL_TICKS).toBeLessThan(LIVE.restartTicks);
 
     r.seek(raised.tick);
