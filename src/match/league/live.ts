@@ -146,6 +146,7 @@ export class LiveSim extends LivePositioning implements MatchSim {
       if (this.kickFrom) this.endKick(h.side, h.body.pos);
     }
     this.watchLineBreak(h);
+    this.watchBombContest();
     this.expireCalls();
     if (this.scripted || this.tucked >= 0) this.tidyPlays();
     if (this.attacking !== beforeSide || this.tackles < beforeTackles
@@ -228,6 +229,7 @@ export class LiveSim extends LivePositioning implements MatchSim {
       attacking: this.attacking,
       players,
       ball,
+      ...(this.visualBombContest ? { bombContest: this.visualBombContest } : {}),
       label: `${this.names[this.attacking]} ball · ${state} · ${this.points.home}–${this.points.away} · ${clockText(this.half, this.clockTicks * TICK_S)}${this.siren && (kind === 'play' || kind === 'tackle' || kind === 'ruck') ? ' · siren' : ''} · ${legs}${short}`,
       events: this.events,
       clock: { half: this.half, seconds: this.clockTicks * TICK_S, minute: Math.floor(this.matchSeconds / 60), siren: this.siren, finished: this.finished },

@@ -253,6 +253,12 @@ zoom that holds them; a trail follows the ball from the boot and fades after the
 the bounce, and the framing is back on the ball within a second. A bomb or a cross-field
 kick rings the two under it as it comes down and lights the one who takes it; a grubber
 leaves a skid mark at each hop (`src/match/view/kickLayer.ts`, tuning reference §9).
+
+On a contested open-play bomb, the chaser and receiver plant and reach while the ball
+is still falling. The catch or regather brings the actual holder's hands around the
+ball, then both players land. On a spill, the loose ball falls to its bounce and both
+come down empty-handed.
+
 **Touch and dead ball** (BAK-207 2d): the side that touched the ball last loses it. Into
 touch → TOUCH, a play-the-ball 10 m in from touch for the other side (no scrums); a carrier
 held on the touchline can be bundled out (INTO TOUCH!). Dead in-goal or over the dead-ball
