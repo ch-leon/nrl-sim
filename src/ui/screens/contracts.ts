@@ -234,12 +234,25 @@ function render(sub: HTMLElement, tbody: HTMLElement, saleHost: HTMLElement): vo
       el('td', { class: 'nrl-contract-rating', attrs: { title: `Overall ${Math.round(overallRating(p))}` } },
         starsEl(playerStars(p), { size: 12 }),
         el('span', { class: 'nrl-num nrl-contract-ovr', text: String(Math.round(overallRating(p))) })),
-      el('td', { class: `nrl-num${weeks <= EXPIRY_WINDOW_WEEKS && !queued ? ' nrl-contract-soon' : ''}`, text: `${weeks} wk${weeks === 1 ? '' : 's'}` }),
+      endsCell(weeks, queued?.endSeason ?? p.deal?.endSeason, !queued),
       el('td', { class: 'nrl-num', text: fmtMoney(careerActionClock(s).structural ? activeSalary(p, careerActionClock(s).season) : p.deal?.salary ?? 0), attrs: { title: 'Annual salary on the cap' } }),
       el('td', {}, el('div', { class: 'nrl-contract-actions' }, renew, release, sell)),
     ));
   }
   tbody.replaceChildren(...rows);
+}
+
+/**
+ * When the deal ends (§6, "Ends season n"): its last season, "S2", or a queued renewal's. Inside
+ * the expiry window the weeks are what count, so a deal about to end keeps "3 wks", in amber. A
+ * player with no deal on record keeps the weeks. The title has both.
+ */
+function endsCell(weeks: number, endSeason: number | undefined, canLapse: boolean): HTMLElement {
+  const left = `${weeks} wk${weeks === 1 ? '' : 's'}`;
+  const soon = canLapse && weeks <= EXPIRY_WINDOW_WEEKS;
+  const text = soon || endSeason === undefined ? left : `S${endSeason}`;
+  const title = endSeason === undefined ? `${weeks} weeks left` : `Ends season ${endSeason} · ${weeks} weeks left on this deal`;
+  return el('td', { class: `nrl-num${soon ? ' nrl-contract-soon' : ''}`, text, attrs: { title } });
 }
 
 /** Open the Contracts sheet (lights Finance, which holds it). Re-renders on state changes until closed. */
@@ -258,7 +271,7 @@ export function openContractsScreen(): HTMLElement {
       el('col', { attrs: { style: 'width:64px' } }), el('col', { attrs: { style: 'width:76px' } }), el('col', { class: 'nrl-contracts-col-actions' })),
     el('thead', {}, el('tr', {},
       el('th', { text: 'Player' }), el('th', { text: 'Pos' }), el('th', { text: 'Rating' }),
-      el('th', { class: 'nrl-num', text: 'Left' }), el('th', { class: 'nrl-num', text: 'Cap' }), el('th'))),
+      el('th', { class: 'nrl-num', text: 'Ends' }), el('th', { class: 'nrl-num', text: 'Cap' }), el('th'))),
     tbody);
   render(sub, tbody, saleHost);
   const sheet = el('div', { class: 'nrl-screen nrl-finance-sheet nrl-contracts' },

@@ -8,6 +8,8 @@ import { GROUND_MAX, NAME_MAX } from '../../src/data/names';
 import { DEFAULT_DIFFICULTY, DIFFICULTIES, DIFFICULTY } from '../../src/config';
 import { deleteSlot, writeSlot, slotKey } from '../../src/core/save';
 import { createNewGame } from '../../src/core/state';
+import { bus } from '../../src/core/events';
+import { careerFixture } from '../helpers/playerCareer';
 
 describe('the build label (#350 T1)', () => {
   it('sits in the corner, and after the setup on an iPhone SE on its side, never over the panel', () => {
@@ -460,8 +462,12 @@ describe('League setup destination', () => {
 
   it('returns failed starts to the slot list even if all slots remain empty', () => {
     const root = new StubNode('div');
+    const said: { text: string; kind: string }[] = [];
+    const stop = bus.on('ui:notify', (n) => { said.push({ text: n.text, kind: n.kind }); });
     void showTitleFlow(root as unknown as HTMLElement, 'The new career could not be saved.');
-    expect(root.querySelector('[data-nrl-title-error]')!.textContent).toContain('could not be saved');
+    stop();
+    // The message is a toast over the title now (SuperCOOKED §6), not a line under the slots.
+    expect(said).toEqual([{ text: 'The new career could not be saved.', kind: 'danger' }]);
     expect(root.querySelector('[data-nrl-new-1]')).toBeTruthy();
     expect(root.querySelector('[data-nrl-start]')).toBeNull();
   });
@@ -608,5 +614,30 @@ describe('the loading screen (SuperCOOKED 10)', () => {
     const tip = overlay.querySelectorAll('.nrl-title-tip')[0]!.textContent;
     expect(Object.values(HINTS).map((h) => `Tip: ${h}`)).toContain(tip);
     expect(loadingTip(0)).toBe(Object.values(HINTS)[0]);
+  });
+});
+
+describe('slot cards carry the ladder place (SuperCOOKED 11)', () => {
+  beforeEach(() => { stubLocalStorage(); stubDocument(); });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('adds the club\'s place once a round is in, and leaves it off before', () => {
+    const fresh = createNewGame('Fresh FC', 3);
+    writeSlot(1, fresh);
+    // A real league (every club on the ladder); after a round, two clubs are ahead of ours: third.
+    const played = structuredClone(careerFixture(4));
+    let ahead = 0;
+    played.league.ladder = played.league.ladder.map((r) => {
+      const mine = r.clubId === played.clubId;
+      const up = !mine && ahead < 2;
+      if (up) ahead++;
+      return { ...r, played: 1, wins: up ? 1 : 0, draws: 0, losses: up ? 0 : 1, pointsFor: mine ? 30 : 20, pointsAgainst: 20, points: up ? 2 : 0 };
+    });
+    writeSlot(2, played);
+    const root = new StubNode('div');
+    void showTitleFlow(root as unknown as HTMLElement);
+    const when = (slot: number) => root.querySelector(`[data-nrl-slot-${slot}]`)!.querySelector('.nrl-title-when')!.textContent;
+    expect(when(1)).toBe(`Season ${fresh.season} · Week ${fresh.week}`);
+    expect(when(2)).toBe(`Season ${played.season} · Week ${played.week} · 3rd`);
   });
 });
