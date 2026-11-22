@@ -116,7 +116,7 @@ export class LiveView {
     const drawn = prev.tick + (cur.tick - prev.tick) * a;
     const pickup = cur.groundPickup;
     const age = pickup ? drawn - pickup.tick : 0;
-    const reaching = !!pickup && age < 0 && prev.tick === pickup.tick - 1 && !prev.ball.holder && !prev.ball.flight
+    const reaching = !!pickup && age < 0 && cur.tick === pickup.tick && prev.tick === pickup.tick - 1 && !prev.ball.holder && !prev.ball.flight
       && prev.ball.lift === 0 && prev.ball.x === pickup.at.x && prev.ball.y === pickup.at.y;
     const world = (pos: { x: number; y: number }) => {
       const f = toFieldPt(pos);
@@ -179,6 +179,9 @@ export class LiveView {
         picture.frame = reaching ? (age < -.5 ? 0 : 1) : Math.min(5, 2 + Math.floor(age * 3 / PICKUP_RISE_TICKS));
         looseOnTurf = reaching;
         if (picture.frame < 5) {
+          delete picture.strideFrame;
+          delete picture.movement;
+          delete picture.tired;
           // The near hand meets the grounded sprite at its last real position. The feet and
           // shadow take the same small adjustment while the collector's run continues underneath.
           const feet = world(pickup.feet);

@@ -259,6 +259,11 @@ is still falling. The catch or regather brings the actual holder's hands around 
 ball, then both players land. On a spill, the loose ball falls to its bounce and both
 come down empty-handed.
 
+When a player recovers a loose ball from the turf in open play, he drops his hips and
+reaches to its ground position. The ball moves into his hands on the awarded pickup,
+then he tucks it as he rises into his standing or running carry. A tackle, pass,
+try or whistle takes over at its usual tick.
+
 **Touch and dead ball** (BAK-207 2d): the side that touched the ball last loses it. Into
 touch → TOUCH, a play-the-ball 10 m in from touch for the other side (no scrums); a carrier
 held on the touchline can be bundled out (INTO TOUCH!). Dead in-goal or over the dead-ball

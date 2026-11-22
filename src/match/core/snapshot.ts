@@ -114,7 +114,7 @@ export interface GroundPickupSnap {
   feet: { x: number; y: number };
 }
 
-/** Ticks from the take until the player is back in his ordinary carry. */
+/** Keep the cue through the last interpolation into the ordinary carry. */
 export const GROUND_PICKUP_TICKS = 6;
 
 /** Something that happened on this tick, for the lab log / commentary. */
