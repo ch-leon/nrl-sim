@@ -2,7 +2,7 @@
 // WebKit CI artifact, never to git.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { OUT_ROOT, BASE, IPHONE_UA, openNav } from '../common.mjs';
+import { OUT_ROOT, BASE, IPHONE_UA, openNav, setupStep } from '../common.mjs';
 
 export async function runCoachName(browser) {
   const out = join(OUT_ROOT, 'webkit', 'coach-name');
@@ -17,10 +17,12 @@ export async function runCoachName(browser) {
       page.on('pageerror', (e) => record.problems.push(e.message));
       try {
         await page.goto(BASE);
-        await page.waitForSelector('[data-nrl-coachname]');
+        // Your name is on the Club step; Start on the Start step (SuperCOOKED 13, 14).
+        await setupStep(page, 2);
         await page.fill('[data-nrl-coachname]', name);
         // Blur the field before measuring; Playwright's tap may otherwise scroll it into view.
         await page.locator('[data-nrl-coachname]').blur();
+        await setupStep(page, 3);
         record.layout = await page.evaluate(() => {
           const b = document.querySelector('[data-nrl-start]').getBoundingClientRect();
           const label = document.querySelector('[data-nrl-build]').getBoundingClientRect();

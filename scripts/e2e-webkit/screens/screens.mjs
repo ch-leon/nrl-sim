@@ -1,6 +1,6 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, squadMenu, reachProblems } from '../common.mjs';
+import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, squadMenu, reachProblems, setupStep, slotMenu } from '../common.mjs';
 
 // ── Landscape screens (#336, #344, #347, #343, #351) ─────────────────────────
 // Every nav screen and the main popups on a phone held sideways. Each must show
@@ -333,25 +333,32 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
     st.setProperty('--nrl-safe-l', `${s.l}px`); st.setProperty('--nrl-safe-t', `${s.t}px`);
     st.setProperty('--nrl-safe-r', `${s.r}px`); st.setProperty('--nrl-safe-b', `${s.b}px`);
   }, safe);
-  // The title (#350 T1, #347): a fresh install opens on the new club's setup, every
-  // detail field reachable by scrolling its panel; difficulty and Start stay in view, clear of the notch.
+  // The title (#350 T1, #347): a fresh install opens on the new club's setup, in three steps
+  // (SuperCOOKED 12–14): the town and Next; every name and swatch reachable by scrolling the
+  // Club step's details; career mode, difficulty and Start in view, clear of the notch.
   await step('title-setup', async () => {
     await page.goto(BASE);
-    await page.waitForSelector('[data-nrl-start]');
-    await page.locator('[data-nrl-open-all]').check();
+    await page.waitForSelector('[data-nrl-town]');
     await setInsets();
     await page.waitForTimeout(250);
-    const problems = await controlsProblems(page, ['.nrl-title-pick', '[data-nrl-start]'], safe);
+    const problems = await controlsProblems(page, ['[data-nrl-town]', '[data-nrl-next]', '[data-nrl-back]'], safe);
+    await setupStep(page, 2);
+    problems.push(...await controlsProblems(page, ['[data-nrl-next]', '[data-nrl-back]'], safe));
     for (const control of await page.locator('.nrl-title-details input, .nrl-title-swatch').all()) {
       await control.evaluate(e => { e.setAttribute('data-nrl-reach-probe', ''); e.scrollIntoView({ block: 'center', inline: 'nearest' }); });
       problems.push(...await controlsProblems(page, ['[data-nrl-reach-probe]'], safe));
       await control.evaluate(e => e.removeAttribute('data-nrl-reach-probe'));
     }
     await page.evaluate(() => { document.querySelector('.nrl-title-details').scrollTop = 0; });
+    await setupStep(page, 3);
+    await page.locator('[data-nrl-open-all]').check();
+    problems.push(...await controlsProblems(page, ['.nrl-title-pick', '[data-nrl-start]'], safe));
     return problems;
   });
   await step('hub', async (rec) => {
+    await setupStep(page, 2);
     await page.fill('[data-nrl-clubname]', 'Landscape FC');
+    await setupStep(page, 3);
     await tap('[data-nrl-start]');
     await page.locator('[data-expansion-work]').tap();
     await page.waitForSelector('.nrl-tutorial-skip');
@@ -938,11 +945,16 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
     await setInsets();
     await page.waitForTimeout(250);
     rec.notes.push((await page.locator('[data-nrl-slot-label-1]').textContent()) ?? '');
-    return controlsProblems(page, ['[data-nrl-continue-1]', '[data-nrl-new-1]', '[data-nrl-delete-1]', '[data-nrl-new-2]', '[data-nrl-import]'], safe);
+    const out = await controlsProblems(page, ['[data-nrl-continue-1]', '[data-nrl-more-1]', '[data-nrl-new-2]', '[data-nrl-import]'], safe);
+    // New club over the season and Delete are in slot 1's ⋯ (SuperCOOKED 11).
+    await slotMenu(page, 1);
+    out.push(...await controlsProblems(page, ['[data-nrl-new-1]', '[data-nrl-delete-1]'], safe));
+    return out;
   });
   await step('title-overwrite-confirm', async () => {
+    await slotMenu(page, 1);
     await tap('[data-nrl-new-1]');
-    await page.waitForSelector('[data-nrl-start]');
+    await setupStep(page);
     await page.locator('[data-nrl-open-all]').check();
     await tap('[data-nrl-start]');
     await page.waitForSelector('[data-nrl-confirm]');
@@ -950,7 +962,7 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
     const out = await controlsProblems(page, ['[data-nrl-back]', '[data-nrl-start-confirm]', '[data-nrl-start-cancel]'], safe);
     await tap('[data-nrl-start-cancel]');
     if (await page.locator('[data-nrl-confirm]').count()) out.push('Cancel left the overwrite question up');
-    await tap('[data-nrl-back]');
+    await setupStep(page, 0);
     await page.waitForSelector('[data-nrl-continue-1]');
     return out;
   });

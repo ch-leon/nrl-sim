@@ -648,7 +648,7 @@ function renderBubble(
   // "1 of 3" (#370) at the start of the button row, so it costs the copy no room.
   const actions = el('div', { class: 'nrl-tutorial-actions' },
     el('span', { class: 'nrl-tutorial-count', text: `${step.tap} of ${TAP_COUNT}` }));
-  actions.appendChild(button('Skip', () => endTutorial(), { class: 'nrl-tutorial-skip' }));
+  actions.appendChild(button('Skip tutorial', () => endTutorial(), { class: 'nrl-tutorial-skip' }));
   if (wantsNext) {
     actions.appendChild(button('Next', () => advance(), { class: 'nrl-tutorial-next nrl-btn-primary' }));
   }
@@ -706,7 +706,7 @@ export function initFirstVisitHints(): () => void {
 // ── Styles ───────────────────────────────────────────────────────────────
 // Injected once, lazily, from startTutorial. Kept out of dom.ts (owned by WU-5)
 // so this ticket edits only files it owns. Pixel-art styling to match the kit:
-// Broadcast Quiet: a navy card with a yellow edge pointing at the one thing to tap, ringed in yellow.
+// SuperCOOKED 15: the screen dims, the one thing to tap keeps its place inside an orange ring and glow, and a navy card says what to do.
 
 const TUTORIAL_STYLE_ID = 'nrl-tutorial-styles';
 
@@ -732,9 +732,12 @@ export const TUTORIAL_CSS = `
   pointer-events: none;
   border: 2px solid var(--nrl-accent, #ff6b1a);
   border-radius: 12px;
-  box-shadow: 0 0 0 4px rgba(255, 107, 26, 0.25), 0 0 18px 2px rgba(255, 107, 26, 0.45);
+  /* The ring, its glow, then the dim: a huge shadow darkens all but the target, which stays tappable (pointer-events: none). */
+  box-shadow: 0 0 0 4px rgba(255, 107, 26, 0.25), 0 0 24px 2px rgba(255, 107, 26, 0.35), 0 0 0 100vmax rgba(5, 7, 13, 0.6);
   z-index: 200;
 }
+/* A step with nothing to ring (a centred one) dims the whole screen. */
+.nrl-tutorial:not(:has(.nrl-tutorial-cutout)) { background: rgba(5, 7, 13, 0.6); }
 /* #337 U1: never over a match, live or at full time. */
 body.nrl-match-active .nrl-tutorial, .nrl-tutorial[hidden] { display: none; }
 .nrl-tutorial-bubble {
@@ -744,11 +747,10 @@ body.nrl-match-active .nrl-tutorial, .nrl-tutorial[hidden] { display: none; }
   bottom: calc(var(--nrl-nav-h, 5rem) + 12px); /* clear of the dock (its height includes the home bar) */
   transform: translateX(-50%);
   max-width: min(90vw, 320px);
-  background: rgba(5, 7, 13, 0.97);
-  color: #fff;
-  border-radius: 14px;
-  border-left: 4px solid var(--nrl-accent, #ff6b1a);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  background: var(--nrl-navy, #0b1220);
+  color: var(--nrl-text, #fff);
+  border-radius: 16px;
+  box-shadow: inset 0 0 0 1px var(--nrl-line, #222c45), 0 6px 20px rgba(0, 0, 0, 0.45);
   padding: 12px 14px;
   z-index: 201;
   /* #206: never taller than the room above its dock. The copy scrolls inside the
@@ -772,7 +774,7 @@ body.nrl-match-active .nrl-tutorial, .nrl-tutorial[hidden] { display: none; }
   font-size: 0.875rem;
   line-height: 1.45;
   margin-bottom: 10px;
-  color: var(--nrl-text-2, #c8cdd8);
+  color: var(--nrl-text, #fff);
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
@@ -785,6 +787,8 @@ body.nrl-match-active .nrl-tutorial, .nrl-tutorial[hidden] { display: none; }
   flex: 0 0 auto;
 }
 .nrl-tutorial-actions .nrl-btn { min-height: 40px; }
+/* Skip is the quiet one (text on the card); Next, when there is one, is the primary. */
+.nrl-tutorial-actions .nrl-btn.nrl-tutorial-skip { background: transparent; color: var(--nrl-text-2, #c8cdd8); padding: 0 12px; }
 @media (pointer: coarse) { .nrl-tutorial-actions .nrl-btn { min-height: 44px; } }
 /* A landscape phone (#195): the bubble docks bottom-left, clear of the tile the
    player has to tap, the match's speed buttons and the home bar. */
@@ -825,12 +829,12 @@ body.nrl-match-active .nrl-tutorial, .nrl-tutorial[hidden] { display: none; }
   align-self: center;
   margin-right: auto;
   padding: 0 8px;
-  border-radius: 6px;
-  background: var(--nrl-button, #1a2540);
-  color: var(--nrl-accent, #ff6b1a);
-  font-family: var(--nrl-f-label, 'Oswald', sans-serif);
-  font-size: 0.8125rem;
-  font-weight: 700;
+  border-radius: 10px;
+  background: var(--nrl-raised, #1a2540);
+  color: var(--nrl-text-2, #c8cdd8);
+  font-family: var(--nrl-f-num, 'JetBrains Mono', monospace);
+  font-size: 0.625rem;
+  font-weight: 500;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   line-height: 24px;

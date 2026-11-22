@@ -462,23 +462,30 @@ export const HISTORY_CSS = `
 .nrl-books-closing td { border-top: 1px solid var(--nrl-button); font-weight: 600; }
 .nrl-books-closing td:first-child { color: var(--nrl-text); font-family: var(--nrl-f-label); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
 
-/* The season review (N7, #190): the finish, then the season in labelled lines, two columns. */
+/* The season review (N7, #190; SuperCOOKED 61): the finish banner, then the season in labelled lines, two columns. */
 .nrl-review-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-.nrl-review-finish {
-  font-family: var(--nrl-f-label); font-size: 1.25rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
-  background: var(--nrl-raised); border-radius: 10px; padding: 8px 12px; margin-bottom: 6px;
-}
-.nrl-review-finish.nrl-review-premiers { background: var(--nrl-accent); color: var(--nrl-on-accent); }
-.nrl-review-lines { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); column-gap: 20px; align-items: start; }
+.nrl-review-head { display: flex; align-items: center; gap: 16px; flex: 0 0 auto; padding: 10px 14px; margin-bottom: 8px; border-radius: 14px; background: var(--nrl-panel); box-shadow: inset 0 0 0 1px var(--nrl-line); }
+.nrl-review-head.nrl-review-premiers { box-shadow: inset 0 0 0 2px var(--nrl-accent); }
+.nrl-review-big { font-family: var(--nrl-f-display); font-size: 2.75rem; line-height: 1; letter-spacing: -0.02em; text-transform: uppercase; color: var(--nrl-pos); }
+.nrl-review-what { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.nrl-review-kicker { font-family: var(--nrl-f-num); font-size: 0.625rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--nrl-muted); }
+.nrl-review-finish { font-family: var(--nrl-f-label); font-size: 1.125rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; line-height: 1.2; overflow-wrap: anywhere; }
+.nrl-review-note { font-size: 0.75rem; color: var(--nrl-text-2); }
+.nrl-review-tools { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; }
+.nrl-review-lines { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); column-gap: 24px; align-items: start; }
 .nrl-review-col { display: flex; flex-direction: column; }
-.nrl-review-line { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 8px; align-items: baseline; padding: 5px 0; border-top: 1px solid var(--nrl-button); font-size: 0.8125rem; color: var(--nrl-text-2); overflow-wrap: anywhere; }
-.nrl-review-line > .nrl-label { font-size: 0.75rem; }
-.nrl-review-objectives { list-style: none; margin: 0 0 4px 120px; padding: 0; font-size: 0.75rem; }
+.nrl-review-line { display: grid; grid-template-columns: 6.25rem minmax(0, 1fr); gap: 10px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--nrl-button); font-size: 0.8125rem; color: var(--nrl-text); overflow-wrap: anywhere; }
+.nrl-review-col > .nrl-review-line:last-child { border-bottom: 0; }
+.nrl-review-line > .nrl-label { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; color: var(--nrl-muted); overflow-wrap: normal; }
+.nrl-review-objectives { list-style: none; margin: 0 0 4px calc(6.25rem + 10px); padding: 0; font-size: 0.75rem; }
 .nrl-review-objectives li { padding: 1px 0; }
 .nrl-review-good, .nrl-review-line.nrl-review-good > span:last-child { color: var(--nrl-pos); }
 .nrl-review-bad, .nrl-review-line.nrl-review-bad > span:last-child { color: var(--nrl-neg); }
+@media (max-height: 500px) {
+  .nrl-review-head { padding: 6px 12px; gap: 12px; margin-bottom: 4px; }
+  .nrl-review-big { font-size: 2rem; }
+}
 @media (max-width: 700px) {
-  .nrl-review-line { grid-template-columns: 96px minmax(0, 1fr); }
-  .nrl-review-objectives { margin-left: 104px; }
+  .nrl-review-head { flex-wrap: wrap; }
 }
 `;

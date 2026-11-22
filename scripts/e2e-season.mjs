@@ -33,6 +33,7 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium } from 'playwright-core';
 import { pollCoachCall } from './e2e-coach-call.mjs';
+import { setupStep } from './e2e-webkit/newClub.mjs';
 
 // --size WxH (or E2E_SIZE): 844×390 is a landscape phone with touch (the default);
 // anything 1000px or wider is a desktop window driven by the mouse.
@@ -461,19 +462,21 @@ async function play() {
 
   await step('title', async (rec) => {
     await page.goto(BASE);
-    await page.waitForSelector('[data-nrl-start]');
+    await page.waitForSelector('[data-nrl-town]');
     // N7 (#182): the build label on the title screen, "Build <date> <sha>".
     const label = (await page.locator('[data-nrl-build]').first().textContent().catch(() => null))?.trim();
     if (label === undefined || label === null) return 'no build label on the title screen';
     if (!/^Build \S+/.test(label)) throw new Error(`build label reads "${label}"`);
     rec.notes.push(label);
-    // N14 (#263): the colour swatches are a finger's size on a touch screen.
+    // N14 (#263): the colour swatches are a finger's size on a touch screen (the new club's Club step).
+    await setupStep(page, 2);
     const sw = await smallestBox('[data-nrl-primary], [data-nrl-secondary]');
     if (sw) rec.notes.push(`swatches ${sw.w}×${sw.h}`);
     if (tooSmall(sw)) throw new Error(`title swatches ${sw.w}×${sw.h}, under ${TOUCH_MIN}px on touch`);
   });
   await step('new-game', async () => {
     await page.fill('[data-nrl-clubname]', 'Phone Test FC');
+    await setupStep(page, 3);
     await tap('[data-nrl-start]');
     await tap('[data-expansion-work]');
     await page.waitForSelector('.nrl-dock');

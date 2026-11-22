@@ -3,7 +3,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { stubLocalStorage } from '../commercial/memStorage';
 import { StubNode, stubDocument } from './stubDom';
-import { DIFFICULTY_BLURB, TITLE_CSS, showTitleFlow, type TitleChoice } from '../../src/ui/title';
+import { DIFFICULTY_BLURB, TITLE_CSS, loadingTip, showLeagueLoading, showTitleFlow, type TitleChoice } from '../../src/ui/title';
 import { GROUND_MAX, NAME_MAX } from '../../src/data/names';
 import { DEFAULT_DIFFICULTY, DIFFICULTIES, DIFFICULTY } from '../../src/config';
 import { deleteSlot, writeSlot, slotKey } from '../../src/core/save';
@@ -318,10 +318,10 @@ describe('one yellow button on the slots screen (#613)', () => {
     const root = slotsScreen();
     root.querySelector('[data-nrl-back]')!.click(); // a fresh install opens on the setup
     expect(yellow(root)).toEqual(['data-nrl-new-1']);
-    // The other slots keep their full-width row in the secondary fill.
+    // The other slots keep their own button, as an outline (SuperCOOKED 11).
     expect(root.querySelector('[data-nrl-new-2]')!.className).toBe('nrl-title-btn nrl-title-btn-row');
     expect(root.querySelector('[data-nrl-new-3]')!.className).toBe('nrl-title-btn nrl-title-btn-row');
-    expect(TITLE_CSS).toContain('.nrl-title-btn-row { flex-basis: 100%; }');
+    expect(TITLE_CSS).toContain('.nrl-title-btn-row, .nrl-title-btn-row:hover { background: transparent; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);');
   });
 
   it.each([1, 2, 3])('with one save, in slot %s, it is that Continue and no New game', (slot) => {
@@ -355,7 +355,7 @@ describe('one yellow button on the slots screen (#613)', () => {
 });
 
 describe('Start while the town list loads (#613)', () => {
-  it('is disabled and says why, then reads Start and starts', async () => {
+  it('is disabled and says why, then reads Start season and starts', async () => {
     const root = new StubNode('div');
     const choice = showTitleFlow(root as unknown as HTMLElement);
     const start = root.querySelector('[data-nrl-start]')!;
@@ -363,7 +363,7 @@ describe('Start while the town list loads (#613)', () => {
     expect(start.textContent).toBe('Loading towns…');
     await settleTowns();
     expect(start.disabled).toBe(false);
-    expect(start.textContent).toBe('Start');
+    expect(start.textContent).toBe('Start season ▸');
     start.click();
     expect((await choice).mode).toBe('new');
   });
@@ -377,7 +377,7 @@ describe('Start while the town list loads (#613)', () => {
       const start = root.querySelector('[data-nrl-start]')!;
       expect(root.querySelector('[data-nrl-town-status]')!.textContent).toBe('Town list unavailable. Type your own town to start.');
       expect(start.disabled).toBe(false);
-      expect(start.textContent).toBe('Start');
+      expect(start.textContent).toBe('Start season ▸');
       (root.querySelector('[data-nrl-town]')! as InputNode).enter('A New Place');
       start.click();
       expect((await choice).home).toEqual({ town: 'A New Place' });
@@ -464,5 +464,149 @@ describe('League setup destination', () => {
     expect(root.querySelector('[data-nrl-title-error]')!.textContent).toContain('could not be saved');
     expect(root.querySelector('[data-nrl-new-1]')).toBeTruthy();
     expect(root.querySelector('[data-nrl-start]')).toBeNull();
+  });
+});
+
+describe('a new club in three steps (SuperCOOKED 12–14)', () => {
+  const step = (root: StubNode): string | null => root.querySelector('[data-nrl-setup-step]')?.getAttribute('data-nrl-setup-step') ?? null;
+  const current = (root: StubNode): string[] =>
+    root.querySelectorAll('[data-nrl-stepchip]').map((c) => `${c.textContent}:${c.getAttribute('aria-current')}`);
+
+  it('goes Town, Club, Start with Next, and back a step at a time with ◂ Back, then to the slots', async () => {
+    const root = new StubNode('div');
+    void showTitleFlow(root as unknown as HTMLElement);
+    await settleTowns();
+    expect(step(root)).toBe('1');
+    expect(current(root)).toEqual(['1 Town:step', '2 Club:false', '3 Start:false']);
+    expect(root.querySelector('[data-nrl-back]')!.getAttribute('aria-label')).toBe('Back to the save slots');
+    root.querySelector('[data-nrl-next]')!.click();
+    expect(step(root)).toBe('2');
+    expect(current(root)).toEqual(['✓ Town:false', '2 Club:step', '3 Start:false']);
+    root.querySelector('[data-nrl-next]')!.click();
+    expect(step(root)).toBe('3');
+    expect(current(root)).toEqual(['✓ Town:false', '✓ Club:false', '3 Start:step']);
+    // Edit on the club's card goes back to the Club step.
+    root.querySelector('[data-nrl-edit]')!.click();
+    expect(step(root)).toBe('2');
+    root.querySelector('[data-nrl-back]')!.click();
+    expect(step(root)).toBe('1');
+    root.querySelector('[data-nrl-back]')!.click();
+    expect(step(root)).toBeNull();
+    expect(root.querySelector('[data-nrl-new-1]')).not.toBeNull();
+  });
+
+  it('holds Next on the Club step while a name will not do, and says why', async () => {
+    const root = new StubNode('div');
+    void showTitleFlow(root as unknown as HTMLElement);
+    await settleTowns();
+    root.querySelector('[data-nrl-next]')!.click();
+    (root.querySelector('[data-nrl-clubname]')! as InputNode).enter('W');
+    root.querySelector('[data-nrl-next]')!.click();
+    expect(step(root)).toBe('2');
+    expect(root.querySelector('[data-nrl-clubname-why]')!.textContent).toBe('At least 2 characters');
+  });
+
+  it('a name that will not do at Start brings the Club step back', async () => {
+    const root = new StubNode('div');
+    void showTitleFlow(root as unknown as HTMLElement);
+    await settleTowns();
+    root.querySelector('[data-nrl-next]')!.click();
+    root.querySelector('[data-nrl-next]')!.click();
+    root.querySelector('[data-nrl-groundname]')!.value = 'G'.repeat(49);
+    root.querySelector('[data-nrl-start]')!.click();
+    expect(step(root)).toBe('2');
+    expect(root.querySelector('[data-nrl-groundname-why]')!.textContent).toBe('At most 48 characters');
+  });
+
+  it('the return key on the town goes on to the Club step', () => {
+    const root = new StubNode('div');
+    void showTitleFlow(root as unknown as HTMLElement);
+    (root.querySelector('[data-nrl-town]')! as InputNode).pressEnter();
+    expect(step(root)).toBe('2');
+  });
+
+  it('lists the offline towns that match as options, and a tap picks one and names the club', async () => {
+    const root = new StubNode('div');
+    void showTitleFlow(root as unknown as HTMLElement);
+    await settleTowns();
+    (root.querySelector('[data-nrl-town]')! as InputNode).enter('sample');
+    const options = root.querySelectorAll('[data-nrl-town-option]');
+    expect(options.map((o) => o.getAttribute('data-nrl-town-option'))).toEqual(['Sample Bay, 02, NZ']);
+    expect(options[0]!.getAttribute('role')).toBe('option');
+    options[0]!.click();
+    expect(root.querySelector('[data-nrl-town]')!.value).toBe('Sample Bay, 02, NZ');
+    expect(root.querySelector('[data-nrl-clubname]')!.value).toBe('Sample Bay Otters');
+    expect(root.querySelector('[data-nrl-town-option]')!.getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('a faded swatch says why: too close to the main colour', () => {
+    const root = new StubNode('div');
+    void showTitleFlow(root as unknown as HTMLElement);
+    // The main colour is gold: a gold second colour is too close.
+    const gold = root.querySelector('[data-nrl-secondary="#f4d03f"]')!;
+    expect(gold.disabled).toBe(true);
+    expect(gold.getAttribute('aria-label')).toBe('Secondary Gold, too close to your main colour');
+    expect(root.querySelector('[data-nrl-secondary="#1a1a2e"]')!.getAttribute('aria-label')).toBe('Secondary Navy-black');
+  });
+
+  it('the Start step tags Easy for a first career, and the veteran switch says what it opens', () => {
+    const root = new StubNode('div');
+    void showTitleFlow(root as unknown as HTMLElement);
+    const hint = root.querySelector('[data-nrl-difficulty-hint]')!;
+    expect(hint.closest('[data-nrl-difficulty-easy]')).not.toBeNull();
+    expect(root.querySelector('[data-nrl-open-all]')!.parentNode!.textContent).toBe("I've played before: open every building and Office tile now");
+  });
+});
+
+describe('the save slots (SuperCOOKED 11)', () => {
+  it('a season\'s exports, New club and Delete are behind its ⋯, one open at a time', () => {
+    writeSlot(1, createNewGame('One', 1));
+    writeSlot(2, createNewGame('Two', 2));
+    const root = new StubNode('div');
+    void showTitleFlow(root as unknown as HTMLElement);
+    const card = (n: number): StubNode => root.querySelector(`[data-nrl-slot-${n}]`)!;
+    for (const n of [1, 2]) {
+      expect(card(n).getAttribute('data-open')).toBe('false');
+      expect(root.querySelector(`[data-nrl-new-${n}]`)!.closest('.nrl-title-menu')).not.toBeNull();
+      expect(root.querySelector(`[data-nrl-delete-${n}]`)!.closest('.nrl-title-menu')).not.toBeNull();
+      expect(root.querySelector(`[data-nrl-recover-${n}]`)!.closest('.nrl-title-menu')).not.toBeNull();
+    }
+    expect(root.querySelector('[data-nrl-more-1]')!.getAttribute('aria-label')).toBe('More for slot 1: new club, export, delete');
+    root.querySelector('[data-nrl-more-1]')!.click();
+    expect(card(1).getAttribute('data-open')).toBe('true');
+    expect(root.querySelector('[data-nrl-more-1]')!.getAttribute('aria-expanded')).toBe('true');
+    root.querySelector('[data-nrl-more-2]')!.click();
+    expect([card(1).getAttribute('data-open'), card(2).getAttribute('data-open')]).toEqual(['false', 'true']);
+    root.querySelector('[data-nrl-more-2]')!.click();
+    expect(card(2).getAttribute('data-open')).toBe('false');
+    // An empty slot has nothing to export or delete: no ⋯, only New club.
+    expect(root.querySelector('[data-nrl-more-3]')).toBeNull();
+    expect(root.querySelector('[data-nrl-new-3]')!.textContent).toBe('New club');
+  });
+
+  it('the save written last says so, and its Continue is the one with ▸', () => {
+    writeSlot(1, createNewGame('One', 1));
+    const root = new StubNode('div');
+    void showTitleFlow(root as unknown as HTMLElement);
+    expect(root.querySelector('[data-nrl-slot-1]')!.hasAttribute('data-last')).toBe(true);
+    expect(root.querySelector('[data-nrl-continue-1]')!.textContent).toBe('Continue ▸');
+  });
+});
+
+describe('the loading screen (SuperCOOKED 10)', () => {
+  it('shows the wordmark, a bar with no made-up number, what it is doing and one of the game\'s hints', async () => {
+    const { HINTS } = await import('../../src/ui/tutorial');
+    const root = new StubNode('div');
+    const overlay = showLeagueLoading(root as unknown as HTMLElement) as unknown as StubNode;
+    expect(overlay.getAttribute('data-nrl-league-loading')).toBe('');
+    expect(overlay.getAttribute('role')).toBe('status');
+    expect(overlay.querySelector('[data-nrl-parent-brand]')).not.toBeNull();
+    const bar = overlay.querySelectorAll('.nrl-title-bar')[0]!;
+    expect(bar.getAttribute('role')).toBe('progressbar');
+    expect(bar.getAttribute('aria-valuenow')).toBeNull();
+    expect(overlay.textContent).toContain('Preparing your leagues…');
+    const tip = overlay.querySelectorAll('.nrl-title-tip')[0]!.textContent;
+    expect(Object.values(HINTS).map((h) => `Tip: ${h}`)).toContain(tip);
+    expect(loadingTip(0)).toBe(Object.values(HINTS)[0]);
   });
 });

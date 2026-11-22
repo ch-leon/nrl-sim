@@ -1195,9 +1195,17 @@ export function initAudioUi(): () => void {
       'aria-label': 'Volume',
     },
   });
+  // SuperCOOKED 62: the number beside the slider, and --vol for the white fill behind the thumb.
+  const volumeNum = el('span', { class: 'nrl-audio-vol-num nrl-num', attrs: { 'aria-hidden': 'true' } });
+  const showVolume = (): void => {
+    volumeNum.textContent = slider.value;
+    slider.style.setProperty('--vol', `${slider.value}%`);
+  };
   slider.addEventListener('input', () => {
     eng.setVolume(Number(slider.value) / 100);
+    showVolume();
   });
+  showVolume();
 
   /** A 44px switch with what it does under its name. */
   const toggle = (name: string, hint: string, get: () => boolean, set: (on: boolean) => void, cls = ''): { row: HTMLElement; sync: () => void } => {
@@ -1212,15 +1220,15 @@ export function initAudioUi(): () => void {
     save(getState());
   };
   const mute = toggle('Mute', '', () => getState().settings.muted, (on) => eng.setMuted(on));
-  const coachCalls = toggle('Coach calls', 'Nudge your side during a match: hit-up, shift, kick early, rush…',
+  const coachCalls = toggle('Coach calls', 'Nudge your side mid-match: hit-up, shift, kick early…',
     () => getState().settings.coachCalls !== false, (on) => { setMatchSettings({ coachCalls: on }); save(getState()); }, 'nrl-live-toggle');
-  const liveRivals = toggle('Rival matches played out', 'Real stats and injuries for every result. Match weeks take longer on a phone.',
+  const liveRivals = toggle('Play out rival matches', 'Real stats and injuries for every result. Match weeks take longer on a phone.',
     () => getState().settings.liveRivals === true, (on) => { setMatchSettings({ liveRivals: on }); save(getState()); }, 'nrl-live-toggle nrl-rivals-toggle');
   // #366: on when absent, so an old save slows down for big moments too.
   const keyMoments = toggle('Slow down for big moments', 'Line breaks, tries and the last two minutes',
     () => getState().settings.keyMoments !== false, (on) => setSetting({ keyMoments: on }), 'nrl-live-toggle nrl-moments-toggle');
   // #368: the weekly summary card after each advance; on unless switched off.
-  const weekSummary = toggle('Show weekly summary', 'Training, injuries, money and the board after each advance.',
+  const weekSummary = toggle('Weekly summary', 'Training, injuries, money and the board after each week',
     () => getState().settings.weekSummary !== false, (on) => setSetting({ weekSummary: on }), 'nrl-summary-toggle');
   // #371: a letter over each side's players, so the sides read apart without their colours; off when absent.
   const teamLetters = toggle('Team letters on players', 'Each side’s letter over its players in a match.',
@@ -1234,14 +1242,15 @@ export function initAudioUi(): () => void {
     textSize.set(id);
     setSetting({ textSize: id });
   }, { class: 'nrl-settings-seg', label: 'Text size' });
-  const textSizeRow = el('div', { class: 'nrl-audio-row nrl-settings-textsize' }, el('b', { text: 'Text size' }), textSize.el);
+  // The segmented group is named "Text size" for a screen reader; the label above it is the visible one.
+  const textSizeRow = el('div', { class: 'nrl-audio-row nrl-settings-textsize' }, textSize.el);
 
   const installBtn = button('Install app', () => {
     void promptInstall().then((outcome) => {
       if (outcome !== 'unavailable') syncInstallVisibility();
     });
   });
-  installBtn.classList.add('nrl-audio-install');
+  installBtn.classList.add('nrl-audio-install', 'nrl-btn-outline');
   const installRow = el('div', { class: 'nrl-audio-row nrl-audio-btnrow nrl-audio-install-row' }, installBtn);
   const syncInstallVisibility = (): void => {
     installRow.style.display = canInstall() ? '' : 'none';
@@ -1257,9 +1266,9 @@ export function initAudioUi(): () => void {
   const replayBtn = button('Replay tutorial', () => {
     closeModal();
     startTutorial(true);
-  });
+  }, { class: 'nrl-btn-outline' });
 
-  const exportBtn = button('Export save', () => downloadSave(getState()));
+  const exportBtn = button('Export save', () => downloadSave(getState()), { class: 'nrl-btn-outline' });
   // Import replaces the slot being played and reloads, so it asks first, on its own row.
   // The names file (#398) shares the row: every player's and club's name, out or in.
   const importRow = el('div', { class: 'nrl-audio-row nrl-settings-import' });
@@ -1271,7 +1280,7 @@ export function initAudioUi(): () => void {
         text: said?.text ?? 'Every name in this career, as a file for another save of it.',
         attrs: { 'data-names-said': said ? String(said.ok) : '' },
       }),
-      button('Export names', () => { downloadNames(getState()); importIdle(); }, { class: 'nrl-settings-names-export' }),
+      button('Export names', () => { downloadNames(getState()); importIdle(); }, { class: 'nrl-settings-names-export nrl-btn-outline' }),
       button('Import names', () => {
         void pickSaveFile().then(async (text) => {
           if (text === null) return;
@@ -1286,8 +1295,8 @@ export function initAudioUi(): () => void {
             openModal(content, SETTINGS_MODAL);
           }
         });
-      }, { class: 'nrl-settings-names-import' }),
-      button(said?.ok ? 'Done' : 'Cancel', importIdle, { class: 'nrl-settings-names-cancel' }),
+      }, { class: 'nrl-settings-names-import nrl-btn-outline' }),
+      button(said?.ok ? 'Done' : 'Cancel', importIdle, { class: 'nrl-settings-names-cancel nrl-btn-outline' }),
     );
   };
   const importIdle = (): void => {
@@ -1302,10 +1311,10 @@ export function initAudioUi(): () => void {
               setTimeout(() => location.reload(), 600);
             }
           });
-        }, { class: 'nrl-settings-import-go' }),
-        button('Cancel', importIdle),
+        }, { class: 'nrl-settings-import-go nrl-btn-outline' }),
+        button('Cancel', importIdle, { class: 'nrl-btn-outline' }),
       );
-    }), button('Names file…', () => namesAsk(), { class: 'nrl-settings-names' }));
+    }, { class: 'nrl-btn-outline' }), button('Names file…', () => namesAsk(), { class: 'nrl-settings-names nrl-btn-outline' }));
   };
 
   const openAllRow = el('div', { class: 'nrl-audio-row nrl-unlocks-row' });
@@ -1323,26 +1332,29 @@ export function initAudioUi(): () => void {
     }, { class: 'nrl-unlocks-open' }));
   };
 
+  // SuperCOOKED 62: sound and the match switches on the left; text size, the weekly summary and the
+  // save tools on the right. Every switch the game has stays, in the column it belongs to.
+  const label = (text: string, cls = ''): HTMLElement => el('span', { class: `nrl-settings-label nrl-num${cls ? ` ${cls}` : ''}`, text });
   const content = el(
     'div',
     { class: 'nrl-audio-settings' },
     el('div', { class: 'nrl-audio-title nrl-settings-head' },
-      el('h2', { text: 'Settings' }),
-      // #398: text only, beside the heading, so it costs the popup no row.
-      el('p', { class: 'nrl-settings-disclaimer', text: BRAND.disclaimer })),
+      el('h2', { text: 'Settings' })),
     el('div', { class: 'nrl-settings-cols' },
       el('div', { class: 'nrl-settings-col' },
-        el('label', { class: 'nrl-audio-row' }, el('b', { text: 'Volume' }), slider),
-        mute.row, coachCalls.row, liveRivals.row, spendPoints.row, teamLetters.row),
+        el('label', { class: 'nrl-audio-row nrl-audio-volume' }, el('b', { text: 'Volume' }), slider, volumeNum),
+        mute.row, coachCalls.row, liveRivals.row, keyMoments.row, spendPoints.row, teamLetters.row),
       el('div', { class: 'nrl-settings-col' },
+        label('Text size', 'nrl-settings-textsize-label'),
         textSizeRow,
-        // One row for the two, so the key-moments and weekly-summary switches (#366, #368) cost no height.
-        el('div', { class: 'nrl-audio-row nrl-audio-btnrow nrl-settings-pair' }, replayBtn, exportBtn),
-        importRow,
-        keyMoments.row,
         weekSummary.row,
+        label('Your save', 'nrl-settings-save-label'),
+        el('div', { class: 'nrl-audio-row nrl-audio-btnrow nrl-settings-pair' }, exportBtn, replayBtn),
+        importRow,
         installRow, openAllRow),
     ),
+    // #398: text only, so it costs the popup no row; under the right column, as in the mockup.
+    el('p', { class: 'nrl-settings-disclaimer', text: BRAND.disclaimer }),
   );
 
   // Developer settings (was Labs: match controls, Leon, 30 Oct; #519). Load the sheet only when opened.
@@ -1357,6 +1369,7 @@ export function initAudioUi(): () => void {
     for (const t of [mute, coachCalls, keyMoments, liveRivals, weekSummary, teamLetters, spendPoints]) t.sync();
     textSize.set(textSizeOf(getState().settings.textSize));
     slider.value = String(Math.round(clampVolume(getState().settings.volume) * 100));
+    showVolume();
     importIdle();
     openModal(content, SETTINGS_MODAL);
   };
@@ -1377,94 +1390,124 @@ function ensureAudioStyles(): void {
   style.id = 'nrl-audio-styles';
   style.textContent = `
 .nrl-audio-settings { min-width: 220px; }
-.nrl-dialog-region .nrl-settings-modal { width: min(100%, 720px); }
-.nrl-audio-title { margin: 0 0 4px; min-height: 32px; display: flex; align-items: center; padding-right: 44px; }
-.nrl-settings-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 4px 12px; }
-.nrl-settings-col { display: flex; flex-direction: column; gap: 4px; }
+/* SuperCOOKED 62: a navy card, 18 radius, two columns of hairline rows. */
+.nrl-dialog-region .nrl-settings-modal { width: min(100%, 720px); border-radius: 18px; }
+.nrl-audio-title { margin: 0 0 6px; min-height: 40px; display: flex; align-items: center; padding-right: 44px; }
+.nrl-settings-head h2 { font-size: 1.375rem; }
+.nrl-settings-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 4px 24px; }
+.nrl-settings-col { display: flex; flex-direction: column; gap: 0; }
 .nrl-audio-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-height: 44px;
-  padding: 0 10px 0 4px;
-  border-radius: 10px;
-  background: var(--nrl-raised);
+  gap: 12px;
+  min-height: 46px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--nrl-raised);
   pointer-events: auto;
 }
-.nrl-audio-row > b { font-family: var(--nrl-f-label); font-size: 0.9375rem; letter-spacing: 0.06em; text-transform: uppercase; }
+.nrl-audio-row > b { font-family: var(--nrl-f-body); font-size: 0.875rem; font-weight: 600; }
 .nrl-audio-row > .nrl-btn { flex: 1 1 auto; }
-.nrl-audio-btnrow { padding: 0; background: none; }
+.nrl-audio-volume > b { flex: 0 0 auto; min-width: 3.75rem; }
+.nrl-audio-vol-num { flex: 0 0 auto; min-width: 2ch; text-align: right; font-size: 0.75rem; color: var(--nrl-text-2); }
+.nrl-audio-btnrow { padding: 6px 0 0; border-bottom: 0; }
 .nrl-audio-btnrow > .nrl-btn { min-height: 44px; }
-.nrl-settings-pair { gap: 4px; }
+.nrl-settings-pair { gap: 6px; }
 .nrl-settings-pair > .nrl-btn { flex: 1 1 0; padding: 0 8px; }
 .nrl-settings-toggle { cursor: pointer; }
-/* Text size (#371): the label, then Normal / Large / Larger sharing the rest of the row. */
-.nrl-settings-textsize { padding: 0 0 0 10px; gap: 8px; }
-.nrl-settings-textsize > b { white-space: nowrap; }
-.nrl-settings-textsize > .nrl-seg { flex: 1 1 auto; background: var(--nrl-button); }
-.nrl-settings-seg > .nrl-btn { flex: 1 1 0; min-height: 44px; padding: 0 4px; font-size: 0.875rem; letter-spacing: 0.02em; }
-.nrl-settings-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; font-size: 0.8125rem; }
-.nrl-settings-text b { font-family: var(--nrl-f-label); font-size: 1rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.nrl-settings-col > .nrl-settings-toggle:last-child { border-bottom: 0; }
+/* Small mono caps over a group: TEXT SIZE, YOUR SAVE. */
+.nrl-settings-label { margin: 6px 0 4px; font-size: 0.625rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--nrl-muted); }
+.nrl-settings-textsize-label { margin-top: 0; }
+/* Text size (#371): Normal / Large / Larger sharing the row, under their label. */
+.nrl-settings-textsize { padding: 0 0 6px; border-bottom: 0; }
+.nrl-settings-textsize > .nrl-seg { flex: 1 1 auto; background: var(--nrl-panel); }
+.nrl-settings-seg > .nrl-btn { flex: 1 1 0; min-height: 44px; padding: 0 4px; font-size: 0.875rem; letter-spacing: 0.06em; }
+.nrl-settings-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; line-height: 1.25; font-size: 0.8125rem; }
+.nrl-settings-text b { font-family: var(--nrl-f-body); font-size: 0.875rem; font-weight: 600; }
 .nrl-settings-text small { font-size: 0.6875rem; color: var(--nrl-muted); }
 .nrl-settings-ask { flex: 1 1 100%; font-size: 0.8125rem; line-height: 1.35; color: var(--nrl-text-2); padding-top: 6px; }
-.nrl-settings-import { flex-wrap: wrap; padding: 0; background: none; }
-.nrl-settings-import:has(.nrl-settings-ask) { padding: 0 10px 8px; background: var(--nrl-raised); }
+.nrl-settings-import { flex-wrap: wrap; padding: 6px 0 0; gap: 6px; border-bottom: 0; }
 .nrl-settings-import > .nrl-btn { flex: 1 1 auto; min-height: 44px; }
-/* The heading and the not-affiliated line (#398) share the title row. */
 .nrl-settings-head { gap: 12px; min-width: 0; }
 .nrl-settings-head h2 { flex: 0 0 auto; margin: 0; }
-.nrl-settings-disclaimer { flex: 1 1 auto; min-width: 0; margin: 0; font-size: 0.6875rem; line-height: 1.25; color: var(--nrl-muted); }
+/* The not-affiliated line (#398) sits under the right column. */
+.nrl-settings-disclaimer { margin: 6px 0 0 calc(50% + 12px); font-size: 0.6875rem; line-height: 1.25; color: var(--nrl-muted); }
 /* Import save and the names file side by side; asking, Export / Import names / Cancel share a row. */
 .nrl-settings-import > .nrl-btn { flex-basis: 0; padding: 0 6px; white-space: normal; line-height: 1.05; }
 .nrl-settings-ask.nrl-attn { color: var(--nrl-accent); }
-/* 956x330: columns of three rows, so every switch and the Import question sit on screen unscrolled.
-   Four since the key-moments and weekly-summary switches (#366, #368); the hints go, which no longer fit. */
-@media (max-height: 340px) {
+.nrl-labs-open { align-self: stretch; margin-top: 6px; }
+@media (max-width: 560px) { .nrl-settings-disclaimer { margin-left: 0; } }
+/* 956x330, 844x390, 667x375: columns of three rows, so every switch and the Import question sit on screen unscrolled.
+   The hints go, which no longer fit. Each column one group, read down: sound and text size, the
+   match switches, the in-match looks and the weekly summary, the save tools. */
+@media (max-height: 400px) {
   .nrl-dialog-region .nrl-settings-modal { width: min(100%, 940px); }
+  .nrl-audio-title { min-height: 32px; margin-bottom: 2px; }
+  .nrl-audio-row { min-height: 44px; padding: 0; }
+  .nrl-settings-ask { padding-top: 0; font-size: 0.6875rem; }
   .nrl-settings-text small { display: none; }
-  .nrl-settings-cols { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(3, auto); grid-auto-flow: column; align-items: start; gap: 6px 12px; }
+  .nrl-audio-row { gap: 6px; }
+  .nrl-audio-row > b, .nrl-settings-text b { font-size: 0.8125rem; line-height: 1.15; }
+  .nrl-audio-volume > b { min-width: 0; }
+  .nrl-audio-row { min-width: 0; }
+  .nrl-settings-seg > .nrl-btn { font-size: 0.75rem; letter-spacing: 0.02em; }
+  .nrl-settings-cols { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(3, auto); grid-auto-flow: column; align-items: start; gap: 0 12px; }
   .nrl-settings-col { display: contents; }
   .nrl-settings-import { grid-row: span 2; align-self: start; }
-  /* Each column one group, read down (#359's note: Rival matches headed the middle one): sound and
-     text size · the match switches · the key moments, weekly summary and install · the save tools. */
-  .nrl-settings-col:first-child > :nth-child(-n+2), .nrl-settings-col:last-child > :first-child { grid-column: 1; }
-  .nrl-settings-col:first-child > :nth-child(n+3) { grid-column: 2; }
-  .nrl-settings-col:last-child > :nth-child(n+4) { grid-column: 3; }
-  .nrl-settings-col:last-child > :nth-child(2), .nrl-settings-col:last-child > :nth-child(3) { grid-column: 4; }
-  /* A quarter of the width: the three sizes take the row (the group keeps its "Text size" label for a
-     screen reader), and the two buttons close up so REPLAY TUTORIAL fits. */
-  .nrl-settings-textsize { padding: 0; background: none; }
-  .nrl-settings-textsize > b { display: none; }
+  .nrl-settings-col:first-child > :nth-child(-n+2), .nrl-settings-col:last-child > :nth-child(2) { grid-column: 1; }
+  .nrl-settings-col:first-child > :nth-child(n+3):nth-child(-n+5) { grid-column: 2; }
+  .nrl-settings-col:first-child > :nth-child(n+6), .nrl-settings-col:last-child > :nth-child(3) { grid-column: 3; }
+  .nrl-settings-col:last-child > :nth-child(n+4) { grid-column: 4; }
+  /* The label words go; the segmented group keeps its spoken name. */
+  .nrl-settings-label { display: none; }
+  .nrl-settings-textsize { padding: 0; }
   .nrl-settings-pair > .nrl-btn { padding: 0 4px; letter-spacing: 0.02em; white-space: normal; line-height: 1.05; }
+  /* Back beside the heading, as it was, so it costs no row. */
+  .nrl-audio-settings { position: relative; }
+  .nrl-settings-disclaimer { position: absolute; top: 0; left: 9.5rem; right: 3rem; height: 32px; margin: 0; display: flex; align-items: center; }
 }
-/* A switch a finger can hit (N14, #263; X3): 52×44, the 28×16 track and its knob drawn in its background
-   (the match LOG toggle's look: the accent on, the line colour off). */
+@media (max-height: 400px) and (max-width: 760px) {
+  .nrl-audio-row > b, .nrl-settings-text b { font-size: 0.75rem; }
+  .nrl-settings-pair > .nrl-btn, .nrl-settings-import > .nrl-btn { font-size: 0.75rem; }
+}
+/* A switch a finger can hit (N14, #263; X3): 52×44, a 38×22 track and its 16px knob drawn in its own
+   background (padding 11px 7px with the fill clipped to the content box, so the track is the capsule):
+   the accent on, a faded line colour off. */
 .nrl-switch {
   -webkit-appearance: none;
   appearance: none;
   flex: 0 0 auto;
+  order: 2;
+  margin: 0 0 0 auto;
+  box-sizing: border-box;
   width: 52px;
   height: 44px;
-  margin: 0;
+  padding: 11px 7px;
+  border-radius: 18px / 22px;
   cursor: pointer;
   pointer-events: auto;
   background:
-    radial-gradient(circle, #fff 5px, transparent 5.5px) no-repeat 13px 50% / 16px 16px,
-    linear-gradient(var(--nrl-line), var(--nrl-line)) no-repeat 50% 50% / 32px 18px;
-  border-radius: 10px;
+    radial-gradient(circle, var(--nrl-muted) 7.5px, transparent 8px) no-repeat 3px 50% / 16px 16px,
+    linear-gradient(var(--nrl-sw-off), var(--nrl-sw-off)) no-repeat 0 0 / 100% 100%;
+  background-clip: content-box;
+  background-origin: content-box;
+  --nrl-sw-off: color-mix(in srgb, var(--nrl-muted) 28%, var(--nrl-panel));
 }
 .nrl-switch:checked {
   background:
-    radial-gradient(circle, var(--nrl-on-accent) 5px, transparent 5.5px) no-repeat 25px 50% / 16px 16px,
-    linear-gradient(var(--nrl-accent), var(--nrl-accent)) no-repeat 50% 50% / 32px 18px;
+    radial-gradient(circle, var(--nrl-on-accent) 7.5px, transparent 8px) no-repeat right 3px center / 16px 16px,
+    linear-gradient(var(--nrl-accent), var(--nrl-accent)) no-repeat 0 0 / 100% 100%;
+  background-clip: content-box;
+  background-origin: content-box;
 }
 .nrl-switch:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: -2px; }
-/* The volume slider (#349 E1), 44px tall to take a thumb. */
-.nrl-audio-slider { -webkit-appearance: none; appearance: none; flex: 1 1 auto; min-width: 120px; height: 44px; margin: 0; background: transparent; pointer-events: auto; }
-.nrl-audio-slider::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: var(--nrl-line); }
-.nrl-audio-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; margin-top: -8px; border-radius: 11px; background: var(--nrl-accent); }
-.nrl-audio-slider::-moz-range-track { height: 6px; border-radius: 3px; background: var(--nrl-line); }
-.nrl-audio-slider::-moz-range-thumb { width: 22px; height: 22px; border: 0; border-radius: 11px; background: var(--nrl-accent); }
+/* The volume slider (#349 E1), 44px tall to take a thumb: a white fill up to --vol, a white thumb. */
+.nrl-audio-slider { -webkit-appearance: none; appearance: none; flex: 1 1 0; width: 0; min-width: 40px; height: 44px; margin: 0; background: transparent; pointer-events: auto; --vol: 70%; }
+.nrl-audio-slider::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: linear-gradient(to right, var(--nrl-text) var(--vol), var(--nrl-raised) var(--vol)); }
+.nrl-audio-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; margin-top: -6px; border-radius: 9px; background: var(--nrl-text); }
+.nrl-audio-slider::-moz-range-track { height: 6px; border-radius: 3px; background: var(--nrl-raised); }
+.nrl-audio-slider::-moz-range-progress { height: 6px; border-radius: 3px; background: var(--nrl-text); }
+.nrl-audio-slider::-moz-range-thumb { width: 18px; height: 18px; border: 0; border-radius: 9px; background: var(--nrl-text); }
 `;
   document.head.appendChild(style);
 }

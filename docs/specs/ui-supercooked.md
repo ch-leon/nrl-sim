@@ -276,6 +276,15 @@ Each row: mockup → current source → what changes. Anything not listed keeps 
 - **`62-settings`** → settings in `fx/audio.ts`: left: volume, mute, coach calls, play out rival matches, slow down for big moments; right: text size, weekly summary, save tools (Export, Import, Replay tutorial), disclaimer. Developer settings and Open everything stay where they are.
 - **`63-sacked`** → `screens/board.ts`: red "SACKED · END OF SEASON n" tag, "You're **cooked.**", the reason, four career tiles, the save-kept line, **New club ▸**.
 - **`64-paywall-placeholder`** → `screens/paywall.ts`: **reskin only for now**: tokens, fonts, buttons. The layout will be redone; prices stay from `src/commercial/prices.ts`.
+- **Built in Phase 5** (what the code has decides what shows):
+  - The only full-screen loading screen is the one shown while a League career is set up ("Preparing your leagues…"); it gets the wordmark, an indeterminate bar (the set-up reports no progress) and one of the game's first-visit hints as the tip. The town list loads while the Town step is already up, so "Loading offline towns…" is that step's status line, not a screen.
+  - Slot cards show the season and week but no ladder position (the save summary doesn't carry it). Behind each save's ⋯: the recovery and original exports, New club over that season, and the two-tap Delete.
+  - The three setup steps are built at once and one is shown, so every field keeps its value. Club keeps the code's field order (club, your name, ground) and the drawn player in the kit as its preview; touch swatches stay 44px. Start adds the Career mode switch (Classic / League), which the mockup doesn't show; its summary card names the town, not a region. "Start over" is destructive (amber on navy) and stays in the bottom row.
+  - The tutorial's "1 OF 3" pill sits in the button row: a header row would push the copy past the unscrolled-fit check (#208). No "Your assistant" header or pointer arrow: the coach's name labels the line.
+  - The weekly summary's button stays "Play week ▸": nothing gives a reliable next week number across trials and the season rollover. Its lines are the code's own words, set as name and detail.
+  - The season review keeps every row it had; with no finals result its line reads "Finished nth".
+  - Settings has more than the mockup (Spend points myself, Team letters, Names file, Install, Open everything, Developer settings). Under 400px tall it lays out in four columns of three rows with the hints hidden, so every row and the main controls stay above the dock; the rest scrolls.
+  - The sacked card puts the club's name in the reason sentence; its four tiles come from the sacked summary.
 
 ---
 
