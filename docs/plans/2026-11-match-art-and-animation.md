@@ -48,9 +48,10 @@ are unchanged. A different pass, a coach call or a set play ends the option with
 a new roll.
 
 `shapes.backDoor.on:0` restores #715's three-shape match and RNG stream exactly.
-Live-match recovery uses engine revision 7. BAK-208 and the tuning reference list
-the rules and values. The PR records the balance comparison and the #322 edge-race
-check.
+The back-door packet landed at engine revision 7. The nearby defender's lead read
+moves live-match recovery to engine revision 8; `shapes.leadDecoy.on:0` keeps the
+revision 7 line. BAK-208 and the tuning reference list the rules and values. The
+PR records the balance comparison and the #322 edge-race check.
 
 Status: stages 1–4 presentation and the first stage-5 pass are implemented in
 five linked PRs. Leon reviewed the clip and approved merging on 17 November

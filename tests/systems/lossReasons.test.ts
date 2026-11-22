@@ -237,16 +237,25 @@ describe('out-schemed (#468)', () => {
     const { runMatch } = await import('../../src/match/league/match');
     const { sideSheet } = await import('../../src/match/balance/measure');
     const s = club();
-    const us = sideSheet(PLAYER_ID, { rating: 60, tactics: { attack: 'grind', defence: 'slide' } });
+    const flatRoster = sideSheet(PLAYER_ID, { rating: 60, tactics: { attack: 'grind', defence: 'slide' } });
+    // Keep the flat ratings, with the same players picked by the club whose report we read.
+    const picked = ours(s).roster!;
+    const us: TeamSheet = { ...flatRoster, roster: flatRoster.roster!.map((p, slot) => ({
+      ...p, id: picked[slot]!.id!, name: picked[slot]!.name,
+    })) };
     const them = sideSheet(rivalId(s), { rating: 60, tactics: { attack: 'balanced', defence: 'compressed' } });
     let losses = 0;
-    // After the timed back-door runs (#722), seeds 1–3 are countered losses and 4–6 wins.
     for (const seed of [1, 2, 3, 4, 5, 6]) {
       const r = runMatch(us, them, { seed, length: { halves: 2, halfMinutes: 7 } });
-      const lost = r.awayScore > r.homeScore;
       const reasons = why(s, r, us, them);
-      expect(hasReason(reasons)).toBe(lost);
-      if (lost) losses++;
+      if (r.awayScore > r.homeScore) {
+        losses++;
+        const breaks = r.events.filter(e => e.kind === 'break' && e.teamId === PLAYER_ID).length;
+        expect(reasons, `seed ${seed}`).toContainEqual({
+          text: `Out-schemed: their Compressed countered your Tight. You made ${breaks} line break${breaks === 1 ? '' : 's'}`,
+          screen: 'lineup', cta: 'Try a different plan',
+        });
+      } else expect(reasons, `seed ${seed}`).toEqual([]);
     }
     expect(losses).toBeGreaterThan(0);
     const flatUs = { ...us, tactics: { attack: 'balanced', defence: 'slide' } as const };

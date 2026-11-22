@@ -89,6 +89,45 @@ export abstract class LivePositioning extends LiveContact {
     return ph.shape;
   }
 
+  /** A free line defender can check toward the lead while others hold the carrier. */
+  private readLead(shape: AttackingShape, carrier: Player, defenders: readonly Player[], committed: readonly Player[], markers: readonly Player[], broken: boolean) {
+    const read = SHAPES.leadDecoy, packet = shape.backDoor;
+    if (read.on <= 0 || read.readTicks <= 0 || !packet || shape.secondPass || shape.leadRead === null) return null;
+    const lead = this.at(packet.lead.side, packet.lead.slot);
+    const distance = dist(lead.body.pos, carrier.body.pos);
+    if (broken || this.overLineAt >= 0 || this.pendingGoal || committed.length === 0 || distance > LIVE.engageM
+      || (lead.body.pos.x - carrier.body.pos.x) * this.dir < SHAPES.backDoor.leadClearM
+      || (lead.body.pos.y - carrier.body.pos.y) * shape.edge <= 0
+      || lead.body.vel.x * this.dir <= FATIGUE.walkSpeed) {
+      if (shape.leadRead) shape.leadRead = null;
+      return null;
+    }
+    const cover = this.fullback(other(carrier.side));
+    const available = (d: Player) => d !== cover && this.onField(d) && !this.locked(d) && d.subFor === null
+      && this.tick >= d.cooldownUntil && !committed.includes(d) && !markers.includes(d) && this.retreatLine(d) === null
+      && (d.body.pos.x - lead.body.pos.x) * this.dir >= 0 && dist(d.body.pos, carrier.body.pos) > LIVE.tackleReach;
+    let defender: Player | undefined;
+    if (shape.leadRead) {
+      const reading = shape.leadRead;
+      defender = defenders.find(d => d.slot === reading.defender.slot && d.key === reading.defender.who);
+      if (this.tick >= reading.until || !defender || !available(defender) || dist(defender.body.pos, lead.body.pos) > read.reachM) {
+        shape.leadRead = null;
+        return null;
+      }
+    } else {
+      let nearest = Infinity;
+      for (const d of defenders) {
+        const gap = dist(d.body.pos, lead.body.pos);
+        if (gap > read.reachM || gap >= nearest || !available(d)) continue;
+        defender = d;
+        nearest = gap;
+      }
+      if (!defender) return null;
+      shape.leadRead = { defender: { side: defender.side, slot: defender.slot, who: defender.key }, until: this.tick + read.readTicks };
+    }
+    return { defender, lead };
+  }
+
   protected candidates(passer: Player, plan: AttackPlan = this.atkPlan(passer)): Candidate[] {
     const overlap = this.overlapSide(passer);
     // A shift call (#73): receivers on the called side, as the attacker faces the line (left is +y going +x).
@@ -471,6 +510,8 @@ export abstract class LivePositioning extends LiveContact {
       : this.tick < this.ruckPlayedAt + LIVE.markerReleaseTicks * dplan.markerHold
         ? this.markers.map((i) => this.players[i]!).filter((d) => d.side === def && !committed.includes(d))
         : [];
+    const leadRead = ph.kind === 'play' && carrier && shape
+      ? this.readLead(shape, carrier, defenders, committed, markers, broken) : null;
     for (const p of defenders) {
       const role = ROLES[p.slot]!;
       p.through = false;
@@ -509,6 +550,10 @@ export abstract class LivePositioning extends LiveContact {
           deep *= 1 - rushDepth;
           p.target = { x: clamp(this.lineX + this.dir * deep, -8, FIELD_LENGTH + 8), y: clamp(MID_Y + (anchor.y - MID_Y) * 0.6, 4, 64) };
         }
+      } else if (leadRead && p === leadRead.defender) {
+        // Check his advance for a step and shade across to the running threat.
+        const pos = p.body.pos, shade = SHAPES.leadDecoy.shadeM;
+        p.target = clampToGround({ x: pos.x, y: pos.y + clamp(leadRead.lead.body.pos.y - pos.y, -shade, shade) }, 0.5);
       } else {
         const slide = this.slideEffect();
         const expansive = this.tactics[atk].attack === 'expansive' ? slide : 0;
