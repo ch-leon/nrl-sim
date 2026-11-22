@@ -8,12 +8,29 @@ import { KICK_CONTEST, fieldingRead, grubberRace, highBall } from '../kickContes
 import { TOUCH, exitPoint, inOwnInGoal, outOfPlay, ownLineX, touchRestartSpot } from '../touch';
 import { ROLES } from '../roles';
 import { LIVE } from './knobs';
+import { readShoulder, type ShoulderRead } from './centreCarry';
 import { other, AIM_TEXT, KICK_TEXT, type Player, type Phase } from './types';
 import { LiveClock } from './clock';
 import { TICK_S } from '../../core/engine';
 import { BOMB_PLANT_TICKS, BOMB_RECOVERY_TICKS, BOMB_TAKEOFF_LEAD, type BombContestSnap } from '../../core/snapshot';
 
 export abstract class LiveKicks extends LiveClock {
+  protected centreCarry: (Omit<ShoulderRead, 'defender'> & {
+    carrier: Player; defender: Player; catchTick: number; untilTick: number;
+  }) | null = null;
+
+  private readCentreCarry(p: Player): void {
+    if (LIVE.centreShoulderTicks <= 0 || this.phase.kind !== 'play' || p.side !== this.attacking
+      || ROLES[p.slot]!.name !== 'centre' || this.scripted || this.tucked === this.indexOf(p)
+      || this.offloadReceiver !== null || this.pendingControl[p.side] || this.locked(p) || !this.onField(p) || p.subFor !== null) return;
+    const heldMarkers = this.tick < this.ruckPlayedAt + LIVE.markerReleaseTicks * this.defPlan().markerHold;
+    const defenders = this.side(other(p.side)).filter(d => !this.locked(d) && this.tick >= d.cooldownUntil
+      && this.retreatLine(d) === null && !(heldMarkers && this.markers.includes(this.indexOf(d))));
+    const read = readShoulder(p.body, this.dir, defenders.map(d => d.body));
+    this.centreCarry = read && { ...read, carrier: p, defender: defenders[read.defender]!,
+      catchTick: this.tick, untilTick: this.tick + LIVE.centreShoulderTicks };
+  }
+
   protected visualBombContest: BombContestSnap | undefined;
 
   // ── Ball resolution ───────────────────────────────────────────────────────
@@ -151,6 +168,8 @@ export abstract class LiveKicks extends LiveClock {
       }
       this.ball = { kind: 'held', by: this.indexOf(r) };
       r.catchTick = this.tick;
+      this.centreCarry = null;
+      if (b.via === 'pass') this.readCentreCarry(r);
       if (b.via === 'kick' && b.bounces === 0) r.aerialCatchTick = this.tick;
       r.decided = false;
       r.steppedOn = -1;
