@@ -37,7 +37,7 @@ import { SET_TACKLES } from '../../config';
 import { TICK_S, type MatchSim } from '../core/engine';
 import { speedOf } from '../core/body';
 import { CARRY_LIFT, flightAt } from '../core/ball';
-import { REACT_SNAP_TICKS, type PlayerSnap, type Snapshot } from '../core/snapshot';
+import { INTERCEPT_TICKS, REACT_SNAP_TICKS, type PlayerSnap, type Snapshot } from '../core/snapshot';
 import { clockText } from './rules';
 import { goalStrikeTick } from './goals';
 import { LIVE } from './live/knobs';
@@ -234,6 +234,13 @@ export class LiveSim extends LivePositioning implements MatchSim {
       score: { ...this.points },
       phase: { kind: ph.kind, since: this.phaseSince, ...(this.golden ? { golden: true } : {}) },
     };
+    const take = this.visualInterception;
+    if (take && this.tick - take.tick < INTERCEPT_TICKS && ph.kind === 'play' && b.kind === 'held') {
+      const h = this.players[b.by]!;
+      if (h.side === take.player.side && h.slot === take.player.slot && h.key === take.player.who && h.catchTick === take.tick) {
+        snap.interception = { ...take, player: { ...take.player } };
+      }
+    }
     const w = ph.kind === 'tackle' ? ph.wrestle : null;
     if (ph.kind === 'ruck' && ph.decision && this.tick < ph.decision.until && this.ruckReceiver(ph)) {
       const d = ph.decision;

@@ -118,6 +118,8 @@ What's in the game, with the PR that added each.
 
 - **Receiver preparation:** an ordinary dummy-half commits to his pass four ticks before release. The intended receiver raises an arm while keeping his running stride; a changed instruction or invalid recipient cancels the call. Interceptions and spills still resolve normally ([PR #707](https://github.com/ch-leon/nrl-sim/pull/707), merged 17 November).
 
+- **Intercepting a pass.** The defender reaches into the pass, draws the ball to his body and carries it away on the turn. [PR #768](https://github.com/ch-leon/nrl-sim/pull/768)
+
 - **Contact weight and recovery:** tackle holds use planted support feet, falls land more sharply, and players recover through supported poses. Defenders clear the carrier in sequence and finish at their live positions before the shared tackle artwork hands back to ordinary movement. Existing contact outcomes and ball ownership are preserved ([PR #701](https://github.com/ch-leon/nrl-sim/pull/701)).
 
 - **Everyday match movement:** players lean into starts, take braking steps and plant into turns. Nearby defenders watch the ball while shuffling or backpedalling, including during a pass. Short support/transfer cycles follow distance travelled; the Art Lab Footwork control previews each pose. This builds on the art foundation and preserves match decisions ([PR #699](https://github.com/ch-leon/nrl-sim/pull/699)).

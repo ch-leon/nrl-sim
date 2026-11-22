@@ -6,6 +6,14 @@ export type Side = 'home' | 'away';
 
 /** Exact contact participants, in arrival order. Nearby defenders are not joiners. */
 export interface ContactPlayer { side: Side; slot: number; who: string }
+/** A confirmed pass take and the direction back along its flight. */
+export interface InterceptionSnap {
+  player: ContactPlayer;
+  tick: number;
+  fromX: number;
+  fromY: number;
+}
+export const INTERCEPT_TICKS = 4;
 export interface AttackShapeSnap {
   kind: 'spread' | 'pod' | 'edge' | 'back-door'; side: Side; dir: 1 | -1; edge: 1 | -1; startedTick: number; linkSlot?: 4 | 5;
   backDoor?: { caller: ContactPlayer; lead: ContactPlayer; support: ContactPlayer; originY: number };
@@ -112,6 +120,8 @@ export interface SimEvent {
 }
 
 export interface Snapshot {
+  /** Presentation history for a defender gathering the pass into his return. */
+  interception?: InterceptionSnap;
   /** Actual structure prepared during contact (or a standalone PTB); renderers still use real positions. */
   attackShape?: AttackShapeSnap;
   /** The ordinary dummy-half's committed intended recipient, before release. Interceptions/spills can prevent the catch. */
