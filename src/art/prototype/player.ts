@@ -10,7 +10,7 @@ export { HEAD_OPTIONS, type Head, type Facing } from './head';
 
 export type Movement = 'drive' | 'brake' | 'cutBack' | 'cutForward' | 'shuffleBack' | 'shuffleForward' | 'backpedal';
 export type Build = 'lean' | 'athletic' | 'stocky';
-export type Action = 'idle' | 'run' | 'carry' | 'pass' | 'catch' | 'land' | 'call' | 'receive' | 'guard' | 'brace' | 'wrap' | 'ground' | 'ptb' | 'fend';
+export type Action = 'idle' | 'run' | 'carry' | 'pass' | 'catch' | 'land' | 'call' | 'receive' | 'guard' | 'brace' | 'wrap' | 'ground' | 'ptb' | 'fend' | 'wrongFoot';
 /** Reactions (#667): the arms held still over standing or running legs. */
 export type ReactAction = 'headHands' | 'hips' | 'fold';
 export interface Appearance {
@@ -188,6 +188,12 @@ const STEP_LEG = {
   shuffleForward: [[2, 3, 4, 0], [0, 3, 1, 0], [-1, 2, -2, 1], [0, 3, 0, 0]],
   backpedal: [[-1, 3, -3, 0], [-2, 2, -2, 1], [1, 3, 2, 0], [0, 3, 0, 0]],
 } as const;
+/** An empty reach, a wide balancing step, then both feet under the body. */
+const WRONG_FOOT_POSES = [
+  { crouch: 2, lean: 5, farBoot: -3, nearBoot: 5, reach: { farHand: 12, nearHand: 10, drop: 0 } },
+  { crouch: 1, lean: 2, farBoot: -4, nearBoot: 3, reach: { farHand: -6, nearHand: 6, drop: 3 } },
+  { crouch: 0, lean: 0, farBoot: 0, nearBoot: 0, reach: null },
+] as const;
 /** A turn's shoulders follow the head on the second support beat; hips remain over the plant. */
 export function movementTorso(facing: Facing, movement: Movement | undefined, gait: number): Facing {
   if ((movement !== 'cutBack' && movement !== 'cutForward') || gait >= 3) return facing;
@@ -212,7 +218,8 @@ export function prototypeUpperAt(build: Build, action: Action | ReactAction, fra
   // Away from the shared contact picture a tackle and a beaten (or tackled) man each have a start,
   // a middle and an end over the pose's last frames: reach, wrap, drive low; jolt, rock back, regather.
   const beat = f < 2 ? 0 : f < 4 ? 1 : 2;
-  const crouch = action === 'guard' || action === 'land' ? 1 : action === 'wrap' ? [2, 3, 4][beat]! : action === 'brace' ? [3, 4, 1][beat]! : action === 'ptb' ? [6, 6, 3, 1, 0, 0][f]! : 0;
+  const wrongFoot = action === 'wrongFoot' ? WRONG_FOOT_POSES[beat] : undefined;
+  const crouch = wrongFoot?.crouch ?? (action === 'guard' || action === 'land' ? 1 : action === 'wrap' ? [2, 3, 4][beat]! : action === 'brace' ? [3, 4, 1][beat]! : action === 'ptb' ? [6, 6, 3, 1, 0, 0][f]! : 0);
   const motionCrouch = motion ? motion.crouch - (shuffle && (gait === 1 || gait === 4) ? 1 : 0) : 0;
   // Tired legs no longer lift him into flight: the bob only dips.
   const bob = running && !motion ? Math.max(weary ? 0 : -1, (jog ? JOG_BOB : RUN_BOB)[gait]!) : 0;
@@ -225,11 +232,12 @@ export function prototypeUpperAt(build: Build, action: Action | ReactAction, fra
   // Tired, the hips keep the legs' reach and the shoulders sink toward them: a shorter, hunched trunk.
   const shoulderY = 20 + crouch + bob - breath + weary + motionCrouch;
   const hipLeft = CENTRE - Math.floor(bodyW / 2) + lean;
-  const left = hipLeft + (motion?.lean ?? 0);
+  const shoulderLean = wrongFoot?.lean ?? motion?.lean ?? 0;
+  const left = hipLeft + shoulderLean;
   // Head down and forward of the shoulders when tired or dejected: the neck sinks into the collar.
-  const headX = CENTRE - 7 + lean + (weary > 1 || hang > 1 ? 1 : 0) + (motion?.lean ?? 0) + (motion?.head ?? 0);
+  const headX = CENTRE - 7 + lean + (weary > 1 || hang > 1 ? 1 : 0) + shoulderLean + (motion?.head ?? 0);
   const headY = shoulderY - 17 + weary + hang;
-  return { f, running, gait, jog, motion, cut, shuffle, weary, lean, swing, beat, bob, breath, hipY, shoulderY, hipLeft, left, headX, headY };
+  return { f, running, gait, jog, motion, cut, shuffle, weary, lean, swing, beat, bob, breath, hipY, shoulderY, hipLeft, left, headX, headY, shoulderLean, wrongFoot };
 }
 
 /**
@@ -266,7 +274,7 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action | Re
   }
 
   const upper = prototypeUpperAt(a.build, action, frame, strideFrame, tired, movement);
-  const { f, running, gait, jog, motion, cut, shuffle, lean, swing, beat, bob, breath, hipY, shoulderY, hipLeft, left, headX, headY } = upper;
+  const { f, running, gait, jog, cut, shuffle, lean, swing, beat, bob, breath, hipY, shoulderY, hipLeft, left, headX, headY, shoulderLean, wrongFoot } = upper;
   const legs = jog ? JOG_LEG : RUN_LEG;
   /** One running leg from its hip: thigh, sock to the boot, boot (toe forward). */
   const runLeg = (hipX: number, top: number, beat: number, thigh: number, boot: number, band: number | null) => {
@@ -292,9 +300,10 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action | Re
   if (running) {
     runLeg(18, hipY, (gait + 3) % 6, skinDark, shade(a.boots, .7), null);
   } else {
-    line(18, hipY, 18, 30 + bob, skinDark);
-    line(18, 30 + bob, 18, 34, kit.sock);
-    b.fillRect(17, 34, 5, 2, shade(a.boots, .7));
+    const footX = 18 + (wrongFoot?.farBoot ?? 0);
+    line(18, hipY, footX, 30 + bob, skinDark);
+    line(footX, 30 + bob, footX, 34, kit.sock);
+    b.fillRect(footX - 1, 34, 5, 2, shade(a.boots, .7));
   }
   // The fend's ball goes under the far arm, out of the defender's reach.
   if (action === 'fend' && possession) heldBall(left - 5, shoulderY + 2);
@@ -307,6 +316,8 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action | Re
     line(left - 3, shoulderY + 3, left, hipY - 1, skinDark, 2);
   } else if (action === 'fold') {
     // Folded arms are painted over the chest below.
+  } else if (wrongFoot?.reach) {
+    line(left + 2, shoulderY + 1, left + wrongFoot.reach.farHand, shoulderY + 4, skinDark, 2);
   } else if (swing > 0) {
     // Swung forward: the forearm comes up past the chest.
     line(left + 2, shoulderY + 1, left + 3, shoulderY + 5, skinDark, 2);
@@ -330,7 +341,7 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action | Re
     const row = torso[Math.min(y, 6)]!;
     for (let x = 0; x < torsoWidth; x++) {
       const color = palette[row[Math.floor(x * row.length / torsoWidth)]!];
-      if (color !== undefined) b.set(torsoLeft + x - Math.round((motion?.lean ?? 0) * y / 7), shoulderY + y, color);
+      if (color !== undefined) b.set(torsoLeft + x - Math.round(shoulderLean * y / 7), shoulderY + y, color);
     }
   }
   if (kit.pattern === 'v') {
@@ -351,15 +362,15 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action | Re
   const nearX = hipLeft + bodyW - 4;
   if (running) runLeg(nearX, hipY + 2, gait, a.skin, a.boots, kit.trim);
   else {
-    const heel = action === 'ptb' && f >= 4 ? -5 : 0;
+    const heel = wrongFoot?.nearBoot ?? (action === 'ptb' && f >= 4 ? -5 : 0);
     line(nearX, hipY + 2, nearX + heel, 31 + bob, a.skin);
     line(nearX + heel, 31 + bob, nearX + heel, 34, kit.sock);
     b.fillRect(nearX + heel, 31 + bob, thick, 1, kit.trim);
     b.fillRect(nearX + heel, 34, 5, 2, a.boots);
   }
 
-  b.fillRect(CENTRE + lean + (motion?.lean ?? 0), shoulderY - 2, 3, 3, skinDark);
-  b.fillRect(CENTRE + lean - 1 + (motion?.lean ?? 0), shoulderY, 5, 1, kit.trim);
+  b.fillRect(CENTRE + lean + shoulderLean, shoulderY - 2, 3, 3, skinDark);
+  b.fillRect(CENTRE + lean - 1 + shoulderLean, shoulderY, 5, 1, kit.trim);
   const shX = left + bodyW - 2;
   const shY = shoulderY + 2;
   // The near elbow goes behind the head too, so the head covers both hands.
@@ -424,6 +435,11 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action | Re
     line(shX - 4, shY + 1, handX - 1, handY + 4, skinDark, 2);
     line(shX, shY, handX - 2, shY - 1, a.skin);
     line(handX - 2, shY - 1, handX, handY, a.skin, 2);
+  } else if (wrongFoot?.reach) {
+    handX = shX + wrongFoot.reach.nearHand;
+    handY = shY + wrongFoot.reach.drop;
+    line(shX, shY, handX - 3, shY + 2, a.skin, 2);
+    line(handX - 3, shY + 2, handX, handY, a.skin, 2);
   } else if (shuffle || cut || movement === 'backpedal') {
     handX = shX + (shuffle ? 3 : 2); handY = shY + 4;
     line(left + 1, shY, left - 1, shY + 4, skinDark, 2);

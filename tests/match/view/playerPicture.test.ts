@@ -2,12 +2,75 @@ import { describe, expect, it } from 'vitest';
 import { JOG_SPEED, REACT_HOLD_TICKS, STRIDE_METRES, pictureContext, playerPicture, reaction, tiredLevel } from '../../../src/match/view/playerPicture';
 import { FATIGUE } from '../../../src/match/league/fatigue';
 import type { PlayerSnap, Snapshot } from '../../../src/match/core/snapshot';
-import { LIVE } from '../../../src/match/league/live/knobs';
+import { LiveSim, LIVE } from '../../../src/match/league/live';
+import { labSheet } from '../../../src/match/lab/sheets';
+import { Runner } from '../../../src/match/core/engine';
 import { FACING_BAND, SIDE_BAND, screenFacing, screenPlayerFacing, screenHeading } from '../../../src/match/view/screenFacing';
 import { fieldToWorldPoint } from '../../../src/scenes/matchField';
 import { toFieldPt } from '../../../src/match/core/field';
 // Toward the home try line and the near touchline: up and to the right of the screen.
 const p: PlayerSnap = { side: 'home', slot: 0, who: 'captain', x: 40, y: 20, pose: 'run', headX: -.6, headY: -.8, speed: 6, caughtTick: 100 };
+describe('successful step pictures', () => {
+  it('matches the cut and the missed reach for either end and mirrored view', () => {
+    for (const dir of [1, -1] as const) for (const lateral of [1.6, -1.6]) for (const flip of [1, -1]) {
+      const holder = { side: p.side, slot: p.slot };
+      const runner: PlayerSnap = { ...p, headX: dir, headY: 0, step: { startedTick: 120, role: 'carrier', untilTick: 124, lateral } };
+      const reachHeading = { headX: -dir, headY: -lateral };
+      const defender: PlayerSnap = { ...p, ...reachHeading, side: 'away', slot: 1, pose: 'tackled', speed: 0, poseUntil: 132,
+        step: { startedTick: 120, role: 'defender', untilTick: 132, reachX: reachHeading.headX, reachY: reachHeading.headY } };
+      const cutX = screenHeading(0, lateral, flip).x;
+      const plant = playerPicture(runner, runner, 120, holder, flip);
+      expect(plant).toMatchObject({ action: 'carry', frame: 0, strideFrame: 0, possession: true, lift: 0 });
+      expect(plant.movement).toBe(cutX * (plant.left ? -1 : 1) < 0 ? 'cutBack' : 'cutForward');
+      expect(playerPicture(runner, runner, 122, holder, flip)).toMatchObject({ frame: 3, strideFrame: 3, movement: plant.movement });
+      expect(playerPicture(runner, runner, 124, holder, flip).movement).toBeUndefined();
+      const reach = playerPicture(defender, defender, 120, holder, flip);
+      expect(reach).toMatchObject({ action: 'wrongFoot', frame: 0, possession: false, left: screenHeading(reachHeading.headX, reachHeading.headY, flip).x < 0, lift: 0 });
+      expect(playerPicture(defender, defender, 125, null, flip)).toMatchObject({ action: 'wrongFoot', frame: 2 });
+      expect(playerPicture(defender, defender, 131, null, flip)).toMatchObject({ action: 'wrongFoot', frame: 5 });
+      expect(playerPicture({ ...defender, pose: 'run' }, defender, 132, null, flip).action).toBe('run');
+      const { step: _step, ...oldDefender } = defender;
+      expect(playerPicture(oldDefender, oldDefender, 120, holder, flip).action).toBe('tackled');
+      const contact = playerPicture({ ...runner, pose: 'tackled' }, runner, 122, holder, flip);
+      expect(contact.action).toBe('tackled');
+      expect(contact.movement).toBeUndefined();
+      expect(playerPicture({ ...runner, pose: 'pass' }, runner, 122, null, flip)).toMatchObject({ action: 'pass', possession: false });
+    }
+  });
+  it('reaches toward the original lane in a live step and when seeking directly into the miss', () => {
+    const home = labSheet('rival-reapers'), away = labSheet('rival-wolves');
+    const runner = new Runner(seed => new LiveSim(home, away, seed), 34);
+    const samePlayer = (s: Snapshot, q: PlayerSnap) => s.players.find(r => r.side === q.side && r.slot === q.slot && r.who === q.who)!;
+    // Pick an actual, side-on approach where flipping the jink would turn the defender away from the runner.
+    runner.skipUntil(s => {
+      if (!s.events.some(e => e.kind === 'step')) return false;
+      const c = s.players.find(q => q.step?.role === 'carrier' && q.step.startedTick === s.tick);
+      const d = s.players.find(q => q.step?.role === 'defender' && q.step.startedTick === s.tick);
+      if (c?.step?.role !== 'carrier' || !d) return false;
+      const oldC = samePlayer(runner.prev, c), oldD = samePlayer(runner.prev, d);
+      const aim = { headX: oldC.x - oldD.x, headY: oldC.y - oldD.y };
+      const facing = screenPlayerFacing(aim, oldD);
+      return facing.facing === 'side' && facing.left !== (screenHeading(0, c.step.lateral).x > 0);
+    });
+    const { cur: award, prev: before } = runner;
+    const c = award.players.find(q => q.step?.role === 'carrier' && q.step.startedTick === award.tick);
+    const d = award.players.find(q => q.step?.role === 'defender' && q.step.startedTick === award.tick);
+    expect(c && d, 'fixture must contain a side-on step').toBeTruthy();
+    const oldCarrier = samePlayer(before, c!), oldDefender = samePlayer(before, d!);
+    const reachX = oldCarrier.x - oldDefender.x, reachY = oldCarrier.y - oldDefender.y;
+    expect(d!.step).toMatchObject({ reachX, reachY });
+    for (const flip of [1, -1]) {
+      const picture = playerPicture(d!, oldDefender, award.tick, award.ball.holder, flip, pictureContext(award, before));
+      expect(picture).toMatchObject({ action: 'wrongFoot', facing: 'side', left: screenHeading(reachX, reachY, flip).x < 0 });
+    }
+    runner.skipUntil(s => s.tick >= award.tick + 5);
+    const select = (flip: number) => playerPicture(samePlayer(runner.cur, d!), samePlayer(runner.prev, d!), runner.tick, runner.cur.ball.holder, flip, pictureContext(runner.cur, runner.prev));
+    const played = [select(1), select(-1)];
+    expect(played[0]).toMatchObject({ action: 'wrongFoot', frame: 2 });
+    runner.seek(award.tick + 5);
+    expect([select(1), select(-1)]).toEqual(played);
+  });
+});
 describe('live player presentation', () => {
   it('catches during forward movement and tucks into a carry, with stable direction', () => {
     const holder = { side: 'home' as const, slot: 0 };
