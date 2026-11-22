@@ -326,4 +326,5 @@ export async function runIndividualChallenges(browser) {
 
   writeFileSync(join(out, 'report.json'), JSON.stringify(reports, null, 2));
   if (reports.some(r => !r.ok)) throw new Error('Individual challenge journeys failed; see '+join(out, 'report.json'));
+  return 0;
 }
