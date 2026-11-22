@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- **Loose-ball pickups.** The player who gets to a loose ball in open play drops his hips, scoops it from the turf and tucks it into his running or standing carry. Ported from [draft PR #764](https://github.com/ch-leon/nrl-sim/pull/764). [Match rules](../specs/BAK-208-match-rules-and-skills.md#44-kicks--first-slice-implemented-long-bomb-grubber-chip-cross-field)
+
 - **Centre carries out wide.** A centre catching an ordinary pass near touch reads the nearest free defender ahead. He straightens onto the outside shoulder of a man holding infield, or cuts back inside a man sliding toward touch, and only when that lane has room. The read lasts at most 0.9 seconds. A covered lane, a square defender, a manual step or a set play leaves the usual gap-seeking carry. Pass, sprint and contact odds are unchanged. `live.centreShoulderTicks:0` turns the read off. [PR #770](https://github.com/ch-leon/nrl-sim/pull/770), ported from [draft PR #755](https://github.com/ch-leon/nrl-sim/pull/755), part of [#649](https://github.com/ch-leon/nrl-sim/issues/649).
 
 - **Contested bombs.** The chaser and receiver plant and leap as an open-play bomb comes down. The player who takes it gathers it in the air. On a spill, both land empty-handed and the ball bounces free. Ported from [draft PR #761](https://github.com/ch-leon/nrl-sim/pull/761). [Match rules](../specs/BAK-208-match-rules-and-skills.md#44-kicks--first-slice-implemented-long-bomb-grubber-chip-cross-field)

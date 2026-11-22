@@ -65,4 +65,23 @@ describe('big-moment artwork', () => {
       if (frame === 2) expect(hasHand(9, 13)).toBe(true);
     }
   });
+  it('plants both boots as the hand dips to the turf and tucks into the carry', () => {
+    const reach = momentPoseAt('groundPickup', 1);
+    const take = momentPoseAt('groundPickup', 2, true);
+    const tuck = momentPoseAt('groundPickup', 4, true);
+    expect(reach.pose.hip[1]).toBeGreaterThan(momentPoseAt('groundPickup', 0).pose.hip[1]);
+    expect(take.ball).toEqual(reach.ball);
+    expect(tuck.ball[1]).toBeLessThan(take.ball[1]);
+    for (const { pose, lift } of [reach, take, tuck]) {
+      expect(lift).toBe(0);
+      expect([pose.foot[1], pose.farFoot[1]]).toEqual([35, 35]);
+    }
+    const hand = bentContactArm(add(reach.pose.shoulder, 3, 1), reach.near).hand;
+    expect(distance(hand, add(reach.ball, 4.5, 3.5))).toBeLessThan(4);
+    const look = appearanceFor('captain');
+    for (const gait of [-1, 0, 6]) {
+      expect(drawMomentPlayer(look, kit, 'groundPickup', 5, 'front', true, gait).data)
+        .toEqual(drawPrototypePlayer(look, kit, 'carry', 0, 'front', true, gait).data);
+    }
+  });
 });
