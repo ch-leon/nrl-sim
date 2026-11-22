@@ -174,7 +174,7 @@ Build these once in Phase 0 (in `dom.ts` or a new `src/ui/parts.ts`) and use the
 | Stat tile | label, big Archivo number, 6px bar: fill = current, faint = ceiling; accent border + label when it's the training focus | `p.stats`, `p.ceilings`, `state.training.focus` |
 | Player card | portrait slot (34px), surname, stars, position code, fitness dot, C/K tag | `portraitDataUrl`, `fitnessPct`, roles from `sideRoles` |
 | Screen header | ◂ back (where you came from), Archivo title, one line of context, controls right | existing `screenHead()`, `backButton()` |
-| Toast | bar colour = kind, optional Undo with countdown; coach lines with a "Coach" tag in italics | `toasts.ts` |
+| Toast | bar colour = kind, optional Undo with countdown (a 2px accent bar along the foot that runs down with the offer; the label stays "Undo"); coach lines with a "Coach" tag in italics | `toasts.ts` |
 | Confirm dialog | title, one line, two buttons, primary on the right | decisions-before-advance, start over, delete, release, open everything, long advance |
 | Placement bar | replaces the dock while placing a building: name, hint, Cancel, Build here | `placementBar.ts` |
 | Rotate card | "Turn your phone sideways" + wordmark | `orientation.ts` |
@@ -278,7 +278,7 @@ Each row: mockup → current source → what changes. Anything not listed keeps 
 - **`64-paywall-placeholder`** → `screens/paywall.ts`: **reskin only for now**: tokens, fonts, buttons. The layout will be redone; prices stay from `src/commercial/prices.ts`.
 - **Built in Phase 5** (what the code has decides what shows):
   - The only full-screen loading screen is the one shown while a League career is set up ("Preparing your leagues…"); it gets the wordmark, an indeterminate bar (the set-up reports no progress) and one of the game's first-visit hints as the tip. The town list loads while the Town step is already up, so "Loading offline towns…" is that step's status line, not a screen.
-  - Slot cards show the season and week but no ladder position (the save summary doesn't carry it). Behind each save's ⋯: the recovery and original exports, New club over that season, and the two-tap Delete.
+  - Slot cards show the season, week and ladder place ("Season 1 · Week 2 · 3rd", the HUD's own standing; none before a round is in). The title passes `getSlotSummaries` the ladder lookup, so `core/save` doesn't import the game systems (that pulled in 91 import cycles). Behind each save's ⋯: the recovery and original exports, New club over that season, and the two-tap Delete.
   - The three setup steps are built at once and one is shown, so every field keeps its value. Club keeps the code's field order (club, your name, ground) and the drawn player in the kit as its preview; touch swatches stay 44px. Start adds the Career mode switch (Classic / League), which the mockup doesn't show; its summary card names the town, not a region. "Start over" is destructive (amber on navy) and stays in the bottom row.
   - The tutorial's "1 OF 3" pill sits in the button row: a header row would push the copy past the unscrolled-fit check (#208). No "Your assistant" header or pointer arrow: the coach's name labels the line.
   - The weekly summary's button stays "Play week ▸": nothing gives a reliable next week number across trials and the season rollover. Its lines are the code's own words, set as name and detail.
@@ -308,14 +308,14 @@ Build these from the parts in §4 and the nearest mockup. Keep their content as 
 
 - **Built in Phase 6** (what the code has decides what shows):
   - The pre-match plan sheet was built in Phase 2 (§5 Match), so Phase 6 left it alone.
-  - Contracts stays a table (the e2e flow and the hold-still logic read it), in the Recruit look: portrait in the kit, name over a muted line, position, stars with the rating, weeks left, cap, then Renew / Release / Sell. A Renew that can't go keeps its label and says why in amber on the row. Weeks left stay in weeks, not "Ends season n".
+  - Contracts stays a table (the e2e flow and the hold-still logic read it), in the Recruit look: portrait in the kit, name over a muted line, position, stars with the rating, when the deal ends, cap, then Renew / Release / Sell. A Renew that can't go keeps its label and says why in amber on the row. The **Ends** column is the deal's last season ("S2"; a queued renewal's when there is one); inside the 8-week window it keeps the weeks ("3 wks") in amber, since then they are what count. Its title has both.
   - Rival squad opens on the pitch (the side the match would pick for them, in their kit, read-only, with Bench and Reserves beside it) and keeps the old list one tap away (Pitch / List), with Edit club and the club editor. Rivals have no stored captain or kicker, so no C or K tags.
   - The expansion intro is the season review's banner with the bank as its big number ("IN THE BANK"), Skip intro and one orange **Carry on ▸**; the coach's lines sit under it as ruled rows. "Let's get to work" stays as the button's tooltip.
   - Coach calls group the calls by Coach's Office level, each group with an Unlocked / Locked pill and, when locked, "Opens with Coach's Office n"; a group opens together, so the reason is on the group, not on each tile. Playbook plays are tiles with the IQ check as a pill beside the "Needs:" line; only the first Buy the club can afford is orange. The attack coach card and "Other coaches' plays" look as they did.
   - The Guide is a topic list beside the open page on a wide window (its tab hooks stay); under 560px wide it is one or the other, with ◂ Topics. Replay tutorial moved into its header.
   - History's Records rows, Retired players, Trophies and the season books use the Finance label/value rows and table; Season P&L and Ledger use the This week rules with JetBrains Mono figures. Row heights are unchanged.
   - The long-advance question is the confirm dialog (title, one line, Cancel and Play); it is now modal, where before the dock stayed usable behind it. The decisions-before-advance ask keeps its list and ✕, in the confirm dialog's look, with **Answer now** the primary on the right.
-  - The update prompt is a toast-style bar with Reload as its primary. The newer-save message stays the title's own notice on the slot (it is title-screen text, Phase 5's file), not a toast.
+  - The update prompt is a toast-style bar with Reload as its primary. The title's messages (a failed import or load, including a save from a newer version, a League start that failed, an import's repair note) are toasts, danger or info, in a lane at the title's foot so they never cover the slots. A newer save's own card still says "Newer game version" with the reason.
 
 ---
 
