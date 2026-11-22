@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- **Offloads in contact.** A tackled runner can get one arm free and send the ball to a support runner while the defender holds on. The flight starts at the releasing hand. Ported from [draft PR #766](https://github.com/ch-leon/nrl-sim/pull/766).
+
 - **One-on-one sidesteps.** When a ball carrier beats a defender with a step, the runner plants and cuts away. The beaten defender reaches into the old running line and gathers his feet to chase. Ported from [draft PR #765](https://github.com/ch-leon/nrl-sim/pull/765).
 
 - **Loose-ball pickups.** The player who gets to a loose ball in open play drops his hips, scoops it from the turf and tucks it into his running or standing carry. Ported from [draft PR #764](https://github.com/ch-leon/nrl-sim/pull/764). [Match rules](../specs/BAK-208-match-rules-and-skills.md#44-kicks--first-slice-implemented-long-bomb-grubber-chip-cross-field)

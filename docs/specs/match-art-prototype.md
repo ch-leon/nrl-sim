@@ -201,6 +201,15 @@ the sole while falling. This applies to both legs on the carrier and every actua
 joiner, after posture and docking, in the study and live matches. Close body
 contact, appearance, ownership and simulation timing are preserved.
 
+In an open-play offload the actual carrier braces under the tackler and frees
+one hand in the direction of the pass. The tackler stays on his approach side
+with his feet near their field positions and finishes the contact as play moves
+on. The shared pose hands the single ball from the carry into the launched
+flight. The real receiver, interception or spill uses the regular handling art.
+The contact ends on a whistle, turnover, interrupted flight or release of the
+pair's locks. The offload snapshot carries the real flight timing and aim so
+replay seeks can reconstruct it.
+
 For a standalone HTML artifact, with fonts and artwork included:
 
 ```sh

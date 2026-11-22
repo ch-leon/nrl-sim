@@ -1,7 +1,8 @@
 // The view follows contact facts. It never rolls a result or recruits a nearby player.
 import type { ContactPlayer, ContactSnap, PlayerSnap, Snapshot } from '../core/snapshot';
+import { currentPass, flightPlayer } from './handling';
 
-export type ContactKind = 'wrap' | 'low' | 'dominant' | 'break' | 'steal';
+export type ContactKind = 'wrap' | 'low' | 'dominant' | 'break' | 'steal' | 'offload';
 /** Where the first defender came from, against the carrier's heading (#674). */
 export type ContactApproach = 'front' | 'side' | 'behind';
 /**
@@ -46,6 +47,7 @@ export function contactApproach(carrier: PlayerSnap, defender: PlayerSnap | unde
 export function contactVariant(kind: ContactKind, approach: ContactApproach): ContactVariant {
   if (kind === 'break') return 'bump';
   if (kind === 'steal') return 'strip';
+  if (kind === 'offload') return approach === 'front' ? 'square' : 'drag';
   if (kind === 'dominant') return approach === 'front' ? 'stop' : 'square';
   return approach === 'behind' ? 'ankle' : approach === 'side' ? 'drag' : 'square';
 }
@@ -53,7 +55,7 @@ export function contactVariant(kind: ContactKind, approach: ContactApproach): Co
 /** Modern snapshots are self-contained; older rehearsal data can be folded in tick order. */
 export function advanceContactAnimation(previous: ContactAnimation | null, snap: Snapshot): ContactAnimation | null {
   const event = snap.events.find(e => e.contact);
-  if (event && !['tackle', 'big-hit', 'break-tackle', 'strip'].includes(event.kind)) return null;
+  if (event && !['tackle', 'big-hit', 'break-tackle', 'strip', 'offload'].includes(event.kind)) return null;
   // Old recordings without exact references intentionally keep the ordinary player art.
   if (previous && snap.tick < previous.tick) previous = null;
   const facts = snap.contact ?? event?.contact;
@@ -70,8 +72,8 @@ export function advanceContactAnimation(previous: ContactAnimation | null, snap:
   let resolvedTick = prior?.resolvedTick ?? null;
   const outcome = contact.outcome ?? event?.kind;
   if (outcome) {
-    resolvedTick = contact.resolvedTick ?? resolvedTick ?? event!.tick;
-    kind = outcome === 'strip' ? 'steal' : outcome === 'break-tackle' ? 'break' : outcome === 'big-hit' ? 'dominant'
+    resolvedTick = contact.resolvedTick ?? resolvedTick ?? event?.tick ?? snap.tick;
+    kind = outcome === 'offload' ? 'offload' : outcome === 'strip' ? 'steal' : outcome === 'break-tackle' ? 'break' : outcome === 'big-hit' ? 'dominant'
       : contact.defenders.length === 1 && resolvedTick - contact.startedTick <= 7 ? 'low' : 'wrap';
   }
   const find = (p: ContactPlayer) => snap.players.find(q => q.side === p.side && q.slot === p.slot && q.who === p.who);
@@ -80,7 +82,24 @@ export function advanceContactAnimation(previous: ContactAnimation | null, snap:
   // A strip is only painted when the engine has actually awarded the defender the ball.
   const expected = kind === 'steal' ? contact.defenders[0]! : contact.carrier;
   if (kind === 'steal' && contact.defenders.length !== 1) return null;
-  if (!snap.ball.holder || snap.ball.holder.side !== expected.side || snap.ball.holder.slot !== expected.slot) return null;
+  const holder = snap.ball.holder;
+  if (kind === 'offload') {
+    const defender = flightPlayer(snap, contact.defenders[0]);
+    const offload = contact.offload;
+    if (!snap.contact || !offload || contact.startedTick !== contact.resolvedTick || snap.tick < contact.startedTick
+      || !Number.isInteger(offload.arrivesTick) || offload.arrivesTick <= contact.startedTick || !Number.isFinite(offload.to?.x) || !Number.isFinite(offload.to?.y)
+      || joined.length !== 1 || snap.phase?.kind !== 'play' || snap.attacking !== carrier.side
+      || carrier.binned || carrier.pose !== 'tackled' || defender?.pose !== 'tackle' || defender.side === carrier.side
+      || !Number.isInteger(contact.releaseTick) || snap.tick >= contact.releaseTick!
+      || carrier.poseUntil !== contact.releaseTick || defender.poseUntil !== contact.releaseTick
+      || (holder && [carrier, defender].some(p => holder.side === p.side && holder.slot === p.slot))) return null;
+    if (snap.tick < offload.arrivesTick) {
+      const pass = currentPass(snap);
+      if (!pass || !pass.source || contactPlayerKey(pass.source.player) !== contactPlayerKey(contact.carrier)
+        || pass.startedTick !== contact.startedTick || pass.arrivesTick !== offload.arrivesTick
+        || pass.to.x !== offload.to.x || pass.to.y !== offload.to.y) return null;
+    } else if (holder?.side !== carrier.side) return null;
+  } else if (!holder || holder.side !== expected.side || holder.slot !== expected.slot) return null;
   if (!facts && resolvedTick !== null) {
     if (kind === 'break' || kind === 'steal') {
       if (snap.tick - resolvedTick > 20) return null;

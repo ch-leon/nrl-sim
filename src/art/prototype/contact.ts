@@ -80,17 +80,43 @@ export interface ContactBody {
   arms: readonly ContactArm[]; grip: number; role: ContactRole;
   running: boolean;
 }
-export interface ContactPose { carrier: ContactBody; defenders: ContactBody[]; ball: Point; owner: ContactPlayer; ptb: boolean; impact: number }
+export interface ContactPose {
+  carrier: ContactBody; defenders: ContactBody[]; ball: Point; owner: ContactPlayer; ptb: boolean; impact: number;
+  /** Centre of the flying ball when it leaves the hand, in the shared picture. */
+  offloadRelease?: Point;
+}
+
+function offloadArm(shoulder: Point, aim: Point, extend: number, tuckSide: number): { arm: ContactArm; ball: Point } {
+  const length = Math.hypot(aim[0], aim[1]) || 1;
+  const dx = aim[0] / length, dy = aim[1] / length;
+  const reach = Math.max(5, Math.min(9, length * .45));
+  const tuck = add(shoulder, 5 * tuckSide, 4);
+  const hand = blend(tuck, add(shoulder, reach * dx, -2 + 5 * dy), extend);
+  const arm = bentContactArm(shoulder, hand);
+  return { arm, ball: add(arm.hand, reach / 4 * dx, reach / 4 * dy) };
+}
+
+const contactLead = (variant: ContactAnimation['variant']) => variant === 'ankle' ? STUMBLE : variant === 'drag' ? DRIVE : variant === 'stop' ? JACK : BRACE;
+
+export function offloadBallCentre(state: ContactAnimation, pose: ContactPose, look: Appearance): Point | undefined {
+  if (!pose.offloadRelease) return undefined;
+  const brace = contactLead(state.variant);
+  return add(pose.offloadRelease, 0, standTall(brace, look.stature).shoulder[1] - brace.shoulder[1]);
+}
 
 /** Only the supplied participants are painted. Joins and outcomes come from snapshots. */
-export function contactPoseAt(state: ContactAnimation): ContactPose {
+export function contactPoseAt(state: ContactAnimation, throwAt?: { aim: Point; gather: number; carrierLeft: boolean }): ContactPose {
   const age = Math.max(0, (state.tick - state.contact.startedTick) / 20);
+  const offload = state.kind === 'offload';
+  const offloadAge = state.tick - state.contact.startedTick;
   let after = state.resolvedTick === null ? -1 : Math.max(0, (state.tick - state.resolvedTick) / 20);
   if (state.contact.releaseTick !== undefined && state.resolvedTick !== null && state.kind !== 'break' && state.kind !== 'steal') {
     // Fit the fall/release to the actual displayed ruck, including quick rucks.
     // The last shared tick is releaseTick - 1: PTB uses the individual actor from releaseTick.
     after = Math.max(0, (state.tick - state.resolvedTick) / Math.max(1, state.contact.releaseTick - state.resolvedTick - 1)) * 1.05;
   }
+  // The ball is already out. Hold the brace through the flick, then finish the contact without a ruck.
+  if (offload) after = Math.max(0, offloadAge - 4) / Math.max(1, state.contact.releaseTick! - state.contact.startedTick - 5);
   const completed = after >= 0 && !['break', 'steal'].includes(state.kind);
   const variant = state.variant;
   const stop = variant === 'stop';
@@ -107,9 +133,9 @@ export function contactPoseAt(state: ContactAnimation): ContactPose {
   const drive = state.resolvedTick === null ? Math.sin(age * 20 * Math.PI * 2 / CONTACT_BEATS.struggleTicks) * .65 : 0;
   const recoil = state.kind === 'dominant' && !stop ? -10 * ease(after / .14) : 0;
   const hit = Math.max(...state.joined.map(j => Math.max(0, 1 - (state.tick - j.tick) / CONTACT_BEATS.joinTicks)));
-  const lead = plantStance(variant === 'ankle' ? STUMBLE : variant === 'drag' ? DRIVE : stop ? JACK : BRACE);
-  let c = blendBody(plantStance(CARRIER), lead, ease(age / (stop ? .08 : .12)));
-  if (variant === 'drag') {
+  const lead = plantStance(contactLead(variant));
+  let c = offload ? lead : blendBody(plantStance(CARRIER), lead, ease(age / (stop ? .08 : .12)));
+  if (variant === 'drag' && !offload) {
     // Legs still pumping: a stride or two with the tackler hanging off him, dying away as he goes down.
     const step = age * Math.PI * 3; const pump = 1 - fall;
     const s = Math.sin(step) * pump; const lift = Math.cos(step) * pump;
@@ -118,7 +144,7 @@ export function contactPoseAt(state: ContactAnimation): ContactPose {
   }
   c = shift(blendBody(c, forward ? FORWARD_DOWN : BACK_DOWN, fall), recoil);
   // Absorb each actual arrival through the trunk and knees; feet stay planted.
-  const squash = (1 - fall) * hit;
+  const squash = (1 - fall) * (offload ? 0 : hit);
   c = { ...c, hip: add(c.hip, drive * .35, squash), shoulder: add(c.shoulder, -2 * squash + drive, squash), head: add(c.head, -2 * squash + drive, squash), knee: add(c.knee, 0, squash) };
   const run = escaped && after >= .15;
   if (escaped) {
@@ -140,14 +166,17 @@ export function contactPoseAt(state: ContactAnimation): ContactPose {
   const recoveryTarget = shift(ready.pose, CONTACT_X - CENTRE, CONTACT_FOOT - PAINT_FOOT);
   c = blendBody(c, forward ? FORWARD_SUPPORT : BACK_SUPPORT, support);
   c = blendBody(c, KNEEL, kneel);
-  c = blendBody(c, recoveryTarget, recovery);
+  c = blendBody(c, offload ? plantStance(CARRIER) : recoveryTarget, recovery);
   if (ptb) c = recoveryTarget;
   c = fitLegs(c);
   const palm = add(c.shoulder, -3, Math.min(8, CONTACT_FOOT - c.shoulder[1]));
   const freeHand = completed && after > beats.supportAt && !ptb
     ? bentContactArm(add(c.shoulder, -2, 1), blend(palm, add(c.shoulder, -4, 7), kneel)) : undefined;
-  const carrier: ContactBody = { player: state.contact.carrier, pose: c, tilt: (forward ? 65 : -75) * fall * (1 - Math.max(support * .55, kneel)), left: false,
-    arms: freeHand ? [freeHand] : [], grip: 0, role: 'carrier', running: run };
+  const aim = throwAt?.aim ?? [-20, 0];
+  const tuckSide = throwAt?.carrierLeft ? -1 : 1;
+  const throwing = offload ? offloadArm(add(c.shoulder, 1, 1), aim, (throwAt?.gather ?? 1) * (1 - ease((offloadAge - 2) / 4)), tuckSide) : undefined;
+  const carrier: ContactBody = { player: state.contact.carrier, pose: c, tilt: (forward ? 65 : -75) * fall * (1 - Math.max(support * .55, kneel)), left: offload && !!throwAt?.carrierLeft,
+    arms: [...(freeHand ? [freeHand] : []), ...(throwing ? [throwing.arm] : [])], grip: 0, role: 'carrier', running: run };
   const defenders = state.joined.map(({ player, tick }, index): ContactBody => {
     // The man from behind takes the legs or the hips; anyone after him comes in front.
     const role: ContactRole = fromBehind ? index === 0 ? variant : index === 1 ? 'upper' : 'low'
@@ -159,7 +188,7 @@ export function contactPoseAt(state: ContactAnimation): ContactPose {
     const lowDrop = low && index === 0 && role === 'low' ? ease(after / .1) : 1;
     const target = role === 'far' ? FAR : role === 'low' ? blendBody(HIGH, LOW, lowDrop) : role === 'ankle' ? ANKLE : role === 'drag' ? DRAG : square ? STOP : HIGH;
     const down = role === 'far' ? FAR_DOWN : role === 'low' ? LOW_DOWN : role === 'ankle' ? ANKLE_DOWN : role === 'drag' ? DRAG_DOWN : square ? STOP_DOWN : HIGH_DOWN;
-    const join = ease((state.tick - tick) / beats.joinTicks);
+    const join = offload ? 1 : ease((state.tick - tick) / beats.joinTicks);
     const releaseAt = beats.releaseAt + (role === 'upper' ? beats.upperDelay : 0) + (state.joined.length - 1 - index) * beats.releaseStagger;
     const release = ptb ? 1 : completed ? ease((after - releaseAt) / beats.releaseSpan) : 0;
     let p = blendBody(shift(stand(target.hip[0]), role === 'far' ? -7 : behind ? -8 : 9, -3), target, join);
@@ -217,7 +246,8 @@ export function contactPoseAt(state: ContactAnimation): ContactPose {
   });
   const owner = stolen ? defenders[0]!.player : carrier.player;
   const ball = stolen ? blend(add(c.shoulder, 5, 4), add(defenders[0]!.pose.shoulder, 4, 4), ease(after / .18)) : blend(add(c.shoulder, 3, 4), add(ready.ball, CONTACT_X - CENTRE, CONTACT_FOOT - PAINT_FOOT), recovery);
-  return { carrier, defenders, ball, owner, ptb, impact: state.kind === 'dominant' && after < .15 ? 1 - after / .15 : 0 };
+  const offloadRelease = offload ? offloadArm(add(lead.shoulder, 1, 1), aim, 1, tuckSide).ball : undefined;
+  return { carrier, defenders, ball, owner, ptb, impact: state.kind === 'dominant' && after < .15 ? 1 - after / .15 : 0, ...(offloadRelease && { offloadRelease }) };
 }
 
 export function tiltedHead(look: Appearance, kit: Kit, facing: Facing, left: boolean, angle: number): PixelBuffer {
@@ -277,7 +307,7 @@ export function drawContact(state: ContactAnimation, lookFor: (p: ContactPlayer)
   if (far) drawBody(far);
   for (const d of pose.defenders.filter(d => d.role !== 'far')) drawBody(d);
   for (const d of pose.defenders) if (!d.running) arm(d.arms[0]!, lookFor(d.player), true);
-  if (pose.carrier.arms[0]) arm(pose.carrier.arms[0], lookFor(pose.carrier.player), true);
+  if (pose.carrier.arms[0] && (state.kind !== 'offload' || pose.carrier.arms.length > 1)) arm(pose.carrier.arms[0], lookFor(pose.carrier.player), true);
   drawBody(pose.carrier);
   for (const d of pose.defenders) if (!d.running && state.kind !== 'steal') arm(d.arms[1]!, lookFor(d.player));
   if (state.kind === 'steal') {
@@ -285,7 +315,9 @@ export function drawContact(state: ContactAnimation, lookFor: (p: ContactPlayer)
     const reach = 1 - ease((state.tick - state.resolvedTick!) / 6);
     arm(bentContactArm(add(shoulder, 3, 2), add(shoulder, 5 + 6 * reach, 8 - 2 * reach)), lookFor(pose.carrier.player));
   }
-  if (!pose.ptb && ![pose.carrier, ...pose.defenders].some(a => a.running && contactPlayerKey(a.player) === ownerKey)) {
+  if (state.kind === 'offload') {
+    arm(pose.carrier.arms[pose.carrier.arms.length - 1]!, lookFor(pose.carrier.player));
+  } else if (!pose.ptb && ![pose.carrier, ...pose.defenders].some(a => a.running && contactPlayerKey(a.player) === ownerKey)) {
     out.blit(ballPixels(), Math.round(pose.ball[0]), Math.round(pose.ball[1]));
     const owner = state.kind === 'steal' ? pose.defenders[0]! : pose.carrier;
     arm(bentContactArm(add(owner.pose.shoulder, 4, 2), add(pose.ball, 4, 4)), lookFor(owner.player));
