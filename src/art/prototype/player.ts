@@ -13,6 +13,11 @@ export type Build = 'lean' | 'athletic' | 'stocky';
 export type Action = 'idle' | 'run' | 'carry' | 'pass' | 'catch' | 'land' | 'call' | 'receive' | 'guard' | 'brace' | 'wrap' | 'ground' | 'ptb' | 'fend';
 /** Reactions (#667): the arms held still over standing or running legs. */
 export type ReactAction = 'headHands' | 'hips' | 'fold';
+/** An authored near-arm pose, in pixels from its shoulder, over the usual gait. */
+export interface ArmPose {
+  elbow: readonly [number, number];
+  hand: readonly [number, number];
+}
 export interface Appearance {
   skin: number;
   hair: number;
@@ -237,7 +242,7 @@ export function prototypeUpperAt(build: Build, action: Action | ReactAction, fra
  * `tired` (#666): 1 on tired legs, 2 spent or blown. A tired man runs and stands lower and hunched,
  * head down, without the lift into flight; spent, his arms barely pump. 0 is the fresh figure, unchanged.
  */
-export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action | ReactAction, frame: number, facing: Facing = 'front', possession = false, strideFrame?: number, tired = 0, movement?: Movement): PixelBuffer {
+export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action | ReactAction, frame: number, facing: Facing = 'front', possession = false, strideFrame?: number, tired = 0, movement?: Movement, nearArm?: ArmPose): PixelBuffer {
   const b = new PixelBuffer(WIDTH, PAINT_H);
   const stocky = a.build === 'stocky';
   const bodyW = stocky ? 11 : a.build === 'athletic' ? 9 : 7;
@@ -372,7 +377,14 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action | Re
 
   let handX = shX + 1;
   let handY = shY + 6;
-  if (action === 'headHands') {
+  if (nearArm) {
+    const elbowX = shX + nearArm.elbow[0];
+    const elbowY = shY + nearArm.elbow[1];
+    handX = shX + nearArm.hand[0];
+    handY = shY + nearArm.hand[1];
+    line(shX, shY, elbowX, elbowY, a.skin);
+    line(elbowX, elbowY, handX, handY, a.skin);
+  } else if (action === 'headHands') {
     handX = headX + 16; handY = headY + 12;
   } else if (action === 'hips') {
     handX = shX; handY = hipY;
@@ -453,7 +465,7 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action | Re
     b.fillRect(shX, shY - 1, 3, 1, kit.trim);
   }
   // A small palm and lit knuckle distinguish hands from the forearm at phone size.
-  if (action !== 'headHands' && (swing === 0 || action === 'carry' || action === 'land' || action === 'brace' || action === 'catch')) {
+  if (action !== 'headHands' && (nearArm || swing === 0 || action === 'carry' || action === 'land' || action === 'brace' || action === 'catch')) {
     b.fillRect(handX, handY, 2, 2, a.skin);
     b.set(handX + 1, handY, shade(a.skin, 1.12));
   }

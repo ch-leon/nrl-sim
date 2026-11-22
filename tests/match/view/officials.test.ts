@@ -5,11 +5,12 @@
 import { describe, it, expect } from 'vitest';
 import { LiveSim } from '../../../src/match/league/live';
 import { sideSheet } from '../../../src/match/balance/measure';
+import { Runner, TICK_MS, replayRange } from '../../../src/match/core/engine';
 import { toFieldPt } from '../../../src/match/core/field';
 import type { Snapshot } from '../../../src/match/core/snapshot';
 import { fieldOffsetX, fieldToWorldPoint } from '../../../src/scenes/matchField';
-import { BENCH, REF, benchSeat, benchSeated, binSeat, binnedSpot, refCoversCarrier, refereeSignal, refereeSpot } from '../../../src/match/view/officials';
-import { refereeKit, REFEREE_STRIPS } from '../../../src/art/match/bench';
+import { BENCH, REF, SIX_AGAIN_POSE_TICKS, benchSeat, benchSeated, binSeat, binnedSpot, refCoversCarrier, refereeSignal, refereeSpot } from '../../../src/match/view/officials';
+import { refereeKit, REFEREE_STRIPS, SIX_AGAIN_ARMS } from '../../../src/art/match/bench';
 import { kitContrast, resolveKits } from '../../../src/art/match/kitClash';
 import { kitFromColors } from '../../../src/art/match/kit';
 import { binCardSpot } from '../../../src/scenes/matchOfficials';
@@ -19,11 +20,13 @@ const world = (p: { x: number; y: number }) => {
   return fieldToWorldPoint(f.fx, f.fy, fieldOffsetX());
 };
 
+const fixture = (seed: number, halfMinutes = 7): LiveSim => new LiveSim(
+  sideSheet('H', { rating: 62 }), sideSheet('A', { rating: 58 }), seed, { length: { halves: 2, halfMinutes } },
+);
+
 /** Historical seven-minute halves provide the penalty/try presentation witnesses. */
 function* matchSnapshots(seed: number, halfMinutes = 7, maxTick = 30_000): Generator<Snapshot> {
-  const home = sideSheet('H', { rating: 62 });
-  const away = sideSheet('A', { rating: 58 });
-  const sim = new LiveSim(home, away, seed, { length: { halves: 2, halfMinutes } });
+  const sim = fixture(seed, halfMinutes);
   yield sim.snapshot();
   while (!sim.finished && sim.tick < maxTick) {
     sim.step();
@@ -114,6 +117,41 @@ describe('the referee (#642)', () => {
     expect(snaps.some((s) => refereeSignal(s) === 'try')).toBe(true);
     expect(snaps.some((s) => refereeSignal(s) === 'penalty')).toBe(true);
     expect(refereeSignal(snaps[0]!)).toBeNull();
+  });
+
+  it('circles the arm for a live six-again call, including in replays and on seeks', () => {
+    const snaps = matches[0]!;
+    const call = snaps.find((s) => s.phase?.kind === 'ruck' && s.events.some((e) => e.kind === 'six-again'))!;
+    const duration = SIX_AGAIN_ARMS.length * SIX_AGAIN_POSE_TICKS;
+    const picture = snaps.slice(call.tick, call.tick + duration);
+    expect(refereeSignal(snaps[call.tick - 1]!)).toBeNull();
+    expect(picture.map(refereeSignal)).toEqual(Array(duration).fill('six-again'));
+    expect(refereeSignal(snaps[call.tick + duration]!)).toBeNull();
+    expect(picture.every((s) => s.attacking === call.attacking && s.sixAgainTick === call.tick)).toBe(true);
+    const nextPenalty = snaps.slice(call.tick + duration).find((s) => refereeSignal(s) === 'penalty')!;
+    expect(nextPenalty.sixAgainTick).toBeUndefined();
+
+    const mid = picture[9]!;
+    expect(mid.events.some((e) => e.kind === 'six-again')).toBe(false);
+    expect(replayRange(fixture, 3, mid.tick, mid.tick)).toEqual([mid]);
+    const runner = new Runner(fixture, 3);
+    runner.seek(call.tick - 1);
+    runner.setSpeed(8);
+    runner.play();
+    runner.update((mid.tick - runner.tick) * TICK_MS / runner.speed);
+    expect(runner.cur).toEqual(mid);
+    runner.seek(mid.tick);
+    expect(runner.cur).toEqual(mid);
+  });
+
+  it('cuts the six-again signal when a stoppage or another referee call takes over', () => {
+    const live = matches[0]!.find((s) => refereeSignal(s) === 'six-again')!;
+    for (const kind of ['set-piece', 'restart', 'half-time', 'full-time']) {
+      expect(refereeSignal({ ...live, phase: { kind, since: live.tick } })).toBeNull();
+    }
+    expect(refereeSignal({ ...live, phase: { kind: 'penalty', since: live.tick } })).toBe('penalty');
+    const trySnap = matches[0]!.find((s) => refereeSignal(s) === 'try')!;
+    expect(refereeSignal({ ...trySnap, sixAgainTick: trySnap.tick })).toBe('try');
   });
 
   it('wears a strip neither side can be taken for', () => {

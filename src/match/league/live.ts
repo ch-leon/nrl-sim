@@ -55,6 +55,8 @@ export class LiveSim extends LivePositioning implements MatchSim {
    */
   private phaseSeen: Phase | null = null;
   private phaseSince = 0;
+  /** Retain the real call for the referee picture, including on a seek into the signal. */
+  private sixAgainTick: number | undefined;
 
   // ── Tick ──────────────────────────────────────────────────────────────────
   step(): void {
@@ -148,10 +150,12 @@ export class LiveSim extends LivePositioning implements MatchSim {
     this.watchLineBreak(h);
     this.expireCalls();
     if (this.scripted || this.tucked >= 0) this.tidyPlays();
-    if (this.attacking !== beforeSide || this.tackles < beforeTackles
-      || !['play', 'tackle', 'ruck'].includes(this.phase.kind)) {
+    const live = this.phase.kind === 'play' || this.phase.kind === 'tackle' || this.phase.kind === 'ruck';
+    if (this.attacking !== beforeSide || this.tackles < beforeTackles || !live) {
       this.pendingControl.home = this.pendingControl.away = null;
     }
+    if (!live || this.attacking !== beforeSide) this.sixAgainTick = undefined;
+    else if (this.events.some((e) => e.kind === 'six-again')) this.sixAgainTick = this.tick;
     if (this.phase !== this.phaseSeen) {
       this.phaseSeen = this.phase;
       this.phaseSince = this.tick;
@@ -230,6 +234,7 @@ export class LiveSim extends LivePositioning implements MatchSim {
       ball,
       label: `${this.names[this.attacking]} ball · ${state} · ${this.points.home}–${this.points.away} · ${clockText(this.half, this.clockTicks * TICK_S)}${this.siren && (kind === 'play' || kind === 'tackle' || kind === 'ruck') ? ' · siren' : ''} · ${legs}${short}`,
       events: this.events,
+      ...(this.sixAgainTick === undefined ? {} : { sixAgainTick: this.sixAgainTick }),
       clock: { half: this.half, seconds: this.clockTicks * TICK_S, minute: Math.floor(this.matchSeconds / 60), siren: this.siren, finished: this.finished },
       score: { ...this.points },
       phase: { kind: ph.kind, since: this.phaseSince, ...(this.golden ? { golden: true } : {}) },
