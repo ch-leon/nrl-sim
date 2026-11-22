@@ -271,14 +271,6 @@ export async function runMatchPlays(browser, sizes = [[844, 390], [667, 375], [5
         if (def.tray.scrolls) problems.push('the tray scrolls while defending');
 
         if (withPlays) {
-          // The smallest phone always exercises the real break before calling a play (#717).
-          // Closing the tray restores the selected ×4; halftime still requires the normal button.
-          if (w === 568 && h === 320) {
-            await shutTray();
-            await waitMatchState(() => window.__nrlGame.scene.getScene('Match').playback.half >= 2, null,
-              'the second half after halftime confirmation', { tray: false });
-            if (halfTimeContinuations !== 1) problems.push(`expected one halftime continuation, got ${halfTimeContinuations}`);
-          }
           // Call one: the first tile that can be called. Its tag comes once it has been run.
           // A tap inside 300ms of the tiles changing makes no call (#608): tap until the tile lights.
           let called = null;
@@ -340,6 +332,16 @@ export async function runMatchPlays(browser, sizes = [[844, 390], [667, 375], [5
           if (!result) problems.push(`${called} was never run in four tries`);
           else if (!new RegExp(`^${SHORT[called]}( \\+\\d+m|: (no gain|line break!|try!|try against|intercepted|broke down|ball stripped|lost the ball))$`).test(result)) problems.push(`the tag reads "${result}"`);
           else log(`    ${w}x${h}: ${called} called, tag "${result}"`);
+          // The smallest phone still presses the real half-time Continue (#717). The call is made
+          // while a set remains: after the lead read, waiting out the break first can reach full
+          // time before a play called in the second half shows its tag. The waiter presses Continue
+          // if the card opens during the call; otherwise fast-forward to it with the tray shut.
+          if (w === 568 && h === 320 && halfTimeContinuations === 0) {
+            await shutTray();
+            await waitMatchState(() => window.__nrlGame.scene.getScene('Match').playback.half >= 2, null,
+              'the second half after halftime confirmation', { tray: false });
+          }
+          if (w === 568 && h === 320 && halfTimeContinuations !== 1) problems.push(`expected one halftime continuation, got ${halfTimeContinuations}`);
         }
         await shutTray();
         if (errors.length) problems.push(`page errors: ${errors.join(' | ')}`);
