@@ -120,6 +120,7 @@ export class MatchActor {
   place(x: number, y: number, depth: number): void {
     this.sprite.setPosition(x, y - this.lift).setDepth(depth); this.shadow.setPosition(x, y); this.ring.setPosition(x, y);
   }
+  get groundY(): number { return this.shadow.y; }
   ballAnchor(picture: PlayerPicture): { x: number; y: number } { return this.cache.ballAnchor(picture); }
   wear(who: string): void { this.who = who; }
   paint(picture: PlayerPicture): void {

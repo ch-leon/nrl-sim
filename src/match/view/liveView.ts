@@ -14,6 +14,7 @@ import { advanceContactAnimation, type ContactAnimation } from './contactAnimati
 import { flightPlayer, passSpriteOffset } from './handling';
 import { screenPlayerFacing } from './screenFacing';
 import { contactLayout, type ContactLayout, type ContactPoint } from './contactLayout';
+import { bombBallLift, bombPlayer, bombPose } from './bombContest';
 
 export interface ActorView {
   place(x: number, y: number, depth: number): void;
@@ -22,6 +23,8 @@ export interface ActorView {
   wear?(who: string): void;
   paint?(picture: PlayerPicture): void;
   ballAnchor?(picture: PlayerPicture): { x: number; y: number };
+  /** Ground line even when the body is off its feet. */
+  readonly groundY?: number;
   /** Draw him this opaque (a substitute fades in), 1 once he has. */
   fade?(alpha: number): void;
   setSpriteVisible?(visible: boolean): void;
@@ -138,7 +141,21 @@ export class LiveView {
         member.left = this.s.fieldToWorld(to.fx, to.fy).x < this.s.fieldToWorld(from.fx, from.fy).x;
       }
       // A sin-binned man sits in his side's bin (#642); everyone else is where the sim (and a try's mob) has him.
-      const f = toFieldPt(this.s.officials?.spot(c, cur) ?? { x: p.x + was.dx + (c.x + on.dx - p.x - was.dx) * a + (bm?.dx ?? 0), y: p.y + was.dy + (c.y + on.dy - p.y - was.dy) * a + (bm?.dy ?? 0) });
+      const picture = actor.paint ? playerPicture(c, p, cur.tick, cur.ball.holder, this.screenDir, ctx) : undefined;
+      const ground = this.s.officials?.spot(c, cur) ?? { x: p.x + was.dx + (c.x + on.dx - p.x - was.dx) * a + (bm?.dx ?? 0), y: p.y + was.dy + (c.y + on.dy - p.y - was.dy) * a + (bm?.dy ?? 0) };
+      const bomb = ctx.bombContest;
+      const plant = picture?.action === 'bombContest' ? bombPlayer(bomb, c) : undefined;
+      if (bomb && plant && picture) {
+        // The last running step finishes at the plant. As the feet leave it, rejoin the sim's path.
+        const weight = drawn < bomb.plantTick ? a : Math.max(0, Math.min(1, (bomb.arrivesTick - 2 - drawn) / 2));
+        ground.x += (plant.x - ground.x) * weight;
+        ground.y += (plant.y - ground.y) * weight;
+        const before = prev.bombContest;
+        const match = before && before.arrivesTick === bomb.arrivesTick && bombPlayer(before, p);
+        const lift = match ? bombPose(before, prev.tick, match === before.players[0], false)?.lift ?? 0 : 0;
+        picture.lift = Math.round(lift + ((picture.lift ?? 0) - lift) * a);
+      }
+      const f = toFieldPt(ground);
       const w = snap(this.s.fieldToWorld(f.fx, f.fy));
       if (bm && ctx.walkOff) {
         const ahead = bm.toward && toFieldPt({ x: c.x + bm.dx + bm.toward.x, y: c.y + bm.dy + bm.toward.y });
@@ -150,7 +167,7 @@ export class LiveView {
       points.push({ player: { side: c.side, slot: c.slot, who: c.who ?? `${c.side}/${c.slot}` }, ...w });
       const faceLeft = screenFacing(c, p, this.screenDir).left;
       const cadence = c.pose === 'run' ? Math.max(0.45, Math.min(1.7, c.speed / CADENCE_SPEED)) : 1;
-      if (actor.paint) actor.paint(playerPicture(c, p, cur.tick, cur.ball.holder, this.screenDir, ctx));
+      if (actor.paint && picture) actor.paint(picture);
       else actor.play(c.pose as PlayerAnim, faceLeft, timeScale * cadence);
     }
     let layout: ContactLayout | null = null;
@@ -181,7 +198,8 @@ export class LiveView {
     const carried = cb.holder ? breakMan(brk, cb.holder) : undefined;
     const bf = toFieldPt({ x: pb.x + (cb.x - pb.x) * ba + (carried?.dx ?? 0), y: pb.y + (cb.y - pb.y) * ba + (carried?.dy ?? 0) });
     const bw = snap(this.s.fieldToWorld(bf.fx, bf.fy));
-    const lift = Math.round((pb.lift + (cb.lift - pb.lift) * ba) * LIFT_PX_PER_M);
+    const beforeLift = bombBallLift(prev), currentLift = bombBallLift(cur);
+    const lift = Math.round((beforeLift + (currentLift - beforeLift) * ba) * LIFT_PX_PER_M);
     // Heading and flight time for the ball's turn and spin: its screen step this tick, the climb included.
     const f0 = toFieldPt({ x: pb.x, y: pb.y });
     const f1 = toFieldPt({ x: cb.x, y: cb.y });
@@ -189,7 +207,7 @@ export class LiveView {
     const w1 = this.s.fieldToWorld(f1.fx, f1.fy);
     const motion: BallMotion = ballPlaced
       ? { dx: 0, dy: 0, t: prev.tick + a }
-      : { dx: w1.x - w0.x, dy: w1.y - w0.y - (cb.lift - pb.lift) * LIFT_PX_PER_M, t: prev.tick + a };
+      : { dx: w1.x - w0.x, dy: w1.y - w0.y - (currentLift - beforeLift) * LIFT_PX_PER_M, t: prev.tick + a };
     // Which hand holds it, remembered per tick: a release hands the offset back over HAND_BLEND_TICKS.
     for (const s of [prev, cur]) {
       const hh = s.ball.holder && s.players.find((q) => q.side === s.ball.holder!.side && q.slot === s.ball.holder!.slot);

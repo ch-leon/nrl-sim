@@ -837,7 +837,10 @@ export class LivePlayback {
     this.popups.update(deltaMs, zoom, feet, view);
     this.zone.update(deltaMs);
     const kick = this.replay ? this.replayKicks.kick : this.kicks.kick;
-    this.kickLayer.update(kick, deltaMs, zoom, (fx, fy) => this.scene.fieldToWorld(fx, fy), feet);
+    this.kickLayer.update(kick, deltaMs, zoom, (fx, fy) => this.scene.fieldToWorld(fx, fy), (side, slot) => {
+      const actor = this.scene.players[side][slot];
+      return actor ? { x: actor.sprite.x, y: actor.groundY ?? actor.sprite.y } : null;
+    });
     this.traits.update(deltaMs, zoom, (fx, fy) => this.scene.fieldToWorld(fx, fy), feet, this.replay ? 1 : this.runner.speed);
     this.contest.update(deltaMs, zoom, (fx, fy) => this.scene.fieldToWorld(fx, fy), feet);
     // The picture on screen is the replay's tick, not the live match still paused underneath.
