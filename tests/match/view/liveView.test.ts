@@ -85,7 +85,7 @@ describe('LiveView', () => {
   it('hands the ball to the actual interceptor once and restores the same take after a seek', () => {
     const home = labSheet(DEFAULT_HOME), away = labSheet(DEFAULT_AWAY);
     const factory = (seed: number) => new LiveSim(home, away, seed);
-    const [air, take, turn, gather] = replayRange(factory, 1, 2456, 2459) as [Snapshot, Snapshot, Snapshot, Snapshot];
+    const [air, take, turn, gather] = replayRange(factory, 1, 2299, 2302) as [Snapshot, Snapshot, Snapshot, Snapshot];
     const ref = take.interception!.player;
     expect(air.ball.flight?.receiver).toEqual(ref);
     expect(take.events.some(e => e.kind === 'intercept' && e.side === ref.side && e.slot === ref.slot)).toBe(true);

@@ -46,4 +46,42 @@ describe('big-moment artwork', () => {
         .toEqual(drawPrototypePlayer(look, kit, 'carry', 0, 'front', true, gait).data);
     }
   });
+  it('shows open hands clear of the head, with sleeves joining the raised arms to the jersey', () => {
+    const darkKit = buildKit(0x583d33, 0x191720, 'sleeves');
+    for (const build of ['lean', 'stocky'] as const) for (const frame of [1, 2]) {
+      const look = { ...appearanceFor('captain'), build, skin: 0x78513c, stature: 0 };
+      const pixels = drawMomentPlayer(look, darkKit, 'bombContest', frame, 'front', false);
+      const { pose } = momentPoseAt('bombContest', frame);
+      const y = pose.shoulder[1]; // raised shoulder row −2, plus two spare rows in the final texture
+      for (const [side, color] of [[1, darkKit.jersey], ...(frame === 2 ? [[-1, darkKit.jerseyShade]] : [])] as const) {
+        for (let row = y; row <= y + 3; row++) {
+          const shoulder = pose.shoulder[0] + side! * (row <= y + 1 ? 5 : 3);
+          expect([shoulder - 1, shoulder, shoulder + 1, shoulder + 2].some(x => pixels.get(x, row).color === color)).toBe(true);
+        }
+      }
+      const hasHand = (from: number, to: number) => Array.from({ length: to - from }, (_, i) => from + i)
+        .some(x => [10, 11, 12, 13, 14].some(row => pixels.get(x, row).color === look.skin));
+      expect(hasHand(29, 35)).toBe(true);
+      if (frame === 2) expect(hasHand(9, 13)).toBe(true);
+    }
+  });
+  it('plants both boots as the hand dips to the turf and tucks into the carry', () => {
+    const reach = momentPoseAt('groundPickup', 1);
+    const take = momentPoseAt('groundPickup', 2, true);
+    const tuck = momentPoseAt('groundPickup', 4, true);
+    expect(reach.pose.hip[1]).toBeGreaterThan(momentPoseAt('groundPickup', 0).pose.hip[1]);
+    expect(take.ball).toEqual(reach.ball);
+    expect(tuck.ball[1]).toBeLessThan(take.ball[1]);
+    for (const { pose, lift } of [reach, take, tuck]) {
+      expect(lift).toBe(0);
+      expect([pose.foot[1], pose.farFoot[1]]).toEqual([35, 35]);
+    }
+    const hand = bentContactArm(add(reach.pose.shoulder, 3, 1), reach.near).hand;
+    expect(distance(hand, add(reach.ball, 4.5, 3.5))).toBeLessThan(4);
+    const look = appearanceFor('captain');
+    for (const gait of [-1, 0, 6]) {
+      expect(drawMomentPlayer(look, kit, 'groundPickup', 5, 'front', true, gait).data)
+        .toEqual(drawPrototypePlayer(look, kit, 'carry', 0, 'front', true, gait).data);
+    }
+  });
 });

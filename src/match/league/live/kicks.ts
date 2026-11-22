@@ -1,19 +1,95 @@
-import { FIELD_LENGTH, FIELD_WIDTH, MID_Y } from '../../core/field';
-import { grubberFlight, kickFlight, landed, type BallState } from '../../core/ball';
+import { FIELD_LENGTH, FIELD_WIDTH, MID_X, MID_Y, inPlay } from '../../core/field';
+import { KICK_SPEED, grubberFlight, hangTime, kickFlight, landed, type BallState } from '../../core/ball';
 import type { InterceptionSnap, Side } from '../../core/snapshot';
-import { clamp, dist, sub, type Vec } from '../../core/vec';
+import { clamp, dist, dot, norm, sub, type Vec } from '../../core/vec';
 import { knockOnChance } from '../contest';
+import { legsSpeed } from '../fatigue';
+import { GAS, canSprint, paceMult } from '../gas';
 import { KICKOFF, kickoffLanding, pinnedDeep, regatherChance, type KickoffCall } from '../kickoff';
 import { KICK_CONTEST, fieldingRead, grubberRace, highBall } from '../kickContest';
 import { TOUCH, exitPoint, inOwnInGoal, outOfPlay, ownLineX, touchRestartSpot } from '../touch';
 import { ROLES } from '../roles';
+import { WING_BOMB } from '../tactics';
+import { speedMult } from '../traits';
+import { WEATHER } from '../weather';
 import { LIVE } from './knobs';
-import { other, AIM_TEXT, KICK_TEXT, type Player, type Phase } from './types';
+import { readShoulder, type ShoulderRead } from './centreCarry';
+import { other, AIM_TEXT, KICK_TEXT, type Player, type Phase, type PendingKick } from './types';
 import { LiveClock } from './clock';
+import { TICK_S } from '../../core/engine';
+import { BOMB_PLANT_TICKS, BOMB_RECOVERY_TICKS, BOMB_TAKEOFF_LEAD, type BombContestSnap } from '../../core/snapshot';
 
 export abstract class LiveKicks extends LiveClock {
   /** Presentation only, written when the defender actually takes the pass. */
   protected visualInterception?: InterceptionSnap;
+
+  protected centreCarry: (Omit<ShoulderRead, 'defender'> & {
+    carrier: Player; defender: Player; catchTick: number; untilTick: number;
+  }) | null = null;
+
+  private readCentreCarry(p: Player): void {
+    if (LIVE.centreShoulderTicks <= 0 || this.phase.kind !== 'play' || p.side !== this.attacking
+      || ROLES[p.slot]!.name !== 'centre' || this.scripted || this.tucked === this.indexOf(p)
+      || this.offloadReceiver !== null || this.pendingControl[p.side] || this.locked(p) || !this.onField(p) || p.subFor !== null) return;
+    const heldMarkers = this.tick < this.ruckPlayedAt + LIVE.markerReleaseTicks * this.defPlan().markerHold;
+    const defenders = this.side(other(p.side)).filter(d => !this.locked(d) && this.tick >= d.cooldownUntil
+      && this.retreatLine(d) === null && !(heldMarkers && this.markers.includes(this.indexOf(d))));
+    const read = readShoulder(p.body, this.dir, defenders.map(d => d.body));
+    this.centreCarry = read && { ...read, carrier: p, defender: defenders[read.defender]!,
+      catchTick: this.tick, untilTick: this.tick + LIVE.centreShoulderTicks };
+  }
+
+  protected visualBombContest: BombContestSnap | undefined;
+
+  /** Read the aim during the wind-up, then check the same read at the boot. */
+  protected kickLanding(kick: PendingKick): Vec {
+    if (WING_BOMB.on <= 0 || kick.wingBombRoll === undefined) return kick.to;
+    return this.wingBombTarget(this.players[kick.kicker]!, kick.wingBombRoll, kick.peak) ?? kick.to;
+  }
+
+  /** At the boot, look for an onside winger who can get under a bomb in his corner. */
+  protected wingBombTarget(kicker: Player, roll: number, peak: number): Vec | null {
+    const dir = this.dirOf(kicker.side);
+    const goal = dir > 0 ? FIELD_LENGTH : 0;
+    const from = kicker.body.pos;
+    const toLine = (goal - from.x) * dir;
+    const depth = WING_BOMB.cornerM - (roll - 0.5) * WING_BOMB.scatterM;
+    if (LIVE.wingerChase <= 0 || toLine > Math.min(WING_BOMB.fromM, MID_X) || toLine <= depth) return null;
+
+    const wingers = this.side(kicker.side).filter(p => ROLES[p.slot]!.name === 'winger' && !this.locked(p));
+    const infield = WING_BOMB.cornerM + (roll - 0.5) * WING_BOMB.scatterM;
+    let best: Vec | null = null;
+    let bestRoom = 0;
+    for (const wing of wingers) {
+      const body = wing.body;
+      const near = body.pos.y < MID_Y;
+      const offTouch = near ? body.pos.y : FIELD_WIDTH - body.pos.y;
+      if (wing === kicker || wing.subFor !== null || !inPlay(body.pos) || offTouch > WING_BOMB.wingM || (body.pos.x - from.x) * dir > 0) continue;
+      const to = { x: goal - dir * depth, y: near ? infield : FIELD_WIDTH - infield };
+      const chaseM = dist(body.pos, to);
+      // Targeting sends the nearest winger. A different winger can be closer if the pair has crossed over.
+      const nearerWing = wingers.some(p => {
+        if (p === wing) return false;
+        const d = dist(p.body.pos, to);
+        return d < chaseM || (d === chaseM && p.slot < wing.slot);
+      });
+      if (nearerWing) continue;
+      // Budget the hang time at sprint pace until his gas goes, allowing for the turn onto the target.
+      const seconds = Math.max(0, Math.max(hangTime(peak), dist(from, to) / KICK_SPEED) - WING_BOMB.turnS);
+      const sprintS = canSprint(wing.gas) ? Math.min(seconds, wing.gas.gas * wing.tankS) : 0;
+      const pace = body.maxSpeed * legsSpeed(wing.energy) * speedMult(wing.traits, 'jets') * (wing.hurt ? WEATHER.hurtSpeed : 1);
+      const restPace = sprintS > 0 ? GAS.blown : paceMult(wing.gas, false);
+      const runM = pace * (sprintS + (seconds - sprintS) * restPace);
+      const startingPace = dot(body.vel, norm(sub(to, body.pos)));
+      const lostM = Math.max(0, pace - startingPace) ** 2 / (2 * body.accel);
+      const room = runM - lostM + KICK_CONTEST.bomb.contestM - chaseM;
+      if (room > bestRoom) {
+        best = to;
+        bestRoom = room;
+      }
+    }
+    return best;
+  }
 
   // ── Ball resolution ───────────────────────────────────────────────────────
   protected launchPendingKick(): void {
@@ -22,7 +98,8 @@ export abstract class LiveKicks extends LiveClock {
     this.offloadReceiver = null;
     this.pendingKick = null;
     const kicker = this.players[k.kicker]!;
-    let to = k.to;
+    const landing = this.kickLanding(k);
+    let to = landing;
     if (k.kind === 'grubber') {
       // A grubber that would roll dead stops at the line it crosses (2d).
       const ex = exitPoint(kicker.body.pos, to);
@@ -44,7 +121,7 @@ export abstract class LiveKicks extends LiveClock {
     this.dir = this.dirOf(receiving);
     this.tackles = 0;
     this.lastPlay = false;
-    this.lineX = k.to.x + this.dir * LIVE.onsideM;
+    this.lineX = landing.x + this.dir * LIVE.onsideM;
     if (k.dropOut) this.emit('drop-out', `${kicker.name} kicks the goal-line drop-out`, kicker);
     else if (k.kickoff) this.emit('kickoff', `${kicker.name} kicks off`, kicker);
     else {
@@ -150,6 +227,8 @@ export abstract class LiveKicks extends LiveClock {
       }
       this.ball = { kind: 'held', by: this.indexOf(r) };
       r.catchTick = this.tick;
+      this.centreCarry = null;
+      if (b.via === 'pass') this.readCentreCarry(r);
       if (b.via === 'kick' && b.bounces === 0) r.aerialCatchTick = this.tick;
       r.decided = false;
       r.steppedOn = -1;
@@ -266,17 +345,10 @@ export abstract class LiveKicks extends LiveClock {
    * one side is under it: the catch, or a regather, as for any kick.
    */
   private contestBomb(b: Extract<BallState, { kind: 'flight' }>): Player | 'settled' | null {
-    const kicking = other(this.attacking);
-    const under = (s: Side): Player | undefined =>
-      this.side(s)
-        .filter((p) => !this.locked(p) && this.onField(p) && dist(p.body.pos, b.to) <= KICK_CONTEST.bomb.contestM)
-        .sort((p, q) => dist(p.body.pos, b.to) - dist(q.body.pos, b.to))[0];
-    const chaser = under(kicking);
-    // The man it was kicked to, if he is under it; else the receiving side's nearest.
-    const nominated = b.receiver !== null ? this.players[b.receiver] : undefined;
-    const mine = nominated && nominated.side === this.attacking && !this.locked(nominated) && this.onField(nominated) && dist(nominated.body.pos, b.to) <= KICK_CONTEST.bomb.contestM;
-    const catcher = mine ? nominated : under(this.attacking);
-    if (!chaser || !catcher) return null;
+    const pair = this.bombContenders(b);
+    if (!pair) return null;
+    const [chaser, catcher] = pair;
+    const kicking = chaser.side;
     const odds = highBall(chaser.stats.speed, catcher.stats.handling, b.peak, this.tactics[kicking].attack === 'kick-chase', this.wx.handling, this.kickCover(kicking), this.rushKickGap(kicking));
     const u = this.rng.next();
     if (u < odds.won) {
@@ -296,6 +368,54 @@ export abstract class LiveKicks extends LiveClock {
       return 'settled';
     }
     return catcher;
+  }
+
+  private inBombReach(p: Player, at: Vec): boolean {
+    return !this.locked(p) && this.onField(p) && dist(p.body.pos, at) <= KICK_CONTEST.bomb.contestM;
+  }
+
+  private bombContenders(b: Extract<BallState, { kind: 'flight' }>, distance = (p: Player) => dist(p.body.pos, b.to)): [Player, Player] | null {
+    const under = (s: Side): Player | undefined => this.side(s).filter(p => this.inBombReach(p, b.to))
+      .sort((p, q) => distance(p) - distance(q))[0];
+    const chaser = under(other(this.attacking));
+    // The man it was kicked to, if he is under it; else the receiving side's nearest.
+    const nominated = b.receiver === null ? undefined : this.players[b.receiver];
+    const catcher = nominated?.side === this.attacking && this.inBombReach(nominated, b.to) ? nominated : under(this.attacking);
+    return chaser && catcher ? [chaser, catcher] : null;
+  }
+
+  /** Observe the last few steps under the bomb. Once airborne, a closer player cannot inherit the jump. */
+  protected watchBombContest(): void {
+    const b = this.ball;
+    const visual = this.visualBombContest;
+    if (this.phase.kind !== 'play' || (visual && this.tick > visual.arrivesTick + BOMB_RECOVERY_TICKS)) this.visualBombContest = undefined;
+    if (this.phase.kind !== 'play' || !this.kickFrom || this.kickInAir !== 'bomb' || this.goalUp || this.retreat || b.kind !== 'flight' || b.via !== 'kick' || outOfPlay(b.to)) return;
+    const arrivesTick = b.t0 + b.ticks;
+    const left = arrivesTick - this.tick;
+    if (left > BOMB_PLANT_TICKS || left <= 0) return;
+    if (left < BOMB_TAKEOFF_LEAD) {
+      if (visual?.arrivesTick === arrivesTick && visual.releasedTick === undefined && !visual.players.every(ref => {
+        const p = this.at(ref.side, ref.slot);
+        return p.key === ref.who && this.inBombReach(p, b.to);
+      })) {
+        this.visualBombContest = { ...visual, releasedTick: this.tick };
+      }
+      return;
+    }
+    // Before takeoff, allow for a chaser still closing while the first one slows or runs through.
+    // A short projection ranks players already in reach. At landing the resolver uses their real positions.
+    const lead = (left - 1) * TICK_S;
+    const pair = this.bombContenders(b, ({ body }) => dist({ x: body.pos.x + body.vel.x * lead, y: body.pos.y + body.vel.y * lead }, b.to));
+    // The landing resolver first needs somebody inside ordinary catch reach to open the contest.
+    // An open-play kick clears retreat, so underKick's retreat check has no effect here.
+    const fielder = pair && this.underKick(b.to, b.receiver);
+    if (!pair || !fielder || dist(fielder.body.pos, b.to) > LIVE.kickCatchReach) {
+      this.visualBombContest = undefined;
+      return;
+    }
+    if (visual?.arrivesTick === arrivesTick && visual.players.every((ref, i) => ref.side === pair[i]!.side && ref.slot === pair[i]!.slot && ref.who === pair[i]!.key)) return;
+    const plant = (p: Player) => ({ side: p.side, slot: p.slot, who: p.key, ...p.body.pos });
+    this.visualBombContest = { at: { ...b.to }, plantTick: this.tick, arrivesTick, players: [plant(pair[0]), plant(pair[1])] };
   }
 
   /**

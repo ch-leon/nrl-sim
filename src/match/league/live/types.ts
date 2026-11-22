@@ -2,7 +2,7 @@ import type { ControlInput } from '../controls';
 import type { RosterEntry, TeamSheet } from '../../../sim/events';
 import type { Position } from '../../../core/state';
 import type { Body } from '../../core/body';
-import type { ContactPlayer, Side } from '../../core/snapshot';
+import type { ContactPlayer, Side, StepSnap } from '../../core/snapshot';
 import type { Vec } from '../../core/vec';
 import { AVERAGE, type ContestStats } from '../contest';
 import { FULLBACK, HOOKER, KICKER } from '../roles';
@@ -85,6 +85,8 @@ export interface Player {
   steppedOn: number;
   /** A sidestep in progress: lateral metres still to cover, over this many ticks. */
   jink: { dy: number; ticks: number } | null;
+  /** Render-only timing for a successful step. */
+  visualStep: StepSnap | null;
   target: Vec;
   through: boolean;
   /** Coming off for this bench man (2b): he jogs to `subSpot` on the touchline first. */
@@ -118,12 +120,13 @@ export interface BenchMan {
 export interface RuckDecision {
   from: ContactPlayer; to: ContactPlayer | null;
   decidedAt: number; until: number; kicker: boolean; cancelled?: true;
+  secondKicker?: true;
 }
 
 export type Phase =
   | { kind: 'restart'; t0: number; kicking: Side; from?: 'goal-line' }
   | { kind: 'set-piece'; t0: number; side: Side; spot: Vec; how: 'ptb' | 'tap'; player: number }
-  | { kind: 'play'; shape?: AttackingShape | null }
+  | { kind: 'play'; shape?: AttackingShape | null; secondKicker?: ContactPlayer & { catchTick: number } }
   | { kind: 'tackle'; t0: number; carrier: number; tackler: number; big: boolean; wrestle: WrestleState | null; wreck: number; shape?: AttackingShape | null }
   | { kind: 'ruck'; t0: number; carrier: number; tackler: number; stage: 'down' | 'ptb' | 'dh'; handover: boolean; heldAt: number; down: number; pace: 'quick' | 'slow' | null; contactStartedTick?: number; decision?: RuckDecision; shape?: AttackingShape | null }
   | { kind: 'try'; t0: number; scorer: number }
@@ -141,6 +144,8 @@ export interface PendingKick {
   peak: number;
   kickoff: boolean;
   kind: KickChoice;
+  /** Ordinary bomb's existing aim roll, reused if a winger can chase at the boot. */
+  wingBombRoll?: number;
   /** The trait behind the kick, if one shaped it. */
   trait?: string;
   /** A territory kick going for touch, or for the 40/20 (2d). */

@@ -193,7 +193,10 @@ export class LabScene extends MatchScene {
     // The wrestle bar: the fight left in the carrier while he is in a tackle (§8.1).
     this.wrestleBar?.update(r.cur.wrestle, zoom, (w) => feet(w.side, w.slot));
     // Legs (§8): a bar under everyone, green → amber once tired → red once spent.
-    this.legsLayer?.update(r.cur, zoom, feet);
+    this.legsLayer?.update(r.cur, zoom, (side, slot) => {
+      const actor = this.players[side][slot];
+      return actor ? { x: actor.sprite.x, y: actor.groundY } : null;
+    });
     // Sprint and gas (§8.2): streaks behind anyone flat out, gas bars on the carrier and his chasers.
     this.sprintLayer?.update(r.cur, zoom, (side, slot) => {
       const a = this.players[side][slot];

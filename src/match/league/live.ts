@@ -37,12 +37,13 @@ import { SET_TACKLES } from '../../config';
 import { TICK_S, type MatchSim } from '../core/engine';
 import { speedOf } from '../core/body';
 import { CARRY_LIFT, flightAt } from '../core/ball';
-import { INTERCEPT_TICKS, REACT_SNAP_TICKS, type PlayerSnap, type Snapshot } from '../core/snapshot';
+import { GROUND_PICKUP_TICKS, INTERCEPT_TICKS, REACT_SNAP_TICKS, type GroundPickupSnap, type PlayerSnap, type Snapshot } from '../core/snapshot';
+import type { Vec } from '../core/vec';
 import { clockText } from './rules';
 import { goalStrikeTick } from './goals';
 import { LIVE } from './live/knobs';
 import { LivePositioning } from './live/positioning';
-import type { Phase } from './live/types';
+import type { Phase, Player } from './live/types';
 export type { ControlInput } from './controls';
 export { LIVE, runOn } from './live/knobs';
 export type { LiveOptions, PlanInput } from './live/types';
@@ -55,6 +56,7 @@ export class LiveSim extends LivePositioning implements MatchSim {
    */
   private phaseSeen: Phase | null = null;
   private phaseSince = 0;
+  private groundPickup?: GroundPickupSnap;
 
   // ── Tick ──────────────────────────────────────────────────────────────────
   step(): void {
@@ -94,11 +96,17 @@ export class LiveSim extends LivePositioning implements MatchSim {
     if (this.phase.kind === 'restart' && this.phase.from === undefined) this.takeNewPlans();
     // The AI coaches (N9.6) read the play at each play-the-ball.
     if (this.aiCoach.length > 0 && this.phase.kind === 'ruck') for (const s of this.aiCoach) this.aiCall(s);
+    let recovery: { at: Vec; collector: Player } | undefined;
     if (this.phase.kind === 'half-time') this.stepHalfTime(this.phase);
     else if (this.phase.kind !== 'conversion') {
       this.launchPendingKick();
       this.launchGoal();
+      const before = this.ball;
       this.landings();
+      if (before.kind === 'loose') {
+        const collector = this.holder();
+        if (collector?.catchTick === this.tick) recovery = { at: before.pos, collector };
+      }
     }
     switch (this.phase.kind) {
       case 'restart':
@@ -145,7 +153,12 @@ export class LiveSim extends LivePositioning implements MatchSim {
       this.lastTouch = h.side;
       if (this.kickFrom) this.endKick(h.side, h.body.pos);
     }
+    // Observe the grounded recovery after movement, so the art can meet the old ball spot.
+    if (recovery && h === recovery.collector && this.phase.kind === 'play') {
+      this.groundPickup = { tick: this.tick, at: { ...recovery.at }, player: { side: h.side, slot: h.slot, who: h.key }, feet: { ...h.body.pos } };
+    }
     this.watchLineBreak(h);
+    this.watchBombContest();
     this.expireCalls();
     if (this.scripted || this.tucked >= 0) this.tidyPlays();
     if (this.attacking !== beforeSide || this.tackles < beforeTackles
@@ -161,6 +174,7 @@ export class LiveSim extends LivePositioning implements MatchSim {
   // ── Snapshot ──────────────────────────────────────────────────────────────
   snapshot(): Snapshot {
     const b = this.ball; const ph = this.phase;
+    const live = ph.kind === 'play' || ph.kind === 'tackle' || ph.kind === 'ruck';
     const scorer = ph.kind === 'try' ? this.players[ph.scorer] : undefined;
     const players: PlayerSnap[] = this.players.map((p) => {
       const pending = this.pendingKick && this.players[this.pendingKick.kicker] === p ? this.pendingKick : null;
@@ -172,6 +186,10 @@ export class LiveSim extends LivePositioning implements MatchSim {
         kind: pending?.kind === 'grubber' || (!pending && b.kind === 'flight' && b.bounces > 0) ? 'grubber'
           : goal || this.goalUp || ph.kind === 'conversion' ? 'drop' : 'punt',
       } : undefined;
+      const step = p.visualStep;
+      const stepping = live && step && this.tick < step.untilTick && this.onField(p) && (step.role === 'carrier'
+        ? ph.kind === 'play' && b.kind === 'held' && this.players[b.by] === p && p.catchTick <= step.startedTick && !this.locked(p)
+        : p.pose === 'tackled' && p.slide?.t0 === step.startedTick && p.lockUntil === step.untilTick);
       return {
         side: p.side,
         slot: p.slot,
@@ -190,6 +208,7 @@ export class LiveSim extends LivePositioning implements MatchSim {
         who: p.key,
         poseUntil: p.poseUntil,
         caughtTick: p.catchTick,
+        ...(stepping ? { step: { ...step } } : {}),
         ...(kick ? { kick } : {}),
         // A shot at goal (#669): from his spot to the end of the conversion, for the routine and the tee.
         ...(ph.kind === 'conversion' && ph.readyAt > 0 && this.players[ph.kicker] === p
@@ -223,11 +242,18 @@ export class LiveSim extends LivePositioning implements MatchSim {
     const state = kind === 'play' ? `tackle ${Math.min(this.tackles, SET_TACKLES)}/${SET_TACKLES}${this.lastPlay ? ' · last' : ''}` : kind;
     const legs = `legs ${Math.round(this.energyOf('home') * 100)}/${Math.round(this.energyOf('away') * 100)}%`;
     const short = this.players.some((p) => !this.onField(p)) ? ` · ${this.side('home').length} v ${this.side('away').length}` : '';
+    const pickup = this.groundPickup;
+    const collector = b.kind === 'held' ? this.players[b.by] : undefined;
+    const showPickup = pickup && kind === 'play' && this.tick <= pickup.tick + GROUND_PICKUP_TICKS
+      && collector?.key === pickup.player.who && collector.side === pickup.player.side && collector.slot === pickup.player.slot
+      && collector.catchTick === pickup.tick;
     const snap: Snapshot = {
       tick: this.tick,
       attacking: this.attacking,
       players,
       ball,
+      ...(this.visualBombContest ? { bombContest: this.visualBombContest } : {}),
+      ...(showPickup ? { groundPickup: pickup } : {}),
       label: `${this.names[this.attacking]} ball · ${state} · ${this.points.home}–${this.points.away} · ${clockText(this.half, this.clockTicks * TICK_S)}${this.siren && (kind === 'play' || kind === 'tackle' || kind === 'ruck') ? ' · siren' : ''} · ${legs}${short}`,
       events: this.events,
       clock: { half: this.half, seconds: this.clockTicks * TICK_S, minute: Math.floor(this.matchSeconds / 60), siren: this.siren, finished: this.finished },
@@ -256,7 +282,8 @@ export class LiveSim extends LivePositioning implements MatchSim {
       const c = this.players.find(p => p.key === contact.carrier.who && p.side === contact.carrier.side && p.slot === contact.carrier.slot);
       const holding = ((ph.kind === 'tackle' && ph.t0 === contact.startedTick) || (ph.kind === 'ruck' && ph.stage !== 'dh' && ph.contactStartedTick === contact.startedTick)) && this.players[ph.carrier] === c;
       const escaping = ph.kind === 'play' && (contact.outcome === 'strip' || contact.outcome === 'break-tackle') && this.tick - contact.resolvedTick! <= 20;
-      if (holding || escaping) snap.contact = { ...contact,
+      const offloading = ph.kind === 'play' && contact.outcome === 'offload' && c?.side === this.attacking && this.tick < contact.releaseTick!;
+      if (holding || escaping || offloading) snap.contact = { ...contact,
         phaseTick: ph.kind === 'ruck' || ph.kind === 'tackle' ? ph.t0 : contact.resolvedTick ?? contact.startedTick,
         ...(ph.kind === 'ruck' && ph.stage !== 'dh' ? { releaseTick: ph.stage === 'down' ? ph.t0 + ph.down : ph.t0 } : {}),
       };

@@ -6,7 +6,7 @@ import { speedOf } from '../../core/body';
 import { add, dist, dot, norm, sub, type Vec } from '../../core/vec';
 import { angleFrom, stepChance, type Situation } from '../contest';
 import { PLAYERS, ROLES } from '../roles';
-import { MAX_LAT_M, RUN_CLOSE_M, RUN_IT_CHANCE, RUN_IT_ZONE_M, bombTarget, chipTarget, chooseKick, crossFieldTarget, grubberTarget, kickTarget, pickReceiver, pickReceiverWeighted, type KickChoice } from '../tactics';
+import { CLOSE_ATTACK_KICK_M, LONG_KICK, MAX_LAT_M, RUN_CLOSE_M, RUN_IT_CHANCE, RUN_IT_ZONE_M, WING_BOMB, bombTarget, chipTarget, chooseKick, crossFieldTarget, grubberTarget, kickTarget, longKickTarget, pickReceiver, pickReceiverWeighted, type KickChoice } from '../tactics';
 import { zoneOf, type AttackPlan } from '../presets';
 import { LAST_TACKLE, chooseLastPlay, earlyKickChance, lastTackleWeights, type LastTackleRead } from '../lastTackle';
 import { FINISHER_M, TRAIT_PTS, announce, bootMult, stepTraits } from '../traits';
@@ -77,6 +77,7 @@ export abstract class LivePlay extends LiveKicks {
       this.pendingControl[this.attacking] = null;
       const target = nearest;
       const way = intent.kind === 'step-up' ? -1 : 1;
+      h.visualStep = null;
       h.jink = { dy: way * LIVE.stepJinkM, ticks: LIVE.stepJinkTicks };
       if (target && nearD <= LIVE.stepRange) {
         h.steppedOn = this.indexOf(target);
@@ -106,7 +107,8 @@ export abstract class LivePlay extends LiveKicks {
     // A field goal late on with the scores close: the kicker's call, once a set.
     // The coach's kick call for the set (#73) comes before the kicker's own.
     const called = this.callState[this.attacking].attack;
-    // Kicks in play are the slot-5 kicker's; a field goal is his or the named goal-kicker's (N11), whoever has the ball.
+    // The usual kicker or the five-eighth who took this last-tackle pass can kick in play.
+    // A field goal stays with the usual kicker or the named goal-kicker (N11).
     const isKicker = h === this.kicker(h.side);
     if (own && (isKicker || h === this.goalKicker(h.side)) && this.fieldGoalOn(h)) {
       if (this.fgCall === null) this.fgCall = called === 'field-goal' || this.rng.next() < GOALS.fieldGoalChance;
@@ -120,7 +122,10 @@ export abstract class LivePlay extends LiveKicks {
     const forLast = called === 'grubber' || called === 'forty-twenty';
     const early = this.tackles === SET_TACKLES - 2 && !forLast && (toLine <= LIVE.earlyKickM || zone === 'own20' || zone === 'ownHalf');
     const kickEarly = called === 'kick-early' && !this.lastPlay;
-    if (own && (this.lastPlay || early || kickEarly) && isKicker) {
+    const alternate = this.phase.kind === 'play' ? this.phase.secondKicker : undefined;
+    const tookLastPass = this.lastPlay && alternate?.side === h.side && alternate.slot === h.slot
+      && alternate.who === h.key && alternate.catchTick === h.catchTick && this.onField(h) && h.subFor === null;
+    if (own && (this.lastPlay || early || kickEarly) && (isKicker || tookLastPass)) {
       // Grubber or 40/20 (#396) sets the last-tackle kick even when it comes after his own choice, till the kick is struck.
       if (this.lastPlay && forLast) this.kickCall = called === 'grubber' ? 'grubber' : 'long';
       else if (this.kickCall === null) {
@@ -139,7 +144,7 @@ export abstract class LivePlay extends LiveKicks {
           return;
         }
       } else if (this.kickCall !== 'run' && (this.tick - h.catchTick >= LIVE.kickRunTicks || nearD < LIVE.engageM)) {
-        this.pendingKick = this.planKick(h, this.kickCall);
+        this.pendingKick = this.planKick(h, this.kickCall, undefined, true);
         this.lock(h, 'kick', LIVE.kickLockTicks);
         return;
       }
@@ -310,11 +315,15 @@ export abstract class LivePlay extends LiveKicks {
   private callLastPlay(toLine: number, plan: AttackPlan, h: Player): 'run' | 'pass' | KickChoice {
     if (LAST_TACKLE.on > 0) {
       const play = chooseLastPlay(lastTackleWeights(this.lastTackleRead(h, toLine)), this.rng.next());
-      return play === 'kick' ? chooseKick(toLine, this.rng.next(), plan.kickBias) : play;
+      if (play !== 'kick') return play;
+    } else {
+      if (toLine <= RUN_CLOSE_M) return 'run';
+      if (toLine <= RUN_IT_ZONE_M && this.rng.next() < RUN_IT_CHANCE) return 'run';
     }
-    if (toLine <= RUN_CLOSE_M) return 'run';
-    if (toLine <= RUN_IT_ZONE_M && this.rng.next() < RUN_IT_CHANCE) return 'run';
-    return chooseKick(toLine, this.rng.next(), plan.kickBias);
+    // In close, add the bomb to his existing kick-type roll only if there is a corner chase.
+    const closeBombWeight = WING_BOMB.on > 0 && toLine <= CLOSE_ATTACK_KICK_M
+      && this.wingBombTarget(h, 0.5, bombPeak(traitBoost(h.traits, 'bigBoot'))) ? WING_BOMB.closeWeight : 0;
+    return chooseKick(toLine, this.rng.next(), plan.kickBias, closeBombWeight);
   }
 
   /** What the kicker reads for the last-tackle call (#650): the zone, the style, the score and the clock, his boot, the edge's pace. */
@@ -363,7 +372,7 @@ export abstract class LivePlay extends LiveKicks {
   }
 
   /** Where the kick goes and who it is for, by type (BAK-208 §4.4). */
-  private planKick(h: Player, kind: KickChoice, aim?: Vec): PendingKick {
+  private planKick(h: Player, kind: KickChoice, aim?: Vec, ordinary = false): PendingKick {
     const def = other(this.attacking);
     const fb = this.fullback(def);
     const boot0 = bootMult(h.traits);
@@ -396,9 +405,13 @@ export abstract class LivePlay extends LiveKicks {
         const far = wingers.sort((a, b) => Math.abs(b.body.pos.y - h.body.pos.y) - Math.abs(a.body.pos.y - h.body.pos.y))[0] ?? h;
         return { ...base, to: crossFieldTarget(h.body.pos, this.dir, far.body.pos, this.rng.next()), receiver: this.indexOf(far), peak: 13 };
       }
-      case 'bomb':
+      case 'bomb': {
+        const roll = this.rng.next();
         // Big Boot puts it higher (#99): more hang, and the chase is under it.
-        return { ...base, to: controlAim(bombTarget(h.body.pos, this.dir, fb.body.pos, this.rng.next()), aim, bombTarget(h.body.pos, this.dir, fb.body.pos, 0), bombTarget(h.body.pos, this.dir, fb.body.pos, 1)), receiver: this.indexOf(fb), peak: bombPeak(traitBoost(h.traits, 'bigBoot')), ...trait };
+        const stock = bombTarget(h.body.pos, this.dir, fb.body.pos, roll);
+        const to = aim ? controlAim(stock, aim, bombTarget(h.body.pos, this.dir, fb.body.pos, 0), bombTarget(h.body.pos, this.dir, fb.body.pos, 1)) : stock;
+        return { ...base, to, receiver: this.indexOf(fb), peak: bombPeak(traitBoost(h.traits, 'bigBoot')), ...trait, ...(ordinary && !aim ? { wingBombRoll: roll } : {}) };
+      }
       default: {
         // Labs: match controls (Leon, 30 Oct). Territory aims keep the normal
         // wind / boot target and its scatter; only the intent chooses the kick.
@@ -406,7 +419,7 @@ export abstract class LivePlay extends LiveKicks {
           const to = kickTarget(h.body.pos, this.dir, fb.body.pos, this.rng.next(), boot);
           return { ...base, to: controlAim(to, aim, kickTarget(h.body.pos, this.dir, fb.body.pos, 0, boot), kickTarget(h.body.pos, this.dir, fb.body.pos, 1, boot)), receiver: this.indexOf(fb), peak: 12, ...trait };
         }
-        // Territory (2d): from his own 40 on the last he may go for the 40/20; from deep, often for touch; else to the fullback.
+        // Territory (2d): from his own 40 on the last he may go for the 40/20; from deep, often for touch.
         const toLine = this.toLine(h);
         const lever = traitBoost(h.traits, 'bigBoot') + traitBoost(h.traits, 'playmaker');
         // The coach's 40/20 call (#396) goes for it without the roll, as far as calls.fortyTwenty.reachM goes. It is only
@@ -424,7 +437,11 @@ export abstract class LivePlay extends LiveKicks {
           const land = Math.max(toLine - 32 * boot.dist, 12);
           return { ...base, to: this.touchTarget(h, land, TOUCH.touchInsideM, boot.acc), receiver: this.indexOf(fb), peak: 11, aim: 'touch', ...trait };
         }
-        return { ...base, to: kickTarget(h.body.pos, this.dir, fb.body.pos, this.rng.next(), boot), receiver: this.indexOf(fb), peak: 12, ...trait };
+        const roll = this.rng.next();
+        const to = LONG_KICK.on > 0 && this.onField(fb) && (this.lastPlay || this.callState[this.attacking].attack !== 'kick-early')
+          ? longKickTarget(h.body.pos, this.dir, fb.body.pos, roll, boot, this.side(def).map((p) => p.body.pos))
+          : kickTarget(h.body.pos, this.dir, fb.body.pos, roll, boot);
+        return { ...base, to, receiver: this.indexOf(fb), peak: 12, ...trait };
       }
     }
   }
@@ -462,6 +479,9 @@ export abstract class LivePlay extends LiveKicks {
     const sideways = way ?? (c.body.pos.y >= t.body.pos.y ? 1 : -1);
     c.jink = { dy: sideways * LIVE.stepJinkM, ticks: LIVE.stepJinkTicks };
     this.lock(t, 'tackled', 12, add(t.body.pos, { x: this.dir * 0.8, y: -sideways * 0.6 }));
+    const reach = sub(c.body.pos, t.body.pos);
+    c.visualStep = { role: 'carrier', startedTick: this.tick, untilTick: this.tick + Math.max(1, Math.ceil(c.jink.ticks)), lateral: c.jink.dy };
+    t.visualStep = { role: 'defender', startedTick: this.tick, untilTick: t.lockUntil, reachX: reach.x, reachY: reach.y };
     t.cooldownUntil = this.tick + LIVE.beatenCooldown;
     this.burst(c);
   }

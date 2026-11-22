@@ -304,8 +304,12 @@ describe('measuring and reporting', () => {
     // balanced 0-8:138:a3c50b2b797e77b1 / expansive 6-6:141:efe82ee10feba754.
     // The lead read (engine revision 8) moves Balanced; Expansive's pin stays.
     // Before the lead read, Balanced was 12-6:141:82d97834a1c52696.
-    { attack: 'balanced' as const, expected: '6-4:125:3b59450ec3a85edd' },
-    { attack: 'expansive' as const, expected: '10-4:150:975213c1842aa58e' },
+    // The centre shoulder read (engine revision 9) changes both carries. Before it:
+    // balanced 6-4:125:3b59450ec3a85edd / expansive 10-4:150:975213c1842aa58e.
+    // The five-eighth last-tackle option (engine revision 12) re-pins both. Before it:
+    // balanced 0-0:137:6c911bf022e28778 / expansive 4-0:134:443f2da66ba81a8d.
+    { attack: 'balanced' as const, expected: '13-10:155:57426901f7cbc31f' },
+    { attack: 'expansive' as const, expected: '0-6:147:52d52acd0272a5fe' },
   ])('pins an even $attack / Slide match (seed 1)', async ({ attack, expected }) => {
     const sim = new LiveSim(sideSheet('H', { rating: 60, tactics: { attack } }), sideSheet('A', { rating: 60 }), 1);
     const parts: string[] = [];
@@ -343,8 +347,14 @@ describe('measuring and reporting', () => {
     // Ordinary structures (#649) still leave scripted selection alone; the opponent prepares its packet.
     // The timed back-door runs (#722, engine revision 7) re-pin these event trajectories;
     // before them: plays-on 0-4:134:d93f46a7e35ffb6c / plays-on-hard 0-0:139:e3df2859485cf187.
-    { name: 'plays-on', aiCoach: false, expected: '12-0:143:b08a6399d81219bc' },
-    { name: 'plays-on-hard', aiCoach: true, expected: '1-0:144:74a11af0f394ead7' },
+    // The centre shoulder read (engine revision 9) moves plays-on. plays-on-hard stays.
+    // Before it, plays-on was 12-0:143:b08a6399d81219bc.
+    // Punts into space (#650, engine revision 10) move the Hard coach match.
+    // plays-on stays. Before the punts, plays-on-hard was 1-0:144:74a11af0f394ead7.
+    // The five-eighth last-tackle option (engine revision 12) re-pins both. Before it:
+    // plays-on 10-0:141:fb9bb3ff69ff1592 / plays-on-hard 1-0:146:2652be8270891c73.
+    { name: 'plays-on', aiCoach: false, expected: '4-10:155:79024e6ce6d03277' },
+    { name: 'plays-on-hard', aiCoach: true, expected: '0-10:148:ee54e8d79a90e3cf' },
   ])('pins $name: an even Balanced / Slide match with set plays (seed 1)', async ({ aiCoach, expected }) => {
     const home = { ...sideSheet('H', { rating: 60 }), plays: ['block-play' as const, 'cut-out-winger' as const, 'kick-pass' as const] };
     const sim = new LiveSim(home, sideSheet('A', { rating: 60 }), 1, aiCoach ? { aiCoach: ['home'] } : {});
@@ -359,5 +369,23 @@ describe('measuring and reporting', () => {
     expect(parts.some((p) => p.includes(':set-play:home:'))).toBe(true);
     expect(parts.some((p) => p.includes(':coach-call:home:set-play:'))).toBe(aiCoach);
     expect(`${sim.points.home}-${sim.points.away}:${parts.length}:${hash}`).toBe(expected);
+  });
+  it('with punts into space off, plays-on-hard keeps the revision 9 pin', async () => {
+    const restore = applyTuning({ 'longKick.on': 0, 'wingBomb.on': 0, 'secondKicker.on': 0 });
+    try {
+      const home = { ...sideSheet('H', { rating: 60 }), plays: ['block-play' as const, 'cut-out-winger' as const, 'kick-pass' as const] };
+      const sim = new LiveSim(home, sideSheet('A', { rating: 60 }), 1, { aiCoach: ['home'] });
+      const parts: string[] = [];
+      while (!sim.finished && sim.tick < 100_000) {
+        sim.step();
+        for (const e of sim.tickEvents) parts.push(`${e.tick}:${e.kind}:${e.side ?? ''}:${e.detail ?? ''}`);
+      }
+      const spec = 'node:crypto';
+      const { createHash } = await import(spec);
+      const hash = createHash('sha256').update(parts.join('|')).digest('hex').slice(0, 16);
+      expect(`${sim.points.home}-${sim.points.away}:${parts.length}:${hash}`).toBe('1-0:144:74a11af0f394ead7');
+    } finally {
+      restore();
+    }
   });
 });

@@ -389,6 +389,7 @@ export abstract class LiveBase {
         decided: false,
         steppedOn: -1,
         jink: null,
+        visualStep: null,
         target: { x: MID_X, y: MID_Y },
         through: false,
         subFor: null,

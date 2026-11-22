@@ -1,5 +1,5 @@
-import { CONTACT_X, CONTACT_FOOT, contactPoseAt, type ContactBody, type ContactPose } from '../../art/prototype/contact';
-import { add, type Body, type Point } from '../../art/prototype/tackle';
+import { CONTACT_X, CONTACT_FOOT, bentContactArm, contactPoseAt, type ContactBody, type ContactPose } from '../../art/prototype/contact';
+import { add, blend, type Body, type Point } from '../../art/prototype/tackle';
 import { contactPlayerKey, type ContactAnimation } from './contactAnimation';
 import type { ContactPlayer } from '../core/snapshot';
 
@@ -16,7 +16,7 @@ function move(actor: ContactBody, dx: number, dy: number): ContactBody {
 }
 
 /** World travel remains the sim's; only local contact posture is choreographed. */
-export function contactLayout(state: ContactAnimation, points: readonly ContactPoint[], left: boolean): ContactLayout | null {
+export function contactLayout(state: ContactAnimation, points: readonly ContactPoint[], carrierLeft: boolean, offload?: { x: number; y: number; gather: number }): ContactLayout | null {
   if (state.phase === 'ptb') return null;
   const escape = state.kind === 'break' || state.kind === 'steal';
   // A bumped-off man gets his spin (#674) before both go back to their own pictures.
@@ -24,7 +24,10 @@ export function contactLayout(state: ContactAnimation, points: readonly ContactP
   const find = (p: ContactPlayer) => points.find(q => contactPlayerKey(q.player) === contactPlayerKey(p));
   const at = find(state.contact.carrier);
   if (!at || state.contact.defenders.some(p => !find(p))) return null;
-  const pose = contactPoseAt(state); const sign = left ? -1 : 1;
+  const entry = state.kind === 'offload' ? find(state.contact.defenders[0]!)!.x - at.x : 0;
+  const left = entry ? (entry < 0) === (state.variant === 'square') : carrierLeft;
+  const sign = left ? -1 : 1;
+  const pose = contactPoseAt(state, offload ? { aim: [offload.x * sign, offload.y], gather: offload.gather, carrierLeft: carrierLeft !== left } : undefined);
   // Ordinary contact is authored around a fixed pivot: cancelling hip sway here would
   // move every planted sole. Escapes already travel in the sim, so cancel their authored run-out.
   const dx = escape ? CONTACT_X - pose.carrier.pose.hip[0] : 0;
@@ -33,14 +36,21 @@ export function contactLayout(state: ContactAnimation, points: readonly ContactP
   pose.defenders = pose.defenders.map((d, i) => {
     d = move(d, dx, dy);
     const actual = find(d.player)!;
-    const join = clamp((state.tick - state.joined[i]!.tick) / 3);
+    const join = clamp((state.tick - state.joined[i]!.tick + (offload?.gather ?? 0)) / 3);
     const releaseTick = state.contact.releaseTick;
     const window = Math.min(3 + i, Math.max(2, (releaseTick ?? 0) - (state.resolvedTick ?? 0)));
     const release = escape ? clamp((state.tick - state.resolvedTick!) / 4)
       : releaseTick !== undefined ? clamp((state.tick - releaseTick + window) / (window - 1)) : 0;
-    const blend = 1 - join * (1 - release);
-    const shift: Point = [(CONTACT_X + (actual.x - at.x) * sign - d.pose.hip[0]) * blend,
-      (CONTACT_FOOT + actual.y - at.y - Math.max(d.pose.foot[1], d.pose.farFoot[1])) * blend];
+    const align = 1 - join * (1 - release);
+    const rawX = CONTACT_X + (actual.x - at.x) * sign - d.pose.hip[0];
+    const rawY = CONTACT_FOOT + actual.y - at.y - Math.max(d.pose.foot[1], d.pose.farFoot[1]);
+    if (state.kind === 'offload') {
+      // Keep his starting side and plant. A small local shift compresses the hold; hands stay on the carrier.
+      const compress = (n: number, max: number) => Math.sign(n) * Math.min(Math.abs(n), max) * (1 - align);
+      const placed = move(d, rawX - compress(rawX, Math.min(4, Math.abs(entry) / 2)), rawY - compress(rawY, 3));
+      return { ...placed, arms: placed.arms.map((a, index) => bentContactArm(a.shoulder, blend(a.hand, d.arms[index]!.hand, d.grip), index === 0 ? -1 : 1)) };
+    }
+    const shift: Point = [rawX * align, rawY * align];
     if (contactPlayerKey(pose.owner) === contactPlayerKey(d.player)) pose.ball = add(pose.ball, shift[0], shift[1]);
     return move(d, shift[0], shift[1]);
   });

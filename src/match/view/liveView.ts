@@ -6,6 +6,7 @@
 import { toFieldPt } from '../core/field';
 import type { PlayerSnap, Snapshot, Side } from '../core/snapshot';
 import type { PlayerAnim } from '../../art/match/players';
+import { PICKUP_BALL_X } from '../../art/match/moments';
 import { pictureContext, playerPicture, strideFor, tiredLevel, type PlayerPicture } from './playerPicture';
 import { tryScene, type TryScene } from './tryMob';
 import { breakMan, breakScene } from './walkOff';
@@ -14,6 +15,7 @@ import { advanceContactAnimation, type ContactAnimation } from './contactAnimati
 import { flightPlayer, passSpriteOffset } from './handling';
 import { screenPlayerFacing } from './screenFacing';
 import { contactLayout, type ContactLayout, type ContactPoint } from './contactLayout';
+import { bombBallLift, bombPlayer, bombPose } from './bombContest';
 
 export interface ActorView {
   place(x: number, y: number, depth: number): void;
@@ -22,6 +24,8 @@ export interface ActorView {
   wear?(who: string): void;
   paint?(picture: PlayerPicture): void;
   ballAnchor?(picture: PlayerPicture): { x: number; y: number };
+  /** Ground line even when the body is off its feet. */
+  readonly groundY?: number;
   /** Draw him this opaque (a substitute fades in), 1 once he has. */
   fade?(alpha: number): void;
   setSpriteVisible?(visible: boolean): void;
@@ -49,7 +53,10 @@ export interface ViewSurface {
   /** Bodies were put somewhere new in one tick (a half's restart): the camera goes with them instead of panning. */
   cut?(): void;
   focus?: { carrier(t: { side: Side; x: number; y: number } | null): void };
-  contact?: { paint(state: ContactAnimation | null, layout: ContactLayout | null, facing: 'front' | 'back'): void };
+  contact?: {
+    paint(state: ContactAnimation | null, layout: ContactLayout | null, facing: 'front' | 'back'): void;
+    offloadAnchor?(state: ContactAnimation, layout: ContactLayout): { x: number; y: number } | undefined;
+  };
   /** The referee, benches and sin bin (#642): where a binned man sits, and drawn from the same two ticks. */
   officials?: { spot(p: PlayerSnap, s: Snapshot): { x: number; y: number } | null; draw(prev: Snapshot, cur: Snapshot, alpha: number): void };
 }
@@ -75,6 +82,8 @@ const BALL_SNAP_M = 6;
 const MOB_STEP_M = 0.12;
 /** Run-cycle rate is 1 at this ground speed (m/s). */
 const CADENCE_SPEED = 7;
+/** The feet blend back to the collector's normal travel during the rise. */
+const PICKUP_RISE_TICKS = 5;
 
 export class LiveView {
   private readonly s: ViewSurface;
@@ -108,6 +117,16 @@ export class LiveView {
     }
     // The whistle (#675): the walk-off, the huddle before golden point and the kick-off after a break.
     const drawn = prev.tick + (cur.tick - prev.tick) * a;
+    const pickup = cur.groundPickup;
+    const age = pickup ? drawn - pickup.tick : 0;
+    const reaching = !!pickup && age < 0 && cur.tick === pickup.tick && prev.tick === pickup.tick - 1 && !prev.ball.holder && !prev.ball.flight
+      && prev.ball.lift === 0 && prev.ball.x === pickup.at.x && prev.ball.y === pickup.at.y;
+    const world = (pos: { x: number; y: number }) => {
+      const f = toFieldPt(pos);
+      return snap(this.s.fieldToWorld(f.fx, f.fy));
+    };
+    const pickupSpot = pickup && world(pickup.at);
+    let looseOnTurf = false;
     const phaseAge = Math.max(0, drawn - (cur.phase?.since ?? drawn));
     const brk = breakScene(cur, phaseAge + heldTicks, phaseAge);
     if (brk) ctx.walkOff = new Map();
@@ -138,8 +157,45 @@ export class LiveView {
         member.left = this.s.fieldToWorld(to.fx, to.fy).x < this.s.fieldToWorld(from.fx, from.fy).x;
       }
       // A sin-binned man sits in his side's bin (#642); everyone else is where the sim (and a try's mob) has him.
-      const f = toFieldPt(this.s.officials?.spot(c, cur) ?? { x: p.x + was.dx + (c.x + on.dx - p.x - was.dx) * a + (bm?.dx ?? 0), y: p.y + was.dy + (c.y + on.dy - p.y - was.dy) * a + (bm?.dy ?? 0) });
+      const picture = actor.paint ? playerPicture(c, p, cur.tick, cur.ball.holder, this.screenDir, ctx) : undefined;
+      const ground = this.s.officials?.spot(c, cur) ?? { x: p.x + was.dx + (c.x + on.dx - p.x - was.dx) * a + (bm?.dx ?? 0), y: p.y + was.dy + (c.y + on.dy - p.y - was.dy) * a + (bm?.dy ?? 0) };
+      const bomb = ctx.bombContest;
+      const plant = picture?.action === 'bombContest' ? bombPlayer(bomb, c) : undefined;
+      if (bomb && plant && picture) {
+        // The last running step finishes at the plant. As the feet leave it, rejoin the sim's path.
+        const weight = drawn < bomb.plantTick ? a : Math.max(0, Math.min(1, (bomb.arrivesTick - 2 - drawn) / 2));
+        ground.x += (plant.x - ground.x) * weight;
+        ground.y += (plant.y - ground.y) * weight;
+        const before = prev.bombContest;
+        const match = before && before.arrivesTick === bomb.arrivesTick && bombPlayer(before, p);
+        const lift = match ? bombPose(before, prev.tick, match === before.players[0], false)?.lift ?? 0 : 0;
+        picture.lift = Math.round(lift + ((picture.lift ?? 0) - lift) * a);
+      }
+      const f = toFieldPt(ground);
       const w = snap(this.s.fieldToWorld(f.fx, f.fy));
+      if (pickup && pickupSpot && ((reaching && p !== c) || age >= 0) && !jumped && !brk && !mobNow && ctx.motionLive !== false
+        && picture?.possession && (picture.action === 'catch' || picture.action === 'carry')
+        && pickup.player.side === c.side && pickup.player.slot === c.slot && pickup.player.who === c.who
+        && !ctx.contactPlayers?.has(`${c.side}/${c.slot}/${c.who}`)) {
+        picture.action = 'groundPickup';
+        picture.possession = !reaching;
+        picture.frame = reaching ? (age < -.5 ? 0 : 1) : Math.min(5, 2 + Math.floor(age * 3 / PICKUP_RISE_TICKS));
+        looseOnTurf = reaching;
+        if (picture.frame < 5) {
+          delete picture.strideFrame;
+          delete picture.movement;
+          delete picture.tired;
+          // The near hand meets the grounded sprite at its last real position. The feet and
+          // shadow take the same small adjustment while the collector's run continues underneath.
+          const feet = world(pickup.feet);
+          const dx = pickupSpot.x - feet.x, dy = pickupSpot.y - feet.y;
+          picture.left = dx === 0 ? picture.left : dx < 0;
+          picture.facing = dy === 0 && picture.facing !== 'side' ? picture.facing : dy < 0 ? 'back' : 'front';
+          const weight = reaching ? 1 + age : 1 - age / PICKUP_RISE_TICKS;
+          w.x = Math.round(w.x + (dx - (picture.left ? -PICKUP_BALL_X : PICKUP_BALL_X)) * weight);
+          w.y = Math.round(w.y + dy * weight);
+        }
+      }
       if (bm && ctx.walkOff) {
         const ahead = bm.toward && toFieldPt({ x: c.x + bm.dx + bm.toward.x, y: c.y + bm.dy + bm.toward.y });
         ctx.walkOff.set(`${c.side}/${c.slot}`, { ...bm, ...(ahead ? { left: this.s.fieldToWorld(ahead.fx, ahead.fy).x < this.s.fieldToWorld(f.fx, f.fy).x } : {}) });
@@ -150,11 +206,12 @@ export class LiveView {
       points.push({ player: { side: c.side, slot: c.slot, who: c.who ?? `${c.side}/${c.slot}` }, ...w });
       const faceLeft = screenFacing(c, p, this.screenDir).left;
       const cadence = c.pose === 'run' ? Math.max(0.45, Math.min(1.7, c.speed / CADENCE_SPEED)) : 1;
-      if (actor.paint) actor.paint(playerPicture(c, p, cur.tick, cur.ball.holder, this.screenDir, ctx));
+      if (actor.paint && picture) actor.paint(picture);
       else actor.play(c.pose as PlayerAnim, faceLeft, timeScale * cadence);
     }
     let layout: ContactLayout | null = null;
     let contactFacing: 'front' | 'back' = 'front';
+    let offloadFrom: PlayerSnap | undefined;
     if (this.s.contact) {
       // A retained tackle picture belongs to live play. Whistle scenes move
       // the players independently, so clear the shared pile before laying
@@ -164,7 +221,16 @@ export class LiveView {
         const carrier = cur.players.find(p => p.side === this.contactState!.contact.carrier.side && p.slot === this.contactState!.contact.carrier.slot)!;
         const facing = screenFacing(carrier, this.before(prev, carrier), this.screenDir);
         contactFacing = facing.facing;
-        layout = contactLayout(this.contactState, points, facing.left);
+        const facts = this.contactState.contact;
+        let throwAt: { x: number; y: number; gather: number } | undefined;
+        if (facts.offload) {
+          const from = toFieldPt(carrier), to = toFieldPt(facts.offload.to);
+          const p0 = this.s.fieldToWorld(from.fx, from.fy), p1 = this.s.fieldToWorld(to.fx, to.fy);
+          if (prev.tick + 1 === cur.tick && cur.tick === facts.startedTick
+            && prev.ball.holder?.side === carrier.side && prev.ball.holder.slot === carrier.slot) offloadFrom = flightPlayer(prev, facts.carrier);
+          throwAt = { x: p1.x - p0.x, y: p1.y - p0.y, gather: offloadFrom ? a : 1 };
+        }
+        layout = contactLayout(this.contactState, points, facing.left, throwAt);
         if (layout) for (const p of layout.feet) {
           const actor = this.s.players[p.player.side][p.player.slot];
           actor?.place(p.x, p.y, p.y + 1); actor?.setSpriteVisible?.(false);
@@ -181,7 +247,8 @@ export class LiveView {
     const carried = cb.holder ? breakMan(brk, cb.holder) : undefined;
     const bf = toFieldPt({ x: pb.x + (cb.x - pb.x) * ba + (carried?.dx ?? 0), y: pb.y + (cb.y - pb.y) * ba + (carried?.dy ?? 0) });
     const bw = snap(this.s.fieldToWorld(bf.fx, bf.fy));
-    const lift = Math.round((pb.lift + (cb.lift - pb.lift) * ba) * LIFT_PX_PER_M);
+    const beforeLift = bombBallLift(prev), currentLift = bombBallLift(cur);
+    const lift = Math.round((beforeLift + (currentLift - beforeLift) * ba) * LIFT_PX_PER_M);
     // Heading and flight time for the ball's turn and spin: its screen step this tick, the climb included.
     const f0 = toFieldPt({ x: pb.x, y: pb.y });
     const f1 = toFieldPt({ x: cb.x, y: cb.y });
@@ -189,23 +256,33 @@ export class LiveView {
     const w1 = this.s.fieldToWorld(f1.fx, f1.fy);
     const motion: BallMotion = ballPlaced
       ? { dx: 0, dy: 0, t: prev.tick + a }
-      : { dx: w1.x - w0.x, dy: w1.y - w0.y - (cb.lift - pb.lift) * LIFT_PX_PER_M, t: prev.tick + a };
+      : { dx: w1.x - w0.x, dy: w1.y - w0.y - (currentLift - beforeLift) * LIFT_PX_PER_M, t: prev.tick + a };
     // Which hand holds it, remembered per tick: a release hands the offset back over HAND_BLEND_TICKS.
     for (const s of [prev, cur]) {
       const hh = s.ball.holder && s.players.find((q) => q.side === s.ball.holder!.side && q.slot === s.ball.holder!.slot);
       this.held.set(s.tick, hh ? (screenFacing(hh, s === cur ? this.before(prev, hh) : hh, this.screenDir).left ? -4 : 4) : 0);
     }
     for (const k of this.held.keys()) if (k < cur.tick - 8 || k > cur.tick + 1) this.held.delete(k);
-    if (cb.holder) {
+    if (looseOnTurf && pickupSpot) {
+      this.s.ball.place(pickupSpot.x, pickupSpot.y, 0, pickupSpot.y + 2);
+      this.s.focus?.carrier(null);
+    } else if (cb.holder) {
       const h = cur.players.find((q) => q.side === cb.holder!.side && q.slot === cb.holder!.slot);
       const hand = h && screenFacing(h, this.before(prev, h), this.screenDir).left ? -4 : 4;
       this.s.ball.place(bw.x + hand, bw.y, lift, bw.y + 1.01 + cb.holder.slot * 0.001, motion);
       const drawn = layout?.feet.find(p => p.player.side === cb.holder!.side && p.player.slot === cb.holder!.slot);
       this.s.focus?.carrier(brk ? null : { side: cb.holder.side, x: drawn?.x ?? bw.x, y: drawn?.y ?? bw.y });
     } else {
-      const offset = passSpriteOffset(cur, motion.t, (ref, endpoint, flight) => {
+      const contact = this.contactState;
+      const offload = contact?.kind === 'offload' && layout ? this.s.contact?.offloadAnchor?.(contact, layout) : undefined;
+      const flightTick = offload ? (cur.tick - prev.tick <= 1 ? drawn : cur.tick) : motion.t;
+      const offset = passSpriteOffset(cur, flightTick, (ref, endpoint, flight) => {
         const player = flightPlayer(cur, ref)!;
         const actor = this.s.players[ref.side]?.[ref.slot];
+        if (endpoint === 'release' && offload) {
+          const carried = offloadFrom && actor?.ballAnchor?.(playerPicture(offloadFrom, offloadFrom, prev.tick, prev.ball.holder, this.screenDir));
+          return carried ? { x: carried.x + (offload.x - carried.x) * a, y: carried.y + (offload.y - carried.y) * a } : offload;
+        }
         if (!actor?.ballAnchor) return undefined;
         if (endpoint === 'release') {
           const heading = flight.source!;
@@ -222,7 +299,12 @@ export class LiveView {
         const target = toFieldPt(flight.to), aimed = this.s.fieldToWorld(target.fx, target.fy);
         return { x: anchor.x + actual.x - aimed.x, y: anchor.y + actual.y - aimed.y };
       }, LIFT_PX_PER_M);
-      if (offset) this.s.ball.place(bw.x, bw.y, lift, bw.y + 2, { ...motion, offsetX: offset.x, offsetY: offset.y });
+      if (offset) {
+        // The release is in front of the shared bodies even when the defender's feet sort lower.
+        const depth = offload && flightTick < contact!.contact.startedTick + 2
+          ? Math.max(bw.y + 2, ...layout!.feet.map(p => p.y + 1.03)) : bw.y + 2;
+        this.s.ball.place(bw.x, bw.y, lift, depth, { ...motion, offsetX: offset.x, offsetY: offset.y });
+      }
       else {
         const hand = this.handAt(prev.tick) * (1 - a) + this.handAt(cur.tick) * a;
         this.s.ball.place(bw.x + hand, bw.y, lift, bw.y + 2, motion);
@@ -233,7 +315,7 @@ export class LiveView {
     if (placed >= CUT_BODIES) this.s.cut?.();
     this.faded = !!brk;
     // Held balls are painted once in the player's hands (or the shared tackle).
-    const embedded = !!cb.holder && !!this.s.players[cb.holder.side][cb.holder.slot]?.paint;
+    const embedded = !looseOnTurf && !!cb.holder && !!this.s.players[cb.holder.side][cb.holder.slot]?.paint;
     this.s.ball.setRendered?.(!embedded);
   }
 

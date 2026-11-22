@@ -4,10 +4,11 @@ import { FIELD_LENGTH, FIELD_WIDTH, MID_X, MID_Y, clampToGround } from '../../co
 import { BODY_RADIUS, arrive, integrate, separate, speedOf, type Body } from '../../core/body';
 import type { Side } from '../../core/snapshot';
 import { add, clamp, dist, type Vec } from '../../core/vec';
-import { ROLES, formationTarget } from '../roles';
+import { FIVE_EIGHTH, KICKER, ROLES, formationTarget } from '../roles';
 import { gapTarget, intercept, supportSpots, type Candidate } from '../tactics';
 import type { AttackPlan } from '../presets';
 import { speedMult } from '../traits';
+import { SECOND_KICKER } from '../lastTackle';
 import { FATIGUE, afterRun, legsSpeed } from '../fatigue';
 import { GAS, canSprint, paceMult, runCostMult, stepGas } from '../gas';
 import { WRESTLE } from '../wrestle';
@@ -191,7 +192,11 @@ export abstract class LivePositioning extends LiveContact {
   }
 
   protected dummyHalfSpot(): Vec {
-    return clampToGround({ x: this.mark.x - this.dir * 1.6, y: this.mark.y + 0.4 }, 1);
+    return this.behindRuck(this.mark);
+  }
+
+  private behindRuck(mark: Vec): Vec {
+    return clampToGround({ x: mark.x - this.dir * 1.6, y: mark.y + 0.4 }, 1);
   }
 
   /**
@@ -220,6 +225,17 @@ export abstract class LivePositioning extends LiveContact {
     const withBall = this.mark.x + this.dir * LIVE.grubberChaseLeadM;
     const x = this.dir > 0 ? Math.min(Math.max(hold, this.mark.x), withBall) : Math.max(Math.min(hold, this.mark.x), withBall);
     return { x, y: clamp(ROLES[p.slot]!.lane, 3, FIELD_WIDTH - 3) };
+  }
+
+  private centreCarryTarget(p: Player): Vec | null {
+    const carry = this.centreCarry;
+    if (!carry) return null;
+    if (carry.carrier === p && carry.catchTick === p.catchTick && this.tick < carry.untilTick
+      && !this.locked(p) && !p.jink && this.tick >= p.immuneUntil && !this.pendingControl[p.side]
+      && !this.scripted && !this.pendingKick && !this.pendingGoal && p.subFor === null
+      && (carry.target.x - p.body.pos.x) * this.dir > BODY_RADIUS) return carry.target;
+    this.centreCarry = null;
+    return null;
   }
 
   protected assignTargets(): void {
@@ -380,6 +396,14 @@ export abstract class LivePositioning extends LiveContact {
     const attackers = this.side(atk);
     const carrier = h && h.side === atk ? h : null;
     const anchor = carrier ? carrier.body.pos : receiver && receiver.side === atk ? flight!.to : bp;
+    const split = SECOND_KICKER.on > 0 && !this.directedLastPlay() && !this.pendingControl[atk] && !this.pendingPlay[atk]
+      && ((ph.kind === 'tackle' && this.tackles === SET_TACKLES - 2)
+        || (ph.kind === 'ruck' && !ph.handover && this.tackles === SET_TACKLES - 1))
+      && [FIVE_EIGHTH, KICKER].every(slot => {
+        const p = this.at(atk, slot);
+        return this.onField(p) && p.subFor === null && this.indexOf(p) !== (ph.kind === 'tackle' || ph.kind === 'ruck' ? ph.carrier : -1) && p !== this.dummyHalf(atk);
+      });
+    const splitSpot = split ? this.behindRuck(ph.kind === 'tackle' ? this.players[ph.carrier]!.body.pos : this.mark) : null;
     const supports: Player[] = [];
     if (carrier || (receiver && receiver.side === atk)) {
       const lead = carrier ?? receiver!;
@@ -411,8 +435,8 @@ export abstract class LivePositioning extends LiveContact {
           p.through = false;
           p.wantsSprint = true;
         } else if (ph.kind === 'play') {
-          const defs = this.side(def).filter((d) => !this.locked(d)).map((d) => d.body.pos);
-          p.target = gapTarget(p.body.pos, this.dir, defs);
+          p.target = this.centreCarryTarget(p)
+            ?? gapTarget(p.body.pos, this.dir, this.side(def).filter((d) => !this.locked(d)).map((d) => d.body.pos));
           p.through = true;
           // Space ahead, just beaten a man, or through the line: go.
           p.wantsSprint = this.tick < p.burstUntil || broken || this.laneClear(p);
@@ -432,6 +456,12 @@ export abstract class LivePositioning extends LiveContact {
         }
       } else if (p === this.dummyHalf(atk) && (ph.kind === 'tackle' || ph.kind === 'ruck')) {
         p.target = this.dummyHalfSpot();
+      } else if (splitSpot && (p.slot === KICKER || p.slot === FIVE_EIGHTH)) {
+        // The halfback sets up flatter on the open side. His partner drops back on the other side before the heel.
+        const primary = p.slot === KICKER;
+        const edge = (splitSpot.y <= MID_Y ? 1 : -1) * (primary ? 1 : -1);
+        const depth = primary ? SECOND_KICKER.halfbackDepthM : SECOND_KICKER.fiveEighthDepthM;
+        p.target = clampToGround({ x: splitSpot.x - this.dir * depth, y: splitSpot.y + edge * SECOND_KICKER.laneM }, 1);
       } else if (shape?.kind === 'back-door' && ph.kind === 'ruck'
         && (ph.stage !== 'down' || this.tick >= ph.t0 + ph.down - SHAPES.backDoor.sweepLeadTicks)
         && p.slot === shape.backDoor!.support.slot) {
@@ -488,8 +518,10 @@ export abstract class LivePositioning extends LiveContact {
     const rushDepth = this.tactics[atk].attack === 'kick-chase' ? Math.min(1, this.rushEffect()) : 0;
     const compressed = this.tactics[atk].attack === 'expansive' ? Math.min(1, this.compressedEffect()) : 0;
     const coverDepth = Math.min(1, kickCover);
-    if (ph.kind === 'play' && carrier) {
-      const want = carrier.body.pos.x + this.dir * 2.5;
+    const heelLive = splitSpot && ph.kind === 'ruck' && ph.stage === 'dh';
+    if ((ph.kind === 'play' && carrier) || heelLive) {
+      // The heel puts the ball in play; only defenders who completed their retreat can come up.
+      const want = (carrier?.body.pos.x ?? splitSpot!.x) + this.dir * 2.5;
       const stepM = dplan.lineSpeed * (GAS.cruise / LIVE.lineCruiseRef) * TICK_S;
       // Rush up toward the carrier, never past him.
       if (this.dir > 0) this.lineX = Math.max(want, this.lineX - stepM);
@@ -542,7 +574,7 @@ export abstract class LivePositioning extends LiveContact {
         const pk = this.pendingKick;
         p.wantsSprint = broken;
         if (pk && this.players[pk.kicker]!.side === atk && !pk.kickoff) {
-          p.target = { ...pk.to };
+          p.target = { ...this.kickLanding(pk) };
           p.wantsSprint = true;
         } else {
           let deep = this.lastPlay ? LIVE.fullbackLastM : LIVE.fullbackDeepM;

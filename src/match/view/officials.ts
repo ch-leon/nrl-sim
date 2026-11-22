@@ -15,7 +15,7 @@ import type { PlayerSnap, Side, Snapshot } from '../core/snapshot';
  */
 export const REF = {
   /** Metres off the play. */
-  offM: 6,
+  offM: 7.25,
   /** The play he follows: this share the ball, the rest the middle of the bodies on the field (so a pass or a kick moves him at a man's pace, not the ball's). Small, as the ball's own snap onto a holder moves him by this share of it. */
   ballShare: 0.15,
   /**

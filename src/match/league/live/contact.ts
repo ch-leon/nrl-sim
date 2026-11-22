@@ -244,7 +244,7 @@ export abstract class LiveContact extends LivePenalties {
         const r = pickReceiver(c.body.pos, this.dir, cands) ?? cands.find((k) => !k.busy)?.idx ?? null;
         if (r !== null) {
           this.emit('offload', `${c.name} gets the offload away to ${this.players[r]!.name}`, c, credit);
-          this.tagContact(c, [t]);
+          const event = this.events[this.events.length - 1]!;
           // A Razzle Dazzle offload is the miracle ball — and the one that gets spilled; so is one the coach called for (#396).
           this.pass(c, this.players[r]!, (tr.credit.offload?.id === 'razzleDazzle' ? EDGE_COST.razzleDazzle : 0) + (this.playCall() === 'offload' ? CALLS.offload.spill : 0)
             + this.rushOffloadSpill(c.side));
@@ -256,6 +256,12 @@ export abstract class LiveContact extends LivePenalties {
           this.lock(c, 'tackled', LIVE.contactTicks + LIVE.downTicks);
           this.lock(t, 'tackle', LIVE.contactTicks + LIVE.downTicks);
           c.busyUntil = this.tick + LIVE.contactTicks + LIVE.downTicks + 10;
+          const flight = this.ball;
+          if (flight.kind === 'flight') {
+            event.contact = this.visualContact = { ...this.contactInfo(c, [t]),
+              outcome: 'offload', resolvedTick: this.tick, releaseTick: c.poseUntil,
+              offload: { to: { ...flight.to }, arrivesTick: flight.t0 + flight.ticks } };
+          }
           return;
         }
         break; // nobody there after all: a plain tackle

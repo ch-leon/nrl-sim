@@ -106,7 +106,7 @@ describe('the goal-kicker and the captain (N11)', () => {
     expect(good.made / good.tried).toBeGreaterThan(poor.made / poor.tried + 0.1);
   }, 240_000);
 
-  it('kicks in play stay with the slot-5 kicker when another man is named; field goals still come', () => {
+  it('the named fullback can attempt a field goal and the side keeps its ordinary kicking pattern', () => {
     const away = sideSheet('A', { rating: 60 });
     const plain = named('H');
     const fullbackKicks = { ...plain, kicker: plain.roster![0]!.id! };

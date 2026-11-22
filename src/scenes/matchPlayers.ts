@@ -6,7 +6,7 @@ import type { RingStyle } from '../art/match/kitClash';
 import { liveRingPixels, RING_SCALE } from '../match/view/ringTexture';
 import { appearanceFor, playerBallAnchor, WIDTH, HEIGHT, CENTRE, FOOT, type Appearance } from '../art/prototype/player';
 import { drawLivePlayer } from '../art/match/livePlayer';
-import { CONTACT_W, CONTACT_H, CONTACT_X, CONTACT_FOOT, drawContact } from '../art/prototype/contact';
+import { CONTACT_W, CONTACT_H, CONTACT_X, CONTACT_FOOT, drawContact, offloadBallCentre } from '../art/prototype/contact';
 import type { MatchArtRegistry } from './matchArt';
 import type { PlayerPicture } from '../match/view/playerPicture';
 import type { ContactAnimation } from '../match/view/contactAnimation';
@@ -121,6 +121,7 @@ export class MatchActor {
   place(x: number, y: number, depth: number): void {
     this.sprite.setPosition(x, y - this.lift).setDepth(depth); this.shadow.setPosition(x, y); this.ring.setPosition(x, y);
   }
+  get groundY(): number { return this.shadow.y; }
   ballAnchor(picture: PlayerPicture): { x: number; y: number } { return this.cache.ballAnchor(picture); }
   wear(who: string): void { this.who = who; }
   paint(picture: PlayerPicture): void {
@@ -150,6 +151,11 @@ export class MatchContactLayer {
   constructor(scene: Phaser.Scene, art: MatchArtRegistry, private readonly kits: Record<Side, Kit>, private readonly look: (who: string) => Appearance = appearanceFor) {
     this.texture = new PaintedTexture(scene, art, 'live-contact', CONTACT_W, CONTACT_H);
     this.sprite = scene.add.image(0, 0, this.texture.key).setVisible(false);
+  }
+  offloadAnchor(state: ContactAnimation, layout: ContactLayout): { x: number; y: number } | undefined {
+    const at = offloadBallCentre(state, layout.pose, this.look(state.contact.carrier.who));
+    if (!at) return undefined;
+    return { x: (at[0] - CONTACT_X) * (layout.left ? -1 : 1), y: at[1] - CONTACT_FOOT };
   }
   paint(state: ContactAnimation | null, layout: ContactLayout | null, facing: 'front' | 'back'): void {
     if (!state || !layout) { this.sprite.setVisible(false); this.key = ''; return; }

@@ -49,9 +49,18 @@ a new roll.
 
 `shapes.backDoor.on:0` restores #715's three-shape match and RNG stream exactly.
 The back-door packet landed at engine revision 7. The nearby defender's lead read
-moves live-match recovery to engine revision 8; `shapes.leadDecoy.on:0` keeps the
-revision 7 line. BAK-208 and the tuning reference list the rules and values. The
-PR records the balance comparison and the #322 edge-race check.
+landed at engine revision 8; `shapes.leadDecoy.on:0` keeps the revision 7 line.
+A centre catching near touch can then choose a defender's open shoulder, which
+moves live-match recovery to engine revision 9; `live.centreShoulderTicks:0`
+keeps the previous carry. An ordinary long punt can then aim away from a shading
+fullback, which moves live-match recovery to engine revision 10; `longKick.on:0`
+keeps the previous landing. An attacking bomb can then go to a winger's corner
+when the chase is on, which moves live-match recovery to engine revision 11;
+`wingBomb.on:0` keeps the fullback aim. On the last tackle the dummy-half can
+find the deeper five-eighth when the halfback is under pressure, which moves
+live-match recovery to engine revision 12; `secondKicker.on:0` keeps the
+previous ruck. BAK-208 and the tuning reference list the rules and
+values. The PR records the balance comparison and the #322 edge-race check.
 
 Status: stages 1–4 presentation and the first stage-5 pass are implemented in
 five linked PRs. Leon reviewed the clip and approved merging on 17 November

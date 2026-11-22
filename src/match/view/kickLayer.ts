@@ -19,6 +19,7 @@ import { GROUNDED_LIFT } from './commentary';
 import { RING_STYLES } from '../../art/match/kitClash';
 import { drawRing } from './rings';
 import { screenDensity } from '../../world/viewport';
+import { bombBallLift } from './bombContest';
 
 /** The events a kick in general play starts with. */
 export const KICK_STARTS: ReadonlySet<string> = new Set(['kick', 'kickoff', 'drop-out']);
@@ -199,11 +200,16 @@ export class KickWatch {
       if (k.contest) k.winner = { ...b.holder };
       return;
     }
-    k.path.push({ x: b.x, y: b.y, lift: b.lift });
+    k.path.push({ x: b.x, y: b.y, lift: bombBallLift(s) });
     if (k.path.length === 3 && k.type !== 'grubber') k.flight = predictFlight(k.path);
     if (k.type === 'grubber' && b.lift < SKID_LIFT_M && this.prevLift >= SKID_LIFT_M) k.skids.push({ x: b.x, y: b.y, lift: 0 });
     // Coming down: the nearest of each side to where it lands are under it, and the rings follow them.
-    if (CONTEST_KICKS.has(k.type) && b.lift < this.prevLift) k.contest = contestants(s, k.flight?.landing ?? b, k.side) ?? k.contest;
+    if (CONTEST_KICKS.has(k.type) && b.lift < this.prevLift) {
+      const duel = k.type === 'bomb' ? s.bombContest : undefined;
+      k.contest = duel && duel.releasedTick === undefined
+        ? [{ side: duel.players[0].side, slot: duel.players[0].slot }, { side: duel.players[1].side, slot: duel.players[1].slot }]
+        : contestants(s, k.flight?.landing ?? b, k.side) ?? k.contest;
+    }
     this.prevLift = b.lift;
     if (b.lift < GROUNDED_LIFT) {
       // A kick whose flight is read has landed the first tick it touches the ground (the
