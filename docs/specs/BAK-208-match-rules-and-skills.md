@@ -242,7 +242,7 @@ type. On the second-last tackle inside 25 m he goes early 35% of the time (grubb
 | Kick | When the AI chooses it | Resolution |
 |---|---|---|
 | **Territory** (long) | Beyond 50 m (85%), or 40–50 m (20%) | Distance from Boot and wind. The kicker looks for space across from a fullback who has shaded to one side. The chase sets the line |
-| **Bomb** | Beyond 50 m (15%), 40–50 m (50%), 22–40 m (30%) | Peak 20 m, 22–28 m long, onto the fullback's patch; catch contest (§4.3) |
+| **Bomb** | Beyond 50 m (15%), 40–50 m (50%), 22–40 m (30%). Inside 22 m the kicker considers it when a winger can chase | Peak 20 m. A chaseable attacking bomb goes to a winger's corner. The usual 22–28 m kick goes to the fullback's patch. Both use the catch contest (§4.3) |
 | **Cross-field** | 40–50 m (30%), 22–40 m (35%), inside 22 m (30%) | Peak 13 m, to the far winger, 2 m short of the line; winger vs winger under it |
 | **Grubber** | 22–40 m (20%), inside 22 m (50%) | From inside 16 m, skids about 3 m into the in-goal; from further out, about 8 m short of the line, aimed at a winger's lane pulled back toward the kicker. The wingers start their run on the second-last. A try or a repeat set sometimes; usually the defence gets it |
 | **Chip** | 22–40 m (15%), inside 22 m (20%) | 10–13 m over the rushing line, the kicker chases his own |
@@ -258,8 +258,21 @@ and at least 12 m inside touch. A centred fullback or another defender already c
 the proposed landing brings back the usual target in front of the fullback. The read
 applies to the kicker's own early and last-tackle punts. Explicit Lab aim, the coach's
 kick calls, 40/20 attempts and touch-finders use their existing targets. `longKick.on:0`
-keeps the previous landing and adds no draw. Live-match recovery is engine revision 10.
+keeps the previous landing and adds no draw. The long punt landed at engine revision 10.
 Ported from [draft PR #756](https://github.com/ch-leon/nrl-sim/pull/756).
+
+On an ordinary attacking bomb (#650), the kicker looks for an onside winger already
+wide who can reach a landing 8–12 m short of the try line and 8–12 m inside touch.
+If both wingers can get there, the kicker picks the one with more time to spare.
+Inside 22 m, an eligible corner adds the bomb to the options once the kicker has
+already chosen to kick. It has a weight of 0.20 against 1.00 for the other kicks
+combined, before the usual preset lean and using the same kick-type roll.
+The fullback reads the aim during the wind-up. He and the nearest defensive cover
+can still get under it, and the usual bomb contest decides who takes it. A bomb
+from midfield or one without a viable chase keeps the usual fullback aim. Explicit
+Lab aims and scripted kicks use their existing targets. `wingBomb.on:0` keeps the
+fullback aim and adds no draw. Live-match recovery is engine revision 11.
+Ported from [draft PR #757](https://github.com/ch-leon/nrl-sim/pull/757).
 
 Every kick pop-ups its type (BOMB!, GRUBBER!, CHIP!, CROSS-FIELD!, plain KICK! for
 territory); REGATHER! and DROPPED! follow. **The camera goes wide** (N15.3, #297): from the kick's
@@ -761,6 +774,7 @@ makes the break but can't finish it, the workhorse who is never quick and never 
 | N13.5 | A side's plan can change at half-time and after a try, by a rule the match opts into — *shipped* (off unless a side is named; N14 wires the rivals). Tuning §30 | §5 |
 | #649.1 | The weighted receiver: the pass goes to one of the near-best options by weight, not always the best — *awaiting lab sign-off*. Tuning §5 | §4.2 |
 | #650.1 | More options on the last: kick, run it or shift it wide by zone, style, the late score and who is on the field; the second-last's early kick leans the same way — *awaiting lab sign-off*. Tuning §6 | §4.4 |
+| #650 | Attacking bombs can go to either winger's corner when the chase can reach it — *awaiting lab sign-off*. Tuning §6 | §4.4 |
 | #652.1 | Held up over the line: any defender on a carrier in contact at the line can hold him up (a lone tackler too, Leon 13 Nov 2026); play-the-ball 10 m out, the tackle counted — *awaiting lab sign-off*. Tuning §11 | §8.1 |
 
 Then BAK-207 Phase 2 (full match, scoring, halves) and Phase 3 (balance).
