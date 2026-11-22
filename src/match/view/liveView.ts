@@ -4,7 +4,9 @@
 // Structural interfaces mirror MatchScene's public surface; no Phaser import,
 // so it is unit-tested with fake actors.
 import { toFieldPt } from '../core/field';
+import { flightLift } from '../core/ball';
 import type { PlayerSnap, Snapshot, Side } from '../core/snapshot';
+import { lerp, type Vec } from '../core/vec';
 import type { PlayerAnim } from '../../art/match/players';
 import { PICKUP_BALL_X } from '../../art/match/moments';
 import { pictureContext, playerPicture, strideFor, tiredLevel, type PlayerPicture } from './playerPicture';
@@ -36,6 +38,8 @@ export interface BallMotion {
   /** Sprite centre correction for a launched pass; ground/shadow do not move. */
   offsetX?: number;
   offsetY?: number;
+  /** End-over-end rotation and continuous shadow fade for a grubber. */
+  tumble?: { angle: number; shadowAlpha: number };
   dx: number;
   dy: number;
   t: number;
@@ -121,10 +125,11 @@ export class LiveView {
     const age = pickup ? drawn - pickup.tick : 0;
     const reaching = !!pickup && age < 0 && cur.tick === pickup.tick && prev.tick === pickup.tick - 1 && !prev.ball.holder && !prev.ball.flight
       && prev.ball.lift === 0 && prev.ball.x === pickup.at.x && prev.ball.y === pickup.at.y;
-    const world = (pos: { x: number; y: number }) => {
+    const project = (pos: Vec) => {
       const f = toFieldPt(pos);
-      return snap(this.s.fieldToWorld(f.fx, f.fy));
+      return this.s.fieldToWorld(f.fx, f.fy);
     };
+    const world = (pos: Vec) => snap(project(pos));
     const pickupSpot = pickup && world(pickup.at);
     let looseOnTurf = false;
     const phaseAge = Math.max(0, drawn - (cur.phase?.since ?? drawn));
@@ -250,10 +255,8 @@ export class LiveView {
     const beforeLift = bombBallLift(prev), currentLift = bombBallLift(cur);
     const lift = Math.round((beforeLift + (currentLift - beforeLift) * ba) * LIFT_PX_PER_M);
     // Heading and flight time for the ball's turn and spin: its screen step this tick, the climb included.
-    const f0 = toFieldPt({ x: pb.x, y: pb.y });
-    const f1 = toFieldPt({ x: cb.x, y: cb.y });
-    const w0 = this.s.fieldToWorld(f0.fx, f0.fy);
-    const w1 = this.s.fieldToWorld(f1.fx, f1.fy);
+    const w0 = project(pb);
+    const w1 = project(cb);
     const motion: BallMotion = ballPlaced
       ? { dx: 0, dy: 0, t: prev.tick + a }
       : { dx: w1.x - w0.x, dy: w1.y - w0.y - (currentLift - beforeLift) * LIFT_PX_PER_M, t: prev.tick + a };
@@ -263,6 +266,11 @@ export class LiveView {
       this.held.set(s.tick, hh ? (screenFacing(hh, s === cur ? this.before(prev, hh) : hh, this.screenDir).left ? -4 : 4) : 0);
     }
     for (const k of this.held.keys()) if (k < cur.tick - 8 || k > cur.tick + 1) this.held.delete(k);
+    // The arrival snapshot has already resolved possession or set the ball down.
+    // Use the previous flight for the last skip up to that tick.
+    const flight = cb.flight ?? (cur.tick === prev.tick + 1 && cur.tick === pb.flight?.arrivesTick ? pb.flight : undefined);
+    const grubber = flight?.grubber;
+    const finishesOnTurf = !cb.flight && cb.lift === 0 && cb.x === flight?.to.x && cb.y === flight.to.y;
     if (looseOnTurf && pickupSpot) {
       this.s.ball.place(pickupSpot.x, pickupSpot.y, 0, pickupSpot.y + 2);
       this.s.focus?.carrier(null);
@@ -272,6 +280,19 @@ export class LiveView {
       this.s.ball.place(bw.x + hand, bw.y, lift, bw.y + 1.01 + cb.holder.slot * 0.001, motion);
       const drawn = layout?.feet.find(p => p.player.side === cb.holder!.side && p.player.slot === cb.holder!.slot);
       this.s.focus?.carrier(brk ? null : { side: cb.holder.side, x: drawn?.x ?? bw.x, y: drawn?.y ?? bw.y });
+    } else if (grubber && drawn >= flight.startedTick && (drawn < flight.arrivesTick || finishesOnTurf)) {
+      const u = (drawn - flight.startedTick) / (flight.arrivesTick - flight.startedTick);
+      const skips = u * grubber.bounces;
+      const remaining = grubber.bounces - skips;
+      const from = project(flight.from), to = project(flight.to);
+      const dir = Math.sign(to.x - from.x) || Math.sign(to.y - from.y) || 1;
+      const spot = world(lerp(flight.from, flight.to, u));
+      const height = Math.round(flightLift(flight.fromLift, grubber.peak, u, grubber.bounces) * LIFT_PX_PER_M);
+      // Half a turn per skip lands on alternating tips. The last skip slows to rest on its side.
+      const angle = dir * Math.PI * (skips + Math.min(0.5, remaining / 2));
+      const shadowAlpha = Math.min(1, 2 * skips, 2 * remaining);
+      this.s.ball.place(spot.x, spot.y, height, spot.y + 2, { ...motion, tumble: { angle, shadowAlpha } });
+      this.s.focus?.carrier(null);
     } else {
       const contact = this.contactState;
       const offload = contact?.kind === 'offload' && layout ? this.s.contact?.offloadAnchor?.(contact, layout) : undefined;
@@ -306,7 +327,7 @@ export class LiveView {
         this.s.ball.place(bw.x, bw.y, lift, depth, { ...motion, offsetX: offset.x, offsetY: offset.y });
       }
       else {
-        const hand = this.handAt(prev.tick) * (1 - a) + this.handAt(cur.tick) * a;
+        const hand = this.handAt(prev.tick) * (1 - a) + (cb.flight?.grubber ? 0 : this.handAt(cur.tick) * a);
         this.s.ball.place(bw.x + hand, bw.y, lift, bw.y + 2, motion);
       }
       this.s.focus?.carrier(null);

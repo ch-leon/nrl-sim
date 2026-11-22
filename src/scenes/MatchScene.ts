@@ -225,14 +225,22 @@ export class MatchBall implements PlaybackBall {
     this.gx = x;
     this.gy = y;
     const sy = y - lift + 2;
-    this.sprite.setPosition(x + (motion?.offsetX ?? 0), sy - this.half + (motion?.offsetY ?? 0)).setDepth(depth);
-    this.turn(motion);
+    const tumble = motion?.tumble;
+    let support = this.half;
+    if (tumble) {
+      const angle = Math.round(tumble.angle / BALL_TURN_STEP) * BALL_TURN_STEP;
+      // Keep the oval's lower edge at the flight's lift as it rolls onto each tip.
+      support = this.half + Math.round(Math.hypot(this.sprite.width / 2 * Math.sin(angle), this.half * Math.cos(angle)) - this.half);
+      this.sprite.setRotation(angle).setFlipX(false);
+    } else this.turn(motion);
+    this.sprite.setPosition(x + (motion?.offsetX ?? 0), sy - support + (motion?.offsetY ?? 0)).setDepth(depth);
     this.vx = motion?.dx ?? 0;
     this.vy = motion?.dy ?? 0;
     // The shadow lies on the ground along the light, shrinking and paling as the ball climbs:
     // a bomb's closes on its landing spot as it falls.
     const near = 1 / (1 + lift / BALL_SHADOW_REACH);
-    this.shadow.setPosition(x + lift * this.throwX, y + lift * this.throwY).setScale(near).setAlpha(0.35 + 0.65 * near).setVisible(lift > 3);
+    this.shadow.setPosition(x + lift * this.throwX, y + lift * this.throwY).setScale(near)
+      .setAlpha((0.35 + 0.65 * near) * (tumble?.shadowAlpha ?? 1)).setVisible(tumble ? tumble.shadowAlpha > 0 : lift > 3);
   }
   /**
    * Point the ball along its flight and wobble it with the tick (a pure function of the
