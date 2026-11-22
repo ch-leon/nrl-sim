@@ -351,12 +351,13 @@ describe('the lab and the harness', () => {
   // Seed 1 at tick 1031 and seed 4 at tick 514 before the weighted receiver (#649) reshuffled them; seed 3 at 653
   // and seed 4's block play breaking down at 991 before the last-tackle call (#650): seed 4's first breakdown is now the
   // away side's, and seed 9 or 11 the first of 1–12 whose is the home side's.
-  it('the lab’s named seeds: a block play launched (seed 3, tick 690) and a home play breaking down (seed 11, tick 1579)', () => {
+  // Punts into space (#650) move seed 3's block play from tick 690 to 714. Seed 11's breakdown stays.
+  it('the lab’s named seeds: a block play launched (seed 3, tick 714) and a home play breaking down (seed 11, tick 1579)', () => {
     const lab = (seed: number): PlaySim =>
       new PlaySim(withPlays({ ...labSheet(DEFAULT_HOME, 'gen', { attack: 'grind' }), rotation: 'standard' }, true), withPlays({ ...labSheet(DEFAULT_AWAY, 'gen', {}), rotation: 'standard' }, true), seed, { energy: LEGS_ENERGY.fresh, weather: 'clear', calls: [] });
     const one = lab(3);
     const launch = until(one, (e) => e.kind === 'set-play' && e.side === 'home');
-    expect([launch?.tick, launch?.detail, one.script?.outcome]).toEqual([690, 'block-play', 'ok']);
+    expect([launch?.tick, launch?.detail, one.script?.outcome]).toEqual([714, 'block-play', 'ok']);
     expect(one.script?.decoys.map((d) => d.idx % 9)).toEqual([7]);
     const eleven = lab(11);
     const bd = until(eleven, (e) => e.kind === 'play-breaks-down');

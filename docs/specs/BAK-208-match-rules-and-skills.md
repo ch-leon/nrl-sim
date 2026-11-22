@@ -235,7 +235,7 @@ type. On the second-last tackle inside 25 m he goes early 35% of the time (grubb
 
 | Kick | When the AI chooses it | Resolution |
 |---|---|---|
-| **Territory** (long) | Beyond 50 m (85%), or 40–50 m (20%) | Distance from Boot; lands in front of the fullback; chase sets the line |
+| **Territory** (long) | Beyond 50 m (85%), or 40–50 m (20%) | Distance from Boot and wind. The kicker looks for space across from a fullback who has shaded to one side. The chase sets the line |
 | **Bomb** | Beyond 50 m (15%), 40–50 m (50%), 22–40 m (30%) | Peak 20 m, 22–28 m long, onto the fullback's patch; catch contest (§4.3) |
 | **Cross-field** | 40–50 m (30%), 22–40 m (35%), inside 22 m (30%) | Peak 13 m, to the far winger, 2 m short of the line; winger vs winger under it |
 | **Grubber** | 22–40 m (20%), inside 22 m (50%) | From inside 16 m, skids about 3 m into the in-goal; from further out, about 8 m short of the line, aimed at a winger's lane pulled back toward the kicker. The wingers start their run on the second-last. A try or a repeat set sometimes; usually the defence gets it |
@@ -244,6 +244,16 @@ type. On the second-last tackle inside 25 m he goes early 35% of the time (grubb
 | **Touch-finder** | Territory kick from deep: own 20 60%, own half 50%, midfield 35%, attacking half 15% | *Implemented in BAK-207 2d:* aims to land 4 m in from the nearer touchline (± 5 m × Boot), rolls 9–13 m for the line; out on the full → the other side's play-the-ball level with the kick |
 | **Field goal** | Last 3 minutes, his side level or a point behind, inside 30 m, tackle 3 or later | *Implemented in BAK-207 2c:* a drop kick, odds by angle, distance, Skill and Boot; charge-down 8%; a miss is a 20 m restart |
 | **Conversion** | After every try | *Implemented in BAK-207 2c:* a Nines drop kick in line with the try, from where the posts look widest; GOAL! / MISSED! |
+
+On an ordinary long punt, the kicker reads the fullback's position as he shapes to kick
+(#650). If the fullback has shifted more than 6 m from the centre, the kicker can aim
+into the opposite half using the usual accuracy scatter. The landing stays in range
+and at least 12 m inside touch. A centred fullback or another defender already covering
+the proposed landing brings back the usual target in front of the fullback. The read
+applies to the kicker's own early and last-tackle punts. Explicit Lab aim, the coach's
+kick calls, 40/20 attempts and touch-finders use their existing targets. `longKick.on:0`
+keeps the previous landing and adds no draw. Live-match recovery is engine revision 10.
+Ported from [draft PR #756](https://github.com/ch-leon/nrl-sim/pull/756).
 
 Every kick pop-ups its type (BOMB!, GRUBBER!, CHIP!, CROSS-FIELD!, plain KICK! for
 territory); REGATHER! and DROPPED! follow. **The camera goes wide** (N15.3, #297): from the kick's

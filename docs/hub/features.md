@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- **Long punts into space.** On an ordinary territory punt, the kicker reads the fullback. If he has shaded more than 6 m off centre and the opposite landing is clear, the kick goes there, still at least 12 m from touch, with the same depth and the same accuracy roll. A centred fullback, a covered lane, a Lab aim, a coach kick call, a 40/20 or a touch-finder keeps the existing target. `longKick.on:0` turns the read off. Ported from [draft PR #756](https://github.com/ch-leon/nrl-sim/pull/756), part of [#650](https://github.com/ch-leon/nrl-sim/issues/650).
+
 - **Centre carries out wide.** A centre catching an ordinary pass near touch reads the nearest free defender ahead. He straightens onto the outside shoulder of a man holding infield, or cuts back inside a man sliding toward touch, and only when that lane has room. The read lasts at most 0.9 seconds. A covered lane, a square defender, a manual step or a set play leaves the usual gap-seeking carry. Pass, sprint and contact odds are unchanged. `live.centreShoulderTicks:0` turns the read off. [PR #770](https://github.com/ch-leon/nrl-sim/pull/770), ported from [draft PR #755](https://github.com/ch-leon/nrl-sim/pull/755), part of [#649](https://github.com/ch-leon/nrl-sim/issues/649).
 
 - **Contested bombs.** The chaser and receiver plant and leap as an open-play bomb comes down. The player who takes it gathers it in the air. On a spill, both land empty-handed and the ball bounces free. Ported from [draft PR #761](https://github.com/ch-leon/nrl-sim/pull/761). [Match rules](../specs/BAK-208-match-rules-and-skills.md#44-kicks--first-slice-implemented-long-bomb-grubber-chip-cross-field)

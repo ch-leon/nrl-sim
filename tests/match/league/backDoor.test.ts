@@ -236,7 +236,8 @@ describe('ordinary back-door option (#649)',()=>{
   });
 
   it('off preserves the preceding ordinary-shapes event and RNG fingerprint exactly',async()=>{
-    restores.push(applyTuning({'shapes.backDoor.on':0}));
+    // Punts into space were also absent from the engine that recorded this fingerprint.
+    restores.push(applyTuning({'shapes.backDoor.on':0,'longKick.on':0}));
     const sim=new LiveSim(sideSheet('H',{rating:60}),sideSheet('A',{rating:60}),1),parts:string[]=[];
     const rng=(sim as unknown as {rng:{next:()=>number}}).rng,next=rng.next.bind(rng);let draws=0;
     rng.next=()=>{draws++;return next();};
@@ -319,7 +320,8 @@ describe('reading the back-door lead (#649)', () => {
 
   it('with the read off preserves the revision 7 back-door event fingerprint', async () => {
     // The centre shoulder read is a later carry, so it stays off for this revision 7 witness.
-    restores.push(applyTuning({ 'shapes.leadDecoy.on': 0, 'live.centreShoulderTicks': 0 }));
+    // The centre shoulder read and punts into space are later carries, so they stay off for this revision 7 witness.
+    restores.push(applyTuning({ 'shapes.leadDecoy.on': 0, 'live.centreShoulderTicks': 0, 'longKick.on': 0 }));
     const sim = new LiveSim(sideSheet('H', { rating: 60 }), sideSheet('A', { rating: 60 }), 1);
     const rng = (sim as unknown as { rng: { next: () => number } }).rng;
     const next = rng.next.bind(rng);

@@ -347,8 +347,10 @@ describe('measuring and reporting', () => {
     // before them: plays-on 0-4:134:d93f46a7e35ffb6c / plays-on-hard 0-0:139:e3df2859485cf187.
     // The centre shoulder read (engine revision 9) moves plays-on. plays-on-hard stays.
     // Before it, plays-on was 12-0:143:b08a6399d81219bc.
+    // Punts into space (#650, engine revision 10) move the Hard coach match.
+    // plays-on stays. Before the punts, plays-on-hard was 1-0:144:74a11af0f394ead7.
     { name: 'plays-on', aiCoach: false, expected: '10-0:141:fb9bb3ff69ff1592' },
-    { name: 'plays-on-hard', aiCoach: true, expected: '1-0:144:74a11af0f394ead7' },
+    { name: 'plays-on-hard', aiCoach: true, expected: '1-0:146:2652be8270891c73' },
   ])('pins $name: an even Balanced / Slide match with set plays (seed 1)', async ({ aiCoach, expected }) => {
     const home = { ...sideSheet('H', { rating: 60 }), plays: ['block-play' as const, 'cut-out-winger' as const, 'kick-pass' as const] };
     const sim = new LiveSim(home, sideSheet('A', { rating: 60 }), 1, aiCoach ? { aiCoach: ['home'] } : {});
@@ -363,5 +365,23 @@ describe('measuring and reporting', () => {
     expect(parts.some((p) => p.includes(':set-play:home:'))).toBe(true);
     expect(parts.some((p) => p.includes(':coach-call:home:set-play:'))).toBe(aiCoach);
     expect(`${sim.points.home}-${sim.points.away}:${parts.length}:${hash}`).toBe(expected);
+  });
+  it('with punts into space off, plays-on-hard keeps the revision 9 pin', async () => {
+    const restore = applyTuning({ 'longKick.on': 0 });
+    try {
+      const home = { ...sideSheet('H', { rating: 60 }), plays: ['block-play' as const, 'cut-out-winger' as const, 'kick-pass' as const] };
+      const sim = new LiveSim(home, sideSheet('A', { rating: 60 }), 1, { aiCoach: ['home'] });
+      const parts: string[] = [];
+      while (!sim.finished && sim.tick < 100_000) {
+        sim.step();
+        for (const e of sim.tickEvents) parts.push(`${e.tick}:${e.kind}:${e.side ?? ''}:${e.detail ?? ''}`);
+      }
+      const spec = 'node:crypto';
+      const { createHash } = await import(spec);
+      const hash = createHash('sha256').update(parts.join('|')).digest('hex').slice(0, 16);
+      expect(`${sim.points.home}-${sim.points.away}:${parts.length}:${hash}`).toBe('1-0:144:74a11af0f394ead7');
+    } finally {
+      restore();
+    }
   });
 });

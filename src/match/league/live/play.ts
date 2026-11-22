@@ -6,7 +6,7 @@ import { speedOf } from '../../core/body';
 import { add, dist, dot, norm, sub, type Vec } from '../../core/vec';
 import { angleFrom, stepChance, type Situation } from '../contest';
 import { PLAYERS, ROLES } from '../roles';
-import { MAX_LAT_M, RUN_CLOSE_M, RUN_IT_CHANCE, RUN_IT_ZONE_M, bombTarget, chipTarget, chooseKick, crossFieldTarget, grubberTarget, kickTarget, pickReceiver, pickReceiverWeighted, type KickChoice } from '../tactics';
+import { LONG_KICK, MAX_LAT_M, RUN_CLOSE_M, RUN_IT_CHANCE, RUN_IT_ZONE_M, bombTarget, chipTarget, chooseKick, crossFieldTarget, grubberTarget, kickTarget, longKickTarget, pickReceiver, pickReceiverWeighted, type KickChoice } from '../tactics';
 import { zoneOf, type AttackPlan } from '../presets';
 import { LAST_TACKLE, chooseLastPlay, earlyKickChance, lastTackleWeights, type LastTackleRead } from '../lastTackle';
 import { FINISHER_M, TRAIT_PTS, announce, bootMult, stepTraits } from '../traits';
@@ -406,7 +406,7 @@ export abstract class LivePlay extends LiveKicks {
           const to = kickTarget(h.body.pos, this.dir, fb.body.pos, this.rng.next(), boot);
           return { ...base, to: controlAim(to, aim, kickTarget(h.body.pos, this.dir, fb.body.pos, 0, boot), kickTarget(h.body.pos, this.dir, fb.body.pos, 1, boot)), receiver: this.indexOf(fb), peak: 12, ...trait };
         }
-        // Territory (2d): from his own 40 on the last he may go for the 40/20; from deep, often for touch; else to the fullback.
+        // Territory (2d): from his own 40 on the last he may go for the 40/20; from deep, often for touch.
         const toLine = this.toLine(h);
         const lever = traitBoost(h.traits, 'bigBoot') + traitBoost(h.traits, 'playmaker');
         // The coach's 40/20 call (#396) goes for it without the roll, as far as calls.fortyTwenty.reachM goes. It is only
@@ -424,7 +424,11 @@ export abstract class LivePlay extends LiveKicks {
           const land = Math.max(toLine - 32 * boot.dist, 12);
           return { ...base, to: this.touchTarget(h, land, TOUCH.touchInsideM, boot.acc), receiver: this.indexOf(fb), peak: 11, aim: 'touch', ...trait };
         }
-        return { ...base, to: kickTarget(h.body.pos, this.dir, fb.body.pos, this.rng.next(), boot), receiver: this.indexOf(fb), peak: 12, ...trait };
+        const roll = this.rng.next();
+        const to = LONG_KICK.on > 0 && this.onField(fb) && (this.lastPlay || this.callState[this.attacking].attack !== 'kick-early')
+          ? longKickTarget(h.body.pos, this.dir, fb.body.pos, roll, boot, this.side(def).map((p) => p.body.pos))
+          : kickTarget(h.body.pos, this.dir, fb.body.pos, roll, boot);
+        return { ...base, to, receiver: this.indexOf(fb), peak: 12, ...trait };
       }
     }
   }
