@@ -1901,8 +1901,7 @@ body:has(.nrl-update-toast) .nrl-hub-chips { max-width: calc(100vw - 32px - 310p
 .nrl-btn.nrl-toast-x { width: 44px; padding: 0; font-family: var(--nrl-f-body); }
 /* The Undo's countdown (00/01): a 2px bar along the foot, inside the rounded corners (no clipping, so focus
    rings show), that shrinks to nothing as the offer runs out. */
-.nrl-toast-timer { position: absolute; left: 12px; right: 12px; bottom: 3px; height: 2px; border-radius: 1px; background: var(--nrl-accent); transform-origin: left center; transition: transform 200ms linear; pointer-events: none; }
-@media (prefers-reduced-motion: reduce) { .nrl-toast-timer { transition: none; } }
+.nrl-toast-timer { position: absolute; left: 12px; right: 12px; bottom: 3px; height: 2px; border-radius: 1px; background: var(--nrl-accent); transform-origin: left center; transition: transform var(--nrl-dur-sheet) linear; pointer-events: none; }
 .nrl-hint {
   pointer-events: auto;
   display: flex;
