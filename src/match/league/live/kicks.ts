@@ -1,7 +1,6 @@
 import { FIELD_LENGTH, FIELD_WIDTH, MID_Y } from '../../core/field';
 import { grubberFlight, kickFlight, landed, type BallState } from '../../core/ball';
-import { TICK_S } from '../../core/engine';
-import { BOMB_PLANT_TICKS, BOMB_RECOVERY_TICKS, BOMB_TAKEOFF_LEAD, type BombContestSnap, type Side } from '../../core/snapshot';
+import type { Side } from '../../core/snapshot';
 import { clamp, dist, sub, type Vec } from '../../core/vec';
 import { knockOnChance } from '../contest';
 import { KICKOFF, kickoffLanding, pinnedDeep, regatherChance, type KickoffCall } from '../kickoff';
@@ -11,6 +10,8 @@ import { ROLES } from '../roles';
 import { LIVE } from './knobs';
 import { other, AIM_TEXT, KICK_TEXT, type Player, type Phase } from './types';
 import { LiveClock } from './clock';
+import { TICK_S } from '../../core/engine';
+import { BOMB_PLANT_TICKS, BOMB_RECOVERY_TICKS, BOMB_TAKEOFF_LEAD, type BombContestSnap } from '../../core/snapshot';
 
 export abstract class LiveKicks extends LiveClock {
   protected visualBombContest: BombContestSnap | undefined;
