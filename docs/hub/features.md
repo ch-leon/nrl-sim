@@ -76,7 +76,7 @@ What's in the game, with the PR that added each.
 
 - **Conversion touch judges.** Two officials watch from the goalposts. Both raise their flags vertically on a make and wave them side to side at the waist on a miss. [PR #778](https://github.com/ch-leon/nrl-sim/pull/778)
 
-- **Touch judges in open play.** The same two officials jog along the touchlines in career matches and the Match Lab, one on each side. They catch up to kicks, turn with play and carry their flags low. [Match presentation](../specs/match-big-moments.md#touch-judges-in-open-play)
+- **Touch judges in open play.** The same two officials jog along the touchlines in career matches and the Match Lab, one on each side. They catch up to kicks, turn with play and carry their flags low. [PR #782](https://github.com/ch-leon/nrl-sim/pull/782) · [Match presentation](../specs/match-big-moments.md#touch-judges-in-open-play)
 
 - **Loose-ball pickups.** The player who gets to a loose ball in open play drops his hips, scoops it from the turf and tucks it into his running or standing carry. Ported from [draft PR #764](https://github.com/ch-leon/nrl-sim/pull/764). [Match rules](../specs/BAK-208-match-rules-and-skills.md#44-kicks--first-slice-implemented-long-bomb-grubber-chip-cross-field)
 

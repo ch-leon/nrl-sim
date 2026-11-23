@@ -139,7 +139,7 @@ export interface ConversionSnap {
   readonly decision?: Readonly<{ tick: number; good: boolean }>;
 }
 
-/** Presentation only. Distance is in metres, for the touch judge's planted jog cycle. */
+/** Presentation only. Displacement on the last tick gives facing, and cumulative metres give the jog frame. */
 export interface TouchJudgeSnap {
   readonly x: number;
   readonly y: number;

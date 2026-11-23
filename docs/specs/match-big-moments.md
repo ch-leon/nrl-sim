@@ -145,12 +145,13 @@ clock and restart keep their existing timing.
 
 ### Touch judges in open play
 
-The same two judges follow play from just outside their assigned touchlines, one on
+The same two judges follow play from 0.9 m outside their assigned touchlines, one on
 each side. They accelerate or brake to come level with the ball, capped at 5.8 m/s,
 so kicks, passes and changes of possession can leave them a few strides behind. They
 face where they run, look back infield at a standstill and carry their flags down by
 their sides. Footfalls are sampled from distance covered, with a boot on the turf
-throughout the jog cycle.
+throughout the jog cycle. The near bench and sin-bin seats sit further back on the
+apron to leave the touchline lane clear.
 
 After a try they head toward the corresponding uprights. If the try hold is too short
 to get them there on foot, the touchline picture fades out and the pair fades in on
