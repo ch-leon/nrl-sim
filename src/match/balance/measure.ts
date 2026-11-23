@@ -24,12 +24,19 @@ import { aiCoachSides, type CallInput } from '../league/calls';
 import { NINES, fullMatch, type MatchLength } from '../league/rules';
 import { DEFAULT_TACTICS } from '../league/presets';
 import { applyTuning } from '../league/tuning';
+import type { TapOrigin } from '../league/touch';
 import { labSheet, starTraits } from '../lab/sheets';
 import { POSITION_GROUPS, type Cell, type SideSpec } from './plan';
-import { FLOW, FirstReceivers, LAST_TACKLES, ORIGINS, PlayWatch, RECEIVERS, ScoreLine, TERRITORY, Territory, type FlowKey, type LastTackleKey, type OriginKey, type ReceiverKey, type TerritoryKey } from './watch';
+import { FLOW, FirstReceivers, LAST_TACKLES, ORIGINS, PlayWatch, RECEIVERS, ScoreLine, TERRITORY, Territory, TapWatch, emptyTapSamples, type TapSamples, type FlowKey, type LastTackleKey, type OriginKey, type ReceiverKey, type TerritoryKey } from './watch';
 
 /** Exact fit fixtures belong to the headless harness, never the live game or saved sheets. */
 export class BalanceSim extends LiveSim {
+  tapWatch?: TapWatch;
+
+  protected override onTapStarted(origin: TapOrigin, quick: boolean, side: Side, x: number, dir: 1 | -1): void {
+    this.tapWatch?.start(this.tick, origin, quick, side, x, dir);
+  }
+
   constructor(home: TeamSheet, away: TeamSheet, seed: number, options: LiveOptions = {},
     fits: Record<Side, SideSpec['fit']> = { home: undefined, away: undefined }) {
     super(home, away, seed, options);
@@ -108,6 +115,8 @@ export interface WatchStats {
   receivers?: Record<ReceiverKey, Stat>;
   /** Absent in results written before #650. */
   territory?: Record<TerritoryKey, Stat>;
+  /** Pooled counts and total metres in the written orientation. */
+  taps?: TapSamples;
 }
 
 export interface CellResult {
@@ -535,6 +544,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
     const lastPerSeed: Record<LastTackleKey, number>[] = [];
     const receiversPerSeed: Record<ReceiverKey, number>[] = [];
     const territoryPerSeed: Record<TerritoryKey, number>[] = [];
+    const tapSamples = emptyTapSamples();
     let wrestleTicks = 0;
     let wins = 0;
     let draws = 0;
@@ -571,6 +581,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
       const watch = new PlayWatch();
       const receivers = new FirstReceivers();
       const territory = new Territory();
+      if (!flip) sim.tapWatch = new TapWatch(tapSamples);
       let inW = 0;
       let lastMen = 0;
       let nextLegs = 3;
@@ -615,6 +626,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
         }
         const view = { phase: sim.phaseKind, lastPlay: sim.lastTackleUp, attacking: sim.inPossession, holder: sim.holderIndex, x: () => sim.ballX };
         watch.tick(tickEvents, view);
+        sim.tapWatch?.tick(sim.tick, tickEvents, view);
         receivers.tick(view, sim.tackleCount);
         territory.tick(tickEvents, view, sim.tackleCount, () => sim.toGo);
         const men = sim.wrestleMen;
@@ -700,6 +712,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
     // Lead changes, tries by origin and last tackles are counts (scaled to a full match); the late margins are shares and points, which a stretch does not scale.
     const scaled = (k: string): number => (k === 'leadChanges' ? scale : 1);
     const watch: WatchStats = {
+      taps: tapSamples,
       flow: Object.fromEntries(FLOW.map((k) => [k, stat(flowPerSeed.map((f) => f[k] * scaled(k)))])) as Record<FlowKey, Stat>,
       origins: Object.fromEntries(ORIGINS.map((k) => [k, stat(originsPerSeed.map((o) => o[k] * scale))])) as Record<OriginKey, Stat>,
       lastTackles: Object.fromEntries(LAST_TACKLES.map((k) => [k, stat(lastPerSeed.map((o) => o[k] * scale))])) as Record<LastTackleKey, Stat>,

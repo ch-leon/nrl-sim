@@ -11,7 +11,7 @@ import { MAX_LAT_M, pickReceiver, pickReceiverWeighted } from '../tactics';
 import { NINES } from '../rules';
 import { conversionSpot, goalChance, goalStrikeTick, postsFor } from '../goals';
 import { PENALTY, offsideChance } from '../penalties';
-import { TOUCH, exitPoint, inOwnInGoal, isFortyTwenty, ownLineX, touchRestartSpot, twentySpot } from '../touch';
+import { QUICK_TAP, TOUCH, exitPoint, inOwnInGoal, isFortyTwenty, ownLineX, touchRestartSpot, twentySpot, type TapOrigin } from '../touch';
 import { LIVE } from './knobs';
 import { other, type Player, type Phase, type RuckDecision } from './types';
 import { LivePlay } from './play';
@@ -328,7 +328,7 @@ export abstract class LiveRestarts extends LivePlay {
     this.events[this.events.length - 1]!.detail = '20m';
     const spot = twentySpot(this.dirOf(defender), at.y);
     this.endKick(defender, spot);
-    this.startSetPiece(defender, spot, 'tap', FULLBACK);
+    this.startSetPiece(defender, spot, 'tap', FULLBACK, 0, '20m');
   }
 
   /** A kick in play has ended with `side` getting the ball at `at`: if that is the other side, count the metres the kick won. */
@@ -361,7 +361,7 @@ export abstract class LiveRestarts extends LivePlay {
     }
     this.emit('dead-ball', `${p.name} grounds it in-goal — 20-metre restart`, p);
     this.events[this.events.length - 1]!.detail = '20m';
-    this.startSetPiece(p.side, twentySpot(dir, p.body.pos.y), 'tap', p.slot);
+    this.startSetPiece(p.side, twentySpot(dir, p.body.pos.y), 'tap', p.slot, 0, '20m');
     return true;
   }
 
@@ -371,7 +371,7 @@ export abstract class LiveRestarts extends LivePlay {
    * spot, both sides set, then play goes on. A stoppage: the coach can freshen up.
    * `tackles`: the count the set carries on from (held up over the line, #652); a fresh set otherwise.
    */
-  protected startSetPiece(side: Side, spot: Vec, how: 'ptb' | 'tap', prefer?: number, tackles = 0): void {
+  protected startSetPiece(side: Side, spot: Vec, how: 'ptb' | 'tap', prefer?: number, tackles = 0, tapOrigin?: TapOrigin): void {
     this.callSwaps();
     const free = this.side(side).filter((p) => p.subFor === null && p !== this.dummyHalf(side));
     const pick = (prefer !== undefined ? free.find((p) => p.slot === prefer) : undefined) ?? [...free].sort((a, b) => dist(a.body.pos, spot) - dist(b.body.pos, spot))[0] ?? this.fullback(side);
@@ -388,7 +388,7 @@ export abstract class LiveRestarts extends LivePlay {
     this.kickFrom = null;
     this.mark = { ...spot };
     this.lineX = spot.x + this.dir * LIVE.onsideM;
-    this.phase = { kind: 'set-piece', t0: this.tick, side, spot: { ...spot }, how, player: this.indexOf(pick) };
+    this.phase = { kind: 'set-piece', t0: this.tick, side, spot: { ...spot }, how, player: this.indexOf(pick), ...(tapOrigin ? { tapOrigin } : {}) };
   }
 
   protected stepSetPiece(ph: Extract<Phase, { kind: 'set-piece' }>): void {
@@ -405,18 +405,19 @@ export abstract class LiveRestarts extends LivePlay {
     }
     if (!timedOut) {
       if (this.players.some((q) => q.subFor !== null)) return; // the interchange first
-      if (dist(p.body.pos, ph.spot) > 1 || this.players.some((q) => dist(q.body.pos, q.target) > 4)) return;
+      if (dist(p.body.pos, ph.spot) > 1) return;
+      if (this.players.some((q) => dist(q.body.pos, q.target) > 4)) {
+        if (this.readQuickTap(ph, p)) {
+          p.body.vel = { x: 0, y: 0 };
+          this.startTap(ph, p, true);
+        }
+        return;
+      }
     }
     if (timedOut) p.body.pos = { ...ph.spot };
     p.body.vel = { x: 0, y: 0 };
     if (ph.how === 'tap') {
-      this.emit('tap', `${p.name} taps and goes`, p);
-      p.catchTick = this.tick;
-      p.decided = false;
-      p.steppedOn = -1;
-      this.phase = { kind: 'play' };
-      // A set play off the tap (#326).
-      if (this.sheetPlays[ph.side].length > 0) this.launchPlay('tap', p);
+      this.startTap(ph, p, false);
       return;
     }
     // Play-the-ball: the nearest defender stands at the mark as the tackler would.
@@ -425,6 +426,44 @@ export abstract class LiveRestarts extends LivePlay {
     this.phase = { kind: 'ruck', t0: this.tick, carrier: ph.player, tackler: this.indexOf(marker), stage: 'ptb', handover: false, heldAt: 0, down: 0, pace: null };
     this.startRetreat();
   }
+
+  private readQuickTap(ph: Extract<Phase, { kind: 'set-piece' }>, p: Player): boolean {
+    const side = ph.side;
+    if (QUICK_TAP.on <= 0 || !ph.tapOrigin || ph.how !== 'tap' || this.siren || !this.onField(p) || this.locked(p)
+      || this.pendingControl[side] || this.pendingPlay[side] || this.callState[side].attack
+      || (ph.tapOrigin === 'penalty' && this.penaltyUp?.phase === ph && this.penaltyUp.called)) return false;
+    const captain = this.onFieldCaptain(side);
+    if (!captain) return false;
+    const hothead = traitBoost(captain.traits, 'hothead');
+    const depth = Math.max(QUICK_TAP.minShortM, QUICK_TAP.shortM
+      - (captain.stats.footyIQ - PENALTY.captainIqMid) * QUICK_TAP.iqPerPointM - hothead * QUICK_TAP.hotheadPerLevelM);
+    const line = clamp(this.lineX, 0, FIELD_LENGTH);
+    const short = this.side(other(side)).filter(d =>
+      // A man beyond the legal line, or at his shape's mark, offers no read.
+      (line - d.body.pos.x) * this.dir >= depth
+      && (d.target.x - d.body.pos.x) * this.dir >= depth
+      && Math.abs(d.target.y - ph.spot.y) <= QUICK_TAP.laneM);
+    return short.length >= QUICK_TAP.shortMen && this.playAtLaunch('tap', p) === null;
+  }
+
+  private startTap(ph: Extract<Phase, { kind: 'set-piece' }>, p: Player, quick: boolean): void {
+    this.emit(quick ? 'quick-tap' : 'tap', quick ? `${p.name} taps before the defence is back!` : `${p.name} taps and goes`, p);
+    if (ph.tapOrigin) {
+      if (quick) this.events[this.events.length - 1]!.detail = ph.tapOrigin;
+      this.onTapStarted(ph.tapOrigin, quick, ph.side, ph.spot.x, this.dir);
+    }
+    p.catchTick = this.tick;
+    p.decided = false;
+    p.steppedOn = -1;
+    this.phase = { kind: 'play' };
+    // No markers at a tap: each short defender must reach the fixed ten before joining in.
+    if (quick) this.startRetreat(true);
+    // A set play off the tap (#326).
+    if (this.sheetPlays[ph.side].length > 0) this.launchPlay('tap', p);
+  }
+
+  /** Read-only tap observation for the balance harness. */
+  protected onTapStarted(_origin: TapOrigin, _quick: boolean, _side: Side, _x: number, _dir: 1 | -1): void {}
 
   /** A goal-line drop-out by `side`, from the middle of its own try line. */
   protected startDropOut(side: Side): void {
@@ -473,7 +512,7 @@ export abstract class LiveRestarts extends LivePlay {
       // A missed penalty goal is dead: a 20 m restart for the defence.
       const def = other(ph.side);
       if (this.siren) this.endHalf();
-      else this.startSetPiece(def, twentySpot(this.dirOf(def), MID_Y), 'tap', FULLBACK);
+      else this.startSetPiece(def, twentySpot(this.dirOf(def), MID_Y), 'tap', FULLBACK, 0, '20m');
       return;
     }
     this.afterScore(ph.side);

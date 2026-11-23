@@ -73,7 +73,7 @@ export abstract class LivePenalties extends LiveRestarts {
     this.looseFor = null;
     this.markers = [];
     this.retreat = null;
-    if (choice === 'tap') this.startSetPiece(award, mark, 'tap');
+    if (choice === 'tap') this.startSetPiece(award, mark, 'tap', undefined, 0, 'penalty');
     else {
       this.ball = { kind: 'held', by: this.indexOf(taker) };
       this.phase = choice === 'goal'
@@ -234,7 +234,7 @@ export abstract class LivePenalties extends LiveRestarts {
     const def = other(g.side);
     this.emit('dead-ball', `Dead ball — 20-metre restart, ${this.names[def]} ball`);
     this.events[this.events.length - 1]!.detail = '20m';
-    this.startSetPiece(def, twentySpot(this.dirOf(def), MID_Y), 'tap', FULLBACK);
+    this.startSetPiece(def, twentySpot(this.dirOf(def), MID_Y), 'tap', FULLBACK, 0, '20m');
   }
 
   protected stepGoal(ph: Extract<Phase, { kind: 'goal' }>): void {

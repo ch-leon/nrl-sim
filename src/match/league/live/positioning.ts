@@ -436,7 +436,9 @@ export abstract class LivePositioning extends LiveContact {
           p.wantsSprint = true;
         } else if (ph.kind === 'play') {
           p.target = this.centreCarryTarget(p)
-            ?? gapTarget(p.body.pos, this.dir, this.side(def).filter((d) => !this.locked(d)).map((d) => d.body.pos));
+            ?? gapTarget(p.body.pos, this.dir, this.side(def)
+              .filter((d) => !this.locked(d) && (!this.retreat?.tap || this.retreatLine(d) === null))
+              .map((d) => d.body.pos));
           p.through = true;
           // Space ahead, just beaten a man, or through the line: go.
           p.wantsSprint = this.tick < p.burstUntil || broken || this.laneClear(p);

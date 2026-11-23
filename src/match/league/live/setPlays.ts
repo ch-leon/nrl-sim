@@ -103,27 +103,20 @@ export abstract class LiveSetPlays extends LiveCalls {
     }
   }
 
-  /**
-   * The launch (plan §3.3): at the dummy-half (`from` 'ptb', `launcher` the
-   * dummy-half with the ball) or a tap (`launcher` the man tapping). The
-   * coach's waiting call if it can be run from here, else, if the side has not
-   * had its play this set, the half's own pick. The play's men are found for
-   * the edge it runs to, the odds set by their IQ, the side's style and the
-   * defence, and the one roll made; what it decided is played out at the
-   * caller's pass (scriptedTurn). The launcher's pass to the caller goes
-   * unread. False, with no roll, when no play goes.
-   */
-  protected launchPlay(from: PlayFrom, launcher: Player): boolean {
+  /** Read the same play and available runners as launch does, without a roll or a change of state. */
+  protected playAtLaunch(from: PlayFrom, launcher: Player) {
     const side = this.attacking;
     const list = this.sheetPlays[side];
-    if (list.length === 0) return false;
+    if (list.length === 0) return null;
     const facts = this.playFacts(side, from, 0);
-    this.refreshAutoHalf(side);
     const pending = this.pendingPlay[side];
     let id: PlayId | null = null;
     if (pending) id = playWhen(PLAYS_BY_ID[pending], facts) === null ? pending : null;
-    else if (!this.playUsed[side]) id = pickAutoPlay(list, facts, this.autoUsed[side], this.sets[side]);
-    if (!id) return false;
+    else if (!this.playUsed[side]) {
+      const used = this.autoUsed[side];
+      id = pickAutoPlay(list, facts, used.half === this.half ? used : { ...used, launched: 0 }, this.sets[side]);
+    }
+    if (!id) return null;
     const play = PLAYS_BY_ID[id];
     const b = this.ballPos();
     // Which edge: the short (near) side, the open side, or the overlap.
@@ -136,7 +129,27 @@ export abstract class LiveSetPlays extends LiveCalls {
     const edge: Edge = ySign < 0 ? 'left' : 'right';
     const men = play.script.map((s) => this.at(side, roleSlot(s.to, edge)));
     // A man of the play off the field (the bin) or still down: not this time.
-    if (men.some((p) => !this.onField(p) || (p !== launcher && this.locked(p)))) return false;
+    if (men.some((p) => !this.onField(p) || (p !== launcher && this.locked(p)))) return null;
+    return { id, play, pending, b, edge, ySign, men };
+  }
+
+  /**
+   * The launch (plan §3.3): at the dummy-half (`from` 'ptb', `launcher` the
+   * dummy-half with the ball) or a tap (`launcher` the man tapping). The
+   * coach's waiting call if it can be run from here, else, if the side has not
+   * had its play this set, the half's own pick. The play's men are found for
+   * the edge it runs to, the odds set by their IQ, the side's style and the
+   * defence, and the one roll made; what it decided is played out at the
+   * caller's pass (scriptedTurn). The launcher's pass to the caller goes
+   * unread. False, with no roll, when no play goes.
+   */
+  protected launchPlay(from: PlayFrom, launcher: Player): boolean {
+    const side = this.attacking;
+    if (this.sheetPlays[side].length === 0) return false;
+    this.refreshAutoHalf(side);
+    const next = this.playAtLaunch(from, launcher);
+    if (!next) return false;
+    const { id, play, pending, b, edge, ySign, men } = next;
     const nine = ROLES.map((_, slot) => {
       const p = this.at(side, slot);
       return { name: p.name, footyIQ: p.stats.footyIQ };

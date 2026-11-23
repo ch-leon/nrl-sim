@@ -5,9 +5,11 @@
 // looks (events, plus the ball's x and who holds it, read off the sim). The
 // attribution rules are written up in balance/README.md ("Watchability").
 import { SET_TACKLES } from '../../config';
+import { TICK_S } from '../core/engine';
 import type { Side, SimEvent } from '../core/snapshot';
 import { PLAYS } from '../league/plays';
 import { PLAYERS } from '../league/roles';
+import type { TapOrigin } from '../league/touch';
 
 /** Per match: lead changes (a count), whether it was close with a minute to play, whether the last minute decided it, and the winner's biggest deficit. */
 export const FLOW = ['leadChanges', 'closeLate', 'decidedLate', 'comeback'] as const;
@@ -99,6 +101,59 @@ export interface TickView {
   holder: number;
   /** The ball's x, read only for the few events that need it. */
   x: () => number;
+}
+
+export interface TapSample {
+  taps: number;
+  completed: number;
+  metres: number;
+  breaks: number;
+}
+
+export const TAP_ORIGINS = ['penalty', '20m'] as const satisfies readonly TapOrigin[];
+export const TAP_SPEEDS = ['quick', 'ordinary'] as const;
+export type TapSamples = Record<TapOrigin, Record<(typeof TAP_SPEEDS)[number], TapSample>>;
+
+export function emptyTapSamples(): TapSamples {
+  const empty = (): TapSample => ({ taps: 0, completed: 0, metres: 0, breaks: 0 });
+  return { penalty: { quick: empty(), ordinary: empty() }, '20m': { quick: empty(), ordinary: empty() } };
+}
+
+const TAP_WINDOW_TICKS = Math.round(8 / TICK_S);
+
+/** First play from a penalty mark or 20 m tap. Retain the last x at which its side held the ball. */
+export class TapWatch {
+  private tap: { sample: TapSample; side: Side; dir: 1 | -1; x: number; lastX: number; until: number; broke: boolean } | null = null;
+  constructor(private readonly samples: TapSamples) {}
+
+  start(tick: number, origin: TapOrigin, quick: boolean, side: Side, x: number, dir: 1 | -1): void {
+    this.finish();
+    const sample = this.samples[origin][quick ? 'quick' : 'ordinary'];
+    sample.taps++;
+    this.tap = { sample, side, dir, x, lastX: x, until: tick + TAP_WINDOW_TICKS, broke: false };
+  }
+
+  tick(tick: number, events: readonly SimEvent[], view: TickView): void {
+    const tap = this.tap;
+    if (!tap) return;
+    let ended = view.attacking !== tap.side || view.phase !== 'play' && view.phase !== 'tackle';
+    for (const e of events) {
+      if (e.kind === 'line-break' && e.detail !== 'half' && e.side === tap.side) tap.broke = true;
+      if (SPILLS.has(e.kind) || STOPPAGES.has(e.kind) || e.kind === 'try' || e.kind === 'kick'
+        || e.kind === 'drop-goal' || e.kind === 'tackle' || e.kind === 'big-hit') ended = true;
+    }
+    if (view.holder >= 0 && sideOf(view.holder) === tap.side) tap.lastX = view.x();
+    if (ended || tick >= tap.until) this.finish();
+  }
+
+  private finish(): void {
+    const tap = this.tap;
+    if (!tap) return;
+    tap.sample.completed++;
+    tap.sample.metres += (tap.lastX - tap.x) * tap.dir;
+    if (tap.broke) tap.sample.breaks++;
+    this.tap = null;
+  }
 }
 
 /** Try origins and last-tackle plays over one match. */

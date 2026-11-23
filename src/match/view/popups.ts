@@ -65,6 +65,7 @@ const WORDS: Readonly<Record<string, { word: string; tone: PopupTone; big?: bool
   touch: { word: 'TOUCH', tone: 'neutral' },
   '40-20': { word: '40/20!', tone: 'attack', big: true },
   'on-full': { word: 'ON THE FULL!', tone: 'bad' },
+  'quick-tap': { word: 'QUICK TAP!', tone: 'attack' },
   'dead-ball': { word: 'DEAD BALL', tone: 'neutral' },
   'drop-out': { word: 'DROP-OUT', tone: 'neutral' },
   // Penalties (2e): over the man penalised; the captain's call over the taker; six again over the tackler.
