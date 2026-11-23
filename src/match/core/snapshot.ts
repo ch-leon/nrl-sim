@@ -180,6 +180,8 @@ export interface Snapshot {
   label: string;
   /** Events emitted on this tick. */
   events: SimEvent[];
+  /** Tick of a six-again call during the current passage of play. Presentation only. */
+  sixAgainTick?: number;
   /** A wrestle in progress (BAK-208 §8.1): the carrier, the fight left in him (1 → 0) and how many men are on him. */
   wrestle?: WrestleSnap;
   /** Participants in the current contact, including their persistent appearances. */

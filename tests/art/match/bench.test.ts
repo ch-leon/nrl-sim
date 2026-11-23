@@ -1,12 +1,29 @@
 // #642: the bench, the sin bin and the corner posts are drawn with the players' own art.
 import { describe, it, expect } from 'vitest';
 import { kitFromColors } from '../../../src/art/match/kit';
-import { CORNER_FLAG_H, CORNER_FLAG_X, drawBinSpot, drawCornerFlag, drawSeatedPlayer, paintBench } from '../../../src/art/match/bench';
+import { CORNER_FLAG_H, CORNER_FLAG_X, SIX_AGAIN_ARMS, drawBinSpot, drawCornerFlag, drawRefereeSixAgain, drawSeatedPlayer, paintBench, refereeLook } from '../../../src/art/match/bench';
 import { FOOT, HEIGHT, WIDTH, appearanceFor, drawPrototypePlayer } from '../../../src/art/prototype/player';
 import { opaqueBounds } from '../../../src/art/match/players';
 
 const kit = kitFromColors(['#8e1c1c', '#f2c14e'], 'rival-reapers');
 const look = { ...appearanceFor('bench-test', 'prop'), number: 12 };
+
+it('raises and circles the referee’s arm over the same feet when standing, jogging or running', () => {
+  const ref = refereeLook();
+  const bootStart = (FOOT - 4) * WIDTH * 4;
+  for (const facing of ['front', 'back'] as const) {
+    for (const stride of [undefined, 7, 4]) {
+      const frame = stride === undefined ? 0 : stride % 6;
+      const normal = drawPrototypePlayer(ref, kit, stride === undefined ? 'idle' : 'run', frame, facing, false, stride);
+      const poses = SIX_AGAIN_ARMS.map((_, i) => drawRefereeSixAgain(ref, kit, i, frame, facing, stride));
+      expect(new Set(poses.map((p) => p.data.join(','))).size).toBe(SIX_AGAIN_ARMS.length);
+      expect(opaqueBounds(poses[3]!)!.x1 - opaqueBounds(normal)!.x1).toBeGreaterThanOrEqual(8);
+      for (const pose of poses) {
+        expect(pose.data.subarray(bootStart).every((v, i) => v === normal.data[bootStart + i])).toBe(true);
+      }
+    }
+  }
+});
 
 describe('the bench (#642)', () => {
   it('a seated reserve is a player frame, shorter than him standing, feet on the same row', () => {
