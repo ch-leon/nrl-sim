@@ -26,6 +26,7 @@ import { LIVE, runOn } from './knobs';
 import { backDoorTarget, behindLead } from '../attackingShapes';
 import { other, type Player, type Phase } from './types';
 import { LivePenalties } from './penalties';
+import { BENCH } from '../bench';
 
 export abstract class LiveContact extends LivePenalties {
   /** Write-only launch history for sprite handoff; never consulted by match decisions. */
@@ -202,6 +203,11 @@ export abstract class LiveContact extends LivePenalties {
       if (sp.bonus.fend) tr.mods.fend = (tr.mods.fend ?? 0) + sp.bonus.fend;
       if (sp.bonus.offload) tr.mods.offload = (tr.mods.offload ?? 0) + sp.bonus.offload;
     }
+    this.startImpactCarry(c);
+    const freshCarrier = c.impact !== null && c.impact.carryAt === c.catchTick && !c.impact.carryContested;
+    if (freshCarrier) c.impact!.carryContested = true;
+    const freshTackler = this.spendImpactTackle(t, c);
+    if (freshCarrier !== freshTackler) tr.mods.edge = (tr.mods.edge ?? 0) + (freshCarrier ? 1 : -1) * BENCH.impact.contestEdge;
     const outcome = resolveContest(c.stats, t.stats, this.rng.next(), sit, tr.mods);
     const credit = announce(tr.credit[outcome]);
     // Contact costs both men legs, whatever happens.
@@ -326,7 +332,8 @@ export abstract class LiveContact extends LivePenalties {
     const wb = traitBoost(c.traits, 'wreckingBall');
     const wreck = wb > 0 && this.rng.next() < LIVE.wreckDriveChance * wb ? wb : 0;
     const fight = fightOf({ ...c.stats, stamina: c.stamina }, c.energy, this.rng.next()) * (1 + WRESTLE.wreckFight * wreck);
-    const wrestle: WrestleState = { men: [this.indexOf(t)], fight, fight0: fight, grip: gripOf(t.stats, t.energy, true), t0: this.tick, metres: 0, speedDiff: sit.speedDiff };
+    const grip = gripOf(t.stats, t.energy, true) * (freshTackler ? 1 + BENCH.impact.grip : 1);
+    const wrestle: WrestleState = { men: [this.indexOf(t)], fight, fight0: fight, grip, t0: this.tick, metres: 0, speedDiff: sit.speedDiff };
     this.visualContact = this.contactInfo(c, [t]);
     this.hold(c, 'tackled');
     this.hold(t, 'tackle');
@@ -425,7 +432,8 @@ export abstract class LiveContact extends LivePenalties {
       const i = this.indexOf(d);
       if (w.men.includes(i) || this.locked(d) || this.retreatLine(d) !== null || this.tick < d.cooldownUntil || dist(d.body.pos, c.body.pos) > LIVE.tackleReach + 0.3) continue;
       w.men.push(i);
-      w.grip += gripOf(d.stats, d.energy, false);
+      const freshTackler = this.spendImpactTackle(d, c);
+      w.grip += gripOf(d.stats, d.energy, false) * (freshTackler ? 1 + BENCH.impact.grip : 1);
       this.tire(d, FATIGUE.contactCost.tackler);
     }
     const men = w.men.map((i) => this.players[i]!);
@@ -518,6 +526,10 @@ export abstract class LiveContact extends LivePenalties {
       brickWall: wall,
     });
     if (this.rng.next() >= chance) return false;
+    if (this.phase.kind === 'play') {
+      this.startImpactCarry(c);
+      for (const d of men) this.spendImpactTackle(d, c);
+    }
     const t = men[0]!;
     const who = men.length > 1 ? `${men.slice(0, -1).map((d) => d.name).join(', ')} and ${men[men.length - 1]!.name}` : t.name;
     const credit = men.length >= 2 && wall > 0 ? announce(men[walls.indexOf(wall)]!.traits.find((x) => x.id === 'brickWall')) : undefined;
@@ -555,6 +567,8 @@ export abstract class LiveContact extends LivePenalties {
   }
 
   protected score(scorer: Player): void {
+    // A runner can ground it just after the catch; kick regathers and placements alone do not use a carry.
+    if (this.phase.kind === 'play' && scorer.impact?.runAt === scorer.catchTick && scorer.impact.runM > 0) this.startImpactCarry(scorer);
     this.retreat = null;
     this.overLineAt = -1;
     const dir = this.dirOf(scorer.side);

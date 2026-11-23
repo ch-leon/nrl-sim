@@ -35,6 +35,20 @@ export const BENCH = {
   recoverCap: 0.9,
   /** A man coming off gets this long to reach the touchline before the swap is made where he stands (seconds). */
   jogOffS: 12,
+  impact: {
+    on: 1,
+    /** Two carries or tackles in total each time a player comes on. */
+    uses: 2,
+    /** Ground covered with the ball to count a run without contact (metres). */
+    carryM: 2,
+    /** Extra pace for a short run after taking the ball up. */
+    pace: 0.12,
+    burstTicks: 16,
+    /** Carrier-edge units, signed for whether the runner or tackler is fresh. */
+    contestEdge: 0.055,
+    /** Extra grip on the fresh tackler's first contact or legal wrestle join. */
+    grip: 0.08,
+  },
   standard: { offBelow: 0.55, gain: 0.15, perStoppage: 2 } as RotationPolicy,
   heavy: { offBelow: 0.7, gain: 0.1, perStoppage: 3 } as RotationPolicy,
 };

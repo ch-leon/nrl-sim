@@ -211,6 +211,9 @@ export abstract class LiveClock extends LiveSetPlays {
     p.brokeAt = -1000;
     p.subFor = null;
     p.subFresh = false;
+    p.impact = BENCH.impact.on > 0 && BENCH.impact.uses > 0
+      ? { left: Math.floor(BENCH.impact.uses), carryAt: -1, carryContested: false, tackleAt: -1, runAt: -1, runM: 0, until: 0 }
+      : null;
     this.emit('interchange', wasHurt ? `${p.name} on for the injured ${out}` : `${p.name} on for ${out}`, p);
     if (fresh) {
       this.events[this.events.length - 1]!.detail = 'fresh-legs';

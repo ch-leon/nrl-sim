@@ -396,6 +396,7 @@ export abstract class LiveBase {
         subAt: 0,
         subSpot: { x: MID_X, y: 1 },
         subFresh: false,
+        impact: null,
         binUntilS: -1,
         binSpot: { x: MID_X, y: 1 },
       };
@@ -485,6 +486,29 @@ export abstract class LiveBase {
     const called = this.callState[side].defence;
     return (called && callDefence(called)) || this.tactics[side].defence;
   }
+  /** Spend a charge only on a carry taken up or a defender making contact. */
+  private spendImpact(p: Player, action: 'carry' | 'tackle'): boolean {
+    if (!p.impact || p.impact.left <= 0) return false;
+    p.impact.left--;
+    const carry = action === 'carry';
+    this.emit('fresh-impact', carry ? `${p.name} takes it up on fresh legs` : `${p.name} gets into the tackle on fresh legs`, p);
+    this.events[this.events.length - 1]!.detail = action;
+    return true;
+  }
+
+  protected spendImpactTackle(p: Player, carrier: Player): boolean {
+    if (!p.impact || p.impact.tackleAt === carrier.catchTick || !this.spendImpact(p, 'tackle')) return false;
+    p.impact.tackleAt = carrier.catchTick;
+    return true;
+  }
+
+  protected startImpactCarry(p: Player): void {
+    if (!p.impact || p.impact.carryAt === p.catchTick || !this.spendImpact(p, 'carry')) return;
+    p.impact.carryAt = p.catchTick;
+    p.impact.carryContested = false;
+    p.impact.until = this.tick + BENCH.impact.burstTicks;
+  }
+
   /** After a break the carrier goes: he sprints while his gas lasts (a Jets player has more of it). */
   protected burst(c: Player): void {
     c.immuneUntil = this.tick + LIVE.immuneTicks;
