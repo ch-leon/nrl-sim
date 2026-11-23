@@ -5,6 +5,8 @@ import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, setMatchSpeed, setupS
 
 /** The plays the club takes in: wide launch rules (second-man: any but your 20, tackles 1–4), so one is on most sets. */
 const PLAYS = ['second-man', 'block-play', 'cut-out-winger'];
+/** New-club draw for the first trial, shared across the three phones. */
+const CAREER_SEED = 468;
 /** Every coach call (CALLS.unlocks, all four levels): a top Coach's Office. */
 const ALL_CALLS = ['hit-up', 'hold', 'fresh-legs', 'kickoff-short', 'kickoff-long', 'shift-left', 'shift-right', 'rush', 'offload', 'gang-tackle', 'kick-early', 'run-it', 'grubber', 'take-two', 'tap-go', 'bomb', 'field-goal', 'forty-twenty'];
 const SHORT = { 'second-man': 'Second man', 'block-play': 'Block play', 'cut-out-winger': 'Cut-out' };
@@ -50,6 +52,14 @@ export async function runMatchPlays(browser, sizes = [[844, 390], [667, 375], [5
       const name = `match plays ${w}x${h} ${withPlays ? 'with plays' : 'no playbook'}`;
       const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 2, hasTouch: true, isMobile: true, userAgent: IPHONE_UA });
       await ctx.addInitScript(closeWeekSummary);
+      await ctx.addInitScript((seed) => {
+        const realNow = Date.now;
+        Date.now = () => seed;
+        window.__restoreMatchPlaysClock = () => {
+          Date.now = realNow;
+          delete window.__restoreMatchPlaysClock;
+        };
+      }, CAREER_SEED);
       const page = await ctx.newPage();
       page.setDefaultTimeout(10000);
       const errors = [];
@@ -129,6 +139,8 @@ export async function runMatchPlays(browser, sizes = [[844, 390], [667, 375], [5
       const problems = [];
       try {
         await page.goto(BASE);
+        await page.waitForSelector('[data-nrl-town]');
+        await page.evaluate(() => window.__restoreMatchPlaysClock());
         await setupStep(page);
         await page.locator('[data-nrl-start]').tap();
         await page.locator('[data-expansion-work]').tap();
@@ -286,10 +298,12 @@ export async function runMatchPlays(browser, sizes = [[844, 390], [667, 375], [5
           for (let tries = 0; tries < 4 && !result; tries++) {
             await openTray();
             await waitTitle('Your ball');
-            // Called early in a set, so there are plays left to run it on: a play called on the fourth or the
-            // last tackle lapses when the set ends ("not run"), and four of those in a row failed this check
-            // (568x320 on 4c43c0f). Where the tackle chip is not showing, call as before.
+            // Call at an early play-the-ball. In open play even an early carry can end in an error
+            // or a kick before the call reaches the ruck. The same early-tackle limit keeps room
+            // for the call to land if the first play-the-ball gives the half no eligible runners.
             const play = await waitMatchState(() => {
+              const sc = window.__nrlGame.scene.getScene('Match');
+              if (sc.playback.controlPhase !== 'ruck') return null;
               const b = document.querySelector('[data-tray-plays]:not([hidden]) [data-play]:not([disabled])');
               if (!b) return null;
               // The tackle from the open tray's head (" · tackle 2", SuperCOOKED 41: the ball chip steps aside under
