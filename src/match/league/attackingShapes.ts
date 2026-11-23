@@ -4,6 +4,7 @@ import { clamp, type Vec } from '../core/vec';
 import { formationTarget, ROLES } from './roles';
 import type { AttackPreset } from './presets';
 import type { AttackShapeSnap, ContactPlayer } from '../core/snapshot';
+import { GOAL_LINE_STAND } from './goalLineStand';
 
 export type ShapeKind = AttackShapeSnap['kind'];
 export interface AttackingShape extends AttackShapeSnap {
@@ -43,8 +44,10 @@ export function shapeEdge(kind: ShapeKind, y: number, dir: 1 | -1, tackle: numbe
   return kind === 'pod' ? (near === -1 ? 1 : -1) : near;
 }
 export const packetSlots = (kind: ShapeKind, edge: 1 | -1, linkSlot?: 4 | 5, backDoor?: AttackingShape['backDoor']): readonly number[] => kind === 'back-door' ? backDoor ? [backDoor.caller.slot, backDoor.lead.slot, backDoor.support.slot] : [] : kind === 'pod' ? [7, 8, linkSlot ?? (edge > 0 ? 4 : 5)] : kind === 'edge' ? (edge < 0 ? [4, 3, 1] : [5, 8, 2]) : [];
-export function chooseShape(preset: AttackPreset, tackle: number, toLine: number, y: number, roll: number, dir: 1 | -1 = 1, feasible: { pod: boolean; edge: boolean; backDoor?: boolean } = { pod: true, edge: true, backDoor: true }): Pick<AttackingShape, 'kind' | 'edge'> {
+export function chooseShape(preset: AttackPreset, tackle: number, toLine: number, y: number, roll: number, dir: 1 | -1 = 1, feasible: { pod: boolean; edge: boolean; backDoor?: boolean } = { pod: true, edge: true, backDoor: true }, standPressure = 0): Pick<AttackingShape, 'kind' | 'edge'> {
   const weights = shapeWeights(preset, tackle, toLine, y), order: ShapeKind[] = ['spread', 'pod', 'edge', 'back-door'];
+  weights.pod *= 1 + standPressure * GOAL_LINE_STAND.podWeight;
+  weights.edge *= 1 + standPressure * GOAL_LINE_STAND.edgeWeight;
   if (!feasible.pod) weights.pod = 0;
   if (!feasible.edge) weights.edge = 0;
   if (feasible.backDoor === false) weights['back-door'] = 0;

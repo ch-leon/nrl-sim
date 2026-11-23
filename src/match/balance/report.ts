@@ -3,6 +3,7 @@
 // change against the baseline (or a previous run) flagged when it is bigger
 // than luck would explain. Pure: results in, Markdown out.
 import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL } from '../league/presets';
+import { STAND_OUTCOMES } from '../league/goalLineStand';
 import { SIDE_COUNTS, MATCH_MINUTES, type CellResult, type CountKey, type Stat, type WatchStats } from './measure';
 import { LAST_TACKLES, ORIGINS } from './watch';
 
@@ -113,6 +114,7 @@ export function reportMarkdown(r: ReportInput): string {
     }
     out.push('');
     out.push(...watchTable(rows, base));
+    out.push(...goalLineTable(rows));
     const prev = r.previous?.filter((x) => x.scenario === sc) ?? [];
     if (prev.length) {
       const moved: string[] = [];
@@ -133,6 +135,27 @@ export function reportMarkdown(r: ReportInput): string {
   const secs = r.results.reduce((a, x) => a + x.ms, 0) / 1000;
   out.push(`_${r.results.length} cells in ${secs.toFixed(0)} s._`, '');
   return out.join('\n');
+}
+
+/** Raw samples keep rare third sets visible even in large or shortened runs. */
+function goalLineTable(rows: readonly CellResult[]): string[] {
+  if (!rows.some((row) => row.goalLine)) return [];
+  const out = [
+    `| Variant | Starts inside 20 | Stands of 3+ | Matches with a stand | ${STAND_OUTCOMES.join(' | ')} | Unfinished |`,
+    `|---|---:|---:|---:|${STAND_OUTCOMES.map(() => '---:').join('|')}|---:|`,
+  ];
+  for (const row of rows) {
+    const stats = row.goalLine;
+    if (!stats) {
+      out.push(`| ${row.variant} | ${Array(STAND_OUTCOMES.length + 4).fill('—').join(' | ')} |`);
+      continue;
+    }
+    const outcomes = STAND_OUTCOMES.map((kind) => stats.outcomes[kind]);
+    const total = outcomes.reduce((n, count) => n + count, stats.unfinished);
+    out.push(`| ${row.variant} | ${stats.starts} | ${total} | ${stats.matches}/${row.seeds} (${pct1(stats.matches / row.seeds)}) | ${outcomes.join(' | ')} | ${stats.unfinished} |`);
+  }
+  out.push('', '_Goal-line stands are raw counts in the written matchup. A stand is counted once, from the third straight start inside the opposition 20 to its first ending._', '');
+  return out;
 }
 
 /**

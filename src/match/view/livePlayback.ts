@@ -898,7 +898,7 @@ export class LivePlayback {
     for (const sim of events) {
       // A line break the view calls half (#638) reads and plays as a plain line; the recorded events below are the sim's own.
       const e = shownBreak(sim, cur);
-      if (e.side !== undefined && e.slot !== undefined && e.kind !== 'call-paid' && e.kind !== 'coach-call') this.lastActor[e.side] = e.slot;
+      if (e.side !== undefined && e.slot !== undefined && e.kind !== 'call-paid' && e.kind !== 'coach-call' && e.kind !== 'goal-line-stand') this.lastActor[e.side] = e.slot;
       // The whoosh and the crowd (audio); a skipped or resumed stretch is not heard.
       if (!this.skipping && e.kind === 'line-break' && e.detail !== HALF_BREAK) bus.emit('match:clean-break', { tick: e.tick });
       // A kick struck or brought down (N15.3); a skipped or resumed stretch shows none.
@@ -925,7 +925,7 @@ export class LivePlayback {
       else if (line && e.kind === 'full-time') this.finalLine = line;
       if (e.kind === 'try' && !this.skipping) this.offerTryReplay(e.tick);
       if (e.kind === 'coach-call' || e.kind === 'call-paid') this.opts.overlay?.setCalls?.(this.sim.callsMade, this.sim.callsPaid);
-      const p = this.skipping ? null : popupFor(e);
+      const p = this.skipping || e.kind === 'goal-line-stand' ? null : popupFor(e);
       // A bonus try: the zone it was grounded in lights up under the pop-up (#77).
       const end = this.skipping ? null : bonusTryEnd(e, cur);
       if (end) this.zone.flash(end);
@@ -939,6 +939,9 @@ export class LivePlayback {
     for (const ev of this.recorder.add(events, cur)) bus.emit('match:event', ev);
     // The whistle (audio; the contract has no penalty event). Not through a skipped or resumed stretch.
     if (!this.skipping) for (const e of events) if (e.kind === 'penalty') bus.emit('match:penalty', { tick: e.tick });
+    if (!this.skipping) for (const e of events) if (e.kind === 'goal-line-stand' && e.side) {
+      bus.emit('match:goal-line-stand', { side: e.side, x: toFieldPt(cur.ball).fx });
+    }
   }
 
   /** One replay per try: the button stays up for eight seconds, including after the siren. */

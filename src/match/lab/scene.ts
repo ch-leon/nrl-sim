@@ -11,6 +11,7 @@ import { cssZoom } from '../../world/viewport';
 import type { Side, SimEvent } from '../core/snapshot';
 import { toMatchEvent } from '../league/events';
 import { LiveView } from '../view/liveView';
+import { toFieldPt } from '../core/field';
 import { BreakClock } from '../view/walkOff';
 import { PopupLayer } from '../view/popupLayer';
 import { ContestLayer } from '../view/contestLayer';
@@ -143,6 +144,7 @@ export class LabScene extends MatchScene {
       if (ev) bus.emit('match:event', ev);
       if (e.kind === 'penalty') bus.emit('match:penalty', { tick: e.tick });
       if (e.kind === 'line-break' && e.detail !== HALF_BREAK) bus.emit('match:clean-break', { tick: e.tick });
+      if (e.kind === 'goal-line-stand' && e.side) bus.emit('match:goal-line-stand', { side: e.side, x: toFieldPt(r.cur.ball).fx });
     }
   }
 

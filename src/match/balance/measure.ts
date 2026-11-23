@@ -23,6 +23,7 @@ import { LiveSim, type LiveOptions, type PlanInput } from '../league/live';
 import { aiCoachSides, type CallInput } from '../league/calls';
 import { NINES, fullMatch, type MatchLength } from '../league/rules';
 import { DEFAULT_TACTICS } from '../league/presets';
+import { GOAL_LINE_STAND, STAND_OUTCOMES, type StandOutcome } from '../league/goalLineStand';
 import { applyTuning } from '../league/tuning';
 import { labSheet, starTraits } from '../lab/sheets';
 import { POSITION_GROUPS, type Cell, type SideSpec } from './plan';
@@ -143,6 +144,8 @@ export interface CellResult {
   ms: number;
   /** Absent in results written before #648: read as not measured, never as zero. Last in the line so the older fields keep their place. */
   watch?: WatchStats;
+  /** Raw three-set passages and qualifying starts in the written orientation (#657). Absent when off or unmeasured. */
+  goalLine?: { starts: number; matches: number; outcomes: Record<StandOutcome, number>; unfinished: number };
 }
 
 /** Overrides belong to the harness's sheets, never to the game's stored squad. */
@@ -535,6 +538,10 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
     const lastPerSeed: Record<LastTackleKey, number>[] = [];
     const receiversPerSeed: Record<ReceiverKey, number>[] = [];
     const territoryPerSeed: Record<TerritoryKey, number>[] = [];
+    const goalLine = {
+      starts: 0, matches: 0, unfinished: 0,
+      outcomes: Object.fromEntries(STAND_OUTCOMES.map((outcome) => [outcome, 0])) as Record<StandOutcome, number>,
+    };
     let wrestleTicks = 0;
     let wins = 0;
     let draws = 0;
@@ -648,6 +655,10 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
         shares.push(diff > 0 ? 1 : diff === 0 ? 0.5 : 0);
       }
       if (!flip) {
+        goalLine.starts += sim.goalLineStarts;
+        if (sim.goalLineStands.length || sim.goalLineStandInProgress) goalLine.matches++;
+        if (sim.goalLineStandInProgress) goalLine.unfinished++;
+        for (const stand of sim.goalLineStands) goalLine.outcomes[stand.outcome]++;
         watch.finish();
         flowPerSeed.push(score.result());
         originsPerSeed.push(watch.origins);
@@ -726,6 +737,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
         : {}),
       ms: Date.now() - t0,
       watch,
+      ...(GOAL_LINE_STAND.on > 0 ? { goalLine } : {}),
     };
   } finally {
     restore();

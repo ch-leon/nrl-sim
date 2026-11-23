@@ -868,7 +868,9 @@ export class MatchScene extends Phaser.Scene {
     }
     this.crowdReduced = reducedMotion();
     this.time.addEvent({ delay: CROWD_TICK_MS, loop: true, callback: () => this.animateCrowd() });
-    this.offCrowd = bus.on('match:event', (ev) => this.crowdReact(ev));
+    const offEvent = bus.on('match:event', (ev) => this.crowdReact(ev));
+    const offStand = bus.on('match:goal-line-stand', () => this.rise(0.45, 3000));
+    this.offCrowd = () => { offEvent(); offStand(); };
   }
 
   /** Raise a side's excitement for a while (decays on the crowd tick). */

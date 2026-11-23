@@ -124,6 +124,7 @@ export function surnameOf(name: string | undefined): string {
  */
 export function popupFor(e: SimEvent): Popup | null {
   if (e.kind === 'line-break' && e.detail === 'half') return null;
+  if (e.kind === 'goal-line-stand') return { word: 'THIRD SET', sub: 'ON THE LINE', tone: 'attack', big: true, ms: 2400 };
   const w = WORDS[e.kind] ?? (e.trait && e.kind === 'tackle' ? { word: 'DRIVE!', tone: 'attack' as const } : undefined);
   if (!w) return null;
   // A kick at goal that misses reads as a miss, whichever kind it was.
