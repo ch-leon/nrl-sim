@@ -14,9 +14,9 @@ concurrency:
 jobs:
   # The checks, split across runners so each has headroom under its timeout; the `check`
   # job below is their verdict (the name branch protection keys on). Typecheck, build and
-  # bundle size on one runner; the unit tests on three: the two slow QA files (the corpus
-  # and the soak, about four minutes between them) on their own, and the rest halved by
-  # vitest --shard. Every test file runs in exactly one part.
+  # bundle size on one runner. The unit tests use three runners: one for the corpus,
+  # soak and edge-race tests, and two for the rest via vitest --shard.
+  # Every test file runs in exactly one part.
   check-build:
     name: check (typecheck, build)
     runs-on: ubuntu-latest
@@ -48,11 +48,15 @@ jobs:
       matrix:
         include:
           - part: qa
-            args: tests/qa/corpus.test.ts tests/qa/soak.test.ts
+            args: tests/qa/corpus.test.ts tests/qa/soak.test.ts tests/match/balance/edgeRace.test.ts
           - part: 1/2
-            args: --exclude tests/qa/corpus.test.ts --exclude tests/qa/soak.test.ts --shard=1/2
+            args: >-
+              --exclude tests/qa/corpus.test.ts --exclude tests/qa/soak.test.ts
+              --exclude tests/match/balance/edgeRace.test.ts --shard=1/2
           - part: 2/2
-            args: --exclude tests/qa/corpus.test.ts --exclude tests/qa/soak.test.ts --shard=2/2
+            args: >-
+              --exclude tests/qa/corpus.test.ts --exclude tests/qa/soak.test.ts
+              --exclude tests/match/balance/edgeRace.test.ts --shard=2/2
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
