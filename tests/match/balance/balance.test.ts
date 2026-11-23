@@ -353,8 +353,9 @@ describe('measuring and reporting', () => {
     // plays-on stays. Before the punts, plays-on-hard was 1-0:144:74a11af0f394ead7.
     // The five-eighth last-tackle option (engine revision 12) re-pins both. Before it:
     // plays-on 10-0:141:fb9bb3ff69ff1592 / plays-on-hard 1-0:146:2652be8270891c73.
+    // Repeat-set goal-line pressure (#657) moves plays-on-hard from 0-10:148:ee54e8d79a90e3cf.
     { name: 'plays-on', aiCoach: false, expected: '4-10:155:79024e6ce6d03277' },
-    { name: 'plays-on-hard', aiCoach: true, expected: '0-10:148:ee54e8d79a90e3cf' },
+    { name: 'plays-on-hard', aiCoach: true, expected: '0-10:160:3f17f68f48208a44' },
   ])('pins $name: an even Balanced / Slide match with set plays (seed 1)', async ({ aiCoach, expected }) => {
     const home = { ...sideSheet('H', { rating: 60 }), plays: ['block-play' as const, 'cut-out-winger' as const, 'kick-pass' as const] };
     const sim = new LiveSim(home, sideSheet('A', { rating: 60 }), 1, aiCoach ? { aiCoach: ['home'] } : {});

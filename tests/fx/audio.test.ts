@@ -515,6 +515,26 @@ describe('AudioEngine (fake context)', () => {
     expect(musicGain.setTargetAtTime.mock.calls[musicGain.setTargetAtTime.mock.calls.length - 1]![0]).toBe(1);
   });
 
+  it('holds the crowd lift through routine play after the third set, then returns to the bed', async () => {
+    await engine.resume();
+    engine.subscribeBus();
+    const tackle = { t: 1, kind: 'tackle', teamId: 'r1', x: 8 } as const;
+    bus.emit('match:event', tackle);
+    const bed = engine.crowdTarget * CROWD_OUT;
+    const gain = engine.crowdGain! as unknown as FakeParam;
+    const lastRamp = () => gain.linearRampToValueAtTime.mock.calls.at(-1)![0];
+    bus.emit('match:goal-line-stand', { side: 'away', x: 8 });
+    const peak = lastRamp();
+    expect(peak).toBeGreaterThan(bed);
+    fake.currentTime += 1;
+    bus.emit('match:event', tackle);
+    expect(lastRamp()).toBeGreaterThan(bed);
+    expect(lastRamp()).toBeLessThan(peak);
+    fake.currentTime += 10;
+    bus.emit('match:event', tackle);
+    expect(lastRamp()).toBe(bed);
+  });
+
   it('a loss plays the loss sting and does not go to the grounds track until the player moves on', async () => {
     await engine.resume();
     engine.subscribeBus();

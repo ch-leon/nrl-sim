@@ -675,6 +675,29 @@ outside 45–55% with held up off too (main as it is); at 400 seeds both ways th
 rows are all inside, off → on: Tight 52.8 → 53.7%, Expansive 46.9 → 48.2%, Kick-chase
 47.0 → 48.8%, All-out 54.2 → 53.2% (no change starred).
 
+**Goal-line stands (#657).** A side can start a run of consecutive fresh sets on the
+opposition line when it plays the ball within 20 m of the try line, inclusive. Count a
+six-again when the heel is played, a penalty tap or restart once it is taken, and a new
+set after a regather, drop-out catch or turnover when the ball is secured. The same side
+can extend its run by getting the kick back. A kick gathered over the try line can finish
+the passage with a try. An ordinary tackle or the recovery of a loose pass by the same
+side carries on the existing set.
+
+Near the line the defence pinches in toward the ruck and spends more legs running and
+in contact as the set count rises. The first set plays at ordinary width and effort, the
+second applies half the change and the third and later sets use the full amount. Free
+defenders tighten their line while markers, kick cover and the legal retreat keep their
+jobs. The attacking side favours feasible forward pods and wide shifts, is more likely to
+kick on the second-last tackle and gives a viable corner bomb more weight on the last.
+Manual inputs, coach calls and set plays take precedence. If play backs out beyond the
+20, the effects pause until the ball comes back.
+
+The third fresh set gets one banner, a line of commentary and a lift in the crowd bed.
+A try, strip, error, held-up ball, change of possession, goal attempt, fresh set outside
+the 20 or the whistle ends the passage. A held-up ball still uses its ordinary tackle
+count and restart. The harness reports stands that reach three sets and classifies one
+ending per passage. `goalLineStand.on` 0 disables the mechanic and its telemetry.
+
 ### 8.2 Sprint, gas and getting legs back (Leon, 2026-10-18) — *implemented in F2*
 
 F gave every player one bar, **legs**: full at kick-off, spent by running, contact and

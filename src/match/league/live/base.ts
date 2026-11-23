@@ -129,12 +129,8 @@ export abstract class LiveBase {
     return (this.goalLineRun?.sets ?? 0) >= STAND_SETS;
   }
 
-  private goalLineMetres(side: Side, spot: Vec): number {
-    return this.dirOf(side) > 0 ? FIELD_LENGTH - spot.x : spot.x;
-  }
-
   private nextGoalLineSets(side: Side, spot: Vec): number {
-    const metres = this.goalLineMetres(side, spot);
+    const metres = this.toLineFor(side, spot);
     if (metres < 0 || metres > GOAL_LINE_STAND.zoneM) return 0;
     return this.goalLineRun?.side === side ? this.goalLineRun.sets + 1 : 1;
   }
@@ -171,9 +167,10 @@ export abstract class LiveBase {
   /** First set has normal shape and costs. The third reaches full pressure. */
   protected goalLinePressure(side: Side, at?: Vec, fresh = false): number {
     if (GOAL_LINE_STAND.on <= 0) return 0;
-    const sets = at && fresh ? this.nextGoalLineSets(side, at) : this.goalLineRun?.side === side ? this.goalLineRun.sets : 0;
-    if (sets < 2 || this.goalLineMetres(side, at ?? this.ballPos()) > GOAL_LINE_STAND.zoneM) return 0;
-    return Math.max(0, Math.min(1, (sets - 1) / (STAND_SETS - 1)));
+    const current = this.goalLineRun?.side === side ? this.goalLineRun.sets : 0;
+    const sets = at && fresh ? this.nextGoalLineSets(side, at) : current;
+    if (sets < 2 || this.toLineFor(side, at ?? this.ballPos()) > GOAL_LINE_STAND.zoneM) return 0;
+    return Math.min(1, (sets - 1) / (STAND_SETS - 1));
   }
   /** Plan changes the restart actually played (the match report's line). */
   readonly planChanges: PlanChange[] = [];

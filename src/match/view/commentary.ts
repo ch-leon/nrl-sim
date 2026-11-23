@@ -105,7 +105,7 @@ export const LINES: Readonly<Record<string, readonly string[]>> = {
   // ── The set ──
   handover: ['Tackled on the last — handover to {other}.', 'Handover. {other} take over.', 'Five tackles done — {other} ball.'],
   'six-again': ['Six again! {other} get a fresh set.', 'Six again — the ref calls it on {team}.', 'The ref waves six again.'],
-  'goal-line-stand': ['Third straight set on the line for {team}. {other} are still holding on.'],
+  'goal-line-stand': ['Third straight set on the line for {team}.', '{team} begin their third set on the line.', '{other} face another set on the line. That makes three.'],
   'quick-ptb': ['Quick play-the-ball from {player}.', '{player} wins the ruck and plays it fast.', '{player} plays it quickly.'],
   'slow-ptb': ['Slow play-the-ball — the defence is set.', '{player} is slow to his feet.', 'The defence wins the ruck. Slow ball.'],
   dart: ['{player} darts from dummy-half.', '{player} goes himself from dummy-half.', 'Out of dummy-half goes {player}.'],
