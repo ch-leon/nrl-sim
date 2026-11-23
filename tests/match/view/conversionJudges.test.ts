@@ -81,7 +81,8 @@ describe('touch judges at conversions', () => {
 
   it.each([
     { seed: 2, halfMinutes: 2, award: 3245, whistle: 'half-time' },
-    { seed: 3, halfMinutes: 3, award: 8462, whistle: 'full-time' },
+    // Score-and-clock changes the final set of the previous seed 3 witness.
+    { seed: 2, halfMinutes: 2.75, award: 9186, whistle: 'full-time' },
   ])('keeps the decision visible when the conversion ends in $whistle', ({ seed, halfMinutes, award, whistle }) => {
     const r = new Runner(s => new LiveSim(home, away, s, { length: { halves: 2, halfMinutes } }), seed);
     r.seek(award);
