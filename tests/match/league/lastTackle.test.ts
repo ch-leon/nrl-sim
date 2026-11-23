@@ -3,8 +3,9 @@
 // the early kick on the second-last, called at the play-the-ball.
 import { describe, expect, it } from 'vitest';
 import { LiveSim } from '../../../src/match/league/live';
-import { LAST_TACKLE, chooseLastPlay, earlyKickChance, kickLean, lastTackleWeights, runLean, type LastTackleRead } from '../../../src/match/league/lastTackle';
+import { LAST_TACKLE, chooseLastPlay, earlyKickChance, kickLean, lastTackleWeights, protectOnLast, runLean, type LastTackleRead } from '../../../src/match/league/lastTackle';
 import { ATTACK_PRESETS } from '../../../src/match/league/presets';
+import { chooseKick } from '../../../src/match/league/tactics';
 import { applyTuning, listKnobs } from '../../../src/match/league/tuning';
 import { labSheet, DEFAULT_HOME, DEFAULT_AWAY } from '../../../src/match/lab/sheets';
 
@@ -45,6 +46,36 @@ describe('last tackle: the weights', () => {
     expect(behind.run).toBeCloseTo(level.run * LAST_TACKLE.trailRun);
     expect(share(ahead, 'kick')).toBeGreaterThan(share(level, 'kick'));
     expect(lastTackleWeights(read({ margin: 0, late: true }))).toEqual(level);
+  });
+  it('shifts to attack one try behind late and gives the two-point lead a territory kick on the same rolls', () => {
+    const last = read({ zone: 'attackingHalf', toLine: 35, late: true });
+    const chase = { ...last, margin: -6 };
+    const protect = { ...last, margin: 2 };
+    expect(chooseLastPlay(lastTackleWeights(chase), 0.7)).toBe('pass');
+    expect(chooseLastPlay(lastTackleWeights(protect), 0.7)).toBe('kick');
+    expect(protectOnLast(protect)).toBe(true);
+    expect(chooseKick(protect.toLine, 0.6, {}, 0, LAST_TACKLE.scoreClock.longWeight)).toBe('long');
+    expect(chooseKick(protect.toLine, 0.6)).toBe('cross-field');
+  });
+  it('keeps the extra leans inside the late, score and territory windows, with the early kick untouched', () => {
+    const last = read({ zone: 'attackingHalf', toLine: 35, late: true });
+    const ordinary = [
+      { ...last, margin: -6, late: false }, { ...last, margin: -7 }, { ...last, margin: -6, toLine: 41 },
+      { ...last, margin: 0 }, { ...last, margin: 3 }, { ...last, margin: 2, toLine: 29 },
+    ];
+    const deep = read({ zone: 'own20', toLine: 90, late: true, margin: 2 });
+    const weights = ordinary.map(lastTackleWeights);
+    const early = earlyKickChance(0.3, deep, false);
+    const restore = applyTuning({ 'lastTackle.scoreClock.on': 0 });
+    try {
+      expect(ordinary.map(lastTackleWeights)).toEqual(weights);
+      expect(earlyKickChance(0.3, deep, false)).toBe(early);
+      expect(protectOnLast(deep)).toBe(false);
+      const chase = { ...last, margin: -6 };
+      expect(chooseLastPlay(lastTackleWeights(chase), 0.55)).toBe('kick');
+    } finally {
+      restore();
+    }
   });
   it('reads who is on the field: a big boot kicks more, quick outside backs run and pass more, never below minMult', () => {
     expect(kickLean(read({ kicking: 80 }))).toBeGreaterThan(1);

@@ -8,7 +8,7 @@ import { angleFrom, stepChance, type Situation } from '../contest';
 import { PLAYERS, ROLES } from '../roles';
 import { CLOSE_ATTACK_KICK_M, LONG_KICK, MAX_LAT_M, RUN_CLOSE_M, RUN_IT_CHANCE, RUN_IT_ZONE_M, WING_BOMB, bombTarget, chipTarget, chooseKick, crossFieldTarget, grubberTarget, kickTarget, longKickTarget, pickReceiver, pickReceiverWeighted, type KickChoice } from '../tactics';
 import { zoneOf, type AttackPlan } from '../presets';
-import { LAST_TACKLE, chooseLastPlay, earlyKickChance, lastTackleWeights, type LastTackleRead } from '../lastTackle';
+import { LAST_TACKLE, chooseLastPlay, earlyKickChance, lastTackleWeights, protectOnLast, type LastTackleRead } from '../lastTackle';
 import { FINISHER_M, TRAIT_PTS, announce, bootMult, stepTraits } from '../traits';
 import { traitBoost } from '../../../data/traits';
 import { tiredness } from '../fatigue';
@@ -313,9 +313,12 @@ export abstract class LivePlay extends LiveKicks {
    * in the side's style.
    */
   private callLastPlay(toLine: number, plan: AttackPlan, h: Player): 'run' | 'pass' | KickChoice {
+    let longBonus = 0;
     if (LAST_TACKLE.on > 0) {
-      const play = chooseLastPlay(lastTackleWeights(this.lastTackleRead(h, toLine)), this.rng.next());
+      const read = this.lastTackleRead(h, toLine);
+      const play = chooseLastPlay(lastTackleWeights(read), this.rng.next());
       if (play !== 'kick') return play;
+      if (protectOnLast(read)) longBonus = LAST_TACKLE.scoreClock.longWeight;
     } else {
       if (toLine <= RUN_CLOSE_M) return 'run';
       if (toLine <= RUN_IT_ZONE_M && this.rng.next() < RUN_IT_CHANCE) return 'run';
@@ -323,7 +326,7 @@ export abstract class LivePlay extends LiveKicks {
     // In close, add the bomb to his existing kick-type roll only if there is a corner chase.
     const closeBombWeight = WING_BOMB.on > 0 && toLine <= CLOSE_ATTACK_KICK_M
       && this.wingBombTarget(h, 0.5, bombPeak(traitBoost(h.traits, 'bigBoot'))) ? WING_BOMB.closeWeight : 0;
-    return chooseKick(toLine, this.rng.next(), plan.kickBias, closeBombWeight);
+    return chooseKick(toLine, this.rng.next(), plan.kickBias, closeBombWeight, longBonus);
   }
 
   /** What the kicker reads for the last-tackle call (#650): the zone, the style, the score and the clock, his boot, the edge's pace. */

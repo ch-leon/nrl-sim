@@ -250,7 +250,17 @@ any side may go early (+5%). Numbers and
 what they measured: tuning reference §6. Off (`lastTackle.on` 0), as before: inside 6 m he
 runs it; inside 40 m he runs it one time in five; otherwise a kick by zone, each announced by
 type. On the second-last tackle inside 25 m he goes early 35% of the time (grubber 60 / chip
-40), if the ball finds him:
+40), if the ball finds him.
+
+**Score and clock on the last (#651, first slice).** In the same last-minute window,
+a side 1–6 points behind inside the opposition 40 multiplies its existing run and pass
+weights by another three. A side one or two points ahead from at least 30 m out
+multiplies its existing kick weight by another 1.5 and adds three to the long kick's
+weight before its preset bias. Both use the usual rolls. The territory punt keeps its
+normal target, kick chase and return. The adjustment applies to ordinary decisions
+for both sides, with preset weights, manual inputs, coach calls and set plays still in
+their usual order. `lastTackle.scoreClock.on:0` keeps the previous final-tackle leans.
+Live-match recovery uses engine revision 21.
 
 | Kick | When the AI chooses it | Resolution |
 |---|---|---|
