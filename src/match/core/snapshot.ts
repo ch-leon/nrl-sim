@@ -132,6 +132,14 @@ export interface GroundPickupSnap {
   feet: { x: number; y: number };
 }
 
+/** The boot touch and gather on a quick tap. The sim keeps ordinary possession throughout. */
+export interface QuickTapSnap {
+  tick: number;
+  player: ContactPlayer;
+  dir: 1 | -1;
+}
+export const QUICK_TAP_PICTURE_TICKS = 12;
+
 /** A try's conversion at the end it attacks. The outcome appears only on the official decision tick. */
 export interface ConversionSnap {
   readonly toward: 1 | -1;
@@ -175,6 +183,7 @@ export interface Snapshot {
   /** Short visual reach and landing around a contested bomb. Possession comes from the ball. */
   bombContest?: BombContestSnap;
   groundPickup?: GroundPickupSnap;
+  quickTap?: QuickTapSnap;
   conversion?: ConversionSnap;
   /** Short state label for the lab readout (phase, set, tackle count...). */
   label: string;

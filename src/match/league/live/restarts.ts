@@ -3,7 +3,7 @@ import { SET_TACKLES } from '../../../config';
 import { traitBoost } from '../../../data/traits';
 import { FIELD_LENGTH, MID_Y, clampToGround } from '../../core/field';
 import { bounceFlight, kickFlight, landed, rollFlight, type BallState } from '../../core/ball';
-import type { ConversionSnap, Side } from '../../core/snapshot';
+import type { ConversionSnap, QuickTapSnap, Side } from '../../core/snapshot';
 import { add, clamp, dist, scale, type Vec } from '../../core/vec';
 import { FIVE_EIGHTH, FULLBACK, KICKER } from '../roles';
 import { SECOND_KICKER } from '../lastTackle';
@@ -17,6 +17,7 @@ import { other, type Player, type Phase, type RuckDecision } from './types';
 import { LivePlay } from './play';
 
 export abstract class LiveRestarts extends LivePlay {
+  protected quickTapPicture: QuickTapSnap | null = null;
   /** The last conversion's decision, carried into the dead-ball picture. The sim never reads it. */
   protected conversionDecision?: ConversionSnap & { decision: NonNullable<ConversionSnap['decision']> };
 
@@ -457,7 +458,10 @@ export abstract class LiveRestarts extends LivePlay {
     p.steppedOn = -1;
     this.phase = { kind: 'play' };
     // No markers at a tap: each short defender must reach the fixed ten before joining in.
-    if (quick) this.startRetreat(true);
+    if (quick) {
+      this.startRetreat(true);
+      this.quickTapPicture = { tick: this.tick, player: { side: p.side, slot: p.slot, who: p.key }, dir: this.dir };
+    }
     // A set play off the tap (#326).
     if (this.sheetPlays[ph.side].length > 0) this.launchPlay('tap', p);
   }

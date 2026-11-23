@@ -1,4 +1,4 @@
-import type { BombContestSnap, PlayerSnap, Side, Snapshot } from '../core/snapshot';
+import { QUICK_TAP_PICTURE_TICKS, type BombContestSnap, type PlayerSnap, type Side, type Snapshot } from '../core/snapshot';
 import type { Facing, Movement } from '../../art/prototype/player';
 import { PLAYER_ANIMS, type PlayerAnim } from '../../art/match/players';
 import { LIVE } from '../league/live/knobs';
@@ -65,6 +65,9 @@ export interface PictureContext extends MotionContext {
   /** A bomb in the air (#671): the few men under it, looking up. */
   eyesUp?: EyesUp;
   bombContest?: BombContestSnap;
+  quickTap?: Snapshot['quickTap'];
+  /** Interpolated sim tick, where a rendered frame supplies it. */
+  drawnTick?: number;
   /** The whistle (#675): each man's walk-off, reaction or huddle picture (walkOff.ts), and which way he walks on screen. */
   walkOff?: Map<string, { action: LivePlayerAction | null; frame: number; gait: number; slump: boolean; left?: boolean }>;
 }
@@ -121,6 +124,7 @@ export function pictureContext(s: Snapshot, prev?: Snapshot): PictureContext {
   const up = prev && eyesUp(prev, s);
   if (up) ctx.eyesUp = up;
   if (s.bombContest) ctx.bombContest = s.bombContest;
+  if (s.quickTap) ctx.quickTap = s.quickTap;
   const h = s.ball.holder && s.players.find(p => p.side === s.ball.holder!.side && p.slot === s.ball.holder!.slot);
   if (h) ctx.carrier = { side: h.side, x: h.x, y: h.y };
   if (r) {
@@ -232,6 +236,16 @@ export function playerPicture(p: PlayerSnap, previous: PlayerSnap, tick: number,
   if (aerial && jumper && contest && !landing) {
     const toward = { headX: contest.at.x - jumper.x, headY: contest.at.y - jumper.y };
     facing = screenFacing(toward, toward, screenDir);
+  }
+  const tap = ctx.quickTap;
+  const tapAge = tap ? (ctx.drawnTick ?? tick) - tap.tick : -1;
+  // Five authored beats, then the distance-linked carry supplies the next stride.
+  const tapFrame = Math.floor(tapAge * 6 / QUICK_TAP_PICTURE_TICKS);
+  if (tap && !p.step && possession && (action === 'carry' || action === 'catch') && tapFrame >= 0 && tapFrame < 5
+    && tap.player.who === p.who && tap.player.side === p.side && tap.player.slot === p.slot) {
+    action = 'quickTap';
+    frame = tapFrame;
+    if (frame < 4) facing = { facing: 'front', left: tap.dir * screenDir < 0 };
   }
   let slump = false;
   const scene = ctx.tryScene;

@@ -117,6 +117,7 @@ export class LiveView {
     }
     // The whistle (#675): the walk-off, the huddle before golden point and the kick-off after a break.
     const drawn = prev.tick + (cur.tick - prev.tick) * a;
+    if (ctx.quickTap) ctx.drawnTick = drawn;
     const pickup = cur.groundPickup;
     const age = pickup ? drawn - pickup.tick : 0;
     const reaching = !!pickup && age < 0 && cur.tick === pickup.tick && prev.tick === pickup.tick - 1 && !prev.ball.holder && !prev.ball.flight

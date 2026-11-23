@@ -37,7 +37,7 @@ import { SET_TACKLES } from '../../config';
 import { TICK_S, type MatchSim } from '../core/engine';
 import { speedOf } from '../core/body';
 import { CARRY_LIFT, flightAt } from '../core/ball';
-import { GROUND_PICKUP_TICKS, REACT_SNAP_TICKS, type GroundPickupSnap, type PlayerSnap, type Snapshot } from '../core/snapshot';
+import { GROUND_PICKUP_TICKS, QUICK_TAP_PICTURE_TICKS, REACT_SNAP_TICKS, type GroundPickupSnap, type PlayerSnap, type Snapshot } from '../core/snapshot';
 import type { Vec } from '../core/vec';
 import { clockText } from './rules';
 import { goalStrikeTick } from './goals';
@@ -157,6 +157,11 @@ export class LiveSim extends LivePositioning implements MatchSim {
     if (recovery && h === recovery.collector && this.phase.kind === 'play') {
       this.groundPickup = { tick: this.tick, at: { ...recovery.at }, player: { side: h.side, slot: h.slot, who: h.key }, feet: { ...h.body.pos } };
     }
+    const tap = this.quickTapPicture;
+    if (tap && (this.tick >= tap.tick + QUICK_TAP_PICTURE_TICKS || this.phase.kind !== 'play'
+      || h?.slot !== tap.player.slot || h.side !== tap.player.side || h.key !== tap.player.who || h.catchTick !== tap.tick || this.locked(h))) {
+      this.quickTapPicture = null;
+    }
     this.watchLineBreak(h);
     this.watchBombContest();
     this.expireCalls();
@@ -259,6 +264,7 @@ export class LiveSim extends LivePositioning implements MatchSim {
       ball,
       ...(this.visualBombContest ? { bombContest: this.visualBombContest } : {}),
       ...(showPickup ? { groundPickup: pickup } : {}),
+      ...(this.quickTapPicture ? { quickTap: this.quickTapPicture } : {}),
       ...(conversion ? { conversion } : {}),
       label: `${this.names[this.attacking]} ball · ${state} · ${this.points.home}–${this.points.away} · ${clockText(this.half, this.clockTicks * TICK_S)}${this.siren && (kind === 'play' || kind === 'tackle' || kind === 'ruck') ? ' · siren' : ''} · ${legs}${short}`,
       events: this.events,

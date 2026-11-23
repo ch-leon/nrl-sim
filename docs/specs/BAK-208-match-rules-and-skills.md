@@ -313,6 +313,16 @@ line off the attack (a grubber can run on up to 6 m) → DEAD BALL, a 20 m tap r
 the defence; a defender who gathers a kick in his own in-goal grounds it for the same when
 pressed or deep, else runs it out; held in his own in-goal, or the ball dead off him →
 DROP-OUT from the middle of his try line (tuning reference §16).
+**Quick taps** (#658): at a direct penalty tap or a 20 m restart, the captain can send the
+taker once he reaches the mark while at least two nearby defenders are visibly short.
+Footy IQ and Hothead lower the amount of ground he needs to see them still retreating.
+The named captain reads it when he is on the field. The highest-IQ man there fills in
+when needed. The read uses positions and draws no random number. Short defenders must
+reach the fixed 10 m line before rejoining play, while defenders already back can make
+a tackle. An interchange, a coach's attack call, manual control or a playable set move
+takes priority. Kicks for touch and 40/20s use their ordinary tap. The boot touch, gather,
+pop-up and commentary mark the quick restart.
+
 **The grubber race** (E #99, 28 Oct): a grubber that comes to rest in the in-goal is raced
 for by each side's quickest man to it. His time to the ball decides it and the bounce adds up
 to 0.45 s of luck either way; only the winner's side can take it. The attacker first is a

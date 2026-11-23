@@ -102,8 +102,8 @@ describe('held up: in the sim', () => {
     // Re-pinned against main at 5b7d08c3 (the last-tackle call, #650, on), which this branch carries; before #650 the
     // pins were a65edf9's, and with the last-tackle call off too the match is still a65edf9's (below).
     // Early DH commitment (#672), attacking structures (#649), the centre shoulder
-    // read and punts into space (#650) are off for the historical event/roll fingerprints.
-    const historical = { 'heldUp.on': 0, 'live.dhDecisionLeadTicks': 0, 'shapes.on': 0, 'live.centreShoulderTicks': 0, 'longKick.on': 0, 'wingBomb.on': 0, 'secondKicker.on': 0 };
+    // read, newer kicking options and quick taps (#658) are off for the historical event/roll fingerprints.
+    const historical = { 'heldUp.on': 0, 'live.dhDecisionLeadTicks': 0, 'shapes.on': 0, 'live.centreShoulderTicks': 0, 'longKick.on': 0, 'wingBomb.on': 0, 'secondKicker.on': 0, 'quickTap.on': 0 };
     withTuning(historical, () => {
       expect(play(31)).toEqual({ events: 122, home: 4, away: 10, draws: 813, heldUp: 0 });
       expect(play(13)).toEqual({ events: 147, home: 10, away: 10, draws: 725, heldUp: 0 });

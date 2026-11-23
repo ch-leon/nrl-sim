@@ -67,7 +67,7 @@ export abstract class LiveBase {
   protected lineX = 60;
   /** The last ruck's fixed legal line; reaching it once releases each non-marker. */
   protected retreat: {
-    side: Side; dir: 1 | -1; line: number; tap: boolean;
+    side: Side; dir: 1 | -1; line: number; tap?: boolean;
     eligible: Map<Player, string>; markers: Map<Player, string>;
   } | null = null;
 

@@ -166,6 +166,14 @@ with or without it. The columns (`src/match/balance/watch.ts`), in `results*.jso
 as a `watch` field after `ms` (older results lack it and are read as not measured,
 never as zero: the table is left out, or a dash shown for that row):
 
+- **Quick taps (#658)**: the separate tap table pools actual penalty-mark and 20 m
+  taps by restart type in the written orientation. It shows the quick share and
+  compares average net forward metres and clean line breaks on the first play.
+  Measure from the restart mark to the last place its side held the ball, through
+  passes and offloads, until the first completed tackle, kick, loss, stoppage or
+  score, capped at eight seconds. The sample size is shown beside each gain. The
+  same counts and total metres are in `watch.taps`. A tap after a kick for touch or
+  a 40/20 is outside the comparison.
 - **Lead changes**: a side taking the lead from the side that last held it. 0-0 to
   the first score is not one; level and then ahead again by the same side is not
   one. A stretch's count is scaled to 14 minutes like the other counts.
