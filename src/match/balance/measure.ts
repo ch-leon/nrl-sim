@@ -80,7 +80,7 @@ export const COUNTS = [
   'lostInContact', 'injuries', 'lineBreaks', 'coachCalls', 'callsPaid', 'completion',
   'sinBins', 'shortMin', 'binSwing', 'points', 'margin', 'homeMargin', 'goldenPoint', 'goldenPointWon', 'draws', 'possession',
   'bombs', 'bombsWon', 'bombsSpilled', 'grubbers', 'grubberTries', 'grubberRepeats', 'grubberDropouts', 'grubberTurnovers', 'kickTries',
-  'scrambles', 'heldUp', 'heldUpMatches',
+  'scrambles', 'heldUp', 'heldUpMatches', 'dummyPasses', 'dummyBites',
 ] as const;
 export type CountKey = (typeof COUNTS)[number];
 
@@ -310,6 +310,10 @@ export function countEvents(es: readonly SimEvent[], side?: Side): Record<CountK
       case 'step':
         c.steps++;
         c.breaks++;
+        break;
+      case 'dummy-pass':
+        c.dummyPasses++;
+        if (e.detail === 'bite') c.dummyBites++;
         break;
       case 'offload':
         c.offloads++;

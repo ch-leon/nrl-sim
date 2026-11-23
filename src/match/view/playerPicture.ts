@@ -1,4 +1,4 @@
-import type { BombContestSnap, PlayerSnap, Side, Snapshot } from '../core/snapshot';
+import type { BombContestSnap, DummyPassSnap, PlayerSnap, Side, Snapshot } from '../core/snapshot';
 import type { Facing, Movement } from '../../art/prototype/player';
 import { PLAYER_ANIMS, type PlayerAnim } from '../../art/match/players';
 import { LIVE } from '../league/live/knobs';
@@ -55,6 +55,7 @@ export function strideFor(p: PlayerSnap, previous: PlayerSnap, tick: number): nu
 export interface PictureContext extends MotionContext {
   incoming?: ReceivePicture;
   call?: ReceivePicture;
+  dummyPass?: DummyPassSnap;
   contactPlayers?: ReadonlySet<string>;
   /** A play-the-ball in progress (#665): the side defending it, where the ball is, and whether it is coming out. */
   ruck?: { side: Side; x: number; y: number; rising: boolean };
@@ -117,6 +118,7 @@ export function pictureContext(s: Snapshot, prev?: Snapshot): PictureContext {
   if (incoming) ctx.incoming = incoming;
   const call = callingPass(s);
   if (call) ctx.call = call;
+  if (s.dummyPass) ctx.dummyPass = s.dummyPass;
   if (s.contact) ctx.contactPlayers = new Set([s.contact.carrier, ...s.contact.defenders].map(p => `${p.side}/${p.slot}/${p.who}`));
   const up = prev && eyesUp(prev, s);
   if (up) ctx.eyesUp = up;
@@ -291,6 +293,20 @@ export function playerPicture(p: PlayerSnap, previous: PlayerSnap, tick: number,
         facing = screenPlayerFacing(reach, p, screenDir);
       }
     }
+  }
+  const dummy = ctx.dummyPass;
+  if (dummy && tick >= dummy.startedTick && tick < dummy.untilTick && possession && action === 'carry'
+    && dummy.carrier.side === p.side && dummy.carrier.slot === p.slot && dummy.carrier.who === p.who) {
+    const progress = (tick - dummy.startedTick) / (dummy.untilTick - dummy.startedTick);
+    // Reach with both hands, bring the ball back across his chest, then run in the usual carry.
+    // The legs keep their stride and the pass painter draws the ball still in his hands.
+    action = 'pass';
+    frame = progress < .2 ? 2 : progress < .55 ? 1 : progress < .75 ? 3 : 4;
+    if (progress < .75) {
+      const hands = { headX: 0, headY: dummy.towardY };
+      facing = screenPlayerFacing(hands, hands, screenDir);
+    }
+    movement = undefined;
   }
   // Eyes on the bomb (#671): standing or running, ball elsewhere, one of the few under it.
   const lookUp = ctx.eyesUp?.who.has(`${p.side}/${p.slot}`) && (action === 'idle' || action === 'run') && !possession && !p.binned ? ctx.eyesUp.level : 0;

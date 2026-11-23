@@ -10,6 +10,16 @@ export interface AttackShapeSnap {
   kind: 'spread' | 'pod' | 'edge' | 'back-door'; side: Side; dir: 1 | -1; edge: 1 | -1; startedTick: number; linkSlot?: 4 | 5;
   backDoor?: { caller: ContactPlayer; lead: ContactPlayer; support: ContactPlayer; originY: number };
 }
+/** A pass motion on an open-play carry. The held ball stays with the carrier. */
+export interface DummyPassSnap {
+  carrier: ContactPlayer;
+  receiver: ContactPlayer;
+  defender: ContactPlayer;
+  startedTick: number;
+  untilTick: number;
+  towardY: 1 | -1;
+  bit: boolean;
+}
 export interface ContactSnap {
   startedTick: number;
   carrier: ContactPlayer;
@@ -163,6 +173,7 @@ export interface SimEvent {
 }
 
 export interface Snapshot {
+  dummyPass?: DummyPassSnap;
   /** Actual structure prepared during contact (or a standalone PTB); renderers still use real positions. */
   attackShape?: AttackShapeSnap;
   /** The ordinary dummy-half's committed intended recipient, before release. Interceptions/spills can prevent the catch. */

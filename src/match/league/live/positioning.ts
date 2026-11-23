@@ -536,6 +536,7 @@ export abstract class LivePositioning extends LiveContact {
         ? this.committed(wrestling, defenders).filter((d) => dist(d.body.pos, wrestling.body.pos) < LIVE.joinM).slice(0, WRESTLE.maxMen - w.men.length)
         : [];
     const target = carrier ?? wrestling;
+    const dummy = carrier && this.activeDummy(carrier);
     // Markers stand over the mark through the ruck and hold there until released.
     const markers: Player[] = inRuck
       ? this.currentMarkers()
@@ -558,6 +559,10 @@ export abstract class LivePositioning extends LiveContact {
       } else if (p === receiver) {
         p.target = { ...flight!.to };
         p.wantsSprint = true;
+      } else if (dummy?.snap.bit && p === dummy.defender && !this.locked(p)) {
+        // Follow the runner for a beat. He can still tackle if the carrier is within reach.
+        p.target = dummy.target;
+        p.wantsSprint = false;
       } else if (committed.includes(p) && target) {
         // Cut the angle: meet him where he's going, not where he is (in a wrestle, straight in to help).
         p.target = clampToGround(intercept(p.body.pos, p.body.maxSpeed, target.body.pos, target.body.vel), 0.5);

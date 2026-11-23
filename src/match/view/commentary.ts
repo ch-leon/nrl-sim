@@ -135,6 +135,9 @@ export const LINES: Readonly<Record<string, readonly string[]>> = {
   // Held up over the line (#652): {player} is the first man in the tackle, {team} the side that held out.
   'held-up': ['Held up! {player} gets under the ball.', '{player} holds him up — no try!', 'Held up over the line! {team} survive.', "Held up! {player} won't let him ground it."],
   'run-down': ['{player} runs him down!', 'Caught from behind! {player} gets there.', '{player} chases him down from behind.'],
+  'dummy-pass': ['{player} shapes to pass.', '{player} keeps it after the dummy.', '{player} shows the ball and tucks it away.'],
+  'dummy-pass:bite': ['{player} sells the dummy!', '{player} shows it and goes himself.', 'The defence buys the dummy from {player}.'],
+  'dummy-pass:square': ['{player} shows the ball. The line holds.', '{player} shapes to pass. The line stays square.', '{player} dummies but the defence holds.'],
   intercept: ['{player} picks it off!', 'Intercept! {player} reads the pass.', '{player} jumps the pass!', 'Intercept! {player} steals it!', '{player} snatches the pass out of the air!', 'Pass picked off by {player}!'],
   gamble: ['{player} gambles and misses.', '{player} goes for the intercept, no luck.', '{player} jumps out of the line and misses.'],
   strip: ['{player} strips the ball!', '{player} rips it free in the tackle!', 'Stripped! {player} wins the ball.'],
@@ -299,6 +302,8 @@ export function lineKey(e: SimEvent, kickInAir: boolean, score?: Readonly<Record
       return d === 'contact' ? 'error:contact' : 'error';
     case 'line-break':
       return d === 'half' ? 'line-break:half' : 'line-break';
+    case 'dummy-pass':
+      return d === 'bite' || d === 'square' ? `dummy-pass:${d}` : 'dummy-pass';
     case 'break-tackle':
       return d === 'wrestle' ? 'break-tackle:wrestle' : 'break-tackle';
     case 'tackle':

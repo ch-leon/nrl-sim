@@ -3,7 +3,8 @@ import { SET_TACKLES } from '../../../config';
 import { TICK_S } from '../../core/engine';
 import { FIELD_LENGTH, FIELD_WIDTH, MID_Y, inGoal } from '../../core/field';
 import { speedOf } from '../../core/body';
-import { add, dist, dot, norm, sub, type Vec } from '../../core/vec';
+import { add, clamp, dist, dot, norm, sub, type Vec } from '../../core/vec';
+import type { DummyPassSnap } from '../../core/snapshot';
 import { angleFrom, stepChance, type Situation } from '../contest';
 import { PLAYERS, ROLES } from '../roles';
 import { CLOSE_ATTACK_KICK_M, LONG_KICK, MAX_LAT_M, RUN_CLOSE_M, RUN_IT_CHANCE, RUN_IT_ZONE_M, WING_BOMB, bombTarget, chipTarget, chooseKick, crossFieldTarget, grubberTarget, kickTarget, longKickTarget, pickReceiver, pickReceiverWeighted, type KickChoice } from '../tactics';
@@ -26,6 +27,34 @@ import { other, type Player, type Phase, type PendingKick } from './types';
 import { LiveKicks } from './kicks';
 
 export abstract class LivePlay extends LiveKicks {
+  private dummyPass: { carrier: Player; defender: Player; catchTick: number; snap: DummyPassSnap; target: Vec } | null = null;
+
+  protected activeDummy(h: Player) {
+    const dummy = this.dummyPass;
+    return dummy && dummy.carrier === h && dummy.catchTick === h.catchTick && this.tick < dummy.snap.untilTick
+      && this.phase.kind === 'play' && h.side === this.attacking && !this.pendingGoal && !this.pendingKick && !this.locked(h) ? dummy : null;
+  }
+
+  private shapeDummy(h: Player, to: Player, d: Player, roll: number): void {
+    const dy = to.body.pos.y - h.body.pos.y;
+    const towardY = dy < 0 ? -1 : 1;
+    if (Math.abs(dy) < LIVE.dummyWidthM || (to.body.pos.y - d.body.pos.y) * towardY <= 0
+      || (d.body.pos.x - h.body.pos.x) * this.dir <= 0) return;
+    const skill = (h.stats.handling + h.stats.footyIQ) / 2;
+    const bit = roll < clamp(LIVE.dummyBiteBase + (skill - d.stats.footyIQ) * LIVE.dummyReadPerPoint, 0, 1);
+    this.dummyPass = { carrier: h, defender: d, catchTick: h.catchTick,
+      snap: {
+        carrier: { side: h.side, slot: h.slot, who: h.key },
+        receiver: { side: to.side, slot: to.slot, who: to.key },
+        defender: { side: d.side, slot: d.slot, who: d.key },
+        startedTick: this.tick, untilTick: this.tick + LIVE.dummyTicks, towardY, bit,
+      },
+      target: { x: d.body.pos.x, y: clamp(d.body.pos.y + towardY * LIVE.dummyShadeM, 0.5, FIELD_WIDTH - 0.5) },
+    };
+    this.emit('dummy-pass', bit ? `${h.name} sells the dummy to ${d.name}` : `${d.name} stays square as ${h.name} shapes to pass`, h);
+    this.events[this.events.length - 1]!.detail = bit ? 'bite' : 'square';
+  }
+
   protected stepPlay(): void {
     const h = this.holder();
     if (!h || this.locked(h)) return;
@@ -75,6 +104,7 @@ export abstract class LivePlay extends LiveKicks {
     // still decides whether a nearby defender is beaten.
     if (intent?.kind === 'step-up' || intent?.kind === 'step-down') {
       this.pendingControl[this.attacking] = null;
+      this.dummyPass = null;
       const target = nearest;
       const way = intent.kind === 'step-up' ? -1 : 1;
       h.visualStep = null;
@@ -171,7 +201,9 @@ export abstract class LivePlay extends LiveKicks {
           .sort((a, b) => Math.abs(b.pos.y - h.body.pos.y) - Math.abs(a.pos.y - h.body.pos.y))[0];
         if (widest && Math.abs(widest.pos.y - h.body.pos.y) > MAX_LAT_M) receiver = widest.idx;
       }
-      if (receiver !== null && this.rng.next() < LIVE.passBase + h.stats.handling / 300 + TRAIT_PTS.playmakerPass * maker + plan.pass) {
+      const passAt = LIVE.passBase + h.stats.handling / 300 + TRAIT_PTS.playmakerPass * maker + plan.pass;
+      const roll = receiver === null ? 1 : this.rng.next();
+      if (receiver !== null && roll < passAt) {
         const to = this.players[receiver]!;
         if (Math.abs(to.body.pos.y - h.body.pos.y) > MAX_LAT_M) {
           this.emit('cut-out', `${h.name} throws the cut-out ball to ${to.name}`, h, announce(h.traits.find((t) => t.id === 'playmaker')));
@@ -181,13 +213,20 @@ export abstract class LivePlay extends LiveKicks {
         this.pass(h, to);
         return;
       }
+      if (LIVE.dummyChance > 0 && LIVE.dummyTicks > 0 && receiver !== null && nearest && nearD >= LIVE.stepRange
+        && !intent && !called && !this.scripted && !early && !kickEarly && !this.lastPlay && this.tick >= h.immuneUntil) {
+        // Partition the existing carry roll, keeping pass probability and RNG consumption intact.
+        const carryFrom = clamp(passAt, 0, 1);
+        const dummyEnd = carryFrom + (1 - carryFrom) * Math.min(1, LIVE.dummyChance);
+        if (roll < dummyEnd) this.shapeDummy(h, this.players[receiver]!, nearest, (roll - carryFrom) / (dummyEnd - carryFrom));
+      }
     }
 
     if (this.tick < h.immuneUntil) return;
 
     // One-on-one and the defender is almost on him: try to step (once per
     // defender) — unless the game plan says tuck it and carry in.
-    if (nearest && nearD <= LIVE.stepRange && this.steppedOn(h) !== this.indexOf(nearest)) {
+    if (nearest && nearD <= LIVE.stepRange && this.steppedOn(h) !== this.indexOf(nearest) && !this.activeDummy(h)) {
       const sit = this.situation(h, nearest, committed);
       if (sit.defenders === 1) {
         h.steppedOn = this.indexOf(nearest);
@@ -203,6 +242,7 @@ export abstract class LivePlay extends LiveKicks {
     // Contact: a committed defender has reached him.
     for (const d of committed) {
       if (dist(d.body.pos, h.body.pos) <= LIVE.tackleReach) {
+        this.dummyPass = null;
         this.contest(h, d, committed);
         return;
       }
