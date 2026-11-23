@@ -45,9 +45,10 @@ afterEach(() => {
   Reflect.deleteProperty(globalThis, 'localStorage');
 });
 
-// A held match from the engine before wing bombs (revision 10) is not this engine.
-const previousEngine = matchEngineIdentity().replace(/^nrl-live-12-/, 'nrl-live-11-');
-const badIds = [undefined, 'bad identity', 'nrl-live-999-00000000000000', previousEngine] as const;
+// Check held fixtures from main and the adjacent draft engine candidate.
+const previousMain = matchEngineIdentity().replace(/^nrl-live-\d+-/, 'nrl-live-12-');
+const previousCandidate = matchEngineIdentity().replace(/^nrl-live-\d+-/, 'nrl-live-22-');
+const badIds = [undefined, 'bad identity', 'nrl-live-999-00000000000000', previousMain, previousCandidate] as const;
 describe.each([null, DEV_TEST_PREFIX])('recovery namespace %s', namespace => {
   it.each(badIds)('restarts only this fixture on reload with identity %s, preserving once-only effects', engineId => {
     // The other namespace and another slot must remain byte-for-byte untouched.
