@@ -236,8 +236,8 @@ function tableRow(md: string, firstColumn: string, rowStart: string): Record<str
 describe('the report', () => {
   const stat = (mean: number) => ({ mean, se: 0.1 });
   const current = measureCell({ variant: { name: 'baseline' }, scenario: { name: 'even', home: { rating: 60 }, away: { rating: 60 } } }, 2, 1, 1);
-  const { watch: fresh, goalLine: _goalLine, ...before } = current;
-  const beforeStands = { ...before, watch: fresh };
+  const { goalLine: _goalLine, ...beforeStands } = current;
+  const { watch: fresh, ...before } = beforeStands;
   const plan = { name: 't', seeds: 2, minutes: 1 };
   const meta = { commit: 'x' };
   const report = (...results: CellResult[]) => reportMarkdown({ plan, meta, results });
