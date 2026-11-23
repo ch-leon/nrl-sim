@@ -53,7 +53,6 @@ class ReturnSim extends LiveSim {
   man(slot: number) { return this.at(this.receiving, slot); }
   chaser() { return this.at(other(this.receiving), 0); }
   route() { return this.currentKickReturn(this.holder()); }
-  phaseKind() { return this.phase.kind; }
   advance(ticks: number) { for (let i = 0; i < ticks; i++) this.step(); }
 
   collectBounce() {
@@ -131,7 +130,7 @@ describe('clean kick returns (#660)', () => {
     expect(sim.route()).toBeNull();
     expect(sim.man(0).burstUntil).toBe(0);
     for (let i = 0; i < 4; i++) sim.contactNow();
-    expect(sim.phaseKind()).toBe('tackle');
+    expect(sim.phaseKind).toBe('tackle');
   });
 
   it('keeps kick-offs, drop-outs, touch attempts, grubbers, misses, spills, bomb contests and regathers on their own paths', () => {
@@ -176,7 +175,7 @@ describe('clean kick returns (#660)', () => {
     tackled.step();
     expect(tackled.route()).not.toBeNull();
     for (let i = 0; i < 4; i++) tackled.contactNow();
-    expect(tackled.phaseKind()).toBe('tackle');
+    expect(tackled.phaseKind).toBe('tackle');
     expect(tackled.route()).toBeNull();
     expect(tackled.man(1).wantsSprint).toBe(false);
     expect(tackled.man(0).burstUntil).toBe(0);
