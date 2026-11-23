@@ -90,7 +90,8 @@ describe('interchanges in the live sim', () => {
     }
     return { events, lateLegs: sum / n };
   }
-  const seeds = [1, 2, 3];
+  // Use a contiguous cohort so unusual possession or stoppage patterns do not decide the comparison.
+  const seeds = [1, 2, 3, 4, 5, 6, 7, 8];
   const on: Game[] = [];
   const off: Game[] = [];
   beforeAll(() => {
