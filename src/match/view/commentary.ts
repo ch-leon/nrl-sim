@@ -151,7 +151,7 @@ export const LINES: Readonly<Record<string, readonly string[]>> = {
   // ── Penalties (2e) and the captain's call ──
   advantage: ['Advantage to {other} — offside.', 'The ref plays advantage for {other}.', 'Offside, but the ref lets {other} play.'],
   'advantage-over': ['Advantage over. Play on!', 'The ref calls play on.', '{other} take the advantage. Play on!'],
-  'penalty:recalled': ['No advantage — back for the penalty to {other}.', 'We’ll come back for the offside. {other} penalty.', 'The whistle brings {other} back to the mark.'],
+  'penalty:recalled': ['No advantage. Back for the penalty.', 'We’ll come back for the offside.', '{other} go back to the penalty mark.'],
   'penalty:offside': ['Penalty to {other} — offside.', 'Offside! {player} gives away a penalty.', 'The ref pings {team} for offside.'],
   'penalty:high': ['High shot from {player} — penalty.', 'Penalty! {player} catches him high.', 'A high tackle — penalty to {other}.'],
   penalty: ['Penalty to {other}.', 'The whistle — penalty, {other}.', '{player} gives away a penalty.'],
