@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { refereeKit, refereeLook } from '../../../src/art/match/bench';
-import { drawTouchJudge, TOUCH_JUDGE_POSES } from '../../../src/art/match/touchJudge';
+import { drawTouchJudge, TOUCH_JUDGE_JOG_FRAMES, TOUCH_JUDGE_POSES } from '../../../src/art/match/touchJudge';
 import { appearanceFor, CENTRE, drawPrototypePlayer, FOOT } from '../../../src/art/prototype/player';
 import type { PixelBuffer } from '../../../src/art/pixel';
 
@@ -28,6 +28,26 @@ function cloth(frame: PixelBuffer) {
 }
 
 describe.each(['front', 'back'] as const)('touch judge sprites seen from the %s', facing => {
+  it('carries the flag low over six planted jog frames', () => {
+    const look = { ...appearanceFor('touch-judge-0'), tape: false, boots: refereeLook().boots };
+    const frames = Array.from({ length: TOUCH_JUDGE_JOG_FRAMES }, (_, jog) => {
+      const player = drawPrototypePlayer(look, kit, 'run', jog, facing, false, jog + 6);
+      const judge = drawTouchJudge(look, kit, facing, 'sideline', jog);
+      const boots: number[] = [];
+      for (let x = 0; x < player.w; x++) {
+        const boot = player.get(x, FOOT);
+        if (boot.alpha) {
+          expect(judge.get(x, FOOT)).toEqual(boot);
+          boots.push(x);
+        }
+      }
+      expect(boots.length).toBeGreaterThan(0);
+      expect(cloth(judge).y).toBeGreaterThan(FOOT - 10);
+      return boots.join(',');
+    });
+    expect(new Set(frames).size).toBeGreaterThan(2);
+  });
+
   it.each([0, 1])('keeps official %i planted through both signals', i => {
     const look = { ...appearanceFor(`touch-judge-${i}`), tape: false, boots: refereeLook().boots };
     const standing = drawPrototypePlayer(look, kit, 'idle', 0, facing);

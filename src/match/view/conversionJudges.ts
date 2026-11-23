@@ -1,11 +1,9 @@
 import type { TouchJudgePose } from '../../art/match/touchJudge';
-import { FIELD_LENGTH, IN_GOAL, MID_Y } from '../core/field';
 import type { Snapshot } from '../core/snapshot';
 import type { Vec } from '../core/vec';
-import { GOALS, postsFor } from '../league/goals';
+import { CONVERSION_SIGNAL_TICKS, touchJudgeSpots } from '../league/live/touchJudges';
 
-/** The first part of the existing dead-ball window (kick-off setup is at least LIVE.restartTicks). */
-export const CONVERSION_SIGNAL_TICKS = 32;
+export { CONVERSION_SIGNAL_TICKS, TOUCH_JUDGE_FADE_TICKS } from '../league/live/touchJudges';
 const FLAG_LIFT_TICKS = 3;
 const JUDGE_EXIT_TICKS = 5;
 // Two complete sweeps. Give each end of the gesture a beat, then lower the flag.
@@ -16,14 +14,6 @@ const MISS_WAVE: readonly TouchJudgePose[] = [
   'waveMidOut', 'waveAcross', 'waveMidIn', 'waveIn', 'waveIn',
   'waveMidIn', 'waveAcross', 'waveMidOut', 'waveOut', 'waveOut',
 ];
-
-/** Each judge has an upright to sight along, behind the defenders' waiting line. */
-function touchJudgeSpots(toward: 1 | -1): [Vec, Vec] {
-  const posts = postsFor(toward, FIELD_LENGTH, MID_Y);
-  const x = posts.x + toward * (IN_GOAL - 1.5);
-  const gap = GOALS.halfPosts + 0.9;
-  return [{ x, y: posts.y - gap }, { x, y: posts.y + gap }];
-}
 
 export function conversionJudges(s: Snapshot, heldTicks = 0): { feet: [Vec, Vec]; lookAt: Vec; pose: TouchJudgePose; alpha: number } | null {
   const cue = s.conversion;

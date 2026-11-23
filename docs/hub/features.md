@@ -76,6 +76,8 @@ What's in the game, with the PR that added each.
 
 - **Conversion touch judges.** Two officials watch from the goalposts. Both raise their flags vertically on a make and wave them side to side at the waist on a miss. [PR #778](https://github.com/ch-leon/nrl-sim/pull/778)
 
+- **Touch judges in open play.** The same two officials jog along the touchlines in career matches and the Match Lab, one on each side. They catch up to kicks, turn with play and carry their flags low. [Match presentation](../specs/match-big-moments.md#touch-judges-in-open-play)
+
 - **Loose-ball pickups.** The player who gets to a loose ball in open play drops his hips, scoops it from the turf and tucks it into his running or standing carry. Ported from [draft PR #764](https://github.com/ch-leon/nrl-sim/pull/764). [Match rules](../specs/BAK-208-match-rules-and-skills.md#44-kicks--first-slice-implemented-long-bomb-grubber-chip-cross-field)
 
 - **Centre carries out wide.** A centre catching an ordinary pass near touch reads the nearest free defender ahead. He straightens onto the outside shoulder of a man holding infield, or cuts back inside a man sliding toward touch, and only when that lane has room. The read lasts at most 0.9 seconds. A covered lane, a square defender, a manual step or a set play leaves the usual gap-seeking carry. Pass, sprint and contact odds are unchanged. `live.centreShoulderTicks:0` turns the read off. [PR #770](https://github.com/ch-leon/nrl-sim/pull/770), ported from [draft PR #755](https://github.com/ch-leon/nrl-sim/pull/755), part of [#649](https://github.com/ch-leon/nrl-sim/issues/649).

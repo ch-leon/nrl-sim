@@ -143,6 +143,23 @@ dead-ball interval so the judges can be read before the kick-off. The automatic
 camera includes both judges and respects manual zoom and replay framing. The score,
 clock and restart keep their existing timing.
 
+### Touch judges in open play
+
+The same two judges follow play from just outside their assigned touchlines, one on
+each side. They accelerate or brake to come level with the ball, capped at 5.8 m/s,
+so kicks, passes and changes of possession can leave them a few strides behind. They
+face where they run, look back infield at a standstill and carry their flags down by
+their sides. Footfalls are sampled from distance covered, with a boot on the turf
+throughout the jog cycle.
+
+After a try they head toward the corresponding uprights. If the try hold is too short
+to get them there on foot, the touchline picture fades out and the pair fades in on
+their usual posts. After the signal they jog out behind the dead-ball line to their
+touchlines. The judges settle and fade at a half-time or full-time whistle, after any
+conversion signal. The Match Lab and career playback carry their positions in the
+fixed-tick snapshots, including scrubs and replays. Their movement has no effect on
+the ball, rules, score or clock.
+
 ## The whistle: walk-offs and the golden-point huddle (#675)
 
 `Snapshot.phase` reports the phase of play, the tick it began (`since`, kept by

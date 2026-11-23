@@ -34,6 +34,7 @@
 // minutes of match clock; his side plays a man short and stand-ins take his
 // duties until he is back.
 import { SET_TACKLES } from '../../config';
+import type { TeamSheet } from '../../sim/events';
 import { TICK_S, type MatchSim } from '../core/engine';
 import { speedOf } from '../core/body';
 import { CARRY_LIFT, flightAt } from '../core/ball';
@@ -43,7 +44,8 @@ import { clockText } from './rules';
 import { goalStrikeTick } from './goals';
 import { LIVE } from './live/knobs';
 import { LivePositioning } from './live/positioning';
-import type { Phase, Player } from './live/types';
+import { CONVERSION_SIGNAL_TICKS, startingTouchJudges, stepTouchJudges } from './live/touchJudges';
+import type { LiveOptions, Phase, Player } from './live/types';
 export type { ControlInput } from './controls';
 export { LIVE, runOn } from './live/knobs';
 export type { LiveOptions, PlanInput } from './live/types';
@@ -57,6 +59,12 @@ export class LiveSim extends LivePositioning implements MatchSim {
   private phaseSeen: Phase | null = null;
   private phaseSince = 0;
   private groundPickup?: GroundPickupSnap;
+  private touchJudges?: ReturnType<typeof startingTouchJudges>;
+
+  constructor(home: TeamSheet, away: TeamSheet, seed: number, opts: LiveOptions = {}) {
+    super(home, away, seed, opts);
+    if (opts.touchJudges) this.touchJudges = startingTouchJudges();
+  }
 
   // ── Tick ──────────────────────────────────────────────────────────────────
   step(): void {
@@ -169,6 +177,26 @@ export class LiveSim extends LivePositioning implements MatchSim {
       this.phaseSeen = this.phase;
       this.phaseSince = this.tick;
     }
+    if (this.touchJudges) this.moveTouchJudges(this.touchJudges);
+  }
+
+  private moveTouchJudges(judges: ReturnType<typeof startingTouchJudges>): void {
+    const ph = this.phase;
+    const decision = this.conversionDecision;
+    if (ph.kind === 'conversion' && ph.what === undefined) {
+      this.touchJudges = stepTouchJudges(judges, { kind: 'posts', end: this.dirOf(ph.side) });
+    } else if (decision && this.phaseSince === decision.decision.tick && this.tick - this.phaseSince < CONVERSION_SIGNAL_TICKS) {
+      this.touchJudges = stepTouchJudges(judges, { kind: 'posts', end: decision.toward });
+    } else if (ph.kind === 'try' && !this.golden) {
+      const toward = this.dirOf(this.players[ph.scorer]!.side);
+      this.touchJudges = stepTouchJudges(judges, { kind: 'approach', end: toward, ticksLeft: ph.t0 + LIVE.tryTicks - this.tick });
+    } else if (ph.kind === 'half-time' || ph.kind === 'full-time') {
+      this.touchJudges = stepTouchJudges(judges, { kind: 'whistle' });
+    } else {
+      const b = this.ball;
+      const ballX = b.kind === 'held' ? this.players[b.by]!.body.pos.x : b.kind === 'flight' ? flightAt(b, this.tick).pos.x : b.pos.x;
+      this.touchJudges = stepTouchJudges(judges, { kind: 'track', ballX });
+    }
   }
 
   // ── Snapshot ──────────────────────────────────────────────────────────────
@@ -260,6 +288,7 @@ export class LiveSim extends LivePositioning implements MatchSim {
       ...(this.visualBombContest ? { bombContest: this.visualBombContest } : {}),
       ...(showPickup ? { groundPickup: pickup } : {}),
       ...(conversion ? { conversion } : {}),
+      ...(this.touchJudges ? { touchJudges: this.touchJudges } : {}),
       label: `${this.names[this.attacking]} ball · ${state} · ${this.points.home}–${this.points.away} · ${clockText(this.half, this.clockTicks * TICK_S)}${this.siren && (kind === 'play' || kind === 'tackle' || kind === 'ruck') ? ' · siren' : ''} · ${legs}${short}`,
       events: this.events,
       clock: { half: this.half, seconds: this.clockTicks * TICK_S, minute: Math.floor(this.matchSeconds / 60), siren: this.siren, finished: this.finished },
