@@ -33,11 +33,11 @@ function surface() {
 }
 
 /** A decided full-time match after golden point, using the lab's default sides and seven-minute halves.
- * The lead read reshuffles which seeds are level. Try seed 70 first; keep the original window as a fallback.
+ * Impact interchanges reshuffle which seeds are level. Try seed 4 first; keep the original window as a fallback.
  * A draw at the end has no winner, so the pose check needs a decided score.
  */
 const GOLDEN_FROM = 28;
-const GOLDEN_SEEDS = [70, ...Array.from({ length: 60 }, (_, i) => GOLDEN_FROM + i).filter((seed) => seed !== 70)];
+const GOLDEN_SEEDS = [4, ...Array.from({ length: 60 }, (_, i) => GOLDEN_FROM + i)];
 
 function play(): Snapshot[] {
   for (const seed of GOLDEN_SEEDS) {
