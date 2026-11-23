@@ -1,0 +1,43 @@
+{
+  "name": "goal-line-stands-657",
+  "description": "How often does a side start a third consecutive set inside the opposition 20 m, how do stands end, and what happens to try scoring? The default and disabled variant replay the same seeds in historical whole matches with two seven-minute halves. Neutral flat 60 measures the §7 match totals, and Kick-chase versus Compressed samples a second tactical matchup. The harness normalizes legacy event totals to five minutes. Multiply the unrounded count means in results by 14/5 for the historical §7 comparison and read completion directly.",
+  "seeds": 80,
+  "base": {
+    "rules.halfMinutes": 7
+  },
+  "scenarios": [
+    {
+      "name": "even 60 v 60",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "kick-chase v compressed",
+      "seeds": 60,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "defence": "compressed"
+        }
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "goal-line stands off",
+      "tuning": {
+        "goalLineStand.on": 0
+      }
+    }
+  ]
+}
