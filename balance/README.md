@@ -231,6 +231,15 @@ never as zero: the table is left out, or a dash shown for that row):
   lower is better field position for whoever won the ball). Results from before #650
   show a dash.
 
+- **Long return m / Bomb return m** (#660): signed metres gained towards the
+  opposition line from a direct open-play catch to the first tackle, score,
+  stoppage or loss of possession, including any support pass completed in that
+  play. A kick away ends a return at the last held ball position. The sample
+  excludes kick-offs, drop-outs, deliberate touch and 40/20 kicks, loose-ball
+  pickups and the kicking side's regathers. The report pools the receiving
+  sides' returns, with standard errors estimated over matches. Return counts
+  by kick type are in `watch.kickReturns` in the JSONL.
+
 Origins and last-tackle plays are shares of the tries or last tackles in the row;
 the `*` marks use a standard error that treats each try (or last tackle) as an
 independent draw, the most such a share can claim. The percentages and the per-match

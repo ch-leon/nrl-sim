@@ -287,6 +287,19 @@ Lab aims and scripted kicks use their existing targets. `wingBomb.on:0` keeps th
 fullback aim and adds no draw. Live-match recovery is engine revision 11.
 Ported from [draft PR #757](https://github.com/ch-leon/nrl-sim/pull/757).
 
+After a clean in-field catch from an open-play long punt or bomb, the catcher
+looks for a way through the chase (#660). A free chaser inside 5 m or covered
+lanes shut down the return. With room, the catcher commits to the clearest of
+three short lines and saves his burst for the first second after the catch hold.
+The actual ball winner uses his usual legs and gas. The two nearest available
+teammates peel in behind as backward pass options, staying on their side when
+both are already there and staying infield near touch. Existing decisions and
+odds govern passes, steps and tackles. Loss of possession, contact, a manual
+input or a coach's attack call ends the return lines. Contested takes, loose
+recoveries, aimed touch kicks, in-goal catches and restarts follow their existing
+resolution. `kickReturn.on:0` preserves the preceding match and RNG sequence.
+The standalone kick-return engine uses recovery revision 14.
+
 Every kick pop-ups its type (BOMB!, GRUBBER!, CHIP!, CROSS-FIELD!, plain KICK! for
 territory); REGATHER! and DROPPED! follow. **The camera goes wide** (N15.3, #297): from the kick's
 third tick in the air the view reads where it will land (the sim flies it on a fixed curve)
@@ -789,6 +802,7 @@ makes the break but can't finish it, the workhorse who is never quick and never 
 | #650.1 | More options on the last: kick, run it or shift it wide by zone, style, the late score and who is on the field; the second-last's early kick leans the same way — *awaiting lab sign-off*. Tuning §6 | §4.4 |
 | #650 | Attacking bombs can go to either winger's corner when the chase can reach it — *awaiting lab sign-off*. Tuning §6 | §4.4 |
 | #650 | The dummy-half can find the deeper five-eighth in space when the halfback is pressured on the last tackle — *awaiting lab sign-off*. Tuning §6 | §4.4 |
+| #660 | A clean long kick or bomb catch can be returned into a gap with two support runners. Tuning §6 | §4.4 |
 | #652.1 | Held up over the line: any defender on a carrier in contact at the line can hold him up (a lone tackler too, Leon 13 Nov 2026); play-the-ball 10 m out, the tackle counted — *awaiting lab sign-off*. Tuning §11 | §8.1 |
 
 Then BAK-207 Phase 2 (full match, scoring, halves) and Phase 3 (balance).

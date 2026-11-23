@@ -54,6 +54,7 @@ export abstract class LivePlay extends LiveKicks {
 
     const intent = this.pendingControl[this.attacking];
     if (intent) {
+      this.endKickReturn();
       if (intent.kind === 'kick') {
         this.pendingControl[this.attacking] = null;
         if (this.tackles === SET_TACKLES - 1) {

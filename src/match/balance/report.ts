@@ -168,6 +168,8 @@ const WATCH_COLUMNS: readonly { head: string; digits: number; get: (w: WatchStat
   // Kicks on the second-last tackle and where a won ball's set starts (#650); a dash in results from before it.
   { head: '2nd-last kicks', digits: 2, get: (w) => w.territory?.earlyKicks },
   { head: 'Set start m to go', digits: 1, get: (w) => w.territory?.startM },
+  { head: 'Long return m', digits: 1, get: (w) => w.kickReturns?.long.count ? w.kickReturns.long.metres : undefined },
+  { head: 'Bomb return m', digits: 1, get: (w) => w.kickReturns?.bomb.count ? w.kickReturns.bomb.metres : undefined },
 ];
 
 /** The watchability table for one scenario's rows, or nothing when none of them has the measures (a run from before #648). */

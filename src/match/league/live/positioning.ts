@@ -19,6 +19,7 @@ import { PLAYS_BY_ID } from '../../../data/plays';
 import { WEATHER } from '../weather';
 import { ownLineX } from '../touch';
 import { LIVE } from './knobs';
+import { returnSupportSpots } from './kickReturn';
 import { other, type Player } from './types';
 import { LiveContact } from './contact';
 import { SHAPES, chooseShape, shapeEdge, shapeTarget, packetSlots, backDoorTarget, type AttackingShape, type ShapeKind } from '../attackingShapes';
@@ -245,6 +246,7 @@ export abstract class LivePositioning extends LiveContact {
     const atk = this.attacking;
     const def = other(atk);
     const h = this.holder();
+    const kickReturn = this.currentKickReturn(h);
     const flight = this.ball.kind === 'flight' ? this.ball : null;
     const receiver = flight && flight.receiver !== null ? this.players[flight.receiver]! : null;
     // Everyone cruises unless the moment calls for the foot down (§8.2), set below.
@@ -396,6 +398,7 @@ export abstract class LivePositioning extends LiveContact {
     const attackers = this.side(atk);
     const carrier = h && h.side === atk ? h : null;
     const anchor = carrier ? carrier.body.pos : receiver && receiver.side === atk ? flight!.to : bp;
+    const returnSpots = kickReturn && returnSupportSpots(anchor, this.dir, kickReturn.supportSide);
     const split = SECOND_KICKER.on > 0 && !this.directedLastPlay() && !this.pendingControl[atk] && !this.pendingPlay[atk]
       && ((ph.kind === 'tackle' && this.tackles === SET_TACKLES - 2)
         || (ph.kind === 'ruck' && !ph.handover && this.tackles === SET_TACKLES - 1))
@@ -405,7 +408,7 @@ export abstract class LivePositioning extends LiveContact {
       });
     const splitSpot = split ? this.behindRuck(ph.kind === 'tackle' ? this.players[ph.carrier]!.body.pos : this.mark) : null;
     const supports: Player[] = [];
-    if (carrier || (receiver && receiver.side === atk)) {
+    if (!kickReturn && (carrier || (receiver && receiver.side === atk))) {
       const lead = carrier ?? receiver!;
       const pool = attackers.filter((p) => p !== lead && p !== this.dummyHalf(atk) && !this.locked(p) && this.tick >= p.busyUntil && !this.anticipatingGrubber(p));
       pool.sort((a, b) => dist(a.body.pos, lead.body.pos) - dist(b.body.pos, lead.body.pos));
@@ -416,6 +419,7 @@ export abstract class LivePositioning extends LiveContact {
     const broken = this.lineBroken();
     for (const p of attackers) {
       const role = ROLES[p.slot]!;
+      const returnSupport = kickReturn ? this.kickReturnSupportIndex(kickReturn, p) : -1;
       p.through = false;
       if (this.targetRetreat(p)) continue;
       if (handoverMarkers.includes(p)) {
@@ -435,7 +439,7 @@ export abstract class LivePositioning extends LiveContact {
           p.through = false;
           p.wantsSprint = true;
         } else if (ph.kind === 'play') {
-          p.target = this.centreCarryTarget(p)
+          p.target = kickReturn?.target ?? this.centreCarryTarget(p)
             ?? gapTarget(p.body.pos, this.dir, this.side(def).filter((d) => !this.locked(d)).map((d) => d.body.pos));
           p.through = true;
           // Space ahead, just beaten a man, or through the line: go.
@@ -496,6 +500,9 @@ export abstract class LivePositioning extends LiveContact {
         p.wantsSprint=!shape.secondPass && (p.slot===shape.backDoor!.lead.slot || carrier?.sprinting===true);
       } else if (shape && packetSlots(shape.kind,shape.edge,shape.linkSlot,shape.backDoor).includes(p.slot) && (ph.kind === 'tackle' || ph.kind === 'ruck') && !this.locked(p)) {
         p.target = clampToGround(shapeTarget(shape, p.slot, anchor), 1);
+      } else if (returnSpots && returnSupport >= 0) {
+        p.target = returnSpots[returnSupport]!;
+        p.wantsSprint = true;
       } else if (supports.includes(p)) {
         const s = spots[supports.indexOf(p) as 0 | 1];
         // Take the side he's already on.
