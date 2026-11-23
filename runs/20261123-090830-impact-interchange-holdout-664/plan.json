@@ -1,0 +1,37 @@
+{
+  "name": "impact interchange holdout 664",
+  "description": "Check the historical neutral grubber-try guardrail on 200 independent seeds after the first 80 matches landed one try above its band. Compare impact interchanges, the same bench approach without charges, and the original interchange. All sides are fresh, flat 60, standard rotation, with two seven-minute halves and no coach calls. Read per-match totals as the unrounded count mean times 14/5.",
+  "seeds": 200,
+  "seedStart": 10001,
+  "base": {
+    "rules.halfMinutes": 7
+  },
+  "scenarios": [
+    {
+      "name": "even standard v standard",
+      "home": {
+        "rating": 60,
+        "rotation": "standard"
+      },
+      "away": {
+        "rating": 60,
+        "rotation": "standard"
+      },
+      "aiCoach": []
+    }
+  ],
+  "variants": [
+    {
+      "name": "same route without impact",
+      "tuning": {
+        "bench.impact.uses": 0
+      }
+    },
+    {
+      "name": "original interchange",
+      "tuning": {
+        "bench.impact.on": 0
+      }
+    }
+  ]
+}

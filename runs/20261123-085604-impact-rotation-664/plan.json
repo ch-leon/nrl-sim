@@ -1,0 +1,59 @@
+{
+  "name": "impact rotation 664",
+  "description": "What does standard rotation buy an otherwise identical team against rotation off, and how much of that result changes with the substitute's two-involvement edge? Both sides have four bench players. Flat 60 sides, fresh starts, no coach calls. The no-impact control sets uses to zero while keeping the same bench-side handoff route. The tracked rotating side plays each seed at both ends. The neutral row uses standard rotation on both sides. Compare current two 2:30 halves with two 7:00 halves (the historical §7 exposure); for 14-minute totals multiply the unrounded per-five-minute count by 14/5. Percentages stay unscaled.",
+  "seeds": 80,
+  "scenarios": [
+    {
+      "name": "even standard v standard",
+      "home": {
+        "rating": 60,
+        "bench": 4,
+        "rotation": "standard"
+      },
+      "away": {
+        "rating": 60,
+        "bench": 4,
+        "rotation": "standard"
+      },
+      "aiCoach": []
+    },
+    {
+      "name": "standard rotation v rotation off",
+      "seeds": 120,
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "bench": 4,
+        "rotation": "standard"
+      },
+      "away": {
+        "rating": 60,
+        "bench": 4,
+        "rotation": "off"
+      },
+      "aiCoach": []
+    }
+  ],
+  "variants": [
+    {
+      "name": "current halves without impact",
+      "tuning": {
+        "bench.impact.uses": 0
+      }
+    },
+    {
+      "name": "seven minute halves",
+      "tuning": {
+        "rules.halfMinutes": 7
+      }
+    },
+    {
+      "name": "seven minute halves without impact",
+      "tuning": {
+        "rules.halfMinutes": 7,
+        "bench.impact.uses": 0
+      }
+    }
+  ]
+}

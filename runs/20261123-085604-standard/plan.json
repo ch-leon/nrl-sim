@@ -1,0 +1,185 @@
+{
+  "name": "standard",
+  "description": "The always-on suite: run on every change to the match code. Even sides, a stamina gap, the defence presets, attacking styles, a 20-point rating gap, fast low-stamina fliers against slower stayers (sprint and gas), and late-game legs, all at the current knobs. The six preset rows (100 seeds, both ways) are the 45–55% check against Balanced or Slide.",
+  "seeds": 20,
+  "scenarios": [
+    {
+      "name": "even 60 v 60",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "stamina 30 v 80",
+      "home": {
+        "rating": 60,
+        "stats": {
+          "stamina": 30
+        }
+      },
+      "away": {
+        "rating": 60,
+        "stats": {
+          "stamina": 80
+        }
+      }
+    },
+    {
+      "name": "slide v rush",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "defence": "rush"
+        }
+      }
+    },
+    {
+      "name": "expansive v grind",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind"
+        }
+      }
+    },
+    {
+      "name": "grind v balanced",
+      "seeds": 100,
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "expansive v balanced",
+      "seeds": 100,
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "kick-chase v balanced",
+      "seeds": 100,
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "all-out v balanced",
+      "seeds": 100,
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "rush v slide",
+      "seeds": 100,
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "compressed v slide",
+      "seeds": 100,
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "defence": "compressed"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "70 v 50",
+      "home": {
+        "rating": 70
+      },
+      "away": {
+        "rating": 50
+      }
+    },
+    {
+      "name": "fliers v stayers",
+      "home": {
+        "rating": 60,
+        "stats": {
+          "speed": 85,
+          "stamina": 30
+        }
+      },
+      "away": {
+        "rating": 60,
+        "stats": {
+          "speed": 65,
+          "stamina": 80
+        }
+      }
+    },
+    {
+      "name": "last 6 min on late legs",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      },
+      "legs": "late",
+      "minutes": 6
+    }
+  ]
+}

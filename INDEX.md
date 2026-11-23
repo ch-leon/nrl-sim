@@ -403,3 +403,6 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261123-034106-standard | standard | a1dca9f7 | HEAD | [report](runs/20261123-034106-standard/report.md) |
 | 20261123-034327-goal-line-stands-657 | goal-line-stands-657 | 24081b4c | HEAD | [report](runs/20261123-034327-goal-line-stands-657/report.md) |
 | 20261123-034326-standard | standard | 24081b4c | HEAD | [report](runs/20261123-034326-standard/report.md) |
+| 20261123-085604-standard | standard | eb7f6784 | HEAD | [report](runs/20261123-085604-standard/report.md) |
+| 20261123-085604-impact-rotation-664 | impact rotation 664 | eb7f6784 | HEAD | [report](runs/20261123-085604-impact-rotation-664/report.md) |
+| 20261123-090830-impact-interchange-holdout-664 | impact interchange holdout 664 | eb7f6784 | HEAD | [report](runs/20261123-090830-impact-interchange-holdout-664/report.md) |
