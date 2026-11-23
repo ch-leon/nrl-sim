@@ -64,7 +64,7 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
-- **Goal-line stands.** Repeat sets starting inside the opposition 20 draw the defence in toward the ruck and cost it more legs. The attack looks for a short forward drive, a wide shift or a kick into the corner. The third straight set gets a banner, commentary and a crowd swell. [Issue #657](https://github.com/ch-leon/nrl-sim/issues/657)
+- **Goal-line stands.** Repeat sets starting inside the opposition 20 draw the defence in toward the ruck and cost it more legs. The attack looks for a short forward drive, a wide shift or a kick into the corner. The third straight set gets a banner, commentary and a crowd swell. [PR #784](https://github.com/ch-leon/nrl-sim/pull/784)
 
 - **A second kicking option on the last tackle.** On the last play-the-ball the halfback sets up flatter on the open side and the five-eighth drops behind on the other. Once the heel is played, the onside line can come up. If a defender is closing on the halfback and the five-eighth has more room, dummy-half finds him. He then makes the ordinary kick, run or pass. A directed last-tackle call, a set play or a manual pass keeps the usual path. `secondKicker.on:0` restores the single kicker and the previous ruck. Ported from draft PR #760, part of [#650](https://github.com/ch-leon/nrl-sim/issues/650).
 

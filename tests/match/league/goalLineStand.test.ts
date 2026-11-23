@@ -61,6 +61,27 @@ class StandSim extends LiveSim {
     return this.heldUpAtLine(h);
   }
 
+  collectKick(collectorSide: Side, metres: number, dropOut = false) {
+    const kicker = this.kicker(dropOut ? 'away' : 'home');
+    const collector = this.at(collectorSide, 1);
+    const to = this.spot('home', metres);
+    for (const p of this.players) {
+      p.body.pos = { x: FIELD_LENGTH / 2, y: MID_Y };
+      p.lockUntil = p.cooldownUntil = 0;
+    }
+    collector.body.pos = { ...to };
+    this.pendingKick = {
+      at: this.tick, kicker: this.indexOf(kicker), to, receiver: this.indexOf(collector),
+      peak: 5, kind: 'chip', kickoff: dropOut, dropOut,
+    };
+    this.launchPendingKick();
+    if (this.ball.kind !== 'flight') throw new Error('Expected a kick');
+    this.tick += this.ball.ticks;
+    this.landings();
+  }
+
+  groundForTry() { this.score(this.holder()!); }
+
   whistle() { this.endHalf(); }
 
   defendingWidth() {
@@ -124,6 +145,31 @@ describe('repeated sets on the line', () => {
       expect(sim.pressureAt('home', 10)).toBe(0);
     } finally {
       restore();
+    }
+  });
+
+  it('keeps the passage through a regather and a short drop-out, then credits the try from an in-goal regather', () => {
+    const sim = new StandSim();
+    sim.awardTap('home', 15);
+    sim.releaseRestart();
+    sim.collectKick('home', 10);
+    sim.collectKick('home', 17, true);
+    expect(sim.goalLineStarts).toBe(3);
+    expect(sim.goalLineStandInProgress).toBe(true);
+    sim.collectKick('home', -1);
+    expect(sim.goalLineStarts).toBe(3);
+    sim.groundForTry();
+    expect(sim.goalLineStands).toEqual([{ side: 'home', sets: 3, outcome: 'try' }]);
+  });
+
+  it('ends a stand when the defence catches a kick or a long drop-out pushes the next set back', () => {
+    for (const [collector, metres, dropOut, outcome] of [
+      ['away', 10, false, 'turnover'], ['home', 35, true, 'outside-20'],
+    ] as const) {
+      const sim = new StandSim();
+      for (let n = 0; n < 3; n++) { sim.awardTap('home', 15); sim.releaseRestart(); }
+      sim.collectKick(collector, metres, dropOut);
+      expect(sim.goalLineStands).toEqual([{ side: 'home', sets: 3, outcome }]);
     }
   });
 
