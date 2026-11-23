@@ -21,7 +21,9 @@ function passage(seed: number, from: number, to: number) {
   const ticks = [];
   for (let tick = 1; tick <= to; tick++) {
     sim.step();
-    if (tick >= from) ticks.push({ snap: sim.snapshot(), mark: sim.originalMark, restart: sim.restartMark, tackles: sim.tackleCount });
+    if (tick >= from) ticks.push({
+      snap: sim.snapshot(), mark: sim.originalMark, restart: sim.restartMark, tackles: sim.tackleCount, sets: { ...sim.sets },
+    });
   }
   return ticks;
 }
@@ -78,6 +80,16 @@ describe('penalty advantage', () => {
     const frames = passage(29, from, from + PENALTY.advantageTicks);
     expect(frames[frames.length - 2]!.snap.advantage).toBeDefined();
     expect(frames[frames.length - 1]!.snap.events).toContainEqual(expect.objectContaining({ kind: 'penalty', recalled: true }));
+  });
+
+  it('starts a new set after a recall on tackle zero', () => {
+    const frames = passage(107, 1177, 1229);
+    const first = frames[0]!;
+    const last = frames[frames.length - 1]!;
+    expect(first.snap.advantage?.side).toBe('away');
+    expect(first.tackles).toBe(0);
+    expect(last.tackles).toBe(0);
+    expect(last.sets.away).toBe(first.sets.away + 1);
   });
 
   it('keeps the immediate whistle when the window is disabled', () => {
