@@ -258,18 +258,18 @@ describe('the report', () => {
     const md = reportMarkdown({ plan, meta, results: [{ ...old, watch: older }] });
     // The baseline's second (watchability) row.
     const line = md.split('\n').filter((l) => l.startsWith('| baseline | ')).pop()!;
-    const columns = md.split('\n').find((l) => l.startsWith('| Variant | Lead changes'))!.split(' | ');
+    const columns = md.split('\n').find((l) => l.startsWith('| Variant | Lead changes'))!.split('|').map((s) => s.trim());
     const firstReceiver = columns.indexOf('1st receiver same man %');
-    expect(line.split(' | ').slice(firstReceiver, firstReceiver + 4)).toEqual(['—', '—', '—', '—']);
+    expect(line.split('|').map((s) => s.trim()).slice(firstReceiver, firstReceiver + 4)).toEqual(['—', '—', '—', '—']);
   });
   it('adds the second-last kicks and set start columns last, with a dash for results from before them (#650)', () => {
     expect(reportMarkdown({ plan, meta, results: [old] })).toContain('| 1st receiver slots | 2nd-last kicks | Set start m to go |');
     const { territory: _, ...older } = fresh!;
     const lines = reportMarkdown({ plan, meta, results: [{ ...old, watch: older }] }).split('\n');
     const line = lines.filter((l) => l.startsWith('| baseline | ')).pop()!;
-    const columns = lines.find((l) => l.startsWith('| Variant | Lead changes'))!.split(' | ');
+    const columns = lines.find((l) => l.startsWith('| Variant | Lead changes'))!.split('|').map((s) => s.trim());
     const territory = columns.indexOf('2nd-last kicks');
-    expect(line.split(' | ').slice(territory, territory + 2)).toEqual(['—', '—']);
+    expect(line.split('|').map((s) => s.trim()).slice(territory, territory + 2)).toEqual(['—', '—']);
   });
 });
 
