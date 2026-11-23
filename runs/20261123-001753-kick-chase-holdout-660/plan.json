@@ -1,0 +1,33 @@
+{
+  "name": "kick-chase-holdout-660",
+  "description": "Check the first historical-length Kick-chase point-share result using new seeds, the same flat teams in both orientations, and an exact off control. Each row plays 200 14-minute matches, with seeds 101 through 200 per orientation.",
+  "seeds": 100,
+  "seedStart": 101,
+  "base": {
+    "rules.halfMinutes": 7
+  },
+  "scenarios": [
+    {
+      "name": "kick-chase v balanced",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "kick returns off",
+      "tuning": {
+        "kickReturn.on": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "name": "expansive-holdout-660",
+  "description": "Check whether the standard Expansive point-share move repeats using the unchanged live length, new seeds, both orientations, and an exact feature-off control. Each row plays 200 matches with seeds 101 through 200 per orientation.",
+  "seeds": 100,
+  "seedStart": 101,
+  "scenarios": [
+    {
+      "name": "expansive v balanced",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "kick returns off",
+      "tuning": {
+        "kickReturn.on": 0
+      }
+    }
+  ]
+}
