@@ -231,3 +231,28 @@ describe('Sell and Release disarm (#612)', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 });
+
+describe('when each deal ends (SuperCOOKED §6 "Ends season n")', () => {
+  beforeEach(() => {
+    bus.clear(); stubDocument(); createNewGame('Test Club', 1);
+    Object.assign(document, { addEventListener: () => {}, removeEventListener: () => {} });
+  });
+  afterEach(() => { slot.close?.(); slot.close = null; vi.unstubAllGlobals(); });
+
+  it('names the season a deal ends, and keeps the weeks, in amber, for one about to lapse', () => {
+    const [later, soon] = getState().squad;
+    later!.contractWeeks = 19; later!.deal = { salary: 1000, startSeason: 1, endSeason: 2 };
+    soon!.contractWeeks = 3; soon!.deal = { salary: 1000, startSeason: 1, endSeason: 1 };
+    openContractsScreen();
+    const screen = slot.screen as StubNode;
+    const head = screen.all().filter((n) => n.tagName === 'TH').map((th) => th.textContent);
+    expect(head).toContain('Ends');
+    expect(head).not.toContain('Left');
+    const ends = (id: string) => screen.querySelector(`[data-contract="${id}"]`)!.children[3]!;
+    expect(ends(later!.id).textContent).toBe('S2');
+    expect(ends(later!.id).getAttribute('title')).toBe('Ends season 2 · 19 weeks left on this deal');
+    expect(ends(later!.id).classList.contains('nrl-contract-soon')).toBe(false);
+    expect(ends(soon!.id).textContent).toBe('3 wks');
+    expect(ends(soon!.id).classList.contains('nrl-contract-soon')).toBe(true);
+  });
+});

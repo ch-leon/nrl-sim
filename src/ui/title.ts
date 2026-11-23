@@ -36,6 +36,9 @@ import { commercialEnabled } from '../commercial/flags';
 import { openLoginDialog, openPaywall } from './screens/paywall';
 import { HOVER_FILL, listenForPress, MOTION_CSS } from './dom';
 import { HINTS } from './tutorial';
+import { bus } from '../core/events';
+import { ladderStanding } from '../systems/board';
+import { ordinal } from './hud';
 
 export type TitleChoice = {
   clubName?: string;
@@ -193,7 +196,6 @@ ${MOTION_CSS}
 .nrl-title-btn[data-nrl-start-confirm] { color: ${C.neg}; }
 .nrl-title-btn[data-armed], .nrl-title-btn[data-armed]:active:not(:disabled) { background: rgba(255, 138, 61, 0.16); color: ${C.neg};
   box-shadow: inset 0 0 0 1px rgba(255, 138, 61, 0.6); }
-.nrl-title-notice { flex-basis: 100%; color: ${C.neg}; font-size: 0.8125rem; }
 .nrl-title-build { position: fixed; right: calc(8px + var(--nrl-safe-r, env(safe-area-inset-right, 0px)));
   bottom: calc(4px + var(--nrl-safe-b, env(safe-area-inset-bottom, 0px))); pointer-events: none; color: ${C.muted};
   font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.625rem; letter-spacing: 0.14em; text-transform: uppercase; }
@@ -522,7 +524,7 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
         : 'Empty');
       club.setAttribute(`data-nrl-slot-label-${s.slot}`, '');
       card.appendChild(club);
-      if (s.status === 'ok') card.appendChild(mk('div', 'nrl-title-when', `Season ${s.season} · Week ${s.week}`));
+      if (s.status === 'ok') card.appendChild(mk('div', 'nrl-title-when', `Season ${s.season} · Week ${s.week}${s.ladder ? ` · ${ordinal(s.ladder)}` : ''}`));
       if (s.message) card.appendChild(mk('div', 'nrl-title-warn', s.message));
 
       // The card's one button: Continue on a season, New club where there is none to continue.
@@ -603,7 +605,9 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
       return summaries.find((s) => s.status === 'empty')?.slot;
     };
 
-    const showSlots = (notice?: string): void => {
+    // A message for the player (a failed import or load, a repaired save): a toast over the title
+    // (§6), danger unless it is good news, rather than a line under the slots.
+    const showSlots = (notice?: string, kind: 'danger' | 'info' = 'danger'): void => {
       main.replaceChildren();
       main.setAttribute('class', 'nrl-title-main nrl-title-main-slots');
       overlay.appendChild(build);
@@ -614,7 +618,8 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
       main.appendChild(brand);
       const side = mk('div', 'nrl-title-side');
       const slots = mk('div', 'nrl-title-slots');
-      const summaries = getSlotSummaries();
+      // Each season's ladder place for its card (mockup 11), the HUD's own standing.
+      const summaries = getSlotSummaries((st) => ladderStanding(st).rank);
       const primary = primarySlot(summaries);
       for (const s of summaries) slots.appendChild(slotCard(s, s.slot === primary));
       side.appendChild(slots);
@@ -628,7 +633,7 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
           if (!free) return showSlots('All slots are full — delete one before importing.');
           const res = installImportedSave(text, free.slot);
           if (!res.ok) return showSlots(res.message ? `Import failed: ${res.message}` : 'Import failed: could not write to storage.');
-          showSlots(res.repairs.length ? res.repairs[0]!.notification : undefined);
+          showSlots(res.repairs.length ? res.repairs[0]!.notification : undefined, 'info');
         });
       });
       foot.appendChild(importBtn);
@@ -643,15 +648,9 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
         buy.appendChild(login);
         foot.appendChild(buy);
       }
-      if (notice) {
-        const n = mk('div', 'nrl-title-notice', notice);
-        n.setAttribute('data-nrl-notice', '');
-        n.setAttribute('data-nrl-title-error', '');
-        n.setAttribute('role', 'status');
-        foot.appendChild(n);
-      }
       side.appendChild(foot);
       main.appendChild(side);
+      if (notice) bus.emit('ui:notify', { text: notice, kind });
     };
 
     // A new club for slot `s.slot`, in three steps. A slot that holds a season asks before Start replaces it.

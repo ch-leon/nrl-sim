@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest';
 import {
   ACTION_LANE_PX, DOCK_GAP_PX, TOAST_CAP, TRIM_KEEP, MIN_LANE_PX, RESERVE_CLASS, RESERVE_GAP_PX, RESERVE_VAR,
   TOAST_BUSY_MS, TOAST_LIFT_GAP, TOAST_LIFT_VAR, TOAST_MAX_MS, TOAST_MIN_MS,
-  dismissOnBodyTap, dockLane, moreInNews, trimQueue, trimmable, holdReserve, isActionToast, isLongInfo, laneIndex, laneMinPx, listReserve, queueBadge, toastLiftPx, toastMs,
+  dismissOnBodyTap, dockLane, timeLeftScale, moreInNews, trimQueue, trimmable, holdReserve, isActionToast, isLongInfo, laneIndex, laneMinPx, listReserve, queueBadge, toastLiftPx, toastMs,
   type ReserveList,
 } from '../../src/ui/toasts';
 import { UNDO_MS } from '../../src/systems/undo';
@@ -136,6 +136,17 @@ describe('the Undo toast (#370)', () => {
     // The base toast rule keeps taps; the action toast only drops the pointer cursor.
     expect(rule(CSS, '.nrl-toast')).toContain('pointer-events: auto');
     expect(rule(CSS, '.nrl-toast.nrl-toast-action')).not.toContain('pointer-events: none');
+  });
+  it('counts down on a bar, not in its label (SuperCOOKED 01: "Undo with countdown")', () => {
+    expect(timeLeftScale(UNDO_MS, UNDO_MS)).toBe(1);
+    expect(timeLeftScale(UNDO_MS / 4, UNDO_MS)).toBe(0.25);
+    expect(timeLeftScale(-200, UNDO_MS)).toBe(0); // a late tick never draws backwards
+    expect(timeLeftScale(100, 0)).toBe(0);
+    const bar = rule(CSS, '.nrl-toast-timer');
+    expect(bar).toContain('position: absolute');
+    expect(bar).toContain('pointer-events: none'); // never in the way of Undo or ✕
+    expect(bar).toContain('transform-origin: left center');
+    expect(rule(CSS, '.nrl-toast.nrl-toast-action')).toContain('position: relative');
   });
 });
 

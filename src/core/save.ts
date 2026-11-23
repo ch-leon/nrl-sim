@@ -463,12 +463,18 @@ export interface SlotSummary {
   clubName?: string;
   season?: number;
   week?: number;
+  /** The club's place on the ladder (1 = top), when the caller asked for it; left out before a round is in. */
+  ladder?: number;
   /** Human-readable reason for 'future' / 'corrupt'. */
   message?: string;
 }
 
-/** Describe slots without replacing their source; repaired originals are retained. */
-export function getSlotSummaries(): SlotSummary[] {
+/**
+ * Describe slots without replacing their source; repaired originals are retained. `place`
+ * reads a season's ladder place (the title passes the HUD's standing; it lives in the game
+ * systems, which this module doesn't import): 0, a throw or no `place` leaves it off.
+ */
+export function getSlotSummaries(place?: (state: GameState) => number): SlotSummary[] {
   const store = getStore();
   const out: SlotSummary[] = [];
   if (loadSlot(1).status === 'ok') store?.migrateLegacy();
@@ -485,10 +491,20 @@ export function getSlotSummaries(): SlotSummary[] {
     out.push({
       slot, status: 'ok',
       clubName: String(result.state.clubName), season: result.state.season, week: result.state.week,
+      ...slotPlace(result.state, place),
       ...(result.repairs.length ? { message: REPAIR_NOTICE } : {}),
     });
   }
   return out;
+}
+
+function slotPlace(state: GameState, place?: (state: GameState) => number): { ladder?: number } {
+  try {
+    const rank = place?.(state) ?? 0;
+    return rank > 0 ? { ladder: rank } : {};
+  } catch {
+    return {}; // the card is only a summary: a ladder it can't read leaves the place off
+  }
 }
 
 // ── save / load / clear ──────────────────────────────────────────────────────

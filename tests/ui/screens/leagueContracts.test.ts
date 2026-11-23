@@ -101,7 +101,8 @@ describe('League Contracts annual cap cells', () => {
     const queuedRow = body().querySelector(`[data-contract="${queued.id}"]`)!;
     expect(expiredRow.children[3]!.textContent).toBe('0 wks');
     expect(expiredRow.children[4]!.textContent).toBe('$0');
-    expect(queuedRow.children[3]!.textContent).toBe('25 wks');
+    // A queued renewal's row says when that deal ends (SuperCOOKED §6 "Ends season n"); weeks show only near the end.
+    expect(queuedRow.children[3]!.textContent).toBe('S2');
     expect(queuedRow.children[4]!.textContent).toBe('$2,000');
   });
 });
