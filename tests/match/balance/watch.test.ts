@@ -218,55 +218,81 @@ describe('measuring a cell', () => {
     const { watch: _w, ms: _m, ...rest } = r;
     const { watch: _w2, ms: _m2, ...rest2 } = measureCell(cell, 2, 3, 9);
     expect(rest2).toEqual(rest);
-    expect(Object.keys(r).slice(-2)).toEqual(['ms', 'watch']);
+    expect(r).toMatchObject({ ms: expect.any(Number), watch: { flow: expect.any(Object) } });
   });
 });
 
+/** Read a row by table heading and column name so other report tables can use the same variant. */
+function tableRow(md: string, firstColumn: string, rowStart: string): Record<string, string> | undefined {
+  const table = md.split('\n\n').find(block => block.startsWith(`| Variant | ${firstColumn} |`));
+  const [header, ...lines] = table?.split('\n') ?? [];
+  const row = lines.find(line => line.startsWith(rowStart));
+  if (!header || !row) return undefined;
+  const cells = (line: string) => line.slice(1, -1).split('|').map(cell => cell.trim());
+  const values = cells(row);
+  return Object.fromEntries(cells(header).map((column, i) => [column, values[i]!]));
+}
+
 describe('the report', () => {
   const stat = (mean: number) => ({ mean, se: 0.1 });
-  const old = measureCell({ variant: { name: 'baseline' }, scenario: { name: 'even', home: { rating: 60 }, away: { rating: 60 } } }, 2, 1, 1);
-  const { watch: fresh, ...before } = old;
+  const current = measureCell({ variant: { name: 'baseline' }, scenario: { name: 'even', home: { rating: 60 }, away: { rating: 60 } } }, 2, 1, 1);
+  const { watch: fresh, goalLine: _goalLine, ...before } = current;
+  const beforeStands = { ...before, watch: fresh };
   const plan = { name: 't', seeds: 2, minutes: 1 };
   const meta = { commit: 'x' };
+  const report = (...results: CellResult[]) => reportMarkdown({ plan, meta, results });
+
   it('writes the watchability table after the existing one', () => {
-    const md = reportMarkdown({ plan, meta, results: [old] });
+    const md = report(current);
     expect(md).toContain('| Variant | Lead changes | Within 6, 1 min out % | Decided last min % |');
     expect(md.indexOf('Legs end H/A')).toBeLessThan(md.indexOf('Lead changes'));
     expect(md).toContain('Last tackle pass %');
   });
   it('reads results from before the measures as absent: no table, no zeros, no failure', () => {
     const noWatch = JSON.parse(JSON.stringify(before)) as CellResult;
-    const md = reportMarkdown({ plan, meta, results: [noWatch] });
+    const md = report(noWatch);
     expect(md).not.toContain('Lead changes');
     // The existing table is the same with or without the new measures.
-    const withIt = reportMarkdown({ plan, meta, results: [old] });
-    expect(withIt.startsWith(md.slice(0, md.indexOf('_1 cells')))).toBe(true);
+    expect(report(current).startsWith(md.slice(0, md.indexOf('_1 cells')))).toBe(true);
   });
   it('shows a dash for a row that lacks them and compares only rows that have them', () => {
-    const variant = { ...JSON.parse(JSON.stringify(before)), variant: 'other' } as CellResult;
-    const md = reportMarkdown({ plan, meta, results: [old, variant] });
-    const line = md.split('\n').find((l) => l.startsWith('| other | —'))!;
-    expect(line).toBeDefined();
-    expect(line).not.toContain('(');
-    const both = reportMarkdown({ plan, meta, results: [old, { ...old, variant: 'again', watch: { ...fresh!, flow: { ...fresh!.flow, leadChanges: stat(fresh!.flow.leadChanges.mean + 3) } } }] });
-    expect(both).toMatch(/\| again \| [\d.]+ \(\+3\.0/);
+    const md = report(current, { ...before, variant: 'other' });
+    const { Variant, ...watchCells } = tableRow(md, 'Lead changes', '| other |')!;
+    expect(Variant).toBe('other');
+    expect(Object.values(watchCells)).toEqual(Array(Object.keys(watchCells).length).fill('—'));
+    const again = report(current, { ...current, variant: 'again', watch: { ...fresh!, flow: { ...fresh!.flow, leadChanges: stat(fresh!.flow.leadChanges.mean + 3) } } });
+    expect(tableRow(again, 'Lead changes', '| again |')?.['Lead changes']).toMatch(/^[\d.]+ \(\+3\.0/);
   });
-  it('adds the first-receiver columns last, with a dash for results from before them (#649)', () => {
-    expect(reportMarkdown({ plan, meta, results: [old] })).toContain('| Last tackle pass % | 1st receiver same man % | 1st receiver slots |');
-    // Results from before #649 lack the #650 columns after them too (#650: four dashes, was two).
-    const { receivers: _, territory: _t, ...older } = fresh!;
-    const md = reportMarkdown({ plan, meta, results: [{ ...old, watch: older }] });
-    // The baseline's second (watchability) row.
-    const line = md.split('\n').filter((l) => l.startsWith('| baseline | ')).pop()!;
-    expect(line.trim().endsWith('| — | — | — | — |')).toBe(true);
-    expect(line.split('—').length).toBe(5);
+  it('shows dashes for first-receiver and territory columns in results before #649', () => {
+    expect(report(current)).toContain('| Last tackle pass % | 1st receiver same man % | 1st receiver slots |');
+    const { receivers: _receivers, territory: _territory, ...older } = fresh!;
+    const row = tableRow(report({ ...before, watch: older }), 'Lead changes', '| baseline |');
+    expect(row).toMatchObject({ '1st receiver same man %': '—', '1st receiver slots': '—', '2nd-last kicks': '—', 'Set start m to go': '—' });
   });
-  it('adds the second-last kicks and set start columns last, with a dash for results from before them (#650)', () => {
-    expect(reportMarkdown({ plan, meta, results: [old] })).toContain('| 1st receiver slots | 2nd-last kicks | Set start m to go |');
-    const { territory: _, ...older } = fresh!;
-    const line = reportMarkdown({ plan, meta, results: [{ ...old, watch: older }] }).split('\n').filter((l) => l.startsWith('| baseline | ')).pop()!;
-    expect(line.trim().endsWith('| — | — |')).toBe(true);
-    expect(line.split('—').length).toBe(3);
+  it('shows dashes for second-last kicks and set starts in results before #650', () => {
+    expect(report(current)).toContain('| 1st receiver slots | 2nd-last kicks | Set start m to go |');
+    const { territory: _territory, ...older } = fresh!;
+    const row = tableRow(report({ ...before, watch: older }), 'Lead changes', '| baseline |');
+    expect(row).toMatchObject({ '2nd-last kicks': '—', 'Set start m to go': '—' });
+  });
+  it('reports raw goal-line stands and leaves older results unmeasured', () => {
+    const withStand = {
+      ...current,
+      goalLine: {
+        starts: 12, matches: 1, unfinished: 1,
+        outcomes: { try: 1, strip: 0, error: 0, 'held-up': 1, turnover: 0, 'outside-20': 0, 'goal-attempt': 0, clock: 0 },
+      },
+    };
+    const older = { ...beforeStands, variant: 'legacy' };
+    expect(report(older)).not.toContain('Starts inside 20');
+    const md = report(withStand, older);
+    expect(tableRow(md, 'Starts inside 20', '| baseline |')).toMatchObject({
+      'Starts inside 20': '12', 'Stands of 3+': '3', 'Matches with a stand': '1/2 (50.0%)',
+      try: '1', strip: '0', 'held-up': '1', Unfinished: '1',
+    });
+    const { Variant, ...legacyCells } = tableRow(md, 'Starts inside 20', '| legacy |')!;
+    expect(Variant).toBe('legacy');
+    expect(Object.values(legacyCells)).toEqual(Array(12).fill('—'));
   });
 });
 
