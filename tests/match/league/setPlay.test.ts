@@ -5,7 +5,7 @@
 // off; a coach (or Hard's AI coach) can call one live, and the judge pays it
 // like a shift.
 import { describe, it, expect, afterEach } from 'vitest';
-import { LiveSim, type LiveOptions } from '../../../src/match/league/live';
+import { LIVE, LiveSim, type LiveOptions } from '../../../src/match/league/live';
 import { runMatch } from '../../../src/match/league/match';
 import { sideSheet } from '../../../src/match/balance/measure';
 import { cellsOf, checkPlan, type Plan } from '../../../src/match/balance/plan';
@@ -15,8 +15,8 @@ import { PLAYS } from '../../../src/match/league/plays';
 import { applyTuning } from '../../../src/match/league/tuning';
 import { zoneOf } from '../../../src/match/league/presets';
 import { supportSpots } from '../../../src/match/league/tactics';
-import { formationTarget, ROLES } from '../../../src/match/league/roles';
-import { FIELD_LENGTH, FIELD_WIDTH } from '../../../src/match/core/field';
+import { formationTarget, PROP, ROLES } from '../../../src/match/league/roles';
+import { FIELD_LENGTH, FIELD_WIDTH, MID_Y } from '../../../src/match/core/field';
 import { LEGS_ENERGY } from '../../../src/match/league/fatigue';
 import { labSheet, withPlays, DEFAULT_AWAY, DEFAULT_HOME } from '../../../src/match/lab/sheets';
 import { labHash, parseLabHash } from '../../../src/match/lab/controller';
@@ -24,6 +24,7 @@ import type { PlayFrom, PlayId } from '../../../src/data/plays';
 import type { Side, SimEvent } from '../../../src/match/core/snapshot';
 import type { TeamSheet } from '../../../src/sim/events';
 import type { Player } from '../../../src/match/league/live/types';
+import { popupFor } from '../../../src/match/view/popups';
 
 const flat = (plays?: PlayId[], over: Parameters<typeof sideSheet>[1] = {}): TeamSheet => ({ ...sideSheet('H', { rating: 60, ...over }), ...(plays ? { plays } : {}) });
 const A = sideSheet('A', { rating: 60 });
@@ -97,6 +98,68 @@ let restore: (() => void) | null = null;
 afterEach(() => {
   restore?.();
   restore = null;
+});
+
+class PostsChargeSim extends LiveSim {
+  stageRuck(side: Side, half: number, lateralM = 0, tackles = 1): void {
+    this.half = half;
+    this.tick += LIVE.dhHoldTicks + 1;
+    this.attacking = side;
+    this.dir = this.dirOf(side);
+    this.tackles = tackles;
+    this.playUsed[side] = false; // A different attacking set.
+    this.mark = { x: this.dir > 0 ? FIELD_LENGTH - 8 : 8, y: MID_Y + lateralM };
+    const dummy = this.dummyHalf(side);
+    const prop = this.at(side, PROP);
+    dummy.body.pos = { x: this.mark.x - 1.5 * this.dir, y: this.mark.y };
+    prop.body.pos = { x: this.mark.x - 4 * this.dir, y: this.mark.y - 2 };
+    this.ball = { kind: 'held', by: this.indexOf(dummy) };
+    this.phase = { kind: 'ruck', stage: 'dh', heldAt: this.tick - LIVE.dhHoldTicks, t0: this.tick,
+      carrier: this.indexOf(this.kicker(side)), tackler: this.indexOf(this.kicker(side === 'home' ? 'away' : 'home')),
+      handover: false, down: 0, pace: null };
+  }
+
+  get passReceiver(): Player | null {
+    return this.ball.kind === 'flight' && this.ball.receiver !== null ? this.players[this.ball.receiver]! : null;
+  }
+}
+
+describe('the Posts charge signature', () => {
+  function fixture(level: 1 | 2 | 3) {
+    const star = (id: string) => {
+      const sheet = sideSheet(id, { rating: 60 });
+      sheet.roster![PROP]!.traits = [{ id: 'wreckingBall', level }];
+      return sheet;
+    };
+    return new PostsChargeSim(star('H'), star('A'), 1);
+  }
+
+  it('names the level-II prop and uses a live pass, once a half for either side', () => {
+    const sim = fixture(2);
+    for (const side of ['home', 'away'] as const) {
+      for (const [half, goes] of [[1, true], [1, false], [2, true]] as const) {
+        sim.stageRuck(side, half);
+        sim.step();
+        const launch = sim.tickEvents.find(e => e.kind === 'signature-play');
+        if (!goes) {
+          expect(launch).toBeUndefined();
+          continue;
+        }
+        expect(launch).toMatchObject({ side, slot: PROP, detail: 'posts-charge', player: sim.passReceiver?.name });
+        expect(sim.passReceiver?.slot).toBe(PROP);
+        expect(popupFor(launch!)).toMatchObject({ word: 'POSTS CHARGE!', sub: launch!.player!.toUpperCase() });
+      }
+    }
+  });
+
+  it('requires Wrecking Ball II, a central ruck and a tackle in the window', () => {
+    const trials = [[fixture(1), 0, 1], [fixture(3), 14, 1], [fixture(3), 0, 4]] as const;
+    for (const [sim, lateral, tackles] of trials) {
+      sim.stageRuck('home', 1, lateral, tackles);
+      sim.step();
+      expect(sim.tickEvents.some(e => e.kind === 'signature-play')).toBe(false);
+    }
+  });
 });
 
 describe('no plays: the match it always was', () => {

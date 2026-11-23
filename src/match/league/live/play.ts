@@ -19,8 +19,7 @@ import { CALLS } from '../calls';
 import { bombPeak } from '../kickContest';
 import { FORTY_TWENTY_ENABLED, TOUCH, inOwnInGoal } from '../touch';
 import { BIN } from '../sinbin';
-import { PLAYS } from '../plays';
-import { PLAYS_BY_ID } from '../../../data/plays';
+import { PLAYS, livePlay } from '../plays';
 import { LIVE } from './knobs';
 import { other, type Player, type Phase, type PendingKick } from './types';
 import { LiveKicks } from './kicks';
@@ -54,6 +53,7 @@ export abstract class LivePlay extends LiveKicks {
 
     const intent = this.pendingControl[this.attacking];
     if (intent) {
+      if (this.scripted?.by === 'star') this.scripted = null;
       if (intent.kind === 'kick') {
         this.pendingControl[this.attacking] = null;
         if (this.tackles === SET_TACKLES - 1) {
@@ -236,7 +236,7 @@ export abstract class LivePlay extends LiveKicks {
     const i = this.indexOf(h);
     const at = s.side === h.side ? s.men.indexOf(i) : -1;
     if (at < 0 || at !== s.step - 1) return 'fall';
-    const play = PLAYS_BY_ID[s.id];
+    const play = livePlay(s.id);
     const last = s.step >= s.men.length;
     if (s.outcome === 'ok' && last) {
       if (play.kick) {

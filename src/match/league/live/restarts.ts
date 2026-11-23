@@ -79,7 +79,8 @@ export abstract class LiveRestarts extends LivePlay {
     // Scripted/controlled decisions keep their existing release-time path. No extra hold or roll.
     if (!ph.decision && LIVE.dhDecisionLeadTicks > 0 && this.tick < release
       && this.tick >= release - Math.min(LIVE.dhHoldTicks, LIVE.dhDecisionLeadTicks)
-      && this.sheetPlays[this.attacking].length === 0 && !this.pendingPlay[this.attacking] && !this.pendingControl[this.attacking]) {
+      && this.sheetPlays[this.attacking].length === 0 && !this.pendingPlay[this.attacking] && !this.pendingControl[this.attacking]
+      && !this.postsChargeRunner(h)) {
       ph.decision = this.chooseRuck(h, release);
     }
     if (this.tick < ph.heldAt + LIVE.dhHoldTicks) return;
@@ -95,7 +96,8 @@ export abstract class LiveRestarts extends LivePlay {
       }
     }
     // A set play (#326): the coach's waiting call or the half's own, launched here with its one roll in place of the dart's.
-    if (this.sheetPlays[this.attacking].length > 0 && this.launchPlay('ptb', h)) {
+    if ((this.sheetPlays[this.attacking].length > 0 && this.launchPlay('ptb', h))
+      || (!intent && !ph.decision && this.launchSignature(h))) {
       this.phase = { kind: 'play' };
       return;
     }

@@ -14,8 +14,7 @@ import { GAS, canSprint, paceMult, runCostMult, stepGas } from '../gas';
 import { WRESTLE } from '../wrestle';
 import { postsFor } from '../goals';
 import { CALLS } from '../calls';
-import { PLAYS, roleSlot } from '../plays';
-import { PLAYS_BY_ID } from '../../../data/plays';
+import { PLAYS, livePlay, roleSlot } from '../plays';
 import { WEATHER } from '../weather';
 import { ownLineX } from '../touch';
 import { LIVE } from './knobs';
@@ -435,11 +434,12 @@ export abstract class LivePositioning extends LiveContact {
           p.through = false;
           p.wantsSprint = true;
         } else if (ph.kind === 'play') {
-          p.target = this.centreCarryTarget(p)
+          const posts = this.chargingPosts(p) ? postsFor(this.dir, FIELD_LENGTH, MID_Y) : null;
+          p.target = posts ?? this.centreCarryTarget(p)
             ?? gapTarget(p.body.pos, this.dir, this.side(def).filter((d) => !this.locked(d)).map((d) => d.body.pos));
           p.through = true;
           // Space ahead, just beaten a man, or through the line: go.
-          p.wantsSprint = this.tick < p.burstUntil || broken || this.laneClear(p);
+          p.wantsSprint = posts !== null || this.tick < p.burstUntil || broken || this.laneClear(p);
         } else p.target = { ...p.body.pos };
       } else if (p === receiver) {
         const sweep = shape?.secondPass?.supportTo;
@@ -608,7 +608,7 @@ export abstract class LivePositioning extends LiveContact {
   private scriptTargets(): void {
     const s = this.scripted!;
     if (s.side !== this.attacking) return;
-    const play = PLAYS_BY_ID[s.id];
+    const play = livePlay(s.id);
     const h = this.holder();
     const flight = this.ball.kind === 'flight' && this.ball.via === 'pass' ? this.ball : null;
     const anchor = h && h.side === s.side ? h.body.pos : flight && flight.receiver !== null && this.players[flight.receiver]!.side === s.side ? flight.to : null;

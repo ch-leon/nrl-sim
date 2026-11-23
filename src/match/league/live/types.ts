@@ -18,8 +18,8 @@ import { NEUTRAL_CAPTAIN, type CaptainRead } from '../penalties';
 import type { DifficultyEdge } from '../spread';
 import type { CallInput } from '../calls';
 import type { WeatherKind } from '../../../sim/events';
-import type { PlayId, PlayMods } from '../../../data/plays';
-import type { Edge } from '../plays';
+import type { PlayMods } from '../../../data/plays';
+import type { Edge, LivePlayId } from '../plays';
 import type { AttackingShape } from '../attackingShapes';
 
 interface Stats extends ContestStats { kicking: number }
@@ -162,8 +162,8 @@ export interface PendingKick {
  */
 export interface ScriptedPlay {
   side: Side;
-  id: PlayId;
-  by: 'coach' | 'half';
+  id: LivePlayId;
+  by: 'coach' | 'half' | 'star';
   edge: Edge;
   ySign: 1 | -1;
   men: number[];
@@ -174,6 +174,7 @@ export interface ScriptedPlay {
   /** The man carrying the bonus (−1 until the last man has the ball), and whether his first contact has used it. */
   bonusFor: number;
   bonusUsed: boolean;
+  signatureCredited?: boolean;
   until: number;
 }
 

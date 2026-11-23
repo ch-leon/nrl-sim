@@ -5,18 +5,22 @@
 // pass and the kick are live/play.ts's (scriptedTurn), the decoy lines
 // live/positioning.ts's, the bonus at contact live/contact.ts's.
 //
-// Nothing here runs for a side with no plays on its sheet: no branch is taken
-// and no roll drawn, so a match without plays plays exactly as before.
+// The coach's plays come from the sheet; a star's own play uses the same roll
+// and script without having to be bought or selected by the coach.
 import { SET_TACKLES } from '../../../config';
 import { FIELD_WIDTH, MID_Y } from '../../core/field';
 import type { Side } from '../../core/snapshot';
-import { PLAYS_BY_ID, type PlayFrom, type PlayId } from '../../../data/plays';
-import { PLAYS, pickAutoPlay, playBonus, playFit, playOdds, playOutcome, playTitle, playWhen, roleSlot, type Edge, type PlayFacts, type PlayFit } from '../plays';
-import { ROLES } from '../roles';
+import { dist } from '../../core/vec';
+import { PLAYS_BY_ID, type Play, type PlayFrom, type PlayId } from '../../../data/plays';
+import { traitLevel } from '../../../data/traits';
+import { PLAYS, POSTS_CHARGE, POSTS_CHARGE_PLAY, livePlay, pickAutoPlay, playBonus, playFit, playOdds, playOutcome, playTitle, playWhen, roleSlot, type Edge, type LivePlayId, type PlayFacts, type PlayFit } from '../plays';
+import { PROP, ROLES } from '../roles';
 import { other, type Player, type ScriptedPlay } from './types';
 import { LiveCalls } from './calls';
 
 export abstract class LiveSetPlays extends LiveCalls {
+  private readonly signatureHalf: Record<Side, number> = { home: 0, away: 0 };
+
   /** A side's plays as the sim runs them (its sheet's, none when `plays.on` is 0). */
   playsOf(side: Side): readonly PlayId[] {
     return this.sheetPlays[side];
@@ -137,6 +141,39 @@ export abstract class LiveSetPlays extends LiveCalls {
     const men = play.script.map((s) => this.at(side, roleSlot(s.to, edge)));
     // A man of the play off the field (the bin) or still down: not this time.
     if (men.some((p) => !this.onField(p) || (p !== launcher && this.locked(p)))) return false;
+    this.pendingPlay[side] = null;
+    const used = this.autoUsed[side];
+    used.launched++;
+    used.lastSet[id] = this.sets[side];
+    this.beginScript(launcher, play, pending ? 'coach' : 'half', ySign, men);
+    return true;
+  }
+
+  /** A live prop has to be in support and behind his dummy-half for the short ball. */
+  protected postsChargeRunner(launcher: Player): Player | null {
+    const side = launcher.side;
+    if (PLAYS.on <= 0 || POSTS_CHARGE.on <= 0 || this.signatureHalf[side] === this.half || this.playUsed[side]
+      || this.pendingPlay[side] || this.pendingControl[side] || this.callState[side].attack) return null;
+    const prop = this.at(side, PROP);
+    if (prop === launcher || traitLevel(prop.traits, 'wreckingBall') < POSTS_CHARGE.minTraitLevel
+      || !this.onField(prop) || prop.subFor !== null || prop.hurt || this.locked(prop) || this.tick < prop.busyUntil) return null;
+    if (Math.abs(this.mark.y - MID_Y) > POSTS_CHARGE.maxFromPostsM || Math.abs(prop.body.pos.y - MID_Y) > POSTS_CHARGE.maxFromPostsM
+      || playWhen(POSTS_CHARGE_PLAY, this.playFacts(side, 'ptb', 0)) !== null
+      || (prop.body.pos.x - launcher.body.pos.x) * this.dir > 0 || dist(prop.body.pos, launcher.body.pos) > PLAYS.reachM) return null;
+    return prop;
+  }
+
+  protected launchSignature(launcher: Player): boolean {
+    const prop = this.postsChargeRunner(launcher);
+    if (!prop) return false;
+    this.signatureHalf[prop.side] = this.half;
+    this.beginScript(launcher, POSTS_CHARGE_PLAY, 'star', prop.body.pos.y < MID_Y ? 1 : -1, [prop]);
+    return true;
+  }
+
+  private beginScript(launcher: Player, play: Play<LivePlayId>, by: ScriptedPlay['by'], ySign: 1 | -1, men: Player[]): void {
+    const side = this.attacking;
+    const edge: Edge = ySign < 0 ? 'left' : 'right';
     const nine = ROLES.map((_, slot) => {
       const p = this.at(side, slot);
       return { name: p.name, footyIQ: p.stats.footyIQ };
@@ -145,19 +182,15 @@ export abstract class LiveSetPlays extends LiveCalls {
     const odds = playOdds(play, fit.shortfall, this.tactics[side].attack, this.defencePreset(other(side)));
     const outcome = playOutcome(this.rng.next(), odds);
     const caller = men[0]!;
-    const by = pending ? 'coach' : 'half';
-    this.pendingPlay[side] = null;
     this.playUsed[side] = true;
-    const used = this.autoUsed[side];
-    used.launched++;
-    used.lastSet[id] = this.sets[side];
     this.playsRun.launched[side]++;
-    this.emit('set-play', by === 'half' ? `${caller.name} calls ${playTitle(play)}` : `${this.names[side]} run ${playTitle(play)}`, caller);
-    this.events[this.events.length - 1]!.detail = id;
-    if (by === 'coach') this.judge.make(side, 'set-play', side, this.dirOf(side), b.x, id);
+    if (by === 'star') this.emit('signature-play', `${caller.name} calls for the ball: ${play.name}!`, caller);
+    else this.emit('set-play', by === 'half' ? `${caller.name} calls ${playTitle(play)}` : `${this.names[side]} run ${playTitle(play)}`, caller);
+    this.events[this.events.length - 1]!.detail = play.id;
+    if (by === 'coach' && play.id !== POSTS_CHARGE_PLAY.id) this.judge.make(side, 'set-play', side, this.dirOf(side), this.ballPos().x, play.id);
     this.scripted = {
       side,
-      id,
+      id: play.id,
       by,
       edge,
       ySign,
@@ -170,12 +203,11 @@ export abstract class LiveSetPlays extends LiveCalls {
       bonusUsed: false,
       until: this.tick + PLAYS.scriptTicks,
     };
-    if (caller !== launcher) this.pass(launcher, caller, 0, 0);
+    if (caller !== launcher) this.pass(launcher, caller, 0, by === 'star' ? undefined : 0);
     else {
       caller.catchTick = this.tick;
       caller.decided = false;
     }
-    return true;
   }
 
   /** Who the caller's pass is for: the next man in the script, else (a carry play) the first decoy. */
@@ -189,7 +221,10 @@ export abstract class LiveSetPlays extends LiveCalls {
     const s = this.scripted!;
     const toward = this.playTarget(s);
     this.scripted = null;
-    this.emit('play-breaks-down', `${h.name} can't find ${toward ? toward.name : 'his man'} — ${playTitle(PLAYS_BY_ID[s.id])} breaks down`, h);
+    const title = playTitle(livePlay(s.id));
+    this.emit(s.by === 'star' ? 'signature-breakdown' : 'play-breaks-down', s.by === 'star'
+      ? `${h.name} tucks it up as ${title} breaks down`
+      : `${h.name} can't find ${toward ? toward.name : 'his man'} — ${title} breaks down`, h);
     this.events[this.events.length - 1]!.detail = s.id;
     this.playsRun.brokeDown[s.side]++;
     this.tucked = this.indexOf(h);
@@ -201,10 +236,31 @@ export abstract class LiveSetPlays extends LiveCalls {
     return s && !s.bonusUsed && s.bonusFor === this.indexOf(h) ? s.bonus.stepAgainst ?? 0 : 0;
   }
 
+  protected chargingPosts(h: Player): boolean {
+    return this.scripted?.id === POSTS_CHARGE_PLAY.id && this.scripted.outcome === 'ok'
+      && this.scripted.men[0] === this.indexOf(h);
+  }
+
+  /** The commentary credits the signature only for a real bust, fend or try. */
+  protected rememberSignature(h: Player): void {
+    const s = this.scripted;
+    if (!s || !this.chargingPosts(h) || s.signatureCredited) return;
+    s.signatureCredited = true;
+    this.emit('signature-success', `${h.name}'s ${POSTS_CHARGE_PLAY.name} comes off!`, h);
+    this.events[this.events.length - 1]!.detail = s.id;
+  }
+
   /** A play is over at the next tackle, stoppage, turnover or kick, or when it has run its time; a tucked caller's tackle is made. */
   protected tidyPlays(): void {
     const s = this.scripted;
-    if (s && (this.phase.kind !== 'play' || this.attacking !== s.side || this.ball.kind === 'loose' || (this.ball.kind === 'flight' && this.ball.via === 'kick') || this.tick > s.until)) this.scripted = null;
+    if (s) {
+      const wrestle = s.by === 'star' && s.outcome === 'ok' && this.phase.kind === 'tackle'
+        && this.phase.wrestle !== null && this.phase.carrier === s.men[0];
+      const signaturePassEnded = s.by === 'star' && (this.ball.kind === 'flight' && this.ball.receiver !== s.men[0]
+        || this.ball.kind === 'held' && this.ball.by !== s.men[0]);
+      if ((!wrestle && this.phase.kind !== 'play') || this.attacking !== s.side || this.ball.kind === 'loose'
+        || (this.ball.kind === 'flight' && this.ball.via === 'kick') || signaturePassEnded || this.tick > s.until) this.scripted = null;
+    }
     if (this.tucked >= 0 && this.phase.kind !== 'play') this.tucked = -1;
   }
 }

@@ -12,6 +12,7 @@ import { EDGE_COST, FINISHER_M, announce, contestTraits, interceptTraits } from 
 import { traitBoost } from '../../../data/traits';
 import { FATIGUE } from '../fatigue';
 import { HELD_UP, WRESTLE, driveSpeed, fightOf, gripOf, heldUpChance, heldUpContest, holdOf, wrestleTick, type WrestleState } from '../wrestle';
+import { POSTS_CHARGE } from '../plays';
 import { NINES } from '../rules';
 import { GOALS, inBonusZone, postsFor } from '../goals';
 import { PENALTY } from '../penalties';
@@ -196,8 +197,10 @@ export abstract class LiveContact extends LivePenalties {
     this.applyCompressedContact(c, t, committed, tr.mods, sit.support);
     // A set play's last man (#326): the play's bonus on his first contact, once.
     const sp = this.scripted;
+    let chargeFight = 1;
     if (sp && !sp.bonusUsed && sp.bonusFor === this.indexOf(c)) {
       sp.bonusUsed = true;
+      if (this.chargingPosts(c)) chargeFight += POSTS_CHARGE.wrestleFight;
       if (sp.bonus.broken) tr.mods.broken = (tr.mods.broken ?? 0) + sp.bonus.broken;
       if (sp.bonus.fend) tr.mods.fend = (tr.mods.fend ?? 0) + sp.bonus.fend;
       if (sp.bonus.offload) tr.mods.offload = (tr.mods.offload ?? 0) + sp.bonus.offload;
@@ -224,6 +227,7 @@ export abstract class LiveContact extends LivePenalties {
         return;
       }
       case 'broken':
+        this.rememberSignature(c);
         this.emit('break-tackle', `${c.name} busts through ${t.name}`, c, credit);
         this.tagContact(c, [t]);
         this.lock(t, 'down', 16, add(t.body.pos, scale(back, -1.2)));
@@ -231,6 +235,7 @@ export abstract class LiveContact extends LivePenalties {
         this.burst(c);
         return;
       case 'fend':
+        this.rememberSignature(c);
         this.emit('fend', `${c.name} palms off ${t.name}`, c, credit);
         this.tagContact(c, [t]);
         c.pose = 'fend';
@@ -325,7 +330,7 @@ export abstract class LiveContact extends LivePenalties {
     // Held: the wrestle (§8.1). A Wrecking Ball sometimes keeps his legs pumping — more fight, more ground.
     const wb = traitBoost(c.traits, 'wreckingBall');
     const wreck = wb > 0 && this.rng.next() < LIVE.wreckDriveChance * wb ? wb : 0;
-    const fight = fightOf({ ...c.stats, stamina: c.stamina }, c.energy, this.rng.next()) * (1 + WRESTLE.wreckFight * wreck);
+    const fight = fightOf({ ...c.stats, stamina: c.stamina }, c.energy, this.rng.next()) * (1 + WRESTLE.wreckFight * wreck) * chargeFight;
     const wrestle: WrestleState = { men: [this.indexOf(t)], fight, fight0: fight, grip: gripOf(t.stats, t.energy, true), t0: this.tick, metres: 0, speedDiff: sit.speedDiff };
     this.visualContact = this.contactInfo(c, [t]);
     this.hold(c, 'tackled');
@@ -449,6 +454,7 @@ export abstract class LiveContact extends LivePenalties {
     }
     if (end === 'free') {
       // The defenders' grip went before his fight: he is through.
+      this.rememberSignature(c);
       this.emit('break-tackle', `${c.name} fights out of the tackle!`, c);
       this.tagContact(c, men, ph.t0);
       this.events[this.events.length - 1]!.detail = 'wrestle';
@@ -563,6 +569,7 @@ export abstract class LiveContact extends LivePenalties {
     this.concededRun[other(scorer.side)]++;
     this.concededRun[scorer.side] = 0;
     this.points[scorer.side] += bonus ? NINES.bonusTryPoints : NINES.tryPoints;
+    this.rememberSignature(scorer);
     this.emit('try', bonus ? `TRY! ${scorer.name} goes round under the posts — five points for ${this.names[scorer.side]}` : `TRY! ${scorer.name} dives over for ${this.names[scorer.side]}`, scorer);
     if (bonus) this.events[this.events.length - 1]!.detail = 'bonus';
     // Dive and slide, then up to celebrate on the spot — he stays put until the restart.
