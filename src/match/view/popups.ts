@@ -57,6 +57,7 @@ const WORDS: Readonly<Record<string, { word: string; tone: PopupTone; big?: bool
   'held-up': { word: 'HELD UP!', tone: 'defence', big: true },
   // Interchanges (BAK-207 2b): over the man coming on.
   interchange: { word: 'ON!', tone: 'neutral' },
+  'fresh-impact': { word: 'FRESH LEGS', tone: 'neutral' },
   // Goal kicking (2c): the result over the kicker; a charge-down over the man who blocked it.
   conversion: { word: 'GOAL!', tone: 'attack' },
   'field-goal': { word: 'FIELD GOAL!', tone: 'attack', big: true },
@@ -155,7 +156,7 @@ export function popupFor(e: SimEvent): Popup | null {
               : w.word;
   // A bonus try points at the zone it was grounded in (#77; zoneLayer.ts lights it).
   const sub = e.kind === 'try' && e.detail === 'bonus' ? BONUS_SUB : surnameOf(e.player).toUpperCase();
-  const p: Popup = { word, sub, tone: w.tone, big, ms: big ? POPUP_BIG_MS : POPUP_MS };
+  const p: Popup = { word, sub, tone: w.tone, big, ms: big || e.kind === 'fresh-impact' ? POPUP_BIG_MS : POPUP_MS };
   if (e.trait) p.trait = e.trait.toUpperCase();
   return p;
 }

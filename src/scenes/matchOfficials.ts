@@ -29,7 +29,7 @@ import { conversionJudges } from '../match/view/conversionJudges';
 import type { Vec } from '../match/core/vec';
 import { toFieldPt } from '../match/core/field';
 import type { PlayerSnap, Side, Snapshot } from '../match/core/snapshot';
-import { BENCH, REF, benchSeat, benchSeated, binSeat, binnedSpot, refCoversCarrier, refereeSignal, refereeSpot, type BenchSheet } from '../match/view/officials';
+import { BENCH, REF, benchJog, benchSeat, benchSeated, binSeat, binnedSpot, refCoversCarrier, refereeSignal, refereeSpot, type BenchSheet } from '../match/view/officials';
 import type { MatchArtRegistry } from './matchArt';
 import { BOARD_TEX_H, BOARD_TEX_W, boardColor, drawScoreboard, flashWord, scoreboardOrigin, type BoardState } from '../art/match/scoreboard';
 import { reducedMotion } from '../match/view/impact';
@@ -94,6 +94,14 @@ interface BenchView {
   /** Who was painted, so an unchanged bench is not repainted. */
   shown: string;
   card: Phaser.GameObjects.Image;
+  joggers: BenchJogger[];
+}
+
+interface BenchJogger {
+  image: Phaser.GameObjects.Image;
+  shadow: Phaser.GameObjects.Image;
+  canvas: Canvas;
+  shown: string;
 }
 
 interface TouchJudgeView {
@@ -153,7 +161,16 @@ export class MatchOfficials {
       const image = scene.add.image(empty.x, empty.y, canvas.key).setOrigin(0, 0).setDepth(mid + 1);
       const bin = world(binSeat(side));
       scene.add.image(Math.round(bin.x) - BIN_SPOT_X, Math.round(bin.y) - BIN_SPOT_Y, spot).setOrigin(0, 0).setDepth(bin.y);
-      return { canvas, image, seats, shown: '', card: scene.add.image(0, 0, card).setOrigin(0.5, 1).setVisible(false) };
+      const joggers = Array.from({ length: opts.sheets[side].bench?.length ?? 0 }, (_, i): BenchJogger => {
+        const canvas = new Canvas(scene, art, `bench-jog-${side}-${i}`, WIDTH, HEIGHT);
+        return {
+          canvas,
+          image: scene.add.image(0, 0, canvas.key).setVisible(false),
+          shadow: scene.add.image(0, 0, opts.shadowKey).setDepth(-80_000).setVisible(false),
+          shown: '',
+        };
+      });
+      return { canvas, image, seats, joggers, shown: '', card: scene.add.image(0, 0, card).setOrigin(0.5, 1).setVisible(false) };
     };
     this.benches = { home: bench('home'), away: bench('away') };
     // The referee: one sprite and its shadow, in a strip neither side can be taken for.
@@ -228,7 +245,7 @@ export class MatchOfficials {
     if (cur.score) this.drawBoard([cur.score.home, cur.score.away]);
     this.drawReferee(prev, cur, alpha);
     this.drawTouchJudges(cur, heldTicks);
-    for (const side of ['home', 'away'] as const) this.drawBench(side, cur);
+    for (const side of ['home', 'away'] as const) this.drawBench(side, cur, prev.tick + (cur.tick - prev.tick) * alpha);
   }
 
   private world(p: { x: number; y: number }): { x: number; y: number } {
@@ -312,15 +329,36 @@ export class MatchOfficials {
     this.ref.setOrigin((left ? WIDTH - CENTRE : CENTRE) / WIDTH, FOOT / HEIGHT).setFlipX(left);
   }
 
-  private drawBench(side: Side, cur: Snapshot): void {
+  private drawBench(side: Side, cur: Snapshot, tick: number): void {
     const b = this.benches[side];
     const who = benchSeated(this.opts.sheets[side], side, cur).slice(0, BENCH.seats);
+    const exits = breakKind(cur) ? [] : cur.interchangeExits;
+    b.joggers.forEach((j, i) => {
+      const key = who[i];
+      const exit = exits?.find(e => e.side === side && e.who === key);
+      const run = exit && benchJog(exit, i, tick);
+      j.image.setVisible(!!run);
+      j.shadow.setVisible(!!run);
+      if (!run || key === undefined) return;
+      who[i] = '';
+      const at = this.world(run), to = this.world(run.to);
+      const x = Math.round(at.x), y = Math.round(at.y);
+      const left = to.x < at.x;
+      const facing = to.y < at.y - 2 ? 'back' : 'front';
+      const frame = `${key}/${facing}/${run.stride}`;
+      if (j.shown !== frame) {
+        j.shown = frame;
+        j.canvas.paint(drawLivePlayer(this.opts.look(key), this.opts.kits[side], 'run', run.stride % 6, facing, false, run.stride, 2));
+      }
+      j.image.setPosition(x, y).setDepth(y + 1).setOrigin((left ? WIDTH - CENTRE : CENTRE) / WIDTH, FOOT / HEIGHT).setFlipX(left);
+      j.shadow.setPosition(x, y);
+    });
     const shown = who.join('|');
     if (shown !== b.shown) {
       b.shown = shown;
       const people = b.seats.map((_, i) => {
         const w = who[i];
-        if (w === undefined) return null;
+        if (!w) return null;
         let pic = this.seated.get(`${side}/${w}`);
         if (!pic) {
           pic = drawSeatedPlayer(this.opts.look(w), this.opts.kits[side]);

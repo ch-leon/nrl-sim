@@ -101,7 +101,7 @@ const BLOWING_TICKS = 6;
 
 /** How tired he looks (#666), on the legs bar's own bands so bar and body agree: 2 spent or blown, 1 tired, 0 fresh. */
 export function tiredLevel(p: PlayerSnap): 0 | 1 | 2 {
-  if (p.blown) return 2;
+  if (p.blown || p.interchanging) return 2;
   if (p.legs === undefined) return 0;
   const band = legsBand(p.legs, FATIGUE);
   return band === 'spent' ? 2 : band === 'tired' ? 1 : 0;

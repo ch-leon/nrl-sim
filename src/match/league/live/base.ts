@@ -4,7 +4,7 @@ import type { TeamSheet } from '../../../sim/events';
 import { FIELD_LENGTH, MID_X, MID_Y, clampToGround } from '../../core/field';
 import { makeBody, maxSpeedFor } from '../../core/body';
 import { flightAt, type BallState } from '../../core/ball';
-import type { Side, SimEvent } from '../../core/snapshot';
+import type { InterchangeExit, Side, SimEvent } from '../../core/snapshot';
 import type { Vec } from '../../core/vec';
 import type { Situation } from '../contest';
 import { FULLBACK, HOOKER, KICKER, PLAYERS, ROLES } from '../roles';
@@ -33,6 +33,7 @@ export abstract class LiveBase {
   tick = 0;
   finished = false;
   protected readonly rng: Rng;
+  protected visualExits: InterchangeExit[] = [];
   protected readonly players: Player[];
   /** Each side's men on the field, kept once (side() is called many times a tick) and rebuilt when a man goes to or comes back from the sin bin (#71). */
   private homeOn: Player[];

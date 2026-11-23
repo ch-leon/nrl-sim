@@ -37,7 +37,7 @@ import { SET_TACKLES } from '../../config';
 import { TICK_S, type MatchSim } from '../core/engine';
 import { speedOf } from '../core/body';
 import { CARRY_LIFT, flightAt } from '../core/ball';
-import { GROUND_PICKUP_TICKS, REACT_SNAP_TICKS, type GroundPickupSnap, type PlayerSnap, type Snapshot } from '../core/snapshot';
+import { GROUND_PICKUP_TICKS, INTERCHANGE_EXIT_TICKS, REACT_SNAP_TICKS, type GroundPickupSnap, type PlayerSnap, type Snapshot } from '../core/snapshot';
 import type { Vec } from '../core/vec';
 import { clockText } from './rules';
 import { goalStrikeTick } from './goals';
@@ -218,8 +218,10 @@ export class LiveSim extends LivePositioning implements MatchSim {
         ...(ph.kind === 'try' && scorer?.side === p.side ? { celebrationTick: ph.t0 } : {}),
         ...(p.react !== null && this.tick - p.react.tick < REACT_SNAP_TICKS ? { reactTick: p.react.tick, react: p.react.kind } : {}),
         ...(p.binUntilS >= 0 ? { binned: true } : {}),
+        ...(p.subFor !== null ? { interchanging: true } : {}),
       };
     });
+    const exits = this.visualExits.filter(exit => this.tick - exit.tick < INTERCHANGE_EXIT_TICKS);
     let ball: Snapshot['ball'];
     if (b.kind === 'held') {
       const h = this.players[b.by]!;
@@ -260,6 +262,7 @@ export class LiveSim extends LivePositioning implements MatchSim {
       ...(this.visualBombContest ? { bombContest: this.visualBombContest } : {}),
       ...(showPickup ? { groundPickup: pickup } : {}),
       ...(conversion ? { conversion } : {}),
+      ...(exits.length ? { interchangeExits: exits } : {}),
       label: `${this.names[this.attacking]} ball · ${state} · ${this.points.home}–${this.points.away} · ${clockText(this.half, this.clockTicks * TICK_S)}${this.siren && (kind === 'play' || kind === 'tackle' || kind === 'ruck') ? ' · siren' : ''} · ${legs}${short}`,
       events: this.events,
       clock: { half: this.half, seconds: this.clockTicks * TICK_S, minute: Math.floor(this.matchSeconds / 60), siren: this.siren, finished: this.finished },

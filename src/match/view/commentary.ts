@@ -148,6 +148,8 @@ export const LINES: Readonly<Record<string, readonly string[]>> = {
   blown: ['{player} has run out of gas.', '{player} is blowing hard.', '{player} has nothing left in the tank.'],
   injury: ['{player} is hurt in the tackle.', '{player} is down and hurt.', 'Trouble here: {player} is hurt.'],
   interchange: ['{player} comes on for {team}.', 'Interchange: {player} on.', '{player} is on off the bench.'],
+  'fresh-impact:carry': ['Fresh legs as {player} takes it up.', '{player} winds up on fresh legs.', 'Fresh legs for the carry from {player}.'],
+  'fresh-impact:tackle': ['Fresh legs as {player} gets a grip.', '{player} brings fresh legs to the tackle.', 'Fresh legs in contact from {player}.'],
   // ── Penalties (2e) and the captain's call ──
   'penalty:offside': ['Penalty to {other} — offside.', 'Offside! {player} gives away a penalty.', 'The ref pings {team} for offside.'],
   'penalty:high': ['High shot from {player} — penalty.', 'Penalty! {player} catches him high.', 'A high tackle — penalty to {other}.'],

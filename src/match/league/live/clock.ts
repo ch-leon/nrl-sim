@@ -1,7 +1,7 @@
 import { TICK_S } from '../../core/engine';
-import { FIELD_LENGTH, FIELD_WIDTH, MID_Y } from '../../core/field';
+import { FIELD_LENGTH, FIELD_WIDTH, MID_Y, benchSeat } from '../../core/field';
 import { maxSpeedFor } from '../../core/body';
-import type { Side, SimEvent } from '../../core/snapshot';
+import { INTERCHANGE_EXIT_TICKS, type Side, type SimEvent } from '../../core/snapshot';
 import { clamp, dist, type Vec } from '../../core/vec';
 import { ROLES } from '../roles';
 import { FATIGUE, drainRate } from '../fatigue';
@@ -150,7 +150,7 @@ export abstract class LiveClock extends LiveSetPlays {
           const p = this.at(side, pick.slot);
           p.subFor = pick.bench;
           p.subAt = this.tick;
-          p.subSpot = this.interchangeSpot(p);
+          p.subSpot = this.interchangeTarget(p);
           p.subFresh = true;
           this.freshLegs[side].pending = false;
         } else this.lapseFreshLegs(side);
@@ -162,9 +162,14 @@ export abstract class LiveClock extends LiveSetPlays {
         const p = this.at(side, sw.slot);
         p.subFor = sw.bench;
         p.subAt = this.tick;
-        p.subSpot = this.interchangeSpot(p);
+        p.subSpot = this.interchangeTarget(p);
       }
     }
+  }
+
+  /** Interchanges head to their bench on the near touchline. The bin uses its usual touchline route. */
+  private interchangeTarget(p: Player): Vec {
+    return BENCH.impact.on > 0 ? { x: benchSeat(p.side, 2).x, y: FIELD_WIDTH - 1 } : this.interchangeSpot(p);
   }
 
   /** Where a man comes off: the nearest touchline, level with where he is (in from the try lines). */
@@ -188,6 +193,10 @@ export abstract class LiveClock extends LiveSetPlays {
     this.bench[p.side][bi] = { name: p.name, key: p.key, ...(p.id ? { id: p.id } : {}), injuryRisk: p.injuryRisk, injured: p.hurt, stats: p.stats, traits: p.traits, stamina: p.stamina, energy: p.energy, position: ROLES[p.slot]!.name };
     this.retreat?.eligible.delete(p);
     this.retreat?.markers.delete(p);
+    if (this.phase.kind !== 'half-time') {
+      this.visualExits = this.visualExits.filter(exit => this.tick - exit.tick < INTERCHANGE_EXIT_TICKS && (exit.side !== p.side || exit.who !== p.key));
+      this.visualExits.push({ side: p.side, who: p.key, from: { ...p.body.pos }, tick: this.tick });
+    }
     const out = p.name;
     const wasHurt = p.hurt;
     p.name = b.name;
