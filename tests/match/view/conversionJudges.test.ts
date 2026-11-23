@@ -13,7 +13,8 @@ const factory = (seed: number) => new LiveSim(home, away, seed);
 
 describe('touch judges at conversions', () => {
   it.each([
-    { seed: 37, award: 2126, toward: 1, good: true },
+    // The bench-side interchange moves this seed's positive-end goal to tick 2234.
+    { seed: 37, award: 2234, toward: 1, good: true },
     { seed: 15, award: 1339, toward: -1, good: false },
     { seed: 26, award: 5183, toward: -1, good: true },
     { seed: 18, award: 2116, toward: 1, good: false },
