@@ -522,7 +522,8 @@ describe('AudioEngine (fake context)', () => {
     bus.emit('match:event', tackle);
     const bed = engine.crowdTarget * CROWD_OUT;
     const gain = engine.crowdGain! as unknown as FakeParam;
-    const lastRamp = () => gain.linearRampToValueAtTime.mock.calls.at(-1)![0];
+    const ramps = gain.linearRampToValueAtTime.mock.calls;
+    const lastRamp = () => ramps[ramps.length - 1]![0];
     bus.emit('match:goal-line-stand', { side: 'away', x: 8 });
     const peak = lastRamp();
     expect(peak).toBeGreaterThan(bed);
