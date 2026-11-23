@@ -170,8 +170,8 @@ describe('runMatch', () => {
   it('is deterministic, starts with a kick-off, ends at full time, and its stats agree with the overlay count', () => {
     const home = sheet('H', 65);
     const away = sheet('A', 55);
-    // The timed back-door runs (#722) leave rainy seed 6 scoreless; seed 1 is a current scoring witness.
-    for (const seed of [5, 1]) {
+    // The corner cover read leaves rainy seed 1 scoreless. Both witnesses here reach the scoreboard.
+    for (const seed of [5, 2]) {
       const r = runMatch(home, away, { seed, weather: 'rain' });
       expect(runMatch(home, away, { seed, weather: 'rain' })).toEqual(r);
       expect(r.events[0]!.kind).toBe('kickoff');

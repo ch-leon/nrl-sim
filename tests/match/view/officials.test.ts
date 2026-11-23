@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest';
 import { LiveSim } from '../../../src/match/league/live';
 import { sideSheet } from '../../../src/match/balance/measure';
 import { toFieldPt } from '../../../src/match/core/field';
-import type { Snapshot } from '../../../src/match/core/snapshot';
+import type { SimEvent, Snapshot } from '../../../src/match/core/snapshot';
 import { fieldOffsetX, fieldToWorldPoint } from '../../../src/scenes/matchField';
 import { BENCH, REF, benchSeat, benchSeated, binSeat, binnedSpot, refCoversCarrier, refereeSignal, refereeSpot } from '../../../src/match/view/officials';
 import { refereeKit, REFEREE_STRIPS } from '../../../src/art/match/bench';
@@ -159,24 +159,28 @@ describe('the bench and the sin bin (#642)', () => {
   });
 
   it('a binned man walks off as the sim has him, then sits in his side’s bin until he is back on', () => {
-    let saw = { walking: false, seated: false };
-    for (let seed = 1; seed <= 40 && !saw.seated; seed++) {
-      const sim = new LiveSim(home, away, seed);
-      while (!sim.finished) {
-        sim.step();
-        const s = sim.snapshot();
-        for (const p of s.players) {
-          const at = binnedSpot(p, s);
-          if (!p.binned) expect(at).toBeNull();
-          else if (at) {
-            expect(at).toEqual(binSeat(p.side));
-            saw.seated = true;
-          } else saw.walking = true;
-        }
-        if (saw.seated) break;
+    const saw = { walking: false, seated: false, returned: false };
+    let sent: SimEvent | undefined;
+    // A full four-minute bin needs room to play out in the real match clock.
+    for (const s of matchSnapshots(21)) {
+      sent ??= s.events.find(e => e.kind === 'sin-bin');
+      if (!sent) continue;
+      const { side, slot } = sent;
+      const p = s.players.find(p => p.side === side && p.slot === slot)!;
+      const at = binnedSpot(p, s);
+      if (s.events.some(e => e.kind === 'sin-bin-return' && e.side === p.side && e.slot === p.slot)) {
+        expect(p.binned).toBeFalsy();
+        expect(at).toBeNull();
+        saw.returned = true;
+        break;
       }
+      expect(p.binned).toBe(true);
+      if (at) {
+        expect(at).toEqual(binSeat(p.side));
+        saw.seated = true;
+      } else saw.walking = true;
     }
-    expect(saw).toEqual({ walking: true, seated: true });
+    expect(saw).toEqual({ walking: true, seated: true, returned: true });
   });
 
   it('hides the bin card through the whistle picture and restores it with live play', () => {

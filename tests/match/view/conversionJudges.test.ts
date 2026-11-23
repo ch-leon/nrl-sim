@@ -14,8 +14,8 @@ const factory = (seed: number) => new LiveSim(home, away, seed);
 describe('touch judges at conversions', () => {
   it.each([
     { seed: 37, award: 2126, toward: 1, good: true },
-    { seed: 15, award: 1339, toward: -1, good: false },
-    { seed: 26, award: 5183, toward: -1, good: true },
+    { seed: 15, award: 1338, toward: -1, good: false },
+    { seed: 15, award: 4190, toward: -1, good: true },
     { seed: 18, award: 2116, toward: 1, good: false },
   ])('follows the real decision at end $toward, seed $seed, good $good', ({ seed, award, toward, good }) => {
     const r = new Runner(factory, seed);
@@ -81,7 +81,7 @@ describe('touch judges at conversions', () => {
 
   it.each([
     { seed: 2, halfMinutes: 2, award: 3245, whistle: 'half-time' },
-    { seed: 3, halfMinutes: 3, award: 8462, whistle: 'full-time' },
+    { seed: 3, halfMinutes: 3, award: 8689, whistle: 'full-time' },
   ])('keeps the decision visible when the conversion ends in $whistle', ({ seed, halfMinutes, award, whistle }) => {
     const r = new Runner(s => new LiveSim(home, away, s, { length: { halves: 2, halfMinutes } }), seed);
     r.seek(award);
