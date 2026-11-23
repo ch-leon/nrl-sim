@@ -19,6 +19,7 @@ import {
   drawBinCard,
   drawBinSpot,
   drawCornerFlag,
+  drawRefereeSixAgain,
   drawSeatedPlayer,
   paintBench,
   refereeKit,
@@ -29,7 +30,7 @@ import { conversionJudges } from '../match/view/conversionJudges';
 import type { Vec } from '../match/core/vec';
 import { toFieldPt } from '../match/core/field';
 import type { PlayerSnap, Side, Snapshot } from '../match/core/snapshot';
-import { BENCH, REF, benchSeat, benchSeated, binSeat, binnedSpot, refCoversCarrier, refereeSignal, refereeSpot, type BenchSheet } from '../match/view/officials';
+import { BENCH, REF, SIX_AGAIN_POSE_TICKS, benchSeat, benchSeated, binSeat, binnedSpot, refCoversCarrier, refereeSignal, refereeSpot, type BenchSheet } from '../match/view/officials';
 import type { MatchArtRegistry } from './matchArt';
 import { BOARD_TEX_H, BOARD_TEX_W, boardColor, drawScoreboard, flashWord, scoreboardOrigin, type BoardState } from '../art/match/scoreboard';
 import { reducedMotion } from '../match/view/impact';
@@ -298,11 +299,14 @@ export class MatchOfficials {
       stride = (Math.floor(cur.tick * 0.5) % 6) + (speed < 5 ? 6 : 0);
       frame = stride % 6;
     }
-    const key = `${action}/${frame}/${stride ?? ''}/${facing}`;
+    const arm = signal === 'six-again' ? Math.floor((cur.tick - cur.sixAgainTick!) / SIX_AGAIN_POSE_TICKS) : undefined;
+    const key = `${action}/${frame}/${stride ?? ''}/${facing}/${arm ?? ''}`;
     if (key !== this.refShown) {
       let pixels = this.refFrames.get(key);
       if (!pixels) {
-        pixels = drawLivePlayer(this.refLook, this.refKit, action, frame, facing, false, stride);
+        pixels = arm === undefined
+          ? drawLivePlayer(this.refLook, this.refKit, action, frame, facing, false, stride)
+          : drawRefereeSixAgain(this.refLook, this.refKit, arm, frame, facing, stride);
         if (this.refFrames.size >= REF_FRAMES) this.refFrames.delete(this.refFrames.keys().next().value!);
         this.refFrames.set(key, pixels);
       }
