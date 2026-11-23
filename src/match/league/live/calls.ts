@@ -13,6 +13,7 @@ import { GOALS } from '../goals';
 import { CALLS, CALL_LABEL, callIsBench, callIsDefence, callIsPenalty, callIsPlay, callScope, paidOffText, penaltyChoiceOf, type CallVerdict, type CoachCall } from '../calls';
 import { FORTY_TWENTY_ENABLED, FORTY_TWENTY_INTO_M, TOUCH } from '../touch';
 import type { PlayId } from '../../../data/plays';
+import { puntCarry } from '../weather';
 import { LIVE } from './knobs';
 import { other, type Player } from './types';
 import { LiveBase } from './base';
@@ -118,7 +119,7 @@ export abstract class LiveCalls extends LiveBase {
    * kicker's Big Boot and the wind, without its gusts), the shortest roll on (touchRollM), and their 20 (isFortyTwenty's).
    */
   private fortyTwentyReach(side: Side): number {
-    return FORTY_TWENTY_INTO_M + TOUCH.touchRollM + CALLS.fortyTwenty.reachM * bootMult(this.kicker(side).traits).dist * this.wx.kickDistance;
+    return FORTY_TWENTY_INTO_M + TOUCH.touchRollM + CALLS.fortyTwenty.reachM * bootMult(this.kicker(side).traits).dist * puntCarry(this.wind, this.dirOf(side));
   }
 
   /**

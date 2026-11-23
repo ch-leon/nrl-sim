@@ -27,6 +27,7 @@ import { MATCH_PREVIEW } from '../preview';
 import { blendPace, KeyMoments, playbackPace } from '../view/livePlayback';
 import { NINES } from '../league/rules';
 import type { LiveSim } from '../league/live';
+import type { WindDirection } from '../league/weather';
 
 export interface LabSceneData {
   home: TeamSheet;
@@ -144,6 +145,10 @@ export class LabScene extends MatchScene {
       if (e.kind === 'penalty') bus.emit('match:penalty', { tick: e.tick });
       if (e.kind === 'line-break' && e.detail !== HALF_BREAK) bus.emit('match:clean-break', { tick: e.tick });
     }
+  }
+
+  protected override stadiumWind(): WindDirection {
+    return (this.controller.runner.current as LiveSim).wind;
   }
 
   /** The lab's own clock: its runner's speed. */

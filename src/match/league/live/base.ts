@@ -20,7 +20,7 @@ import type { CaptainRead, PenaltyChoice } from '../penalties';
 import { edgeSheets, spreadSheets } from '../spread';
 import { CallJudge, callDefence, withAttackCall, withDefenceCall, type CallInput, type CallVerdict, type CoachCall } from '../calls';
 import type { KickoffCall } from '../kickoff';
-import { weatherEffect, type WeatherEffect } from '../weather';
+import { weatherEffect, windDirection, type WeatherEffect, type WindDirection } from '../weather';
 import type { MatchInjury, WeatherKind } from '../../../sim/events';
 import { styleFit, type StyleFit } from '../fit';
 import { compressedCounter, fitEdge, rushCounter, slideCounter } from '../counters';
@@ -87,6 +87,7 @@ export abstract class LiveBase {
   protected penaltyKickUp: { side: Side } | null = null;
   /** The weather and what it does (2f), the injury rate, and the injuries so far (for MatchResult). */
   readonly weather: WeatherKind;
+  readonly wind: WindDirection;
   protected readonly wx: WeatherEffect;
   protected readonly injuryRate: number;
   protected readonly clubIds: Record<Side, string>;
@@ -282,6 +283,7 @@ export abstract class LiveBase {
     }
     this.weather = opts.weather ?? 'clear';
     this.wx = weatherEffect(this.weather);
+    this.wind = windDirection(this.weather, seed);
     this.injuryRate = opts.injuryRate ?? 1;
     this.clubIds = { home: home.clubId, away: away.clubId };
     this.length = opts.length ?? fullMatch();

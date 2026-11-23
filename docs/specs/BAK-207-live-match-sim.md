@@ -258,8 +258,10 @@ goals (`penalty-goal`, good / missed), which the overlay already scores. Measure
 reference §17 (about 2.4 penalties and 2.3 six-agains a match; Rush concedes the most).
 
 **2f as shipped:** `league/weather.ts`. Rain makes every knock-on, spilled kick and ball lost
-in contact ×1.6; wind carries territory kicks 12% further (±15% a kick) and spreads goal kicks
-1.4× as wide. A held tackle (0.6%) or a big hit (3%) can jar the ball loose, less for a
+in contact ×1.6. Wind has a seeded direction along the field. Long punts carry further and
+come down sooner with it, or drop short and hang longer into it. The sides swap which one
+has the tailwind when they change ends. Penalties for touch carry 12% further and goal kicks
+spread 1.4× as wide in wind. A held tackle (0.6%) or a big hit (3%) can jar the ball loose, less for a
 skilful carrier: a knock-on (SPILLED!). A big hit can hurt the carrier, the old engine's roll
 scaled to the live sim's 3½× big hits so a season's injuries stay as they are; he runs at 85%
 until the next stoppage, when he comes off first for the freshest bench man (HURT!, "on for

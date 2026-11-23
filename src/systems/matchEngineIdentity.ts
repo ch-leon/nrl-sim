@@ -11,7 +11,7 @@ import { cyrb53 } from '../utils/hash';
  * AI, or result recording. Visual-only changes do not bump this revision.
  * No historical engines: only an exact identity match may replay old inputs.
  */
-export const MATCH_ENGINE_REVISION = 12;
+export const MATCH_ENGINE_REVISION = 25;
 
 /** Canonical data order keeps object insertion order out of compatibility. */
 function canonical(value: unknown): string {
