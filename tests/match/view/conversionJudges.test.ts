@@ -15,7 +15,7 @@ describe('touch judges at conversions', () => {
   it.each([
     { seed: 37, award: 2126, toward: 1, good: true },
     { seed: 15, award: 1339, toward: -1, good: false },
-    { seed: 26, award: 5183, toward: -1, good: true },
+    { seed: 2, award: 5700, toward: -1, good: true },
     { seed: 18, award: 2116, toward: 1, good: false },
   ])('follows the real decision at end $toward, seed $seed, good $good', ({ seed, award, toward, good }) => {
     const r = new Runner(factory, seed);
