@@ -1,0 +1,25 @@
+{
+  "name": "dummy-read-holdout",
+  "description": "On independent seeds, does adding the dummy change lead changes or the largest comeback in a normal five-minute match?",
+  "seeds": 160,
+  "seedStart": 10001,
+  "base": {
+    "live.dummyChance": 0
+  },
+  "scenarios": [
+    {
+      "name": "even 60 v 60",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    }
+  ],
+  "sweep": {
+    "live.dummyChance": [
+      0.18
+    ]
+  }
+}

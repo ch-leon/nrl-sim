@@ -406,3 +406,14 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261123-085604-standard | standard | eb7f6784 | HEAD | [report](runs/20261123-085604-standard/report.md) |
 | 20261123-085604-impact-rotation-664 | impact rotation 664 | eb7f6784 | HEAD | [report](runs/20261123-085604-impact-rotation-664/report.md) |
 | 20261123-090830-impact-interchange-holdout-664 | impact interchange holdout 664 | eb7f6784 | HEAD | [report](runs/20261123-090830-impact-interchange-holdout-664/report.md) |
+| 20261123-114924-standard | standard | ba223318 | HEAD | [report](runs/20261123-114924-standard/report.md) |
+| 20261123-120434-standard | standard | 3b606644 | HEAD | [report](runs/20261123-120434-standard/report.md) |
+| 20261123-120721-standard | standard | d855d36c | HEAD | [report](runs/20261123-120721-standard/report.md) |
+| 20261123-121659-standard | standard | 987c71a9 | HEAD | [report](runs/20261123-121659-standard/report.md) |
+| 20261123-122308-standard | standard | f82bd280 | HEAD | [report](runs/20261123-122308-standard/report.md) |
+| 20261123-122601-standard | standard | 90dd66ad | HEAD | [report](runs/20261123-122601-standard/report.md) |
+| 20261123-115737-corner-cover-tackle | Corner cover tackle | 3b606644 | feat/seven-corner | [report](runs/20261123-115737-corner-cover-tackle/report.md) |
+| 20261123-115137-dummy-pass | dummy-pass | a60b0352 | feat/seven-dummy | [report](runs/20261123-115137-dummy-pass/report.md) |
+| 20261123-120943-dummy-read-holdout | dummy-read-holdout | d855d36c | HEAD | [report](runs/20261123-120943-dummy-read-holdout/report.md) |
+| 20261123-121901-dummy-strength-holdout | dummy-strength-holdout | d855d36c | HEAD | [report](runs/20261123-121901-dummy-strength-holdout/report.md) |
+| 20261123-120842-standard | standard | f6151a36 | HEAD | [report](runs/20261123-120842-standard/report.md) |

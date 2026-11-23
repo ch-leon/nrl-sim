@@ -1,0 +1,26 @@
+{
+  "name": "dummy-pass",
+  "description": "How often does a dummy-and-go occur and draw the closest defender across at different attempt rates in even 60 v 60 matches?",
+  "seeds": 40,
+  "base": {
+    "live.dummyChance": 0
+  },
+  "scenarios": [
+    {
+      "name": "even 60 v 60",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    }
+  ],
+  "sweep": {
+    "live.dummyChance": [
+      0.09,
+      0.18,
+      0.27
+    ]
+  }
+}

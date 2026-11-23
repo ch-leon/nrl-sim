@@ -1,0 +1,27 @@
+{
+  "name": "dummy-strength-holdout",
+  "description": "Does the dummy alter the 20-point ability gap seen in the short 20-seed standard row? The 70-rated side plays each independent seed from both ends.",
+  "seeds": 100,
+  "seedStart": 10001,
+  "base": {
+    "live.dummyChance": 0
+  },
+  "scenarios": [
+    {
+      "name": "independent 70 v 50",
+      "home": {
+        "rating": 70
+      },
+      "away": {
+        "rating": 50
+      },
+      "track": "home",
+      "bothWays": true
+    }
+  ],
+  "sweep": {
+    "live.dummyChance": [
+      0.18
+    ]
+  }
+}

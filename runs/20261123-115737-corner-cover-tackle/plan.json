@@ -1,0 +1,42 @@
+{
+  "name": "Corner cover tackle",
+  "description": "Measure trySavers and coverMisses, and check effect on tries and the held-up frequency in even and expansive matchups. Baseline has corner cover switched off.",
+  "seeds": 48,
+  "base": {
+    "cornerCover.on": 0
+  },
+  "scenarios": [
+    {
+      "name": "even 60 v 60",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "expansive clubs",
+      "home": {
+        "club": "rival-thunder",
+        "tactics": {
+          "attack": "expansive"
+        }
+      },
+      "away": {
+        "club": "rival-cyclones",
+        "tactics": {
+          "attack": "expansive"
+        }
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "corner cover on",
+      "tuning": {
+        "cornerCover.on": 1
+      }
+    }
+  ]
+}
