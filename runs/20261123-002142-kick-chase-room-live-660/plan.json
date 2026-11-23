@@ -1,0 +1,32 @@
+{
+  "name": "kick-chase-room-live-660",
+  "description": "Test 7 m and 8 m return-room gates with all other settings held fixed. The same live-length Kick-chase seeds and orientations have existing feature-off/main and current 5 m results in the unchanged standard plan.",
+  "seeds": 100,
+  "base": {
+    "kickReturn.roomM": 7
+  },
+  "scenarios": [
+    {
+      "name": "kick-chase v balanced",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "8 m room",
+      "tuning": {
+        "kickReturn.roomM": 8
+      }
+    }
+  ]
+}
