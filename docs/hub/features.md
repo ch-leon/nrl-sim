@@ -64,7 +64,7 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
-- At a penalty or 20 m restart, a captain can call a quick tap while defenders are still getting back. The taker nudges it with his boot and regathers, with **QUICK TAP!** on the pitch. Short defenders have to reach the 10 m line before tackling. [Issue #658](https://github.com/ch-leon/nrl-sim/issues/658)
+- At a penalty or 20 m restart, a captain can call a quick tap while defenders are still getting back. The taker nudges it with his boot and regathers, with **QUICK TAP!** on the pitch. Short defenders have to reach the 10 m line before tackling. [PR #783](https://github.com/ch-leon/nrl-sim/pull/783)
 
 - **A second kicking option on the last tackle.** On the last play-the-ball the halfback sets up flatter on the open side and the five-eighth drops behind on the other. Once the heel is played, the onside line can come up. If a defender is closing on the halfback and the five-eighth has more room, dummy-half finds him. He then makes the ordinary kick, run or pass. A directed last-tackle call, a set play or a manual pass keeps the usual path. `secondKicker.on:0` restores the single kicker and the previous ruck. Ported from draft PR #760, part of [#650](https://github.com/ch-leon/nrl-sim/issues/650).
 
