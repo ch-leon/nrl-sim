@@ -5,6 +5,10 @@ import { LIFT_PX_PER_M, LiveView, type ActorView, type BallView } from '../../..
 import { fieldOffsetX, fieldToWorldPoint } from '../../../src/scenes/matchField';
 import { FIELD_WIDTH, toFieldPt } from '../../../src/match/core/field';
 import type { Snapshot, PlayerSnap } from '../../../src/match/core/snapshot';
+import { replayRange, replayTo } from '../../../src/match/core/engine';
+import { LiveSim } from '../../../src/match/league/live';
+import { labSheet, DEFAULT_HOME, DEFAULT_AWAY } from '../../../src/match/lab/sheets';
+import type { PlayerPicture } from '../../../src/match/view/playerPicture';
 import { caseSnapshot } from '../../../src/labs/art/contactCases';
 
 interface FakeActor extends ActorView {
@@ -76,6 +80,36 @@ describe('LiveView', () => {
     expect(hidden.size).toBe(0); expect(groups[groups.length - 1]).toBeNull();
     const loose = { ...previous, tick: previous.tick + 1, ball: { ...previous.ball, holder: null } };
     view.draw(previous, loose, 1); expect(balls[balls.length - 1]).toBe(true);
+  });
+
+  it('hands the ball to the actual interceptor once and restores the same take after a seek', () => {
+    const home = labSheet(DEFAULT_HOME), away = labSheet(DEFAULT_AWAY);
+    const factory = (seed: number) => new LiveSim(home, away, seed);
+    const [air, take, turn, gather] = replayRange(factory, 1, 2299, 2302) as [Snapshot, Snapshot, Snapshot, Snapshot];
+    const ref = take.interception!.player;
+    expect(air.ball.flight?.receiver).toEqual(ref);
+    expect(take.events.some(e => e.kind === 'intercept' && e.side === ref.side && e.slot === ref.slot)).toBe(true);
+    expect(gather.interception).toEqual(replayTo(factory, 1, gather.tick).interception);
+
+    const s = surface();
+    const actor = s.players[ref.side][ref.slot]!;
+    let picture: PlayerPicture | undefined;
+    let flying = false;
+    actor.paint = p => { picture = p; };
+    s.ball.setRendered = visible => { flying = visible; };
+    const view = new LiveView(s);
+    view.draw(air, air, 1);
+    expect(picture).toMatchObject({ action: 'run', possession: false });
+    expect(flying).toBe(true);
+    view.draw(air, take, 1);
+    expect(picture).toMatchObject({ who: ref.who, action: 'intercept', possession: true });
+    expect(flying).toBe(false);
+    view.draw(turn, gather, 1);
+    const firstGather = picture;
+    expect(firstGather).toMatchObject({ action: 'intercept', possession: true });
+    view.draw(air, air, 1);
+    view.draw(turn, gather, 1);
+    expect(picture).toEqual(firstGather);
   });
 
   it('does not interpolate an interchanged player from the previous occupant’s position', () => {

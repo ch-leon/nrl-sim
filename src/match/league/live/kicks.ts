@@ -1,6 +1,6 @@
 import { FIELD_LENGTH, FIELD_WIDTH, MID_X, MID_Y, inPlay } from '../../core/field';
 import { KICK_SPEED, grubberFlight, hangTime, kickFlight, landed, type BallState } from '../../core/ball';
-import type { Side } from '../../core/snapshot';
+import type { InterceptionSnap, Side } from '../../core/snapshot';
 import { clamp, dist, dot, norm, sub, type Vec } from '../../core/vec';
 import { knockOnChance } from '../contest';
 import { legsSpeed } from '../fatigue';
@@ -20,6 +20,9 @@ import { TICK_S } from '../../core/engine';
 import { BOMB_PLANT_TICKS, BOMB_RECOVERY_TICKS, BOMB_TAKEOFF_LEAD, type BombContestSnap } from '../../core/snapshot';
 
 export abstract class LiveKicks extends LiveClock {
+  /** Presentation only, written when the defender actually takes the pass. */
+  protected visualInterception?: InterceptionSnap;
+
   protected centreCarry: (Omit<ShoulderRead, 'defender'> & {
     carrier: Player; defender: Player; catchTick: number; untilTick: number;
   }) | null = null;
@@ -230,6 +233,10 @@ export abstract class LiveKicks extends LiveClock {
       r.decided = false;
       r.steppedOn = -1;
       if (b.via === 'pass' && r.side !== this.attacking) {
+        this.visualInterception = {
+          player: { side: r.side, slot: r.slot, who: r.key },
+          tick: this.tick, fromX: b.from.x - b.to.x, fromY: b.from.y - b.to.y,
+        };
         this.emit('intercept', `${r.name} picks it off!`, r, picked);
         this.turnover();
         r.burstUntil = this.tick + LIVE.burstTicks;

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { LiveSim } from '../../../src/match/league/live';
 import { sideSheet } from '../../../src/match/balance/measure';
 import { passFlight, kickFlight } from '../../../src/match/core/ball';
@@ -26,6 +26,14 @@ class LaunchSim extends LiveSim {
   }
   afterPose() { this.tick += 6; this.players[5]!.pose = 'run'; return this.snapshot(); }
   replaceSource() { this.players[5]!.key = 'replacement'; return this.snapshot(); }
+  land(miss = false) {
+    if (this.ball.kind !== 'flight' || this.ball.receiver === null) throw new Error('Expected a pass with a receiver');
+    this.players[this.ball.receiver]!.body.pos = { ...this.ball.to, ...(miss ? { x: 80 } : {}) };
+    this.tick = this.ball.t0 + this.ball.ticks;
+    this.landings();
+    return this.snapshot();
+  }
+  replaceThief() { this.players[10]!.key = 'replacement'; return this.snapshot(); }
   changeBall(kind: 'held' | 'loose' | 'kick' | 'new-pass') {
     this.tick++;
     this.ball = kind === 'held' ? { kind: 'held', by: 1 } : kind === 'loose' ? { kind: 'loose', pos: { x: 40, y: 20 }, vel: { x: 0, y: 0 } }
@@ -74,8 +82,56 @@ describe('handling presentation (#702)', () => {
     }
     const thief = { ...receiver, side: 'away' as const, who: 'thief' };
     const s = snap(114, { players: [passer, receiver, thief], ball: { ...snap(114).ball, flight: { ...flight, receiver: thief } } });
-    expect(playerPicture(thief, thief, 114, null, 1, pictureContext(s)).action).toBe('receive');
+    expect(playerPicture(thief, thief, 114, null, 1, pictureContext(s)).action).toBe('run');
     expect(playerPicture(receiver, receiver, 114, null, 1, pictureContext(s)).action).not.toBe('receive');
+    const anchor = vi.fn(() => ({ x: 5, y: -10 }));
+    passSpriteOffset(s, 114, anchor, 10);
+    expect(anchor).toHaveBeenCalledTimes(1);
+    expect(anchor).toHaveBeenCalledWith(flight.source!.player, 'release', s.ball.flight);
+  });
+  it('publishes a take only at successful landings, tied to the actual holder and identity', () => {
+    for (const scripted of [false, true]) {
+      const sim = new LaunchSim();
+      const launch = sim.launch(true, scripted);
+      expect(launch.interception).toBeUndefined();
+      const s = sim.land();
+      expect(s.events).toContainEqual(expect.objectContaining({ kind: 'intercept', tick: s.tick, side: 'away', slot: 1 }));
+      expect(s.interception).toEqual({ player: launch.ball.flight!.receiver, tick: s.tick, fromX: .5, fromY: 14 });
+      s.interception!.player.who = 'fake';
+      expect(sim.snapshot().interception!.player).toEqual(launch.ball.flight!.receiver);
+      expect(sim.replaceThief().interception).toBeUndefined();
+    }
+    for (const [intercept, miss] of [[false, false], [true, true]]) {
+      const sim = new LaunchSim();
+      sim.launch(intercept);
+      expect(sim.land(miss).interception).toBeUndefined();
+    }
+  });
+  it('reaches toward the lane on either side and keeps the same movement as the return', () => {
+    const p = { ...receiver, caughtTick: 116, legs: .1 };
+    const previous = { ...p, x: p.x - .2, speed: p.speed - .3 };
+    const holder = { side: p.side, slot: p.slot };
+    const take = { player: { ...holder, who: p.who! }, tick: 116, fromX: -2, fromY: 1 };
+    for (const screenDir of [-1, 1]) for (const lane of [-1, 1]) {
+      const interception = { ...take, fromX: take.fromX * lane, fromY: take.fromY * lane };
+      const ctx = pictureContext(snap(116, { ball: { ...snap(116).ball, holder }, interception }));
+      for (const [age, beat] of [[0, 0], [1, 1], [2, 2], [3, 2]] as const) {
+        const tick = 116 + age;
+        const travel = playerPicture(p, previous, tick, holder, screenDir);
+        const reached = playerPicture(p, previous, tick, holder, screenDir, ctx);
+        expect(reached).toEqual({ ...travel, action: 'intercept', frame: beat + (lane < 0 ? 0 : 3) });
+      }
+      expect(playerPicture(p, previous, 120, holder, screenDir, ctx)).toEqual(playerPicture(p, previous, 120, holder, screenDir));
+    }
+    const ctx = { interception: take };
+    for (const changed of [{ pose: 'kick' }, { pose: 'pass' }, { pose: 'fend' }, { pose: 'tackled' }, { who: 'replacement' }, { caughtTick: 117 }, { binned: true }]) {
+      const q = { ...p, ...changed };
+      expect(playerPicture(q, q, 117, holder, 1, ctx).action).not.toBe('intercept');
+    }
+    expect(playerPicture(p, previous, 116, null, 1, ctx).action).not.toBe('intercept');
+    const contact = { startedTick: 116, carrier: take.player, defenders: [] };
+    const stopped = snap(116, { ball: { ...snap(116).ball, holder }, interception: take, contact });
+    expect(playerPicture(p, previous, 116, holder, 1, pictureContext(stopped)).action).not.toBe('intercept');
   });
   it('cancels preparation for contact, invalid/stale identities, kicks, old snapshots and dead phases', () => {
     for (const over of [{ who: 'replacement' }, { binned: true }, { pose: 'tackled' }, { pose: 'dummyHalf' }]) {

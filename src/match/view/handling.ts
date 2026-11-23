@@ -26,8 +26,14 @@ export function callingPass(s: Snapshot): ReceivePicture | undefined {
 }
 export function receivingPass(s: Snapshot): ReceivePicture | undefined {
   const f = currentPass(s);
-  if (!f || f.arrivesTick - s.tick > RECEIVE_TICKS || !flightPlayer(s, f.receiver)) return undefined;
+  if (!f || defendingTarget(s, f) || f.arrivesTick - s.tick > RECEIVE_TICKS || !flightPlayer(s, f.receiver)) return undefined;
   return { player: f.receiver!, frame: f.arrivesTick - s.tick > 3 ? 0 : 1, tick: s.tick };
+}
+
+/** A defender in the flight's path only reacts to a confirmed take. */
+function defendingTarget(s: Snapshot, f: BallFlightSnap): boolean {
+  const attacking = s.attacking ?? f.source?.player.side;
+  return !!(attacking && f.receiver && f.receiver.side !== attacking);
 }
 
 export interface BallOffset { x: number; y: number }
@@ -37,10 +43,10 @@ export interface BallOffset { x: number; y: number }
 export function passSpriteOffset(s: Snapshot, atTick: number, anchors: (player: ContactPlayer, endpoint: 'release' | 'receive', f: BallFlightSnap) => BallOffset | undefined, liftPxPerM: number): BallOffset | null {
   const f = currentPass(s);
   if (!f) return null;
-  const source = flightPlayer(s, f.source?.player), receiver = flightPlayer(s, f.receiver);
+  const source = flightPlayer(s, f.source?.player);
   const validSource = f.source && [f.source.headX, f.source.headY, f.source.speed, f.source.odometer, f.source.legs].every(Number.isFinite);
   const from = source && validSource && f.source ? anchors(f.source.player, 'release', f) : undefined;
-  const to = receiver && f.receiver ? anchors(f.receiver, 'receive', f) : undefined;
+  const to = f.receiver && !defendingTarget(s, f) && flightPlayer(s, f.receiver) ? anchors(f.receiver, 'receive', f) : undefined;
   if (!from && !to) return null;
   const u = Math.max(0, Math.min(1, (atTick - f.startedTick) / (f.arrivesTick - f.startedTick)));
   // MatchBall rests its seven-row sprite at y - lift - 1.5; embedded balls use the same centre.

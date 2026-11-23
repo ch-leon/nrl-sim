@@ -37,12 +37,27 @@ describe('connected handling artwork (#702)', () => {
   it('shares its real rendered white ball panels with release/reception anchors across builds, fatigue and motion', () => {
     for (const build of ['lean', 'athletic', 'stocky'] as const) for (const stature of [-2, 2]) for (const tired of [0, 2]) for (const gait of [-1, 0, 2, 5, 8]) {
       const look = { ...base, build, stature };
-      for (const movement of [undefined, 'drive', 'brake'] as const) for (const action of ['carry', 'catch'] as const) {
-        const anchor = playerBallAnchor(look, action, 0, gait, tired, movement);
-        const pixels = drawLivePlayer(look, kit, action, 0, 'front', true, gait, tired, 0, movement);
+      for (const movement of [undefined, 'drive', 'brake'] as const) for (const [action, frame] of [
+        ['carry', 0], ['catch', 0], ['intercept', 0], ['intercept', 1], ['intercept', 2], ['intercept', 3], ['intercept', 4], ['intercept', 5],
+      ] as const) {
+        const anchor = playerBallAnchor(look, action, frame, gait, tired, movement);
+        const pixels = drawLivePlayer(look, kit, action, frame, 'front', true, gait, tired, 0, movement);
         const x = Math.round(anchor.x + CENTRE - 4.5), y = Math.round(anchor.y + FOOT - 3.5);
         const white = [[2, 2], [6, 2], [2, 3], [6, 3]].filter(([dx, dy]) => pixels.get(x + dx!, y + dy!).color === 0xffffff);
         expect(white.length).toBeGreaterThanOrEqual(2);
+      }
+    }
+  });
+  it('draws the lane-side ball inward over successive poses', () => {
+    const look = { ...base, build: 'stocky' as const };
+    for (const start of [0, 3]) {
+      const anchors = [0, 1, 2].map(beat => playerBallAnchor(look, 'intercept', start + beat, 3));
+      anchors.push(playerBallAnchor(look, 'carry', 0, 3));
+      expect(Math.sign(anchors[0]!.x)).toBe(start === 0 ? 1 : -1);
+      for (let i = 1; i < anchors.length; i++) {
+        const from = anchors[i - 1]!, to = anchors[i]!;
+        expect(to.y).toBeGreaterThan(from.y);
+        expect(Math.hypot(to.x - from.x, to.y - from.y)).toBeLessThanOrEqual(10);
       }
     }
   });
