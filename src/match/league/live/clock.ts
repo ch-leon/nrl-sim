@@ -38,6 +38,7 @@ export abstract class LiveClock extends LiveSetPlays {
   protected endHalf(): void {
     this.retreat = null;
     this.expirePlays(true);
+    this.visualExits = [];
     const score = `${this.names.home} ${this.points.home} – ${this.points.away} ${this.names.away}`;
     this.pendingKick = null;
     this.outPending = null;
@@ -193,9 +194,10 @@ export abstract class LiveClock extends LiveSetPlays {
     this.bench[p.side][bi] = { name: p.name, key: p.key, ...(p.id ? { id: p.id } : {}), injuryRisk: p.injuryRisk, injured: p.hurt, stats: p.stats, traits: p.traits, stamina: p.stamina, energy: p.energy, position: ROLES[p.slot]!.name };
     this.retreat?.eligible.delete(p);
     this.retreat?.markers.delete(p);
-    if (this.phase.kind !== 'half-time') {
+    if (BENCH.impact.on > 0 && this.phase.kind !== 'half-time') {
       this.visualExits = this.visualExits.filter(exit => this.tick - exit.tick < INTERCHANGE_EXIT_TICKS && (exit.side !== p.side || exit.who !== p.key));
-      this.visualExits.push({ side: p.side, who: p.key, from: { ...p.body.pos }, tick: this.tick });
+      const tired = !p.hurt || p.gas.blown || p.energy < FATIGUE.spentAt ? 2 : p.energy < FATIGUE.tiredAt ? 1 : 0;
+      this.visualExits.push({ side: p.side, who: p.key, from: { ...p.body.pos }, tick: this.tick, tired });
     }
     const out = p.name;
     const wasHurt = p.hurt;

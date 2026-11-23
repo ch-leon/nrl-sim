@@ -81,7 +81,7 @@ export interface PlayerSnap {
   legs?: number;
   /** In the sin bin (#71): standing on the touchline, out of the play. */
   binned?: boolean;
-  /** Jogging toward the touchline to be interchanged. */
+  /** Jogging toward the touchline on spent legs to be interchanged. */
   interchanging?: boolean;
 }
 
@@ -170,6 +170,7 @@ export interface InterchangeExit {
   who: string;
   from: { x: number; y: number };
   tick: number;
+  tired: 0 | 1 | 2;
 }
 
 export const INTERCHANGE_EXIT_TICKS = 230;

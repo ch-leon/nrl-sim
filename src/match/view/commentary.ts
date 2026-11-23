@@ -228,7 +228,7 @@ const ENDS_KICK: ReadonlySet<string> = new Set([
 
 /** Lines that matter: a try, a sin bin, a clean break, a penalty, a kick that wins it, the whistles. The strip holds one a moment before any other line replaces it. */
 const IMPORTANT_KEYS: ReadonlySet<string> = new Set([
-  'try', 'try:bonus', 'line-break', '40-20', 'field-goal:good', 'held-up', 'penalty', 'penalty:offside', 'penalty:high',
+  'try', 'try:bonus', 'line-break', 'fresh-impact:carry', 'fresh-impact:tackle', '40-20', 'field-goal:good', 'held-up', 'penalty', 'penalty:offside', 'penalty:high',
   'sin-bin', 'sin-bin:high', 'sin-bin:professional', 'sin-bin:repeat', 'sin-bin:offside',
   'golden-point', 'half-time:lead', 'half-time:level', 'full-time:win', 'full-time:draw', 'full-time:golden-point',
 ]);
@@ -303,6 +303,8 @@ export function lineKey(e: SimEvent, kickInAir: boolean, score?: Readonly<Record
       return d === 'half' ? 'line-break:half' : 'line-break';
     case 'break-tackle':
       return d === 'wrestle' ? 'break-tackle:wrestle' : 'break-tackle';
+    case 'fresh-impact':
+      return d === 'tackle' ? 'fresh-impact:tackle' : 'fresh-impact:carry';
     case 'tackle':
       return e.trait ? 'tackle:drive' : 'tackle';
     case 'penalty':

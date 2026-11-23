@@ -339,16 +339,16 @@ export class MatchOfficials {
       const run = exit && benchJog(exit, i, tick);
       j.image.setVisible(!!run);
       j.shadow.setVisible(!!run);
-      if (!run || key === undefined) return;
+      if (!run || !exit || key === undefined) return;
       who[i] = '';
       const at = this.world(run), to = this.world(run.to);
       const x = Math.round(at.x), y = Math.round(at.y);
       const left = to.x < at.x;
       const facing = to.y < at.y - 2 ? 'back' : 'front';
-      const frame = `${key}/${facing}/${run.stride}`;
+      const frame = `${key}/${facing}/${run.stride}/${exit.tired}`;
       if (j.shown !== frame) {
         j.shown = frame;
-        j.canvas.paint(drawLivePlayer(this.opts.look(key), this.opts.kits[side], 'run', run.stride % 6, facing, false, run.stride, 2));
+        j.canvas.paint(drawLivePlayer(this.opts.look(key), this.opts.kits[side], 'run', run.stride % 6, facing, false, run.stride, exit.tired));
       }
       j.image.setPosition(x, y).setDepth(y + 1).setOrigin((left ? WIDTH - CENTRE : CENTRE) / WIDTH, FOOT / HEIGHT).setFlipX(left);
       j.shadow.setPosition(x, y);
