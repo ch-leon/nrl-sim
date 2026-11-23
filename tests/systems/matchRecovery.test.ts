@@ -11,7 +11,7 @@ import { registerEconomySystem } from '../../src/systems/economy';
 import { registerTrainingSystem } from '../../src/systems/training';
 import { MATCH_RESTARTED_TEXT, registerPlayerMatchSystem, resumePlayerMatch } from '../../src/systems/matchday';
 import { isLiveMatchRecord, liveMatchSameRules, peelLiveMatchExport, readLiveMatch, writeLiveMatch } from '../../src/systems/liveMatchRecord';
-import { isMatchEngineIdentity, matchEngineIdentity } from '../../src/systems/matchEngineIdentity';
+import { isMatchEngineIdentity, MATCH_ENGINE_REVISION, matchEngineIdentity } from '../../src/systems/matchEngineIdentity';
 import { activePack, preparePack, selectPack } from '../../src/content';
 import { NINES } from '../../src/match/league/rules';
 import { runMatch } from '../../src/match/league/match';
@@ -45,8 +45,8 @@ afterEach(() => {
   Reflect.deleteProperty(globalThis, 'localStorage');
 });
 
-// A held match from the engine before wing bombs (revision 10) is not this engine.
-const previousEngine = matchEngineIdentity().replace(/^nrl-live-12-/, 'nrl-live-11-');
+// A held match with the same field and rules from the previous engine still needs a restart.
+const previousEngine = matchEngineIdentity().replace(/^nrl-live-\d+-/, `nrl-live-${MATCH_ENGINE_REVISION - 1}-`);
 const badIds = [undefined, 'bad identity', 'nrl-live-999-00000000000000', previousEngine] as const;
 describe.each([null, DEV_TEST_PREFIX])('recovery namespace %s', namespace => {
   it.each(badIds)('restarts only this fixture on reload with identity %s, preserving once-only effects', engineId => {

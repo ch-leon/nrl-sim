@@ -164,7 +164,8 @@ describe('kick contests in the live sim (#99)', () => {
     };
     // Exercise the race on neutral Balanced / Slide. Enabled Slide deliberately
     // shuts Kick-chase attackers out of these races; its coverage is tested separately.
-    const r = races(play(Array.from({ length: 32 }, (_, i) => i + 1), (all) => {
+    // With the open-play dummy on, seed 1 is a grounding (5949) and seed 50 is a try (2201).
+    const r = races(play([1, 50], (all) => {
       const next = races(all);
       return next.scored > 0 && next.grounded > 0;
     }, 'balanced').es);

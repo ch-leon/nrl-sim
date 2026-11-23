@@ -41,8 +41,8 @@ interface Played {
   refusals: Set<string>;
 }
 
-/** Current-default penalty witnesses after the lead read (engine revision 8): seeds 19 and 40. After the timed back-door runs (#722) they were 1 and 50. */
-const PENALTY_SEEDS = [19, 40];
+/** With the open-play dummy, the home penalty at seed 11 tick 2529 lets the coach choose either option. */
+const PENALTY_SEEDS = [11];
 
 /** Play with the home coach making `call` whenever he may (as a player at the tray does: a tap, in on the next tick). */
 function play(seed: number, call: CoachCall | null, minutes = 6, side: 'home' | 'away' = 'home'): Played {
@@ -259,9 +259,7 @@ describe('five more calls (#396): each does what it says', () => {
 
   it('Tap and go: the penalty is tapped, and the set’s call is still his', () => {
     let made = 0;
-    // Seeds 19 and 40 still win a penalty, but the captain already taps it.
-    // Seed 9 is a penalty he would kick, so Tap and go is the coach's call.
-    for (const seed of [9]) {
+    for (const seed of PENALTY_SEEDS) {
       const calls: CallInput[] = [];
       const sim = new LiveSim(H, A, seed, { length: { halves: 1, halfMinutes: 6 }, calls });
       const events: SimEvent[] = [];

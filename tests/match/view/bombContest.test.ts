@@ -154,9 +154,8 @@ describe('contested open-play bombs', () => {
 
   it('stages a contested catch in ordinary match play using the sim snapshots', () => {
     const fixtures = [
-      { home: 'rival-diggers', away: 'rival-scorpions', seed: 19 },
-      { home: DEFAULT_HOME, away: DEFAULT_AWAY, seed: 26 },
-      { home: DEFAULT_HOME, away: DEFAULT_AWAY, seed: 20 },
+      // A normal seed-1 bomb with both contesters in reach at tick 554.
+      { home: DEFAULT_HOME, away: DEFAULT_AWAY, seed: 1 },
     ];
     for (const { home, away, seed } of fixtures) {
       const sim = new LiveSim(labSheet(home), labSheet(away), seed);

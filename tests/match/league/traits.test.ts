@@ -30,11 +30,12 @@ function sheet(id: string, traits: (i: number) => TraitInstance[] | undefined = 
   };
 }
 
-function events(home: TeamSheet, away: TeamSheet, seeds: number, seconds: number): SimEvent[] {
+function events(home: TeamSheet, away: TeamSheet, seeds: number | readonly number[], seconds: number): SimEvent[] {
   const out: SimEvent[] = [];
   const n = Math.round(seconds / TICK_S);
-  for (let s = 1; s <= seeds; s++) {
-    const sim = new LiveSim(home, away, s);
+  const fixtures = typeof seeds === 'number' ? Array.from({ length: seeds }, (_, i) => i + 1) : seeds;
+  for (const seed of fixtures) {
+    const sim = new LiveSim(home, away, seed);
     for (let i = 0; i < n; i++) {
       sim.step();
       out.push(...sim.snapshot().events);
@@ -167,12 +168,13 @@ describe('traits in the live sim', () => {
     const pm = events(sheet('H', (i) => (i === 5 || i === 4 ? T('playmaker', 3) : undefined)), sheet('A'), SEEDS * 3, SECS);
     expect(count(pm, 'cut-out', 'home')).toBeGreaterThan(0);
     expect(count(control, 'cut-out')).toBe(0);
-    // Eight seeds (four until held up at the line, #652, and the last-tackle call, #650, together left them without a long kick or bomb).
-    const boot = events(sheet('H', (i) => (i === 5 ? T('bigBoot', 2) : undefined)), sheet('A'), 8, SECS);
+    // Seed 6 gives the traited halfback a bomb (1016) and a long kick (2613).
+    const boot = events(sheet('H', (i) => (i === 5 ? T('bigBoot', 2) : undefined)), sheet('A'), [6], SECS);
     // Big Boot shapes the long kicks and bombs (distance and accuracy); grubbers and chips are placement, not power.
     const kicks = boot.filter((e) => e.kind === 'kick' && e.side === 'home' && (e.detail === 'long' || e.detail === 'bomb'));
     expect(kicks.length).toBeGreaterThan(0);
     expect(kicks.every((e) => e.trait === 'Big Boot II')).toBe(true);
+    expect(new Set(kicks.map((e) => e.detail))).toEqual(new Set(['long', 'bomb']));
   });
   it('replays identically with traits, and an empty trait list is the same as none', () => {
     const traited = sheet('H', (i) => (i % 2 ? T('jets', 2) : T('lastLine')));

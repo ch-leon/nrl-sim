@@ -276,8 +276,8 @@ it('aligns current-pass sprite centres with painted moving/tired anchors and the
 });
 
 it('joins the pinned seed-1 short and long passes to the actual painted catch without an added ball hop', async () => {
-  // Current default structures (#649): pickup 169, short pass 175→181 (6 ticks).
-  // The moving long pass is 1001→1013 (12 ticks), Dane Addison → Deakin Stampton, at 7.1 m/s.
+  // Seed 1 still has the short pass at 175→181. With the dummy on, Dane Addison's
+  // long pass to Levi Fonoti is 2338→2350 (12 ticks), at 6.6 m/s.
   const { LiveSim } = await import('../../../src/match/league/live');
   const { labSheet, DEFAULT_HOME, DEFAULT_AWAY } = await import('../../../src/match/lab/sheets');
   const { PlayerFrameCache } = await import('../../../src/scenes/matchPlayers');
@@ -294,16 +294,16 @@ it('joins the pinned seed-1 short and long passes to the actual painted catch wi
   s.ball.place = (x, y, lift, _depth, motion) => { centre = { x: x + (motion?.offsetX ?? 0), y: y - lift - 1.5 + (motion?.offsetY ?? 0) }; };
   const view = new LiveView(s), records = new Map<number, { centre: { x: number; y: number }; previous: { x: number; y: number } }>();
   let before = sim.snapshot(), previousCentre = centre, selected = 0;
-  for (let tick = 1; tick <= 1014; tick++) {
+  for (let tick = 1; tick <= 2350; tick++) {
     sim.step(); const cur = sim.snapshot(); view.draw(before, cur, 1);
-    if (tick === 175 || tick === 1001) {
+    if (tick === 175 || tick === 2338) {
       expect(cur.ball.flight?.startedTick).toBe(tick);
-      expect(cur.ball.flight?.arrivesTick).toBe(tick === 175 ? 181 : 1013);
+      expect(cur.ball.flight?.arrivesTick).toBe(tick === 175 ? 181 : 2350);
       expect(cur.ball.flight?.source).toBeDefined();
-      if (tick === 1001) expect(cur.ball.flight!.source!.speed).toBeGreaterThan(6);
+      if (tick === 2338) expect(cur.ball.flight!.source!.speed).toBeGreaterThan(6);
     }
-    if (tick === 180 || tick === 1012) records.set(tick, { centre: { ...centre }, previous: { ...previousCentre } });
-    if (tick === 181 || tick === 1013) {
+    if (tick === 180 || tick === 2349) records.set(tick, { centre: { ...centre }, previous: { ...previousCentre } });
+    if (tick === 181 || tick === 2350) {
       const holder = cur.ball.holder!;
       expect(holder).not.toBeNull();
       const picture = pictures.get(`${holder.side}/${holder.slot}`)!;
