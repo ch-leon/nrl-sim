@@ -25,4 +25,4 @@ it('uses revision nineteen and separates recovery identities by the actual froze
       expect(accepts[current]!(identities[saved]!)).toBe(current === saved);
     }
   }
-}, 20_000);
+});

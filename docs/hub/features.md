@@ -1,6 +1,6 @@
 # Features
 
-Last updated: 2026-11-22
+Last updated: 2026-11-23
 
 What's in the game, with the PR that added each.
 
@@ -63,6 +63,8 @@ What's in the game, with the PR that added each.
 - Android test APK ([PR](https://github.com/ch-leon/nrl-sim/pull/394)); CI ([PR](https://github.com/ch-leon/nrl-sim/pull/442))
 
 ## Recently added
+
+- **Impact interchanges.** A tired player jogs toward his bench while his replacement gets a short burst on a carry or extra grip on a tackle. Watch for **FRESH LEGS** on the first two involvements. [PR #785](https://github.com/ch-leon/nrl-sim/pull/785)
 
 - **A second kicking option on the last tackle.** On the last play-the-ball the halfback sets up flatter on the open side and the five-eighth drops behind on the other. Once the heel is played, the onside line can come up. If a defender is closing on the halfback and the five-eighth has more room, dummy-half finds him. He then makes the ordinary kick, run or pass. A directed last-tackle call, a set play or a manual pass keeps the usual path. `secondKicker.on:0` restores the single kicker and the previous ruck. Ported from draft PR #760, part of [#650](https://github.com/ch-leon/nrl-sim/issues/650).
 
