@@ -104,8 +104,10 @@ export function reportMarkdown(r: ReportInput): string {
     for (const row of rows) {
       const cells = COLUMNS.map((k) => {
         const v = row.counts[k];
+        if (!v) return '—'; // This metric was added after the saved run.
         const mark = bandMark(k, v.mean);
-        const d = row === base ? '' : ` (${delta(v, base.counts[k], Math.min(row.seeds, base.seeds) >= MIN_SEEDS_TO_FLAG)})`;
+        const baseCount = base.counts[k];
+        const d = row !== base && baseCount ? ` (${delta(v, baseCount, Math.min(row.seeds, base.seeds) >= MIN_SEEDS_TO_FLAG)})` : '';
         return `${v.mean.toFixed(k.startsWith('grubber') ? 3 : 1)}${mark ? ` ${mark}` : ''}${d}`;
       });
       const side = tracked
@@ -124,9 +126,10 @@ export function reportMarkdown(r: ReportInput): string {
         for (const k of COLUMNS) {
           // A run from before a metric existed has nothing to compare it with.
           const before = p.counts[k];
-          if (!before) continue;
-          const d = delta(row.counts[k], before, Math.min(row.seeds, p.seeds) >= MIN_SEEDS_TO_FLAG);
-          if (d.endsWith('*')) moved.push(`${row.variant}: ${k} ${before.mean.toFixed(1)} → ${row.counts[k].mean.toFixed(1)} (${d})`);
+          const after = row.counts[k];
+          if (!before || !after) continue;
+          const d = delta(after, before, Math.min(row.seeds, p.seeds) >= MIN_SEEDS_TO_FLAG);
+          if (d.endsWith('*')) moved.push(`${row.variant}: ${k} ${before.mean.toFixed(1)} → ${after.mean.toFixed(1)} (${d})`);
         }
       }
       out.push(moved.length ? `**Changed since the previous run:** ${moved.join('; ')}` : '**Changed since the previous run:** nothing beyond noise.', '');

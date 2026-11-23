@@ -28,12 +28,15 @@ function passage(seed: number, from: number, to: number) {
 
 describe('penalty advantage', () => {
   let restore: (() => void) | undefined;
-  afterEach(() => restore?.());
+  afterEach(() => {
+    restore?.();
+    restore = undefined;
+  });
 
   it('plays advantage after retained possession and waives the penalty on real ground gained', () => {
     const frames = passage(10, 2231, 2272);
     const first = frames[0]!;
-    const last = frames.at(-1)!;
+    const last = frames[frames.length - 1]!;
     expect(first.snap.events.map(e => e.kind)).toContain('advantage');
     expect(refereeSignal(first.snap)).toBe('advantage');
     expect(frames.slice(0, -1).every(f => f.snap.advantage?.side === 'away')).toBe(true);
@@ -50,7 +53,7 @@ describe('penalty advantage', () => {
   it('awards one penalty at the original mark when the carry is stopped short', () => {
     const frames = passage(8, 667, 714);
     const first = frames[0]!;
-    const last = frames.at(-1)!;
+    const last = frames[frames.length - 1]!;
     expect(first.snap.events.map(e => e.kind)).toContain('advantage');
     expect(frames.some(f => f.snap.phase?.kind === 'tackle')).toBe(true);
     expect(last.restart).toEqual(first.mark);
@@ -60,6 +63,21 @@ describe('penalty advantage', () => {
     expect(penalties).toHaveLength(1);
     expect(penalties[0]).toMatchObject({ recalled: true, detail: 'offside', tick: last.snap.tick });
     expect(popupFor(penalties[0]!)?.word).toBe('BACK FOR PENALTY');
+  });
+
+  it('takes advantage on a try even when the goal line is less than eight metres away', () => {
+    const frames = passage(62, 1423, 1471);
+    expect(frames[0]!.snap.advantage?.side).toBe('home');
+    const scored = frames[frames.length - 1]!.snap;
+    expect(scored.events.map(e => e.kind)).toEqual(['advantage-over', 'try']);
+    expect(scored.advantage).toBeUndefined();
+  });
+
+  it('recalls at the deadline when the passage has yielded neither ground nor a break', () => {
+    const from = 2192;
+    const frames = passage(29, from, from + PENALTY.advantageTicks);
+    expect(frames[frames.length - 2]!.snap.advantage).toBeDefined();
+    expect(frames[frames.length - 1]!.snap.events).toContainEqual(expect.objectContaining({ kind: 'penalty', recalled: true }));
   });
 
   it('keeps the immediate whistle when the window is disabled', () => {

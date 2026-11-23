@@ -58,7 +58,16 @@ export abstract class LivePenalties extends LiveRestarts {
     this.emit('advantage-over', `Advantage over — play on, ${this.names[side]}`, a.offender);
   }
 
-  protected gainedAdvantage(h: Player): boolean {
+  /** A completed tackle settles the passage before six again. Returns true if it comes back. */
+  protected settleTackleAdvantage(carrier: Player): boolean {
+    if (this.gainedAdvantage(carrier)) {
+      this.takeAdvantage(carrier.side);
+      return false;
+    }
+    return this.recallAdvantage();
+  }
+
+  private gainedAdvantage(h: Player): boolean {
     const a = this.advantage;
     return !!a && h.side === a.side && (h.body.pos.x - a.mark.x) * this.dirOf(a.side) >= PENALTY.advantageGainM;
   }

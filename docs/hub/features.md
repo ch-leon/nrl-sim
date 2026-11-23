@@ -64,7 +64,7 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
-- **Penalty advantage.** After an ordinary offside at the ruck, the referee signals play on for up to 3.5 seconds. An 8 m gain, a line break or a try takes the advantage. If play dies before that, the penalty comes back to the original mark. [Match rules](../specs/BAK-208-match-rules-and-skills.md#45-penalty-advantage)
+- **Penalty advantage.** After an ordinary offside at the ruck, the referee signals play on for up to 3.5 seconds. An 8 m gain, a line break or a try takes the advantage. If play dies before that, the penalty comes back to the original mark. [PR #791](https://github.com/ch-leon/nrl-sim/pull/791) · [Match rules](../specs/BAK-208-match-rules-and-skills.md#45-penalty-advantage)
 
 - **A second kicking option on the last tackle.** On the last play-the-ball the halfback sets up flatter on the open side and the five-eighth drops behind on the other. Once the heel is played, the onside line can come up. If a defender is closing on the halfback and the five-eighth has more room, dummy-half finds him. He then makes the ordinary kick, run or pass. A directed last-tackle call, a set play or a manual pass keeps the usual path. `secondKicker.on:0` restores the single kicker and the previous ruck. Ported from draft PR #760, part of [#650](https://github.com/ch-leon/nrl-sim/issues/650).
 

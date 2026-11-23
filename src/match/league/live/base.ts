@@ -571,6 +571,7 @@ export abstract class LiveBase {
   protected abstract startDropOut(side: Side): void;
   protected abstract penalize(spot: Vec, why: string, culprit: Player, kind: 'offside' | 'high' | 'kickoff', trait?: string): boolean;
   protected abstract recallAdvantage(): boolean;
+  protected abstract settleTackleAdvantage(carrier: Player): boolean;
   protected abstract takePenalty(award: Side, mark: Vec, choice: PenaltyChoice): void;
   protected abstract penaltyOpen(): { side: Side; mark: Vec; choice: PenaltyChoice; shot: number; called: boolean } | null;
   protected abstract goalAcc(k: Player): number;

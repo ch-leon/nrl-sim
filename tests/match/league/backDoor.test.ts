@@ -321,7 +321,7 @@ describe('reading the back-door lead (#649)', () => {
   it('with the read off preserves the revision 7 back-door event fingerprint', async () => {
     // The centre shoulder read is a later carry, so it stays off for this revision 7 witness.
     // The centre shoulder read and punts into space are later carries, so they stay off for this revision 7 witness.
-    restores.push(applyTuning({ 'shapes.leadDecoy.on': 0, 'live.centreShoulderTicks': 0, 'longKick.on': 0, 'wingBomb.on': 0, 'secondKicker.on': 0 }));
+    restores.push(applyTuning({ 'shapes.leadDecoy.on': 0, 'live.centreShoulderTicks': 0, 'longKick.on': 0, 'wingBomb.on': 0, 'secondKicker.on': 0, 'penalty.advantageTicks': 0 }));
     const sim = new LiveSim(sideSheet('H', { rating: 60 }), sideSheet('A', { rating: 60 }), 1);
     const rng = (sim as unknown as { rng: { next: () => number } }).rng;
     const next = rng.next.bind(rng);

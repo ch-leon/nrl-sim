@@ -2,7 +2,7 @@
 // knobs by name with a clean way back, plans that fail fast on a typo, sweeps
 // expanded in order, the report's bands and luck test, and a measured cell
 // that is deterministic and actually feels its overrides.
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, onTestFinished } from 'vitest';
 import enabledPlan from '../../../balance/plans/counters-enabled.json';
 import { BASE, MOMENTUM, OPEN, contestOdds } from '../../../src/match/league/contest';
 import { COUNTERS, fitEdge, slideCounter } from '../../../src/match/league/counters';
@@ -310,7 +310,8 @@ describe('measuring and reporting', () => {
     // balanced 0-0:137:6c911bf022e28778 / expansive 4-0:134:443f2da66ba81a8d.
     { attack: 'balanced' as const, expected: '13-10:155:57426901f7cbc31f' },
     { attack: 'expansive' as const, expected: '0-6:147:52d52acd0272a5fe' },
-  ])('pins an even $attack / Slide match (seed 1)', async ({ attack, expected }) => {
+  ])('pins a pre-advantage even $attack / Slide match (seed 1)', async ({ attack, expected }) => {
+    onTestFinished(applyTuning({ 'penalty.advantageTicks': 0 }));
     const sim = new LiveSim(sideSheet('H', { rating: 60, tactics: { attack } }), sideSheet('A', { rating: 60 }), 1);
     const parts: string[] = [];
     while (!sim.finished && sim.tick < 100_000) {
@@ -355,7 +356,8 @@ describe('measuring and reporting', () => {
     // plays-on 10-0:141:fb9bb3ff69ff1592 / plays-on-hard 1-0:146:2652be8270891c73.
     { name: 'plays-on', aiCoach: false, expected: '4-10:155:79024e6ce6d03277' },
     { name: 'plays-on-hard', aiCoach: true, expected: '0-10:148:ee54e8d79a90e3cf' },
-  ])('pins $name: an even Balanced / Slide match with set plays (seed 1)', async ({ aiCoach, expected }) => {
+  ])('pins pre-advantage $name: an even Balanced / Slide match with set plays (seed 1)', async ({ aiCoach, expected }) => {
+    onTestFinished(applyTuning({ 'penalty.advantageTicks': 0 }));
     const home = { ...sideSheet('H', { rating: 60 }), plays: ['block-play' as const, 'cut-out-winger' as const, 'kick-pass' as const] };
     const sim = new LiveSim(home, sideSheet('A', { rating: 60 }), 1, aiCoach ? { aiCoach: ['home'] } : {});
     const parts: string[] = [];
@@ -371,7 +373,7 @@ describe('measuring and reporting', () => {
     expect(`${sim.points.home}-${sim.points.away}:${parts.length}:${hash}`).toBe(expected);
   });
   it('with punts into space off, plays-on-hard keeps the revision 9 pin', async () => {
-    const restore = applyTuning({ 'longKick.on': 0, 'wingBomb.on': 0, 'secondKicker.on': 0 });
+    const restore = applyTuning({ 'longKick.on': 0, 'wingBomb.on': 0, 'secondKicker.on': 0, 'penalty.advantageTicks': 0 });
     try {
       const home = { ...sideSheet('H', { rating: 60 }), plays: ['block-play' as const, 'cut-out-winger' as const, 'kick-pass' as const] };
       const sim = new LiveSim(home, sideSheet('A', { rating: 60 }), 1, { aiCoach: ['home'] });
