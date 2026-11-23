@@ -263,7 +263,7 @@ export function attachMatchAtmosphere(scene: Phaser.Scene, opts: AtmosphereOptio
   if (budget.leaves > 0) {
     const direction = (): number => opts.wind?.() || 1;
     const along = (min: number, max: number): { onEmit: () => number } => ({
-      onEmit: () => direction() * Phaser.Math.Between(min, max),
+      onEmit: () => direction() * (min + Math.random() * (max - min)),
     });
     const fade = (_p: unknown, _k: string, t: number): number => Math.sin(Math.PI * t);
     add(

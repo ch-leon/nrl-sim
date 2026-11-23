@@ -235,7 +235,6 @@ export class MatchOfficials {
   /** The tick on screen (a replay's while it plays): the crowd reads the score and the ball's height from it. */
   latest: Snapshot | null = null;
 
-  /** Draw everyone for the frame between `prev` and `cur` at `alpha` (LiveView calls this after the players). */
   private updateWindFlags(): void {
     const direction = this.opts.wind?.();
     if (!direction || direction === this.flagDirection) return;
@@ -244,6 +243,7 @@ export class MatchOfficials {
     for (const flag of this.windFlags) flag.setScale(direction, 1);
   }
 
+  /** Draw everyone for the frame between `prev` and `cur` at `alpha` (LiveView calls this after the players). */
   draw(prev: Snapshot, cur: Snapshot, alpha: number, heldTicks = 0): void {
     this.updateWindFlags();
     this.latest = cur;
