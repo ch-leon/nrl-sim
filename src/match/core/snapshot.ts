@@ -6,6 +6,7 @@ export type Side = 'home' | 'away';
 
 /** Exact contact participants, in arrival order. Nearby defenders are not joiners. */
 export interface ContactPlayer { side: Side; slot: number; who: string }
+export interface DuelPlayer extends ContactPlayer { name: string }
 export interface AttackShapeSnap {
   kind: 'spread' | 'pod' | 'edge' | 'back-door'; side: Side; dir: 1 | -1; edge: 1 | -1; startedTick: number; linkSlot?: 4 | 5;
   backDoor?: { caller: ContactPlayer; lead: ContactPlayer; support: ContactPlayer; originY: number };
@@ -160,6 +161,8 @@ export interface SimEvent {
   toSlot?: number;
   /** Read-only animation context for this contact outcome. */
   contact?: ContactSnap;
+  /** The two actual players in a one-on-one result, for match presentation. */
+  duel?: { winner: DuelPlayer; loser: DuelPlayer };
 }
 
 export interface Snapshot {

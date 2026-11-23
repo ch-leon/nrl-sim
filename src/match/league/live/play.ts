@@ -476,6 +476,7 @@ export abstract class LivePlay extends LiveKicks {
   /** A clean step: the defender grasps air, the carrier jinks past with a burst. */
   private sidestep(c: Player, t: Player, trait?: string, way?: number): void {
     this.emit('step', `${c.name} steps ${t.name}!`, c, trait);
+    this.tagDuel(c, t);
     const sideways = way ?? (c.body.pos.y >= t.body.pos.y ? 1 : -1);
     c.jink = { dy: sideways * LIVE.stepJinkM, ticks: LIVE.stepJinkTicks };
     this.lock(t, 'tackled', 12, add(t.body.pos, { x: this.dir * 0.8, y: -sideways * 0.6 }));

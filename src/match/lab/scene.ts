@@ -9,11 +9,13 @@ import { bus } from '../../core/events';
 import type { TeamSheet, WeatherKind } from '../../sim/events';
 import { cssZoom } from '../../world/viewport';
 import type { Side, SimEvent } from '../core/snapshot';
+import type { MatchSim } from '../core/engine';
 import { toMatchEvent } from '../league/events';
 import { LiveView } from '../view/liveView';
 import { BreakClock } from '../view/walkOff';
 import { PopupLayer } from '../view/popupLayer';
 import { ContestLayer } from '../view/contestLayer';
+import { DuelLayer } from '../view/duelLayer';
 import { HALF_BREAK, shownBreak } from '../view/lineBreak';
 import { popupFor, type PopupView } from '../view/popups';
 import { impactTier, playImpact } from '../view/impact';
@@ -46,6 +48,8 @@ export class LabScene extends MatchScene {
   private view: LiveView | null = null;
   private popups: PopupLayer | null = null;
   private contest: ContestLayer | null = null;
+  private duelLayer: DuelLayer | null = null;
+  private duelSim: MatchSim | null = null;
   private traits: TraitLayer | null = null;
   private wrestleBar: WrestleBar | null = null;
   private sprintLayer: SprintLayer | null = null;
@@ -79,6 +83,7 @@ export class LabScene extends MatchScene {
     this.view = new LiveView(this);
     this.popups = new PopupLayer(this, DEPTH_POPUP);
     this.contest = new ContestLayer(this, DEPTH_POPUP - 3);
+    this.duelLayer = new DuelLayer(this, DEPTH_POPUP - 3);
     this.traits = new TraitLayer(this, DEPTH_POPUP - 0.5);
     this.traits.setRoster(new TraitRoster({ home: this.sheets.home, away: this.sheets.away }));
     this.wrestleBar = new WrestleBar(this, DEPTH_POPUP);
@@ -86,6 +91,7 @@ export class LabScene extends MatchScene {
     this.sprintLayer.setRoster(new TraitRoster({ home: this.sheets.home, away: this.sheets.away }));
     this.legsLayer = new LegsLayer(this, DEPTH_POPUP - 2, FATIGUE);
     const r = this.controller.runner;
+    this.duelSim = r.current;
     r.onEvents = (events) => this.onSimEvents(events);
     const onVisibility = (): void => {
       if (MATCH_PREVIEW && document.hidden && r.playing) {
@@ -110,6 +116,9 @@ export class LabScene extends MatchScene {
       this.popups = null;
       this.contest?.destroy();
       this.contest = null;
+      this.duelLayer?.destroy();
+      this.duelLayer = null;
+      this.duelSim = null;
       this.traits?.destroy();
       this.traits = null;
       this.wrestleBar?.destroy();
@@ -123,8 +132,11 @@ export class LabScene extends MatchScene {
 
   private onSimEvents(events: readonly SimEvent[]): void {
     const r = this.controller.runner;
+    this.checkDuelSource(r.current);
+    this.controller.duels.sync(r.history);
     for (const sim of events) {
       const e = shownBreak(sim, r.cur);
+      this.duelLayer?.note(this.controller.duels.result(sim));
       if (MATCH_PREVIEW) this.previewMoments.note(e);
       this.contest?.note(e, r.cur);
       // The trait cues (#654): the same layer a real match draws, so the lab can sign each one off.
@@ -153,6 +165,7 @@ export class LabScene extends MatchScene {
 
   override update(time: number, delta: number): void {
     const r = this.controller.runner;
+    this.checkDuelSource(r.current);
     let shownSpeed = r.speed;
     if (MATCH_PREVIEW) {
       const now = performance.now();
@@ -189,6 +202,10 @@ export class LabScene extends MatchScene {
     const view: PopupView = { left: v.x, top: v.y, width: v.width, height: v.height };
     this.popups?.update(delta, zoom, feet, view);
     this.contest?.update(delta, zoom, (fx, fy) => this.fieldToWorld(fx, fy), feet);
+    this.duelLayer?.update(delta, zoom, r.cur, (side, slot) => {
+      const actor = this.players[side][slot];
+      return actor ? { x: actor.sprite.x, y: actor.groundY } : null;
+    });
     this.traits?.update(delta, zoom, (fx, fy) => this.fieldToWorld(fx, fy), feet, r.speed);
     // The wrestle bar: the fight left in the carrier while he is in a tackle (§8.1).
     this.wrestleBar?.update(r.cur.wrestle, zoom, (w) => feet(w.side, w.slot));
@@ -202,5 +219,11 @@ export class LabScene extends MatchScene {
       const a = this.players[side][slot];
       return a ? { x: a.sprite.x, y: a.sprite.y, faceLeft: a.sprite.flipX } : null;
     });
+  }
+
+  private checkDuelSource(sim: MatchSim): void {
+    if (sim === this.duelSim) return;
+    this.duelSim = sim;
+    this.duelLayer?.clear();
   }
 }

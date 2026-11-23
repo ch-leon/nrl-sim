@@ -225,6 +225,7 @@ export abstract class LiveContact extends LivePenalties {
       }
       case 'broken':
         this.emit('break-tackle', `${c.name} busts through ${t.name}`, c, credit);
+        this.tagDuel(c, t);
         this.tagContact(c, [t]);
         this.lock(t, 'down', 16, add(t.body.pos, scale(back, -1.2)));
         t.cooldownUntil = this.tick + LIVE.beatenCooldown;
@@ -232,6 +233,7 @@ export abstract class LiveContact extends LivePenalties {
         return;
       case 'fend':
         this.emit('fend', `${c.name} palms off ${t.name}`, c, credit);
+        this.tagDuel(c, t);
         this.tagContact(c, [t]);
         c.pose = 'fend';
         c.poseUntil = this.tick + 6;
@@ -450,6 +452,7 @@ export abstract class LiveContact extends LivePenalties {
     if (end === 'free') {
       // The defenders' grip went before his fight: he is through.
       this.emit('break-tackle', `${c.name} fights out of the tackle!`, c);
+      if (men.length === 1) this.tagDuel(c, men[0]!);
       this.tagContact(c, men, ph.t0);
       this.events[this.events.length - 1]!.detail = 'wrestle';
       for (const d of men) {
@@ -522,6 +525,7 @@ export abstract class LiveContact extends LivePenalties {
     const who = men.length > 1 ? `${men.slice(0, -1).map((d) => d.name).join(', ')} and ${men[men.length - 1]!.name}` : t.name;
     const credit = men.length >= 2 && wall > 0 ? announce(men[walls.indexOf(wall)]!.traits.find((x) => x.id === 'brickWall')) : undefined;
     this.emit('held-up', `Held up! ${who} ${men.length > 1 ? 'keep' : 'keeps'} ${c.name} off the ground`, t, credit);
+    if (men.length === 1) this.tagDuel(t, c);
     this.tagContact(c, men, startedTick);
     this.lock(c, 'down', LIVE.downTicks);
     for (const d of men) this.lock(d, 'down', LIVE.downTicks);

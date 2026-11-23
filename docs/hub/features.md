@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- **Repeat one-on-ones.** Match commentary names both players when one steps, fends off or busts through the other, runs him down or holds him up alone. A repeat win names the pair again and briefly links the two players on the pitch. Match Lab remembers the same actions when you seek. [#662](https://github.com/ch-leon/nrl-sim/issues/662)
+
 - **A second kicking option on the last tackle.** On the last play-the-ball the halfback sets up flatter on the open side and the five-eighth drops behind on the other. Once the heel is played, the onside line can come up. If a defender is closing on the halfback and the five-eighth has more room, dummy-half finds him. He then makes the ordinary kick, run or pass. A directed last-tackle call, a set play or a manual pass keeps the usual path. `secondKicker.on:0` restores the single kicker and the previous ruck. Ported from draft PR #760, part of [#650](https://github.com/ch-leon/nrl-sim/issues/650).
 
 - **Attacking bombs to the corner.** When an onside winger has time to chase, an ordinary attacking bomb can drop in his corner, 8–12 m from the try line and from touch. The fullback reads that aim while the kicker winds up, and the usual contest decides who takes it. Inside 22 m the bomb joins the last-tackle kick choices only if that chase is on. A midfield bomb, a winger who cannot get there, a Lab aim or a scripted kick keeps the fullback's patch. `wingBomb.on:0` turns the corner off. Ported from draft PR #757, part of [#650](https://github.com/ch-leon/nrl-sim/issues/650).

@@ -10,6 +10,7 @@ import { DEFAULT_ROTATION, isRotation, type Rotation } from '../league/bench';
 import type { WeatherKind } from '../../sim/events';
 import type { CallInput, CoachCall } from '../league/calls';
 import { MATCH_PREVIEW, PreviewWatchClock } from '../preview';
+import { DuelTimeline } from '../view/duels';
 
 /** Per-side preset overrides for the lab; a missing field keeps the club's own style. */
 export interface LabTactics {
@@ -156,6 +157,7 @@ export function isLabHash(hash: string): boolean {
 
 export class LabController {
   readonly watchClock = MATCH_PREVIEW ? new PreviewWatchClock() : null;
+  readonly duels = new DuelTimeline();
   readonly runner: Runner;
   readonly params: LabParams;
   /** Coach calls made in the lab, by tick: replayed when the match is rebuilt to seek (#73). */

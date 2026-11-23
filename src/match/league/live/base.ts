@@ -461,6 +461,10 @@ export abstract class LiveBase {
   protected emit(kind: string, text: string, p?: Player, trait?: string): void {
     this.events.push({ tick: this.tick, kind, text, ...(p ? { side: p.side, slot: p.slot, player: p.name } : {}), ...(trait ? { trait } : {}) });
   }
+  protected tagDuel(winner: Player, loser: Player): void {
+    const player = (p: Player) => ({ side: p.side, slot: p.slot, who: p.key, name: p.name });
+    this.events[this.events.length - 1]!.duel = { winner: player(winner), loser: player(loser) };
+  }
   /** Remember, for the picture only, that he just made the error, missed the goal or was binned (#667). */
   protected react(p: Player, kind: 'error' | 'miss' | 'bin'): void {
     p.react = { tick: this.tick, kind };
@@ -508,6 +512,7 @@ export abstract class LiveBase {
   protected runDown(c: Player, t: Player, sit: Situation): void {
     if (sit.angle !== 'behind' || !t.sprinting || this.tick - c.brokeAt > LIVE.runDownTicks) return;
     this.emit('run-down', `${t.name} runs down ${c.name}!`, t);
+    this.tagDuel(t, c);
   }
   protected lock(p: Player, pose: string, ticks: number, slideTo?: Vec): void {
     p.pose = pose;
