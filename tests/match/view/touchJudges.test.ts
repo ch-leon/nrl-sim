@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Runner, replayRange, TICK_MS, TICK_S } from '../../../src/match/core/engine';
 import { FIELD_LENGTH, FIELD_WIDTH, IN_GOAL, MID_X } from '../../../src/match/core/field';
+import type { Snapshot } from '../../../src/match/core/snapshot';
 import { dist } from '../../../src/match/core/vec';
 import { DEFAULT_AWAY, DEFAULT_HOME, labSheet } from '../../../src/match/lab/sheets';
 import { LiveSim } from '../../../src/match/league/live';
@@ -10,6 +11,17 @@ import { CONVERSION_SIGNAL_TICKS, conversionJudges } from '../../../src/match/vi
 const home = labSheet(DEFAULT_HOME);
 const away = labSheet(DEFAULT_AWAY);
 const factory = (seed: number) => new LiveSim(home, away, seed, { touchJudges: true });
+
+function conversionBeforeKickoff(toward: 1 | -1): Runner {
+  const isDecision = (s: Snapshot) => s.conversion?.toward === toward
+    && s.conversion.decision?.tick === s.tick && s.phase?.kind === 'restart';
+  for (const seed of [15, 37, 26, 18]) {
+    const match = new Runner(factory, seed);
+    match.skipUntil(isDecision, 7_000);
+    if (isDecision(match.cur)) return match;
+  }
+  throw new Error(`No conversion followed by a kick-off was found toward end ${toward}`);
+}
 
 describe('touch judges on the sidelines', () => {
   it('comes level with play on both rails and catches up on foot after a kick and a reversal', () => {
@@ -67,26 +79,33 @@ describe('touch judges on the sidelines', () => {
     expect(watched.history).toEqual(plain.history);
   });
 
-  it.each([[37, 2126], [15, 1339]])('uses the conversion spots and jogs back out after seed %i', (seed, decision) => {
-    const snaps = replayRange(factory, seed, decision - 120, decision + CONVERSION_SIGNAL_TICKS + 160);
-    const signal = snaps[120]!;
-    const spots = conversionJudges(signal)!.feet;
-    expect(signal.touchJudges).toMatchObject(spots);
-    const signalEnd = 120 + CONVERSION_SIGNAL_TICKS;
-    for (const [j, snap] of snaps.slice(signalEnd).entries()) {
-      const before = snaps[signalEnd + j - 1]!.touchJudges!;
-      expect(conversionJudges(snap)).toBeNull();
-      for (const [i, p] of snap.touchJudges!.entries()) {
+  it.each([1, -1] as const)('uses the conversion spots and jogs back out at end %i', toward => {
+    const match = conversionBeforeKickoff(toward);
+    const cue = conversionJudges(match.cur)!;
+    expect(conversionJudges(match.prev)).toMatchObject({ feet: cue.feet, pose: 'watch' });
+    expect(cue.pose).toBe(match.cur.conversion!.decision!.good ? 'raise' : 'waveOut');
+    expect(match.cur.touchJudges).toMatchObject(cue.feet);
+    for (let age = 1; age < CONVERSION_SIGNAL_TICKS; age++) {
+      match.step();
+      expect(conversionJudges(match.cur)?.feet).toEqual(cue.feet);
+      expect(match.cur.touchJudges).toMatchObject(cue.feet);
+    }
+    for (let tick = 0; tick < 160; tick++) {
+      match.step();
+      const before = match.prev.touchJudges!;
+      const judges = match.cur.touchJudges!;
+      expect(conversionJudges(match.cur)).toBeNull();
+      for (const [i, p] of judges.entries()) {
         expect(dist(before[i]!, p)).toBeLessThanOrEqual(JUDGE_SPEED_M_S * TICK_S + 1e-9);
         if (p.y >= 0 && p.y <= FIELD_WIDTH) {
           expect(Math.min(p.x + IN_GOAL, FIELD_LENGTH + IN_GOAL - p.x)).toBeLessThanOrEqual(1.5 + 1e-9);
         }
       }
+      if (judges[0].y < 0 && judges[1].y > FIELD_WIDTH) break;
     }
-    const last = snaps[snaps.length - 1]!;
-    expect(last.touchJudges?.[0].y).toBeLessThan(0);
-    expect(last.touchJudges?.[1].y).toBeGreaterThan(FIELD_WIDTH);
-  });
+    expect(match.cur.touchJudges?.[0].y).toBeLessThan(0);
+    expect(match.cur.touchJudges?.[1].y).toBeGreaterThan(FIELD_WIDTH);
+  }, 30_000);
 
   it('settles and fades when the whistle ends play', () => {
     const judges = stepTouchJudges(startingTouchJudges(), { kind: 'track', ballX: 100 });
