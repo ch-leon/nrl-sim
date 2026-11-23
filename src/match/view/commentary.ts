@@ -149,6 +149,9 @@ export const LINES: Readonly<Record<string, readonly string[]>> = {
   injury: ['{player} is hurt in the tackle.', '{player} is down and hurt.', 'Trouble here: {player} is hurt.'],
   interchange: ['{player} comes on for {team}.', 'Interchange: {player} on.', '{player} is on off the bench.'],
   // ── Penalties (2e) and the captain's call ──
+  advantage: ['Advantage to {other} — offside.', 'The ref plays advantage for {other}.', 'Offside, but the ref lets {other} play.'],
+  'advantage-over': ['Advantage over. Play on!', 'The ref calls play on.', '{other} take the advantage. Play on!'],
+  'penalty:recalled': ['No advantage — back for the penalty to {other}.', 'We’ll come back for the offside. {other} penalty.', 'The whistle brings {other} back to the mark.'],
   'penalty:offside': ['Penalty to {other} — offside.', 'Offside! {player} gives away a penalty.', 'The ref pings {team} for offside.'],
   'penalty:high': ['High shot from {player} — penalty.', 'Penalty! {player} catches him high.', 'A high tackle — penalty to {other}.'],
   penalty: ['Penalty to {other}.', 'The whistle — penalty, {other}.', '{player} gives away a penalty.'],
@@ -226,7 +229,7 @@ const ENDS_KICK: ReadonlySet<string> = new Set([
 
 /** Lines that matter: a try, a sin bin, a clean break, a penalty, a kick that wins it, the whistles. The strip holds one a moment before any other line replaces it. */
 const IMPORTANT_KEYS: ReadonlySet<string> = new Set([
-  'try', 'try:bonus', 'line-break', '40-20', 'field-goal:good', 'held-up', 'penalty', 'penalty:offside', 'penalty:high',
+  'try', 'try:bonus', 'line-break', '40-20', 'field-goal:good', 'held-up', 'penalty', 'penalty:offside', 'penalty:high', 'penalty:recalled',
   'sin-bin', 'sin-bin:high', 'sin-bin:professional', 'sin-bin:repeat', 'sin-bin:offside',
   'golden-point', 'half-time:lead', 'half-time:level', 'full-time:win', 'full-time:draw', 'full-time:golden-point',
 ]);
@@ -304,6 +307,8 @@ export function lineKey(e: SimEvent, kickInAir: boolean, score?: Readonly<Record
     case 'tackle':
       return e.trait ? 'tackle:drive' : 'tackle';
     case 'penalty':
+      if (e.recalled) return 'penalty:recalled';
+      return d && LINES[`${e.kind}:${d}`] ? `${e.kind}:${d}` : e.kind;
     case 'sin-bin':
       return d && LINES[`${e.kind}:${d}`] ? `${e.kind}:${d}` : e.kind;
     case 'penalty-choice':

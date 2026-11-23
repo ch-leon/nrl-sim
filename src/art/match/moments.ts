@@ -6,8 +6,8 @@ import { add, body, contactPainter, type Body, type Point } from '../prototype/t
 import { tiltedHead } from '../prototype/contact';
 import { fitLegs, bentContactArm } from './limbs';
 
-export type MomentAction = 'kick' | 'grubberKick' | 'dropKick' | 'airCatch' | 'bombContest' | 'groundPickup' | 'dive' | 'tryRise' | 'celebrate' | 'fistPump' | 'point' | 'kneeSlide' | 'chestBump' | 'blowing' | 'goalRoutine' | 'teeKick';
-export const MOMENT_ACTIONS: readonly MomentAction[] = ['kick', 'grubberKick', 'dropKick', 'airCatch', 'bombContest', 'groundPickup', 'dive', 'tryRise', 'celebrate', 'fistPump', 'point', 'kneeSlide', 'chestBump', 'blowing', 'goalRoutine', 'teeKick'];
+export type MomentAction = 'kick' | 'grubberKick' | 'dropKick' | 'airCatch' | 'bombContest' | 'groundPickup' | 'dive' | 'tryRise' | 'celebrate' | 'fistPump' | 'point' | 'advantage' | 'kneeSlide' | 'chestBump' | 'blowing' | 'goalRoutine' | 'teeKick';
+export const MOMENT_ACTIONS: readonly MomentAction[] = ['kick', 'grubberKick', 'dropKick', 'airCatch', 'bombContest', 'groundPickup', 'dive', 'tryRise', 'celebrate', 'fistPump', 'point', 'advantage', 'kneeSlide', 'chestBump', 'blowing', 'goalRoutine', 'teeKick'];
 export interface MomentPose { pose: Body; ball: Point; near: Point; far: Point; tilt: number; lift: number }
 const stand = (crouch = 0, lean = 0) => body([19, 27 + crouch], [19 + lean, 20 + crouch], [12 + lean, 3 + crouch], [23, 31], [24, 35], [16, 31], [15, 35]);
 /** The same body `dx` pixels along (the goal kicker stepping back from his tee). */
@@ -155,10 +155,11 @@ export function momentPoseAt(action: MomentAction, frame: number, possession = f
     pose = stand(crouch, [0, 1, 1, 0, -1, -1][f]!);
     ball = add(pose.shoulder, -6, 4);
     if (action === 'fistPump') near = ([[25, 27], [27, 20], [27, 15], [27, 12], [27, 17], [27, 23]] as const)[f]!;
+    else if (action === 'advantage') near = [32, 13];
     else if (action === 'point') near = ([[25, 27], [28, 22], [31, 19], [31, 17], [31, 19], [28, 22]] as const)[f]!;
     else near = ([[25, 27], [27, 19], [27, 14], [27, 12], [27, 14], [27, 20]] as const)[f]!;
     if (action === 'kneeSlide' && f > 1) pose = { ...pose, knee: [24, 35], farKnee: [16, 35] };
-    far = possession ? add(ball, 2, 3) : action === 'fistPump' || action === 'point' ? [12, 27] : [10, 13];
+    far = possession ? add(ball, 2, 3) : ['fistPump', 'point', 'advantage'].includes(action) ? [12, 27] : [10, 13];
   }
   if (f === 0 && ['celebrate', 'fistPump', 'point', 'kneeSlide'].includes(action)) {
     const entry = TRY_RISE_POSES[5]; pose = entry.pose; near = entry.near;

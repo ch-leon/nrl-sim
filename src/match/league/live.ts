@@ -158,6 +158,7 @@ export class LiveSim extends LivePositioning implements MatchSim {
       this.groundPickup = { tick: this.tick, at: { ...recovery.at }, player: { side: h.side, slot: h.slot, who: h.key }, feet: { ...h.body.pos } };
     }
     this.watchLineBreak(h);
+    this.stepAdvantage(h);
     this.watchBombContest();
     this.expireCalls();
     if (this.scripted || this.tucked >= 0) this.tidyPlays();
@@ -260,6 +261,7 @@ export class LiveSim extends LivePositioning implements MatchSim {
       ...(this.visualBombContest ? { bombContest: this.visualBombContest } : {}),
       ...(showPickup ? { groundPickup: pickup } : {}),
       ...(conversion ? { conversion } : {}),
+      ...(this.advantage ? { advantage: { side: this.advantage.side, dir: this.dirOf(this.advantage.side) } } : {}),
       label: `${this.names[this.attacking]} ball · ${state} · ${this.points.home}–${this.points.away} · ${clockText(this.half, this.clockTicks * TICK_S)}${this.siren && (kind === 'play' || kind === 'tackle' || kind === 'ruck') ? ' · siren' : ''} · ${legs}${short}`,
       events: this.events,
       clock: { half: this.half, seconds: this.clockTicks * TICK_S, minute: Math.floor(this.matchSeconds / 60), siren: this.siren, finished: this.finished },

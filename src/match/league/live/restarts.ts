@@ -46,8 +46,7 @@ export abstract class LiveRestarts extends LivePlay {
       const defSide = other(this.attacking);
       if (this.rng.next() < offsideChance(this.defencePreset(defSide))) {
         const culprit = [...this.side(defSide)].sort((a, b) => dist(a.body.pos, this.mark) - dist(b.body.pos, this.mark))[1] ?? this.side(defSide)[0]!;
-        this.penalize(defSide, { ...this.mark }, `${culprit.name} is offside`, culprit, 'offside');
-        return;
+        if (this.penalize(this.mark, `${culprit.name} is offside`, culprit, 'offside')) return;
       }
       const dh = this.dummyHalf(this.attacking);
       const spot = this.dummyHalfSpot();
@@ -290,6 +289,7 @@ export abstract class LiveRestarts extends LivePlay {
    * attack, a 20 m restart for the defence; off the defence, a goal-line drop-out.
    */
   protected outOfField(at: Vec, how: 'touch' | 'dead', bounced: boolean, said = false): void {
+    if (this.recallAdvantage()) return;
     this.pendingKick = null;
     const loser = this.lastTouch;
     const kf = this.kickFrom;

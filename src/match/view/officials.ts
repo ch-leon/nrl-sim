@@ -133,8 +133,8 @@ export function refCoversCarrier(s: Snapshot, spot: { x: number; y: number }, of
   return rw.y >= cw.y && rw.y - BODY_H < cw.y && Math.abs(rw.x - cw.x) < BODY_HALF_W * 2;
 }
 
-/** What the referee is signalling on this tick: an arm up for a try, pointing for a penalty. */
-export type RefSignal = 'try' | 'penalty' | null;
+/** What the referee is signalling on this tick. */
+export type RefSignal = 'try' | 'penalty' | 'advantage' | null;
 
 /** The phase in the snapshot's state label (`<side> ball · <phase> · …`). */
 function phaseOf(s: Snapshot): string {
@@ -143,6 +143,8 @@ function phaseOf(s: Snapshot): string {
 
 export function refereeSignal(s: Snapshot): RefSignal {
   if (s.players.some((p) => p.tryTick !== undefined)) return 'try';
+  if (s.advantage) return 'advantage';
+  if (s.events.some(e => e.kind === 'penalty' && e.recalled)) return 'penalty';
   return phaseOf(s) === 'penalty' ? 'penalty' : null;
 }
 

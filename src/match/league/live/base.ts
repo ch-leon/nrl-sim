@@ -458,7 +458,7 @@ export abstract class LiveBase {
   protected locked(p: Player): boolean {
     return this.tick < p.lockUntil;
   }
-  protected emit(kind: string, text: string, p?: Player, trait?: string): void {
+  protected emit(kind: string, text: string, p?: Pick<Player, 'side' | 'slot' | 'name'>, trait?: string): void {
     this.events.push({ tick: this.tick, kind, text, ...(p ? { side: p.side, slot: p.slot, player: p.name } : {}), ...(trait ? { trait } : {}) });
   }
   /** Remember, for the picture only, that he just made the error, missed the goal or was binned (#667). */
@@ -569,7 +569,8 @@ export abstract class LiveBase {
   protected abstract groundInGoal(p: Player, raced?: boolean): boolean;
   protected abstract startSetPiece(side: Side, spot: Vec, how: 'ptb' | 'tap', prefer?: number, tackles?: number): void;
   protected abstract startDropOut(side: Side): void;
-  protected abstract penalize(offender: Side, spot: Vec, why: string, culprit: Player, kind: string, trait?: string, bin?: boolean): void;
+  protected abstract penalize(spot: Vec, why: string, culprit: Player, kind: 'offside' | 'high' | 'kickoff', trait?: string): boolean;
+  protected abstract recallAdvantage(): boolean;
   protected abstract takePenalty(award: Side, mark: Vec, choice: PenaltyChoice): void;
   protected abstract penaltyOpen(): { side: Side; mark: Vec; choice: PenaltyChoice; shot: number; called: boolean } | null;
   protected abstract goalAcc(k: Player): number;

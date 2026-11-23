@@ -492,6 +492,9 @@ export abstract class LivePlay extends LiveKicks {
       if (!this.stepWrestle(ph, w)) return;
     } else if (this.tick < ph.t0 + LIVE.contactTicks) return;
     const c = this.players[ph.carrier]!;
+    // The advantage is for this passage only. A completed tackle settles it before six again.
+    if (this.gainedAdvantage(c)) this.takeAdvantage(c.side);
+    else if (this.recallAdvantage()) return;
     if (inOwnInGoal(c.body.pos, this.dirOf(c.side))) {
       // Held up in his own in-goal: a goal-line drop-out (2d).
       this.emit('dead-ball', `${c.name} is held in his own in-goal — goal-line drop-out`, c);

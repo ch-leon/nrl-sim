@@ -643,6 +643,8 @@ AGAIN!** over the tackler; the commentary says why. Sin bins later (BAK-206 B7).
 | `penalty.ruckSixAgain` | `src/match/league/penalties.ts` | 0.008 | Six again at any play-the-ball. |
 | `penalty.holdDown` | `penalties.ts` | 0.08 | Extra six-again chance after a slow wrestle (≥ 1.2 s). |
 | `penalty.offside.slide` / `.rush` / `.compressed` | `penalties.ts` | 0.008 / 0.02 / 0.006 | Offside as the ball is played, by the defence preset. |
+| `penalty.advantageTicks` | `penalties.ts` | 70 ticks (3.5 s) | Maximum play-on window after ordinary offside with the attack still in possession. Set to 0 for the immediate penalty. |
+| `penalty.advantageGainM` | `penalties.ts` | 8 m | Forward ground a carrier gains from the original mark to take the advantage. Line breaks and tries also take it. |
 | `penalty.highShot` / `penalty.highShotHothead` | `penalties.ts` | 0.002 / 0.03 a level | A high shot in a made tackle. |
 | `penalty.goalPoints` | `penalties.ts` | 2 | A penalty goal. |
 | `penalty.shotMin` / `.shotLateS` / `.shotBehind` / `.shotAhead` / `.shotHalfEndS` | `penalties.ts` | 0.6 / 233 s / 6 / 1 / 20 s | When the captain takes the shot. `shotLateS` was 300 (the last five minutes of 18:00); 300 × 7/9, rounded. |
@@ -659,7 +661,7 @@ rush 3.0 penalties, the Rush side conceding 1.85 to Slide's 1.15. Calls: mostly 
 (1.9), some taps (0.45); shots at goal are rare (late and close only). Tries between even
 sides 5.55. The extra dice reshuffle every seed; nothing else moves beyond luck.
 
-Tests: `tests/match/league/penalties.test.ts`.
+Tests: `tests/match/league/penalties.test.ts` and `tests/match/league/penaltyAdvantage.test.ts`. The balance report's `penalties` column counts whistles including recalled offsides. `penaltiesWaived` counts advantage over.
 
 ## 18. Weather, injuries and the ball lost in contact (BAK-207 §5.1, 2f)
 
