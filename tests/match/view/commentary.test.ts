@@ -57,6 +57,7 @@ const SAMPLES: SimEvent[] = [
   ev('gassed'), ev('blown'), ev('injury'), ev('interchange'),
   ev('penalty', { detail: 'offside' }), ev('penalty', { detail: 'high' }),
   ...['goal', 'tap', 'touch'].map((d) => ev('penalty-choice', { detail: d })), ev('tap'),
+  ...['penalty', '20m'].map((d) => ev('quick-tap', { detail: d })),
   ...['high', 'professional', 'repeat', 'offside'].map((d) => ev('sin-bin', { detail: d })), ev('sin-bin-return'),
   ev('try'), ev('try', { detail: 'bonus' }),
   ...['conversion', 'penalty-goal', 'field-goal'].flatMap((k) => ['good', 'missed'].map((d) => ev(k, { detail: d }))), ev('drop-goal'),

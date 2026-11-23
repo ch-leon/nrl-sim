@@ -156,7 +156,7 @@ export const LINES: Readonly<Record<string, readonly string[]>> = {
   'penalty-choice:tap': ['{team} tap and go.', '{team} keep the pressure on with a tap.', '{player} takes the tap.'],
   'penalty-choice:touch': ['{team} kick for touch.', '{player} kicks for the line.', '{team} take the ground: kick for touch.'],
   tap: ['{player} taps and goes.', '{player} takes the tap.', '{player} gets play going again.'],
-  'quick-tap': ['{player} taps before the defence is back!', 'Quick tap! {player} catches them retreating.', 'The line is still getting back and {player} is away!'],
+  'quick-tap': ['{player} taps before the line is set!', '{player} taps while they retreat.', 'Quick tap! The defence is still retreating.'],
   'sin-bin:high': ['Sin bin! {player} goes for the high shot.', '{player} is binned for a high shot.', 'Sin bin: {player}, for the high shot.'],
   'sin-bin:professional': ['Sin bin! {player} for a professional foul.', 'Professional foul — {player} to the bin.', '{player} goes to the bin: a cynical foul.'],
   'sin-bin:repeat': ['{player} is binned — too many penalties.', 'Repeat offences: {player} to the bin.', 'Sin bin! {player}, for repeat offences.'],
