@@ -183,14 +183,14 @@ export const LINES: Readonly<Record<string, readonly string[]>> = {
   'set-play': ['{player} calls {play}.', '{team} go to {play}.', 'Here comes {play}.'],
   'play-breaks-down': ['It breaks down: {player} tucks it.', 'Nobody there: {play} breaks down.', '{play} goes wrong for {team}.'],
   'signature-play': [
-    `{player} calls for the short ball. ${POSTS_CHARGE_PLAY.name}!`,
-    `${POSTS_CHARGE_PLAY.name}! {player} wants it out of dummy-half.`,
-    `{player} calls his ${POSTS_CHARGE_PLAY.name}.`,
+    `{player} calls ${POSTS_CHARGE_PLAY.name}!`,
+    `${POSTS_CHARGE_PLAY.name} from {player}!`,
+    `{player} wants it. ${POSTS_CHARGE_PLAY.name}!`,
   ],
   'signature-breakdown': [
-    `{player} tucks it up as the ${POSTS_CHARGE_PLAY.name} breaks down.`,
-    `The ${POSTS_CHARGE_PLAY.name} breaks down. {player} keeps it.`,
-    `No room for {player} on the ${POSTS_CHARGE_PLAY.name}. He tucks it away.`,
+    `{player} tucks it. ${POSTS_CHARGE_PLAY.name} is off.`,
+    `${POSTS_CHARGE_PLAY.name} stalls. {player} tucks it.`,
+    `{player}'s ${POSTS_CHARGE_PLAY.name} breaks down.`,
   ],
   'signature-success': [
     `{player} makes the ${POSTS_CHARGE_PLAY.name} count!`,

@@ -278,6 +278,18 @@ describe('the ticker at 844×390', () => {
     expect(over).toEqual([]);
   });
 
+  it('keeps the full player name in every signature line at the rename limit', () => {
+    const player = 'Mackenzie Tuilagi-Fonoti';
+    expect(player.length).toBe(24);
+    for (const key of ['signature-play', 'signature-breakdown', 'signature-success']) {
+      for (const template of LINES[key]!) {
+        const line = fillLine(template, { player });
+        expect(line).toContain(player);
+        expect(line!.length, key).toBeLessThanOrEqual(TICKER_FIT_CHARS);
+      }
+    }
+  });
+
   it('names a club by its last word, as the report does', () => {
     expect(shortName('Shellharbour Scorpions')).toBe('Scorpions');
     expect(shortName('Zone Test FC')).toBe('Zone Test FC');
