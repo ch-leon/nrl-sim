@@ -3,7 +3,8 @@
 // little drive left under the first rule, heldUp.oneManFight 0.35). One roll, only then; off (heldUp.on 0) plays as before.
 import { describe, expect, it } from 'vitest';
 import { SET_TACKLES } from '../../../src/config';
-import { FIELD_LENGTH } from '../../../src/match/core/field';
+import { TICK_S } from '../../../src/match/core/engine';
+import { FIELD_LENGTH, MID_Y } from '../../../src/match/core/field';
 import { LiveSim } from '../../../src/match/league/live';
 import { HELD_UP, heldUpChance, heldUpContest, type HeldUpInputs } from '../../../src/match/league/wrestle';
 import { applyTuning, listKnobs } from '../../../src/match/league/tuning';
@@ -118,27 +119,45 @@ describe('held up: in the sim', () => {
     });
   });
 
-  it('on, the roll is drawn only when a carrier in contact reaches the line: a match with none plays as off', () => {
-    // Under the first rule (two men, or one and little drive) most matches have no contest at the line and
-    // play exactly as off; one that has one draws its roll there and goes another way. At the default
-    // (any tackler on him) most matches have one, so the gate is shown under the first rule.
-    const count = (over: Record<string, number>): { same: number; moved: number } => {
-      let same = 0;
-      let moved = 0;
-      // After the timed back-door runs (#722), seed 20 supplies the rare first-rule witness (41 before).
-      for (const seed of [1, 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 20]) {
-        const off = withTuning({ 'heldUp.on': 0 }, () => play(seed));
-        const on = withTuning(over, () => play(seed));
-        if (on.draws === off.draws && on.events === off.events && on.home === off.home && on.away === off.away) same++;
-        else moved++;
+  it('draws once only when the line crossing meets the active contact rule', () => {
+    class LineCarry extends LiveSim {
+      draws = 0;
+
+      constructor(men: number, pace: number) {
+        super(home, away, 20);
+        this.tick = 100;
+        this.attacking = 'home';
+        this.dir = this.dirOf('home');
+        this.phase = { kind: 'play' };
+        for (const p of this.players) p.body.pos = { x: FIELD_LENGTH / 2, y: MID_Y };
+        const carrier = this.at('home', 0);
+        const speed = pace * carrier.body.maxSpeed;
+        const line = this.dir > 0 ? FIELD_LENGTH : 0;
+        // The previous movement tick crossed the line, with the chasers still alongside him.
+        carrier.body.pos = { x: line + this.dir * speed * TICK_S / 2, y: MID_Y };
+        carrier.body.vel = { x: this.dir * speed, y: 0 };
+        for (let i = 0; i < men; i++) {
+          this.at('away', i).body.pos = { x: carrier.body.pos.x, y: MID_Y + (i === 0 ? 1 : -1) };
+        }
+        this.ball = { kind: 'held', by: this.indexOf(carrier) };
+        this.rng.next = () => { this.draws++; return 0.99; }; // Let the try through if there is a contest.
       }
-      return { same, moved };
+    }
+
+    const draws = (men: number, pace = 0.75) => {
+      const sim = new LineCarry(men, pace);
+      sim.step();
+      expect(sim.tickEvents).toContainEqual(expect.objectContaining({ kind: 'try', side: 'home' }));
+      return sim.draws;
     };
-    const first = count({ 'heldUp.oneManFight': 0.35, 'heldUp.base': 0.6 });
-    expect(first.same).toBeGreaterThan(first.moved);
-    expect(first.moved).toBeGreaterThan(0);
-    // The default contests more often: more matches move.
-    expect(count({}).moved).toBeGreaterThan(first.moved);
+    expect(draws(0)).toBe(0);
+    expect(draws(1)).toBe(1);
+    withTuning({ 'heldUp.oneManFight': 0.35, 'heldUp.base': 0.6 }, () => {
+      expect(draws(1)).toBe(0);
+      expect(draws(1, 0.2)).toBe(1);
+      expect(draws(2)).toBe(1);
+    });
+    withTuning({ 'heldUp.on': 0 }, () => expect(draws(2)).toBe(0));
   });
 
   it('held up: no try; a play-the-ball 10 m out with the tackle counted, a handover there on the last', () => {
