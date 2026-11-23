@@ -24,6 +24,10 @@ The sim remains the authority for movement, participants, timing and possession.
   match the normal carry at the same stride. Pass follow-through uses the actual
   pose deadline and ends on the normal running pixels. Stationary players plant
   their feet instead of cycling the running pose.
+- On the interception tick the defender reaches toward the pass, draws the
+  ball in and tucks it into his return. The hands follow the take tick while
+  the feet follow the actual run. Replay seeks restore the same pose for the
+  original interceptor while he holds the ball and is free to run.
 - During the existing ground/release interval, the contact carrier rises into
   the body and ball anchors of the first play-the-ball frame. The head rotates
   upright with the body. Recovery fits quick and slow rucks; no extra wait is

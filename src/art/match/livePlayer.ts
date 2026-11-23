@@ -9,9 +9,9 @@ import { lookUpFrame } from './lookUp';
 
 /** `ready`: a defender set for the play-the-ball (#665). The reactions (#667): standing or on the run. */
 export type Reaction = 'handsOnHead' | 'handsOnHips' | 'armsFolded';
-export type LivePlayerAction = PlayerAnim | 'carry' | 'ready' | 'call' | 'receive' | 'guard' | 'wrongFoot' | Reaction | MomentAction;
+export type LivePlayerAction = PlayerAnim | 'carry' | 'ready' | 'call' | 'receive' | 'guard' | 'intercept' | 'wrongFoot' | Reaction | MomentAction;
 const BASIC: Partial<Record<LivePlayerAction, Action | ReactAction>> = {
-  idle: 'idle', run: 'run', carry: 'carry', pass: 'pass', catch: 'catch', call: 'call', receive: 'receive', guard: 'guard',
+  idle: 'idle', run: 'run', carry: 'carry', pass: 'pass', catch: 'catch', call: 'call', receive: 'receive', guard: 'guard', intercept: 'intercept',
   tackle: 'wrap', tackled: 'brace', down: 'ground', dive: 'ground', ptb: 'ptb', fend: 'fend',
   wrongFoot: 'wrongFoot',
   handsOnHead: 'headHands', handsOnHips: 'hips', armsFolded: 'fold',
@@ -32,7 +32,7 @@ export function drawLivePlayer(look: Appearance, kit: Kit, action: LivePlayerAct
   if (possession && (basic === 'wrap' || basic === 'idle')) basic = 'carry';
   // Every pose maps to a painter; a fend keeps the run cycle's legs under the straight arm.
   const bodyFacing = basic === 'ground' || basic === 'wrap' || basic === 'brace' || basic === 'ptb' ? sharedFacing : facing;
-  const motion = ['idle', 'run', 'carry', 'catch', 'pass', 'call', 'receive', 'guard', 'fend'].includes(basic ?? '') ? movement : undefined;
+  const motion = ['idle', 'run', 'carry', 'catch', 'intercept', 'pass', 'call', 'receive', 'guard', 'fend'].includes(basic ?? '') ? movement : undefined;
   const drawn = drawPrototypePlayer(look, kit, basic ?? 'idle', frame, bodyFacing, possession, strideFrame, tired, motion);
   // Eyes on a bomb (#671): a man standing or running, ball elsewhere, with his head tipped back.
   if (lookUp > 0 && !possession && (action === 'idle' || action === 'run')) return lookUpFrame(drawn, look, kit, facing, action, frame, strideFrame, tired, lookUp, motion);
