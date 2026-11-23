@@ -392,3 +392,6 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261122-212535-standard | standard | 58524bb | main | [report](runs/20261122-212535-standard/report.md) |
 | 20261122-235848-standard | standard | 58524bb8 | HEAD | [report](runs/20261122-235848-standard/report.md) |
 | 20261123-000617-marker-darts-656 | marker-darts-656 | f2a60a92 | feat/marker-darts | [report](runs/20261123-000617-marker-darts-656/report.md) |
+| 20261123-000616-standard-656 | standard | f2a60a92 | feat/marker-darts | [report](runs/20261123-000616-standard-656/report.md) |
+| 20261123-000735-standard-660 | standard | 477f90d0 | feat/kick-returns | [report](runs/20261123-000735-standard-660/report.md) |
+| 20261123-000729-kick-returns-660 | kick-returns-660 | 477f90d0 | feat/kick-returns | [report](runs/20261123-000729-kick-returns-660/report.md) |

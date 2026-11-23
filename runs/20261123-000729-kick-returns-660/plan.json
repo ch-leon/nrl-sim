@@ -1,0 +1,41 @@
+{
+  "name": "kick-returns-660",
+  "description": "Measure net metres from direct long and bomb catches to the end of the first play, on an even field and against Kick-chase. These matches use the 7-minute halves behind the historical §7 targets. Turning off kick returns restores main's return behavior.",
+  "seeds": 50,
+  "base": {
+    "rules.halfMinutes": 7
+  },
+  "scenarios": [
+    {
+      "name": "even 60 v 60",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "kick-chase v balanced",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "kick returns off",
+      "tuning": {
+        "kickReturn.on": 0
+      }
+    }
+  ]
+}
