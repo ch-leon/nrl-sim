@@ -1,9 +1,8 @@
 // src/scenes/matchOfficials.ts — the match's people and furniture off the ball (#642):
 // the officials, the interchange benches, the sin bin and the corner flags. Where they
-// stand is decided by src/match/view/officials.ts (pure functions of the snapshot);
-// this draws them. Every texture is made once at build and repainted in place (the
-// bench after an interchange, the referee when his frame changes), so a match makes
-// no textures as it plays and the registry frees them all on shutdown.
+// stand is decided by src/match/view/officials.ts (pure functions of the snapshot).
+// Textures are repainted in place. An outgoing player's texture is created when
+// first needed, and the registry frees the textures on shutdown.
 import type Phaser from 'phaser';
 import { PixelBuffer } from '../art/pixel';
 import type { Kit } from '../art/match/kit';
@@ -94,7 +93,8 @@ interface BenchView {
   /** Who was painted, so an unchanged bench is not repainted. */
   shown: string;
   card: Phaser.GameObjects.Image;
-  joggers: BenchJogger[];
+  joggers: (BenchJogger | undefined)[];
+  jogging: boolean;
 }
 
 interface BenchJogger {
@@ -125,6 +125,7 @@ export class MatchOfficials {
   private readonly seated = new Map<string, PixelBuffer>();
 
   private readonly scene: Phaser.Scene;
+  private readonly art: MatchArtRegistry;
   private readonly board: Canvas;
   private readonly boardColors: readonly [number, number];
   private boardShown = '';
@@ -137,6 +138,7 @@ export class MatchOfficials {
   constructor(scene: Phaser.Scene, art: MatchArtRegistry, opts: OfficialsOptions) {
     this.opts = opts;
     this.scene = scene;
+    this.art = art;
     const world = (p: { x: number; y: number }) => {
       const f = toFieldPt(p);
       return opts.toWorld(f.fx, f.fy);
@@ -161,16 +163,7 @@ export class MatchOfficials {
       const image = scene.add.image(empty.x, empty.y, canvas.key).setOrigin(0, 0).setDepth(mid + 1);
       const bin = world(binSeat(side));
       scene.add.image(Math.round(bin.x) - BIN_SPOT_X, Math.round(bin.y) - BIN_SPOT_Y, spot).setOrigin(0, 0).setDepth(bin.y);
-      const joggers = Array.from({ length: opts.sheets[side].bench?.length ?? 0 }, (_, i): BenchJogger => {
-        const canvas = new Canvas(scene, art, `bench-jog-${side}-${i}`, WIDTH, HEIGHT);
-        return {
-          canvas,
-          image: scene.add.image(0, 0, canvas.key).setVisible(false),
-          shadow: scene.add.image(0, 0, opts.shadowKey).setDepth(-80_000).setVisible(false),
-          shown: '',
-        };
-      });
-      return { canvas, image, seats, joggers, shown: '', card: scene.add.image(0, 0, card).setOrigin(0.5, 1).setVisible(false) };
+      return { canvas, image, seats, joggers: [], jogging: false, shown: '', card: scene.add.image(0, 0, card).setOrigin(0.5, 1).setVisible(false) };
     };
     this.benches = { home: bench('home'), away: bench('away') };
     // The referee: one sprite and its shadow, in a strip neither side can be taken for.
@@ -245,7 +238,10 @@ export class MatchOfficials {
     if (cur.score) this.drawBoard([cur.score.home, cur.score.away]);
     this.drawReferee(prev, cur, alpha);
     this.drawTouchJudges(cur, heldTicks);
-    for (const side of ['home', 'away'] as const) this.drawBench(side, cur, prev.tick + (cur.tick - prev.tick) * alpha);
+    const tick = prev.tick + (cur.tick - prev.tick) * alpha;
+    const exits = cur.interchangeExits?.length && !breakKind(cur) ? cur.interchangeExits : undefined;
+    this.drawBench('home', cur, tick, exits);
+    this.drawBench('away', cur, tick, exits);
   }
 
   private world(p: { x: number; y: number }): { x: number; y: number } {
@@ -329,17 +325,43 @@ export class MatchOfficials {
     this.ref.setOrigin((left ? WIDTH - CENTRE : CENTRE) / WIDTH, FOOT / HEIGHT).setFlipX(left);
   }
 
-  private drawBench(side: Side, cur: Snapshot, tick: number): void {
+  private createJogger(side: Side, seat: number): BenchJogger {
+    const canvas = new Canvas(this.scene, this.art, `bench-jog-${side}-${seat}`, WIDTH, HEIGHT);
+    return {
+      canvas,
+      image: this.scene.add.image(0, 0, canvas.key).setVisible(false),
+      shadow: this.scene.add.image(0, 0, this.opts.shadowKey).setDepth(-80_000).setVisible(false),
+      shown: '',
+    };
+  }
+
+  private drawBench(side: Side, cur: Snapshot, tick: number, exits: Snapshot['interchangeExits']): void {
     const b = this.benches[side];
-    const who = benchSeated(this.opts.sheets[side], side, cur).slice(0, BENCH.seats);
-    const exits = breakKind(cur) ? [] : cur.interchangeExits;
-    b.joggers.forEach((j, i) => {
-      const key = who[i];
-      const exit = exits?.find(e => e.side === side && e.who === key);
+    const sheet = this.opts.sheets[side];
+    const who = benchSeated(sheet, side, cur).slice(0, BENCH.seats);
+    const seatsWithExits = exits ? Math.min(who.length, sheet.bench?.length ?? 0) : 0;
+    // Previously used seats still need hiding when the bench shrinks or the view seeks.
+    const slots = seatsWithExits || b.jogging ? Math.max(seatsWithExits, b.joggers.length) : 0;
+    b.jogging = false;
+    for (let i = 0; i < slots; i++) {
+      const key = i < seatsWithExits ? who[i] : undefined;
+      const exit = key === undefined ? undefined : exits?.find(e => e.side === side && e.who === key);
       const run = exit && benchJog(exit, i, tick);
-      j.image.setVisible(!!run);
-      j.shadow.setVisible(!!run);
-      if (!run || !exit || key === undefined) return;
+      let j = b.joggers[i];
+      if (!run || !exit || key === undefined) {
+        if (j?.image.visible) {
+          j.image.setVisible(false);
+          j.shadow.setVisible(false);
+        }
+        continue;
+      }
+      if (!j) {
+        j = this.createJogger(side, i);
+        b.joggers[i] = j;
+      }
+      b.jogging = true;
+      j.image.setVisible(true);
+      j.shadow.setVisible(true);
       who[i] = '';
       const at = this.world(run), to = this.world(run.to);
       const x = Math.round(at.x), y = Math.round(at.y);
@@ -352,7 +374,7 @@ export class MatchOfficials {
       }
       j.image.setPosition(x, y).setDepth(y + 1).setOrigin((left ? WIDTH - CENTRE : CENTRE) / WIDTH, FOOT / HEIGHT).setFlipX(left);
       j.shadow.setPosition(x, y);
-    });
+    }
     const shown = who.join('|');
     if (shown !== b.shown) {
       b.shown = shown;
