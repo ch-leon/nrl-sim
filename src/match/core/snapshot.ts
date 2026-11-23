@@ -102,6 +102,8 @@ export interface BallFlightSnap {
   startedTick: number;
   arrivesTick: number;
   fromLift: number;
+  /** Hops of an actual low kick, for drawing the same curve between ticks. */
+  grubber?: { peak: number; bounces: number };
   receiver?: ContactPlayer;
   /** Written only for an actual pass launch, never used by match decisions. */
   source?: { player: ContactPlayer; headX: number; headY: number; speed: number; odometer: number; legs: number; blown: boolean };

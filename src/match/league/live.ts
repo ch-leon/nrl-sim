@@ -236,6 +236,7 @@ export class LiveSim extends LivePositioning implements MatchSim {
       const source = launch && this.players.find(p => p.side === launch.player.side && p.slot === launch.player.slot && p.key === launch.player.who);
       ball = { x: f.pos.x, y: f.pos.y, lift: f.lift, holder: null, flight: {
         via: b.via, from: { ...b.from }, to: { ...b.to }, startedTick: b.t0, arrivesTick: b.t0 + b.ticks, fromLift: b.fromLift,
+        ...(b.via === 'kick' && b.bounces > 0 ? { grubber: { peak: b.peak, bounces: b.bounces } } : {}),
         ...(receiver ? { receiver: { side: receiver.side, slot: receiver.slot, who: receiver.key } } : {}),
         ...(source && launch ? { source: { player: { ...launch.player }, headX: launch.headX, headY: launch.headY, speed: launch.speed, odometer: launch.odometer, legs: launch.legs, blown: launch.blown } } : {}),
       } };
