@@ -1,0 +1,40 @@
+{
+  "name": "quick-taps-658",
+  "description": "How often are direct penalty and 20 m taps taken early, what is the first-play gain and line-break rate by origin, and how do they compare with ordinary taps? The default and disabled variant replay the same seeds in historical whole matches with two seven-minute halves. Neutral flat 60 measures the §7 match totals, while Rush provides a second sample with more ruck offsides. The harness normalizes legacy event totals to five minutes. Multiply the unrounded count means in results by 14/5 for the historical §7 comparison and read completion directly.",
+  "seeds": 80,
+  "base": {
+    "rules.halfMinutes": 7
+  },
+  "scenarios": [
+    {
+      "name": "even 60 v 60",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "slide v rush",
+      "seeds": 60,
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "defence": "rush"
+        }
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "quick taps off",
+      "tuning": {
+        "quickTap.on": 0
+      }
+    }
+  ]
+}

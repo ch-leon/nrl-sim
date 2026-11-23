@@ -399,3 +399,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261123-001843-expansive-holdout-660 | expansive-holdout-660 | 00438acb | feat/kick-returns | [report](runs/20261123-001843-expansive-holdout-660/report.md) |
 | 20261123-002142-kick-chase-room-historical-660 | kick-chase-room-historical-660 | 00438acb | feat/kick-returns | [report](runs/20261123-002142-kick-chase-room-historical-660/report.md) |
 | 20261123-002142-kick-chase-room-live-660 | kick-chase-room-live-660 | 00438acb | feat/kick-returns | [report](runs/20261123-002142-kick-chase-room-live-660/report.md) |
+| 20261123-034106-quick-taps-658 | quick-taps-658 | a1dca9f7 | HEAD | [report](runs/20261123-034106-quick-taps-658/report.md) |
