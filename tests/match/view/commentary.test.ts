@@ -65,6 +65,7 @@ const SAMPLES: SimEvent[] = [
   // Set plays (#326): a coach's call, the launch, the breakdown, and one paying off.
   ev('coach-call', { detail: 'set-play:block-play' }), ev('set-play', { detail: 'block-play' }), ev('set-play', { detail: 'tap-rambo' }),
   ev('play-breaks-down', { detail: 'cut-out-winger' }), nobody('call-paid', { detail: 'set-play', side: 'home' }),
+  ...['signature-play', 'signature-breakdown', 'signature-success'].map(kind => ev(kind, { detail: 'posts-charge' })),
   nobody('siren'),
   nobody('half-time', { side: 'home' }), nobody('golden-point', { side: 'home' }),
   nobody('full-time', { side: 'home' }), nobody('full-time', { side: 'home', detail: 'golden-point' }),

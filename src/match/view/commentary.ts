@@ -20,7 +20,7 @@
 import type { Side, SimEvent } from '../core/snapshot';
 import type { MatchEvent, MatchResult, TeamSheet } from '../../sim/events';
 import { CALL_LABEL, callIsPenalty, isCoachCall } from '../league/calls';
-import { playOfDetail, playShortTitle } from '../league/plays';
+import { POSTS_CHARGE_PLAY, playOfDetail, playShortTitle } from '../league/plays';
 import type { Play } from '../../data/plays';
 import { MID_Y } from '../core/field';
 import { NINES } from '../league/rules';
@@ -182,6 +182,9 @@ export const LINES: Readonly<Record<string, readonly string[]>> = {
   'coach-call:play': ['{team} coach calls {play}.', 'From the {team} box: {play}.', 'A play from the box: {play}.'],
   'set-play': ['{player} calls {play}.', '{team} go to {play}.', 'Here comes {play}.'],
   'play-breaks-down': ['It breaks down: {player} tucks it.', 'Nobody there: {play} breaks down.', '{play} goes wrong for {team}.'],
+  'signature-play': [`{player} calls for the short ball. ${POSTS_CHARGE_PLAY.name}!`],
+  'signature-breakdown': [`{player} tucks it up as the ${POSTS_CHARGE_PLAY.name} breaks down.`],
+  'signature-success': [`{player} makes the ${POSTS_CHARGE_PLAY.name} count!`],
   // Phase 3: the half's own call from the three (no word from the box), and a coach's play that pays off.
   'set-play:half': ['{player} calls {play} himself.', 'Off the cuff: {play}.', '{player} sees it: {play}.'],
   'call-paid:play': ['{play} comes off for {team}!', 'Straight off the whiteboard: {play} works.', 'Called from the box, and {play} pays off.'],

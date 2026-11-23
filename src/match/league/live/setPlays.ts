@@ -222,9 +222,8 @@ export abstract class LiveSetPlays extends LiveCalls {
     const toward = this.playTarget(s);
     this.scripted = null;
     const title = playTitle(livePlay(s.id));
-    this.emit(s.by === 'star' ? 'signature-breakdown' : 'play-breaks-down', s.by === 'star'
-      ? `${h.name} tucks it up as ${title} breaks down`
-      : `${h.name} can't find ${toward ? toward.name : 'his man'} — ${title} breaks down`, h);
+    if (s.by === 'star') this.emit('signature-breakdown', `${h.name} tucks it up as ${title} breaks down`, h);
+    else this.emit('play-breaks-down', `${h.name} can't find ${toward ? toward.name : 'his man'} — ${title} breaks down`, h);
     this.events[this.events.length - 1]!.detail = s.id;
     this.playsRun.brokeDown[s.side]++;
     this.tucked = this.indexOf(h);
