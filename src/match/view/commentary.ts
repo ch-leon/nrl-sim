@@ -137,7 +137,7 @@ export const LINES: Readonly<Record<string, readonly string[]>> = {
   'run-down': ['{player} runs him down!', 'Caught from behind! {player} gets there.', '{player} chases him down from behind.'],
   'dummy-pass': ['{player} shapes to pass.', '{player} keeps it after the dummy.', '{player} shows the ball and tucks it away.'],
   'dummy-pass:bite': ['{player} sells the dummy!', '{player} shows it and goes himself.', 'The defence buys the dummy from {player}.'],
-  'dummy-pass:square': ['{player} shows the ball. The line holds.', '{player} shapes to pass. The line stays square.', '{player} dummies but the defence holds.'],
+  'dummy-pass:square': ['{player} shows the ball. The line holds.', '{player} dummies. The line stays square.', '{player} dummies but the defence holds.'],
   intercept: ['{player} picks it off!', 'Intercept! {player} reads the pass.', '{player} jumps the pass!', 'Intercept! {player} steals it!', '{player} snatches the pass out of the air!', 'Pass picked off by {player}!'],
   gamble: ['{player} gambles and misses.', '{player} goes for the intercept, no luck.', '{player} jumps out of the line and misses.'],
   strip: ['{player} strips the ball!', '{player} rips it free in the tackle!', 'Stripped! {player} wins the ball.'],
