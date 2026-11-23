@@ -47,8 +47,9 @@ describe('corner cover in ordinary live matches', () => {
     expect(miss!.players.find(p => p.side === 'away' && p.slot === 0)?.pose).toBe('dive');
     expect(miss!.ball.holder).toEqual({ side: 'home', slot: 2 });
     expect(miss!.phase?.kind).toBe('play');
-    expect(after.at(-1)?.events.find(e => e.kind === 'try')).toMatchObject({ side: 'home', slot: 2 });
-    expect(after.at(-1)?.score?.home).toBeGreaterThan(miss!.score!.home);
+    const grounding = after[after.length - 1]!;
+    expect(grounding.events.find(e => e.kind === 'try')).toMatchObject({ side: 'home', slot: 2 });
+    expect(grounding.score?.home).toBeGreaterThan(miss!.score!.home);
   });
 
   it('turns the cover rule off in the same two reproductions', () => {

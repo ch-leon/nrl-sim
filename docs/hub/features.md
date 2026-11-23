@@ -64,7 +64,7 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
-- **Try-saving tackles in the corner.** A fullback can come across to cover an open run down the edge. If he reaches the runner before the line, he can dive at his legs for a tackle or miss and leave the runner free to ground it. The play-by-play calls each result. Awaiting Lab sign-off.
+- **Try-saving tackles in the corner.** A fullback can come across to cover an open run down the edge. If he reaches the runner before the line, he can dive at his legs for a tackle or miss and leave the runner free to ground it. The play-by-play calls each result. Awaiting Lab sign-off. [PR #789](https://github.com/ch-leon/nrl-sim/pull/789)
 
 - **A second kicking option on the last tackle.** On the last play-the-ball the halfback sets up flatter on the open side and the five-eighth drops behind on the other. Once the heel is played, the onside line can come up. If a defender is closing on the halfback and the five-eighth has more room, dummy-half finds him. He then makes the ordinary kick, run or pass. A directed last-tackle call, a set play or a manual pass keeps the usual path. `secondKicker.on:0` restores the single kicker and the previous ruck. Ported from draft PR #760, part of [#650](https://github.com/ch-leon/nrl-sim/issues/650).
 

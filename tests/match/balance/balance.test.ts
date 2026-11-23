@@ -308,8 +308,9 @@ describe('measuring and reporting', () => {
     // balanced 6-4:125:3b59450ec3a85edd / expansive 10-4:150:975213c1842aa58e.
     // The five-eighth last-tackle option (engine revision 12) re-pins both. Before it:
     // balanced 0-0:137:6c911bf022e28778 / expansive 4-0:134:443f2da66ba81a8d.
-    { attack: 'balanced' as const, expected: '13-10:155:57426901f7cbc31f' },
-    { attack: 'expansive' as const, expected: '0-6:147:52d52acd0272a5fe' },
+    // The fullback's corner read and low dive (engine revision 20) change both.
+    { attack: 'balanced' as const, expected: '13-10:145:79abb32eab53a59a' },
+    { attack: 'expansive' as const, expected: '0-1:142:8db206291c5676e2' },
   ])('pins an even $attack / Slide match (seed 1)', async ({ attack, expected }) => {
     const sim = new LiveSim(sideSheet('H', { rating: 60, tactics: { attack } }), sideSheet('A', { rating: 60 }), 1);
     const parts: string[] = [];
@@ -353,7 +354,8 @@ describe('measuring and reporting', () => {
     // plays-on stays. Before the punts, plays-on-hard was 1-0:144:74a11af0f394ead7.
     // The five-eighth last-tackle option (engine revision 12) re-pins both. Before it:
     // plays-on 10-0:141:fb9bb3ff69ff1592 / plays-on-hard 1-0:146:2652be8270891c73.
-    { name: 'plays-on', aiCoach: false, expected: '4-10:155:79024e6ce6d03277' },
+    // The fullback's corner read (engine revision 20) moves only plays-on here.
+    { name: 'plays-on', aiCoach: false, expected: '4-10:158:ab37b74646e753ed' },
     { name: 'plays-on-hard', aiCoach: true, expected: '0-10:148:ee54e8d79a90e3cf' },
   ])('pins $name: an even Balanced / Slide match with set plays (seed 1)', async ({ aiCoach, expected }) => {
     const home = { ...sideSheet('H', { rating: 60 }), plays: ['block-play' as const, 'cut-out-winger' as const, 'kick-pass' as const] };
@@ -371,7 +373,7 @@ describe('measuring and reporting', () => {
     expect(`${sim.points.home}-${sim.points.away}:${parts.length}:${hash}`).toBe(expected);
   });
   it('with punts into space off, plays-on-hard keeps the revision 9 pin', async () => {
-    const restore = applyTuning({ 'longKick.on': 0, 'wingBomb.on': 0, 'secondKicker.on': 0 });
+    const restore = applyTuning({ 'longKick.on': 0, 'wingBomb.on': 0, 'secondKicker.on': 0, 'cornerCover.on': 0 });
     try {
       const home = { ...sideSheet('H', { rating: 60 }), plays: ['block-play' as const, 'cut-out-winger' as const, 'kick-pass' as const] };
       const sim = new LiveSim(home, sideSheet('A', { rating: 60 }), 1, { aiCoach: ['home'] });

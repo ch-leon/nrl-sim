@@ -7,7 +7,7 @@ live gameplay change; work still open below has not shipped.
 
 ## Now
 
-- **Corner cover tackles.** The fullback can save a try with a dive at the runner's legs or miss and leave the corner open. Lab sign-off and the delayed ankle tap remain open under [#652](https://github.com/ch-leon/nrl-sim/issues/652).
+- **Corner cover tackles.** The fullback can save a try with a dive at the runner's legs or miss and leave the corner open. Lab sign-off and the delayed ankle tap remain open. [PR #789](https://github.com/ch-leon/nrl-sim/pull/789)
 
 - **A second kicker on the last.** Dummy-half can find the deeper five-eighth when the halfback is under pressure. Ported from draft PR #760, part of [#650](https://github.com/ch-leon/nrl-sim/issues/650).
 

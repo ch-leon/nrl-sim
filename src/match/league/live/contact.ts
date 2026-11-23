@@ -179,8 +179,9 @@ export abstract class LiveContact extends LivePenalties {
     const pos = c.body.pos;
     if (line <= 0 || line > CORNER_COVER.readFromM || Math.min(pos.y, FIELD_WIDTH - pos.y) > CORNER_COVER.touchM
       || c.body.vel.x * this.dir <= 0) return null;
+    const markersHeld = this.markersHeld(c);
     const eligible = (d: Player) => !this.locked(d) && d.subFor === null
-      && this.tick >= d.cooldownUntil && this.retreatLine(d) === null;
+      && this.tick >= d.cooldownUntil && this.retreatLine(d) === null && !(markersHeld && this.markers.includes(this.indexOf(d)));
     const fullback = this.at(other(c.side), FULLBACK);
     if (!this.onField(fullback) || !eligible(fullback)) return null;
     const otherCover = defenders.some((d) => d !== fullback && eligible(d)
@@ -624,12 +625,17 @@ export abstract class LiveContact extends LivePenalties {
   }
 
   // ── Who goes where ────────────────────────────────────────────────────────
+  /** Markers stay square until the ball is clear of the ruck or the dummy-half darts. */
+  private markersHeld(carrier: Player, hold = this.defPlan().markerHold): boolean {
+    return this.tick < this.ruckPlayedAt + LIVE.markerReleaseTicks * hold && carrier !== this.dummyHalf(carrier.side);
+  }
+
   protected committed(h: Player, defenders: readonly Player[]): Player[] {
     // Markers stay square at the ruck until the ball is well clear of it; they
     // may only pounce early on a dummy-half dart. Otherwise the first receiver
     // runs at the line, not at the two men standing over the mark.
     const dplan = this.defPlan();
-    const held = this.tick < this.ruckPlayedAt + LIVE.markerReleaseTicks * dplan.markerHold && h !== this.dummyHalf(h.side);
+    const held = this.markersHeld(h, dplan.markerHold);
     const free = defenders.filter((d) => !this.locked(d) && this.retreatLine(d) === null && this.tick >= d.cooldownUntil && !(held && this.markers.includes(this.indexOf(d))));
     // A defender already behind the carrier can only chase; the ones in front
     // of him are the tackle, so they rank first.
