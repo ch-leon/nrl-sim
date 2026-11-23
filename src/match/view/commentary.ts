@@ -131,6 +131,8 @@ export const LINES: Readonly<Record<string, readonly string[]>> = {
   tackle: ['{player} wraps him up.', '{player} makes the tackle.', 'Held. {player} brings him down.', '{player} stops him in his tracks.'],
   // A Wrecking Ball drives on through it (§3); the tackler holds on.
   'tackle:drive': ['{player} hangs on as he drives through.', 'He drives on, but {player} holds him.', '{player} is carried back but holds on.'],
+  'tackle:try-saver': ['Try-saver from {player}!', '{player} stops him short!', '{player} dives low and saves it!'],
+  'cover-miss': ['{player} dives and misses.', '{player} cannot hang on.', 'He gets past {player}!'],
   'big-hit': ['{player} smashes him backwards!', 'Big hit from {player}!', '{player} drives him back in the tackle!', 'Huge shot from {player}!', '{player} flattens him!', 'Bone-rattling hit from {player}!'],
   // Held up over the line (#652): {player} is the first man in the tackle, {team} the side that held out.
   'held-up': ['Held up! {player} gets under the ball.', '{player} holds him up — no try!', 'Held up over the line! {team} survive.', "Held up! {player} won't let him ground it."],
@@ -226,7 +228,7 @@ const ENDS_KICK: ReadonlySet<string> = new Set([
 
 /** Lines that matter: a try, a sin bin, a clean break, a penalty, a kick that wins it, the whistles. The strip holds one a moment before any other line replaces it. */
 const IMPORTANT_KEYS: ReadonlySet<string> = new Set([
-  'try', 'try:bonus', 'line-break', '40-20', 'field-goal:good', 'held-up', 'penalty', 'penalty:offside', 'penalty:high',
+  'try', 'try:bonus', 'line-break', '40-20', 'field-goal:good', 'held-up', 'tackle:try-saver', 'penalty', 'penalty:offside', 'penalty:high',
   'sin-bin', 'sin-bin:high', 'sin-bin:professional', 'sin-bin:repeat', 'sin-bin:offside',
   'golden-point', 'half-time:lead', 'half-time:level', 'full-time:win', 'full-time:draw', 'full-time:golden-point',
 ]);
@@ -302,7 +304,7 @@ export function lineKey(e: SimEvent, kickInAir: boolean, score?: Readonly<Record
     case 'break-tackle':
       return d === 'wrestle' ? 'break-tackle:wrestle' : 'break-tackle';
     case 'tackle':
-      return e.trait ? 'tackle:drive' : 'tackle';
+      return d === 'try-saver' ? 'tackle:try-saver' : e.trait ? 'tackle:drive' : 'tackle';
     case 'penalty':
     case 'sin-bin':
       return d && LINES[`${e.kind}:${d}`] ? `${e.kind}:${d}` : e.kind;

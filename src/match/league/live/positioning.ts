@@ -544,6 +544,7 @@ export abstract class LivePositioning extends LiveContact {
         : [];
     const leadRead = ph.kind === 'play' && carrier && shape
       ? this.readLead(shape, carrier, defenders, committed, markers, broken) : null;
+    const corner = ph.kind === 'play' && carrier ? this.cornerCover(carrier, defenders) : null;
     for (const p of defenders) {
       const role = ROLES[p.slot]!;
       p.through = false;
@@ -558,12 +559,12 @@ export abstract class LivePositioning extends LiveContact {
       } else if (p === receiver) {
         p.target = { ...flight!.to };
         p.wantsSprint = true;
-      } else if (committed.includes(p) && target) {
+      } else if ((p === corner || committed.includes(p)) && target) {
         // Cut the angle: meet him where he's going, not where he is (in a wrestle, straight in to help).
         p.target = clampToGround(intercept(p.body.pos, p.body.maxSpeed, target.body.pos, target.body.vel), 0.5);
         p.through = true;
         // Closing the last stretch, or covering a break: everything he has.
-        p.wantsSprint = broken || dist(p.body.pos, target.body.pos) < LIVE.sprintCloseM;
+        p.wantsSprint = p === corner || broken || dist(p.body.pos, target.body.pos) < LIVE.sprintCloseM;
       } else if (markers.includes(p)) {
         const k = markers.indexOf(p);
         // Square at the play-the-ball, one behind the other toward their own goal line.

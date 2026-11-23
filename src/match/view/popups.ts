@@ -55,6 +55,8 @@ const WORDS: Readonly<Record<string, { word: string; tone: PopupTone; big?: bool
   'run-down': { word: 'RUN DOWN!', tone: 'defence', big: true },
   // Held up over the line (#652): over the first man in the tackle.
   'held-up': { word: 'HELD UP!', tone: 'defence', big: true },
+  'tackle:try-saver': { word: 'TRY-SAVER!', tone: 'defence', big: true },
+  'cover-miss': { word: 'MISSED!', tone: 'bad' },
   // Interchanges (BAK-207 2b): over the man coming on.
   interchange: { word: 'ON!', tone: 'neutral' },
   // Goal kicking (2c): the result over the kicker; a charge-down over the man who blocked it.
@@ -124,7 +126,7 @@ export function surnameOf(name: string | undefined): string {
  */
 export function popupFor(e: SimEvent): Popup | null {
   if (e.kind === 'line-break' && e.detail === 'half') return null;
-  const w = WORDS[e.kind] ?? (e.trait && e.kind === 'tackle' ? { word: 'DRIVE!', tone: 'attack' as const } : undefined);
+  const w = WORDS[`${e.kind}:${e.detail}`] ?? WORDS[e.kind] ?? (e.trait && e.kind === 'tackle' ? { word: 'DRIVE!', tone: 'attack' as const } : undefined);
   if (!w) return null;
   // A kick at goal that misses reads as a miss, whichever kind it was.
   if ((e.kind === 'conversion' || e.kind === 'field-goal' || e.kind === 'penalty-goal') && e.detail === 'missed') {

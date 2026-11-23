@@ -585,6 +585,8 @@ export abstract class LiveBase {
   protected abstract expirePlays(newSet: boolean): void;
   protected abstract breakDown(h: Player): void;
   protected abstract contest(c: Player, t: Player, committed: readonly Player[]): void;
+  protected abstract cornerCover(c: Player, defenders: readonly Player[]): Player | null;
+  protected abstract diveForCorner(c: Player, t: Player): boolean;
   protected abstract stepWrestle(ph: Extract<Phase, { kind: 'tackle' }>, w: WrestleState): boolean;
   protected abstract goForBonus(h: Player): boolean;
   protected abstract heldUpAtLine(h: Player): boolean;

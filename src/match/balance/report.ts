@@ -97,11 +97,13 @@ export function reportMarkdown(r: ReportInput): string {
     if (tracked && base.trackedSeeds && base.trackedSeeds !== base.seeds) {
       out.push(`_Side win is the tracked side over ${base.trackedSeeds} matches, both ways round. The other columns are the matchup as written (${base.seeds})._`, '');
     }
-    out.push(`| Variant | ${COLUMNS.join(' | ')} | Home win |${tracked ? ' Side win |' : ''} Wrestle s | Legs end H/A |`);
-    out.push(`|---|${COLUMNS.map(() => '---:').join('|')}|---:|${tracked ? '---:|' : ''}---:|---:|`);
+    const columns = base.counts.trySavers ? [...COLUMNS, 'trySavers', 'coverMisses'] as const : COLUMNS;
+    out.push(`| Variant | ${columns.join(' | ')} | Home win |${tracked ? ' Side win |' : ''} Wrestle s | Legs end H/A |`);
+    out.push(`|---|${columns.map(() => '---:').join('|')}|---:|${tracked ? '---:|' : ''}---:|---:|`);
     for (const row of rows) {
-      const cells = COLUMNS.map((k) => {
+      const cells = columns.map((k) => {
         const v = row.counts[k];
+        if (!v) return '—';
         const mark = bandMark(k, v.mean);
         const d = row === base ? '' : ` (${delta(v, base.counts[k], Math.min(row.seeds, base.seeds) >= MIN_SEEDS_TO_FLAG)})`;
         return `${v.mean.toFixed(k.startsWith('grubber') ? 3 : 1)}${mark ? ` ${mark}` : ''}${d}`;
@@ -119,7 +121,7 @@ export function reportMarkdown(r: ReportInput): string {
       for (const row of rows) {
         const p = prev.find((x) => x.variant === row.variant);
         if (!p) continue;
-        for (const k of COLUMNS) {
+        for (const k of columns) {
           // A run from before a metric existed has nothing to compare it with.
           const before = p.counts[k];
           if (!before) continue;

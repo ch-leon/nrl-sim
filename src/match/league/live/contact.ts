@@ -3,10 +3,11 @@ import { TICK_S } from '../../core/engine';
 import { FIELD_LENGTH, FIELD_WIDTH, IN_GOAL, MID_Y, clampToGround, inGoal } from '../../core/field';
 import { PASS_SPEED, passFlight } from '../../core/ball';
 import type { BallFlightSnap, ContactSnap, Side } from '../../core/snapshot';
-import { add, clamp, dist, dot, scale, sub, type Vec } from '../../core/vec';
+import { add, clamp, dist, dot, norm, scale, sub, type Vec } from '../../core/vec';
 import { speedOf } from '../../core/body';
 import { BASE, RACE, compressedContact, edgeRace, interceptChance, resolveContest, type ContestMods } from '../contest';
-import { PLAYERS, ROLES } from '../roles';
+import { FULLBACK, PLAYERS, ROLES } from '../roles';
+import { CORNER_COVER, cornerCoverChance } from '../cornerCover';
 import { MAX_LAT_M, pickReceiver } from '../tactics';
 import { EDGE_COST, FINISHER_M, announce, contestTraits, interceptTraits } from '../traits';
 import { traitBoost } from '../../../data/traits';
@@ -169,6 +170,51 @@ export abstract class LiveContact extends LivePenalties {
       }
     }
     return best;
+  }
+
+  /** The actual fullback can break from depth when a runner gets a clear run at a corner. */
+  protected cornerCover(c: Player, defenders: readonly Player[]): Player | null {
+    if (CORNER_COVER.on !== 1 || this.scripted || this.pendingKick || this.pendingGoal) return null;
+    const line = this.toLine(c);
+    const pos = c.body.pos;
+    if (line <= 0 || line > CORNER_COVER.readFromM || Math.min(pos.y, FIELD_WIDTH - pos.y) > CORNER_COVER.touchM
+      || c.body.vel.x * this.dir <= 0) return null;
+    const eligible = (d: Player) => !this.locked(d) && d.subFor === null
+      && this.tick >= d.cooldownUntil && this.retreatLine(d) === null;
+    const fullback = this.at(other(c.side), FULLBACK);
+    if (!this.onField(fullback) || !eligible(fullback)) return null;
+    const otherCover = defenders.some((d) => d !== fullback && eligible(d)
+      && (dist(d.body.pos, pos) <= LIVE.tackleReach
+        || ((d.body.pos.x - pos.x) * this.dir >= 0 && Math.abs(d.body.pos.y - pos.y) <= LIVE.sprintLaneW)));
+    return otherCover ? null : fullback;
+  }
+
+  protected diveForCorner(c: Player, t: Player): boolean {
+    const reach = sub(c.body.pos, t.body.pos);
+    const distance = dist(t.body.pos, c.body.pos);
+    // A regular front-on tackle keeps its ordinary contest.
+    if (this.toLine(c) > CORNER_COVER.fromM || distance > CORNER_COVER.reachM
+      || dot(reach, c.body.heading) < -distance * CORNER_COVER.frontCos) return false;
+    const saves = this.rng.next() < cornerCoverChance(distance, speedOf(t.body), speedOf(c.body));
+    this.tire(t, FATIGUE.contactCost.tackler);
+    if (!saves) {
+      this.emit('cover-miss', `${t.name} dives at ${c.name}'s legs and misses`, t);
+      const toward = norm(reach);
+      t.body.heading = toward;
+      this.lock(t, 'dive', LIVE.contactTicks, add(t.body.pos, scale(toward, LIVE.tackleReach)));
+      t.cooldownUntil = this.tick + LIVE.beatenCooldown;
+      return true;
+    }
+    this.tire(c, FATIGUE.contactCost.carrier);
+    this.emit('tackle', `Try-saver! ${t.name} dives low to stop ${c.name} short`, t);
+    this.visualContact = { ...this.contactInfo(c, [t]), technique: 'ankle', outcome: 'tackle', resolvedTick: this.tick };
+    const event = this.events[this.events.length - 1]!;
+    event.detail = 'try-saver';
+    event.contact = this.visualContact;
+    this.lock(c, 'tackled', LIVE.contactTicks);
+    this.lock(t, 'tackle', LIVE.contactTicks);
+    this.phase = { kind: 'tackle', t0: this.tick, carrier: this.indexOf(c), tackler: this.indexOf(t), big: false, wrestle: null, wreck: 0 };
+    return true;
   }
 
   protected contest(c: Player, t: Player, committed: readonly Player[]): void {
