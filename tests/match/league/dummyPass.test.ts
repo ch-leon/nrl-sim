@@ -10,7 +10,7 @@ function sim(seed: number) {
 }
 
 function toTick(game: LiveSim, tick: number) {
-  while (game.snapshot().tick < tick) game.step();
+  while (game.tick < tick) game.step();
   return game.snapshot();
 }
 
