@@ -61,7 +61,7 @@ result. Keep it in step with the code: when a constant changes, change the row.
 | `live.passCooldown` | `live/knobs.ts` | 12 | No new pass this soon after a catch. |
 | `live.restartTicks` / `live.restartMaxTicks` | `live/knobs.ts` | 40 / 280 | Kick-off waits for everyone to be set, within these bounds. |
 | `live.tryTicks` | `live/knobs.ts` | 50 | Celebration before the restart. |
-| Dummy-half dart (`live.dartChance`) | `live/restarts.ts` `stepRuck` | 8% | Chance the hooker runs instead of passing (also when nobody is a pass option). |
+| `live.dartChance` | `live/restarts.ts` `chooseRuck` | 8% | Base chance the dummy-half runs with a pass option. Without a pass option he carries without rolling. Marker fatigue can add to the ordinary roll (§10). |
 
 Tests: `tests/match/league/live.test.ts`.
 
@@ -355,6 +355,8 @@ All in `src/match/league/fatigue.ts`; the tank lives on each player in `live/typ
 | `fatigue.workhorseSave` | 0.1 × level mult | Workhorse I ×0.9, II ×0.84, III ×0.78. |
 | `fatigue.tiredAt` / `fatigue.spentAt` | 40% / 20% | Tiers; `tiredness` feeds the contest 0 / 0.5 / 1. |
 | `fatigue.tiredSpeed` / `fatigue.spentSpeed` | ×0.9 / ×0.8 | Top speed. |
+| `fatigue.markerDartBonus` | 0.18 | Adds up to 18 percentage points to the ordinary dummy-half dart chance. The bonus scales with mean tiredness among the available markers assigned to this ruck and within `live.sprintCloseM` (8 m) of its mark. Two tired markers add 9 points, giving a 17% chance at the default base. A `tired-marker` dart cue identifies rolls inside the bonus band. 0 restores the base roll. |
+| `fatigue.lineSpeedLoss` | 0.08 | Scale the advance of the defensive line by `1 − loss × mean tiredness` among eligible line defenders. A fully tired line advances 4% slower and a spent line 8% slower. 0 restores the preset's advance. |
 | `fatigue.gassedReset` | 30% | COOKED! (legs under 20%) is announced again only after he gets back above this. |
 | `LEGS_ENERGY` | fresh 1 · late 0.38 · spent 0.18 | Lab Legs picker (`#lab?legs=`). |
 

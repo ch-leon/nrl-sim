@@ -581,6 +581,19 @@ scaled: a sprint is still a few seconds. Everything he spends is × his **drain 
 A player going under 20% is announced once (**COOKED!**, "… is cooked"; renamed from GASSED! with F2, where gas is the sprint tank) until he
 is back over 30%. Half-time and interchanges (BAK-207 2a, 2b) give legs back (§8.2).
 
+**Tired markers and line speed (#656).** On an ordinary ruck, the dummy-half's
+8% dart chance gains up to 18 percentage points based on the mean tiredness of
+the available markers at the mark. A tired marker counts half as much as a
+spent one. The read uses the existing dart roll and receiver commitment timing.
+When that bonus turns a prospective pass into a dart, the popup and ticker
+identify a tired marker. Manual play, called attack and the no-receiver carry
+keep their usual decision paths.
+
+The onside line's advance slows up to 8% with the mean tiredness of the men
+eligible to advance in it. Markers, the fullback, committed tacklers and men who
+still owe their retreat are outside the read. The existing defence presets,
+10 m retreat and individual fatigue speeds still apply. Recovery revision 13.
+
 Measured (8 seeds × 18 min, 60-rated sheets, on the old 9:00 halves): at Stamina 50 a side's average legs are
 88 / 78 / 67 / 55 / 44 / 32% at 3 / 6 / 9 / 12 / 15 / 18 min — tired for the last two or
 three minutes. Stamina 30 is tired from ~12 min and down to 20% at full time; Stamina 80
@@ -784,6 +797,7 @@ makes the break but can't finish it, the workhorse who is never quick and never 
 | F | Fatigue and the wrestle — *shipped* | §8 |
 | F2 | Sprint and gas; legs as their ceiling — *shipped* (half-time shipped with BAK-207 2a, the bench with 2b) | §8.2 |
 | F2+ | Sprint follow-ups (kick chase, line speed on cruise, lab legs bar, stamina knobs) — *shipped* (N9.3) | §8.2, §11 |
+| #656 | Dummy-half darts against tired markers and a slower advance for a tired line. Tuning §10 | §8 |
 | N13.5 | A side's plan can change at half-time and after a try, by a rule the match opts into — *shipped* (off unless a side is named; N14 wires the rivals). Tuning §30 | §5 |
 | #649.1 | The weighted receiver: the pass goes to one of the near-best options by weight, not always the best — *awaiting lab sign-off*. Tuning §5 | §4.2 |
 | #650.1 | More options on the last: kick, run it or shift it wide by zone, style, the late score and who is on the field; the second-last's early kick leans the same way — *awaiting lab sign-off*. Tuning §6 | §4.4 |

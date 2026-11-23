@@ -160,6 +160,11 @@ const WATCH_COLUMNS: readonly { head: string; digits: number; get: (w: WatchStat
   { head: 'Within 6, 1 min out %', digits: 0, get: (w) => pctStat(w.flow.closeLate) },
   { head: 'Decided last min %', digits: 0, get: (w) => pctStat(w.flow.decidedLate) },
   { head: 'Winner\'s biggest deficit', digits: 1, get: (w) => w.flow.comeback },
+  { head: 'Eligible dart %', digits: 1, get: (w) => w.markerDarts?.all.attempts ? w.markerDarts.all.rate : undefined },
+  { head: 'Fresh marker dart %', digits: 1, get: (w) => w.markerDarts?.fresh.attempts ? w.markerDarts.fresh.rate : undefined },
+  { head: 'Tired marker dart %', digits: 1, get: (w) => w.markerDarts?.tired.attempts ? w.markerDarts.tired.rate : undefined },
+  { head: 'Early line breaks', digits: 2, get: (w) => w.breakWindows?.early },
+  { head: 'Late line breaks', digits: 2, get: (w) => w.breakWindows?.late },
   ...ORIGINS.map((k) => ({ head: `Try ${ORIGIN_LABEL[k]} %`, digits: 0, get: (w: WatchStats, r: CellResult) => sharesOf(w.origins, ORIGINS, r.seeds, r.minutes).shares[k] })),
   ...LAST_TACKLES.map((k) => ({ head: `Last tackle ${k} %`, digits: 0, get: (w: WatchStats, r: CellResult) => sharesOf(w.lastTackles, LAST_TACKLES, r.seeds, r.minutes).shares[k] })),
   // Who took the dummy-half's ball (#649); a dash in results from before it.

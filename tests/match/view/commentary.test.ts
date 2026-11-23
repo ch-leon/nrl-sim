@@ -120,6 +120,8 @@ describe('the lines', () => {
     expect(lineKey(ev('kick', { detail: 'bomb' }), false)).toBe('kick:bomb');
     expect(lineKey(ev('kick', { detail: 'mystery' }), false)).toBe('kick:long');
     expect(lineKey(ev('penalty-choice', { detail: 'touch' }), false)).toBe('penalty-choice:touch');
+    expect(lineKey(ev('dart', { detail: 'tired-marker' }), false)).toBe('dart:tired-marker');
+    expect(LINES['dart:tired-marker']!.every(l => /tired marker/i.test(l))).toBe(true);
     expect(lineKey(ev('try', { detail: 'bonus' }), false)).toBe('try:bonus');
     expect(lineKey(ev('conversion', { detail: 'missed' }), false)).toBe('conversion:missed');
     expect(LINES['try:bonus']!.every((l) => /zone|bonus|five/i.test(l))).toBe(true);

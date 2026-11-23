@@ -28,8 +28,36 @@ import { labSheet, starTraits } from '../lab/sheets';
 import { POSITION_GROUPS, type Cell, type SideSpec } from './plan';
 import { FLOW, FirstReceivers, LAST_TACKLES, ORIGINS, PlayWatch, RECEIVERS, ScoreLine, TERRITORY, Territory, type FlowKey, type LastTackleKey, type OriginKey, type ReceiverKey, type TerritoryKey } from './watch';
 
+type DartSample = { attempts: number; chosen: number };
+type DartGroup = 'all' | 'fresh' | 'tired' | 'mixed' | 'unmarked';
+const DART_GROUPS: readonly DartGroup[] = ['all', 'fresh', 'tired', 'mixed', 'unmarked'];
+type DartStats = Record<DartGroup, DartSample & { rate: Stat }>;
+
 /** Exact fit fixtures belong to the headless harness, never the live game or saved sheets. */
 export class BalanceSim extends LiveSim {
+  readonly darts: Record<DartGroup, DartSample> = {
+    all: { attempts: 0, chosen: 0 },
+    fresh: { attempts: 0, chosen: 0 },
+    tired: { attempts: 0, chosen: 0 },
+    mixed: { attempts: 0, chosen: 0 },
+    unmarked: { attempts: 0, chosen: 0 },
+  };
+
+  protected override onDartChoice(dart: boolean, markerTiredness: number | null): void {
+    const group = markerTiredness === null ? 'unmarked'
+      : markerTiredness === 0 ? 'fresh'
+        : markerTiredness >= 0.5 ? 'tired' : 'mixed';
+    for (const sample of [this.darts.all, this.darts[group]]) {
+      sample.attempts++;
+      if (dart) sample.chosen++;
+    }
+  }
+
+  /** Regulation match clock within the current half. */
+  get halfSeconds(): number | null {
+    return this.golden ? null : this.clockTicks * TICK_S;
+  }
+
   constructor(home: TeamSheet, away: TeamSheet, seed: number, options: LiveOptions = {},
     fits: Record<Side, SideSpec['fit']> = { home: undefined, away: undefined }) {
     super(home, away, seed, options);
@@ -63,6 +91,7 @@ export class BalanceSim extends LiveSim {
   get toGo(): number {
     return this.toLineFor(this.attacking, this.ballPos());
   }
+
 }
 
 /** A full match: two halves. Stretches scale their counts up to this. */
@@ -104,6 +133,10 @@ export interface WatchStats {
   flow: Record<FlowKey, Stat>;
   origins: Record<OriginKey, Stat>;
   lastTackles: Record<LastTackleKey, Stat>;
+  /** Absent in results written before #656. */
+  markerDarts?: DartStats;
+  /** Line breaks in equal windows at the start and end of regulation halves (#656). */
+  breakWindows?: { early: Stat; late: Stat };
   /** Absent in results written before #649. */
   receivers?: Record<ReceiverKey, Stat>;
   /** Absent in results written before #650. */
@@ -504,6 +537,19 @@ function stat(xs: readonly number[]): Stat {
   return { mean, se: Math.sqrt(varc / n) };
 }
 
+/** Pool every roll in the stratum and estimate uncertainty over matches. */
+function dartStats(samples: BalanceSim['darts'][]): DartStats {
+  const rows = DART_GROUPS.map(group => {
+    const attempts = samples.reduce((total, s) => total + s[group].attempts, 0);
+    const chosen = samples.reduce((total, s) => total + s[group].chosen, 0);
+    const mean = attempts > 0 ? chosen / attempts : 0;
+    const residual = stat(samples.map(s => s[group].chosen - mean * s[group].attempts));
+    const se = attempts > 0 ? samples.length * residual.se / attempts : 0;
+    return [group, { attempts, chosen, rate: { mean: 100 * mean, se: 100 * se } }];
+  });
+  return Object.fromEntries(rows) as DartStats;
+}
+
 /** No match comes near this many ticks; it only guards against one that never finishes. */
 const MAX_TICKS = 100_000;
 
@@ -530,6 +576,8 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
     const trackedPerMatch: SideCounts[] = [];
     const opponentPerMatch: SideCounts[] = [];
     const shares: number[] = [];
+    const dartChoices: BalanceSim['darts'][] = [];
+    const breaksByMatch: { early: number; late: number }[] = [];
     const flowPerSeed: Record<FlowKey, number>[] = [];
     const originsPerSeed: Record<OriginKey, number>[] = [];
     const lastPerSeed: Record<LastTackleKey, number>[] = [];
@@ -567,6 +615,9 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
       const events: SimEvent[] = [];
       const held = [0, 0, 0, 0];
       const bins = new BinSwing();
+      const breakWindows = { early: 0, late: 0 };
+      const halfS = length.halfMinutes * 60;
+      const windowS = Math.min(3 * 60, halfS / 2);
       const score = new ScoreLine(minutes * 60);
       const watch = new PlayWatch();
       const receivers = new FirstReceivers();
@@ -611,6 +662,12 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
           for (const e of tickEvents) {
             const pts = pointsOf(e);
             if (pts > 0 && e.side) score.note(sim.matchSeconds, e.side, pts);
+            if (e.kind === 'line-break') {
+              const at = sim.halfSeconds;
+              if (at === null) continue;
+              if (at <= windowS) breakWindows.early++;
+              else if (at > halfS - windowS) breakWindows.late++;
+            }
           }
         }
         const view = { phase: sim.phaseKind, lastPlay: sim.lastTackleUp, attacking: sim.inPossession, holder: sim.holderIndex, x: () => sim.ballX };
@@ -648,6 +705,8 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
         shares.push(diff > 0 ? 1 : diff === 0 ? 0.5 : 0);
       }
       if (!flip) {
+        dartChoices.push(sim.darts);
+        breaksByMatch.push(breakWindows);
         watch.finish();
         flowPerSeed.push(score.result());
         originsPerSeed.push(watch.origins);
@@ -701,6 +760,8 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
     const scaled = (k: string): number => (k === 'leadChanges' ? scale : 1);
     const watch: WatchStats = {
       flow: Object.fromEntries(FLOW.map((k) => [k, stat(flowPerSeed.map((f) => f[k] * scaled(k)))])) as Record<FlowKey, Stat>,
+      markerDarts: dartStats(dartChoices),
+      breakWindows: { early: stat(breaksByMatch.map((b) => b.early)), late: stat(breaksByMatch.map((b) => b.late)) },
       origins: Object.fromEntries(ORIGINS.map((k) => [k, stat(originsPerSeed.map((o) => o[k] * scale))])) as Record<OriginKey, Stat>,
       lastTackles: Object.fromEntries(LAST_TACKLES.map((k) => [k, stat(lastPerSeed.map((o) => o[k] * scale))])) as Record<LastTackleKey, Stat>,
       // A share and a count of distinct slots: neither scales with a stretch's length.

@@ -121,6 +121,7 @@ export interface RuckDecision {
   from: ContactPlayer; to: ContactPlayer | null;
   decidedAt: number; until: number; kicker: boolean; cancelled?: true;
   secondKicker?: true;
+  tiredMarker?: true;
 }
 
 export type Phase =
