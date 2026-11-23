@@ -259,9 +259,8 @@ describe('five more calls (#396): each does what it says', () => {
 
   it('Tap and go: the penalty is tapped, and the set’s call is still his', () => {
     let made = 0;
-    // Seeds 19 and 40 still win a penalty, but the captain already taps it.
-    // Seed 9 is a penalty he would kick, so Tap and go is the coach's call.
-    for (const seed of [9]) {
+    // In seed 113 the captain takes the shot after a high tackle. The coach can call the tap.
+    for (const seed of [113]) {
       const calls: CallInput[] = [];
       const sim = new LiveSim(H, A, seed, { length: { halves: 1, halfMinutes: 6 }, calls });
       const events: SimEvent[] = [];

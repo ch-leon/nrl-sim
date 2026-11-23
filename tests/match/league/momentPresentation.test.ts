@@ -7,13 +7,10 @@ import { REACT_SNAP_TICKS, type SimEvent } from '../../../src/match/core/snapsho
 describe('moment presentation facts', () => {
   it('reports actual kicks, successful high takes and the scored try, without render reads affecting play', () => {
     const home = labSheet(DEFAULT_HOME); const away = labSheet(DEFAULT_AWAY);
-    // Preserve the historical presentation trajectory with all kick types and a scored try.
+    // This full match contains a punt, grubber, drop kick, aerial take and try.
     const opts = { length: { halves: 2 as const, halfMinutes: 7 } };
-    const sim = new LiveSim(home, away, 1, opts); const control = new LiveSim(home, away, 1, opts);
+    const sim = new LiveSim(home, away, 2, opts); const control = new LiveSim(home, away, 2, opts);
     const found = new Set<string>();
-    // Seed 2 included every presentation fact after retreat completion (#625); since the weighted
-    // receiver (#649) it has no grubber, and seed 1 has them all.
-    // Observe its whole match rather than depending on the opening carries.
     while (!sim.finished) {
       sim.step(); control.step();
       const s = sim.snapshot(); sim.snapshot();
