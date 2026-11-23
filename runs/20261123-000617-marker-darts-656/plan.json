@@ -1,0 +1,65 @@
+{
+  "name": "marker-darts-656",
+  "description": "Measure eligible dart choices on equal fresh and late legs, and line breaks in the same early and late clock windows. The fresh and late 6-minute comparisons turn off rotation to hold the opening legs difference. The standard late-legs scenario uses default rotation. Whole matches use 7-minute halves to compare actual tries to the historical §7 target. The off variant restores main's dart and line-speed formulas.",
+  "seeds": 40,
+  "base": {
+    "rules.halfMinutes": 7
+  },
+  "scenarios": [
+    {
+      "name": "even 60 v 60",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "fresh legs, rotation off",
+      "home": {
+        "rating": 60,
+        "rotation": "off"
+      },
+      "away": {
+        "rating": 60,
+        "rotation": "off"
+      },
+      "legs": "fresh",
+      "minutes": 6
+    },
+    {
+      "name": "late legs, rotation off",
+      "home": {
+        "rating": 60,
+        "rotation": "off"
+      },
+      "away": {
+        "rating": 60,
+        "rotation": "off"
+      },
+      "legs": "late",
+      "minutes": 6
+    },
+    {
+      "name": "last 6 min on late legs",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      },
+      "legs": "late",
+      "minutes": 6
+    }
+  ],
+  "variants": [
+    {
+      "name": "marker and line fatigue off",
+      "tuning": {
+        "fatigue.markerDartBonus": 0,
+        "fatigue.lineSpeedLoss": 0
+      }
+    }
+  ]
+}
