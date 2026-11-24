@@ -1914,6 +1914,24 @@ preserves packet lane order near touch; a centre-field tie alternates by tackle
 and attack direction, independent of the weighted roll. Spread retains existing
 support priority. Snapshot/target reads never choose or consume dice.
 
+### Open-side shifts through hands
+
+On a wide mark before the final two tackles, a feasible open-side line can use
+the ordinary shape draw. The same setup reach caps apply to every link. The
+recovery engine revision for this change is 27.
+
+| Knob | Default | Meaning |
+|---|---:|---|
+| `shapes.openSide.on` | 1 | 0 restores the preceding shapes and last-tackle receiver choice. |
+| `shapes.openSide.chance.{grind,balanced,expansive,kick-chase,all-out}` | .15 / .45 / .65 / .20 / .55 | Chance to prepare the shift when a reachable line is available. |
+| `shapes.openSide.imbalanceM` | 12 m | How far toward either touchline the ball must be for an open-side read. |
+| `shapes.openSide.spacingM` | 10.5 m | Maximum spacing of the authored support lanes. Real passes use the normal 12 m window. |
+| `shapes.openSide.depthM` / `.stackM` | 3.25 / 1.25 m | Depth for the next receiver, plus extra depth per following link. |
+| `shapes.openSide.ownLineM` | 16 m | Own-line margin for setting a long shift. |
+| `shapes.openSide.handsTicks` / `.waitTicks` | 5 / 13 ticks | Earliest release after a catch, and maximum time to find the next link. |
+| `shapes.openSide.pressureM` | 1.8 m | A committed defender this close to the passer stops the move. The receiver uses the normal catch pressure distance. |
+| `shapes.openSide.lastMinWidthM` / `.lastCoverEdgeM` | 6 / 3 m | Minimum width for the open-side receiver on an already-chosen last-tackle pass, and the greatest cover advantage to concede to the blind side. |
+
 ### Back-door packet and supporting runs (#649)
 
 The existing three weights above are unchanged. One additional kind uses the

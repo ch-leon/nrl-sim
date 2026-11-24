@@ -25,6 +25,7 @@ import type { MatchInjury, WeatherKind } from '../../../sim/events';
 import { styleFit, type StyleFit } from '../fit';
 import { compressedCounter, fitEdge, rushCounter, slideCounter } from '../counters';
 import { NO_AUTO_USED, sheetPlays, type AutoUsed } from '../plays';
+import type { AttackingShape } from '../attackingShapes';
 import type { PlayId } from '../../../data/plays';
 import { LIVE } from './knobs';
 import { other, STAND_INS, captainOf, benchOf, statsOf, type Player, type BenchMan, type Phase, type PendingKick, type LiveOptions, type PlanInput, type ScriptedPlay } from './types';
@@ -591,6 +592,7 @@ export abstract class LiveBase {
   protected abstract score(scorer: Player): void;
   protected abstract committed(h: Player, defenders: readonly Player[]): Player[];
   protected abstract candidates(passer: Player, plan?: AttackPlan): Candidate[];
+  protected abstract currentAttackShape(): AttackingShape | null;
   protected abstract currentMarkers(): Player[];
   protected abstract dummyHalfSpot(): Vec;
   protected abstract assignTargets(): void;

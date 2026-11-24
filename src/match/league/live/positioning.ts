@@ -5,7 +5,7 @@ import { BODY_RADIUS, arrive, integrate, separate, speedOf, type Body } from '..
 import type { Side } from '../../core/snapshot';
 import { add, clamp, dist, type Vec } from '../../core/vec';
 import { FIVE_EIGHTH, KICKER, ROLES, formationTarget } from '../roles';
-import { gapTarget, intercept, pickReceiver, supportSpots, type Candidate } from '../tactics';
+import { gapTarget, intercept, supportSpots, type Candidate } from '../tactics';
 import type { AttackPlan } from '../presets';
 import { speedMult } from '../traits';
 import { SECOND_KICKER } from '../lastTackle';
@@ -52,7 +52,7 @@ export abstract class LivePositioning extends LiveContact {
       if (available(wing)) {
         const ref = (p: Player) => ({ side: p.side, slot: p.slot, who: p.key, pos: p.body.pos });
         const links = this.side(this.attacking).filter(p => p !== wing && available(p)).map(ref);
-        const line = openSideLine(this.dummyHalfSpotFor(origin), this.dir, ref(wing), links, reach);
+        const line = openSideLine(this.behindRuck(origin), this.dir, ref(wing), links, reach);
         if (line && (roll ?? this.rng.next()) < chance) {
           ph.shape = { kind: 'spread', dir: this.dir, side: this.attacking, edge, startedTick: this.tick,
             openSide: { line, receiving: 0 } };
@@ -88,7 +88,7 @@ export abstract class LivePositioning extends LiveContact {
       side: this.attacking, dir: this.dir, startedTick: this.tick };
   }
 
-  protected currentAttackShape() {
+  protected currentAttackShape(): AttackingShape | null {
     const ph = this.phase;
     if (SHAPES.on <= 0 || (ph.kind !== 'tackle' && ph.kind !== 'ruck' && ph.kind !== 'play') || !ph.shape
       || ph.shape.side !== this.attacking || ph.shape.dir !== this.dir || this.scripted) return null;
@@ -108,7 +108,8 @@ export abstract class LivePositioning extends LiveContact {
       if (ph.kind === 'play') {
         const { player } = line[receiving]!;
         const expected = this.indexOf(this.at(player.side, player.slot));
-        const actual = this.ball.kind === 'flight' ? this.ball.receiver : this.ball.by;
+        const ball = this.ball;
+        const actual = ball.kind === 'flight' ? ball.receiver : ball.kind === 'held' ? ball.by : null;
         if (actual !== expected || (receiving === line.length - 1 && this.ball.kind === 'held')) return null;
       }
     }
@@ -126,27 +127,6 @@ export abstract class LivePositioning extends LiveContact {
       }
     }
     return ph.shape;
-  }
-
-  protected wideReceiver(h: Player, shape: AttackingShape): Player | null {
-    const move = shape.openSide!;
-    const index = move.receiving + (this.phase.kind === 'play' ? 1 : 0);
-    const lane = move.line[index];
-    if (!lane) return null;
-    const p = this.at(lane.player.side, lane.player.slot);
-    if (this.retreatLine(p) !== null || (p.body.pos.y - h.body.pos.y) * shape.edge <= 0
-      || pickReceiver(h.body.pos, this.dir, [{ idx: p.slot, pos: p.body.pos, busy: false }]) === null) return null;
-    return p;
-  }
-
-  protected receiverSpace(p: Player, defenders: readonly Player[]): number {
-    let space = Infinity;
-    for (const d of defenders) {
-      if (!this.locked(d) && this.retreatLine(d) === null && this.tick >= d.cooldownUntil) {
-        space = Math.min(space, dist(d.body.pos, p.body.pos));
-      }
-    }
-    return space;
   }
 
   /** A free line defender can check toward the lead while others hold the carrier. */
@@ -251,10 +231,10 @@ export abstract class LivePositioning extends LiveContact {
   }
 
   protected dummyHalfSpot(): Vec {
-    return this.dummyHalfSpotFor(this.mark);
+    return this.behindRuck(this.mark);
   }
 
-  private dummyHalfSpotFor(mark: Vec): Vec {
+  private behindRuck(mark: Vec): Vec {
     return clampToGround({ x: mark.x - this.dir * 1.6, y: mark.y + 0.4 }, 1);
   }
 
@@ -462,7 +442,7 @@ export abstract class LivePositioning extends LiveContact {
         const p = this.at(atk, slot);
         return this.onField(p) && p.subFor === null && this.indexOf(p) !== (ph.kind === 'tackle' || ph.kind === 'ruck' ? ph.carrier : -1) && p !== this.dummyHalf(atk);
       });
-    const splitSpot = split ? this.dummyHalfSpotFor(ph.kind === 'tackle' ? this.players[ph.carrier]!.body.pos : this.mark) : null;
+    const splitSpot = split ? this.behindRuck(ph.kind === 'tackle' ? this.players[ph.carrier]!.body.pos : this.mark) : null;
     const supports: Player[] = [];
     if (carrier || (receiver && receiver.side === atk)) {
       const lead = carrier ?? receiver!;
@@ -475,7 +455,7 @@ export abstract class LivePositioning extends LiveContact {
     const broken = this.lineBroken();
     const wide = shape?.openSide;
     const wideAnchor = wide && ph.kind !== 'play'
-      ? this.dummyHalfSpotFor(ph.kind === 'tackle' ? this.players[ph.carrier]!.body.pos : this.mark) : anchor;
+      ? this.behindRuck(ph.kind === 'tackle' ? this.players[ph.carrier]!.body.pos : this.mark) : anchor;
     const wideNext = (wide?.receiving ?? 0) + (ph.kind === 'play' ? 1 : 0);
     for (const p of attackers) {
       const role = ROLES[p.slot]!;

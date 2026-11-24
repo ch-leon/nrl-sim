@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- **Open-side shifts through hands.** When a ruck is near one touchline and the support can get into position, balanced and wider sides can work the ball all the way to the opposite winger through normal catches and passes. Cover, handling errors and missing support can end the move. Short-side carries, coach calls and learned plays still have their place. [PR #799](https://github.com/ch-leon/nrl-sim/pull/799).
+
 - **Intercepting a pass.** The defender reaches into the pass, draws the ball to his body and carries it away on the turn. Ported from [draft PR #769](https://github.com/ch-leon/nrl-sim/pull/769).
 
 - **Six-again signal.** On a ruck infringement that resets the tackle count, the referee raises his arm, circles it and lowers it while the attack plays on. A try or a penalty takes over, and the signal ends if play stops or the ball changes hands. Ported from [draft PR #767](https://github.com/ch-leon/nrl-sim/pull/767).

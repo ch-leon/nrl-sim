@@ -21,7 +21,7 @@ import { FORTY_TWENTY_ENABLED, TOUCH, inOwnInGoal } from '../touch';
 import { BIN } from '../sinbin';
 import { PLAYS } from '../plays';
 import { PLAYS_BY_ID } from '../../../data/plays';
-import { SHAPES, openSideOf } from '../attackingShapes';
+import { SHAPES, openSideOf, type AttackingShape } from '../attackingShapes';
 import { LIVE } from './knobs';
 import { other, type Player, type Phase, type PendingKick } from './types';
 import { LiveKicks } from './kicks';
@@ -374,11 +374,31 @@ export abstract class LivePlay extends LiveKicks {
     return n > 0 ? sum / n : 0;
   }
 
+  protected wideReceiver(h: Player, shape: AttackingShape): Player | null {
+    const move = shape.openSide;
+    const lane = move?.line[move.receiving + (this.phase.kind === 'play' ? 1 : 0)];
+    if (!lane) return null;
+    const p = this.at(lane.player.side, lane.player.slot);
+    if (this.retreatLine(p) !== null || (p.body.pos.y - h.body.pos.y) * shape.edge <= 0
+      || pickReceiver(h.body.pos, this.dir, [{ idx: p.slot, pos: p.body.pos, busy: false }]) === null) return null;
+    return p;
+  }
+
+  protected receiverSpace(p: Player, defenders: readonly Player[]): number {
+    let space = Infinity;
+    for (const d of defenders) {
+      if (!this.locked(d) && this.retreatLine(d) === null && this.tick >= d.cooldownUntil) {
+        space = Math.min(space, dist(d.body.pos, p.body.pos));
+      }
+    }
+    return space;
+  }
+
   /** Shifting it wide on the last (#650): look to the open side where there is a genuine pass in reach. */
   private shiftReceiver(h: Player, plan: AttackPlan): Player | null {
     const reach = MAX_LAT_M + (plan.width > 0 ? 3 : 0);
     const wide = SHAPES.openSide;
-    const edge = wide.on > 0 && !this.callState[this.attacking].attack ? openSideOf(h.body.pos.y) : 0;
+    const edge = SHAPES.on > 0 && wide.on > 0 && !this.callState[this.attacking].attack ? openSideOf(h.body.pos.y) : 0;
     let best: Player | null = null;
     let bestLat = 0;
     let open: Player | null = null;

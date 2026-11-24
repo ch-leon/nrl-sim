@@ -182,7 +182,7 @@ export abstract class LiveRestarts extends LivePlay {
       receiver = LIVE.receiverMargin > 0 && LIVE.receiverAtRuck > 0
         ? pickReceiverWeighted(h.body.pos, this.dir, this.candidates(h), MAX_LAT_M, 0, LIVE.receiverMargin, LIVE.receiverSpread, this.rng.next())
         : pickReceiver(h.body.pos, this.dir, this.candidates(h));
-      const shape = !last ? this.currentAttackShape() : null;
+      const shape = !last && this.phase.kind === 'ruck' && this.phase.shape?.openSide ? this.currentAttackShape() : null;
       const next = shape?.openSide ? this.wideReceiver(h, shape) : null;
       if (next && this.receiverSpace(next, this.side(other(h.side))) > LIVE.pressureM) {
         receiver = this.indexOf(next);
