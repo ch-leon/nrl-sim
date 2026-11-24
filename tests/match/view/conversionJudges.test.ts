@@ -13,9 +13,9 @@ const away = labSheet(DEFAULT_AWAY);
 const factory = (seed: number) => new LiveSim(home, away, seed);
 
 describe('touch judges at conversions', () => {
-  // These exact award and whistle ticks come from the engine before kick returns.
+  // These exact award and whistle ticks come from the engine before kick returns. Goal-line stands are off with them.
   let restore: () => void;
-  beforeEach(() => { restore = applyTuning({ 'kickReturn.on': 0 }); });
+  beforeEach(() => { restore = applyTuning({ 'kickReturn.on': 0, 'goalLineStand.on': 0 }); });
   afterEach(() => { restore(); });
 
   it.each([

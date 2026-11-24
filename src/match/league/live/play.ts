@@ -22,6 +22,7 @@ import { BIN } from '../sinbin';
 import { PLAYS } from '../plays';
 import { PLAYS_BY_ID } from '../../../data/plays';
 import { LIVE } from './knobs';
+import { GOAL_LINE_STAND } from '../goalLineStand';
 import { other, type Player, type Phase, type PendingKick } from './types';
 import { LiveKicks } from './kicks';
 
@@ -298,7 +299,8 @@ export abstract class LivePlay extends LiveKicks {
     const on = LAST_TACKLE.on > 0;
     if (toLine <= LIVE.earlyKickM) {
       const chance = on ? earlyKickChance(plan.earlyKick, this.lastTackleRead(h, toLine), true) : plan.earlyKick;
-      if (this.rng.next() >= chance) return 'run';
+      const pressure = this.goalLinePressure(h.side, h.body.pos);
+      if (this.rng.next() >= chance + pressure * GOAL_LINE_STAND.earlyKick) return 'run';
       return this.rng.next() < 0.6 ? 'grubber' : 'chip';
     }
     const chance = on ? earlyKickChance(plan.earlyTerritory, this.lastTackleRead(h, toLine), false) : plan.earlyTerritory;
@@ -322,8 +324,10 @@ export abstract class LivePlay extends LiveKicks {
       if (toLine <= RUN_IT_ZONE_M && this.rng.next() < RUN_IT_CHANCE) return 'run';
     }
     // In close, add the bomb to his existing kick-type roll only if there is a corner chase.
+    const pressure = this.goalLinePressure(h.side, h.body.pos);
     const closeBombWeight = WING_BOMB.on > 0 && toLine <= CLOSE_ATTACK_KICK_M
-      && this.wingBombTarget(h, 0.5, bombPeak(traitBoost(h.traits, 'bigBoot'))) ? WING_BOMB.closeWeight : 0;
+      && this.wingBombTarget(h, 0.5, bombPeak(traitBoost(h.traits, 'bigBoot')))
+      ? WING_BOMB.closeWeight + pressure * GOAL_LINE_STAND.cornerBombWeight : 0;
     return chooseKick(toLine, this.rng.next(), plan.kickBias, closeBombWeight);
   }
 
@@ -506,7 +510,8 @@ export abstract class LivePlay extends LiveKicks {
     this.kickCall = this.fgCall = null;
     // Ruck offences (2e): a tackler holding down after a slow wrestle, or the defence slow off the ruck — six again.
     const slowWrestle = w ? (this.tick - w.t0) * TICK_S >= WRESTLE.slowS : false;
-    if (this.rng.next() < PENALTY.ruckSixAgain + (slowWrestle ? PENALTY.holdDown : 0)) {
+    const sixAgain = this.rng.next() < PENALTY.ruckSixAgain + (slowWrestle ? PENALTY.holdDown : 0);
+    if (sixAgain) {
       this.tackles = 0;
       const t = this.players[ph.tackler]!;
       this.emit('six-again', slowWrestle ? `Six again — ${t.name} holds on too long` : `Six again — ${this.names[t.side]} slow off the ruck`, t);
@@ -522,6 +527,7 @@ export abstract class LivePlay extends LiveKicks {
     this.lock(c, 'down', down);
     for (const i of w ? w.men : [ph.tackler]) this.lock(this.players[i]!, 'down', down);
     this.phase = { kind: 'ruck', t0: this.tick, carrier: ph.carrier, tackler: ph.tackler, stage: 'down', handover, heldAt: 0, down, pace, contactStartedTick: ph.t0,
+      ...(sixAgain ? { freshSet: true } : {}),
       ...(!handover && ph.shape !== undefined ? { shape: ph.shape } : {}) };
     this.startRetreat();
     if (this.siren) this.endHalf(); // the tackle is made: the ball is dead

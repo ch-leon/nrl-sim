@@ -237,7 +237,8 @@ function tableRow(md: string, firstColumn: string, rowStart: string): Record<str
 describe('the report', () => {
   const stat = (mean: number) => ({ mean, se: 0.1 });
   const current = measureCell({ variant: { name: 'baseline' }, scenario: { name: 'even', home: { rating: 60 }, away: { rating: 60 } } }, 2, 1, 1);
-  const { watch: fresh, ...before } = current;
+  const { goalLine: _goalLine, ...beforeStands } = current;
+  const { watch: fresh, ...before } = beforeStands;
   const { taps: _taps, ...beforeTaps } = fresh!;
   const plan = { name: 't', seeds: 2, minutes: 1 };
   const meta = { commit: 'x' };
@@ -306,6 +307,25 @@ describe('the report', () => {
     });
     expect(tableRow(md, 'Lead changes', '| legacy |')?.['Lead changes']).toBeDefined();
     expect(tableRow(md, 'Tap mark', '| legacy |')).toBeUndefined();
+  });
+  it('reports raw goal-line stands and leaves older results unmeasured', () => {
+    const withStand = {
+      ...current,
+      goalLine: {
+        starts: 12, matches: 1, unfinished: 1,
+        outcomes: { try: 1, strip: 0, error: 0, 'held-up': 1, turnover: 0, 'outside-20': 0, 'goal-attempt': 0, clock: 0 },
+      },
+    };
+    const older = { ...beforeStands, variant: 'legacy' };
+    expect(report(older)).not.toContain('Starts inside 20');
+    const md = report(withStand, older);
+    expect(tableRow(md, 'Starts inside 20', '| baseline |')).toMatchObject({
+      'Starts inside 20': '12', 'Stands of 3+': '3', 'Matches with a stand': '1/2 (50.0%)',
+      try: '1', strip: '0', 'held-up': '1', Unfinished: '1',
+    });
+    const { Variant, ...legacyCells } = tableRow(md, 'Starts inside 20', '| legacy |')!;
+    expect(Variant).toBe('legacy');
+    expect(Object.values(legacyCells)).toEqual(Array(12).fill('—'));
   });
 });
 

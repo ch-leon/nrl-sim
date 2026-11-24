@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- **Goal-line stands.** Repeat sets starting inside the opposition 20 draw the defence in toward the ruck and cost it more legs. The attack looks for a short forward drive, a wide shift or a kick into the corner. The third straight set gets a banner, commentary and a crowd swell. Ported from [draft PR #784](https://github.com/ch-leon/nrl-sim/pull/784).
+
 - At a penalty or 20 m restart, a captain can call a quick tap while defenders are still getting back. The taker nudges it with his boot and regathers, with **QUICK TAP!** on the pitch. Short defenders have to reach the 10 m line before tackling. Ported from [draft PR #783](https://github.com/ch-leon/nrl-sim/pull/783).
 
 - **Touch judges in open play.** The same two officials jog along the touchlines in career matches and the Match Lab, one on each side. They catch up to kicks, turn with play and carry their flags low. Ported from [draft PR #782](https://github.com/ch-leon/nrl-sim/pull/782). [Match presentation](../specs/match-big-moments.md#touch-judges-in-open-play)
@@ -167,6 +169,7 @@ What's in the game, with the PR that added each.
 - The scripted persona playtesters record a weekly money and XP diary and spend stat points in character (optimal, spend-by-focus, random, or half). This is a measurement tool. A normal career still spends points by focus automatically ([PR #691](https://github.com/ch-leon/nrl-sim/pull/691)).
 
 - More options on the last tackle: the kicker weighs kicking, running it and shifting it wide by field position, his side's style, his boot, his outside backs' pace and, in the last minute, the score. Between even sides the last tackle is a kick 62% of the time (was 69%) and a pass 15% (was 8%). Awaiting lab sign-off ([PR](https://github.com/ch-leon/nrl-sim/pull/687), [issue](https://github.com/ch-leon/nrl-sim/issues/650)).
+
 
 - A carrier at the try line can be held up: any tackler on him there may stop the try, more surely with two or three men on him and less surely against a carrier at full pace. Play restarts with a play-the-ball 10 m out (a handover on the last). It shows as `HELD UP!` with a commentary line, in about one match in five between even sides (20 to 30% of matches across scenarios), for about 0.2 fewer tries a match, measured on top of the last-tackle options. Awaiting lab sign-off ([PR](https://github.com/ch-leon/nrl-sim/pull/686), [issue](https://github.com/ch-leon/nrl-sim/issues/652)).
 

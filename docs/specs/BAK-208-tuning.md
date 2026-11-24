@@ -422,6 +422,21 @@ play). The roll is drawn only when he is in contact at the line and it is a cont
 
 Tests: `tests/match/league/fatigue.test.ts`, `tests/match/league/heldUp.test.ts`.
 
+### 11.2 Goal-line stands (#657)
+
+The knobs in `src/match/league/goalLineStand.ts` take full effect on the third straight
+fresh set within 20 m and half effect on the second. Only play near the line uses them.
+
+| Knob | Value | Effect |
+|---|---:|---|
+| `goalLineStand.on` | 1 | 0 disables the counts, cues and adjustments. The opt-out adds no draws and restores the previous match. |
+| `goalLineStand.zoneM` | 20 m | Furthest fresh set start from the attacked line to qualify, inclusive. The same distance gates pressure during the set. |
+| `goalLineStand.compression` | 0.30 | Free line defenders aim this fraction of the way from their normal lane toward the ruck. |
+| `goalLineStand.defenceLegs` | 0.40 | Fractional extra cost of defensive running, contact and wrestling. |
+| `goalLineStand.podWeight` / `goalLineStand.edgeWeight` | 0.55 / 1.10 | Fractional extra weight for a feasible forward pod or edge packet, using the same shape draw. |
+| `goalLineStand.earlyKick` | 0.08 | Added to the natural chance of kicking on the second-last tackle. |
+| `goalLineStand.cornerBombWeight` | 0.50 | Added to the natural last-tackle kick-type weight when a corner chase is already viable. |
+
 ## 12. Balance targets (§7) and how to measure
 
 The 26 Oct tuning pass also checks the neutral 60 v 60 guardrails: about

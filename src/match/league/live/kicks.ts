@@ -10,6 +10,7 @@ import { KICK_CONTEST, fieldingRead, grubberRace, highBall } from '../kickContes
 import { TOUCH, exitPoint, inOwnInGoal, outOfPlay, ownLineX, touchRestartSpot } from '../touch';
 import { ROLES } from '../roles';
 import { WING_BOMB } from '../tactics';
+import { GOAL_LINE_STAND } from '../goalLineStand';
 import { speedMult } from '../traits';
 import { WEATHER } from '../weather';
 import { LIVE } from './knobs';
@@ -178,6 +179,7 @@ export abstract class LiveKicks extends LiveClock {
     this.lastTouch = kicker.side;
     this.kickFrom = k.kickoff ? null : { side: kicker.side, x: kicker.body.pos.x, toLine: this.toLineFor(kicker.side, kicker.body.pos), ...(k.aim ? { aim: k.aim } : {}) };
     this.kickoffUp = k.kickoff;
+    this.goalLineSetPending = GOAL_LINE_STAND.on > 0;
     this.kickCall = this.fgCall = null;
     const receiving = other(kicker.side);
     this.retreat = null;
@@ -284,7 +286,7 @@ export abstract class LiveKicks extends LiveClock {
         this.react(r, 'error');
         this.lastTouch = r.side;
         this.bounce(b.to, { x: this.dir, y: (this.rng.next() - 0.5) * 0.6 }, 2.5, 12, 2);
-        this.turnover();
+        this.turnover('error');
         this.looseFor = this.attacking; // a knock-on is theirs whoever reaches it
         if (this.siren) this.endHalf(); // a knock-on kills the ball
         return;
@@ -310,7 +312,7 @@ export abstract class LiveKicks extends LiveClock {
         // The kicking side got there first: their ball, a fresh set (or a try, next tick, if he is over the line).
         this.lock(r, 'catch', 3);
         this.emit('regather', `${r.name} regathers the kick!`, r);
-        this.turnover();
+        this.turnover('turnover', b.to);
         return;
       }
       if (b.via === 'kick') {
@@ -324,6 +326,7 @@ export abstract class LiveKicks extends LiveClock {
         if (returnable) this.startKickReturn(r);
         this.emit('set-start', `${r.name} takes the kick — ${this.names[this.attacking]} ball`, r);
         this.events[this.events.length - 1]!.detail = 'caught';
+        this.settleGoalLineBall(r, b.to);
       }
       return;
     }
@@ -351,7 +354,8 @@ export abstract class LiveKicks extends LiveClock {
         this.ball = { kind: 'held', by: this.indexOf(best) };
         best.catchTick = this.tick;
         best.decided = false;
-        if (best.side !== this.attacking) this.turnover();
+        const changed = best.side !== this.attacking;
+        if (changed) this.turnover('turnover', b.pos);
         this.mark = { ...best.body.pos };
         this.endKick(best.side, best.body.pos);
         if (scramble) {
@@ -365,6 +369,7 @@ export abstract class LiveKicks extends LiveClock {
           this.emit('set-start', `${best.name} scoops it up — ${this.names[this.attacking]} ball`, best);
           this.events[this.events.length - 1]!.detail = 'gathered';
         }
+        if (!changed) this.settleGoalLineBall(best, b.pos);
         if (this.phase.kind !== 'play') this.phase = { kind: 'play' };
       }
     }
@@ -428,7 +433,7 @@ export abstract class LiveKicks extends LiveClock {
       this.lock(chaser, 'catch', 3);
       this.emit('regather', `${chaser.name} beats ${catcher.name} to it — taps it back!`, chaser);
       this.events[this.events.length - 1]!.detail = 'contest';
-      this.turnover();
+      this.turnover('turnover', b.to);
       return 'settled';
     }
     if (u < odds.won + odds.spill) {
@@ -500,7 +505,7 @@ export abstract class LiveKicks extends LiveClock {
     if (way.x * this.dir > 0 && !this.kickoffUp) {
       this.events[this.events.length - 1]!.detail = 'knock-on';
       this.bounce(at, way, 2.5, 12, 2);
-      this.turnover();
+      this.turnover('error');
       this.looseFor = this.attacking; // a knock-on is theirs whoever reaches it
       if (this.siren) this.endHalf(); // a knock-on kills the ball
       return;
@@ -554,7 +559,7 @@ export abstract class LiveKicks extends LiveClock {
   }
 
   /** Possession changes hands where the ball is; a fresh set for the other side. */
-  protected turnover(): void {
+  protected turnover(outcome: 'strip' | 'error' | 'turnover' = 'turnover', setAt?: Vec): void {
     this.retreat = null;
     this.offloadReceiver = null;
     this.pendingControl.home = this.pendingControl.away = null;
@@ -564,6 +569,12 @@ export abstract class LiveKicks extends LiveClock {
     this.tackles = 0;
     this.lastPlay = false;
     const bp = this.ballPos();
+    if (GOAL_LINE_STAND.on > 0) {
+      if (this.goalLineRun && this.goalLineRun.side !== this.attacking) this.endGoalLineStand(outcome);
+      this.goalLineSetPending = true;
+      const collector = this.holder();
+      if (collector) this.settleGoalLineBall(collector, setAt ?? bp);
+    }
     this.mark = { ...bp };
     this.lineX = bp.x + this.dir * LIVE.onsideM;
     this.phase = { kind: 'play' };

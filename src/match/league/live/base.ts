@@ -1,7 +1,7 @@
 import type { ControlInput } from '../controls';
 import { makeRng, type Rng } from '../../../utils/rng';
 import type { TeamSheet } from '../../../sim/events';
-import { FIELD_LENGTH, MID_X, MID_Y, clampToGround } from '../../core/field';
+import { FIELD_LENGTH, MID_X, MID_Y, clampToGround, inGoal } from '../../core/field';
 import { makeBody, maxSpeedFor } from '../../core/body';
 import { flightAt, type BallState } from '../../core/ball';
 import type { Side, SimEvent } from '../../core/snapshot';
@@ -26,6 +26,7 @@ import type { MatchInjury, WeatherKind } from '../../../sim/events';
 import { styleFit, type StyleFit } from '../fit';
 import { compressedCounter, fitEdge, rushCounter, slideCounter } from '../counters';
 import { NO_AUTO_USED, sheetPlays, type AutoUsed } from '../plays';
+import { GOAL_LINE_STAND, STAND_SETS, type StandOutcome } from '../goalLineStand';
 import type { PlayId } from '../../../data/plays';
 import { LIVE } from './knobs';
 import { other, STAND_INS, captainOf, benchOf, statsOf, type Player, type BenchMan, type Phase, type PendingKick, type LiveOptions, type PlanInput, type ScriptedPlay } from './types';
@@ -117,6 +118,62 @@ export abstract class LiveBase {
   protected readonly breakRuleSides: ReadonlySet<Side>;
   /** Tries conceded in a row, without this side scoring in between. */
   protected readonly concededRun: Record<Side, number> = { home: 0, away: 0 };
+  /** Consecutive fresh sets inside the opposition 20, by the same side and at the same end. */
+  protected goalLineRun: { side: Side; sets: number } | null = null;
+  /** A kick or a knock-on doesn't start the next set until someone secures the ball. */
+  protected goalLineSetPending = false;
+  /** Fresh starts inside the opposition 20, whether or not a stand develops. */
+  goalLineStarts = 0;
+  /** Resolved three-set passages, for the balance harness. */
+  readonly goalLineStands: { side: Side; sets: number; outcome: StandOutcome }[] = [];
+
+  get goalLineStandInProgress(): boolean {
+    return (this.goalLineRun?.sets ?? 0) >= STAND_SETS;
+  }
+
+  private nextGoalLineSets(side: Side, spot: Vec): number {
+    const metres = this.toLineFor(side, spot);
+    if (metres < 0 || metres > GOAL_LINE_STAND.zoneM) return 0;
+    return this.goalLineRun?.side === side ? this.goalLineRun.sets + 1 : 1;
+  }
+
+  protected beginGoalLineSet(side: Side, spot: Vec, player: Player): void {
+    if (GOAL_LINE_STAND.on <= 0) return;
+    this.goalLineSetPending = false;
+    if (this.goalLineRun && this.goalLineRun.side !== side) this.endGoalLineStand('turnover');
+    const sets = this.nextGoalLineSets(side, spot);
+    if (sets === 0) {
+      this.endGoalLineStand('outside-20');
+      return;
+    }
+    this.goalLineRun = { side, sets };
+    this.goalLineStarts++;
+    if (sets === STAND_SETS) this.emit('goal-line-stand', `${this.names[side]} start their third straight set on the line`, player);
+  }
+
+  protected settleGoalLineBall(player: Player, spot: Vec): void {
+    if (!this.goalLineSetPending) return;
+    this.goalLineSetPending = false;
+    // A kick regathered over the line can be grounded for a try in this passage.
+    if (this.goalLineRun?.side === player.side && inGoal(spot, this.dirOf(player.side))) return;
+    this.beginGoalLineSet(player.side, spot, player);
+  }
+
+  protected endGoalLineStand(outcome: StandOutcome): void {
+    const run = this.goalLineRun;
+    if (!run) return;
+    if (run.sets >= STAND_SETS) this.goalLineStands.push({ ...run, outcome });
+    this.goalLineRun = null;
+  }
+
+  /** First set has normal shape and costs. The third reaches full pressure. */
+  protected goalLinePressure(side: Side, at?: Vec, fresh = false): number {
+    if (GOAL_LINE_STAND.on <= 0) return 0;
+    const current = this.goalLineRun?.side === side ? this.goalLineRun.sets : 0;
+    const sets = at && fresh ? this.nextGoalLineSets(side, at) : current;
+    if (sets < 2 || this.toLineFor(side, at ?? this.ballPos()) > GOAL_LINE_STAND.zoneM) return 0;
+    return Math.min(1, (sets - 1) / (STAND_SETS - 1));
+  }
   /** Plan changes the restart actually played (the match report's line). */
   readonly planChanges: PlanChange[] = [];
   protected callRead = 0;

@@ -447,6 +447,8 @@ export const CROWD_MOMENTUM = 0.1;
 export const CROWD_OUT = 0.35;
 /** Extra swell, decaying, on a moment. */
 export const CROWD_SWELL: Readonly<Record<string, number>> = { 'try': 0.4, 'try-against': 0.14, 'break': 0.06, 'clean-break': 0.22, 'big-hit': 0.08, 'goal': 0.1 };
+/** A goal-line stand holds the bed up through the routine events of the next few plays. */
+export const CROWD_STAND = { lift: 0.17, seconds: 5 };
 
 /**
  * Steady crowd level (before swells) from the ball's length position `x` (0..100, either try line at an
@@ -585,6 +587,7 @@ export class AudioEngine {
   private crowd: { src: AudioBufferSourceNode; filter: BiquadFilterNode; gain: GainNode } | null = null;
   /** Steady crowd level from where the ball is and the momentum; swells ride on top of it. */
   private crowdBase = CROWD_BASE;
+  private crowdStandUntil = 0;
   private ballX: number | null = null;
   private momentum = 0;
   private homeId: string | null = null;
@@ -778,6 +781,7 @@ export class AudioEngine {
 
   /** Fade the crowd out and let the music back up. */
   stopCrowd(fade = 1.5): void {
+    this.crowdStandUntil = 0;
     const c = this.crowd;
     if (!this.ctx || !c) return;
     this.crowd = null;
@@ -814,17 +818,20 @@ export class AudioEngine {
     if (!this.ctx || !c) return;
     const now = this.ctx.currentTime;
     const g = c.gain.gain;
+    const lift = Math.max(0, this.crowdStandUntil - now) / CROWD_STAND.seconds * CROWD_STAND.lift;
     g.cancelScheduledValues(now);
     g.setValueAtTime(g.value, now);
-    if (swell > 0) {
+    if (swell > 0 || lift > 0) {
       // Up fast on the moment, then back to the steady level over a couple of seconds.
-      g.linearRampToValueAtTime((level + swell) * CROWD_OUT, now + 0.3);
-      g.setTargetAtTime(level * CROWD_OUT, now + 0.9, 1.2);
+      g.linearRampToValueAtTime((level + swell + lift) * CROWD_OUT, now + 0.3);
+      g.setTargetAtTime((level + lift) * CROWD_OUT, now + 0.9, 1.2);
+      if (lift > 0) g.setTargetAtTime(level * CROWD_OUT, Math.max(now + 0.9, this.crowdStandUntil), 1.2);
     } else {
       g.linearRampToValueAtTime(level * CROWD_OUT, now + 0.8);
     }
     c.filter.frequency.cancelScheduledValues(now);
-    c.filter.frequency.linearRampToValueAtTime(700 + 3200 * Math.min(level + swell, 0.6), now + 0.8);
+    c.filter.frequency.linearRampToValueAtTime(700 + 3200 * Math.min(level + swell + lift, 0.6), now + 0.8);
+    if (lift > 0) c.filter.frequency.setTargetAtTime(700 + 3200 * Math.min(level, 0.6), Math.max(now + 0.8, this.crowdStandUntil), 1.2);
   }
 
   /** Does a try by this club get the cheer? */
@@ -855,6 +862,14 @@ export class AudioEngine {
   onCleanBreak(): void {
     this.setCrowdBase(crowdLevel(this.ballX, this.momentum), CROWD_SWELL['clean-break']!);
     this.playSfx('whoosh');
+  }
+
+  onGoalLineStand(x: number): void {
+    if (!this.ctx || this.ctx.state !== 'running') return;
+    this.ballX = x;
+    this.crowdStandUntil = this.ctx.currentTime + CROWD_STAND.seconds;
+    this.startCrowd();
+    this.setCrowdBase(crowdLevel(this.ballX, this.momentum));
   }
 
   /** Full time: the whistle has gone (the match event); the sting for the coached side's result follows it. */
@@ -933,6 +948,7 @@ export class AudioEngine {
     this.unsubs.push(bus.on('match:event', (ev) => this.onMatchEvent(ev)));
     this.unsubs.push(bus.on('match:penalty', () => this.onPenalty()));
     this.unsubs.push(bus.on('match:clean-break', () => this.onCleanBreak()));
+    this.unsubs.push(bus.on('match:goal-line-stand', ({ x }) => this.onGoalLineStand(x)));
     this.unsubs.push(bus.on('match:call-paid', () => this.playSfx('callPaid')));
     this.unsubs.push(bus.on('ui:notify', () => this.playSfx('click')));
     this.unsubs.push(
@@ -943,6 +959,7 @@ export class AudioEngine {
         this.homeId = home?.clubId ?? null;
         this.momentum = 0;
         this.ballX = null;
+        this.crowdStandUntil = 0;
         this.holdGrounds = false;
         this.playMusic('match');
         this.startCrowd();

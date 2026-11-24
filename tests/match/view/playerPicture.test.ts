@@ -42,7 +42,8 @@ describe('successful step pictures', () => {
     const runner = new Runner(seed => new LiveSim(home, away, seed), 34);
     const samePlayer = (s: Snapshot, q: PlayerSnap) => s.players.find(r => r.side === q.side && r.slot === q.slot && r.who === q.who)!;
     // Pick an actual, side-on approach where flipping the jink would turn the defender away from the runner.
-    runner.skipUntil(s => {
+    // Seed 34 had one before goal-line stands; a later seed still does when that match no longer does.
+    const sideOn = (s: Snapshot) => {
       if (!s.events.some(e => e.kind === 'step')) return false;
       const c = s.players.find(q => q.step?.role === 'carrier' && q.step.startedTick === s.tick);
       const d = s.players.find(q => q.step?.role === 'defender' && q.step.startedTick === s.tick);
@@ -51,7 +52,17 @@ describe('successful step pictures', () => {
       const aim = { headX: oldC.x - oldD.x, headY: oldC.y - oldD.y };
       const facing = screenPlayerFacing(aim, oldD);
       return facing.facing === 'side' && facing.left !== (screenHeading(0, c.step.lateral).x > 0);
-    });
+    };
+    const witness = () => {
+      const c = runner.cur.players.find(q => q.step?.role === 'carrier' && q.step.startedTick === runner.cur.tick);
+      const d = runner.cur.players.find(q => q.step?.role === 'defender' && q.step.startedTick === runner.cur.tick);
+      return !!(c && d);
+    };
+    for (const seed of [34, 1, 2, 3, 5, 8, 13, 21, 35, 36, 40, 41]) {
+      if (seed !== 34) runner.reseed(seed);
+      runner.skipUntil(sideOn);
+      if (witness()) break;
+    }
     const { cur: award, prev: before } = runner;
     const c = award.players.find(q => q.step?.role === 'carrier' && q.step.startedTick === award.tick);
     const d = award.players.find(q => q.step?.role === 'defender' && q.step.startedTick === award.tick);
