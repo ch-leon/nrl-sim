@@ -173,7 +173,7 @@ export abstract class LiveKicks extends LiveClock {
         this.outPending = { at: ex.at, how: ex.how, bounced: true };
       }
     }
-    this.ball = k.kind === 'grubber' ? grubberFlight(kicker.body.pos, to, this.tick) : kickFlight(kicker.body.pos, to, this.tick, k.receiver, k.peak);
+    this.ball = k.kind === 'grubber' ? grubberFlight(kicker.body.pos, to, this.tick) : kickFlight(kicker.body.pos, to, this.tick, k.receiver, k.peak, k.durationMult);
     this.lastKicker = k.kicker;
     this.kickInAir = k.kind;
     this.lastTouch = kicker.side;

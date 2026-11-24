@@ -30,6 +30,7 @@ import Phaser from 'phaser';
 import { bus } from '../core/events';
 import { getState, type Fixture, type WeatherKind } from '../core/state';
 import type { MatchEvent } from '../sim/events';
+import type { WindDirection } from '../match/league/weather';
 import { PixelBuffer, toTexture } from '../art/pixel';
 import {
   RAIN_ANGLE,
@@ -78,6 +79,7 @@ const LEAF_TINTS = [0xe0a030, 0xc87828, 0xf0d070, 0xa85a20, 0xe8e0c0, 0xd8c060, 
 
 export interface AtmosphereOptions {
   weather?: WeatherKind | undefined;
+  wind?: () => WindDirection;
   fixture?: Fixture | undefined;
   /** Season for the lighting hash; read from GameState when omitted. */
   season?: number;
@@ -259,13 +261,17 @@ export function attachMatchAtmosphere(scene: Phaser.Scene, opts: AtmosphereOptio
     ).setDepth(DEPTH_SPLASH);
   }
   if (budget.leaves > 0) {
+    const direction = (): number => opts.wind?.() || 1;
+    const along = (min: number, max: number): { onEmit: () => number } => ({
+      onEmit: () => direction() * (min + Math.random() * (max - min)),
+    });
     const fade = (_p: unknown, _k: string, t: number): number => Math.sin(Math.PI * t);
     add(
       scene.add.particles(0, 0, KEY_LEAF, {
         emitZone: { type: 'random', source: screenZone(cam) },
         lifespan: { min: 1800, max: 2800 },
-        speedX: { min: 170, max: 320 },
-        speedY: { min: -25, max: 50 },
+        speedX: along(170, 320),
+        speedY: along(65, 120),
         accelerationY: { min: -90, max: 90 },
         rotate: { start: 0, end: 900 },
         scale: { min: 1.8, max: 2.8 },
@@ -282,9 +288,9 @@ export function attachMatchAtmosphere(scene: Phaser.Scene, opts: AtmosphereOptio
       scene.add.particles(0, 0, KEY_GUST, {
         emitZone: { type: 'random', source: screenZone(cam) },
         lifespan: 900,
-        speedX: { min: 560, max: 800 },
-        speedY: { min: 30, max: 60 },
-        rotate: 4,
+        speedX: along(560, 800),
+        speedY: along(280, 400),
+        rotate: 27,
         scaleX: { min: 1.5, max: 3.2 },
         alpha: { onEmit: () => 0, onUpdate: (_p: unknown, _k: string, t: number) => Math.sin(Math.PI * t) * 0.75 },
         frequency: 70,

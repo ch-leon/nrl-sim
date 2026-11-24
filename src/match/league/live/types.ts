@@ -156,6 +156,8 @@ export interface PendingKick {
   peak: number;
   kickoff: boolean;
   kind: KickChoice;
+  /** Directional change to a punt's flight time. */
+  durationMult?: number;
   /** Ordinary bomb's existing aim roll, reused if a winger can chase at the boot. */
   wingBombRoll?: number;
   /** The trait behind the kick, if one shaped it. */

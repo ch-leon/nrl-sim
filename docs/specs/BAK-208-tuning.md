@@ -697,8 +697,11 @@ Tests: `tests/match/league/penalties.test.ts`.
 
 The match's weather (`MatchResult.weather`, rolled by matchday as today: 60% clear, 25% rain,
 15% wind) now changes the play. **Rain**: every pass knock-on, every spilled kick and every
-ball lost in the tackle is ×1.6. **Wind**: territory kicks carry 12% further, give or take 15%
-a kick, and goal kicks (conversions, field goals, penalty goals) spread 1.4× as wide. **Ball
+ball lost in the tackle is ×1.6. **Wind**: the match seed fixes a direction along the field
+(#661). A long punt carries 14% further downwind and comes down 12% sooner. Into the wind
+it lands 14% shorter and hangs 12% longer. The existing ±15% variation still applies to
+distance. A side's wind benefit reverses at the break when it changes ends. `weather.windPuntOn: 0` restores the flat 12% carry and the previous hang. Penalty kicks
+for touch carry 12% further and goal kicks spread 1.4× as wide. **Ball
 lost in contact**: a held tackle or a big hit can jar the ball loose, a knock-on (SPILLED!;
 the other side's ball), less for a skilful carrier. **Injuries**: a big hit can hurt the
 carrier (the old engine's roll on injury risk and Injury Prone, × the difficulty's rate,
@@ -710,7 +713,10 @@ returns the injuries (1–3 weeks, by squad id), which matchday applies as it do
 | Knob | File | Value | Effect |
 |---|---|---|---|
 | `weather.rainHandling` | `src/match/league/weather.ts` | 1.6 | Rain: knock-ons, spilled kicks, ball lost in contact ×. |
-| `weather.windKick` / `weather.windJitter` | `weather.ts` | 1.12 / 0.15 | Wind: territory kicks (and penalty kicks for touch) carry ×, ± a share per kick. |
+| `weather.windKick` | `weather.ts` | 1.12 | Penalty kicks for touch carry × in wind. With `windPuntOn` at 0, long punts use this flat carry again. |
+| `weather.windPuntOn` | `weather.ts` | 1 | Seeded punt direction. 0 restores the flat wind carry and the previous hang. |
+| `weather.windPuntCarry` / `weather.windPuntHang` | `weather.ts` | 0.14 / 0.12 | Long punts gain this share of carry and lose this share of airtime downwind, with the signs reversed upwind. |
+| `weather.windJitter` | `weather.ts` | 0.15 | Long punts vary by ± this share of distance in wind after the directional adjustment. |
 | `weather.windGoalSpread` | `weather.ts` | 1.4 | Wind: goal kicks' aim error ×. |
 | `weather.lostHeld` / `weather.lostBigHit` | `weather.ts` | 0.006 / 0.03 | Ball lost in a made tackle / a big hit. |
 | `weather.lostSkill` | `weather.ts` | 0.0001 a point | Less for each point of the carrier's Skill over 50. |
@@ -723,7 +729,7 @@ handling instead.
 
 Measured (weather plan, 60 whole matches a row, run `20261019-132027-weather`), even 60 v 60
 per match: errors 13.6 clear, **20.9 rain**, 12.3 wind; balls lost in contact 1.65 / 2.8 /
-1.5; conversions 55% clear, 50% rain, **44% wind**; kick metres 574 clear, **621 wind**
+1.5; conversions 55% clear, 50% rain, **44% wind**; kick metres 574 clear, **621 wind** (before directional wind)
 (rain 509: fewer long kicks get away). Injuries 0.15–0.33 a match (the old engine 0.31; the
 standard plan 0.1–0.55 by scenario). The standard plan (run `20261019-131950-standard`): errors
 up about 2 a match (the ball lost in contact), still inside §7; nothing else beyond luck.

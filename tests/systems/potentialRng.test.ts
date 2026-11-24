@@ -47,9 +47,12 @@ import { contractsEndingSoon } from '../../src/systems/contracts';
 // Main's career-only pin: 3782523015; the combined pin before #722 was 119391389.
 // The timed back-door runs (#722, engine revision 7) moved the measured pin to
 // 1950957202. The lead read (engine revision 8) moves this season back to
-// 3782523015. Both AI modes still compare UI-read and no-read runs, and AI=0
-// pins this measured stream.
-const MAIN_SEED_AFTER_SEASON = 3782523015;
+// 3782523015. Directional punts (revision 19) change windy matches, so the
+// season draws a different number of dice and the stream moves again. With
+// weather.windPuntOn at 0 the revision-18 pin still holds. Both AI modes still
+// compare UI-read and no-read runs, and AI=0 pins this measured stream.
+const MAIN_SEED_AFTER_SEASON = 1950957202;
+const BEFORE_PUNT_WIND = 3782523015;
 
 describe('the rng stream (#369)', () => {
   it.each([0, 1])('weekly potential and dot reads preserve the season stream with habit AI=%i', (ai) => {
@@ -77,7 +80,13 @@ describe('the rng stream (#369)', () => {
       expect(viewed.season).toBe(2);
       expect(viewed.looked).toBe(WEEKS_PER_SEASON);
       expect(viewed.seed).toBe(control.seed);
-      if (ai === 0) expect(viewed.seed).toBe(MAIN_SEED_AFTER_SEASON);
+      if (ai === 0) {
+        expect(viewed.seed).toBe(MAIN_SEED_AFTER_SEASON);
+        const windOff = applyTuning({ 'weather.windPuntOn': 0 });
+        try {
+          expect(season(false).seed).toBe(BEFORE_PUNT_WIND);
+        } finally { windOff(); }
+      }
     } finally { restore(); }
   });
 });

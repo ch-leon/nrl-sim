@@ -62,8 +62,8 @@ export function hangTime(peak: number): number {
 }
 
 /** A kick from the boot: high and long. It is in the air for its hang time, or longer if the distance needs it. */
-export function kickFlight(from: Vec, to: Vec, t0: number, receiver: number | null, peak = 12): BallState {
-  const seconds = Math.max(dist(from, to) / KICK_SPEED, hangTime(peak));
+export function kickFlight(from: Vec, to: Vec, t0: number, receiver: number | null, peak = 12, durationMult = 1): BallState {
+  const seconds = Math.max(dist(from, to) / KICK_SPEED, hangTime(peak)) * durationMult;
   const ticks = Math.max(4, Math.round(seconds / TICK_S));
   return { kind: 'flight', from: { ...from }, to: { ...to }, t0, ticks, peak, fromLift: 0.4, receiver, bounces: 0, via: 'kick' };
 }
