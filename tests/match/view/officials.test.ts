@@ -40,6 +40,9 @@ function playMatch(seed: number, halfMinutes = 7, maxTick = 30_000): Snapshot[] 
 
 describe('the referee (#642)', () => {
   const matches = [3, 11].map((seed) => playMatch(seed));
+  // With the open-play dummy enabled, seed 1 has a full six-again signal from tick 3486.
+  const signalSeed = 1;
+  const signalMatch = playMatch(signalSeed);
 
   it('is a pure function of the snapshot', () => {
     const s = matches[0]![500]!;
@@ -121,7 +124,7 @@ describe('the referee (#642)', () => {
   });
 
   it('circles the arm for a live six-again call, including in replays and on seeks', () => {
-    const snaps = matches[0]!;
+    const snaps = signalMatch;
     const call = snaps.find((s) => s.phase?.kind === 'ruck' && s.events.some((e) => e.kind === 'six-again'))!;
     const duration = SIX_AGAIN_ARMS.length * SIX_AGAIN_POSE_TICKS;
     const picture = snaps.slice(call.tick, call.tick + duration);
@@ -134,8 +137,8 @@ describe('the referee (#642)', () => {
 
     const mid = picture[9]!;
     expect(mid.events.some((e) => e.kind === 'six-again')).toBe(false);
-    expect(replayRange(fixture, 3, mid.tick, mid.tick)).toEqual([mid]);
-    const runner = new Runner(fixture, 3);
+    expect(replayRange(fixture, signalSeed, mid.tick, mid.tick)).toEqual([mid]);
+    const runner = new Runner(fixture, signalSeed);
     runner.seek(call.tick - 1);
     runner.setSpeed(8);
     runner.play();
@@ -146,7 +149,7 @@ describe('the referee (#642)', () => {
   });
 
   it('cuts the six-again signal when a stoppage or another referee call takes over', () => {
-    const live = matches[0]!.find((s) => refereeSignal(s) === 'six-again')!;
+    const live = signalMatch.find((s) => refereeSignal(s) === 'six-again')!;
     for (const kind of ['set-piece', 'restart', 'half-time', 'full-time']) {
       expect(refereeSignal({ ...live, phase: { kind, since: live.tick } })).toBeNull();
     }
