@@ -9,7 +9,7 @@ import { gapTarget, intercept, supportSpots, type Candidate } from '../tactics';
 import type { AttackPlan } from '../presets';
 import { speedMult } from '../traits';
 import { SECOND_KICKER } from '../lastTackle';
-import { FATIGUE, afterRun, legsSpeed } from '../fatigue';
+import { FATIGUE, afterRun, legsSpeed, tiredness } from '../fatigue';
 import { GAS, canSprint, paceMult, runCostMult, stepGas } from '../gas';
 import { WRESTLE } from '../wrestle';
 import { postsFor } from '../goals';
@@ -519,14 +519,6 @@ export abstract class LivePositioning extends LiveContact {
     const compressed = this.tactics[atk].attack === 'expansive' ? Math.min(1, this.compressedEffect()) : 0;
     const coverDepth = Math.min(1, kickCover);
     const heelLive = splitSpot && ph.kind === 'ruck' && ph.stage === 'dh';
-    if ((ph.kind === 'play' && carrier) || heelLive) {
-      // The heel puts the ball in play; only defenders who completed their retreat can come up.
-      const want = (carrier?.body.pos.x ?? splitSpot!.x) + this.dir * 2.5;
-      const stepM = dplan.lineSpeed * (GAS.cruise / LIVE.lineCruiseRef) * TICK_S;
-      // Rush up toward the carrier, never past him.
-      if (this.dir > 0) this.lineX = Math.max(want, this.lineX - stepM);
-      else this.lineX = Math.min(want, this.lineX + stepM);
-    }
     // A wrestle on: the free defenders close by come in to help finish it.
     const w = ph.kind === 'tackle' ? ph.wrestle : null;
     const wrestling = w && ph.kind === 'tackle' ? this.players[ph.carrier]! : null;
@@ -542,6 +534,15 @@ export abstract class LivePositioning extends LiveContact {
       : this.tick < this.ruckPlayedAt + LIVE.markerReleaseTicks * dplan.markerHold
         ? this.markers.map((i) => this.players[i]!).filter((d) => d.side === def && !committed.includes(d))
         : [];
+    if ((ph.kind === 'play' && carrier) || heelLive) {
+      // The heel puts the ball in play; only defenders who completed their retreat can come up.
+      const want = (carrier?.body.pos.x ?? splitSpot!.x) + this.dir * 2.5;
+      const pace = this.lineSpeedFromLegs(defenders, markers, committed, def);
+      const stepM = dplan.lineSpeed * pace * (GAS.cruise / LIVE.lineCruiseRef) * TICK_S;
+      // Rush up toward the carrier, never past him.
+      if (this.dir > 0) this.lineX = Math.max(want, this.lineX - stepM);
+      else this.lineX = Math.min(want, this.lineX + stepM);
+    }
     const leadRead = ph.kind === 'play' && carrier && shape
       ? this.readLead(shape, carrier, defenders, committed, markers, broken) : null;
     for (const p of defenders) {
@@ -597,6 +598,20 @@ export abstract class LivePositioning extends LiveContact {
       }
     }
     if (this.scripted && ph.kind === 'play') this.scriptTargets();
+  }
+
+  /** Legs of the onside men advancing in the line, excluding the ruck, cover and tacklers. */
+  private lineSpeedFromLegs(defenders: readonly Player[], markers: readonly Player[], committed: readonly Player[], side: Side): number {
+    if (FATIGUE.lineSpeedLoss <= 0) return 1;
+    const fullback = this.fullback(side);
+    let sum = 0, count = 0;
+    for (const p of defenders) {
+      if (p === fullback || markers.includes(p) || committed.includes(p) || this.locked(p) || p.subFor !== null
+        || this.tick < p.cooldownUntil || this.retreatLine(p) !== null) continue;
+      sum += tiredness(p.energy);
+      count++;
+    }
+    return count === 0 ? 1 : 1 - clamp(FATIGUE.lineSpeedLoss * sum / count, 0, 1);
   }
 
   /**

@@ -34,6 +34,10 @@ export const FATIGUE = {
   /** Top speed: −10% tired, −20% spent. */
   tiredSpeed: 0.9,
   spentSpeed: 0.8,
+  /** Added dummy-half dart probability at mean marker tiredness 1. */
+  markerDartBonus: 0.18,
+  /** Fractional loss of collective line speed at mean onside line tiredness 1. */
+  lineSpeedLoss: 0.08,
   /** His drain rate (N9.3, by name in the harness): offset − Stamina × perStamina, clamped to min..max (Stamina 50 is ×1). */
   drain: { offset: 1.5, perStamina: 0.01, min: 0.6, max: 1.4 },
   /** The contest's fatigue weights (§4.1): a spent carrier loses this much bust / fend / offload, a spent tackler this much big hit and concedes `tacklerBust` more busts (half as much when tired). */

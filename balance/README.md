@@ -223,6 +223,19 @@ never as zero: the table is left out, or a dash shown for that row):
   share would (a match with no such pair reads 0). **Slots** is how many slots took a
   first pass, a side's mean. Neither is scaled for a stretch. Results from before
   #649 show a dash.
+- **Eligible dart % / Fresh marker dart % / Tired marker dart %** (#656): the
+  share of the dummy-half's eligible dart decisions that chose a dart, pooled
+  across both sides of the matchup as written, with standard errors estimated
+  over matches. An eligible
+  decision has a legal receiver and takes the discretionary dart roll.
+  Fresh has mean marker tiredness zero, and tired has mean marker tiredness
+  at least 0.5 (fresh, tired, and spent legs contribute 0, 0.5, and 1).
+  `watch.markerDarts` in the JSONL also records counts for intermediate and
+  unavailable markers, with directed dart rolls in the unavailable group.
+- **Early line breaks / Late line breaks** (#656): mean line breaks per
+  match in the first and last three minutes of each regulation half. If the half is under six
+  minutes, the windows are each half of it. Breaks after the siren while play
+  continues count as late. Window counts use actual breaks in a stretch.
 - **2nd-last kicks / Set start m to go** (#650): kicks in play (a `kick` event) made
   while the set is on its second-last tackle, a match (a count, scaled for a stretch);
   and the metres to go, to the line the side with the ball attacks, at the first

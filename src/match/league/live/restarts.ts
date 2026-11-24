@@ -7,6 +7,7 @@ import type { ConversionSnap, Side } from '../../core/snapshot';
 import { add, clamp, dist, scale, type Vec } from '../../core/vec';
 import { FIVE_EIGHTH, FULLBACK, KICKER } from '../roles';
 import { SECOND_KICKER } from '../lastTackle';
+import { FATIGUE, tiredness } from '../fatigue';
 import { MAX_LAT_M, pickReceiver, pickReceiverWeighted } from '../tactics';
 import { NINES } from '../rules';
 import { conversionSpot, goalChance, goalStrikeTick, postsFor } from '../goals';
@@ -85,6 +86,7 @@ export abstract class LiveRestarts extends LivePlay {
     if (this.tick < ph.heldAt + LIVE.dhHoldTicks) return;
     this.lastPlay = this.tackles === SET_TACKLES - 1;
     const intent = this.pendingControl[this.attacking];
+    const ordinary = !intent && !this.pendingPlay[this.attacking];
     if (intent && (intent.kind === 'pass-left' || intent.kind === 'pass-right')) {
       this.pendingControl[this.attacking] = null;
       const receiver = controlReceiver(h.body.pos, this.dir, this.candidates(h), intent.kind);
@@ -99,7 +101,7 @@ export abstract class LiveRestarts extends LivePlay {
       this.phase = { kind: 'play' };
       return;
     }
-    const decision = ph.decision ?? this.chooseRuck(h, release);
+    const decision = ph.decision ?? this.chooseRuck(h, release, ordinary);
     // A cancelled/invalid commitment becomes a carry, never a second unseen receiver draw.
     // A later explicit last-tackle kick call retains its deterministic DH-to-kicker override.
     const calledKick = this.lastPlay && ['grubber', 'forty-twenty'].includes(this.callState[this.attacking].attack ?? '');
@@ -112,7 +114,10 @@ export abstract class LiveRestarts extends LivePlay {
       h.decided = false;
       h.pose = 'run';
       h.poseUntil = 0;
-      this.emit('dart', `${h.name} darts from dummy-half`, h);
+      if (decision.tiredMarker && !decision.cancelled) {
+        this.emit('dart', `${h.name} spots a tired marker and darts`, h);
+        this.events[this.events.length - 1]!.detail = 'tired-marker';
+      } else this.emit('dart', `${h.name} darts from dummy-half`, h);
     } else this.pass(h, receiver);
     const ball = this.ball;
     const secondKicker = decision.secondKicker && !decision.cancelled && decision.to && receiver
@@ -161,7 +166,19 @@ export abstract class LiveRestarts extends LivePlay {
     return this.kickerSpace(fiveEighth) - space >= SECOND_KICKER.extraSpaceM - clamp(boot, -limit, limit) ? fiveEighth : null;
   }
 
-  private chooseRuck(h: Player, until: number): RuckDecision {
+  private markerTiredness(h: Player): number | null {
+    const markers = this.currentMarkers().filter(m => m.side === other(h.side) && this.onField(m)
+      && this.markers.includes(this.indexOf(m)) && !this.locked(m) && m.subFor === null
+      && this.tick >= m.cooldownUntil && this.retreatLine(m) === null
+      && (m.body.pos.x - h.body.pos.x) * this.dir >= 0 && dist(m.body.pos, this.mark) <= LIVE.sprintCloseM);
+    if (markers.length === 0) return null;
+    return markers.reduce((sum, m) => sum + tiredness(m.energy), 0) / markers.length;
+  }
+
+  /** Lets the balance harness count actual dart rolls, excluding forced carries. */
+  protected onDartChoice(_dart: boolean, _markerTiredness: number | null): void {}
+
+  private chooseRuck(h: Player, until: number, ordinary = true): RuckDecision {
     const last = this.tackles === SET_TACKLES - 1;
     let receiver: number | null = null, kicker = false, secondKicker = false;
     if (last) {
@@ -181,12 +198,21 @@ export abstract class LiveRestarts extends LivePlay {
         ? pickReceiverWeighted(h.body.pos, this.dir, this.candidates(h), MAX_LAT_M, 0, LIVE.receiverMargin, LIVE.receiverSpread, this.rng.next())
         : pickReceiver(h.body.pos, this.dir, this.candidates(h));
     }
-    if (receiver === null || (!toKicker && this.rng.next() < LIVE.dartChance)) {
-      receiver = null;
+    let tiredMarker = false;
+    if (receiver !== null && !toKicker) {
+      const roll = this.rng.next();
+      const base = roll < LIVE.dartChance;
+      const markerLegs = ordinary && !this.callState[h.side].attack ? this.markerTiredness(h) : null;
+      const bonus = FATIGUE.markerDartBonus * (markerLegs ?? 0);
+      // Name the read only if the marker bonus turned a pass into a dart.
+      tiredMarker = !base && bonus > 0 && roll < Math.min(1, LIVE.dartChance + bonus);
+      this.onDartChoice(base || tiredMarker, markerLegs);
+      if (base || tiredMarker) receiver = null;
     }
     const ref = (p: Player) => ({ side: p.side, slot: p.slot, who: p.key });
     return { from: ref(h), to: receiver === null ? null : ref(this.players[receiver]!), decidedAt: this.tick, until, kicker,
-      ...(secondKicker && receiver !== null ? { secondKicker: true } : {}) };
+      ...(secondKicker && receiver !== null ? { secondKicker: true } : {}),
+      ...(tiredMarker ? { tiredMarker: true } : {}) };
   }
 
   /** Pure identity/eligibility check, also used by snapshot projection. Never recruits a replacement. */

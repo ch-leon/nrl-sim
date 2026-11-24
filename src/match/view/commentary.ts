@@ -108,6 +108,7 @@ export const LINES: Readonly<Record<string, readonly string[]>> = {
   'quick-ptb': ['Quick play-the-ball from {player}.', '{player} wins the ruck and plays it fast.', '{player} plays it quickly.'],
   'slow-ptb': ['Slow play-the-ball — the defence is set.', '{player} is slow to his feet.', 'The defence wins the ruck. Slow ball.'],
   dart: ['{player} darts from dummy-half.', '{player} goes himself from dummy-half.', 'Out of dummy-half goes {player}.'],
+  'dart:tired-marker': ['{player} darts at a tired marker.', 'Tired marker. {player} goes himself.', '{player} spots a tired marker and darts.'],
   // ── Attack ──
   'line-break': ['{player} breaks the line!', 'Line break! {player} is away.', '{player} is through the line!', '{player} finds the gap and goes.', '{player} cuts the defence open!', 'Daylight! {player} is through!', '{player} slices through the line!'],
   // A half break (#638): the carrier is through one gap but the cover is still there. Plain words, no shout.
@@ -287,6 +288,7 @@ export function lineKey(e: SimEvent, kickInAir: boolean, score?: Readonly<Record
     case 'regather':
     case 'drop':
     case 'loose-ball':
+    case 'dart':
       return d && LINES[`${e.kind}:${d}`] ? `${e.kind}:${d}` : e.kind;
     case 'touch':
       return d === 'kick' || d === 'penalty' || d === 'bundled' ? `touch:${d}` : 'touch';

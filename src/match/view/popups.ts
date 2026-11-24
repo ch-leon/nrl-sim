@@ -154,7 +154,8 @@ export function popupFor(e: SimEvent): Popup | null {
               ? (CALL_WORDS[e.detail ?? 'tap'] ?? w.word)
               : w.word;
   // A bonus try points at the zone it was grounded in (#77; zoneLayer.ts lights it).
-  const sub = e.kind === 'try' && e.detail === 'bonus' ? BONUS_SUB : surnameOf(e.player).toUpperCase();
+  const sub = e.kind === 'try' && e.detail === 'bonus' ? BONUS_SUB
+    : e.kind === 'dart' && e.detail === 'tired-marker' ? 'TIRED MARKER' : surnameOf(e.player).toUpperCase();
   const p: Popup = { word, sub, tone: w.tone, big, ms: big ? POPUP_BIG_MS : POPUP_MS };
   if (e.trait) p.trait = e.trait.toUpperCase();
   return p;

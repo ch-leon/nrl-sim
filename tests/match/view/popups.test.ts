@@ -34,6 +34,8 @@ describe('popupFor', () => {
   it('points a bonus try at the zone (#77): its second line says where it came from', () => {
     expect(popupFor({ ...ev('try'), detail: 'bonus' })).toEqual({ word: 'BONUS TRY!', sub: BONUS_SUB, tone: 'attack', big: true, ms: POPUP_BIG_MS });
     expect(BONUS_SUB).toBe('FROM THE ZONE');
+    expect(popupFor({ ...ev('dart'), detail: 'tired-marker' })).toMatchObject({ word: 'DART!', sub: 'TIRED MARKER' });
+    expect(popupFor(ev('dart'))).toMatchObject({ word: 'DART!', sub: 'KAVANAGH' });
     expect(popupFor(ev('try'))?.sub).toBe('KAVANAGH');
   });
   it('stays quiet for routine events', () => {
