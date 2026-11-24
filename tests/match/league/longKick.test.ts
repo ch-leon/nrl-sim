@@ -11,14 +11,25 @@ import type { CoachCall } from '../../../src/match/league/calls';
 import { LONG_KICK, kickTarget, longKickTarget } from '../../../src/match/league/tactics';
 import { applyTuning } from '../../../src/match/league/tuning';
 import { DEFAULT_AWAY, DEFAULT_HOME, labSheet } from '../../../src/match/lab/sheets';
+import { windDirection } from '../../../src/match/league/weather';
+import { NINES } from '../../../src/match/league/rules';
+import type { WeatherKind } from '../../../src/sim/events';
 
 const BOOT = { dist: 1, acc: 1 };
 
 class KickSim extends LiveSim {
   draws = 0;
 
-  constructor() {
-    super(labSheet(DEFAULT_HOME, 'gen'), labSheet(DEFAULT_AWAY, 'gen'), 650);
+  constructor(seed = 650, weather: WeatherKind = 'clear') {
+    super(labSheet(DEFAULT_HOME, 'gen'), labSheet(DEFAULT_AWAY, 'gen'), seed, { weather });
+  }
+
+  changeEnds(): void {
+    this.endHalf();
+    const breakPhase = this.phase;
+    if (breakPhase.kind !== 'half-time') throw new Error('Expected half-time');
+    this.tick += NINES.halfTimeTicks;
+    this.stepHalfTime(breakPhase);
   }
 
   punt(side: Side, shade: number, rolls: number[], options: { early?: boolean; call?: CoachCall; aim?: Vec } = {}) {
@@ -54,7 +65,7 @@ class KickSim extends LiveSim {
     const event = this.events[this.events.length - 1];
     expect(event).toMatchObject({ side, kind: 'kick', detail: 'long' });
     expect(flight.receiver).toBe(this.indexOf(fullback));
-    return { from: flight.from, to: flight.to, peak: flight.peak, text: event?.text, draws: this.draws };
+    return { from: flight.from, to: flight.to, peak: flight.peak, ticks: flight.ticks, text: event?.text, draws: this.draws };
   }
 }
 
@@ -130,6 +141,47 @@ describe('ordinary long punts into space (#650)', () => {
       } finally {
         restore();
       }
+    }
+  });
+});
+
+describe('directional punts (#661)', () => {
+  it('keeps the seed’s direction and swaps which side gets the longer, quicker punt at the actual break', () => {
+    const seeds = [1, 2, 3, 4, 5, 6, 7, 8];
+    expect(new Set(seeds.map(seed => windDirection('wind', seed)))).toEqual(new Set([-1, 1]));
+    for (const seed of seeds) {
+      const wind = new KickSim(seed, 'wind');
+      expect(wind.wind).toBe(windDirection('wind', seed));
+      expect(wind.wind).toBe(new KickSim(seed, 'wind').wind);
+      const punt = () => wind.punt('home', 0, [0, 0, 0.5, 0.99, 0.99, 0.5]);
+      const first = punt();
+      wind.changeEnds();
+      const second = punt();
+      const clear = new KickSim(seed).punt('home', 0, [0, 0, 0.99, 0.99, 0.5]);
+      const distance = (kick: typeof first) => Math.abs(kick.to.x - kick.from.x);
+      const [downwind, upwind] = wind.wind === 1 ? [first, second] : [second, first];
+      expect(wind.wind).toBe(windDirection('wind', seed));
+      expect(first.from.x).toBe(FIELD_LENGTH - second.from.x);
+      expect(distance(downwind)).toBeGreaterThan(distance(clear));
+      expect(distance(upwind)).toBeLessThan(distance(clear));
+      expect(downwind.ticks).toBeLessThan(clear.ticks);
+      expect(upwind.ticks).toBeGreaterThan(clear.ticks);
+      expect(downwind.to.y).toBe(upwind.to.y);
+    }
+  });
+
+  it('with the slice off, a windy punt keeps the flat carry and the clear hang on the same rolls', () => {
+    const restore = applyTuning({ 'weather.windPuntOn': 0 });
+    try {
+      const wind = new KickSim(1, 'wind');
+      const clear = new KickSim(1);
+      const blown = wind.punt('home', 0, [0, 0, 0.5, 0.99, 0.99, 0.5]);
+      const still = clear.punt('home', 0, [0, 0, 0.99, 0.99, 0.5]);
+      const metres = (kick: typeof blown) => Math.abs(kick.to.x - kick.from.x);
+      expect(metres(blown)).toBeCloseTo(metres(still) * 1.12, 5);
+      expect(blown.ticks).toBe(still.ticks);
+    } finally {
+      restore();
     }
   });
 });

@@ -53,6 +53,7 @@ import { canUseWorker, playMatchesInWorker } from '../systems/matchJobs';
 
 import { attachMatchFx } from '../fx/particles';
 import { DEPTH_GLOW, attachMatchAtmosphere } from '../fx/atmosphere';
+import { windDirection, type WindDirection } from '../match/league/weather';
 import { RING_STYLES, resolveKits } from '../art/match/kitClash';
 import { drawRing } from '../match/view/rings';
 import { teamLetters, teamLettersOn, teamTags } from '../ui/teamTag';
@@ -299,6 +300,9 @@ export class MatchScene extends Phaser.Scene {
   private away!: TeamSheet;
   private fixture: Fixture | undefined;
   private weather: WeatherKind | undefined;
+  private wind: WindDirection = 0;
+
+  protected stadiumWind(): WindDirection { return this.wind; }
 
   private readonly offsetX = fieldOffsetX();
   private art!: MatchArtRegistry;
@@ -382,6 +386,7 @@ export class MatchScene extends Phaser.Scene {
     this.away = data.away;
     this.fixture = data.fixture;
     this.weather = data.live?.weather ?? data.weather;
+    this.wind = windDirection(this.weather, data.live?.seed ?? 0);
     this.live = data.live;
     this.players.home = [];
     this.players.away = [];
@@ -487,6 +492,7 @@ export class MatchScene extends Phaser.Scene {
     }
     this.ball = new MatchBall(this, props.ball, props.ballShadow, lighting);
     this.officials = new MatchOfficials(this, this.art, {
+      ...(this.weather === 'wind' ? { wind: () => this.stadiumWind() } : {}),
       kits: { home: kits.home, away: kits.away },
       sheets: { home: this.home, away: this.away },
       look: looks,
@@ -547,7 +553,7 @@ export class MatchScene extends Phaser.Scene {
     this.data.set('away', this.away);
     attachMatchFx(this); // BAK-201: pooled try/big-hit/crowd particle FX (WU-14)
     // GitHub #16: rain/wind, dusk/night lighting (per fixture), stand reactions.
-    attachMatchAtmosphere(this, { weather: this.weather, fixture: this.fixture });
+    attachMatchAtmosphere(this, { weather: this.weather, fixture: this.fixture, wind: () => this.stadiumWind() });
 
     // WU-12: overlay first (subscribes to 'match:event'/'match:finished'), then
     // the live playback, which plays the match and emits its events as they happen.

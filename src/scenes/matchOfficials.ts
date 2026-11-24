@@ -35,6 +35,7 @@ import type { MatchArtRegistry } from './matchArt';
 import { BOARD_TEX_H, BOARD_TEX_W, boardColor, drawScoreboard, flashWord, scoreboardOrigin, type BoardState } from '../art/match/scoreboard';
 import { reducedMotion } from '../match/view/impact';
 import { breakKind } from '../match/view/walkOff';
+import type { WindDirection } from '../match/league/weather';
 
 /** Two planted steps take three metres. Below 0.6 m/s both boots settle. */
 const JUDGE_STRIDE_M = 3;
@@ -80,6 +81,7 @@ export interface OfficialsOptions {
   toWorld: (fx: number, fy: number) => { x: number; y: number };
   shadowKey: string;
   offsetX: number;
+  wind?: () => WindDirection;
   /** The depth a player's sprite is drawn at (the referee goes behind the carrier rather than over him). */
   carrierDepth: (side: Side, slot: number) => number | null;
   /** The sides' short tags (the score bug's) and the scoreboard's depth (behind the pitch). */
@@ -122,6 +124,8 @@ export class MatchOfficials {
   private readonly refFrames = new Map<string, PixelBuffer>();
   private refShown = '';
   private readonly judges: readonly [TouchJudgeView, TouchJudgeView];
+  private readonly windFlags: Phaser.GameObjects.Image[] = [];
+  private flagDirection: WindDirection = 0;
   /** Framing points for the current conversion picture, in world pixels. */
   conversionFocus: Vec[] | null = null;
   private readonly benches: Record<Side, BenchView>;
@@ -148,11 +152,20 @@ export class MatchOfficials {
     };
     // Corner posts at the four corners of the field of play, each sorted by its own foot like an upright.
     const flag = art.texture('corner-flag', drawCornerFlag(opts.kits.home));
+    const placeFlag = (fx: number, fy: number): void => {
+      const w = opts.toWorld(fx, fy);
+      const image = scene.add.image(w.x, w.y, flag)
+        .setOrigin((CORNER_FLAG_X + 0.5) / CORNER_FLAG_W, (CORNER_FLAG_H - 1) / CORNER_FLAG_H).setDepth(w.y + 1);
+      if (opts.wind) this.windFlags.push(image);
+    };
     for (const fx of [0, 100]) {
-      for (const fy of [0, 100]) {
-        const w = opts.toWorld(fx, fy);
-        scene.add.image(w.x, w.y, flag).setOrigin((CORNER_FLAG_X + 0.5) / CORNER_FLAG_W, (CORNER_FLAG_H - 1) / CORNER_FLAG_H).setDepth(w.y + 1);
-      }
+      for (const fy of [0, 100]) placeFlag(fx, fy);
+    }
+    // Halfway pennants keep the direction in shot when the camera follows play in midfield.
+    if (opts.wind) {
+      placeFlag(50, -4);
+      placeFlag(50, 104);
+      this.updateWindFlags();
     }
     // The benches, the sin-bin spots and their cards.
     const spot = art.texture('bin-spot', drawBinSpot());
@@ -244,8 +257,17 @@ export class MatchOfficials {
   /** The tick on screen (a replay's while it plays): the crowd reads the score and the ball's height from it. */
   latest: Snapshot | null = null;
 
+  private updateWindFlags(): void {
+    const direction = this.opts.wind?.();
+    if (!direction || direction === this.flagDirection) return;
+    this.flagDirection = direction;
+    // Flip around the pole's foot, the image origin.
+    for (const flag of this.windFlags) flag.setScale(direction, 1);
+  }
+
   /** Draw everyone for the frame between `prev` and `cur` at `alpha` (LiveView calls this after the players). */
   draw(prev: Snapshot, cur: Snapshot, alpha: number, heldTicks = 0): void {
+    this.updateWindFlags();
     this.latest = cur;
     if (cur.score) this.drawBoard([cur.score.home, cur.score.away]);
     this.drawReferee(prev, cur, alpha);

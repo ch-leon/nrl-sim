@@ -21,6 +21,7 @@ import { FORTY_TWENTY_ENABLED, TOUCH, inOwnInGoal } from '../touch';
 import { BIN } from '../sinbin';
 import { PLAYS } from '../plays';
 import { PLAYS_BY_ID } from '../../../data/plays';
+import { WEATHER, puntCarry } from '../weather';
 import { LIVE } from './knobs';
 import { GOAL_LINE_STAND } from '../goalLineStand';
 import { other, type Player, type Phase, type PendingKick } from './types';
@@ -384,8 +385,6 @@ export abstract class LivePlay extends LiveKicks {
     const def = other(this.attacking);
     const fb = this.fullback(def);
     const boot0 = bootMult(h.traits);
-    // Wind carries a territory kick further and less predictably (2f).
-    const boot = kind === 'long' && this.wx.kickDistance !== 1 ? { dist: boot0.dist * this.wx.kickDistance * (1 + (this.rng.next() - 0.5) * 2 * this.wx.jitter), acc: boot0.acc } : boot0;
     const base = { at: this.tick + LIVE.kickContactTicks, kicker: this.indexOf(h), kickoff: false, kind };
     const trait = boot0.dist > 1 ? { trait: announce(h.traits.find((t) => t.id === 'bigBoot')) ?? 'Big Boot' } : {};
     switch (kind) {
@@ -421,11 +420,17 @@ export abstract class LivePlay extends LiveKicks {
         return { ...base, to, receiver: this.indexOf(fb), peak: bombPeak(traitBoost(h.traits, 'bigBoot')), ...trait, ...(ordinary && !aim ? { wingBombRoll: roll } : {}) };
       }
       default: {
+        // Read wind against field direction, so it favours the other side after the break.
+        // With the slice off, a windy punt keeps the old flat carry and the old hang.
+        const directional = this.wind !== 0 && WEATHER.windPuntOn > 0;
+        const carry = directional ? puntCarry(this.wind, this.dir) : this.wx.kickDistance;
+        const boot = this.wind ? { dist: boot0.dist * carry * (1 + (this.rng.next() - 0.5) * 2 * this.wx.jitter), acc: boot0.acc } : boot0;
+        const punt = { ...base, durationMult: directional ? 1 - this.wind * this.dir * WEATHER.windPuntHang : 1 };
         // Labs: match controls (Leon, 30 Oct). Territory aims keep the normal
         // wind / boot target and its scatter; only the intent chooses the kick.
         if (aim) {
           const to = kickTarget(h.body.pos, this.dir, fb.body.pos, this.rng.next(), boot);
-          return { ...base, to: controlAim(to, aim, kickTarget(h.body.pos, this.dir, fb.body.pos, 0, boot), kickTarget(h.body.pos, this.dir, fb.body.pos, 1, boot)), receiver: this.indexOf(fb), peak: 12, ...trait };
+          return { ...punt, to: controlAim(to, aim, kickTarget(h.body.pos, this.dir, fb.body.pos, 0, boot), kickTarget(h.body.pos, this.dir, fb.body.pos, 1, boot)), receiver: this.indexOf(fb), peak: 12, ...trait };
         }
         // Territory (2d): from his own 40 on the last he may go for the 40/20; from deep, often for touch.
         const toLine = this.toLine(h);
@@ -436,20 +441,20 @@ export abstract class LivePlay extends LiveKicks {
         if (this.lastPlay && this.callState[this.attacking].attack === 'forty-twenty') {
           const land = Math.max(TOUCH.fortyTwentyLandM, toLine - CALLS.fortyTwenty.reachM * boot.dist);
           const aim = land - TOUCH.touchRollM <= 20 ? '40-20' : 'touch';
-          return { ...base, to: this.touchTarget(h, land, TOUCH.fortyTwentyInsideM, boot.acc * CALLS.fortyTwenty.scatter), receiver: this.indexOf(fb), peak: 11, aim, ...trait };
+          return { ...punt, to: this.touchTarget(h, land, TOUCH.fortyTwentyInsideM, boot.acc * CALLS.fortyTwenty.scatter), receiver: this.indexOf(fb), peak: 11, aim, ...trait };
         }
         if (FORTY_TWENTY_ENABLED && this.lastPlay && toLine >= FIELD_LENGTH - 40 && this.rng.next() < TOUCH.fortyTwenty + TOUCH.fortyTwentyTrait * lever) {
-          return { ...base, to: this.touchTarget(h, TOUCH.fortyTwentyLandM, TOUCH.fortyTwentyInsideM, boot.acc * 0.6), receiver: this.indexOf(fb), peak: 11, aim: '40-20', ...trait };
+          return { ...punt, to: this.touchTarget(h, TOUCH.fortyTwentyLandM, TOUCH.fortyTwentyInsideM, boot.acc * 0.6), receiver: this.indexOf(fb), peak: 11, aim: '40-20', ...trait };
         }
         if (this.rng.next() < TOUCH.findTouch[zoneOf(toLine)]) {
           const land = Math.max(toLine - 32 * boot.dist, 12);
-          return { ...base, to: this.touchTarget(h, land, TOUCH.touchInsideM, boot.acc), receiver: this.indexOf(fb), peak: 11, aim: 'touch', ...trait };
+          return { ...punt, to: this.touchTarget(h, land, TOUCH.touchInsideM, boot.acc), receiver: this.indexOf(fb), peak: 11, aim: 'touch', ...trait };
         }
         const roll = this.rng.next();
         const to = LONG_KICK.on > 0 && this.onField(fb) && (this.lastPlay || this.callState[this.attacking].attack !== 'kick-early')
           ? longKickTarget(h.body.pos, this.dir, fb.body.pos, roll, boot, this.side(def).map((p) => p.body.pos))
           : kickTarget(h.body.pos, this.dir, fb.body.pos, roll, boot);
-        return { ...base, to, receiver: this.indexOf(fb), peak: 12, ...trait };
+        return { ...punt, to, receiver: this.indexOf(fb), peak: 12, ...trait };
       }
     }
   }
