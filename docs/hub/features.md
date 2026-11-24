@@ -1,6 +1,6 @@
 # Features
 
-Last updated: 2026-11-22
+Last updated: 2026-11-24
 
 What's in the game, with the PR that added each.
 
@@ -63,6 +63,8 @@ What's in the game, with the PR that added each.
 - Android test APK ([PR](https://github.com/ch-leon/nrl-sim/pull/394)); CI ([PR](https://github.com/ch-leon/nrl-sim/pull/442))
 
 ## Recently added
+
+- **Dummy-half reads tired markers.** When the markers are tired, dummy-half is more likely to run from the play-the-ball. If their legs tip the choice, a Tired Marker cue and the commentary explain the dart. A tired onside line also advances a little slower. Ported from [draft PR #780](https://github.com/ch-leon/nrl-sim/pull/780).
 
 - **SuperCOOKED look, follow-ups.** The Undo toast counts down on a bar along its foot. The title's messages (a failed import, a save from a newer version) are toasts at the foot of the screen. Each save slot shows the club's ladder place ("Season 1 · Week 2 · 3rd"). Contracts says when each deal ends ("S2"), keeping the weeks, in amber, for one about to lapse. Ported from [draft PR #779](https://github.com/ch-leon/nrl-sim/pull/779).
 

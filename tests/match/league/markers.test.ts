@@ -3,6 +3,8 @@ import { BODY_RADIUS } from '../../../src/match/core/body';
 import { dist, type Vec } from '../../../src/match/core/vec';
 import { sideSheet } from '../../../src/match/balance/measure';
 import { LiveSim } from '../../../src/match/league/live';
+import { FATIGUE } from '../../../src/match/league/fatigue';
+import { applyTuning } from '../../../src/match/league/tuning';
 import { LIVE } from '../../../src/match/league/live/knobs';
 import type { DefencePreset } from '../../../src/match/league/presets';
 
@@ -44,6 +46,14 @@ class MarkerSim extends LiveSim {
     for (let i = 0; i < 100; i++) { this.assignTargets(); this.move(); }
     return [16, 17].map(i => ({ ...this.players[i]!.body.pos }));
   }
+  lineAdvance(lineEnergy: number, specialistEnergy: number) {
+    for (const p of this.side('away')) p.energy = lineEnergy;
+    this.players[9]!.energy = this.players[16]!.energy = this.players[17]!.energy = specialistEnergy;
+    this.startRetreat();
+    const before = this.lineX;
+    this.targets(true);
+    return (before - this.lineX) * this.dir;
+  }
   commitments(afterRelease: boolean, dummyHalf = false) {
     this.targets(true);
     if (afterRelease) this.tick += Math.ceil(LIVE.markerReleaseTicks * this.defPlan().markerHold);
@@ -79,6 +89,16 @@ describe('ruck markers', () => {
         expect(dist(first, { x: 50, y: 34 })).toBeGreaterThanOrEqual(2 * BODY_RADIUS - 0.05);
       });
     }
+    it(`eases line speed with eligible defenders' fatigue in direction ${dir}`, () => {
+      const fresh = new MarkerSim(dir).lineAdvance(1, 1);
+      expect(fresh).toBeGreaterThan(0);
+      expect(new MarkerSim(dir).lineAdvance(1, .18)).toBeCloseTo(fresh);
+      expect(new MarkerSim(dir).lineAdvance(.38, 1)).toBeCloseTo(fresh * (1 - FATIGUE.lineSpeedLoss / 2));
+      expect(new MarkerSim(dir).lineAdvance(.18, 1)).toBeCloseTo(fresh * (1 - FATIGUE.lineSpeedLoss));
+      const undo = applyTuning({ 'fatigue.lineSpeedLoss': 0 });
+      try { expect(new MarkerSim(dir).lineAdvance(.18, 1)).toBe(fresh); }
+      finally { undo(); }
+    });
     for (const defence of ['slide', 'rush', 'compressed'] as const) {
       it(`retains ${defence} hold/release and early dummy-half defence in direction ${dir}`, () => {
         expect(new MarkerSim(dir, undefined, defence).commitments(false)).not.toContain(16);

@@ -1,11 +1,13 @@
 # Roadmap
 
-Last updated: 2026-11-22
+Last updated: 2026-11-24
 
 Status checked against GitHub on 7 Nov 2026. Merged tooling is not the same as a
 live gameplay change; work still open below has not shipped.
 
 ## Now
+
+- **Dummy-half reads tired markers.** The ruck cue explains when exhausted markers tempt dummy-half to go himself. Ported from [draft PR #780](https://github.com/ch-leon/nrl-sim/pull/780).
 
 - **A second kicker on the last.** Dummy-half can find the deeper five-eighth when the halfback is under pressure. Ported from draft PR #760, part of [#650](https://github.com/ch-leon/nrl-sim/issues/650).
 
