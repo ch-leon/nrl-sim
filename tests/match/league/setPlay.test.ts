@@ -196,8 +196,8 @@ describe('the launch and the script (plan §3.3)', () => {
 
   it('an intercept flies to the lane defender', () => {
     let intercepts = 0;
-    // Keep multiple trajectories; seed 6 supplies the real interception at 1134 after attacking structures (#649).
-    for (const seed of [1, 2, 6]) {
+    // Keep multiple trajectories; seed 3 supplies a real interception after open-side shifts (#798).
+    for (const seed of [1, 2, 3]) {
       const sim = new PlaySim(flat(['block-play', 'second-man']), A, seed, { length: { halves: 1, halfMinutes: 7 } });
       sim.force = 0.0001;
       let thrown = -1;
@@ -232,7 +232,7 @@ describe('the launch and the script (plan §3.3)', () => {
   }, 60_000);
 
   it('a kick play sends the winger early for the corner, then the kick goes cross-field', () => {
-    const sim = new PlaySim(flat(['kick-pass']), A, 2);
+    const sim = new PlaySim(flat(['kick-pass']), A, 3);
     // Test the successful script; breakdown odds have their own coverage above.
     sim.force = 0.99;
     const e = until(sim, (x) => x.kind === 'set-play');
