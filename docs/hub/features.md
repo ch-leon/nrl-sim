@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- **The score and clock shape the last tackle.** In the final minute, a side within a converted try plays more ball inside the opposition 40. A side protecting a one- or two-point lead favours a territory punt when it has room to land one. Coach calls and set plays still lead. First slice of [#651](https://github.com/ch-leon/nrl-sim/issues/651). Ported from [draft PR #786](https://github.com/ch-leon/nrl-sim/pull/786).
+
 - **Impact interchanges.** A tired player jogs toward his bench while his replacement gets a short burst on a carry or extra grip on a tackle. Watch for **FRESH LEGS** on the first two involvements. Ported from [draft PR #785](https://github.com/ch-leon/nrl-sim/pull/785).
 
 - **Goal-line stands.** Repeat sets starting inside the opposition 20 draw the defence in toward the ruck and cost it more legs. The attack looks for a short forward drive, a wide shift or a kick into the corner. The third straight set gets a banner, commentary and a crowd swell. Ported from [draft PR #784](https://github.com/ch-leon/nrl-sim/pull/784).
