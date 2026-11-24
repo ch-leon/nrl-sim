@@ -3,6 +3,7 @@ import type { Side, SimEvent } from '../../../src/match/core/snapshot';
 import { MATCH_MINUTES, measureCell, type CellResult } from '../../../src/match/balance/measure';
 import { reportMarkdown, sharesOf } from '../../../src/match/balance/report';
 import { FirstReceivers, PlayWatch, ScoreLine, Territory, type TickView } from '../../../src/match/balance/watch';
+import { KickReturns } from '../../../src/match/balance/kickReturns';
 
 const ev = (tick: number, kind: string, side?: Side, detail?: string): SimEvent => ({ tick, kind, text: '', ...(side ? { side } : {}), ...(detail ? { detail } : {}) });
 
@@ -291,6 +292,35 @@ describe('territory (#650)', () => {
     w.tick([], view({ attacking: 'home', phase: 'ruck' }), 0, at);
     expect(w.result()).toEqual({ earlyKicks: 1, startM: 72 });
     expect(new Territory().result()).toEqual({ earlyKicks: 0, startM: 0 });
+  });
+});
+
+describe('kick returns (#660)', () => {
+  it('includes completed support offloads before the first tackle and measures towards the other end', () => {
+    const w = new KickReturns();
+    const at = (xs: number, holder = 9) => view({ attacking: 'away', xs, holder });
+    const tick = (events: SimEvent[], position: TickView, directCatch = false) => w.tick(events, position, false, directCatch, () => -1);
+    tick([ev(1, 'kick', 'home', 'long')], at(70, -1));
+    tick([ev(2, 'set-start', 'away', 'caught')], at(80), true);
+    tick([ev(3, 'offload', 'away')], at(75, -1));
+    tick([], at(77, 10));
+    tick([ev(4, 'tackle', 'home')], at(68, 10));
+    tick([], at(64, 10));
+    expect(w.result().long).toEqual({ count: 1, metres: 12 });
+  });
+
+  it('ends a return where the receiver last held the ball and excludes bounced takes and called kicks', () => {
+    const w = new KickReturns();
+    const at = (xs: number, holder = 9) => view({ attacking: 'away', xs, holder });
+    w.tick([ev(1, 'kick', 'home', 'long')], at(70, -1), true, false, () => -1);
+    w.tick([ev(2, 'set-start', 'away', 'caught')], at(80), false, true, () => -1);
+    w.tick([ev(3, 'kick', 'home', 'long')], at(70, -1), false, false, () => -1);
+    w.tick([ev(4, 'set-start', 'away', 'caught')], at(80), false, false, () => -1);
+    w.tick([ev(5, 'kick', 'home', 'bomb')], at(70, -1), false, false, () => -1);
+    w.tick([ev(6, 'set-start', 'away', 'caught')], at(80), false, true, () => -1);
+    w.tick([], at(72), false, false, () => -1);
+    w.tick([ev(7, 'intercept', 'home')], view({ xs: 60, holder: 1 }), false, false, () => 1);
+    expect(w.result()).toEqual({ long: { count: 0, metres: 0 }, bomb: { count: 1, metres: 8 } });
   });
 });
 

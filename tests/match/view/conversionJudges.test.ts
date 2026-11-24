@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Runner, replayRange } from '../../../src/match/core/engine';
 import { FIELD_LENGTH, IN_GOAL, MID_Y } from '../../../src/match/core/field';
 import { DEFAULT_AWAY, DEFAULT_HOME, labSheet } from '../../../src/match/lab/sheets';
 import { GOALS } from '../../../src/match/league/goals';
 import { LIVE, LiveSim } from '../../../src/match/league/live';
 import { NINES } from '../../../src/match/league/rules';
+import { applyTuning } from '../../../src/match/league/tuning';
 import { CONVERSION_SIGNAL_TICKS, conversionJudges } from '../../../src/match/view/conversionJudges';
 
 const home = labSheet(DEFAULT_HOME);
@@ -12,6 +13,11 @@ const away = labSheet(DEFAULT_AWAY);
 const factory = (seed: number) => new LiveSim(home, away, seed);
 
 describe('touch judges at conversions', () => {
+  // These exact award and whistle ticks come from the engine before kick returns.
+  let restore: () => void;
+  beforeEach(() => { restore = applyTuning({ 'kickReturn.on': 0 }); });
+  afterEach(() => { restore(); });
+
   it.each([
     { seed: 37, award: 2126, toward: 1, good: true },
     { seed: 15, award: 1339, toward: -1, good: false },

@@ -21,6 +21,19 @@ import { bandMark, delta, reportMarkdown } from '../../../src/match/balance/repo
 const EVEN = { name: 'even', home: { rating: 60 }, away: { rating: 60 } };
 const plan = (over: Partial<Plan> = {}): Plan => ({ name: 'p', seeds: 2, minutes: 2, scenarios: [EVEN], ...over });
 
+async function liveFingerprint(sim: LiveSim) {
+  const parts: string[] = [];
+  while (!sim.finished && sim.tick < 100_000) {
+    sim.step();
+    for (const e of sim.tickEvents) parts.push(`${e.tick}:${e.kind}:${e.side ?? ''}:${e.detail ?? ''}`);
+  }
+  // No @types/node in the tsconfig, so the hasher comes in through a variable specifier.
+  const spec = 'node:crypto';
+  const { createHash } = await import(spec);
+  const hash = createHash('sha256').update(parts.join('|')).digest('hex').slice(0, 16);
+  return { parts, pin: `${sim.points.home}-${sim.points.away}:${parts.length}:${hash}` };
+}
+
 describe('knobs by name', () => {
   it('enables strategy counters by default and leaves flat Balanced / Slide neutral (#465)', () => {
     for (const group of Object.values(COUNTERS)) expect(group.on).toBe(1);
@@ -308,24 +321,20 @@ describe('measuring and reporting', () => {
     // balanced 6-4:125:3b59450ec3a85edd / expansive 10-4:150:975213c1842aa58e.
     // The five-eighth last-tackle option (engine revision 12) re-pins both. Before it:
     // balanced 0-0:137:6c911bf022e28778 / expansive 4-0:134:443f2da66ba81a8d.
+    // Kick returns (engine revision 14) move Expansive and preserve the revision 12 replay with returns off.
     { attack: 'balanced' as const, expected: '13-10:155:57426901f7cbc31f' },
-    { attack: 'expansive' as const, expected: '0-6:147:52d52acd0272a5fe' },
-  ])('pins an even $attack / Slide match (seed 1)', async ({ attack, expected }) => {
-    const sim = new LiveSim(sideSheet('H', { rating: 60, tactics: { attack } }), sideSheet('A', { rating: 60 }), 1);
-    const parts: string[] = [];
-    while (!sim.finished && sim.tick < 100_000) {
-      sim.step();
-      for (const e of sim.tickEvents) parts.push(`${e.tick}:${e.kind}:${e.side ?? ''}:${e.detail ?? ''}`);
+    { attack: 'expansive' as const, expected: '0-1:138:b982bd41ff05e4eb', beforeReturns: '0-6:147:52d52acd0272a5fe' },
+  ])('pins an even $attack / Slide match (seed 1)', async ({ attack, expected, beforeReturns }) => {
+    const replay = () => liveFingerprint(new LiveSim(sideSheet('H', { rating: 60, tactics: { attack } }), sideSheet('A', { rating: 60 }), 1));
+    expect((await replay()).pin).toBe(expected);
+    if (beforeReturns) {
+      const restore = applyTuning({ 'kickReturn.on': 0 });
+      try {
+        expect((await replay()).pin).toBe(beforeReturns);
+      } finally {
+        restore();
+      }
     }
-    // No @types/node in the tsconfig, so the hasher comes in through a variable specifier.
-    const spec = 'node:crypto';
-    const { createHash } = await import(spec);
-    const hash = createHash('sha256').update(parts.join('|')).digest('hex').slice(0, 16);
-    // Balanced stays pinned across a preset-only pass. Expansive also has a
-    // pin so its intentional tuning changes have their own replay evidence.
-    // Expansive was 18-18:341:c5d42c10eb6a4f46 before pass 0 -> -0.1.
-    // See docs/status/2026-10-balance.md.
-    expect(`${sim.points.home}-${sim.points.away}:${parts.length}:${hash}`).toBe(expected);
   });
   it.each([
     // Set plays (#326, phase 1): flat 60 v 60 seed 1, the home side taking the block play,
@@ -353,37 +362,31 @@ describe('measuring and reporting', () => {
     // plays-on stays. Before the punts, plays-on-hard was 1-0:144:74a11af0f394ead7.
     // The five-eighth last-tackle option (engine revision 12) re-pins both. Before it:
     // plays-on 10-0:141:fb9bb3ff69ff1592 / plays-on-hard 1-0:146:2652be8270891c73.
-    { name: 'plays-on', aiCoach: false, expected: '4-10:155:79024e6ce6d03277' },
+    // Kick returns move plays-on. The Hard coach still calls a play on this seed.
+    { name: 'plays-on', aiCoach: false, expected: '0-6:138:45572dfeb7a225d1', beforeReturns: '4-10:155:79024e6ce6d03277' },
     { name: 'plays-on-hard', aiCoach: true, expected: '0-10:148:ee54e8d79a90e3cf' },
-  ])('pins $name: an even Balanced / Slide match with set plays (seed 1)', async ({ aiCoach, expected }) => {
+  ])('pins $name: an even Balanced / Slide match with set plays (seed 1)', async ({ aiCoach, expected, beforeReturns }) => {
     const home = { ...sideSheet('H', { rating: 60 }), plays: ['block-play' as const, 'cut-out-winger' as const, 'kick-pass' as const] };
-    const sim = new LiveSim(home, sideSheet('A', { rating: 60 }), 1, aiCoach ? { aiCoach: ['home'] } : {});
-    const parts: string[] = [];
-    while (!sim.finished && sim.tick < 100_000) {
-      sim.step();
-      for (const e of sim.tickEvents) parts.push(`${e.tick}:${e.kind}:${e.side ?? ''}:${e.detail ?? ''}`);
-    }
-    const spec = 'node:crypto';
-    const { createHash } = await import(spec);
-    const hash = createHash('sha256').update(parts.join('|')).digest('hex').slice(0, 16);
+    const replay = () => liveFingerprint(new LiveSim(home, sideSheet('A', { rating: 60 }), 1, aiCoach ? { aiCoach: ['home'] } : {}));
+    const { parts, pin } = await replay();
     expect(parts.some((p) => p.includes(':set-play:home:'))).toBe(true);
     expect(parts.some((p) => p.includes(':coach-call:home:set-play:'))).toBe(aiCoach);
-    expect(`${sim.points.home}-${sim.points.away}:${parts.length}:${hash}`).toBe(expected);
+    expect(pin).toBe(expected);
+    if (beforeReturns) {
+      const restore = applyTuning({ 'kickReturn.on': 0 });
+      try {
+        expect((await replay()).pin).toBe(beforeReturns);
+      } finally {
+        restore();
+      }
+    }
   });
   it('with punts into space off, plays-on-hard keeps the revision 9 pin', async () => {
-    const restore = applyTuning({ 'longKick.on': 0, 'wingBomb.on': 0, 'secondKicker.on': 0 });
+    const restore = applyTuning({ 'longKick.on': 0, 'wingBomb.on': 0, 'secondKicker.on': 0, 'kickReturn.on': 0 });
     try {
       const home = { ...sideSheet('H', { rating: 60 }), plays: ['block-play' as const, 'cut-out-winger' as const, 'kick-pass' as const] };
       const sim = new LiveSim(home, sideSheet('A', { rating: 60 }), 1, { aiCoach: ['home'] });
-      const parts: string[] = [];
-      while (!sim.finished && sim.tick < 100_000) {
-        sim.step();
-        for (const e of sim.tickEvents) parts.push(`${e.tick}:${e.kind}:${e.side ?? ''}:${e.detail ?? ''}`);
-      }
-      const spec = 'node:crypto';
-      const { createHash } = await import(spec);
-      const hash = createHash('sha256').update(parts.join('|')).digest('hex').slice(0, 16);
-      expect(`${sim.points.home}-${sim.points.away}:${parts.length}:${hash}`).toBe('1-0:144:74a11af0f394ead7');
+      expect((await liveFingerprint(sim)).pin).toBe('1-0:144:74a11af0f394ead7');
     } finally {
       restore();
     }

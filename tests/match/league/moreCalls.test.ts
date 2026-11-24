@@ -5,6 +5,7 @@
 // words its verdict; the tray never shows more than five rows; and asking the
 // sim what it would refuse never moves the match.
 import { describe, it, expect } from 'vitest';
+import { FIELD_LENGTH, MID_Y } from '../../../src/match/core/field';
 import { LiveSim } from '../../../src/match/league/live';
 import { sideSheet } from '../../../src/match/balance/measure';
 import {
@@ -258,38 +259,28 @@ describe('five more calls (#396): each does what it says', () => {
   });
 
   it('Tap and go: the penalty is tapped, and the set’s call is still his', () => {
-    let made = 0;
-    // Seeds 19 and 40 still win a penalty, but the captain already taps it.
-    // Seed 9 is a penalty he would kick, so Tap and go is the coach's call.
-    for (const seed of [9]) {
-      const calls: CallInput[] = [];
-      const sim = new LiveSim(H, A, seed, { length: { halves: 1, halfMinutes: 6 }, calls });
-      const events: SimEvent[] = [];
-      while (!sim.finished) {
-        if (sim.callRefusal('home', 'tap-go') === null) {
-          expect(sim.call('home', 'tap-go')).toBeNull();
-          made++;
-          // One a penalty, and it is not the set's call.
-          expect(sim.callRefusal('home', 'tap-go')).toBe('one call a penalty');
-          expect(sim.callRefusal('home', 'hit-up')).not.toBe('one call a set');
-          const from = events.length;
-          for (let i = 0; i < 300 && !sim.finished; i++) {
-            sim.step();
-            events.push(...sim.tickEvents);
-          }
-          const after = events.slice(from);
-          expect(after.find((e) => e.kind === 'penalty-choice')).toBeUndefined();
-          expect(after.some((e) => e.kind === 'tap' && e.side === 'home')).toBe(true);
-          continue;
-        }
-        sim.step();
-        events.push(...sim.tickEvents);
+    class PenaltySim extends LiveSim {
+      awardHomePenalty() {
+        const x = this.dirOf('home') > 0 ? FIELD_LENGTH - 28 : 28;
+        this.penalize('away', { x, y: MID_Y }, 'offside', this.at('away', 0), 'offside');
       }
-      // The call came straight after the captain's choice, and its own line names it.
-      const at = events.findIndex((e) => e.kind === 'coach-call' && e.detail === 'tap-go');
-      if (at >= 0) expect(events[at]!.side).toBe('home');
     }
-    expect(made).toBeGreaterThan(0);
+    const sim = new PenaltySim(H, A, 9, { length: { halves: 1, halfMinutes: 6 } });
+    sim.awardHomePenalty();
+    expect(sim.tickEvents).toContainEqual(expect.objectContaining({ kind: 'penalty-choice', detail: 'touch', side: 'home' }));
+    sim.step(); // Open the new set while the touch kick is still pending.
+    expect(sim.call('home', 'hit-up')).toBeNull();
+    expect(sim.call('home', 'tap-go')).toBeNull();
+    expect(sim.tickEvents).toContainEqual(expect.objectContaining({ kind: 'coach-call', detail: 'tap-go', side: 'home' }));
+    expect(sim.tickEvents).toContainEqual(expect.objectContaining({ kind: 'penalty-choice', detail: 'tap', side: 'home' }));
+    expect(sim.callRefusal('home', 'tap-go')).toBe('one call a penalty');
+    expect(inside(sim).callState.home.attack).toBe('hit-up');
+
+    while (!sim.finished && sim.phaseKind === 'set-piece') sim.step();
+    expect(sim.tickEvents).toContainEqual(expect.objectContaining({ kind: 'tap', side: 'home' }));
+    expect(sim.callRefusal('home', 'tap-go')).toBe('no penalty');
+    expect(sim.callRefusal('home', 'hit-up')).toBe('one call a set');
+    expect(inside(sim).callState.home.attack).toBe('hit-up');
   });
 
   it('Offload: more offloads, and some spilled', () => {

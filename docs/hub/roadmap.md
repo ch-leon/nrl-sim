@@ -7,6 +7,8 @@ live gameplay change; work still open below has not shipped.
 
 ## Now
 
+- **Supported kick returns.** A clean take with room lets the catcher run at the chase with up to two teammates following. Ported from [draft PR #781](https://github.com/ch-leon/nrl-sim/pull/781).
+
 - **Dummy-half reads tired markers.** The ruck cue explains when exhausted markers tempt dummy-half to go himself. Ported from [draft PR #780](https://github.com/ch-leon/nrl-sim/pull/780).
 
 - **A second kicker on the last.** Dummy-half can find the deeper five-eighth when the halfback is under pressure. Ported from draft PR #760, part of [#650](https://github.com/ch-leon/nrl-sim/issues/650).

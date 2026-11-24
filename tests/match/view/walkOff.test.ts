@@ -78,14 +78,21 @@ describe('the whistle (#675)', () => {
       else expect(['handsOnHips', 'handsOnHead']).toContain(e.action);
       // Not moved yet (a man west of the tunnel stands at −0, which is still no step).
       expect(Math.abs(e.dx)).toBe(0); expect(e.alpha).toBe(1);
-      // Closer to the tunnel, never further from it, and fully gone by FT_GONE.
-      const d0 = Math.hypot(TUNNEL.x - p.x, TUNNEL.y - p.y); const d1 = Math.hypot(TUNNEL.x - p.x - l.dx, TUNNEL.y - p.y - l.dy);
+      // Each side walks toward its own half of the tunnel and fades by FT_GONE.
+      const entranceX = TUNNEL.x + (p.side === 'home' ? -TUNNEL.sideM : TUNNEL.sideM);
+      const d0 = Math.hypot(entranceX - p.x, TUNNEL.y - p.y);
+      const d1 = Math.hypot(entranceX - p.x - l.dx, TUNNEL.y - p.y - l.dy);
       expect(d1).toBeLessThan(d0);
       expect(breakMan(gone, p)!.alpha).toBe(0);
     }
     // The half-time walk-off is gone by the end of the sim's own break.
     const h = snaps[ht]!;
-    expect(breakScene(h, 0)!.men.every((m) => m.alpha === 1 && m.action === 'run')).toBe(true);
+    const atWhistle = breakScene(h, 0);
+    const atRestart = breakScene(h, NINES.halfTimeTicks);
+    for (const p of h.players) {
+      expect(breakMan(atWhistle, p)).toMatchObject({ alpha: 1, action: p.binned ? null : 'run' });
+      expect(breakMan(atRestart, p)?.alpha).toBe(0);
+    }
   });
 
   it('gathers each side round its captain before golden point', () => {
