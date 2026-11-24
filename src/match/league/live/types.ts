@@ -96,6 +96,16 @@ export interface Player {
   subSpot: Vec;
   /** …on the coach's Fresh legs call (#367): the swap is tagged and pays the call. */
   subFresh: boolean;
+  /** Shared carry/tackle budget for this player's current interchange stint. */
+  impact: {
+    left: number;
+    carryAt: number;
+    carryContested: boolean;
+    tackleAt: number;
+    runAt: number;
+    runM: number;
+    until: number;
+  } | null;
   /** In the sin bin (#71): back when the match clock reaches this many seconds (−1 on the field); he stands at `binSpot` on the touchline meanwhile. */
   binUntilS: number;
   binSpot: Vec;

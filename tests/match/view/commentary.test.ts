@@ -55,6 +55,7 @@ const SAMPLES: SimEvent[] = [
   ev('tackle'), ev('tackle', { trait: 'Wrecking Ball II' }), ev('big-hit'), ev('run-down'), ev('held-up'), ev('intercept'), ev('gamble'), ev('strip'),
   ev('loose'), nobody('loose'), ev('error'), ev('error', { detail: 'contact' }),
   ev('gassed'), ev('blown'), ev('injury'), ev('interchange'),
+  ev('fresh-impact', { detail: 'carry' }), ev('fresh-impact', { detail: 'tackle' }),
   ev('penalty', { detail: 'offside' }), ev('penalty', { detail: 'high' }),
   ...['goal', 'tap', 'touch'].map((d) => ev('penalty-choice', { detail: d })), ev('tap'),
   ...['penalty', '20m'].map((d) => ev('quick-tap', { detail: d })),

@@ -6,8 +6,8 @@ import { describe, it, expect } from 'vitest';
 import { LiveSim } from '../../../src/match/league/live';
 import { sideSheet } from '../../../src/match/balance/measure';
 import { Runner, TICK_MS, replayRange } from '../../../src/match/core/engine';
-import { toFieldPt } from '../../../src/match/core/field';
-import type { Snapshot } from '../../../src/match/core/snapshot';
+import { MID_Y, toFieldPt } from '../../../src/match/core/field';
+import type { Side, Snapshot } from '../../../src/match/core/snapshot';
 import { fieldOffsetX, fieldToWorldPoint } from '../../../src/scenes/matchField';
 import { BENCH, REF, SIX_AGAIN_POSE_TICKS, benchSeat, benchSeated, binSeat, binnedSpot, refCoversCarrier, refereeSignal, refereeSpot } from '../../../src/match/view/officials';
 import { refereeKit, REFEREE_STRIPS, SIX_AGAIN_ARMS } from '../../../src/art/match/bench';
@@ -197,24 +197,35 @@ describe('the bench and the sin bin (#642)', () => {
   });
 
   it('a binned man walks off as the sim has him, then sits in his side’s bin until he is back on', () => {
-    let saw = { walking: false, seated: false };
-    for (let seed = 1; seed <= 40 && !saw.seated; seed++) {
-      const sim = new LiveSim(home, away, seed);
-      while (!sim.finished) {
-        sim.step();
-        const s = sim.snapshot();
-        for (const p of s.players) {
-          const at = binnedSpot(p, s);
-          if (!p.binned) expect(at).toBeNull();
-          else if (at) {
-            expect(at).toEqual(binSeat(p.side));
-            saw.seated = true;
-          } else saw.walking = true;
+    // Seed 10 with seven-minute halves has a far-side walk and a return.
+    const sim = new LiveSim(home, away, 10, { length: { halves: 2, halfMinutes: 7 } });
+    const saw = { walking: false, seated: false, returned: false };
+    let first: { side: Side; slot: number } | undefined;
+    while (!sim.finished && !saw.returned) {
+      sim.step();
+      const s = sim.snapshot();
+      for (const p of s.players) {
+        const at = binnedSpot(p, s);
+        if (!p.binned) {
+          expect(at).toBeNull();
+          continue;
         }
-        if (saw.seated) break;
+        if (!first) {
+          expect(p.y).toBeLessThan(MID_Y);
+          first = { side: p.side, slot: p.slot };
+        }
+        const tracked = p.side === first.side && p.slot === first.slot;
+        if (at) {
+          expect(at).toEqual(binSeat(p.side));
+          if (tracked && !saw.seated) {
+            expect(p.y).toBeLessThanOrEqual(BENCH.arrivedM);
+            saw.seated = true;
+          }
+        } else if (tracked) saw.walking = true;
       }
+      saw.returned = s.events.some(e => e.kind === 'sin-bin-return' && e.side === first?.side && e.slot === first?.slot);
     }
-    expect(saw).toEqual({ walking: true, seated: true });
+    expect(saw).toEqual({ walking: true, seated: true, returned: true });
   });
 
   it('hides the bin card through the whistle picture and restores it with live play', () => {

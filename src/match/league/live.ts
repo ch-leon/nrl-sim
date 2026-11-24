@@ -38,7 +38,8 @@ import type { TeamSheet } from '../../sim/events';
 import { TICK_S, type MatchSim } from '../core/engine';
 import { speedOf } from '../core/body';
 import { CARRY_LIFT, flightAt } from '../core/ball';
-import { GROUND_PICKUP_TICKS, INTERCEPT_TICKS, QUICK_TAP_PICTURE_TICKS, REACT_SNAP_TICKS, type GroundPickupSnap, type PlayerSnap, type Snapshot } from '../core/snapshot';
+import { BENCH } from './bench';
+import { GROUND_PICKUP_TICKS, INTERCEPT_TICKS, INTERCHANGE_EXIT_TICKS, QUICK_TAP_PICTURE_TICKS, REACT_SNAP_TICKS, type GroundPickupSnap, type PlayerSnap, type Snapshot } from '../core/snapshot';
 import type { Vec } from '../core/vec';
 import { clockText } from './rules';
 import { goalStrikeTick } from './goals';
@@ -255,8 +256,13 @@ export class LiveSim extends LivePositioning implements MatchSim {
         ...(ph.kind === 'try' && scorer?.side === p.side ? { celebrationTick: ph.t0 } : {}),
         ...(p.react !== null && this.tick - p.react.tick < REACT_SNAP_TICKS ? { reactTick: p.react.tick, react: p.react.kind } : {}),
         ...(p.binUntilS >= 0 ? { binned: true } : {}),
+        ...(BENCH.impact.on > 0 && p.subFor !== null && !p.hurt ? { interchanging: true } : {}),
       };
     });
+    const lastExit = this.visualExits[this.visualExits.length - 1];
+    const exits = lastExit && this.tick - lastExit.tick < INTERCHANGE_EXIT_TICKS
+      ? this.visualExits.filter(exit => this.tick - exit.tick < INTERCHANGE_EXIT_TICKS)
+      : undefined;
     let ball: Snapshot['ball'];
     if (b.kind === 'held') {
       const h = this.players[b.by]!;
@@ -300,6 +306,7 @@ export class LiveSim extends LivePositioning implements MatchSim {
       ...(this.quickTapPicture ? { quickTap: this.quickTapPicture } : {}),
       ...(conversion ? { conversion } : {}),
       ...(this.touchJudges ? { touchJudges: this.touchJudges } : {}),
+      ...(exits ? { interchangeExits: exits } : {}),
       label: `${this.names[this.attacking]} ball · ${state} · ${this.points.home}–${this.points.away} · ${clockText(this.half, this.clockTicks * TICK_S)}${this.siren && (kind === 'play' || kind === 'tackle' || kind === 'ruck') ? ' · siren' : ''} · ${legs}${short}`,
       events: this.events,
       ...(this.sixAgainTick === undefined ? {} : { sixAgainTick: this.sixAgainTick }),

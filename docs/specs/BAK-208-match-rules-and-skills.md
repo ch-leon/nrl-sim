@@ -828,6 +828,7 @@ runs dry.
   instead of 52%, and the Stamina 30 side against Stamina 80 on 60% / 71% instead of
   36% / 69%; on heavy rotation it wins one match in five instead of none (tuning
   reference §14).
+- **Impact interchanges (#664).** A player coming off during a stoppage heads for his side’s bench. Once his replacement takes over, the outgoing player finishes the jog to his seat. Half-time changes happen in the sheds. A substitute gets two involvements per stint, shared across attack and defence. A carry counts after 2 m with the ball or on first contact. A legal tackle or assist counts once against that carry. A simple catch and pass preserves the allowance. A fresh runner gets a short pace burst and an edge on his first contact. A fresh tackler gets extra grip. The ordinary contact contest decides whether the carrier breaks through. **FRESH LEGS** and commentary identify the player when he uses an involvement. See tuning reference §14.
 - **Stoppages** keep F's slow recovery.
 
 **Stats, after F2:** Speed is how fast a player can go; Stamina is how long he can go

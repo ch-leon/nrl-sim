@@ -89,6 +89,8 @@ export interface PlayerSnap {
   legs?: number;
   /** In the sin bin (#71): standing on the touchline, out of the play. */
   binned?: boolean;
+  /** Jogging toward the touchline on spent legs to be interchanged. */
+  interchanging?: boolean;
 }
 
 /** Ticks a reaction stays on the snapshot (#667): the view holds it for less, once he is free to show it. */
@@ -190,9 +192,22 @@ export interface SimEvent {
   contact?: ContactSnap;
 }
 
+/** The outgoing player's feet at the handoff, for the bench picture. */
+export interface InterchangeExit {
+  side: Side;
+  who: string;
+  from: { x: number; y: number };
+  tick: number;
+  tired: 0 | 1 | 2;
+}
+
+export const INTERCHANGE_EXIT_TICKS = 230;
+
 export interface Snapshot {
   /** Presentation history for a defender gathering the pass into his return. */
   interception?: InterceptionSnap;
+  /** Recently replaced players taking their seats off the field. */
+  interchangeExits?: InterchangeExit[];
   /** Actual structure prepared during contact (or a standalone PTB); renderers still use real positions. */
   attackShape?: AttackShapeSnap;
   /** The ordinary dummy-half's committed intended recipient, before release. Interceptions/spills can prevent the catch. */
