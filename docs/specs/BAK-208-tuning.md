@@ -616,6 +616,10 @@ interchange (§14). All of it is `src/match/league/touch.ts`, played out in `liv
 | `touch.bundleNearM` / `touch.bundle` / `touch.bundleBigHit` | `touch.ts` | 1.2 m / 0.4 / 0.7 | A carrier held (smashed) this close to the touchline is bundled into touch this often. |
 | `touch.groundNearM` / `touch.groundDeepM` | `touch.ts` | 8 / 3 m | A defender with a kick in his own in-goal grounds it if an attacker is this close or he is this deep; else he runs it out. |
 | `touch.setMinTicks` / `touch.setMaxTicks` | `touch.ts` | 30 / 200 | A set piece waits 1.5–10 s for the players to set (and any interchange). |
+| `quickTap.on` | `touch.ts` | 1 | At 0 all taps use the ordinary restart. |
+| `quickTap.shortMen` / `quickTap.laneM` | `touch.ts` | 2 / 22 m | At least this many defenders in lanes within this distance of the tap mark must be visibly short. |
+| `quickTap.shortM` / `quickTap.minShortM` | `touch.ts` | 5 / 2 m | Required depth still owed to both the defender's mark and the legal line at Footy IQ 60, with a 2 m floor after the captain adjustments. |
+| `quickTap.iqPerPointM` / `quickTap.hotheadPerLevelM` | `touch.ts` | 0.06 / 1 m | Lower the required depth by this much per Footy IQ point above 60 or per Hothead level. Low IQ raises it. |
 | `touch.dropOutM` / `touch.dropOutSpreadM` | `touch.ts` | 38 / 12 m | How far a goal-line drop-out goes. |
 
 Measured (standard plan, 20 whole matches a row, run `20261019-113030-standard`), per match

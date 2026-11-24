@@ -86,11 +86,12 @@ describe('touch judges at conversions', () => {
   });
 
   it.each([
-    { seed: 2, halfMinutes: 2, award: 3245, whistle: 'half-time' },
-    { seed: 3, halfMinutes: 3, award: 8462, whistle: 'full-time' },
-  ])('keeps the decision visible when the conversion ends in $whistle', ({ seed, halfMinutes, award, whistle }) => {
-    const r = new Runner(s => new LiveSim(home, away, s, { length: { halves: 2, halfMinutes } }), seed);
-    r.seek(award);
+    { seed: 2, length: { halves: 2, halfMinutes: 2 }, whistle: 'half-time' },
+    // Sound the final siren during seed 3's opening scoring play.
+    { seed: 3, length: { halves: 1, halfMinutes: 0.4 }, whistle: 'full-time' },
+  ] as const)('keeps the decision visible when the conversion ends in $whistle', ({ seed, length, whistle }) => {
+    const r = new Runner(s => new LiveSim(home, away, s, { length }), seed);
+    r.skipUntil(s => s.events.some(e => e.kind === 'conversion') && s.phase?.kind === whistle, 4000);
     const at = r.cur;
     expect(at.events.map(e => e.kind)).toEqual(expect.arrayContaining(['conversion', whistle]));
     expect(at.phase?.kind).toBe(whistle);
@@ -98,7 +99,7 @@ describe('touch judges at conversions', () => {
     expect(conversionJudges(at, CONVERSION_SIGNAL_TICKS)).toBeNull();
     if (whistle === 'full-time') expect(r.finished).toBe(true);
     else {
-      r.seek(award + NINES.halfTimeTicks);
+      r.seek(at.tick + NINES.halfTimeTicks);
       expect(r.cur.phase?.kind).toBe('restart');
       expect(r.cur.conversion).toBeUndefined();
     }

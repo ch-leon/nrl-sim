@@ -24,10 +24,11 @@ import { aiCoachSides, type CallInput } from '../league/calls';
 import { NINES, fullMatch, type MatchLength } from '../league/rules';
 import { DEFAULT_TACTICS } from '../league/presets';
 import { applyTuning } from '../league/tuning';
+import type { TapOrigin } from '../league/touch';
 import { labSheet, starTraits } from '../lab/sheets';
 import { POSITION_GROUPS, type Cell, type SideSpec } from './plan';
 import { KickReturns, kickReturnStats, type KickReturnStats } from './kickReturns';
-import { FLOW, FirstReceivers, LAST_TACKLES, ORIGINS, PlayWatch, RECEIVERS, ScoreLine, TERRITORY, Territory, type FlowKey, type LastTackleKey, type OriginKey, type ReceiverKey, type TerritoryKey } from './watch';
+import { FLOW, FirstReceivers, LAST_TACKLES, ORIGINS, PlayWatch, RECEIVERS, ScoreLine, TERRITORY, Territory, TapWatch, emptyTapSamples, type TapSamples, type FlowKey, type LastTackleKey, type OriginKey, type ReceiverKey, type TerritoryKey } from './watch';
 
 type DartSample = { attempts: number; chosen: number };
 type DartGroup = 'all' | 'fresh' | 'tired' | 'mixed' | 'unmarked';
@@ -52,6 +53,12 @@ export class BalanceSim extends LiveSim {
       sample.attempts++;
       if (dart) sample.chosen++;
     }
+  }
+
+  tapWatch?: TapWatch;
+
+  protected override onTapStarted(origin: TapOrigin, quick: boolean, side: Side, x: number, dir: 1 | -1): void {
+    this.tapWatch?.start(this.tick, origin, quick, side, x, dir);
   }
 
   /** Regulation match clock within the current half. */
@@ -155,6 +162,8 @@ export interface WatchStats {
   territory?: Record<TerritoryKey, Stat>;
   /** Absent in results written before #660. */
   kickReturns?: KickReturnStats;
+  /** Absent in results written before #803. Pooled counts and total metres in the written orientation. */
+  taps?: TapSamples;
 }
 
 export interface CellResult {
@@ -598,6 +607,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
     const receiversPerSeed: Record<ReceiverKey, number>[] = [];
     const territoryPerSeed: Record<TerritoryKey, number>[] = [];
     const returnsPerSeed: ReturnType<KickReturns['result']>[] = [];
+    const tapSamples = emptyTapSamples();
     let wrestleTicks = 0;
     let wins = 0;
     let draws = 0;
@@ -638,6 +648,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
       const receivers = new FirstReceivers();
       const territory = new Territory();
       const kickReturns = new KickReturns();
+      if (!flip) sim.tapWatch = new TapWatch(tapSamples);
       let inW = 0;
       let lastMen = 0;
       let nextLegs = 3;
@@ -688,6 +699,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
         }
         const view = { phase: sim.phaseKind, lastPlay: sim.lastTackleUp, attacking: sim.inPossession, holder: sim.holderIndex, x: () => sim.ballX };
         watch.tick(tickEvents, view);
+        sim.tapWatch?.tick(sim.tick, tickEvents, view);
         receivers.tick(view, sim.tackleCount);
         territory.tick(tickEvents, view, sim.tackleCount, () => sim.toGo);
         kickReturns.tick(tickEvents, view, sim.aimedKick, sim.directKickCatch, () => sim.possessionDirection);
@@ -787,6 +799,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
       // Early kicks are a count (scaled); where sets start is metres, not scaled.
       territory: Object.fromEntries(TERRITORY.map((k) => [k, stat(territoryPerSeed.map((o) => o[k] * (k === 'earlyKicks' ? scale : 1)))])) as Record<TerritoryKey, Stat>,
       kickReturns: kickReturnStats(returnsPerSeed),
+      taps: tapSamples,
     };
     const totalWrestles = perSeed.reduce((a, c) => a + c.wrestles, 0);
     return {

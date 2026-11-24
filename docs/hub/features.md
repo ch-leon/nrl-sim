@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- At a penalty or 20 m restart, a captain can call a quick tap while defenders are still getting back. The taker nudges it with his boot and regathers, with **QUICK TAP!** on the pitch. Short defenders have to reach the 10 m line before tackling. Ported from [draft PR #783](https://github.com/ch-leon/nrl-sim/pull/783).
+
 - **Touch judges in open play.** The same two officials jog along the touchlines in career matches and the Match Lab, one on each side. They catch up to kicks, turn with play and carry their flags low. Ported from [draft PR #782](https://github.com/ch-leon/nrl-sim/pull/782). [Match presentation](../specs/match-big-moments.md#touch-judges-in-open-play)
 
 - **Kick returns with support.** A player who takes a long punt or bomb cleanly in space bursts toward the clearest lane. The two nearest available teammates peel in behind for a pass. A close chase can stop the return at the catch. Ported from [draft PR #781](https://github.com/ch-leon/nrl-sim/pull/781).

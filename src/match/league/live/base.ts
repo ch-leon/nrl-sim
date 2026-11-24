@@ -17,6 +17,7 @@ import type { WrestleState } from '../wrestle';
 import { fullMatch, type MatchLength } from '../rules';
 import { BENCH, DEFAULT_ROTATION, type Rotation } from '../bench';
 import type { CaptainRead, PenaltyChoice } from '../penalties';
+import type { TapOrigin } from '../touch';
 import { edgeSheets, spreadSheets } from '../spread';
 import { CallJudge, callDefence, withAttackCall, withDefenceCall, type CallInput, type CallVerdict, type CoachCall } from '../calls';
 import type { KickoffCall } from '../kickoff';
@@ -48,6 +49,7 @@ export abstract class LiveBase {
   private readonly goalKickerKey: Record<Side, string | undefined>;
   /** Each side's captain, as the penalty call reads him (N11): neutral when the sheet names none. */
   protected readonly captain: Record<Side, CaptainRead>;
+  private readonly captainKey: Record<Side, string | undefined>;
   protected ball!: BallState;
   protected phase!: Phase;
   /** An admitted input can supersede the early DH choice, even if its attempted pass/play fails. */
@@ -65,7 +67,7 @@ export abstract class LiveBase {
   protected lineX = 60;
   /** The last ruck's fixed legal line; reaching it once releases each non-marker. */
   protected retreat: {
-    side: Side; dir: 1 | -1; line: number;
+    side: Side; dir: 1 | -1; line: number; tap?: boolean;
     eligible: Map<Player, string>; markers: Map<Player, string>;
   } | null = null;
 
@@ -293,6 +295,7 @@ export abstract class LiveBase {
     this.refreshPlanFit('away');
     this.goalKickerKey = { home: home.kicker, away: away.kicker };
     this.captain = { home: captainOf(home), away: captainOf(away) };
+    this.captainKey = { home: home.captain, away: away.captain };
     this.players = [...this.buildSide(home, 'home'), ...this.buildSide(away, 'away')];
     this.homeOn = this.players.slice(0, PLAYERS);
     this.awayOn = this.players.slice(PLAYERS);
@@ -402,14 +405,14 @@ export abstract class LiveBase {
     });
   }
 
-  protected startRetreat(): void {
+  protected startRetreat(tap = false): void {
     this.retreat = null;
     const handover = this.phase.kind === 'ruck' && this.phase.handover && this.phase.stage !== 'dh';
     const side = handover ? this.attacking : other(this.attacking);
     const dir = this.dirOf(other(side));
     const markers = this.currentMarkers().filter(p => p.side === side && this.onField(p));
     const line = Math.max(0, Math.min(FIELD_LENGTH, this.mark.x + dir * LIVE.onsideM));
-    this.retreat = { side, dir, line, eligible: new Map(), markers: new Map(markers.map(p => [p, p.key])) };
+    this.retreat = { side, dir, line, tap, eligible: new Map(), markers: new Map(markers.map(p => [p, p.key])) };
     this.observeRetreat();
   }
 
@@ -499,7 +502,7 @@ export abstract class LiveBase {
   /** Nobody in front of him in his lane, close: room to put the foot down. */
   protected laneClear(c: Player): boolean {
     return !this.side(other(c.side)).some((d) => {
-      if (this.locked(d)) return false;
+      if (this.locked(d) || (this.retreat?.tap && this.retreatLine(d) !== null)) return false;
       const ahead = (d.body.pos.x - c.body.pos.x) * this.dir;
       return ahead > 0 && ahead < LIVE.sprintLaneM && Math.abs(d.body.pos.y - c.body.pos.y) < LIVE.sprintLaneW;
     });
@@ -550,6 +553,18 @@ export abstract class LiveBase {
     const key = this.goalKickerKey[side];
     return (key !== undefined && this.side(side).find((p) => p.key === key)) || this.kicker(side);
   }
+  /** A quick read belongs to the man captaining this nine now. */
+  protected onFieldCaptain(side: Side): Player | undefined {
+    const key = this.captainKey[side];
+    let best: Player | undefined;
+    for (const p of this.side(side)) {
+      if (p.subFor !== null) continue;
+      if (key !== undefined && p.key === key) return p;
+      if (!best || p.stats.footyIQ > best.stats.footyIQ) best = p;
+    }
+    return best;
+  }
+
   protected dummyHalf(side: Side): Player {
     return this.roleMan(side, HOOKER);
   }
@@ -567,7 +582,7 @@ export abstract class LiveBase {
   protected abstract resolveOut(): void;
   protected abstract endKick(side: Side, at: Vec): void;
   protected abstract groundInGoal(p: Player, raced?: boolean): boolean;
-  protected abstract startSetPiece(side: Side, spot: Vec, how: 'ptb' | 'tap', prefer?: number, tackles?: number): void;
+  protected abstract startSetPiece(side: Side, spot: Vec, how: 'ptb' | 'tap', prefer?: number, tackles?: number, tapOrigin?: TapOrigin): void;
   protected abstract startDropOut(side: Side): void;
   protected abstract penalize(offender: Side, spot: Vec, why: string, culprit: Player, kind: string, trait?: string, bin?: boolean): void;
   protected abstract takePenalty(award: Side, mark: Vec, choice: PenaltyChoice): void;

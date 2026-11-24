@@ -1,3 +1,4 @@
+import type { TapOrigin } from '../touch';
 import type { ControlInput } from '../controls';
 import type { RosterEntry, TeamSheet } from '../../../sim/events';
 import type { Position } from '../../../core/state';
@@ -126,7 +127,7 @@ export interface RuckDecision {
 
 export type Phase =
   | { kind: 'restart'; t0: number; kicking: Side; from?: 'goal-line' }
-  | { kind: 'set-piece'; t0: number; side: Side; spot: Vec; how: 'ptb' | 'tap'; player: number }
+  | { kind: 'set-piece'; t0: number; side: Side; spot: Vec; how: 'ptb' | 'tap'; player: number; tapOrigin?: TapOrigin }
   | { kind: 'play'; shape?: AttackingShape | null; secondKicker?: ContactPlayer & { catchTick: number } }
   | { kind: 'tackle'; t0: number; carrier: number; tackler: number; big: boolean; wrestle: WrestleState | null; wreck: number; shape?: AttackingShape | null }
   | { kind: 'ruck'; t0: number; carrier: number; tackler: number; stage: 'down' | 'ptb' | 'dh'; handover: boolean; heldAt: number; down: number; pace: 'quick' | 'slow' | null; contactStartedTick?: number; decision?: RuckDecision; shape?: AttackingShape | null }

@@ -85,11 +85,32 @@ describe('LiveView', () => {
   it('hands the ball to the actual interceptor once and restores the same take after a seek', () => {
     const home = labSheet(DEFAULT_HOME), away = labSheet(DEFAULT_AWAY);
     const factory = (seed: number) => new LiveSim(home, away, seed);
-    const [air, take, turn, gather] = replayRange(factory, 1, 2299, 2302) as [Snapshot, Snapshot, Snapshot, Snapshot];
+    // The take moves when a quick tap changes the match. Find one whose pass is still in the air.
+    let hit: { seed: number; tick: number } | undefined;
+    for (const seed of [2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 18, 26, 37, 1]) {
+      const sim = factory(seed);
+      let prev = sim.snapshot();
+      while (!sim.finished && sim.tick < 12_000) {
+        sim.step();
+        const cur = sim.snapshot();
+        const player = cur.interception?.player;
+        const receiver = prev.ball.flight?.receiver;
+        const runner = player && prev.players.find(p => p.side === player.side && p.slot === player.slot && p.who === player.who);
+        if (player && receiver && runner?.pose === 'run' && receiver.side === player.side && receiver.slot === player.slot
+          && cur.events.some(e => e.kind === 'intercept' && e.side === player.side && e.slot === player.slot)) {
+          hit = { seed, tick: cur.tick };
+          break;
+        }
+        prev = cur;
+      }
+      if (hit) break;
+    }
+    expect(hit).toBeDefined();
+    const [air, take, turn, gather] = replayRange(factory, hit!.seed, hit!.tick - 1, hit!.tick + 2) as [Snapshot, Snapshot, Snapshot, Snapshot];
     const ref = take.interception!.player;
     expect(air.ball.flight?.receiver).toEqual(ref);
     expect(take.events.some(e => e.kind === 'intercept' && e.side === ref.side && e.slot === ref.slot)).toBe(true);
-    expect(gather.interception).toEqual(replayTo(factory, 1, gather.tick).interception);
+    expect(gather.interception).toEqual(replayTo(factory, hit!.seed, gather.tick).interception);
 
     const s = surface();
     const actor = s.players[ref.side][ref.slot]!;
