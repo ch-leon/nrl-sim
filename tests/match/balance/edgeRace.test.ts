@@ -2,25 +2,18 @@
 // the signed Slide v Expansive response, the relative Compressed edge term) are
 // relative and roll-free, so a flat 60 v 60 match plays bit for bit the same with
 // them on or off (at Speed 60 the relative Compressed term equals the old Speed / 60;
-// at other flat Speeds it does not), and with the edge race on fast backs carrying
-// wide bust more.
+// at other flat Speeds it does not). The bust-rate sample, seeds 1..400 at
+// margin 1, is the four edgeRace.part files: one mean, split so a unit shard
+// can run it inside the 15-minute job.
 import { describe, expect, it } from 'vitest';
-import { BalanceSim, MATCH_MINUTES, measureCell } from '../../../src/match/balance/measure';
-import { sideSheet } from '../../../src/match/balance/measure';
+import { BalanceSim, sideSheet } from '../../../src/match/balance/measure';
 import { applyTuning, type Overrides } from '../../../src/match/league/tuning';
 import type { AttackPreset, DefencePreset } from '../../../src/match/league/presets';
 import type { SideSpec } from '../../../src/match/balance/plan';
+import { EDGE_RACE_MARGIN, EDGE_RACE_RANGES, EDGE_RACE_SEEDS } from './edgeRace';
 
 /** Every #322 lever off (the shipped defaults), and every one on. */
 const OFF: Overrides = { 'race.on': 0, 'counters.slide.expansiveSigned': 0, 'counters.compressed.expansiveRelative': 0 };
-// #672's 30-seed sample gave +0.747 busts/14 min; 100 seeds/orientation gave +1.40 (SE .575),
-// under one SE above the margin, so ordinary seed noise could fail it (#722's back door read
-// +0.77 at 100 seeds and +1.62 at 400). At 400 seeds/orientation main gives 2.869 (SE .065)
-// → 3.401 (.073) tracked busts per five minutes, +1.49/14 min (SE .272): nearly two SE clear.
-// The margin stays 1: the larger fixed sample roughly halves the SE, it does not move the bar.
-const SEEDS = 400;
-/** Extra busts per fourteen minutes for the tracked side; keep the historical rate threshold. */
-const MARGIN = 1;
 const ON: Overrides = { 'race.on': 1, 'race.single': 0, 'counters.slide.expansiveSigned': 1, 'counters.compressed.expansiveRelative': 1 };
 
 function stream(home: SideSpec, away: SideSpec, seed: number, over: Overrides): string {
@@ -54,20 +47,10 @@ describe('the #322 Speed levers', () => {
     }
   }, 240_000);
 
-  it('with the edge race on, fast backs carrying wide bust a flat line more', () => {
-    const cell = (tuning: Overrides) => ({
-      variant: { name: 'x', tuning },
-      scenario: {
-        name: 'fast-backs expansive v flat slide', track: 'home' as const, bothWays: true,
-        home: { rating: 60, positionStats: { backs: { speed: 85 } }, tactics: { attack: 'expansive' as const } },
-        away: { rating: 60, tactics: { defence: 'slide' as const } },
-      },
-    });
-    const off = measureCell(cell({ ...ON, 'race.on': 0 }), SEEDS);
-    const on = measureCell(cell({ ...ON, 'race.on': 1, 'race.perPoint': 0.02, 'race.single': 0 }), SEEDS);
-    // The harness now reports counts per five-minute default; compare the established
-    // fourteen-minute rate so shortening the clock does not dilute the physics threshold.
-    const extraBustsPer14Minutes = (on.trackedCounts!.busts.mean - off.trackedCounts!.busts.mean) * 14 / MATCH_MINUTES;
-    expect(extraBustsPer14Minutes).toBeGreaterThan(MARGIN);
-  }, 420_000);
+  it('splits seeds 1..400 into four ranges that still meet as one sample at margin 1', () => {
+    const seeds = EDGE_RACE_RANGES.flatMap((r) => Array.from({ length: r.seeds }, (_, i) => r.seedStart + i));
+    expect(seeds).toEqual(Array.from({ length: EDGE_RACE_SEEDS }, (_, i) => i + 1));
+    expect(new Set(seeds).size).toBe(EDGE_RACE_SEEDS);
+    expect(EDGE_RACE_MARGIN).toBe(1);
+  });
 });
