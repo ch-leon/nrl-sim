@@ -41,6 +41,8 @@ import { HALF_BREAK, shownBreak } from './lineBreak';
 import { KickLayer, KickWatch, framingHeld, kickFrame, kickPoints, type Frame } from './kickLayer';
 import { TRAIT_FAST_FROM, TRAIT_SLOW_FACTOR, TRAIT_SLOW_MS, TraitLayer, TraitRoster } from './traitLayer';
 import { ContestLayer } from './contestLayer';
+import { DuelTimeline } from './duels';
+import { DuelLayer } from './duelLayer';
 import type { PopupView } from './popups';
 import { replayFrame, replayFrom, REPLAY_WORKER_MS } from './replay';
 import { toFieldPt } from '../core/field';
@@ -308,6 +310,8 @@ export class LivePlayback {
   private readonly traits: TraitLayer;
   /** Line-break flash and the driven tackle's dust (N15.6). */
   private readonly contest: ContestLayer;
+  private readonly duels = new DuelTimeline();
+  private readonly duelLayer: DuelLayer;
   private readonly recorder: MatchRecorder;
   /** The ticker's lines (N15.2): it hears every event, said or not. */
   private readonly commentator: Commentator;
@@ -368,6 +372,7 @@ export class LivePlayback {
     this.traits = new TraitLayer(scene, DEPTH_POPUP - 0.5);
     this.traits.setRoster(new TraitRoster({ home, away }));
     this.contest = new ContestLayer(scene, DEPTH_POPUP - 3);
+    this.duelLayer = new DuelLayer(scene, DEPTH_POPUP - 3);
     this.speed = playbackSpeedOf(opts.speed);
     this.runner = new Runner(this.factory, opts.seed);
     this.runner.onEvents = (events) => this.onSimEvents(events);
@@ -845,6 +850,11 @@ export class LivePlayback {
     this.contest.update(deltaMs, zoom, (fx, fy) => this.scene.fieldToWorld(fx, fy), feet);
     // The picture on screen is the replay's tick, not the live match still paused underneath.
     const shown = this.replay ? this.replay.snaps[this.replay.index]! : this.runner.cur;
+    if (this.replay) this.duelLayer.clear();
+    else this.duelLayer.update(deltaMs, zoom, shown, (side, slot) => {
+      const actor = this.scene.players[side][slot];
+      return actor ? { x: actor.sprite.x, y: actor.groundY ?? actor.sprite.y } : null;
+    });
     this.wrestleBar.update(shown.wrestle, zoom, (w) => feet(w.side, w.slot));
     this.sprintLayer.update(shown, zoom, (side, slot) => {
       const a = this.scene.players[side][slot];
@@ -862,6 +872,7 @@ export class LivePlayback {
     this.kickLayer.destroy();
     this.traits.destroy();
     this.contest.destroy();
+    this.duelLayer.destroy();
   }
 
   /**
@@ -895,9 +906,11 @@ export class LivePlayback {
 
   private onSimEvents(events: readonly SimEvent[]): void {
     const cur = this.runner.cur;
+    this.duels.sync(this.runner.history);
     for (const sim of events) {
       // A line break the view calls half (#638) reads and plays as a plain line; the recorded events below are the sim's own.
       const e = shownBreak(sim, cur);
+      const duel = this.duels.result(sim);
       if (e.side !== undefined && e.slot !== undefined && e.kind !== 'call-paid' && e.kind !== 'coach-call' && e.kind !== 'goal-line-stand') this.lastActor[e.side] = e.slot;
       // The whoosh and the crowd (audio); a skipped or resumed stretch is not heard.
       if (!this.skipping && e.kind === 'line-break' && e.detail !== HALF_BREAK) bus.emit('match:clean-break', { tick: e.tick });
@@ -907,7 +920,9 @@ export class LivePlayback {
         this.traits.clear();
         this.traits.tally(e, cur); // a Workhorse's set is still counted
         this.contest.clear();
+        this.duelLayer.clear();
       } else {
+        this.duelLayer.note(duel);
         this.kicks.event(e, cur);
         // At ×4 and ×8 a one-second move is gone before it can be read. Ease the match; the mark also holds longer.
         const cue = this.traits.note(e, cur);
@@ -920,6 +935,16 @@ export class LivePlayback {
       // The ticker reads the commentator (commentary.ts). It hears a resumed or skipped stretch too, silently, so the match reads the same.
       // Its memory (a second try, a lead change) comes through the same path, so it is rebuilt by a resume and by Skip.
       const said = this.commentator.said(e, cur.score, cur.clock?.minute, cur.ball.y);
+      // A first win keeps the commentator's own line. A repeat (the same player over the same opponent)
+      // replaces an ordinary line. The pair's second win holds the strip; a later repeat is an ordinary
+      // line. A tactic counter (#468), or any line the strip is already holding, stays, and the repeat is said after it.
+      if (duel && duel.wins > 1) {
+        const line = { text: duel.text, important: duel.wins === 2 };
+        const head = said[0];
+        if (head && (head.important || head.counter)) said.push(line);
+        else if (head) said[0] = line;
+        else said.push(line);
+      }
       const line = said[0]?.text ?? '';
       if (!this.skipping) said.forEach((s, i) => this.opts.overlay?.comment(s.text, s.important ? 'important' : 'routine', i > 0));
       else if (line && e.kind === 'full-time') this.finalLine = line;

@@ -14,6 +14,7 @@ export interface InterceptionSnap {
   fromY: number;
 }
 export const INTERCEPT_TICKS = 4;
+export interface DuelPlayer extends ContactPlayer { name: string }
 export interface AttackShapeSnap {
   kind: 'spread' | 'pod' | 'edge' | 'back-door'; side: Side; dir: 1 | -1; edge: 1 | -1; startedTick: number; linkSlot?: 4 | 5;
   backDoor?: { caller: ContactPlayer; lead: ContactPlayer; support: ContactPlayer; originY: number };
@@ -204,6 +205,8 @@ export interface SimEvent {
   recalled?: true;
   /** Read-only animation context for this contact outcome. */
   contact?: ContactSnap;
+  /** The two actual players in a one-on-one result, for match presentation. */
+  duel?: { winner: DuelPlayer; loser: DuelPlayer };
 }
 
 /** The outgoing player's feet at the handoff, for the bench picture. */

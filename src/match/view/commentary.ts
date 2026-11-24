@@ -270,6 +270,8 @@ export function isImportantKey(key: string, detail?: string): boolean {
 export interface Said {
   text: string;
   important: boolean;
+  /** A tactic-counter read (#468). The strip does not hold it, and a repeat duel is said after it. */
+  counter?: boolean;
 }
 
 /** Minutes with no score before a side's drought (or a scoreless match) is worth saying; the match is two halves of seven. */
@@ -503,7 +505,7 @@ export class Commentator {
    */
   said(e: SimEvent, score?: Readonly<Record<Side, number>>, minute?: number, ballY?: number): Said[] {
     const main = this.main(e, score, minute, ballY);
-    const out: Said[] = main.text ? [{ text: main.text, important: isImportantKey(main.key, e.detail) }] : [];
+    const out: Said[] = main.text ? [{ text: main.text, important: isImportantKey(main.key, e.detail), ...(main.key.startsWith('counter:') ? { counter: true } : {}) }] : [];
     for (const text of this.remember(e, score, minute)) out.push({ text, important: true });
     return out;
   }
