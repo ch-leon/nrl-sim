@@ -60,6 +60,19 @@ export const LAST_TACKLE = {
   /** …a side behind multiplies its run and pass weights by this, and a side in front its kick weight by `leadKick`. */
   trailRun: 2,
   leadKick: 2,
+  /** Extra score-and-clock leans on the final tackle (#651), in the same late window. */
+  scoreClock: {
+    on: 1,
+    /** A try or converted try can catch this deficit. Chase only in scoring range. */
+    chaseMargin: 6,
+    chaseM: 40,
+    chaseKeep: 3,
+    /** Protect a lead of up to two by kicking for position, with room to land a punt. */
+    leadMargin: 2,
+    territoryM: 30,
+    protectKick: 1.5,
+    longWeight: 3,
+  },
   /** Who is on the field: the kicker's Skill (kicking) over 60, per point, and each level of Big Boot (×1 / 1.6 / 2.2), add this to the kick weight. */
   bootPerKicking: 0.02,
   bigBoot: 0.3,
@@ -105,13 +118,22 @@ export function runLean(r: LastTackleRead): number {
   return pace * (r.late && r.margin < 0 ? LAST_TACKLE.trailRun : 1);
 }
 
+/** A tight lead with room for a territory punt. Only used on the last tackle. */
+export function protectOnLast(r: LastTackleRead): boolean {
+  const s = LAST_TACKLE.scoreClock;
+  return s.on > 0 && r.late && r.margin > 0 && r.margin <= s.leadMargin && r.toLine >= s.territoryM;
+}
+
 /** The kick, run and pass weights for this last tackle. */
 export function lastTackleWeights(r: LastTackleRead): Record<LastPlay, number> {
   const z = LAST_TACKLE.zones[r.zone];
   const p = LAST_TACKLE.presets[r.preset] ?? { kick: 1, pass: 1 };
-  const keep = runLean(r);
+  const s = LAST_TACKLE.scoreClock;
+  const chase = s.on > 0 && r.late && r.margin < 0 && r.margin >= -s.chaseMargin && r.toLine <= s.chaseM;
+  const keep = runLean(r) * (chase ? s.chaseKeep : 1);
+  const kick = kickLean(r) * (protectOnLast(r) ? s.protectKick : 1);
   return {
-    kick: r.toLine <= LAST_TACKLE.closeM ? 0 : z.kick * p.kick * kickLean(r),
+    kick: r.toLine <= LAST_TACKLE.closeM ? 0 : z.kick * p.kick * kick,
     run: z.run * keep,
     pass: z.pass * p.pass * keep,
   };

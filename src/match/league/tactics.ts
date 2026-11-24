@@ -201,11 +201,13 @@ export function kickWeights(toLine: number, closeBombWeight = 0): Record<KickCho
 /**
  * Which kick on the last tackle: territory (with the odd bomb) from deep;
  * around halfway a bomb or a cross-field kick; inside 40 m an attacking kick,
- * a grubber the closer he gets. A team's style scales the weights (`bias`).
+ * a grubber the closer he gets. A late territorial call can add to the long
+ * weight (`longBonus`). A team's style scales the weights (`bias`).
  * Pure: `roll` is one draw in [0, 1).
  */
-export function chooseKick(toLine: number, roll: number, bias: Partial<Record<KickChoice, number>> = {}, closeBombWeight = 0): KickChoice {
+export function chooseKick(toLine: number, roll: number, bias: Partial<Record<KickChoice, number>> = {}, closeBombWeight = 0, longBonus = 0): KickChoice {
   const w = kickWeights(toLine, closeBombWeight);
+  w.long += longBonus;
   let total = 0;
   for (const k of KICK_ORDER) total += w[k] * (bias[k] ?? 1);
   let r = roll * total;
