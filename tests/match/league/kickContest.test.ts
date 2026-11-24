@@ -157,19 +157,16 @@ describe('kick contests in the live sim (#99)', () => {
         const won = rest.find((x) => x.kind === 'set-start' || x.kind === 'regather' || x.kind === 'dead-ball' || x.kind === 'kickoff');
         if (won?.detail !== 'scramble') continue;
         const after = rest.find((x) => x.kind === 'try' || x.kind === 'dead-ball' || x.kind === 'kickoff' || x.kind === 'kick');
-        if (won.kind === 'regather' && won.side === e.side && after?.kind === 'try' && after.side === e.side) scored++;
-        if (won.kind === 'set-start' && won.side !== e.side && after?.kind === 'dead-ball' && after.detail === '20m') grounded++;
+        if (after?.tick !== won.tick) continue;
+        if (won.kind === 'regather' && won.side === e.side && after.kind === 'try' && after.side === e.side) scored++;
+        if (won.kind === 'set-start' && won.side !== e.side && after.kind === 'dead-ball' && after.detail === '20m') grounded++;
       }
       return { scored, grounded };
     };
-    // Exercise the race on neutral Balanced / Slide. Enabled Slide deliberately
-    // shuts Kick-chase attackers out of these races; its coverage is tested separately.
-    const r = races(play(Array.from({ length: 32 }, (_, i) => i + 1), (all) => {
-      const next = races(all);
-      return next.scored > 0 && next.grounded > 0;
-    }, 'balanced').es);
-    expect(r.scored).toBeGreaterThan(0);
-    expect(r.grounded).toBeGreaterThan(0);
+    // With kick returns on, neutral Balanced / Slide seed 45 wins the race and
+    // scores at 1257. At 7574 in seed 5 the defender wins and grounds it.
+    expect(races(play([45], () => true, 'balanced').es).scored).toBeGreaterThan(0);
+    expect(races(play([5], () => true, 'balanced').es).grounded).toBeGreaterThan(0);
   }, 60_000);
 
   it('a scramble is said: LOOSE BALL! as it goes, the winner named on the ticker, the report counts it', () => {

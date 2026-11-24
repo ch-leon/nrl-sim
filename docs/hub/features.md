@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- **Kick returns with support.** A player who takes a long punt or bomb cleanly in space bursts toward the clearest lane. The two nearest available teammates peel in behind for a pass. A close chase can stop the return at the catch. Ported from [draft PR #781](https://github.com/ch-leon/nrl-sim/pull/781).
+
 - **Dummy-half reads tired markers.** When the markers are tired, dummy-half is more likely to run from the play-the-ball. If their legs tip the choice, a Tired Marker cue and the commentary explain the dart. A tired onside line also advances a little slower. Ported from [draft PR #780](https://github.com/ch-leon/nrl-sim/pull/780).
 
 - **SuperCOOKED look, follow-ups.** The Undo toast counts down on a bar along its foot. The title's messages (a failed import, a save from a newer version) are toasts at the foot of the screen. Each save slot shows the club's ladder place ("Season 1 · Week 2 · 3rd"). Contracts says when each deal ends ("S2"), keeping the weeks, in amber, for one about to lapse. Ported from [draft PR #779](https://github.com/ch-leon/nrl-sim/pull/779).

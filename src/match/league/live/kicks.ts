@@ -13,15 +13,79 @@ import { WING_BOMB } from '../tactics';
 import { speedMult } from '../traits';
 import { WEATHER } from '../weather';
 import { LIVE } from './knobs';
+import { KICK_RETURN, readKickReturn } from './kickReturn';
 import { readShoulder, type ShoulderRead } from './centreCarry';
 import { other, AIM_TEXT, KICK_TEXT, type Player, type Phase, type PendingKick } from './types';
 import { LiveClock } from './clock';
 import { TICK_S } from '../../core/engine';
 import { BOMB_PLANT_TICKS, BOMB_RECOVERY_TICKS, BOMB_TAKEOFF_LEAD, type BombContestSnap } from '../../core/snapshot';
 
+interface KickReturn {
+  carrier: Player;
+  key: string;
+  phase: Extract<Phase, { kind: 'play' }>;
+  catchTick: number;
+  untilTick: number;
+  priorBurstUntil: number;
+  target: Vec;
+  supportSide: -1 | 0 | 1;
+  supports: { player: Player; key: string }[];
+}
+
 export abstract class LiveKicks extends LiveClock {
   /** Presentation only, written when the defender actually takes the pass. */
   protected visualInterception?: InterceptionSnap;
+
+  private kickReturn: KickReturn | null = null;
+
+  private returnSupportAvailable(p: Player): boolean {
+    return this.onField(p) && p.subFor === null && !this.locked(p) && this.tick >= p.busyUntil;
+  }
+
+  private startKickReturn(carrier: Player): void {
+    const side = carrier.side;
+    if (this.phase.kind !== 'play' || !inPlay(carrier.body.pos) || !this.onField(carrier) || carrier.subFor !== null
+      || this.pendingControl[side] || this.callState[side].attack || this.pendingPlay[side] || this.scripted) return;
+    const chase = this.side(other(side)).filter(d => !this.locked(d) && this.tick >= d.cooldownUntil && d.subFor === null && this.retreatLine(d) === null);
+    const target = readKickReturn(carrier.body.pos, this.dir, chase.map(d => d.body));
+    if (!target) return;
+
+    const supports = this.side(side).filter(p => p !== carrier && this.returnSupportAvailable(p))
+      .sort((a, b) => dist(a.body.pos, carrier.body.pos) - dist(b.body.pos, carrier.body.pos) || a.slot - b.slot)
+      .slice(0, 2).sort((a, b) => a.body.pos.y - b.body.pos.y || a.slot - b.slot)
+      .map(player => ({ player, key: player.key }));
+    const untilTick = carrier.lockUntil + KICK_RETURN.burstTicks;
+    const y = carrier.body.pos.y;
+    const halfWidth = KICK_RETURN.supportWideM / 2;
+    const supportSide = supports.length !== 2 ? 0 : supports[0]!.player.body.pos.y >= y + halfWidth ? 1
+      : supports[1]!.player.body.pos.y <= y - halfWidth ? -1 : 0;
+    this.kickReturn = { carrier, key: carrier.key, phase: this.phase, catchTick: this.tick, untilTick,
+      priorBurstUntil: carrier.burstUntil, target, supportSide, supports };
+    carrier.burstUntil = Math.max(carrier.burstUntil, untilTick);
+  }
+
+  protected currentKickReturn(carrier: Player | null): KickReturn | null {
+    const ret = this.kickReturn;
+    if (!ret) return null;
+    if (carrier === ret.carrier && carrier.key === ret.key && carrier.catchTick === ret.catchTick && this.phase === ret.phase
+      && this.tick < ret.untilTick && !carrier.jink && this.tick >= carrier.immuneUntil && this.overLineAt < 0
+      && this.onField(carrier) && carrier.subFor === null && !this.pendingControl[carrier.side] && !this.callState[carrier.side].attack
+      && !this.pendingPlay[carrier.side] && !this.scripted && !this.pendingKick && !this.pendingGoal) return ret;
+    this.endKickReturn();
+    return null;
+  }
+
+  protected kickReturnSupportIndex(ret: KickReturn, p: Player): number {
+    return ret.supports.findIndex(s => s.player === p && s.key === p.key && this.returnSupportAvailable(p));
+  }
+
+  protected endKickReturn(): void {
+    const ret = this.kickReturn;
+    if (!ret) return;
+    const p = ret.carrier;
+    if (p.key === ret.key && p.burstUntil === ret.untilTick && p.brokeAt < ret.catchTick) p.burstUntil = ret.priorBurstUntil;
+    this.kickReturn = null;
+  }
 
   protected centreCarry: (Omit<ShoulderRead, 'defender'> & {
     carrier: Player; defender: Player; catchTick: number; untilTick: number;
@@ -250,10 +314,14 @@ export abstract class LiveKicks extends LiveClock {
         return;
       }
       if (b.via === 'kick') {
+        const returnable = KICK_RETURN.on > 0 && KICK_RETURN.burstTicks > 0 && b.bounces === 0
+          && this.kickFrom && !this.kickFrom.aim && !this.kickoffUp && !playKick && !contested && !pressured
+          && (this.kickInAir === 'long' || this.kickInAir === 'bomb');
         this.lock(r, 'catch', 4);
         this.mark = { ...r.body.pos };
         this.endKick(r.side, r.body.pos);
         if (this.groundInGoal(r)) return;
+        if (returnable) this.startKickReturn(r);
         this.emit('set-start', `${r.name} takes the kick — ${this.names[this.attacking]} ball`, r);
         this.events[this.events.length - 1]!.detail = 'caught';
       }

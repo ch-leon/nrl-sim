@@ -26,6 +26,7 @@ import { DEFAULT_TACTICS } from '../league/presets';
 import { applyTuning } from '../league/tuning';
 import { labSheet, starTraits } from '../lab/sheets';
 import { POSITION_GROUPS, type Cell, type SideSpec } from './plan';
+import { KickReturns, kickReturnStats, type KickReturnStats } from './kickReturns';
 import { FLOW, FirstReceivers, LAST_TACKLES, ORIGINS, PlayWatch, RECEIVERS, ScoreLine, TERRITORY, Territory, type FlowKey, type LastTackleKey, type OriginKey, type ReceiverKey, type TerritoryKey } from './watch';
 
 type DartSample = { attempts: number; chosen: number };
@@ -92,6 +93,17 @@ export class BalanceSim extends LiveSim {
     return this.toLineFor(this.attacking, this.ballPos());
   }
 
+  get aimedKick(): boolean {
+    return this.kickFrom?.aim !== undefined;
+  }
+
+  get directKickCatch(): boolean {
+    return this.holder()?.aerialCatchTick === this.tick;
+  }
+
+  get possessionDirection(): 1 | -1 {
+    return this.dirOf(this.attacking);
+  }
 }
 
 /** A full match: two halves. Stretches scale their counts up to this. */
@@ -141,6 +153,8 @@ export interface WatchStats {
   receivers?: Record<ReceiverKey, Stat>;
   /** Absent in results written before #650. */
   territory?: Record<TerritoryKey, Stat>;
+  /** Absent in results written before #660. */
+  kickReturns?: KickReturnStats;
 }
 
 export interface CellResult {
@@ -583,6 +597,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
     const lastPerSeed: Record<LastTackleKey, number>[] = [];
     const receiversPerSeed: Record<ReceiverKey, number>[] = [];
     const territoryPerSeed: Record<TerritoryKey, number>[] = [];
+    const returnsPerSeed: ReturnType<KickReturns['result']>[] = [];
     let wrestleTicks = 0;
     let wins = 0;
     let draws = 0;
@@ -622,6 +637,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
       const watch = new PlayWatch();
       const receivers = new FirstReceivers();
       const territory = new Territory();
+      const kickReturns = new KickReturns();
       let inW = 0;
       let lastMen = 0;
       let nextLegs = 3;
@@ -674,6 +690,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
         watch.tick(tickEvents, view);
         receivers.tick(view, sim.tackleCount);
         territory.tick(tickEvents, view, sim.tackleCount, () => sim.toGo);
+        kickReturns.tick(tickEvents, view, sim.aimedKick, sim.directKickCatch, () => sim.possessionDirection);
         const men = sim.wrestleMen;
         if (men > 0) {
           inW++;
@@ -713,6 +730,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
         lastPerSeed.push(watch.lastTackles);
         receiversPerSeed.push(receivers.result());
         territoryPerSeed.push(territory.result());
+        returnsPerSeed.push(kickReturns.result());
         const c = countEvents(events);
         c.wrestles = matchWrestles;
         c.held1 = held[1]!;
@@ -768,6 +786,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
       receivers: Object.fromEntries(RECEIVERS.map((k) => [k, stat(receiversPerSeed.map((o) => o[k]))])) as Record<ReceiverKey, Stat>,
       // Early kicks are a count (scaled); where sets start is metres, not scaled.
       territory: Object.fromEntries(TERRITORY.map((k) => [k, stat(territoryPerSeed.map((o) => o[k] * (k === 'earlyKicks' ? scale : 1)))])) as Record<TerritoryKey, Stat>,
+      kickReturns: kickReturnStats(returnsPerSeed),
     };
     const totalWrestles = perSeed.reduce((a, c) => a + c.wrestles, 0);
     return {
