@@ -356,17 +356,17 @@ describe('the lab and the harness', () => {
   // away side's, and seed 9 or 11 the first of 1–12 whose is the home side's.
   // Punts into space (#650) move seed 3's block play from tick 690 to 714. Seed 11's breakdown stays.
   // The five-eighth option moves seed 3's block play to 688. Seed 11's first breakdown is now
-  // the home block play, so the home inside-ball breakdown is seed 22.
-  it('the lab’s named seeds: a block play launched (seed 3, tick 688) and a home play breaking down (seed 22, tick 2579)', () => {
+  // the home block play. Open-side shifts move the home inside-ball breakdown from seed 22 to seed 10.
+  it('the lab’s named seeds: a block play launched (seed 3, tick 688) and a home play breaking down (seed 10, tick 3486)', () => {
     const lab = (seed: number): PlaySim =>
       new PlaySim(withPlays({ ...labSheet(DEFAULT_HOME, 'gen', { attack: 'grind' }), rotation: 'standard' }, true), withPlays({ ...labSheet(DEFAULT_AWAY, 'gen', {}), rotation: 'standard' }, true), seed, { energy: LEGS_ENERGY.fresh, weather: 'clear', calls: [] });
     const one = lab(3);
     const launch = until(one, (e) => e.kind === 'set-play' && e.side === 'home');
     expect([launch?.tick, launch?.detail, one.script?.outcome]).toEqual([688, 'block-play', 'ok']);
     expect(one.script?.decoys.map((d) => d.idx % 9)).toEqual([7]);
-    const twentyTwo = lab(22);
-    const bd = until(twentyTwo, (e) => e.kind === 'play-breaks-down');
-    expect([bd?.tick, bd?.detail, bd?.side]).toEqual([2579, 'inside-ball', 'home']);
+    const ten = lab(10);
+    const bd = until(ten, (e) => e.kind === 'play-breaks-down');
+    expect([bd?.tick, bd?.detail, bd?.side]).toEqual([3486, 'inside-ball', 'home']);
   }, 60_000);
   it('a scenario names its plays (`plays`), a typo fails fast, and the cell plays them', () => {
     const plan = (plays: PlayId[]): Plan => ({ name: 'p', seeds: 1, minutes: 4, scenarios: [{ name: 's', home: { rating: 60, plays }, away: { rating: 60 } }] });
