@@ -7,7 +7,7 @@ live gameplay change; work still open below has not shipped.
 
 ## Now
 
-- **Repeat one-on-ones.** Commentary names both players in a step, fend, bust, run-down or solo held-up, and a repeat win links them on the pitch. Lab sign-off remains open. Ported from [draft PR #792](https://github.com/ch-leon/nrl-sim/pull/792).
+- **Repeat one-on-ones.** A repeat win names both players and links them on the pitch. The first win keeps the commentator's own line, and a tactic counter is never replaced. Lab sign-off remains open. Ported from [draft PR #792](https://github.com/ch-leon/nrl-sim/pull/792).
 
 - **Penalty advantage.** An ordinary offside at the ruck can play on for 3.5 seconds. Eight metres, a break or a try takes it; otherwise the penalty returns to the mark. Lab sign-off remains open. Ported from [draft PR #791](https://github.com/ch-leon/nrl-sim/pull/791).
 

@@ -935,7 +935,16 @@ export class LivePlayback {
       // The ticker reads the commentator (commentary.ts). It hears a resumed or skipped stretch too, silently, so the match reads the same.
       // Its memory (a second try, a lead change) comes through the same path, so it is rebuilt by a resume and by Skip.
       const said = this.commentator.said(e, cur.score, cur.clock?.minute, cur.ball.y);
-      if (duel && said[0]) said[0] = { text: duel.text, important: said[0].important || duel.wins > 1 };
+      // A first win keeps the commentator's own line. A repeat (the same player over the same opponent)
+      // replaces an ordinary line. The pair's second win holds the strip; a later repeat is an ordinary
+      // line. A tactic counter (#468), or any line the strip is already holding, stays, and the repeat is said after it.
+      if (duel && duel.wins > 1) {
+        const line = { text: duel.text, important: duel.wins === 2 };
+        const head = said[0];
+        if (head && (head.important || head.counter)) said.push(line);
+        else if (head) said[0] = line;
+        else said.push(line);
+      }
       const line = said[0]?.text ?? '';
       if (!this.skipping) said.forEach((s, i) => this.opts.overlay?.comment(s.text, s.important ? 'important' : 'routine', i > 0));
       else if (line && e.kind === 'full-time') this.finalLine = line;

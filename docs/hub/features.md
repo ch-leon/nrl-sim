@@ -64,7 +64,7 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
-- **Repeat one-on-ones.** Match commentary names both players when one steps, fends off or busts through the other, runs him down or holds him up alone. A repeat win names the pair again and briefly links the two players on the pitch. Match Lab remembers the same actions when you seek. Ported from [draft PR #792](https://github.com/ch-leon/nrl-sim/pull/792). [#662](https://github.com/ch-leon/nrl-sim/issues/662).
+- **Repeat one-on-ones.** A first step, fend, bust, run-down or solo held-up keeps the commentator's own line. A repeat names both players and briefly links them on the pitch. The pair's second win holds the strip; a later repeat is an ordinary line. A tactic counter, or any line the strip is already holding, stays, and the repeat is said after it. Match Lab remembers the same actions when you seek. Ported from [draft PR #792](https://github.com/ch-leon/nrl-sim/pull/792). [#662](https://github.com/ch-leon/nrl-sim/issues/662).
 
 - **Penalty advantage.** After an ordinary offside at the ruck, the referee holds the whistle for up to 3.5 seconds while the attack still has the ball. Eight metres, a line break or a try takes the advantage. If the chance dies, play comes back to the original mark for the penalty. High shots and bin-worthy fouls are whistled at once. Ported from [draft PR #791](https://github.com/ch-leon/nrl-sim/pull/791). [#659](https://github.com/ch-leon/nrl-sim/issues/659).
 
