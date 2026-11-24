@@ -288,6 +288,7 @@ export class LiveSim extends LivePositioning implements MatchSim {
     const short = this.players.some((p) => !this.onField(p)) ? ` · ${this.side('home').length} v ${this.side('away').length}` : '';
     const pickup = this.groundPickup;
     const collector = b.kind === 'held' ? this.players[b.by] : undefined;
+    const dummy = collector && this.activeDummy(collector);
     const showPickup = pickup && kind === 'play' && this.tick <= pickup.tick + GROUND_PICKUP_TICKS
       && collector?.key === pickup.player.who && collector.side === pickup.player.side && collector.slot === pickup.player.slot
       && collector.catchTick === pickup.tick;
@@ -301,6 +302,7 @@ export class LiveSim extends LivePositioning implements MatchSim {
       attacking: this.attacking,
       players,
       ball,
+      ...(dummy ? { dummyPass: { ...dummy.snap, carrier: { ...dummy.snap.carrier }, receiver: { ...dummy.snap.receiver }, defender: { ...dummy.snap.defender } } } : {}),
       ...(this.visualBombContest ? { bombContest: this.visualBombContest } : {}),
       ...(showPickup ? { groundPickup: pickup } : {}),
       ...(this.quickTapPicture ? { quickTap: this.quickTapPicture } : {}),

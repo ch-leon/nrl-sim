@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- **Dummy-and-go.** When a runner is available, a carrier can turn his shoulders and show the ball in both hands before pulling it back into his carry. The closest defender can slide toward the runner or stay square and close the carrier down. The normal tackle contest applies in both cases. Ported from [draft PR #790](https://github.com/ch-leon/nrl-sim/pull/790). First slice of [#653](https://github.com/ch-leon/nrl-sim/issues/653).
+
 - **Try-saving tackles in the corner.** A fullback can come across to cover an open run down the edge. If he reaches the runner before the line, he can dive at his legs for a tackle or miss and leave the runner free to ground it. The play-by-play calls each result. Ported from [draft PR #789](https://github.com/ch-leon/nrl-sim/pull/789). This slice of [#652](https://github.com/ch-leon/nrl-sim/issues/652).
 
 - **Posts charge.** A prop with Wrecking Ball II or III can call for a short ball from dummy-half near the posts. He straightens toward the uprights with a small first-contact edge. His full name is on the banner and the commentary credits a bust, fend or try. Either side can launch it once a half, and the line can still stop him. Ported from [draft PR #788](https://github.com/ch-leon/nrl-sim/pull/788). First signature from [#663](https://github.com/ch-leon/nrl-sim/issues/663).

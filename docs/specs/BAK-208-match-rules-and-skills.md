@@ -198,6 +198,17 @@ moves RNG timing, so it can change match results; `live.dhDecisionLeadTicks:0`
 keeps legacy decisions and recovery engine revision is 5. Harness comparison with
 main is required; this is not a presentation-only change.
 
+**Dummy-and-go** (first slice of #653). On an ordinary open-play carry before
+the last-tackle sequence, a carrier can shape to a legal receiver outside the
+closest defender. The carrier reaches out in two hands and tucks the ball again
+while his feet keep moving. A defender who reads pass checks his advance and
+slides toward the support runner. A defender who stays square keeps closing on
+the carrier. Every defender remains available for the usual contact contest.
+Carrier Handling and Footy IQ against the defender's Footy IQ determine the
+read. The dummy takes a share of the existing carry roll after the pass decision.
+Coach calls, manual controls and scripted plays use their usual paths.
+`live.dummyChance:0` restores the previous carry. See tuning §5.
+
 ### 4.3 Catch (kicks) — *first slice implemented (lab feedback round 2)*
 A kick hangs for its flight time (2√(2·peak/g): a 12 m kick ≈ 3.1 s, a bomb ≈ 4 s), so
 chasers and catchers can get under it. **Whoever is nearest the landing point within
@@ -891,6 +902,7 @@ makes the break but can't finish it, the workhorse who is never quick and never 
 | #660 | A clean long kick or bomb catch can be returned into a gap with two support runners. Tuning §6 | §4.4 |
 | #652.1 | Held up over the line: any defender on a carrier in contact at the line can hold him up (a lone tackler too, Leon 13 Nov 2026); play-the-ball 10 m out, the tackle counted — *awaiting lab sign-off*. Tuning §11 | §8.1 |
 | #652.2 | Fullbacks can make or miss a low cover tackle at the corner inside the last 10 m — *awaiting lab sign-off*. Tuning §11 | §8.1 |
+| #653 | An open-play carry can shape a pass and go itself. The nearest defender may bite or stay square. The ordinary tackle contest still applies — *awaiting lab sign-off*. Tuning §5 | §4.2 |
 
 Then BAK-207 Phase 2 (full match, scoring, halves) and Phase 3 (balance).
 

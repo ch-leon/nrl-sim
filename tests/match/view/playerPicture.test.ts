@@ -8,8 +8,52 @@ import { Runner } from '../../../src/match/core/engine';
 import { FACING_BAND, SIDE_BAND, screenFacing, screenPlayerFacing, screenHeading } from '../../../src/match/view/screenFacing';
 import { fieldToWorldPoint } from '../../../src/scenes/matchField';
 import { toFieldPt } from '../../../src/match/core/field';
+import { DUMMY_PASS_PHASES } from '../../../src/art/prototype/player';
 // Toward the home try line and the near touchline: up and to the right of the screen.
 const p: PlayerSnap = { side: 'home', slot: 0, who: 'captain', x: 40, y: 20, pose: 'run', headX: -.6, headY: -.8, speed: 6, caughtTick: 100 };
+describe('dummy-pass pictures', () => {
+  it('shows the ball immediately when the fake has only a tick', () => {
+    const carrier = { side: p.side, slot: p.slot, who: p.who! };
+    const receiver = { side: p.side, slot: 1, who: 'support' };
+    const defender = { side: 'away' as const, slot: 2, who: 'marker' };
+    const dummyPass = { carrier, receiver, defender, startedTick: 120, untilTick: 121, towardY: 1 as const, bit: false };
+    const picture = playerPicture(p, p, 120, carrier, 1, { dummyPass });
+    expect(picture.action).toBe('dummyPass');
+    expect(picture.frame % DUMMY_PASS_PHASES).toBe(1);
+    expect(playerPicture(p, p, 121, carrier, 1, { dummyPass }).action).toBe('carry');
+  });
+  it.each([[2, 2607, 2613], [6, 4050, 4055]])('shows, retracts and clears on time in seed %i', (seed, start, end) => {
+    const runner = new Runner(n => new LiveSim(labSheet('rival-reapers'), labSheet('rival-crocs'), n), seed);
+    runner.seek(start);
+    const fake = runner.cur.dummyPass!;
+    const player = (s: Snapshot, ref: typeof fake.carrier) => s.players.find(q => q.side === ref.side && q.slot === ref.slot && q.who === ref.who)!;
+    const current = (flip: number) => {
+      const { cur, prev } = runner;
+      const carrier = player(cur, fake.carrier), old = player(prev, fake.carrier);
+      const ctx = pictureContext(cur, prev);
+      const { dummyPass: _dummyPass, ...carryCtx } = ctx;
+      const ordinary = playerPicture(carrier, old, cur.tick, cur.ball.holder, flip, carryCtx);
+      const picture = playerPicture(carrier, old, cur.tick, cur.ball.holder, flip, ctx);
+      return { carrier, ordinary, picture };
+    };
+    for (const offset of [0, 1, 4]) {
+      runner.seek(start + offset);
+      for (const flip of [1, -1]) {
+        const { carrier, ordinary, picture } = current(flip);
+        const receiver = player(runner.cur, fake.receiver);
+        const aim = screenHeading(receiver.x - carrier.x, receiver.y - carrier.y, flip);
+        const left = Math.abs(aim.x) < .2 ? screenHeading(0, fake.towardY, flip).x < 0 : aim.x < 0;
+        const phase = offset === 0 ? 0 : offset === 1 ? 1 : 2;
+        expect(picture).toMatchObject({ action: 'dummyPass', left, possession: true, strideFrame: ordinary.strideFrame,
+          frame: phase + (left === ordinary.left ? 0 : DUMMY_PASS_PHASES) });
+        expect(picture.movement).toBe(ordinary.movement);
+      }
+    }
+    runner.seek(end);
+    const { picture, ordinary } = current(1);
+    expect(picture).toEqual(ordinary);
+  });
+});
 describe('successful step pictures', () => {
   it('matches the cut and the missed reach for either end and mirrored view', () => {
     for (const dir of [1, -1] as const) for (const lateral of [1.6, -1.6]) for (const flip of [1, -1]) {

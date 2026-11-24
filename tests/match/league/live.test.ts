@@ -3,6 +3,7 @@
 // out in order, the set is five tackles, and it all replays from a seed.
 import { describe, it, expect } from 'vitest';
 import { LiveSim } from '../../../src/match/league/live';
+import { applyTuning } from '../../../src/match/league/tuning';
 import { AVERAGE, OPEN, angleFrom, carrierEdge, contestOdds, interceptChance, knockOnChance, resolveContest, stepChance } from '../../../src/match/league/contest';
 import { gapTarget, intercept, kickTarget, kickoffTarget, pickReceiver, supportSpots } from '../../../src/match/league/tactics';
 import { MAX_SPEED, BODY_RADIUS } from '../../../src/match/core/body';
@@ -298,7 +299,7 @@ describe('LiveSim', () => {
     let maxLoose = 0;
     let flights = 0;
     let pickups = 0;
-    run(factory(7), 180, (s) => {
+    run(factory(1), 180, (s) => {
       const f = s.ball.flight;
       if (f) {
         flights++;
@@ -313,10 +314,34 @@ describe('LiveSim', () => {
       expect(Number.isFinite(s.ball.x) && Number.isFinite(s.ball.y)).toBe(true);
     });
     // #672's seed 7: kick 1298–1357, bounce 1358–1373, ground 1374–1418, pickup 1419.
-    // Its 121 no-holder ticks include two valid flights; only 45 ticks are ground collection.
+    // The open-play dummy leaves that seed with flights and no ground pickup. Seed 1
+    // still has both, and the loose run stays inside five seconds. With the dummy off,
+    // seed 7 still picks the ball up.
     expect(flights).toBeGreaterThan(0);
     expect(pickups).toBeGreaterThan(0);
     expect(maxLoose).toBeLessThan(5 / TICK_S);
+    const restore = applyTuning({ 'live.dummyChance': 0 });
+    try {
+      let oldLoose = 0;
+      let oldMax = 0;
+      let oldFlights = 0;
+      let oldPickups = 0;
+      run(factory(7), 180, (s) => {
+        const f = s.ball.flight;
+        if (f) {
+          oldFlights++;
+          expect(s.ball.holder).toBeNull();
+          expect(s.tick).toBeGreaterThanOrEqual(f.startedTick);
+          expect(s.tick).toBeLessThan(f.arrivesTick);
+        }
+        if (s.ball.holder && oldLoose > 0) oldPickups++;
+        oldLoose = !s.ball.holder && !f && s.phase?.kind === 'play' ? oldLoose + 1 : 0;
+        oldMax = Math.max(oldMax, oldLoose);
+      });
+      expect(oldFlights).toBeGreaterThan(0);
+      expect(oldPickups).toBeGreaterThan(0);
+      expect(oldMax).toBeLessThan(5 / TICK_S);
+    } finally { restore(); }
   });
 
   it('pace is continuous (#85): while the ball is in play nobody stands still for more than a second', () => {

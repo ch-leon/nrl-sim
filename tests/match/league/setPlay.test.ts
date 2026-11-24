@@ -420,16 +420,24 @@ describe('the lab and the harness', () => {
   // Punts into space (#650) move seed 3's block play from tick 690 to 714. Seed 11's breakdown stays.
   // The five-eighth option moves seed 3's block play to 688. Seed 11's first breakdown is now
   // the home block play, so the home inside-ball breakdown is seed 22.
-  it('the lab’s named seeds: a block play launched (seed 3, tick 688) and a home play breaking down (seed 22, tick 2579)', () => {
+  // The open-play dummy moves that breakdown. Seed 36's home inside-ball breaks down at 1609.
+  // With the dummy off, seed 22 is still tick 2579.
+  it('the lab’s named seeds: a block play launched (seed 3, tick 688) and a home play breaking down (seed 36, tick 1609)', () => {
     const lab = (seed: number): PlaySim =>
       new PlaySim(withPlays({ ...labSheet(DEFAULT_HOME, 'gen', { attack: 'grind' }), rotation: 'standard' }, true), withPlays({ ...labSheet(DEFAULT_AWAY, 'gen', {}), rotation: 'standard' }, true), seed, { energy: LEGS_ENERGY.fresh, weather: 'clear', calls: [] });
     const one = lab(3);
     const launch = until(one, (e) => e.kind === 'set-play' && e.side === 'home');
     expect([launch?.tick, launch?.detail, one.script?.outcome]).toEqual([688, 'block-play', 'ok']);
     expect(one.script?.decoys.map((d) => d.idx % 9)).toEqual([7]);
-    const twentyTwo = lab(22);
-    const bd = until(twentyTwo, (e) => e.kind === 'play-breaks-down');
-    expect([bd?.tick, bd?.detail, bd?.side]).toEqual([2579, 'inside-ball', 'home']);
+    const thirtySix = lab(36);
+    const bd = until(thirtySix, (e) => e.kind === 'play-breaks-down' && e.side === 'home');
+    expect([bd?.tick, bd?.detail, bd?.side]).toEqual([1609, 'inside-ball', 'home']);
+    const restore = applyTuning({ 'live.dummyChance': 0 });
+    try {
+      const twentyTwo = lab(22);
+      const old = until(twentyTwo, (e) => e.kind === 'play-breaks-down');
+      expect([old?.tick, old?.detail, old?.side]).toEqual([2579, 'inside-ball', 'home']);
+    } finally { restore(); }
   }, 60_000);
   it('a scenario names its plays (`plays`), a typo fails fast, and the cell plays them', () => {
     const plan = (plays: PlayId[]): Plan => ({ name: 'p', seeds: 1, minutes: 4, scenarios: [{ name: 's', home: { rating: 60, plays }, away: { rating: 60 } }] });

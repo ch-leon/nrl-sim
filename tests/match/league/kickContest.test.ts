@@ -165,13 +165,18 @@ describe('kick contests in the live sim (#99)', () => {
       return { scored, grounded };
     };
     // With kick returns on, neutral Balanced / Slide seed 45 wins the race and
-    // scores. Seed 7 is a defender grounding it. Seed 5 was that grounding before
-    // the corner dive; with the dive off it still is.
+    // scores. The open-play dummy moves seed 7's grounding. Seed 5, the grounding
+    // from before the corner dive, is one again. With the dummy off, seed 7 still
+    // grounds it, and with the dive off as well seed 5 still does.
     expect(races(play([45], () => true, 'balanced').es).scored).toBeGreaterThan(0);
-    expect(races(play([7], () => true, 'balanced').es).grounded).toBeGreaterThan(0);
-    const restore = applyTuning({ 'cornerCover.on': 0 });
+    expect(races(play([5], () => true, 'balanced').es).grounded).toBeGreaterThan(0);
+    const restore = applyTuning({ 'live.dummyChance': 0 });
     try {
-      expect(races(play([5], () => true, 'balanced').es).grounded).toBeGreaterThan(0);
+      expect(races(play([7], () => true, 'balanced').es).grounded).toBeGreaterThan(0);
+      const diveOff = applyTuning({ 'cornerCover.on': 0 });
+      try {
+        expect(races(play([5], () => true, 'balanced').es).grounded).toBeGreaterThan(0);
+      } finally { diveOff(); }
     } finally { restore(); }
   }, 60_000);
 

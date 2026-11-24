@@ -121,8 +121,8 @@ describe('ordinary attacking structures (#649)', () => {
     const sub = new ShapeSim(); sub.force('pod',1); sub.man(8).subFor = 0; expect(sub.choose()).toBeUndefined();
   });
   it('keeps the shapes-off main event fingerprint exactly', async () => {
-    // Keep later kicking, return and goal-line mechanics off for this shapes-off fingerprint.
-    restore.push(applyTuning({'shapes.on':0,'longKick.on':0,'wingBomb.on':0,'secondKicker.on':0,'kickReturn.on':0,'goalLineStand.on':0,'bench.impact.on':0}));
+    // Keep later kicking, return, goal-line and dummy mechanics off for this shapes-off fingerprint.
+    restore.push(applyTuning({'shapes.on':0,'longKick.on':0,'wingBomb.on':0,'secondKicker.on':0,'kickReturn.on':0,'goalLineStand.on':0,'bench.impact.on':0,'live.dummyChance':0}));
     const sim = new LiveSim(sideSheet('H',{rating:60}),sideSheet('A',{rating:60}),1), parts:string[]=[];
     while(!sim.finished) { sim.step(); for(const e of sim.tickEvents) parts.push(`${e.tick}:${e.kind}:${e.side??''}:${e.detail??''}`); }
     const spec='node:crypto',{createHash}=await import(spec);

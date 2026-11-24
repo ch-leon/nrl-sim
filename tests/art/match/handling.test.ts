@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { drawLivePlayer } from '../../../src/art/match/livePlayer';
-import { appearanceFor, HEAD_OPTIONS, playerBallAnchor, CENTRE, FOOT, type Movement } from '../../../src/art/prototype/player';
+import { appearanceFor, HEAD_OPTIONS, playerBallAnchor, CENTRE, FOOT, DUMMY_PASS_PHASES, type Movement } from '../../../src/art/prototype/player';
 import { buildKit } from '../../../src/art/match/kit';
 import { opaqueBounds } from '../../../src/art/match/players';
 import { PlayerFrameCache } from '../../../src/scenes/matchPlayers';
@@ -45,6 +45,30 @@ describe('connected handling artwork (#702)', () => {
         const x = Math.round(anchor.x + CENTRE - 4.5), y = Math.round(anchor.y + FOOT - 3.5);
         const white = [[2, 2], [6, 2], [2, 3], [6, 3]].filter(([dx, dy]) => pixels.get(x + dx!, y + dy!).color === 0xffffff);
         expect(white.length).toBeGreaterThanOrEqual(2);
+      }
+    }
+  });
+  it('shows the held ball out past the torso and returns it, with safe bounds in both boot directions', () => {
+    for (const build of ['lean', 'athletic', 'stocky'] as const) for (const stature of [-2, 2]) {
+      const look = { ...base, build, stature, head: 'flatTop' as const };
+      for (const facing of ['front', 'back', 'side'] as const) for (const tired of [0, 2]) for (const offset of [0, DUMMY_PASS_PHASES]) {
+        const reach = playerBallAnchor(look, 'dummyPass', 1 + offset, 0, tired, 'drive', facing);
+        const gather = playerBallAnchor(look, 'dummyPass', offset, 0, tired, 'drive', facing);
+        const retract = playerBallAnchor(look, 'dummyPass', 2 + offset, 0, tired, 'drive', facing);
+        const carry = playerBallAnchor(look, 'carry', 0, 0, tired, undefined, facing);
+        expect(reach.x - carry.x).toBeGreaterThanOrEqual(6);
+        expect(reach.x - gather.x).toBeGreaterThanOrEqual(3);
+        expect(reach.x - retract.x).toBeGreaterThanOrEqual(4);
+        const pixels = drawLivePlayer(look, kit, 'dummyPass', 1 + offset, facing, true, 0, tired, 0, 'drive');
+        const empty = drawLivePlayer(look, kit, 'dummyPass', 1 + offset, facing, false, 0, tired, 0, 'drive');
+        const x = Math.round(reach.x + CENTRE - 4.5), y = Math.round(reach.y + FOOT - 3.5);
+        expect(pixels.get(x + 6, y + 2).color).toBe(0xffffff);
+        expect(empty.get(x + 6, y + 2).color).not.toBe(0xffffff);
+        const bounds = opaqueBounds(pixels)!;
+        expect(bounds.x0).toBeGreaterThan(0);
+        expect(bounds.x1).toBeLessThan(pixels.w - 1);
+        expect(bounds.y0).toBeGreaterThan(0);
+        expect(bounds.y1).toBeLessThan(pixels.h - 1);
       }
     }
   });

@@ -199,15 +199,36 @@ describe('ordinary attacking bombs to the winger’s corner (#650)', () => {
 
   it('finds both corners in ordinary seeded play without a coach call or a Lab aim', () => {
     // Reapers v Wolves (Kick-chase): seed 1 bombs to the low corner, attacking toward
-    // +x, at 1543. Seed 32 bombs to the high corner, attacking toward −x, at 3194.
-    // With the dive off, seed 42 is still the old high-corner bomb at 3303.
+    // +x, at 1543. The open-play dummy moves seed 32. Seed 59 bombs to the high corner,
+    // attacking toward −x, at 3366. With the dummy off, seed 32 is still that bomb at 3194.
+    // Mariners v Brumbies seed 33 still bombs to the low corner, attacking toward −x.
+    // With the dive and the dummy off, Reapers seed 42 is still the old high-corner bomb at 3303.
     const chase = { attack: 'kick-chase' } as const;
     const low = new BombSim(labSheet('rival-reapers', 'gen', chase), labSheet('rival-wolves', 'gen', chase), 1).firstCornerBomb(2_000, -1);
-    const high = new BombSim(labSheet('rival-reapers', 'gen', chase), labSheet('rival-wolves', 'gen', chase), 32).firstCornerBomb(3_600, 1);
-    if (!low || !high) throw new Error('Expected a natural bomb to each corner');
+    const high = new BombSim(labSheet('rival-reapers', 'gen', chase), labSheet('rival-wolves', 'gen', chase), 59).firstCornerBomb(3_600, 1);
+    const restore = applyTuning({ 'live.dummyChance': 0 });
+    let previous: ReturnType<BombSim['firstCornerBomb']>;
+    try {
+      previous = new BombSim(labSheet('rival-reapers', 'gen', chase), labSheet('rival-wolves', 'gen', chase), 32).firstCornerBomb(3_600, 1);
+    } finally { restore(); }
+    if (!low || !high || !previous) throw new Error('Expected a natural bomb to each corner');
     expect(low.to.y).toBeLessThanOrEqual(12);
     expect(low.to.x - low.from.x).toBeGreaterThan(0);
     expect(high.to.y).toBeGreaterThanOrEqual(FIELD_WIDTH - 12);
     expect(high.to.x - high.from.x).toBeLessThan(0);
+    expect(previous.to.y).toBeGreaterThanOrEqual(FIELD_WIDTH - 12);
+    expect(previous.to.x - previous.from.x).toBeLessThan(0);
+    const mariners = new BombSim(labSheet('rival-mariners'), labSheet('rival-brumbies'), 33).firstCornerBomb(2_500, -1);
+    if (!mariners) throw new Error('Expected the Mariners bomb to the low corner');
+    expect(mariners.to.y).toBeLessThanOrEqual(12);
+    expect(mariners.to.x - mariners.from.x).toBeLessThan(0);
+    const diveOff = applyTuning({ 'cornerCover.on': 0, 'live.dummyChance': 0 });
+    let seed42: ReturnType<BombSim['firstCornerBomb']>;
+    try {
+      seed42 = new BombSim(labSheet('rival-reapers', 'gen', chase), labSheet('rival-wolves', 'gen', chase), 42).firstCornerBomb(3_600, 1);
+    } finally { diveOff(); }
+    if (!seed42) throw new Error('Expected seed 42’s high-corner bomb with the dive off');
+    expect(seed42.to.y).toBeGreaterThanOrEqual(FIELD_WIDTH - 12);
+    expect(seed42.to.x - seed42.from.x).toBeGreaterThan(0);
   }, 15_000);
 });

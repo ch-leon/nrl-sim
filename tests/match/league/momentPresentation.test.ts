@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { LiveSim } from '../../../src/match/league/live';
+import { applyTuning } from '../../../src/match/league/tuning';
 import { labSheet, DEFAULT_HOME, DEFAULT_AWAY } from '../../../src/match/lab/sheets';
 import { playerPicture } from '../../../src/match/view/playerPicture';
 import { REACT_SNAP_TICKS, type SimEvent } from '../../../src/match/core/snapshot';
@@ -9,10 +10,11 @@ describe('moment presentation facts', () => {
     const home = labSheet(DEFAULT_HOME); const away = labSheet(DEFAULT_AWAY);
     // Preserve the historical presentation trajectory with all kick types and a scored try.
     const opts = { length: { halves: 2 as const, halfMinutes: 7 } };
-    const sim = new LiveSim(home, away, 1, opts); const control = new LiveSim(home, away, 1, opts);
+    const sim = new LiveSim(home, away, 3, opts); const control = new LiveSim(home, away, 3, opts);
     const found = new Set<string>();
     // Seed 2 included every presentation fact after retreat completion (#625); since the weighted
-    // receiver (#649) it has no grubber, and seed 1 has them all.
+    // receiver (#649) it has no grubber, and seed 1 had them all. The open-play dummy takes
+    // seed 1's grubber. Seed 3 has every fact. With the dummy off, seed 1 still does.
     // Observe its whole match rather than depending on the opening carries.
     while (!sim.finished) {
       sim.step(); control.step();
@@ -39,6 +41,24 @@ describe('moment presentation facts', () => {
       }
     }
     expect(found).toEqual(new Set(['punt', 'high', 'grubber', 'try', 'rise', 'drop']));
+    const restore = applyTuning({ 'live.dummyChance': 0 });
+    try {
+      const old = new LiveSim(home, away, 1, opts);
+      const oldFound = new Set<string>();
+      while (!old.finished) {
+        old.step();
+        const s = old.snapshot();
+        for (const p of s.players) {
+          if (p.kick) oldFound.add(p.kick.kind);
+          if (p.aerialCatchTick === s.tick) oldFound.add('high');
+          if (p.tryTick !== undefined) {
+            oldFound.add('try');
+            if (s.tick === p.tryTick + 10 && p.pose === 'celebrate') oldFound.add('rise');
+          }
+        }
+      }
+      expect(oldFound).toEqual(found);
+    } finally { restore(); }
   });
   it('stamps the man behind an error, a missed goal or a sin bin, on the tick the sim says so (#667)', () => {
     const home = labSheet(DEFAULT_HOME); const away = labSheet(DEFAULT_AWAY);

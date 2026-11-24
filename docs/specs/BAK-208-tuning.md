@@ -102,6 +102,11 @@ Tests: `tests/match/league/live.test.ts` (contest block).
 | `PASS_SPEED` | `src/match/core/ball.ts` | 16 m/s | Flat pass speed. |
 | `pickReceiver` window | `src/match/league/tactics.ts` | depth 0.3–8 m, lateral 2–`MAX_LAT_M` 12 | Score −\|lat − 6\|·(1 − width) − 0.7·depth + prefer. |
 | Pass vs carry (`live.passBase`) | `live/play.ts` `stepPlay` | 30% + Skill/300 (+ Playmaker, + preset) | When engaged, once per possession. |
+| `live.dummyChance` | `live/knobs.ts`, `live/play.ts` | 0.18 | Fraction of eligible carries with a real receiver selected that fake a pass. 0 restores the previous carry, including the RNG stream. With it off, the event stream matches the previous engine (revision 21). |
+| `live.dummyWidthM` | `live/knobs.ts`, `live/play.ts` | 3 m | Minimum across-field separation for the intended receiver, who must also be on the far side of the defender. |
+| `live.dummyTicks` | `live/knobs.ts`, `live/play.ts` | 9 ticks | Pass motion and maximum time a defender who bites shades across. Contact can end either sooner. |
+| `live.dummyBiteBase` / `live.dummyReadPerPoint` | `live/knobs.ts`, `live/play.ts` | 0.45 / 0.006 | Chance of biting in an even matchup, plus change per point of the carrier's mean Handling and Footy IQ over the defender's Footy IQ. |
+| `live.dummyShadeM` | `live/knobs.ts`, `live/play.ts` | 3 m | Target distance toward the runner for the defender who bites. Normal acceleration, field bounds and tackle reach apply. |
 | `rolePreference` | `live/positioning.ts` | halves +1.5 off the ruck (+0.5 else), forwards +1.2 on tackles 1–3, fullback −0.5 (+ preset) | Who the ball goes to. |
 | `live.overlapPrefer` / `live.shiftM` | `live/knobs.ts` | 0.8 / 20 m | Receivers on the side with the numbers. |
 | Weighted receiver margin (`live.receiverMargin`) | `live/knobs.ts`; `pickReceiverWeighted` in `tactics.ts` | 2 (score points; **0 = off**) | How far behind the best pass score an option may be and still get the ball (#649 step 1, BAK-208 §4.2). 0: always the best, and no roll is drawn, every seed as before #649. Higher: more men in the draw (most passes have 2–4 options, the second-best a median 0.9 behind). |

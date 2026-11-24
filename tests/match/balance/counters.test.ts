@@ -49,6 +49,20 @@ describe('position stat overrides', () => {
 });
 
 describe('tracked counter measurements', () => {
+  it('counts a line break or try by the man who just sold the dummy', () => {
+    const events = [
+      { tick: 10, kind: 'dummy-pass', side: 'home' as const, slot: 4, detail: 'bite', text: '' },
+      { tick: 19, kind: 'line-break', side: 'home' as const, slot: 4, text: '' },
+      { tick: 40, kind: 'try', side: 'home' as const, slot: 4, text: '' },
+      { tick: 50, kind: 'dummy-pass', side: 'away' as const, slot: 1, detail: 'square', text: '' },
+      { tick: 100, kind: 'line-break', side: 'away' as const, slot: 1, text: '' },
+      { tick: 110, kind: 'try', side: 'home' as const, slot: 4, text: '' },
+    ];
+    expect(countEvents(events)).toMatchObject({ dummyPasses: 2, dummyBites: 1, dummyBreaks: 1, dummyTries: 1 });
+    expect(countEvents(events, 'home')).toMatchObject({ dummyPasses: 1, dummyBreaks: 1, dummyTries: 1 });
+    expect(countEvents(events, 'away')).toMatchObject({ dummyPasses: 1, dummyBites: 0, dummyBreaks: 0, dummyTries: 0 });
+  });
+
   it('keeps opposing kick and try context when attributing kick counts to one side', () => {
     const events = [
       { tick: 1, kind: 'kick', side: 'home' as const, detail: 'bomb', text: '' },
@@ -82,13 +96,14 @@ describe('tracked counter measurements', () => {
     // Before it, seed 8 was a draw (#722). The five-eighth option draws both, so the
     // loss/win pair is seeds 11 and 12. Seed 3 supplies a neutral one-minute draw
     // (seed 2 before #649). This two-sample fixture checks aggregation mechanics, not match balance.
-    const tiny = cell;
+    // Keep the known outcomes for the arithmetic check when the new dummy changes those matches.
+    const tiny = { ...cell, variant: { ...cell.variant, tuning: { 'live.dummyChance': 0 } } };
     const first = measureCell(tiny, 1, 4, 11);
     const second = measureCell(tiny, 1, 4, 12);
     const both = measureCell(tiny, 2, 4, 11);
     const xs = [first, second].map((r) => r.trackedWin! + r.trackedDraw! / 2);
     expect(xs).toEqual([0, 1]);
-    expect(measureCell({ ...cell, scenario: even }, 1, 1, 3).pointsShare).toEqual({ mean: 0.5, se: 0 });
+    expect(measureCell({ ...tiny, scenario: even }, 1, 1, 3).pointsShare).toEqual({ mean: 0.5, se: 0 });
     expect(new Set(xs).size).toBe(2);
     const mean = (xs[0]! + xs[1]!) / 2;
     expect(both.pointsShare!.mean).toBe(mean);
