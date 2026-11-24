@@ -306,6 +306,9 @@ zoom that holds them; a trail follows the ball from the boot and fades after the
 the bounce, and the framing is back on the ball within a second. A bomb or a cross-field
 kick rings the two under it as it comes down and lights the one who takes it; a grubber
 leaves a skid mark at each hop (`src/match/view/kickLayer.ts`, tuning reference §9).
+The grubber's ball tumbles end over end through its four diminishing skips. Its
+pose follows the flight tick, touching down on alternating tips before settling
+on its side for the chase.
 
 On a contested open-play bomb, the chaser and receiver plant and reach while the ball
 is still falling. The catch or regather brings the actual holder's hands around the

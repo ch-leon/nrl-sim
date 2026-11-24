@@ -5,6 +5,7 @@
 import { FIELD_LENGTH, FIELD_WIDTH, IN_GOAL, toFieldPt } from '../core/field';
 import { fieldToWorldPoint } from '../../scenes/matchField';
 import { LIVE } from '../league/live';
+import { SIX_AGAIN_ARMS } from '../../art/match/bench';
 import type { PlayerSnap, Side, Snapshot } from '../core/snapshot';
 
 /**
@@ -133,8 +134,10 @@ export function refCoversCarrier(s: Snapshot, spot: { x: number; y: number }, of
   return rw.y >= cw.y && rw.y - BODY_H < cw.y && Math.abs(rw.x - cw.x) < BODY_HALF_W * 2;
 }
 
-/** What the referee is signalling on this tick: an arm up for a try, pointing for a penalty. */
-export type RefSignal = 'try' | 'penalty' | null;
+/** What the referee is signalling on this tick. */
+export type RefSignal = 'try' | 'penalty' | 'six-again' | null;
+/** Sim ticks per arm pose in the six-again circle. */
+export const SIX_AGAIN_POSE_TICKS = 3;
 
 /** The phase in the snapshot's state label (`<side> ball · <phase> · …`). */
 function phaseOf(s: Snapshot): string {
@@ -143,7 +146,11 @@ function phaseOf(s: Snapshot): string {
 
 export function refereeSignal(s: Snapshot): RefSignal {
   if (s.players.some((p) => p.tryTick !== undefined)) return 'try';
-  return phaseOf(s) === 'penalty' ? 'penalty' : null;
+  const phase = s.phase?.kind ?? phaseOf(s);
+  if (phase === 'penalty') return 'penalty';
+  if (s.sixAgainTick === undefined || (phase !== 'play' && phase !== 'tackle' && phase !== 'ruck')) return null;
+  const age = s.tick - s.sixAgainTick;
+  return age >= 0 && age < SIX_AGAIN_ARMS.length * SIX_AGAIN_POSE_TICKS ? 'six-again' : null;
 }
 
 // ── Bench and sin bin ───────────────────────────────────────────────────────

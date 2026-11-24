@@ -37,7 +37,7 @@ import { SET_TACKLES } from '../../config';
 import { TICK_S, type MatchSim } from '../core/engine';
 import { speedOf } from '../core/body';
 import { CARRY_LIFT, flightAt } from '../core/ball';
-import { GROUND_PICKUP_TICKS, REACT_SNAP_TICKS, type GroundPickupSnap, type PlayerSnap, type Snapshot } from '../core/snapshot';
+import { GROUND_PICKUP_TICKS, INTERCEPT_TICKS, REACT_SNAP_TICKS, type GroundPickupSnap, type PlayerSnap, type Snapshot } from '../core/snapshot';
 import type { Vec } from '../core/vec';
 import { clockText } from './rules';
 import { goalStrikeTick } from './goals';
@@ -56,6 +56,8 @@ export class LiveSim extends LivePositioning implements MatchSim {
    */
   private phaseSeen: Phase | null = null;
   private phaseSince = 0;
+  /** Retain the real call for the referee picture, including on a seek into the signal. */
+  private sixAgainTick: number | undefined;
   private groundPickup?: GroundPickupSnap;
 
   // ── Tick ──────────────────────────────────────────────────────────────────
@@ -161,10 +163,12 @@ export class LiveSim extends LivePositioning implements MatchSim {
     this.watchBombContest();
     this.expireCalls();
     if (this.scripted || this.tucked >= 0) this.tidyPlays();
-    if (this.attacking !== beforeSide || this.tackles < beforeTackles
-      || !['play', 'tackle', 'ruck'].includes(this.phase.kind)) {
+    const live = this.phase.kind === 'play' || this.phase.kind === 'tackle' || this.phase.kind === 'ruck';
+    if (this.attacking !== beforeSide || this.tackles < beforeTackles || !live) {
       this.pendingControl.home = this.pendingControl.away = null;
     }
+    if (!live || this.attacking !== beforeSide) this.sixAgainTick = undefined;
+    else if (this.events.some((e) => e.kind === 'six-again')) this.sixAgainTick = this.tick;
     if (this.phase !== this.phaseSeen) {
       this.phaseSeen = this.phase;
       this.phaseSince = this.tick;
@@ -232,6 +236,7 @@ export class LiveSim extends LivePositioning implements MatchSim {
       const source = launch && this.players.find(p => p.side === launch.player.side && p.slot === launch.player.slot && p.key === launch.player.who);
       ball = { x: f.pos.x, y: f.pos.y, lift: f.lift, holder: null, flight: {
         via: b.via, from: { ...b.from }, to: { ...b.to }, startedTick: b.t0, arrivesTick: b.t0 + b.ticks, fromLift: b.fromLift,
+        ...(b.via === 'kick' && b.bounces > 0 ? { grubber: { peak: b.peak, bounces: b.bounces } } : {}),
         ...(receiver ? { receiver: { side: receiver.side, slot: receiver.slot, who: receiver.key } } : {}),
         ...(source && launch ? { source: { player: { ...launch.player }, headX: launch.headX, headY: launch.headY, speed: launch.speed, odometer: launch.odometer, legs: launch.legs, blown: launch.blown } } : {}),
       } };
@@ -264,10 +269,18 @@ export class LiveSim extends LivePositioning implements MatchSim {
       ...(conversion ? { conversion } : {}),
       label: `${this.names[this.attacking]} ball · ${state} · ${this.points.home}–${this.points.away} · ${clockText(this.half, this.clockTicks * TICK_S)}${this.siren && (kind === 'play' || kind === 'tackle' || kind === 'ruck') ? ' · siren' : ''} · ${legs}${short}`,
       events: this.events,
+      ...(this.sixAgainTick === undefined ? {} : { sixAgainTick: this.sixAgainTick }),
       clock: { half: this.half, seconds: this.clockTicks * TICK_S, minute: Math.floor(this.matchSeconds / 60), siren: this.siren, finished: this.finished },
       score: { ...this.points },
       phase: { kind: ph.kind, since: this.phaseSince, ...(this.golden ? { golden: true } : {}) },
     };
+    const take = this.visualInterception;
+    if (take && this.tick - take.tick < INTERCEPT_TICKS && ph.kind === 'play' && b.kind === 'held') {
+      const h = this.players[b.by]!;
+      if (h.side === take.player.side && h.slot === take.player.slot && h.key === take.player.who && h.catchTick === take.tick) {
+        snap.interception = { ...take, player: { ...take.player } };
+      }
+    }
     const w = ph.kind === 'tackle' ? ph.wrestle : null;
     if (ph.kind === 'ruck' && ph.decision && this.tick < ph.decision.until && this.ruckReceiver(ph)) {
       const d = ph.decision;

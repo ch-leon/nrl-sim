@@ -1,4 +1,4 @@
-import type { BombContestSnap, DummyPassSnap, PlayerSnap, Side, Snapshot } from '../core/snapshot';
+import { INTERCEPT_TICKS, type BombContestSnap, type DummyPassSnap, type InterceptionSnap, type PlayerSnap, type Side, type Snapshot } from '../core/snapshot';
 import { DUMMY_PASS_PHASES, type Facing, type Movement } from '../../art/prototype/player';
 import { PLAYER_ANIMS, type PlayerAnim } from '../../art/match/players';
 import { LIVE } from '../league/live/knobs';
@@ -57,6 +57,7 @@ export interface PictureContext extends MotionContext {
   call?: ReceivePicture;
   dummyPass?: DummyPassSnap;
   dummyReceiver?: Pick<PlayerSnap, 'x' | 'y'>;
+  interception?: InterceptionSnap;
   contactPlayers?: ReadonlySet<string>;
   /** A play-the-ball in progress (#665): the side defending it, where the ball is, and whether it is coming out. */
   ruck?: { side: Side; x: number; y: number; rising: boolean };
@@ -125,6 +126,7 @@ export function pictureContext(s: Snapshot, prev?: Snapshot): PictureContext {
     const receiver = s.players.find(p => p.side === ref.side && p.slot === ref.slot && p.who === ref.who);
     if (receiver) ctx.dummyReceiver = receiver;
   }
+  if (s.interception && s.phase?.kind === 'play') ctx.interception = s.interception;
   if (s.contact) ctx.contactPlayers = new Set([s.contact.carrier, ...s.contact.defenders].map(p => `${p.side}/${p.slot}/${p.who}`));
   const up = prev && eyesUp(prev, s);
   if (up) ctx.eyesUp = up;
@@ -325,5 +327,14 @@ export function playerPicture(p: PlayerSnap, previous: PlayerSnap, tick: number,
   // Eyes on the bomb (#671): standing or running, ball elsewhere, one of the few under it.
   const lookUp = ctx.eyesUp?.who.has(`${p.side}/${p.slot}`) && (action === 'idle' || action === 'run') && !possession && !p.binned ? ctx.eyesUp.level : 0;
   const tired = slump ? 2 : weary && (['run', 'carry', 'idle', 'call', 'receive', 'guard', 'catch', 'pass', 'dummyPass'].includes(action) || landing || travelEnd) ? weary : 0;
+  // Keep the return's facing and gait. Only the arms choose the side the pass came from.
+  const take = ctx.interception;
+  if (take && possession && (action === 'catch' || action === 'carry') && ['idle', 'run', 'catch'].includes(p.pose)
+    && !p.binned && !ctx.contactPlayers?.has(`${p.side}/${p.slot}/${p.who}`)
+    && take.player.side === p.side && take.player.slot === p.slot && take.player.who === p.who
+    && take.tick === p.caughtTick && catchAge >= 0 && catchAge < INTERCEPT_TICKS) {
+    const laneLeft = screenHeading(take.fromX, take.fromY, screenDir).x < 0;
+    action = 'intercept'; frame = Math.min(2, catchAge) + (laneLeft !== facing.left ? 3 : 0);
+  }
   return { who: p.who ?? `${p.side}/${p.slot}`, action, frame, lift, ...(strideFrame === undefined ? {} : { strideFrame }), ...(movement ? { movement } : {}), ...(teeFlip ? { teeFlip: true as const } : {}), ...(tired ? { tired } : {}), ...(lookUp ? { lookUp } : {}), ...facing, possession };
 }

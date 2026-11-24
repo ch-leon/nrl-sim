@@ -5,7 +5,7 @@
 import { PixelBuffer, mix, shade } from '../pixel';
 import { OUTLINE, buildKit, colorDistance, type Kit } from './kit';
 import { kitContrast } from './kitClash';
-import { CENTRE, FOOT, HEIGHT, PAINT_H, WIDTH, appearanceFor, stand, type Appearance } from '../prototype/player';
+import { CENTRE, FOOT, HEIGHT, PAINT_H, WIDTH, appearanceFor, drawPrototypePlayer, stand, type Appearance, type ArmPose, type Facing } from '../prototype/player';
 import { body, contactPainter } from '../prototype/tackle';
 import { tiltedHead } from '../prototype/contact';
 import { bentContactArm } from './limbs';
@@ -44,6 +44,21 @@ export function refereeKit(...worn: readonly Kit[]): Kit {
 /** The referee: an ordinary man (no number), the same one every match. */
 export function refereeLook(): Appearance {
   return { ...appearanceFor('match-referee'), head: 'short', build: 'athletic', stature: 0, tape: false, boots: 0x1b1d22 };
+}
+
+/** Lift, circle the forearm around the high elbow, then lower it. */
+export const SIX_AGAIN_ARMS: readonly ArmPose[] = [
+  { elbow: [4, -5], hand: [8, -10] },
+  { elbow: [5, -10], hand: [4, -16] },
+  { elbow: [6, -10], hand: [10, -18] },
+  { elbow: [8, -10], hand: [15, -13] },
+  { elbow: [8, -10], hand: [13, -6] },
+  { elbow: [6, -10], hand: [4, -9] },
+  { elbow: [4, -3], hand: [7, 1] },
+];
+
+export function drawRefereeSixAgain(look: Appearance, kit: Kit, pose: number, frame: number, facing: Facing, stride?: number): PixelBuffer {
+  return drawPrototypePlayer(look, kit, stride === undefined ? 'idle' : 'run', frame, facing, false, stride, 0, undefined, SIX_AGAIN_ARMS[pose]);
 }
 
 // ── Bench ───────────────────────────────────────────────────────────────────

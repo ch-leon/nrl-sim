@@ -10,7 +10,7 @@ export { HEAD_OPTIONS, type Head, type Facing } from './head';
 
 export type Movement = 'drive' | 'brake' | 'cutBack' | 'cutForward' | 'shuffleBack' | 'shuffleForward' | 'backpedal';
 export type Build = 'lean' | 'athletic' | 'stocky';
-export type Action = 'idle' | 'run' | 'carry' | 'pass' | 'dummyPass' | 'catch' | 'land' | 'call' | 'receive' | 'guard' | 'brace' | 'wrap' | 'ground' | 'ptb' | 'fend' | 'wrongFoot';
+export type Action = 'idle' | 'run' | 'carry' | 'pass' | 'catch' | 'dummyPass' | 'intercept' | 'land' | 'call' | 'receive' | 'guard' | 'brace' | 'wrap' | 'ground' | 'ptb' | 'fend' | 'wrongFoot';
 /** Reactions (#667): the arms held still over standing or running legs. */
 export type ReactAction = 'headHands' | 'hips' | 'fold';
 /** An authored near-arm pose, in pixels from its shoulder, over the usual gait. */
@@ -180,6 +180,18 @@ const DUMMY_PASS_POSES = [
 /** The same upper-body poses repeat with the boots facing the other way. */
 export const DUMMY_PASS_PHASES = DUMMY_PASS_POSES.length;
 
+/** One arm reaches to the lane side and retracts, in two short segments. */
+function interceptArm(frame: number, left: number, shX: number, shY: number) {
+  const dir = frame < 3 ? 1 : -1;
+  const beat = frame % 3;
+  const shoulder = dir > 0 || beat === 2 ? shX : left + 1;
+  const x = Math.min(WIDTH - 6, shoulder + (dir > 0 ? [8, 5, 4] : [-8, -4, -3])[beat]!);
+  const y = shY + [-2, 0, 3][beat]!;
+  const elbow = shoulder + dir * [4, 2, 1][beat]!;
+  const elbowY = shY + [0, 2, 4][beat]!;
+  return { shoulder, elbow, elbowY, x, y, dir, gather: beat !== 0 };
+}
+
 /** Shoulder lean / crouch / head lead. The hips and planted boots do not follow the lean.
  * Cuts use two planted support beats; starts, stops and defensive steps add a gather beat.
  */
@@ -220,15 +232,15 @@ export function prototypeUpperAt(build: Build, action: Action | ReactAction, fra
   const bodyW = build === 'stocky' ? 11 : build === 'athletic' ? 9 : 7;
   // Reactions (#667) hold the arms still over standing or running legs: hands on head, hands on hips, arms folded.
   const react = action === 'headHands' || action === 'hips' || action === 'fold';
-  const running = strideFrame !== -1 && (action === 'run' || action === 'carry' || action === 'land' || action === 'catch' || action === 'call' || action === 'receive' || action === 'guard' || ((action === 'pass' || action === 'dummyPass' || action === 'fend' || react) && strideFrame !== undefined));
+  const running = strideFrame !== -1 && (action === 'run' || action === 'carry' || action === 'land' || action === 'catch' || action === 'intercept' || action === 'call' || action === 'receive' || action === 'guard' || ((action === 'pass' || action === 'dummyPass' || action === 'fend' || react) && strideFrame !== undefined));
   const gait = strideFrame === undefined ? f : strideFrame < 0 ? 0 : strideFrame % 6;
   const jog = running && strideFrame !== undefined && strideFrame >= 6;
   const motion = movement ? MOVEMENT_POSES[movement] : undefined;
   const cut = movement === 'cutBack' || movement === 'cutForward';
   const shuffle = movement === 'shuffleBack' || movement === 'shuffleForward';
   // Arms pump with the legs except while the hands are busy catching, passing or fending.
-  const weary = ['run', 'carry', 'land', 'idle', 'catch', 'pass', 'dummyPass', 'call', 'receive', 'guard'].includes(action) ? Math.max(0, Math.min(2, tired)) : 0;
-  const swing = running && (action === 'run' || action === 'carry' || action === 'land' || action === 'call' || (strideFrame !== undefined && f === 5 && action !== 'fend')) ? ARM_SWING[gait]! * (jog ? .5 : 1) * (weary > 1 ? .5 : 1) * (motion?.arms ?? 1) : 0;
+  const weary = ['run', 'carry', 'land', 'idle', 'catch', 'intercept', 'pass', 'dummyPass', 'call', 'receive', 'guard'].includes(action) ? Math.max(0, Math.min(2, tired)) : 0;
+  const swing = running && (action === 'run' || action === 'carry' || action === 'land' || action === 'call' || (strideFrame !== undefined && f === 5 && action !== 'fend' && action !== 'intercept')) ? ARM_SWING[gait]! * (jog ? .5 : 1) * (weary > 1 ? .5 : 1) * (motion?.arms ?? 1) : 0;
   // Away from the shared contact picture a tackle and a beaten (or tackled) man each have a start,
   // a middle and an end over the pose's last frames: reach, wrap, drive low; jolt, rock back, regather.
   const beat = f < 2 ? 0 : f < 4 ? 1 : 2;
@@ -455,6 +467,13 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action | Re
     line(shX, shY, shX + 2, shY + 4, a.skin, 2);
     line(shX + 2, shY + 4, handX, handY, a.skin, 2);
     b.fillRect(handX + 1, handY - 1, 1, 3, a.skin);
+  } else if (action === 'intercept') {
+    const arm = interceptArm(f, left, shX, shY);
+    handX = arm.x; handY = arm.y;
+    if (arm.gather) line(shX - 2, shY + 2, handX - arm.dir, handY + 2, skinDark, 2);
+    if (possession) heldBall(arm.x - 4, arm.y - 4);
+    line(arm.shoulder, shY, arm.elbow, arm.elbowY, a.skin, 2);
+    line(arm.elbow, arm.elbowY, handX, handY, a.skin, 2);
   } else if (action === 'catch' || (action === 'pass' && f < 5)) {
     const pose = HANDLING_POSES[action][f]!;
     handX = shX + pose[0]; handY = shY + pose[1];
@@ -535,17 +554,22 @@ function dummyBallAt({ reach, drop }: typeof DUMMY_PASS_POSES[number], shX: numb
   return { x: Math.min(WIDTH - BALL.w - 2, shX + reach), y };
 }
 
-function handlingBallAt(p: ReturnType<typeof prototypeUpperAt>, build: Build, action: 'carry' | 'land' | 'catch' | 'pass' | 'dummyPass', facing: Facing): { x: number; y: number } {
+type BallAction = 'carry' | 'land' | 'catch' | 'pass' | 'intercept' | 'dummyPass';
+function handlingBallAt(p: ReturnType<typeof prototypeUpperAt>, build: Build, action: BallAction, facing: Facing): { x: number; y: number } {
   const bodyW = build === 'stocky' ? 11 : build === 'athletic' ? 9 : 7;
   const shX = p.left + bodyW - 2, shY = p.shoulderY + 2;
   if (p.dummy) return dummyBallAt(p.dummy, shX, shY, facing);
+  if (action === 'intercept') {
+    const arm = interceptArm(p.f, p.left, shX, shY);
+    return { x: arm.x - 4, y: arm.y - 4 };
+  }
   const carry = action === 'carry' || action === 'land' || (action === 'catch' && p.f === 5);
   const target = carry ? HANDLING_POSES.carry.ball : HANDLING_POSES[action === 'pass' ? 'pass' : 'catch'][p.f]!;
   return { x: shX + target[0] - (carry ? 0 : 3), y: shY + target[1] - (carry ? 0 : 2) };
 }
 
 /** Centre of the embedded ball relative to the actor's feet, in the unmirrored painted frame. */
-export function playerBallAnchor(a: Appearance, action: 'carry' | 'land' | 'catch' | 'pass' | 'dummyPass', frame: number, strideFrame?: number, tired = 0, movement?: Movement, facing: Facing = 'front'): { x: number; y: number } {
+export function playerBallAnchor(a: Appearance, action: BallAction, frame: number, strideFrame?: number, tired = 0, movement?: Movement, facing: Facing = 'front'): { x: number; y: number } {
   const p = prototypeUpperAt(a.build, action, frame, strideFrame, tired, movement);
   const at = handlingBallAt(p, a.build, action, facing);
   return { x: at.x + 4.5 - CENTRE, y: at.y + 3.5 + HEIGHT - PAINT_H - a.stature - FOOT };

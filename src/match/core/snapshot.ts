@@ -6,6 +6,14 @@ export type Side = 'home' | 'away';
 
 /** Exact contact participants, in arrival order. Nearby defenders are not joiners. */
 export interface ContactPlayer { side: Side; slot: number; who: string }
+/** A confirmed pass take and the direction back along its flight. */
+export interface InterceptionSnap {
+  player: ContactPlayer;
+  tick: number;
+  fromX: number;
+  fromY: number;
+}
+export const INTERCEPT_TICKS = 4;
 export interface AttackShapeSnap {
   kind: 'spread' | 'pod' | 'edge' | 'back-door'; side: Side; dir: 1 | -1; edge: 1 | -1; startedTick: number; linkSlot?: 4 | 5;
   backDoor?: { caller: ContactPlayer; lead: ContactPlayer; support: ContactPlayer; originY: number };
@@ -104,6 +112,8 @@ export interface BallFlightSnap {
   startedTick: number;
   arrivesTick: number;
   fromLift: number;
+  /** Hops of an actual low kick, for drawing the same curve between ticks. */
+  grubber?: { peak: number; bounces: number };
   receiver?: ContactPlayer;
   /** Written only for an actual pass launch, never used by match decisions. */
   source?: { player: ContactPlayer; headX: number; headY: number; speed: number; odometer: number; legs: number; blown: boolean };
@@ -174,6 +184,8 @@ export interface SimEvent {
 
 export interface Snapshot {
   dummyPass?: DummyPassSnap;
+  /** Presentation history for a defender gathering the pass into his return. */
+  interception?: InterceptionSnap;
   /** Actual structure prepared during contact (or a standalone PTB); renderers still use real positions. */
   attackShape?: AttackShapeSnap;
   /** The ordinary dummy-half's committed intended recipient, before release. Interceptions/spills can prevent the catch. */
@@ -191,6 +203,8 @@ export interface Snapshot {
   label: string;
   /** Events emitted on this tick. */
   events: SimEvent[];
+  /** Tick of a six-again call during the current passage of play. Presentation only. */
+  sixAgainTick?: number;
   /** A wrestle in progress (BAK-208 §8.1): the carrier, the fight left in him (1 → 0) and how many men are on him. */
   wrestle?: WrestleSnap;
   /** Participants in the current contact, including their persistent appearances. */
