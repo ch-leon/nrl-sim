@@ -24,6 +24,8 @@ export interface ContactSnap {
   defenders: ContactPlayer[];
   /** Self-contained timing so seeking and fast playback do not lose a join or result. */
   joinedTicks?: number[];
+  /** A committed low dive at the carrier's legs. */
+  technique?: 'ankle';
   outcome?: 'tackle' | 'big-hit' | 'break-tackle' | 'strip' | 'offload';
   resolvedTick?: number;
   phaseTick?: number;

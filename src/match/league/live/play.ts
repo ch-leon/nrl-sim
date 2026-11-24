@@ -188,6 +188,9 @@ export abstract class LivePlay extends LiveKicks {
 
     if (this.tick < h.immuneUntil) return;
 
+    const cover = this.cornerCover(h, defenders);
+    if (cover && this.diveForCorner(h, cover)) return;
+
     // One-on-one and the defender is almost on him: try to step (once per
     // defender) — unless the game plan says tuck it and carry in.
     if (nearest && nearD <= LIVE.stepRange && this.steppedOn(h) !== this.indexOf(nearest)) {

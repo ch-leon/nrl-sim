@@ -108,7 +108,7 @@ export function advanceContactAnimation(previous: ContactAnimation | null, snap:
   const phase = kind === 'break' || kind === 'steal' ? 'escape' : carrier.pose === 'ptb' ? 'ptb' : carrier.pose === 'down' ? 'ground' : 'contact';
   // Read from this tick's facts alone (never the fold), so a seek draws what playing through drew.
   const approach = contactApproach(carrier, find(contact.defenders[0]!));
-  return { contact, joined, kind, approach, variant: contactVariant(kind, approach), resolvedTick, tick: snap.tick,
+  return { contact, joined, kind, approach, variant: contact.technique ?? contactVariant(kind, approach), resolvedTick, tick: snap.tick,
     phase, phaseTick: contact.phaseTick ?? (prior?.phase === phase ? prior.phaseTick : snap.tick),
     holder: snap.ball.holder };
 }

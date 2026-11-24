@@ -327,13 +327,15 @@ describe('measuring and reporting', () => {
     // With the stand off as well, each pin is that same revision 15 match.
     // Score and clock on the last (engine revision 18) leaves these two seed-1 pins where impact interchanges put them.
     // With the slice off, each pin is that revision 17 match.
-    { attack: 'balanced' as const, expected: '13-10:155:57426901f7cbc31f', clockOff: '13-10:155:57426901f7cbc31f', impactOff: '13-10:155:57426901f7cbc31f', standsOff: '13-10:155:57426901f7cbc31f' },
+    // The corner dive (engine revision 21) is on the default pin. The score-and-clock replay also has the dive off,
+    // so that pin stays the revision 20 match. The score-and-clock slice does not move these pins on its own.
+    { attack: 'balanced' as const, expected: '13-10:145:79abb32eab53a59a', clockOff: '13-10:155:57426901f7cbc31f', impactOff: '13-10:145:79abb32eab53a59a', standsOff: '13-10:145:79abb32eab53a59a' },
     { attack: 'expansive' as const, expected: '0-1:138:b982bd41ff05e4eb', clockOff: '0-1:138:b982bd41ff05e4eb', impactOff: '0-1:138:b982bd41ff05e4eb', standsOff: '0-1:138:b982bd41ff05e4eb', beforeReturns: '0-6:147:52d52acd0272a5fe' },
   ])('pins an even $attack / Slide match (seed 1)', async ({ attack, expected, clockOff, impactOff, standsOff, beforeReturns }) => {
     const replay = () => liveFingerprint(new LiveSim(sideSheet('H', { rating: 60, tactics: { attack } }), sideSheet('A', { rating: 60 }), 1));
     expect((await replay()).pin).toBe(expected);
     {
-      const restore = applyTuning({ 'lastTackle.scoreClock.on': 0 });
+      const restore = applyTuning({ 'lastTackle.scoreClock.on': 0, 'cornerCover.on': 0 });
       try {
         expect((await replay()).pin).toBe(clockOff);
       } finally {
@@ -357,7 +359,7 @@ describe('measuring and reporting', () => {
       }
     }
     if (beforeReturns) {
-      const restore = applyTuning({ 'kickReturn.on': 0, 'goalLineStand.on': 0, 'bench.impact.on': 0, 'lastTackle.scoreClock.on': 0 });
+      const restore = applyTuning({ 'kickReturn.on': 0, 'goalLineStand.on': 0, 'bench.impact.on': 0, 'lastTackle.scoreClock.on': 0, 'cornerCover.on': 0 });
       try {
         expect((await replay()).pin).toBe(beforeReturns);
       } finally {
@@ -397,7 +399,9 @@ describe('measuring and reporting', () => {
     // With the boost off, each pin is the revision 16 match. With the stand off as well, the revision 15 match.
     // Score and clock on the last (engine revision 18) leaves these two seed-1 pins where impact interchanges put them.
     // With the slice off, each pin is that revision 17 match.
-    { name: 'plays-on', aiCoach: false, expected: '0-6:138:45572dfeb7a225d1', clockOff: '0-6:138:45572dfeb7a225d1', impactOff: '0-6:138:45572dfeb7a225d1', standsOff: '0-6:138:45572dfeb7a225d1', beforeReturns: '4-10:155:79024e6ce6d03277' },
+    // The corner dive (engine revision 21) is on the default pin. The score-and-clock replay also has the dive off,
+    // so that pin stays the revision 20 match. The score-and-clock slice does not move these pins on its own.
+    { name: 'plays-on', aiCoach: false, expected: '0-6:133:bb5c0142e24364b4', clockOff: '0-6:138:45572dfeb7a225d1', impactOff: '0-6:133:bb5c0142e24364b4', standsOff: '0-6:133:bb5c0142e24364b4', beforeReturns: '4-10:155:79024e6ce6d03277' },
     { name: 'plays-on-hard', aiCoach: true, expected: '0-10:160:c9c6855002de5af6', clockOff: '0-10:160:c9c6855002de5af6', impactOff: '0-10:160:c9c6855002de5af6', standsOff: '0-10:148:ee54e8d79a90e3cf' },
   ])('pins $name: an even Balanced / Slide match with set plays (seed 1)', async ({ aiCoach, expected, clockOff, impactOff, standsOff, beforeReturns }) => {
     const home = { ...sideSheet('H', { rating: 60 }), plays: ['block-play' as const, 'cut-out-winger' as const, 'kick-pass' as const] };
@@ -407,7 +411,7 @@ describe('measuring and reporting', () => {
     expect(parts.some((p) => p.includes(':coach-call:home:set-play:'))).toBe(aiCoach);
     expect(pin).toBe(expected);
     {
-      const restore = applyTuning({ 'lastTackle.scoreClock.on': 0 });
+      const restore = applyTuning({ 'lastTackle.scoreClock.on': 0, 'cornerCover.on': 0 });
       try {
         expect((await replay()).pin).toBe(clockOff);
       } finally {
@@ -431,7 +435,7 @@ describe('measuring and reporting', () => {
       }
     }
     if (beforeReturns) {
-      const restore = applyTuning({ 'kickReturn.on': 0, 'goalLineStand.on': 0, 'bench.impact.on': 0, 'lastTackle.scoreClock.on': 0 });
+      const restore = applyTuning({ 'kickReturn.on': 0, 'goalLineStand.on': 0, 'bench.impact.on': 0, 'lastTackle.scoreClock.on': 0, 'cornerCover.on': 0 });
       try {
         expect((await replay()).pin).toBe(beforeReturns);
       } finally {
@@ -440,7 +444,7 @@ describe('measuring and reporting', () => {
     }
   });
   it('with punts into space off, plays-on-hard keeps the revision 9 pin', async () => {
-    const restore = applyTuning({ 'longKick.on': 0, 'wingBomb.on': 0, 'secondKicker.on': 0, 'kickReturn.on': 0, 'goalLineStand.on': 0, 'bench.impact.on': 0, 'lastTackle.scoreClock.on': 0 });
+    const restore = applyTuning({ 'longKick.on': 0, 'wingBomb.on': 0, 'secondKicker.on': 0, 'kickReturn.on': 0, 'goalLineStand.on': 0, 'bench.impact.on': 0, 'lastTackle.scoreClock.on': 0, 'cornerCover.on': 0 });
     try {
       const home = { ...sideSheet('H', { rating: 60 }), plays: ['block-play' as const, 'cut-out-winger' as const, 'kick-pass' as const] };
       const sim = new LiveSim(home, sideSheet('A', { rating: 60 }), 1, { aiCoach: ['home'] });

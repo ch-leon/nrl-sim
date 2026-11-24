@@ -424,6 +424,17 @@ play). The roll is drawn only when he is in contact at the line and it is a cont
 
 Tests: `tests/match/league/fatigue.test.ts`, `tests/match/league/heldUp.test.ts`.
 
+**Corner cover tackle** (#652, BAK-208 §8.1). `cornerCover.ts` owns the odds.
+`live/contact.ts` checks the open lane, makes the roll, and records the result.
+
+| Knob | Value | Effect |
+|---|---|---|
+| `cornerCover.on` | 1 (**0 = off**) | 0 keeps ordinary positioning and contact, with no extra roll. With it off, the event stream matches the previous engine (revision 20). |
+| `cornerCover.readFromM` / `cornerCover.touchM` | 28 / 15 m | Goal-line and touchline bounds for the fullback to read a clear run at the corner. |
+| `cornerCover.fromM` / `cornerCover.reachM` | 10 / 2.7 m | A dive is eligible up to 10 m short of the line and only when the fullback is actually within 2.7 m. |
+| `cornerCover.frontCos` | 0.8 | Defenders arriving more squarely in front than this cosine use the ordinary contact contest. |
+| `cornerCover.base` / `cornerCover.perMs` / `cornerCover.reachCost` | 0.53 / 0.055 / 0.20 | Start at 53%, add 5.5 percentage points per m/s the fullback is quicker, subtract 20 points at full reach scaled by the gap, and clamp to 0–100%. |
+
 ### 11.2 Goal-line stands (#657)
 
 The knobs in `src/match/league/goalLineStand.ts` take full effect on the third straight

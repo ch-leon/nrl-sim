@@ -198,15 +198,16 @@ describe('ordinary attacking bombs to the winger’s corner (#650)', () => {
   });
 
   it('finds both corners in ordinary seeded play without a coach call or a Lab aim', () => {
-    // Reapers v Wolves (Kick-chase) seed 42 bombs to the high corner at 3303.
-    // Mariners v Brumbies seed 33 bombs to the low corner at 2088.
+    // Reapers v Wolves (Kick-chase): seed 1 bombs to the low corner, attacking toward
+    // +x, at 1543. Seed 32 bombs to the high corner, attacking toward −x, at 3194.
+    // With the dive off, seed 42 is still the old high-corner bomb at 3303.
     const chase = { attack: 'kick-chase' } as const;
-    const near = new BombSim(labSheet('rival-reapers', 'gen', chase), labSheet('rival-wolves', 'gen', chase), 42).firstCornerBomb(3_600, 1);
-    const far = new BombSim(labSheet('rival-mariners'), labSheet('rival-brumbies'), 33).firstCornerBomb(2_500, -1);
-    if (!near || !far) throw new Error('Expected a natural bomb to each corner');
-    expect(near.to.y).toBeGreaterThanOrEqual(FIELD_WIDTH - 12);
-    expect(near.to.x - near.from.x).toBeGreaterThan(0);
-    expect(far.to.y).toBeLessThanOrEqual(12);
-    expect(far.to.x - far.from.x).toBeLessThan(0);
+    const low = new BombSim(labSheet('rival-reapers', 'gen', chase), labSheet('rival-wolves', 'gen', chase), 1).firstCornerBomb(2_000, -1);
+    const high = new BombSim(labSheet('rival-reapers', 'gen', chase), labSheet('rival-wolves', 'gen', chase), 32).firstCornerBomb(3_600, 1);
+    if (!low || !high) throw new Error('Expected a natural bomb to each corner');
+    expect(low.to.y).toBeLessThanOrEqual(12);
+    expect(low.to.x - low.from.x).toBeGreaterThan(0);
+    expect(high.to.y).toBeGreaterThanOrEqual(FIELD_WIDTH - 12);
+    expect(high.to.x - high.from.x).toBeLessThan(0);
   }, 15_000);
 });

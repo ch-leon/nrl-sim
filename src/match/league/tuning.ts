@@ -31,6 +31,7 @@ import { LAST_TACKLE, SECOND_KICKER } from './lastTackle';
 import { LONG_KICK, WING_BOMB } from './tactics';
 import { HELD_UP, WRESTLE } from './wrestle';
 import { GOAL_LINE_STAND } from './goalLineStand';
+import { CORNER_COVER } from './cornerCover';
 import { BIN } from './sinbin';
 import { PLAYS, POSTS_CHARGE } from './plays';
 import { DIFFICULTIES, DIFFICULTY } from '../../config';
@@ -69,6 +70,7 @@ export const KNOBS = {
   wrestle: WRESTLE,
   heldUp: HELD_UP,
   goalLineStand: GOAL_LINE_STAND,
+  cornerCover: CORNER_COVER,
   traits: TRAIT_PTS,
   edge: EDGE_COST,
   presets: PRESET_TABLES,
