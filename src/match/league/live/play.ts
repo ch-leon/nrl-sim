@@ -21,6 +21,7 @@ import { FORTY_TWENTY_ENABLED, TOUCH, inOwnInGoal } from '../touch';
 import { BIN } from '../sinbin';
 import { PLAYS } from '../plays';
 import { PLAYS_BY_ID } from '../../../data/plays';
+import { SHAPES, openSideOf } from '../attackingShapes';
 import { LIVE } from './knobs';
 import { other, type Player, type Phase, type PendingKick } from './types';
 import { LiveKicks } from './kicks';
@@ -54,6 +55,7 @@ export abstract class LivePlay extends LiveKicks {
 
     const intent = this.pendingControl[this.attacking];
     if (intent) {
+      if (this.phase.kind === 'play' && this.phase.shape?.openSide) this.phase.shape = null;
       if (intent.kind === 'kick') {
         this.pendingControl[this.attacking] = null;
         if (this.tackles === SET_TACKLES - 1) {
@@ -146,6 +148,22 @@ export abstract class LivePlay extends LiveKicks {
       } else if (this.kickCall !== 'run' && (this.tick - h.catchTick >= LIVE.kickRunTicks || nearD < LIVE.engageM)) {
         this.pendingKick = this.planKick(h, this.kickCall, undefined, true);
         this.lock(h, 'kick', LIVE.kickLockTicks);
+        return;
+      }
+    }
+
+    // An ordinary wide shift uses quick hands before the line closes. Each link reads the real pass lane.
+    const shape = own && this.phase.kind === 'play' && this.phase.shape?.openSide ? this.currentAttackShape() : null;
+    if (shape?.openSide && this.phase.kind === 'play') {
+      const wide = SHAPES.openSide;
+      const held = this.tick - h.catchTick;
+      const next = this.wideReceiver(h, shape);
+      const crowded = nearD <= wide.pressureM || (next && this.receiverSpace(next, defenders) <= LIVE.pressureM);
+      if (crowded || h.decided || held > wide.waitTicks) this.phase.shape = null;
+      else if (held >= wide.handsTicks && next) {
+        shape.openSide.receiving++;
+        h.decided = true;
+        this.pass(h, next);
         return;
       }
     }
@@ -356,19 +374,33 @@ export abstract class LivePlay extends LiveKicks {
     return n > 0 ? sum / n : 0;
   }
 
-  /** Shifting it wide on the last (#650): the widest man behind him in reach, or nobody (no roll). */
+  /** Shifting it wide on the last (#650): look to the open side where there is a genuine pass in reach. */
   private shiftReceiver(h: Player, plan: AttackPlan): Player | null {
     const reach = MAX_LAT_M + (plan.width > 0 ? 3 : 0);
+    const wide = SHAPES.openSide;
+    const edge = wide.on > 0 && !this.callState[this.attacking].attack ? openSideOf(h.body.pos.y) : 0;
     let best: Player | null = null;
     let bestLat = 0;
+    let open: Player | null = null;
+    let openLat = 0;
     for (const c of this.candidates(h, plan)) {
       const depth = (h.body.pos.x - c.pos.x) * this.dir;
-      const lat = Math.abs(c.pos.y - h.body.pos.y);
-      if (c.busy || depth < 0.3 || depth > 8 || lat < 2 || lat > reach || lat <= bestLat) continue;
-      best = this.players[c.idx]!;
-      bestLat = lat;
+      const offset = c.pos.y - h.body.pos.y;
+      const lat = Math.abs(offset);
+      if (c.busy || depth < 0.3 || depth > 8 || lat < 2 || lat > reach) continue;
+      if (lat > bestLat) {
+        best = this.players[c.idx]!;
+        bestLat = lat;
+      }
+      if (offset * edge > 0 && lat >= wide.lastMinWidthM && lat > openLat) {
+        open = this.players[c.idx]!;
+        openLat = lat;
+      }
     }
-    return best;
+    if (!open || !best || open === best) return best;
+    const defenders = this.side(other(h.side));
+    const openSpace = this.receiverSpace(open, defenders);
+    return openSpace > LIVE.pressureM && openSpace + wide.lastCoverEdgeM >= this.receiverSpace(best, defenders) ? open : best;
   }
 
   /** Where the kick goes and who it is for, by type (BAK-208 §4.4). */

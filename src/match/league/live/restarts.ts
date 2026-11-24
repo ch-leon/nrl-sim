@@ -118,7 +118,9 @@ export abstract class LiveRestarts extends LivePlay {
     const secondKicker = decision.secondKicker && !decision.cancelled && decision.to && receiver
       && ball.kind === 'flight' && ball.via === 'pass' && ball.receiver === this.indexOf(receiver)
       ? { ...decision.to, catchTick: ball.t0 + ball.ticks } : undefined;
-    this.phase = { kind: 'play', ...(ph.shape ? { shape: ph.shape } : {}), ...(secondKicker ? { secondKicker } : {}) };
+    const shape = ph.shape?.openSide && (!decision.openSide || !receiver || receiver.slot !== ph.shape.openSide.line[0]?.player.slot)
+      ? null : ph.shape;
+    this.phase = { kind: 'play', ...(shape ? { shape } : {}), ...(secondKicker ? { secondKicker } : {}) };
   }
 
   /** A specific last-play instruction retains the side's usual taker. */
@@ -163,7 +165,7 @@ export abstract class LiveRestarts extends LivePlay {
 
   private chooseRuck(h: Player, until: number): RuckDecision {
     const last = this.tackles === SET_TACKLES - 1;
-    let receiver: number | null = null, kicker = false, secondKicker = false;
+    let receiver: number | null = null, kicker = false, secondKicker = false, openSide = false;
     if (last) {
       const k = this.kicker(this.attacking);
       if (!this.locked(k) && this.tick >= k.busyUntil) {
@@ -180,13 +182,19 @@ export abstract class LiveRestarts extends LivePlay {
       receiver = LIVE.receiverMargin > 0 && LIVE.receiverAtRuck > 0
         ? pickReceiverWeighted(h.body.pos, this.dir, this.candidates(h), MAX_LAT_M, 0, LIVE.receiverMargin, LIVE.receiverSpread, this.rng.next())
         : pickReceiver(h.body.pos, this.dir, this.candidates(h));
+      const shape = !last ? this.currentAttackShape() : null;
+      const next = shape?.openSide ? this.wideReceiver(h, shape) : null;
+      if (next && this.receiverSpace(next, this.side(other(h.side))) > LIVE.pressureM) {
+        receiver = this.indexOf(next);
+        openSide = true;
+      }
     }
     if (receiver === null || (!toKicker && this.rng.next() < LIVE.dartChance)) {
       receiver = null;
     }
     const ref = (p: Player) => ({ side: p.side, slot: p.slot, who: p.key });
     return { from: ref(h), to: receiver === null ? null : ref(this.players[receiver]!), decidedAt: this.tick, until, kicker,
-      ...(secondKicker && receiver !== null ? { secondKicker: true } : {}) };
+      ...(secondKicker && receiver !== null ? { secondKicker: true } : {}), ...(openSide && receiver !== null ? { openSide: true } : {}) };
   }
 
   /** Pure identity/eligibility check, also used by snapshot projection. Never recruits a replacement. */
@@ -199,6 +207,11 @@ export abstract class LiveRestarts extends LivePlay {
     if (!to) return null;
     if (d.secondKicker) return !this.directedLastPlay() && this.secondKickerAvailable(h, to) ? to : null;
     if (d.kicker) return to === this.kicker(h.side) && !this.locked(to) && this.tick >= to.busyUntil ? to : null;
+    if (d.openSide) {
+      const shape = this.currentAttackShape();
+      return shape?.openSide && this.wideReceiver(h, shape) === to
+        && this.receiverSpace(to, this.side(other(h.side))) > LIVE.pressureM ? to : null;
+    }
     const candidate = this.candidates(h).find(c => this.players[c.idx] === to);
     return candidate && pickReceiver(h.body.pos, this.dir, [candidate]) !== null ? to : null;
   }
