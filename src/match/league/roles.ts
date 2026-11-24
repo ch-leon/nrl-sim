@@ -44,6 +44,7 @@ export const FULLBACK = 0;
 export const FIVE_EIGHTH = 4;
 export const KICKER = 5;
 export const HOOKER = 6;
+export const PROP = 7;
 
 /** Defensive line distance from the ruck. */
 export const ONSIDE_M = 10;
