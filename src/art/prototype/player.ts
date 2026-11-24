@@ -530,7 +530,9 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action | Re
 
 function dummyBallAt({ reach, drop }: typeof DUMMY_PASS_POSES[number], shX: number, shY: number, facing: Facing): { x: number; y: number } {
   const side = facing === 'front' ? 4 : facing === 'back' ? -7 : -2;
-  return { x: Math.min(WIDTH - BALL.w - 2, shX + reach), y: shY + (reach > 3 ? side : drop) };
+  // Keep the panel above the shin rows that stand() repeats or removes for stature.
+  const y = Math.min(SHINS[0]! - BALL.h + 1, shY + (reach > 3 ? side : drop));
+  return { x: Math.min(WIDTH - BALL.w - 2, shX + reach), y };
 }
 
 function handlingBallAt(p: ReturnType<typeof prototypeUpperAt>, build: Build, action: 'carry' | 'land' | 'catch' | 'pass' | 'dummyPass', facing: Facing): { x: number; y: number } {

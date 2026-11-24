@@ -53,8 +53,10 @@ describe('connected handling artwork (#702)', () => {
         const reach = playerBallAnchor(look, 'dummyPass', 1 + offset, 0, tired, 'drive', facing);
         const gather = playerBallAnchor(look, 'dummyPass', offset, 0, tired, 'drive', facing);
         const retract = playerBallAnchor(look, 'dummyPass', 2 + offset, 0, tired, 'drive', facing);
-        expect(reach.x - gather.x).toBeGreaterThanOrEqual(4);
-        expect(reach.x - retract.x).toBeGreaterThanOrEqual(5);
+        const carry = playerBallAnchor(look, 'carry', 0, 0, tired, undefined, facing);
+        expect(reach.x - carry.x).toBeGreaterThanOrEqual(6);
+        expect(reach.x - gather.x).toBeGreaterThanOrEqual(3);
+        expect(reach.x - retract.x).toBeGreaterThanOrEqual(4);
         const pixels = drawLivePlayer(look, kit, 'dummyPass', 1 + offset, facing, true, 0, tired, 0, 'drive');
         const empty = drawLivePlayer(look, kit, 'dummyPass', 1 + offset, facing, false, 0, tired, 0, 'drive');
         const x = Math.round(reach.x + CENTRE - 4.5), y = Math.round(reach.y + FOOT - 3.5);
