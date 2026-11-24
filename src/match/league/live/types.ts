@@ -203,6 +203,8 @@ export const KICK_TEXT: Readonly<Record<KickChoice, (name: string) => string>> =
 
 export interface LiveOptions {
   controls?: ControlInput[] | undefined;
+  /** Track the touch judges' presentation positions for a watched match or replay. */
+  touchJudges?: boolean;
   /** Lab and tests: start everyone on these legs (1 = a kick-off). */
   energy?: number;
   /** Two Nines halves unless told otherwise (the balance harness plays single stretches). */

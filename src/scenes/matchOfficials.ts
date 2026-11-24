@@ -25,9 +25,10 @@ import {
   refereeKit,
   refereeLook,
 } from '../art/match/bench';
-import { TOUCH_JUDGE_POSES, drawTouchJudge } from '../art/match/touchJudge';
-import { conversionJudges } from '../match/view/conversionJudges';
-import type { Vec } from '../match/core/vec';
+import { TOUCH_JUDGE_JOG_FRAMES, TOUCH_JUDGE_POSES, drawTouchJudge } from '../art/match/touchJudge';
+import { CONVERSION_SIGNAL_TICKS, TOUCH_JUDGE_FADE_TICKS, conversionJudges } from '../match/view/conversionJudges';
+import { TICK_S } from '../match/core/engine';
+import { clamp, lerp, type Vec } from '../match/core/vec';
 import { toFieldPt } from '../match/core/field';
 import type { PlayerSnap, Side, Snapshot } from '../match/core/snapshot';
 import { BENCH, REF, SIX_AGAIN_POSE_TICKS, benchSeat, benchSeated, binSeat, binnedSpot, refCoversCarrier, refereeSignal, refereeSpot, type BenchSheet } from '../match/view/officials';
@@ -36,8 +37,9 @@ import { BOARD_TEX_H, BOARD_TEX_W, boardColor, drawScoreboard, flashWord, scoreb
 import { reducedMotion } from '../match/view/impact';
 import { breakKind } from '../match/view/walkOff';
 
-/** Seconds a tick lasts (the sim's 20 Hz). */
-const TICK_S = 0.05;
+/** Two planted steps take three metres. Below 0.6 m/s both boots settle. */
+const JUDGE_STRIDE_M = 3;
+const JUDGE_IDLE_STEP_M = 0.6 * TICK_S;
 /** Referee frames kept (a few dozen are ever drawn). */
 const REF_FRAMES = 48;
 /** The scoreboard's flash after a score (real ms): beats of BEAT_MS for FLASH_MS, the last stretch back on the score. */
@@ -111,7 +113,7 @@ export class MatchOfficials {
   private readonly refCanvas: Canvas;
   private readonly refFrames = new Map<string, PixelBuffer>();
   private refShown = '';
-  private readonly judges: readonly TouchJudgeView[];
+  private readonly judges: readonly [TouchJudgeView, TouchJudgeView];
   /** Framing points for the current conversion picture, in world pixels. */
   conversionFocus: Vec[] | null = null;
   private readonly benches: Record<Side, BenchView>;
@@ -163,19 +165,28 @@ export class MatchOfficials {
     this.refCanvas = new Canvas(scene, art, 'referee', WIDTH, HEIGHT);
     this.ref = scene.add.sprite(0, 0, this.refCanvas.key).setOrigin(CENTRE / WIDTH, FOOT / HEIGHT);
     this.refShadow = scene.add.image(0, 0, opts.shadowKey).setDepth(-80_000);
-    this.judges = [0, 1].map(i => {
+    const buildJudge = (i: number): TouchJudgeView => {
       const look: Appearance = { ...appearanceFor(`touch-judge-${i}`), tape: false, boots: this.refLook.boots };
-      const atlas = new PixelBuffer(WIDTH * TOUCH_JUDGE_POSES.length, HEIGHT * 2);
-      const frames = (['front', 'back'] as const).flatMap((facing, row) => TOUCH_JUDGE_POSES.map((pose, col) => {
-        atlas.blit(drawTouchJudge(look, this.refKit, facing, pose), col * WIDTH, row * HEIGHT);
-        return { name: `${facing}/${pose}`, x: col * WIDTH, y: row * HEIGHT, w: WIDTH, h: HEIGHT };
-      }));
+      const still = [...TOUCH_JUDGE_POSES, 'sideline'] as const;
+      const atlas = new PixelBuffer(WIDTH * (still.length + TOUCH_JUDGE_JOG_FRAMES), HEIGHT * 2);
+      const frames = (['front', 'back'] as const).flatMap((facing, row) => {
+        const addFrame = (pixels: PixelBuffer, name: string, col: number) => {
+          atlas.blit(pixels, col * WIDTH, row * HEIGHT);
+          return { name: `${facing}/${name}`, x: col * WIDTH, y: row * HEIGHT, w: WIDTH, h: HEIGHT };
+        };
+        return [
+          ...still.map((pose, col) => addFrame(drawTouchJudge(look, this.refKit, facing, pose), pose, col)),
+          ...Array.from({ length: TOUCH_JUDGE_JOG_FRAMES }, (_, jog) =>
+            addFrame(drawTouchJudge(look, this.refKit, facing, 'sideline', jog), `jog${jog}`, still.length + jog)),
+        ];
+      });
       const key = art.atlas(`touch-judge-${i}`, atlas, frames);
       return {
         image: scene.add.image(0, 0, key).setVisible(false),
         shadow: scene.add.image(0, 0, opts.shadowKey).setDepth(-80_000).setVisible(false),
       };
-    });
+    };
+    this.judges = [buildJudge(0), buildJudge(1)];
     // The scoreboard on the grandstand roof (#673): one texture, repainted when what it shows changes.
     this.boardColors = [boardColor(opts.kits.home), boardColor(opts.kits.away)];
     this.board = new Canvas(scene, art, 'scoreboard', BOARD_TEX_W, BOARD_TEX_H);
@@ -228,7 +239,7 @@ export class MatchOfficials {
     this.latest = cur;
     if (cur.score) this.drawBoard([cur.score.home, cur.score.away]);
     this.drawReferee(prev, cur, alpha);
-    this.drawTouchJudges(cur, heldTicks);
+    this.drawTouchJudges(prev, cur, alpha, heldTicks);
     for (const side of ['home', 'away'] as const) this.drawBench(side, cur);
   }
 
@@ -237,34 +248,61 @@ export class MatchOfficials {
     return this.opts.toWorld(f.fx, f.fy);
   }
 
-  private drawTouchJudges(cur: Snapshot, heldTicks: number): void {
+  private placeJudge(judge: TouchJudgeView, at: Vec, lookAt: Vec, pose: string, opacity: number): void {
+    const x = Math.round(at.x);
+    const y = Math.round(at.y);
+    const left = lookAt.x < at.x;
+    const facing = lookAt.y < at.y - 4 ? 'back' : 'front';
+    judge.image.setPosition(x, y).setDepth(y + 1.0007).setVisible(opacity > 0).setAlpha(opacity)
+      .setFrame(`${facing}/${pose}`).setOrigin((left ? WIDTH - CENTRE : CENTRE) / WIDTH, FOOT / HEIGHT).setFlipX(left);
+    judge.shadow.setPosition(x, y).setVisible(opacity > 0).setAlpha(opacity);
+  }
+
+  private drawTouchJudges(prev: Snapshot, cur: Snapshot, a: number, heldTicks: number): void {
     const cue = conversionJudges(cur, heldTicks);
     this.conversionFocus = null;
     if (!cue) {
-      for (const judge of this.judges) {
-        judge.image.setVisible(false);
-        judge.shadow.setVisible(false);
-      }
+      this.drawSidelineJudges(prev, cur, a, heldTicks);
       return;
     }
     const kicker = this.world(cue.lookAt);
     const [far, near] = cue.feet;
     const feet = [this.world(far), this.world(near)] as const;
     for (const [i, judge] of this.judges.entries()) {
-      const at = feet[i]!;
-      const x = Math.round(at.x);
-      const y = Math.round(at.y);
-      const left = kicker.x < at.x;
-      const facing = kicker.y < at.y - 4 ? 'back' : 'front';
-      judge.image.setPosition(x, y).setDepth(y + 1.0007).setVisible(true).setAlpha(cue.alpha)
-        .setFrame(`${facing}/${cue.pose}`).setOrigin((left ? WIDTH - CENTRE : CENTRE) / WIDTH, FOOT / HEIGHT).setFlipX(left);
-      judge.shadow.setPosition(x, y).setVisible(true).setAlpha(cue.alpha);
+      const arriving = cue.pose === 'ready' && !cur.conversion?.decision;
+      this.placeJudge(judge, feet[i]!, kicker, cue.pose, arriving ? cur.touchJudges?.[i]?.alpha ?? 1 : cue.alpha);
     }
-    const [a, b] = feet;
+    const [farWorld, nearWorld] = feet;
     // Centre on the two flags, with room for their full height. Include the tee while the kick is on.
-    this.conversionFocus = [{ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 - 20 },
-      { x: a.x, y: a.y - 36 }, { x: b.x, y: b.y },
+    this.conversionFocus = [{ x: (farWorld.x + nearWorld.x) / 2, y: (farWorld.y + nearWorld.y) / 2 - 20 },
+      { x: farWorld.x, y: farWorld.y - 36 }, { x: nearWorld.x, y: nearWorld.y },
       ...(!cur.conversion?.decision ? [{ x: kicker.x, y: kicker.y - 18 }] : [])];
+  }
+
+  private drawSidelineJudges(prev: Snapshot, cur: Snapshot, a: number, heldTicks: number): void {
+    const ball = this.world(lerp(prev.ball, cur.ball, a));
+    const decision = cur.conversion?.decision;
+    const whistle = cur.phase?.kind === 'half-time' || cur.phase?.kind === 'full-time';
+    const time = prev.tick + (cur.tick - prev.tick) * a;
+    const leaving = decision ? clamp((time - decision.tick - CONVERSION_SIGNAL_TICKS) / TOUCH_JUDGE_FADE_TICKS, 0, 1) : 1;
+    for (const [i, judge] of this.judges.entries()) {
+      const p = cur.touchJudges?.[i];
+      if (!p) {
+        judge.image.setVisible(false);
+        judge.shadow.setVisible(false);
+        continue;
+      }
+      const before = prev.touchJudges?.[i] ?? p;
+      const at = lerp(before, p, a);
+      const moving = Math.hypot(p.dx, p.dy) > JUDGE_IDLE_STEP_M;
+      const distance = before.distance + (p.distance - before.distance) * a;
+      const jog = Math.floor(distance / JUDGE_STRIDE_M * TOUCH_JUDGE_JOG_FRAMES + i * 3) % TOUCH_JUDGE_JOG_FRAMES;
+      const look = moving ? this.world({ x: at.x + p.dx * 12, y: at.y + p.dy * 12 }) : ball;
+      const opacity = before.alpha + (p.alpha - before.alpha) * a;
+      const alpha = whistle
+        ? (decision ? 0 : Math.max(0, opacity - heldTicks / TOUCH_JUDGE_FADE_TICKS)) : Math.min(opacity, leaving);
+      this.placeJudge(judge, this.world(at), look, moving ? `jog${jog}` : 'sideline', alpha);
+    }
   }
 
   private drawReferee(prev: Snapshot, cur: Snapshot, a: number): void {

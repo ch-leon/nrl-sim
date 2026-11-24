@@ -149,6 +149,16 @@ export interface ConversionSnap {
   readonly decision?: Readonly<{ tick: number; good: boolean }>;
 }
 
+/** Presentation only. Displacement on the last tick gives facing, and cumulative metres give the jog frame. */
+export interface TouchJudgeSnap {
+  readonly x: number;
+  readonly y: number;
+  readonly dx: number;
+  readonly dy: number;
+  readonly distance: number;
+  readonly alpha: number;
+}
+
 /** Keep the cue through the last interpolation into the ordinary carry. */
 export const GROUND_PICKUP_TICKS = 6;
 
@@ -188,6 +198,8 @@ export interface Snapshot {
   bombContest?: BombContestSnap;
   groundPickup?: GroundPickupSnap;
   conversion?: ConversionSnap;
+  /** The far and near touch judges, in that order at both ends of the pitch. */
+  touchJudges?: readonly [TouchJudgeSnap, TouchJudgeSnap];
   /** Short state label for the lab readout (phase, set, tackle count...). */
   label: string;
   /** Events emitted on this tick. */

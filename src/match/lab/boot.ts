@@ -56,7 +56,7 @@ export function bootLab(): void {
     const away = labSheet(params.away, params.traits, params.tactics.away);
     const ctrl = new LabController(
       (h, a, seed, traits, tactics, legs, bench, weather, calls) =>
-        new LiveSim(withPlays({ ...labSheet(h, traits, tactics.home), rotation: bench }, params.plays), withPlays({ ...labSheet(a, traits, tactics.away), rotation: bench }, params.plays), seed, { energy: LEGS_ENERGY[legs], weather, calls, ...(params.ai ? { aiCoach: ['home', 'away'] as ('home' | 'away')[] } : {}), ...(params.final ? { goldenPoint: true } : {}) }),
+        new LiveSim(withPlays({ ...labSheet(h, traits, tactics.home), rotation: bench }, params.plays), withPlays({ ...labSheet(a, traits, tactics.away), rotation: bench }, params.plays), seed, { touchJudges: true, energy: LEGS_ENERGY[legs], weather, calls, ...(params.ai ? { aiCoach: ['home', 'away'] as ('home' | 'away')[] } : {}), ...(params.final ? { goldenPoint: true } : {}) }),
       params,
     );
     const data: LabSceneData = { home, away, controller: ctrl, weather: params.weather ?? 'clear' };
