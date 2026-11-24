@@ -7,6 +7,8 @@ live gameplay change; work still open below has not shipped.
 
 ## Now
 
+- **Repeat one-on-ones.** Commentary names both players in a step, fend, bust, run-down or solo held-up, and a repeat win links them on the pitch. Lab sign-off remains open. Ported from [draft PR #792](https://github.com/ch-leon/nrl-sim/pull/792).
+
 - **Penalty advantage.** An ordinary offside at the ruck can play on for 3.5 seconds. Eight metres, a break or a try takes it; otherwise the penalty returns to the mark. Lab sign-off remains open. Ported from [draft PR #791](https://github.com/ch-leon/nrl-sim/pull/791).
 
 - **Dummy-and-go.** A carrier with a runner outside can show the ball and keep it. The nearest defender may slide to the runner or stay square. Lab sign-off remains open. Ported from [draft PR #790](https://github.com/ch-leon/nrl-sim/pull/790).

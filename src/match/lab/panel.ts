@@ -3,6 +3,7 @@
 // Thin: all state lives in LabController.
 import { button, el, mount, panel } from '../../ui/dom';
 import { RUN_SPEEDS } from '../core/engine';
+import type { SimEvent } from '../core/snapshot';
 import { decodeFlag } from '../core/flag';
 import { isWeather, type LabController, type LabParams } from './controller';
 import type { WeatherKind } from '../../sim/events';
@@ -41,7 +42,7 @@ export class LabPanel {
   private readonly callBtns: HTMLButtonElement[];
   private readonly callSide: () => 'home' | 'away';
   private scrubbing = false;
-  private lastLogged = -1;
+  private lastLogged: SimEvent | undefined;
   private lastStatsTick = -1;
 
   constructor(
@@ -254,14 +255,15 @@ export class LabPanel {
       this.scrub.max = String(Math.max(1, r.maxTick));
       this.scrub.value = String(r.tick);
     }
-    const lastTick = r.history.length ? r.history[r.history.length - 1]!.tick : -1;
-    if (lastTick !== this.lastLogged || r.history.length === 0) {
-      this.lastLogged = lastTick;
+    const lastEvent = r.history[r.history.length - 1];
+    if (lastEvent !== this.lastLogged) {
+      this.lastLogged = lastEvent;
+      this.ctrl.duels.sync(r.history);
       this.log.replaceChildren(
         ...r.history.slice(-8).reverse().map((e) =>
           el('button', {
             class: 'nrl-lab-line',
-            text: `${(e.tick / 20).toFixed(1)}s · ${e.text}${e.trait ? ` (${e.trait})` : ''}`,
+            text: `${(e.tick / 20).toFixed(1)}s · ${this.ctrl.duels.result(e)?.text ?? e.text}${e.trait ? ` (${e.trait})` : ''}`,
             attrs: { type: 'button', title: 'Jump to just before this' },
             onClick: () => {
               this.ctrl.seek(Math.max(0, e.tick - 30));

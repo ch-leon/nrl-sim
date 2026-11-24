@@ -604,6 +604,7 @@ for his first contact. Contact and grounding still use the live contest rules.
 | Big hit | BIG HIT! | 90 ms freeze, camera shake (same size on screen at any zoom), dust at the contact, crowd roar (impact tier 2, #631) |
 | Intercept / strip | word + name | camera snaps to the ball |
 | Signature play (#663) | POSTS CHARGE! + the prop's full name | The commentary credits a real bust, fend or try once per launch. |
+| Repeat duel (#662) | Existing action pop-up and a short line linking the two players at their feet | Both players are named for a step, fend, bust, run-down or solo held-up. Commentary says when one beats the other again. |
 | Trait firing | "SIDESTEP II!" in the trait colour under the word | commentary names the trait; every on-field trait draws a cue on the pitch when it fires (N15.4, #654; `traitLayer.ts`, `sprintLayer.ts`; the player page's "You will see it as …" is each trait's `seen`): the fend's arm, the step's cut, Big Boot's wider trail, the Playmaker's line, the Wrecking Ball's drive, the Hitman's shock, **Offload King** an arc out the back of the tackle to the actual support receiver, **Razzle Dazzle** sparkles and a wobbling arc on the flick (offload event, whether or not it is later spilled), **Pickpocket** a spark on the carrier and a line to the thief (strip), **Poacher** the pass lane back to the passer and a spark at the thief (intercept; a read that misses emits nothing, so only the success shows), **Gambler** a lunge and a tumbling die, gold on the intercept and red on the `gamble` miss, **Hothead** a red temper mark and flare after a penalty against him, **Jets** a longer streak in the trait colour and dust laid by his stride while he sprints, **Brick Wall** a brick wall and a shock where a two-man tackle stops the carrier, **Last Line** a marker and ring on the last line's tackle of a runner who has beaten four of his defence, with a held frame (impact tier 2, only when the moment has no beat of its own), **Workhorse** a horseshoe on his third tackle of a set (counted in the view from tackle events, reset on any change of possession). Brick Wall, Last Line, Workhorse and Jets are never named by a sim event (the sim only moves odds, speed or drain), so their cues read the tackle or sprint plus the sheets' traits; nothing was added to the sim |
 | Kick | type (BOMB!, 40/20!) | wide camera, trail |
 | Try | existing banner (#82) | scorer's traits listed |
@@ -613,6 +614,11 @@ for his first contact. Contact and grounding still use the live contest rules.
 The commentary ticker gets a line for every pop-up, naming players. The lab shows an
 **event feed** and a **per-5-minute stats strip** (tackles, breaks, offloads, errors,
 kicks, tries) so balance is seen, not guessed.
+
+Duels read the actual participants from events and follow player identity through
+interchanges and both halves. The Lab rebuilds the tally from its history on a
+seek, and a reconstructed career match hears the same prior events before live
+play resumes. A new match starts the tally at zero. There is no contest modifier.
 
 ## 7. Balance targets (to verify in Phase 3)
 
