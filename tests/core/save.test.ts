@@ -470,6 +470,16 @@ describe('load: legacy and future saves', () => {
     expect(load()).toEqual({ ...s, version: SAVE_VERSION });
   });
 
+  it('adds the ladder place the caller reads, and leaves it off at 0 or when the read throws (SuperCOOKED 11)', () => {
+    storage.map.set(slotKey(1), JSON.stringify(createNewGame('Placed', 3)));
+    expect(getSlotSummaries()[0]).not.toHaveProperty('ladder');
+    expect(getSlotSummaries(() => 4)[0]).toMatchObject({ status: 'ok', clubName: 'Placed', ladder: 4 });
+    expect(getSlotSummaries(() => 0)[0]).not.toHaveProperty('ladder');
+    const broken = getSlotSummaries(() => { throw new Error('no ladder'); })[0];
+    expect(broken).toMatchObject({ status: 'ok', clubName: 'Placed' });
+    expect(broken).not.toHaveProperty('ladder');
+  });
+
   it('keeps the legacy key when the slot write fails, and still shows it in slot 1', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     const raw = JSON.stringify(createNewGame('Keep', 3));

@@ -45,6 +45,11 @@ export const MIN_LANE_PX = 140;
 /** An action toast's line, its button and its ✕ need this much (#370). */
 export const ACTION_LANE_PX = 200;
 
+/** The Undo's countdown bar (00/01): the share of its time still to run, 1 → 0. */
+export function timeLeftScale(left: number, total: number): number {
+  return total > 0 ? Math.max(0, Math.min(1, left / total)) : 0;
+}
+
 /** Whether `n` carries an action button (the Undo, #370). */
 export function isActionToast(n: Notice): boolean {
   return n.action !== undefined;
@@ -257,6 +262,8 @@ export function initToasts(root: HTMLElement, opts: { advancing?: () => boolean 
   const notices = new WeakMap<Element, Notice>();
   let shown: Element | null = null;
   let left = 0;
+  /** The toast in view's whole time, for an Undo's countdown bar. */
+  let total = 0;
   let last = 0;
   let timer: ReturnType<typeof setInterval> | null = null;
 
@@ -334,6 +341,14 @@ export function initToasts(root: HTMLElement, opts: { advancing?: () => boolean 
         return;
       }
     }
+    // The title (no dock): its slots and their Continue sit at the top, so a message there goes to
+    // the foot, over the build label rather than the slot it is about.
+    if (document.querySelector('.nrl-title')) {
+      setLane('title', '');
+      release();
+      setLift(0);
+      return;
+    }
     // Office's tiles sit where the dock lane is: while the sheet is up the toast goes to the top.
     const office = document.querySelector('.nrl-nav-sheet:not([hidden])');
     const dock = document.querySelector('.nrl-dock')?.getBoundingClientRect();
@@ -374,6 +389,7 @@ export function initToasts(root: HTMLElement, opts: { advancing?: () => boolean 
       shown = first;
       const n = first ? notices.get(first) : undefined;
       left = n ? toastMs(n, lane.childElementCount - 1) : 0;
+      total = left;
       first?.classList.add('nrl-toast-in');
     }
     const queued = lane.childElementCount - 1;
@@ -410,8 +426,14 @@ export function initToasts(root: HTMLElement, opts: { advancing?: () => boolean 
     // An action toast's time is its offer's: it runs even while covered (#370).
     if (shown && ((n && isActionToast(n)) || (!lane.hidden && seen(shown)))) left -= dt;
     if (shown && left <= 0) shown.remove();
+    else if (shown) showTimeLeft(shown);
     render();
   }
+  /** An Undo's countdown (01 "Undo with countdown"): its bar shrinks with the offer's time, which the label never shows. */
+  const showTimeLeft = (toast: Element): void => {
+    const bar = toast.querySelector<HTMLElement>('.nrl-toast-timer');
+    if (bar) bar.style.transform = `scaleX(${timeLeftScale(left, total)})`;
+  };
 
   const close = (toast: Element): void => {
     toast.remove();
@@ -441,7 +463,7 @@ export function initToasts(root: HTMLElement, opts: { advancing?: () => boolean 
       }, { class: 'nrl-toast-btn' });
       const x = button('✕', () => close(toast), { class: 'nrl-toast-x' });
       x.setAttribute('aria-label', 'Close');
-      toast.append(act, x);
+      toast.append(act, x, el('span', { class: 'nrl-toast-timer', attrs: { 'aria-hidden': 'true' } }));
     }
     notices.set(toast, n);
     return toast;

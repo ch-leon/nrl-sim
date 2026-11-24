@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- **SuperCOOKED look, follow-ups.** The Undo toast counts down on a bar along its foot. The title's messages (a failed import, a save from a newer version) are toasts at the foot of the screen. Each save slot shows the club's ladder place ("Season 1 · Week 2 · 3rd"). Contracts says when each deal ends ("S2"), keeping the weeks, in amber, for one about to lapse. Ported from [draft PR #779](https://github.com/ch-leon/nrl-sim/pull/779).
+
 - **Intercepting a pass.** The defender reaches into the pass, draws the ball to his body and carries it away on the turn. Ported from [draft PR #769](https://github.com/ch-leon/nrl-sim/pull/769).
 
 - **Six-again signal.** On a ruck infringement that resets the tackle count, the referee raises his arm, circles it and lowers it while the attack plays on. A try or a penalty takes over, and the signal ends if play stops or the ball changes hands. Ported from [draft PR #767](https://github.com/ch-leon/nrl-sim/pull/767).
