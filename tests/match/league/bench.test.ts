@@ -90,7 +90,7 @@ describe('interchanges in the live sim', () => {
     }
     return { events, lateLegs: sum / n };
   }
-  const seeds = [1, 2, 3];
+  const seeds = [1, 2, 3, 4, 5, 6];
   const on: Game[] = [];
   const off: Game[] = [];
   beforeAll(() => {

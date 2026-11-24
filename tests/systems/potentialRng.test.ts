@@ -48,36 +48,43 @@ import { contractsEndingSoon } from '../../src/systems/contracts';
 // The timed back-door runs (#722, engine revision 7) moved the measured pin to
 // 1950957202. The lead read (engine revision 8) moves this season back to
 // 3782523015. Both AI modes still compare UI-read and no-read runs, and AI=0
-// pins this measured stream.
+// pins this measured stream with open-side shifts disabled.
 const MAIN_SEED_AFTER_SEASON = 3782523015;
+
+function season(readPages: boolean) {
+  bus.clear();
+  createNewGame('Rng', 1);
+  initLeague(getState());
+  registerAllSystems();
+  let looked = 0;
+  if (readPages) registerTickHook('test-look', TICK_ORDER.autosave, () => {
+    const s = getState();
+    for (const p of s.squad) playerPageModel(p, { kind: 'squad' }, s);
+    for (const p of s.freeAgents.slice(0, 3)) playerPageModel(p, { kind: 'freeAgent' }, s);
+    contractsEndingSoon(s);
+    looked++;
+  });
+  advanceWeeks(WEEKS_PER_SEASON);
+  return { looked, season: getState().season, seed: getState().rngSeed };
+}
 
 describe('the rng stream (#369)', () => {
   it.each([0, 1])('weekly potential and dot reads preserve the season stream with habit AI=%i', (ai) => {
     const restore = applyTuning({ 'counters.ai.on': ai });
     try {
-      const season = (readPages: boolean) => {
-        bus.clear();
-        createNewGame('Rng', 1);
-        initLeague(getState());
-        registerAllSystems();
-        let looked = 0;
-        if (readPages) registerTickHook('test-look', TICK_ORDER.autosave, () => {
-          const s = getState();
-          for (const p of s.squad) playerPageModel(p, { kind: 'squad' }, s);
-          for (const p of s.freeAgents.slice(0, 3)) playerPageModel(p, { kind: 'freeAgent' }, s);
-          contractsEndingSoon(s);
-          looked++;
-        });
-        advanceWeeks(WEEKS_PER_SEASON);
-        return { looked, season: getState().season, seed: getState().rngSeed };
-      };
       const control = season(false);
       const viewed = season(true);
       expect(control.season).toBe(2);
       expect(viewed.season).toBe(2);
       expect(viewed.looked).toBe(WEEKS_PER_SEASON);
       expect(viewed.seed).toBe(control.seed);
-      if (ai === 0) expect(viewed.seed).toBe(MAIN_SEED_AFTER_SEASON);
+    } finally { restore(); }
+  });
+
+  it('retains the historical season stream with habit AI and open-side shifts disabled', () => {
+    const restore = applyTuning({ 'counters.ai.on': 0, 'shapes.openSide.on': 0 });
+    try {
+      expect(season(true)).toEqual({ looked: WEEKS_PER_SEASON, season: 2, seed: MAIN_SEED_AFTER_SEASON });
     } finally { restore(); }
   });
 });

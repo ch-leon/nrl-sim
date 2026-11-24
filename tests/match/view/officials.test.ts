@@ -39,7 +39,7 @@ function playMatch(seed: number, halfMinutes = 7, maxTick = 30_000): Snapshot[] 
 }
 
 describe('the referee (#642)', () => {
-  const matches = [3, 11].map((seed) => playMatch(seed));
+  const matches = [3, 1].map((seed) => playMatch(seed));
 
   it('is a pure function of the snapshot', () => {
     const s = matches[0]![500]!;
@@ -100,7 +100,7 @@ describe('the referee (#642)', () => {
     }
     // Includes heel grace and dead phases. The original 3%/7% bounds remain.
     // Before punts into space, the 6 m stand-off read near 4717/173704 (2.72%) and
-    // covers 9697/173704 (5.58%). He now stands 7 m off.
+    // covers 9697/173704 (5.58%). He now stands 8 m off as open-side shifts move play across his path.
     expect(near / held).toBeLessThan(0.03);
     expect(covers / held).toBeLessThan(0.07); // a closer stand-off (#680) puts him over the carrier a little more often; the scene sorts him behind
   });
