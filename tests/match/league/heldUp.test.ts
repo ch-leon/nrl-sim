@@ -104,7 +104,7 @@ describe('held up: in the sim', () => {
     // pins were a65edf9's, and with the last-tackle call off too the match is still a65edf9's (below).
     // Early DH commitment (#672), attacking structures (#649), the centre shoulder
     // read, later kicking mechanics, kick returns, quick taps and goal-line stands are off for the historical fingerprints.
-    const historical = { 'heldUp.on': 0, 'live.dhDecisionLeadTicks': 0, 'shapes.on': 0, 'live.centreShoulderTicks': 0, 'longKick.on': 0, 'wingBomb.on': 0, 'secondKicker.on': 0, 'kickReturn.on': 0, 'quickTap.on': 0, 'goalLineStand.on': 0, 'bench.impact.on': 0 };
+    const historical = { 'heldUp.on': 0, 'live.dhDecisionLeadTicks': 0, 'shapes.on': 0, 'live.centreShoulderTicks': 0, 'longKick.on': 0, 'wingBomb.on': 0, 'secondKicker.on': 0, 'kickReturn.on': 0, 'quickTap.on': 0, 'goalLineStand.on': 0, 'bench.impact.on': 0, 'cornerCover.on': 0 };
     withTuning(historical, () => {
       expect(play(31)).toEqual({ events: 122, home: 4, away: 10, draws: 813, heldUp: 0 });
       expect(play(13)).toEqual({ events: 147, home: 10, away: 10, draws: 725, heldUp: 0 });

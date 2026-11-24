@@ -45,8 +45,8 @@ afterEach(() => {
   Reflect.deleteProperty(globalThis, 'localStorage');
 });
 
-// A held match from before the posts charge (revision 19) must restart.
-const previousEngine = matchEngineIdentity().replace(/^nrl-live-\d+-/, 'nrl-live-19-');
+// A held match from before the corner cover (revision 20) must restart.
+const previousEngine = matchEngineIdentity().replace(/^nrl-live-\d+-/, 'nrl-live-20-');
 const badIds = [undefined, 'bad identity', 'nrl-live-999-00000000000000', previousEngine] as const;
 describe.each([null, DEV_TEST_PREFIX])('recovery namespace %s', namespace => {
   it.each(badIds)('restarts only this fixture on reload with identity %s, preserving once-only effects', engineId => {

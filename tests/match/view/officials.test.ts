@@ -197,8 +197,9 @@ describe('the bench and the sin bin (#642)', () => {
   });
 
   it('a binned man walks off as the sim has him, then sits in his side’s bin until he is back on', () => {
-    // Seed 10 with seven-minute halves has a far-side walk and a return.
-    const sim = new LiveSim(home, away, 10, { length: { halves: 2, halfMinutes: 7 } });
+    // Seed 6 with seven-minute halves has a far-side walk and a return.
+    // Seed 10 was that witness before the corner dive; with the dive on, its bin is gone.
+    const sim = new LiveSim(home, away, 6, { length: { halves: 2, halfMinutes: 7 } });
     const saw = { walking: false, seated: false, returned: false };
     let first: { side: Side; slot: number } | undefined;
     while (!sim.finished && !saw.returned) {

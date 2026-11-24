@@ -5,6 +5,7 @@ import { toFieldPt } from '../../../src/match/core/field';
 import type { Snapshot } from '../../../src/match/core/snapshot';
 import { DEFAULT_AWAY, DEFAULT_HOME, labSheet } from '../../../src/match/lab/sheets';
 import { LiveSim } from '../../../src/match/league/live';
+import { applyTuning } from '../../../src/match/league/tuning';
 import { LiveView, type BallMotion, type ViewSurface } from '../../../src/match/view/liveView';
 import { fieldOffsetX, fieldToWorldPoint } from '../../../src/scenes/matchField';
 
@@ -33,9 +34,12 @@ function picture(mirror = 1) {
 describe('grubber tumble', () => {
   it('follows a real grubber through fractional ground contacts and settles before the chase gets there', () => {
     // Seed 5's cross-field grubber deliberately has contacts between the 20 Hz snapshots.
+    // The corner dive moves that kick. With it off, the strike is still tick 891.
+    const restore = applyTuning({ 'cornerCover.on': 0 });
     const seed = 5, strike = 891, arrival = 953;
     const home = labSheet(DEFAULT_HOME), away = labSheet(DEFAULT_AWAY);
     const snaps = replayRange(n => new LiveSim(home, away, n), seed, 0, arrival + 1);
+    restore();
     const launch = snaps[strike]!;
     expect(launch.events).toContainEqual(expect.objectContaining({ kind: 'kick', detail: 'grubber' }));
     const flight = launch.ball.flight!;

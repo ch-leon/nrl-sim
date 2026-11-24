@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- **Try-saving tackles in the corner.** A fullback can come across to cover an open run down the edge. If he reaches the runner before the line, he can dive at his legs for a tackle or miss and leave the runner free to ground it. The play-by-play calls each result. Ported from [draft PR #789](https://github.com/ch-leon/nrl-sim/pull/789). This slice of [#652](https://github.com/ch-leon/nrl-sim/issues/652).
+
 - **Posts charge.** A prop with Wrecking Ball II or III can call for a short ball from dummy-half near the posts. He straightens toward the uprights with a small first-contact edge. His full name is on the banner and the commentary credits a bust, fend or try. Either side can launch it once a half, and the line can still stop him. Ported from [draft PR #788](https://github.com/ch-leon/nrl-sim/pull/788). First signature from [#663](https://github.com/ch-leon/nrl-sim/issues/663).
 
 - **Directional wind on long punts.** The match seed fixes which way the wind blows. Punts carry further and come down sooner with it, while those kicked into it land shorter and hang longer. The wind holds its direction when the teams swap ends, changing who gets the help. The corner and halfway flags and wind streaks show the direction. Ported from [draft PR #787](https://github.com/ch-leon/nrl-sim/pull/787). This slice of [#661](https://github.com/ch-leon/nrl-sim/issues/661).

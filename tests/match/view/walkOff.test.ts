@@ -34,11 +34,11 @@ function surface() {
 }
 
 /** A decided full-time match after golden point, using the lab's default sides and seven-minute halves.
- * The witness is the revision 16 match: impact interchanges are off, so seed 70 is still the decided one.
+ * Impact interchanges stay off. The corner dive moves seed 70 off golden point; seed 20 is a decided one.
  * A draw at the end has no winner, so the pose check needs a decided score.
  */
 const GOLDEN_FROM = 28;
-const GOLDEN_SEEDS = [70, ...Array.from({ length: 60 }, (_, i) => GOLDEN_FROM + i).filter((seed) => seed !== 70)];
+const GOLDEN_SEEDS = [20, 70, ...Array.from({ length: 60 }, (_, i) => GOLDEN_FROM + i).filter((seed) => seed !== 70)];
 
 function play(): Snapshot[] {
   const restore = applyTuning({ 'bench.impact.on': 0 });

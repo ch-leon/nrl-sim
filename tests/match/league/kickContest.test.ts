@@ -6,6 +6,7 @@ import { describe, it, expect } from 'vitest';
 import { KICK_CONTEST, bombPeak, chaserWins, grubberRace, highBall } from '../../../src/match/league/kickContest';
 import { KICKOFF, regatherChance } from '../../../src/match/league/kickoff';
 import { WEATHER } from '../../../src/match/league/weather';
+import { applyTuning } from '../../../src/match/league/tuning';
 import { LiveSim } from '../../../src/match/league/live';
 import { sideSheet } from '../../../src/match/balance/measure';
 import { toMatchEvent } from '../../../src/match/league/events';
@@ -164,9 +165,14 @@ describe('kick contests in the live sim (#99)', () => {
       return { scored, grounded };
     };
     // With kick returns on, neutral Balanced / Slide seed 45 wins the race and
-    // scores at 1257. At 7574 in seed 5 the defender wins and grounds it.
+    // scores. Seed 7 is a defender grounding it. Seed 5 was that grounding before
+    // the corner dive; with the dive off it still is.
     expect(races(play([45], () => true, 'balanced').es).scored).toBeGreaterThan(0);
-    expect(races(play([5], () => true, 'balanced').es).grounded).toBeGreaterThan(0);
+    expect(races(play([7], () => true, 'balanced').es).grounded).toBeGreaterThan(0);
+    const restore = applyTuning({ 'cornerCover.on': 0 });
+    try {
+      expect(races(play([5], () => true, 'balanced').es).grounded).toBeGreaterThan(0);
+    } finally { restore(); }
   }, 60_000);
 
   it('a scramble is said: LOOSE BALL! as it goes, the winner named on the ticker, the report counts it', () => {

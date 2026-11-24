@@ -739,6 +739,16 @@ outside 45–55% with held up off too (main as it is); at 400 seeds both ways th
 rows are all inside, off → on: Tight 52.8 → 53.7%, Expansive 46.9 → 48.2%, Kick-chase
 47.0 → 48.8%, All-out 54.2 → 53.2% (no change starred).
 
+**Cover tackle at the corner** (#652 — *awaiting lab sign-off*). Inside 28 m of the
+line and 15 m of touch, the onside fullback can come across for a carrier running
+forward with a clear lane. Inside the last 10 m, if the fullback comes within 2.7 m
+from the side or behind, one roll decides the low dive. His chance rises with his
+pace relative to the runner and falls at the end of his reach. A square-on hit uses
+ordinary contact. A save goes to ground at the mark and counts as a tackle. A miss
+puts the fullback on the turf and the carrier stays in open play, where he can
+ground it himself. The tackle uses the ankle contact animation. A delayed trip after
+a glancing tap is outside this slice. Tuning §11.
+
 **Goal-line stands (#657).** A side can start a run of consecutive fresh sets on the
 opposition line when it plays the ball within 20 m of the try line, inclusive. Count a
 six-again when the heel is played, a penalty tap or restart once it is taken, and a new
@@ -880,6 +890,7 @@ makes the break but can't finish it, the workhorse who is never quick and never 
 | #650 | The dummy-half can find the deeper five-eighth in space when the halfback is pressured on the last tackle — *awaiting lab sign-off*. Tuning §6 | §4.4 |
 | #660 | A clean long kick or bomb catch can be returned into a gap with two support runners. Tuning §6 | §4.4 |
 | #652.1 | Held up over the line: any defender on a carrier in contact at the line can hold him up (a lone tackler too, Leon 13 Nov 2026); play-the-ball 10 m out, the tackle counted — *awaiting lab sign-off*. Tuning §11 | §8.1 |
+| #652.2 | Fullbacks can make or miss a low cover tackle at the corner inside the last 10 m — *awaiting lab sign-off*. Tuning §11 | §8.1 |
 
 Then BAK-207 Phase 2 (full match, scoring, halves) and Phase 3 (balance).
 
