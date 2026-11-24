@@ -32,11 +32,13 @@ function picture(mirror = 1) {
 
 describe('grubber tumble', () => {
   it('follows a real grubber through fractional ground contacts and settles before the chase gets there', () => {
-    // Seed 5's cross-field grubber deliberately has contacts between the 20 Hz snapshots.
-    const seed = 5, strike = 891, arrival = 953;
+    // With the open-play dummy enabled, seed 3's cross-field grubber has contacts between snapshots.
+    const seed = 3, strike = 6846, arrival = 6891;
     const home = labSheet(DEFAULT_HOME), away = labSheet(DEFAULT_AWAY);
-    const snaps = replayRange(n => new LiveSim(home, away, n), seed, 0, arrival + 1);
-    const launch = snaps[strike]!;
+    const first = strike - 1;
+    const snaps = replayRange(n => new LiveSim(home, away, n), seed, first, arrival + 1);
+    const snapshotAt = (tick: number) => snaps[tick - first]!;
+    const launch = snapshotAt(strike);
     expect(launch.events).toContainEqual(expect.objectContaining({ kind: 'kick', detail: 'grubber' }));
     const flight = launch.ball.flight!;
     expect(flight).toMatchObject({ via: 'kick', startedTick: strike, arrivesTick: arrival, grubber: { bounces: 4 } });
@@ -44,7 +46,7 @@ describe('grubber tumble', () => {
     const draw = picture(), mirrored = picture(-1);
     const at = (t: number, render = draw) => {
       const prev = Math.floor(t), cur = Math.ceil(t);
-      return render(snaps[prev]!, snaps[cur]!, t - prev);
+      return render(snapshotAt(prev), snapshotAt(cur), t - prev);
     };
     const skipTicks = (arrival - strike) / 4;
     const heights = Array.from({ length: 4 }, (_, i) => at(strike + (i + 0.5) * skipTicks).lift);
@@ -63,8 +65,8 @@ describe('grubber tumble', () => {
     }
     expect(at(strike - 0.1).tumble).toBeUndefined();
     expect(at(arrival - 0.5).tumble!.shadowAlpha).toBeLessThan(1);
-    const landing = draw(snaps[arrival - 1]!, snaps[arrival]!, 1);
-    expect(snaps[arrival]!.ball).toMatchObject({ ...flight.to, lift: 0, holder: null });
+    const landing = draw(snapshotAt(arrival - 1), snapshotAt(arrival), 1);
+    expect(snapshotAt(arrival).ball).toMatchObject({ ...flight.to, lift: 0, holder: null });
     expect(landing).toMatchObject({ lift: 0, tumble: { shadowAlpha: 0 } });
     expect(Math.abs(landing.tumble!.angle)).toBeCloseTo(4 * Math.PI);
     expect(at(arrival + 0.5)).toMatchObject({ x: landing.x, y: landing.y, lift: 0, tumble: undefined });
