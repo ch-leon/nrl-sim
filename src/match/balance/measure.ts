@@ -162,7 +162,7 @@ export interface WatchStats {
   territory?: Record<TerritoryKey, Stat>;
   /** Absent in results written before #660. */
   kickReturns?: KickReturnStats;
-  /** Pooled counts and total metres in the written orientation. */
+  /** Absent in results written before #803. Pooled counts and total metres in the written orientation. */
   taps?: TapSamples;
 }
 
@@ -789,7 +789,6 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
     // Lead changes, tries by origin and last tackles are counts (scaled to a full match); the late margins are shares and points, which a stretch does not scale.
     const scaled = (k: string): number => (k === 'leadChanges' ? scale : 1);
     const watch: WatchStats = {
-      taps: tapSamples,
       flow: Object.fromEntries(FLOW.map((k) => [k, stat(flowPerSeed.map((f) => f[k] * scaled(k)))])) as Record<FlowKey, Stat>,
       markerDarts: dartStats(dartChoices),
       breakWindows: { early: stat(breaksByMatch.map((b) => b.early)), late: stat(breaksByMatch.map((b) => b.late)) },
@@ -800,6 +799,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
       // Early kicks are a count (scaled); where sets start is metres, not scaled.
       territory: Object.fromEntries(TERRITORY.map((k) => [k, stat(territoryPerSeed.map((o) => o[k] * (k === 'earlyKicks' ? scale : 1)))])) as Record<TerritoryKey, Stat>,
       kickReturns: kickReturnStats(returnsPerSeed),
+      taps: tapSamples,
     };
     const totalWrestles = perSeed.reduce((a, c) => a + c.wrestles, 0);
     return {

@@ -219,7 +219,7 @@ describe('measuring a cell', () => {
     const { watch: _w, ms: _m, ...rest } = r;
     const { watch: _w2, ms: _m2, ...rest2 } = measureCell(cell, 2, 3, 9);
     expect(rest2).toEqual(rest);
-    expect(r).toMatchObject({ ms: expect.any(Number), watch: { flow: expect.any(Object) } });
+    expect(Object.keys(r).slice(-2)).toEqual(['ms', 'watch']);
   });
 });
 
