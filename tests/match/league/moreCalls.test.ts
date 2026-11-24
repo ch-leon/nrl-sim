@@ -7,6 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import { FIELD_LENGTH, MID_Y } from '../../../src/match/core/field';
 import { LiveSim } from '../../../src/match/league/live';
+import { applyTuning } from '../../../src/match/league/tuning';
 import { sideSheet } from '../../../src/match/balance/measure';
 import {
   CALLS, COACH_CALLS, CallJudge, callIsDefence, callIsPenalty, callIsPlay, callResultText, callScope, chipState, penaltyChoiceOf,
@@ -42,8 +43,11 @@ interface Played {
   refusals: Set<string>;
 }
 
-/** Current-default penalty witnesses after the lead read (engine revision 8): seeds 19 and 40. After the timed back-door runs (#722) they were 1 and 50. */
-const PENALTY_SEEDS = [19, 40];
+/** Penalty witnesses. The open-play dummy moves seeds 19 and 40; seed 9 has a legal
+ * Take the two that is kicked and a legal Tap and go. With the dummy off, 19 and 40
+ * are still the revision-21 pair (19 is the goal). */
+const PENALTY_SEEDS = [9];
+const BEFORE_DUMMY_PENALTY_SEEDS = [19, 40];
 
 /** Play with the home coach making `call` whenever he may (as a player at the tray does: a tap, in on the next tick). */
 function play(seed: number, call: CoachCall | null, minutes = 6, side: 'home' | 'away' = 'home'): Played {
@@ -178,6 +182,14 @@ describe('five more calls (#396): when the sim takes them', () => {
     expect(refused).toContain('no penalty');
     // Every refusal the pair gave has a caption for the tray.
     for (const r of refused) expect(callCaption(r, false).length, r).toBeGreaterThan(0);
+    const restore = applyTuning({ 'live.dummyChance': 0 });
+    try {
+      let old = 0;
+      for (const seed of BEFORE_DUMMY_PENALTY_SEEDS) {
+        for (const c of ['take-two', 'tap-go'] as const) old += play(seed, c).legal.length;
+      }
+      expect(old).toBeGreaterThan(0);
+    } finally { restore(); }
   });
 });
 
@@ -256,6 +268,12 @@ describe('five more calls (#396): each does what it says', () => {
       }
     }
     expect(made).toBeGreaterThan(0);
+    const restore = applyTuning({ 'live.dummyChance': 0 });
+    try {
+      let old = 0;
+      for (const seed of BEFORE_DUMMY_PENALTY_SEEDS) old += afterCalls(play(seed, 'take-two'), 'take-two').length;
+      expect(old).toBeGreaterThan(0);
+    } finally { restore(); }
   });
 
   it('Tap and go: the penalty is tapped, and the set’s call is still his', () => {

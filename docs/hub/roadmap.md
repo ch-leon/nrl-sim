@@ -7,6 +7,8 @@ live gameplay change; work still open below has not shipped.
 
 ## Now
 
+- **Dummy-and-go.** A carrier with a runner outside can show the ball and keep it. The nearest defender may slide to the runner or stay square. Lab sign-off remains open. Ported from [draft PR #790](https://github.com/ch-leon/nrl-sim/pull/790).
+
 - **Corner cover tackles.** The fullback can save a try with a dive at the runner's legs or miss and leave the corner open. Lab sign-off and the delayed ankle tap remain open. Ported from [draft PR #789](https://github.com/ch-leon/nrl-sim/pull/789).
 
 - **Supported kick returns.** A clean take with room lets the catcher run at the chase with up to two teammates following. Ported from [draft PR #781](https://github.com/ch-leon/nrl-sim/pull/781).

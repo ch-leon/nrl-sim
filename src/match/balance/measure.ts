@@ -129,7 +129,7 @@ export const COUNTS = [
   'lostInContact', 'injuries', 'lineBreaks', 'coachCalls', 'callsPaid', 'completion',
   'sinBins', 'shortMin', 'binSwing', 'points', 'margin', 'homeMargin', 'goldenPoint', 'goldenPointWon', 'draws', 'possession',
   'bombs', 'bombsWon', 'bombsSpilled', 'grubbers', 'grubberTries', 'grubberRepeats', 'grubberDropouts', 'grubberTurnovers', 'kickTries',
-  'scrambles', 'heldUp', 'heldUpMatches', 'trySavers', 'coverMisses',
+  'scrambles', 'heldUp', 'heldUpMatches', 'trySavers', 'coverMisses', 'dummyPasses', 'dummyBites', 'dummyBreaks', 'dummyTries',
 ] as const;
 export type CountKey = (typeof COUNTS)[number];
 
@@ -329,6 +329,9 @@ export function scenarioEdge(home: SideSpec, away: SideSpec): DifficultyEdge | u
 
 /** A try this soon after his side's kick came from it (12 s). */
 const KICK_TRY_TICKS = 240;
+/** A line break or try by the same man this soon after his dummy came from it (2 s, then 4 s). */
+const DUMMY_BREAK_TICKS = 40;
+const DUMMY_TRY_TICKS = 80;
 
 const LATE = (e: SimEvent): boolean => e.kind === 'break-tackle' && e.detail === 'wrestle';
 
@@ -338,6 +341,7 @@ export function countEvents(es: readonly SimEvent[], side?: Side): Record<CountK
   // The kick in play (#99 close-out): a try by the kicking side within KICK_TRY_TICKS of its kick is a kick try.
   // A grubber's next act is one of: try, repeat set (the chase regathers), dropout, or turnover.
   let lastKick: { side: string | undefined; detail: string | undefined; tick: number } | null = null;
+  let dummy: { side: string; slot: number; tick: number; broke: boolean; scored: boolean } | null = null;
   let grubber: { side: string; tick: number; ours: boolean } | null = null;
   const closeGrubber = (kind: 'grubberTries' | 'grubberRepeats' | 'grubberDropouts' | 'grubberTurnovers'): void => {
     if (!grubber) return;
@@ -374,6 +378,11 @@ export function countEvents(es: readonly SimEvent[], side?: Side): Record<CountK
         c.steps++;
         c.breaks++;
         break;
+      case 'dummy-pass':
+        c.dummyPasses++;
+        if (e.detail === 'bite') c.dummyBites++;
+        if (e.side !== undefined && e.slot !== undefined) dummy = { side: e.side, slot: e.slot, tick: e.tick, broke: false, scored: false };
+        break;
       case 'offload':
         c.offloads++;
         break;
@@ -388,6 +397,10 @@ export function countEvents(es: readonly SimEvent[], side?: Side): Record<CountK
         break;
       case 'line-break':
         c.lineBreaks++;
+        if (dummy && e.side === dummy.side && e.slot === dummy.slot && e.tick - dummy.tick <= DUMMY_BREAK_TICKS && !dummy.broke) {
+          c.dummyBreaks++;
+          dummy.broke = true;
+        }
         break;
       case 'coach-call':
         c.coachCalls++;
@@ -428,6 +441,10 @@ export function countEvents(es: readonly SimEvent[], side?: Side): Record<CountK
         break;
       case 'try':
         c.tries++;
+        if (dummy && e.side === dummy.side && e.slot === dummy.slot && e.tick - dummy.tick <= DUMMY_TRY_TICKS && !dummy.scored) {
+          c.dummyTries++;
+          dummy.scored = true;
+        }
         if (e.detail === 'bonus') c.bonusTries++;
         if (lastKick && lastKick.side === e.side && e.tick - lastKick.tick <= KICK_TRY_TICKS) c.kickTries++;
         if (grubber && e.side === grubber.side && e.tick - grubber.tick <= KICK_TRY_TICKS) closeGrubber('grubberTries');

@@ -24,8 +24,11 @@ function replay(seed: number, from: number, until: number): Snapshot[] {
 const isCover = (e: Snapshot['events'][number]) => e.detail === 'try-saver' || e.kind === 'cover-miss';
 
 describe('corner cover in ordinary live matches', () => {
-  it('lets an on-field fullback make a low tackle on a winger short of the line', () => {
-    const [save, ...after] = replay(47, 6952, 6962);
+  // The open-play dummy moves the revision-21 clips. Seed 47's try-saver is tick 4707
+  // (ruck at 4716). Seed 19's miss at 2991 is grounded at 3006. With the dummy off,
+  // seed 47 at 6952 and seed 44 at 5155 are still those clips.
+  const expectSave = (seed: number, from: number, until: number) => {
+    const [save, ...after] = replay(seed, from, until);
     const event = save!.events.find(isCover)!;
     expect(event).toMatchObject({ kind: 'tackle', detail: 'try-saver', side: 'away', slot: 0 });
     const fullback = save!.players.find(p => p.side === 'away' && p.slot === 0)!;
@@ -39,10 +42,9 @@ describe('corner cover in ordinary live matches', () => {
     expect(popupFor(event)?.word).toBe('TRY-SAVER!');
     expect(after.some(s => s.phase?.kind === 'ruck')).toBe(true);
     expect(after.flatMap(s => s.events).some(e => e.kind === 'try')).toBe(false);
-  });
-
-  it('leaves the winger free to ground it when the same fullback misses in another match', () => {
-    const [miss, ...after] = replay(44, 5155, 5160);
+  };
+  const expectMiss = (seed: number, from: number, until: number) => {
+    const [miss, ...after] = replay(seed, from, until);
     expect(miss!.events.find(isCover)).toMatchObject({ kind: 'cover-miss', side: 'away', slot: 0 });
     expect(miss!.players.find(p => p.side === 'away' && p.slot === 0)?.pose).toBe('dive');
     expect(miss!.ball.holder).toEqual({ side: 'home', slot: 2 });
@@ -50,6 +52,18 @@ describe('corner cover in ordinary live matches', () => {
     const grounding = after[after.length - 1]!;
     expect(grounding.events.find(e => e.kind === 'try')).toMatchObject({ side: 'home', slot: 2 });
     expect(grounding.score?.home).toBeGreaterThan(miss!.score!.home);
+  };
+
+  it('lets an on-field fullback make a low tackle on a winger short of the line', () => {
+    expectSave(47, 4707, 4717);
+    const restore = applyTuning({ 'live.dummyChance': 0 });
+    try { expectSave(47, 6952, 6962); } finally { restore(); }
+  });
+
+  it('leaves the winger free to ground it when the same fullback misses in another match', () => {
+    expectMiss(19, 2991, 3006);
+    const restore = applyTuning({ 'live.dummyChance': 0 });
+    try { expectMiss(44, 5155, 5160); } finally { restore(); }
   });
 
   it('turns the cover rule off in the same two reproductions', () => {

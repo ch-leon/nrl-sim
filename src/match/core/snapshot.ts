@@ -18,6 +18,16 @@ export interface AttackShapeSnap {
   kind: 'spread' | 'pod' | 'edge' | 'back-door'; side: Side; dir: 1 | -1; edge: 1 | -1; startedTick: number; linkSlot?: 4 | 5;
   backDoor?: { caller: ContactPlayer; lead: ContactPlayer; support: ContactPlayer; originY: number };
 }
+/** A pass motion on an open-play carry. The held ball stays with the carrier. */
+export interface DummyPassSnap {
+  carrier: ContactPlayer;
+  receiver: ContactPlayer;
+  defender: ContactPlayer;
+  startedTick: number;
+  untilTick: number;
+  towardY: 1 | -1;
+  bit: boolean;
+}
 export interface ContactSnap {
   startedTick: number;
   carrier: ContactPlayer;
@@ -206,6 +216,7 @@ export interface InterchangeExit {
 export const INTERCHANGE_EXIT_TICKS = 230;
 
 export interface Snapshot {
+  dummyPass?: DummyPassSnap;
   /** Presentation history for a defender gathering the pass into his return. */
   interception?: InterceptionSnap;
   /** Recently replaced players taking their seats off the field. */

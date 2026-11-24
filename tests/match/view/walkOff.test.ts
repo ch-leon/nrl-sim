@@ -34,24 +34,33 @@ function surface() {
 }
 
 /** A decided full-time match after golden point, using the lab's default sides and seven-minute halves.
- * Impact interchanges stay off. The corner dive moves seed 70 off golden point; seed 20 is a decided one.
+ * Impact interchanges stay off. The open-play dummy moves seed 20 off golden point. Seed 103 is a
+ * decided one (14–15). With the dummy off, seed 20 is still the decided 13–12 golden-point match.
  * A draw at the end has no winner, so the pose check needs a decided score.
  */
-const GOLDEN_FROM = 28;
-const GOLDEN_SEEDS = [20, 70, ...Array.from({ length: 60 }, (_, i) => GOLDEN_FROM + i).filter((seed) => seed !== 70)];
+function goldenSnaps(seed: number): Snapshot[] {
+  const sim = new LiveSim(labSheet(DEFAULT_HOME), labSheet(DEFAULT_AWAY), seed, { goldenPoint: true, length: { halves: 2, halfMinutes: 7 } });
+  const snaps: Snapshot[] = [sim.snapshot()];
+  while (!sim.finished) { sim.step(); snaps.push(sim.snapshot()); }
+  return snaps;
+}
+
+function decidedGolden(snaps: Snapshot[]): boolean {
+  const golden = snaps.some((q) => q.phase?.kind === 'half-time' && !!q.phase.golden);
+  const final = snaps[snaps.length - 1]!;
+  return golden && final.score!.home !== final.score!.away;
+}
 
 function play(): Snapshot[] {
   const restore = applyTuning({ 'bench.impact.on': 0 });
   try {
-  for (const seed of GOLDEN_SEEDS) {
-    const sim = new LiveSim(labSheet(DEFAULT_HOME), labSheet(DEFAULT_AWAY), seed, { goldenPoint: true, length: { halves: 2, halfMinutes: 7 } });
-    const snaps: Snapshot[] = [sim.snapshot()];
-    while (!sim.finished) { sim.step(); snaps.push(sim.snapshot()); }
-    const golden = snaps.some((q) => q.phase?.kind === 'half-time' && !!q.phase.golden);
-    const final = snaps[snaps.length - 1]!;
-    if (golden && final.score!.home !== final.score!.away) return snaps;
-  }
-  throw new Error('no decided golden-point match in the searched seeds');
+    const snaps = goldenSnaps(103);
+    if (!decidedGolden(snaps)) throw new Error('seed 103 is not a decided golden-point match');
+    const old = applyTuning({ 'live.dummyChance': 0 });
+    try {
+      if (!decidedGolden(goldenSnaps(20))) throw new Error('seed 20 is not a decided golden-point match with the dummy off');
+    } finally { old(); }
+    return snaps;
   } finally { restore(); }
 }
 

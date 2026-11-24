@@ -34,8 +34,8 @@ function picture(mirror = 1) {
 describe('grubber tumble', () => {
   it('follows a real grubber through fractional ground contacts and settles before the chase gets there', () => {
     // Seed 5's cross-field grubber deliberately has contacts between the 20 Hz snapshots.
-    // The corner dive moves that kick. With it off, the strike is still tick 891.
-    const restore = applyTuning({ 'cornerCover.on': 0 });
+    // The corner dive and the open-play dummy move that kick. With both off, the strike is still tick 891.
+    const restore = applyTuning({ 'cornerCover.on': 0, 'live.dummyChance': 0 });
     const seed = 5, strike = 891, arrival = 953;
     const home = labSheet(DEFAULT_HOME), away = labSheet(DEFAULT_AWAY);
     const snaps = replayRange(n => new LiveSim(home, away, n), seed, 0, arrival + 1);

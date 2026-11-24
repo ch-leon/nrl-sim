@@ -151,6 +151,15 @@ export const LIVE = {
   receiverSpread: 2,
   /** …at the play-the-ball too (1), the dummy-half's pass to the first receiver, or only in open play (0). */
   receiverAtRuck: 1,
+  /** Fraction of eligible carries with a believable pass option that start a dummy. 0: off. */
+  dummyChance: 0.18,
+  dummyWidthM: 3,
+  dummyTicks: 9,
+  /** Chance an even matchup reads the pass, and the change per attack vs defence skill point. */
+  dummyBiteBase: 0.45,
+  dummyReadPerPoint: 0.006,
+  /** A defender who bites checks his advance and slides this far toward the runner. */
+  dummyShadeM: 3,
 };
 
 /**

@@ -4,6 +4,7 @@ import type { Side, Snapshot } from '../../../src/match/core/snapshot';
 import { DEFAULT_AWAY, DEFAULT_HOME, labSheet } from '../../../src/match/lab/sheets';
 import { highBall, KICK_CONTEST } from '../../../src/match/league/kickContest';
 import { LiveSim } from '../../../src/match/league/live';
+import { applyTuning } from '../../../src/match/league/tuning';
 import type { KickChoice } from '../../../src/match/league/tactics';
 import { LiveView, type ActorView } from '../../../src/match/view/liveView';
 import { pictureContext, playerPicture, type PlayerPicture } from '../../../src/match/view/playerPicture';
@@ -153,12 +154,15 @@ describe('contested open-play bombs', () => {
   });
 
   it('stages a contested catch in ordinary match play using the sim snapshots', () => {
+    // Diggers v Scorpions seed 27 stages a catch at 495. The lab's seed 1 stages one at 554.
+    // The open-play dummy moves the earlier fixtures. With it off, Diggers seed 19 and the
+    // lab's seed 26 still stage. Seed 20 was listed after those two, so the old test returned
+    // before playing it.
     const fixtures = [
-      { home: 'rival-diggers', away: 'rival-scorpions', seed: 19 },
-      { home: DEFAULT_HOME, away: DEFAULT_AWAY, seed: 26 },
-      { home: DEFAULT_HOME, away: DEFAULT_AWAY, seed: 20 },
+      { home: 'rival-diggers', away: 'rival-scorpions', seed: 27 },
+      { home: DEFAULT_HOME, away: DEFAULT_AWAY, seed: 1 },
     ];
-    for (const { home, away, seed } of fixtures) {
+    const stage = (home: string, away: string, seed: number): boolean => {
       const sim = new LiveSim(labSheet(home), labSheet(away), seed);
       let prev = sim.snapshot();
       let before = prev;
@@ -167,12 +171,18 @@ describe('contested open-play bombs', () => {
         const snap = sim.snapshot();
         if (prev.bombContest?.arrivesTick === snap.tick && snap.events.some(e => e.kind === 'set-start' && e.detail === 'caught')) {
           const reach = jumpers(prev, before);
-          if (reach.length === 2 && reach.every(p => p.lift! > 0) && jumpers(snap, prev).some(p => p.possession)) return;
+          if (reach.length === 2 && reach.every(p => p.lift! > 0) && jumpers(snap, prev).some(p => p.possession)) return true;
         }
         before = prev;
         prev = snap;
       }
-    }
-    throw new Error('No staged contested catch in the seeded fixtures');
+      return false;
+    };
+    for (const { home, away, seed } of fixtures) expect(stage(home, away, seed), `${home} ${seed}`).toBe(true);
+    const restore = applyTuning({ 'live.dummyChance': 0 });
+    try {
+      expect(stage('rival-diggers', 'rival-scorpions', 19)).toBe(true);
+      expect(stage(DEFAULT_HOME, DEFAULT_AWAY, 26)).toBe(true);
+    } finally { restore(); }
   });
 });
