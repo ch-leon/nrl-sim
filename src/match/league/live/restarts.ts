@@ -38,6 +38,7 @@ export abstract class LiveRestarts extends LivePlay {
       if (this.tick < ph.t0 + LIVE.ptbTicks) return;
       if (ph.handover) {
         this.emit('handover', `Tackled on the last — handover to ${this.names[other(this.attacking)]}`, c);
+        this.endGoalLineStand('turnover');
         this.attacking = other(this.attacking);
         this.dir = this.dirOf(this.attacking);
         this.tackles = 0;
@@ -52,6 +53,7 @@ export abstract class LiveRestarts extends LivePlay {
         return;
       }
       const dh = this.dummyHalf(this.attacking);
+      if (ph.handover || ph.freshSet) this.beginGoalLineSet(dh.side, this.mark, dh);
       const spot = this.dummyHalfSpot();
       // Heel it to where he actually is (he's been running to the mark); if he's
       // still a way off, to the mark and he collects it there.
@@ -399,6 +401,8 @@ export abstract class LiveRestarts extends LivePlay {
    * `tackles`: the count the set carries on from (held up over the line, #652); a fresh set otherwise.
    */
   protected startSetPiece(side: Side, spot: Vec, how: 'ptb' | 'tap', prefer?: number, tackles = 0, tapOrigin?: TapOrigin): void {
+    this.goalLineSetPending = false;
+    if (this.goalLineRun && this.goalLineRun.side !== side) this.endGoalLineStand('turnover');
     this.callSwaps();
     const free = this.side(side).filter((p) => p.subFor === null && p !== this.dummyHalf(side));
     const pick = (prefer !== undefined ? free.find((p) => p.slot === prefer) : undefined) ?? [...free].sort((a, b) => dist(a.body.pos, spot) - dist(b.body.pos, spot))[0] ?? this.fullback(side);
@@ -450,7 +454,8 @@ export abstract class LiveRestarts extends LivePlay {
     // Play-the-ball: the nearest defender stands at the mark as the tackler would.
     const marker = [...this.side(other(ph.side))].sort((a, b) => dist(a.body.pos, ph.spot) - dist(b.body.pos, ph.spot))[0]!;
     this.lock(p, 'ptb', LIVE.ptbTicks);
-    this.phase = { kind: 'ruck', t0: this.tick, carrier: ph.player, tackler: this.indexOf(marker), stage: 'ptb', handover: false, heldAt: 0, down: 0, pace: null };
+    this.phase = { kind: 'ruck', t0: this.tick, carrier: ph.player, tackler: this.indexOf(marker), stage: 'ptb', handover: false,
+      ...(this.tackles === 0 ? { freshSet: true } : {}), heldAt: 0, down: 0, pace: null };
     this.startRetreat();
   }
 
@@ -479,6 +484,8 @@ export abstract class LiveRestarts extends LivePlay {
       if (quick) this.events[this.events.length - 1]!.detail = ph.tapOrigin;
       this.onTapStarted(ph.tapOrigin, quick, ph.side, ph.spot.x, this.dir);
     }
+    // A quick tap and an ordinary one both start the set. The stand counts the take, not the award.
+    this.beginGoalLineSet(ph.side, ph.spot, p);
     p.catchTick = this.tick;
     p.decided = false;
     p.steppedOn = -1;
@@ -522,6 +529,7 @@ export abstract class LiveRestarts extends LivePlay {
     if (ph.good === null) {
       if (ph.readyAt === 0 && dist(k.body.pos, ph.spot) < 1) ph.readyAt = this.tick;
       if (this.tick < goalStrikeTick(ph)) return;
+      if (ph.what === 'penalty') this.endGoalLineStand('goal-attempt');
       ph.good = this.rng.next() < goalChance(k.body.pos, posts, k.stats.kicking, this.goalAcc(k));
       this.lock(k, 'kick', LIVE.kickLockTicks);
       this.ball = kickFlight(k.body.pos, this.goalAim(posts, toward, ph.good), this.tick, null, 7);

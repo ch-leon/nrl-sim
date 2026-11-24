@@ -20,6 +20,7 @@ import { WEATHER } from '../weather';
 import { ownLineX } from '../touch';
 import { LIVE } from './knobs';
 import { returnSupportSpots } from './kickReturn';
+import { GOAL_LINE_STAND } from '../goalLineStand';
 import { other, type Player } from './types';
 import { LiveContact } from './contact';
 import { SHAPES, chooseShape, shapeEdge, shapeTarget, packetSlots, backDoorTarget, type AttackingShape, type ShapeKind } from '../attackingShapes';
@@ -58,8 +59,10 @@ export abstract class LivePositioning extends LiveContact {
     }));
     const back = backs.sort((a,b)=>a.cost-b.cost)[0];
     const feasible = { pod: Number.isFinite(pod.cost), edge: Number.isFinite(cost('edge')), backDoor: !!back && Number.isFinite(back.cost) };
+    const toLine = this.toLineFor(this.attacking, origin);
+    const standPressure = this.goalLinePressure(this.attacking, origin);
     const choice = chooseShape(this.tactics[this.attacking].attack, tackle,
-      this.toLineFor(this.attacking, origin), origin.y, this.rng.next(), this.dir, feasible);
+      toLine, origin.y, this.rng.next(), this.dir, feasible, standPressure);
     ph.shape = { ...choice, ...(choice.kind === 'pod' ? {edge:pod.edge,linkSlot:pod.linkSlot} : {}),
       ...(choice.kind === 'back-door' && back ? {edge:back.edge,backDoor:back.backDoor} : {}),
       side: this.attacking, dir: this.dir, startedTick: this.tick };
@@ -301,13 +304,17 @@ export abstract class LivePositioning extends LiveContact {
     if (ph.kind === 'set-piece') {
       // A restart in play (2d): the man with the ball to the spot, his side set
       // behind it (the hooker at dummy-half for a play-the-ball), the defence 10 m back.
+      const compression = this.goalLinePressure(ph.side, ph.spot, this.tackles === 0) * GOAL_LINE_STAND.compression;
       for (const p of this.players) {
         if (!this.onField(p)) continue;
         const role = ROLES[p.slot]!;
         p.through = false;
         if (this.indexOf(p) === ph.player) p.target = { ...ph.spot };
         else if (p.side === ph.side) p.target = ph.how === 'ptb' && p === this.dummyHalf(ph.side) ? this.dummyHalfSpot() : formationTarget(role, ph.spot, this.dir, true);
-        else p.target = formationTarget(role, ph.spot, this.dir, false);
+        else {
+          const spot = formationTarget(role, ph.spot, this.dir, false);
+          p.target = { x: spot.x, y: spot.y + (ph.spot.y - spot.y) * compression };
+        }
         if (p.subFor !== null) p.target = p.subSpot;
       }
       return;
@@ -521,6 +528,7 @@ export abstract class LivePositioning extends LiveContact {
     const defenders = this.side(def);
     const inRuck = ph.kind === 'tackle' || ph.kind === 'ruck';
     const dplan = this.defPlan();
+    const compression = this.goalLinePressure(atk, bp) * GOAL_LINE_STAND.compression;
     // The back three drop as the last two tackles shape for a kick; the edge
     // stays in the line during the earlier carries.
     const kickCover = this.tactics[atk].attack === 'kick-chase' && (this.lastPlay || this.tackles >= SET_TACKLES - 2) ? this.slideEffect() : 0;
@@ -599,8 +607,9 @@ export abstract class LivePositioning extends LiveContact {
       } else {
         const slide = this.slideEffect();
         const expansive = this.tactics[atk].attack === 'expansive' ? slide : 0;
-        const y = clamp(role.lane + (anchor.y - MID_Y) * Math.min(1, (role.defPull ?? role.pull) * dplan.pull + expansive)
+        const lane = clamp(role.lane + (anchor.y - MID_Y) * Math.min(1, (role.defPull ?? role.pull) * dplan.pull + expansive)
           + (MID_Y - role.lane) * compressed, 1.5, 66.5);
+        const y = lane + (this.mark.y - lane) * compression;
         const depth = role.name === 'winger'
           ? (this.lastPlay ? LIVE.fullbackLastM : LIVE.fullbackDeepM) * coverDepth - LIVE.fullbackDeepM * rushDepth : 0;
         p.target = { x: clamp(this.lineX + this.dir * depth, -8, FIELD_LENGTH + 8), y };
@@ -694,6 +703,7 @@ export abstract class LivePositioning extends LiveContact {
     const h = this.holder();
     const lineBroken = this.lineBroken();
     const stopped = this.phase.kind !== 'play' && this.phase.kind !== 'tackle' && this.phase.kind !== 'ruck';
+    const defensiveCost = stopped ? 1 : 1 + this.goalLinePressure(this.attacking) * GOAL_LINE_STAND.defenceLegs;
     for (const p of this.players) {
       if (this.locked(p)) {
         if (stopped) this.legs(p, 0, 'stop');
@@ -730,7 +740,8 @@ export abstract class LivePositioning extends LiveContact {
       // Sprinting costs the legs more per metre than cruising.
       const metres = dist(from, p.body.pos);
       p.odometer += metres;
-      this.legs(p, metres * runCostMult(p.sprinting), stopped ? 'stop' : standing ? 'walk' : 'no');
+      const pressureCost = defensiveCost !== 1 && p.side !== this.attacking && this.onField(p) ? defensiveCost : 1;
+      this.legs(p, metres * runCostMult(p.sprinting) * pressureCost, stopped ? 'stop' : standing ? 'walk' : 'no');
       if (p.jink) {
         // The sidestep: a sharp lateral shift spread over a few ticks.
         p.body.pos = clampToGround(add(p.body.pos, { x: 0, y: p.jink.dy / LIVE.stepJinkTicks }), 0.5);

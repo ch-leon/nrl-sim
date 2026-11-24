@@ -1707,11 +1707,17 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   };
 
   const offEvent = bus.on('match:event', onEvent);
+  const offStand = bus.on('match:goal-line-stand', ({ side }) => {
+    if (bannerWasTry || queued) return;
+    showMoment({ head: 'THIRD SET ON THE LINE', who: side === 'home' ? home.name : away.name, sub: '', tone: 'score' });
+    holdBanner(BANNER_MS.kick);
+  });
   let offFinished: () => void = () => {};
 
   const handle: MatchOverlayHandle = {
     destroy(): void {
       offEvent();
+      offStand();
       offFinished();
       if (bannerTimer) clearTimeout(bannerTimer);
       if (holdTimer) clearTimeout(holdTimer);

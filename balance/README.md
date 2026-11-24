@@ -157,6 +157,14 @@ carriers held up over the line a match (#652) and **heldUpMatches** the share of
 least one, a share like completion (not scaled for a stretch). Every other number (strips, intercepts, quick play-the-balls, wrestles held by
 1/2/3 men, legs at every mark, standard errors) is in `results*.jsonl`.
 
+**Goal-line stands (#657)** records raw qualifying fresh set starts within the opposition
+20, passages reaching at least three such starts in a row, matches with a stand and how
+each passage ended. A passage reaching four sets still counts once. A held-up ball ends
+the stand while preserving the tackle count. `clock` means the stand was still live when
+the period ended. An unfinished passage means the harness reached its tick limit. Counts
+use the matchup as written and are left unscaled for shorter or longer scenarios. The
+`goalLine` field in `results*.jsonl` is absent in older runs and when the mechanic is off.
+
 ## Watchability (#648)
 
 Under each scenario's table the report has a second one, for whether the matches

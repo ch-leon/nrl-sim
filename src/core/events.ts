@@ -81,6 +81,8 @@ export interface Events {
   'match:penalty': { tick: number };
   /** A line break the view calls clean (#638): open grass ahead. Presentation only, for the whoosh and the crowd; a half break sends none. */
   'match:clean-break': { tick: number };
+  /** The third consecutive set on the line, for the banner and crowd. */
+  'match:goal-line-stand': { side: 'home' | 'away'; x: number };
   'board:sacked': { season: number; reason: string };
   // forcedSales (N12.5): who the week's forced sales let go, so a multi-week advance
   // can stop on a sale; the economy emits the warning after the sales.

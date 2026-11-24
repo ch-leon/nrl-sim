@@ -27,6 +27,8 @@ export abstract class LivePenalties extends LiveRestarts {
     const dir = this.dirOf(award);
     this.emit('penalty', `Penalty to ${this.names[award]} — ${why}`, culprit, trait);
     this.events[this.events.length - 1]!.detail = kind;
+    if (this.goalLineRun?.side === offender) this.endGoalLineStand('turnover');
+    this.goalLineSetPending = false;
     // No sin bin for a kick-off dead on the full (#397).
     if (bin) this.maybeBin(offender, culprit, spot, kind);
     this.pendingKick = null;
@@ -206,6 +208,7 @@ export abstract class LivePenalties extends LiveRestarts {
       }
     }
     const posts = postsFor(dir, FIELD_LENGTH, MID_Y);
+    this.endGoalLineStand('goal-attempt');
     const good = this.rng.next() < goalChance(k.body.pos, posts, k.stats.kicking, this.goalAcc(k));
     this.ball = kickFlight(k.body.pos, this.goalAim(posts, dir, good), this.tick, null, 8);
     this.goalUp = { side: k.side, kicker: g.kicker, good };

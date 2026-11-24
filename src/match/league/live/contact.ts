@@ -23,6 +23,7 @@ import { FIT, derivedRatings } from '../fit';
 import { COUNTERS, allOutRecoveryTicks, compressedCommitReach, rushBroken } from '../counters';
 import { BACKS, PACK } from '../presets';
 import { LIVE, runOn } from './knobs';
+import { GOAL_LINE_STAND } from '../goalLineStand';
 import { backDoorTarget, behindLead } from '../attackingShapes';
 import { other, type Player, type Phase } from './types';
 import { LivePenalties } from './penalties';
@@ -220,7 +221,7 @@ export abstract class LiveContact extends LivePenalties {
         t.catchTick = this.tick;
         t.decided = false;
         t.steppedOn = -1;
-        this.turnover();
+        this.turnover('strip');
         return;
       }
       case 'broken':
@@ -287,7 +288,7 @@ export abstract class LiveContact extends LivePenalties {
       this.lock(t, 'tackle', LIVE.contactTicks);
       this.lastTouch = c.side;
       this.bounce(c.body.pos, { x: this.dir, y: (this.rng.next() - 0.5) * 0.6 }, 2.5, 12, 2);
-      this.turnover();
+      this.turnover('error');
       this.looseFor = this.attacking; // a knock-on is theirs whoever reaches it
       if (this.siren) this.endHalf();
       return;
@@ -402,7 +403,8 @@ export abstract class LiveContact extends LivePenalties {
 
   /** Spend some of a player's legs (× his drain rate); announce him once when he is cooked. */
   private tire(p: Player, amount: number): void {
-    p.energy = Math.max(0, p.energy - amount * p.drain);
+    const pressureCost = p.side === this.attacking ? 1 : 1 + this.goalLinePressure(this.attacking) * GOAL_LINE_STAND.defenceLegs;
+    p.energy = Math.max(0, p.energy - amount * p.drain * pressureCost);
     this.checkLegs(p);
   }
 
@@ -522,6 +524,7 @@ export abstract class LiveContact extends LivePenalties {
     const who = men.length > 1 ? `${men.slice(0, -1).map((d) => d.name).join(', ')} and ${men[men.length - 1]!.name}` : t.name;
     const credit = men.length >= 2 && wall > 0 ? announce(men[walls.indexOf(wall)]!.traits.find((x) => x.id === 'brickWall')) : undefined;
     this.emit('held-up', `Held up! ${who} ${men.length > 1 ? 'keep' : 'keeps'} ${c.name} off the ground`, t, credit);
+    this.endGoalLineStand('held-up');
     this.tagContact(c, men, startedTick);
     this.lock(c, 'down', LIVE.downTicks);
     for (const d of men) this.lock(d, 'down', LIVE.downTicks);
@@ -555,6 +558,7 @@ export abstract class LiveContact extends LivePenalties {
   }
 
   protected score(scorer: Player): void {
+    this.endGoalLineStand('try');
     this.retreat = null;
     this.overLineAt = -1;
     const dir = this.dirOf(scorer.side);
