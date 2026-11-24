@@ -136,7 +136,7 @@ export function refCoversCarrier(s: Snapshot, spot: { x: number; y: number }, of
 }
 
 /** What the referee is signalling on this tick. */
-export type RefSignal = 'try' | 'penalty' | 'six-again' | null;
+export type RefSignal = 'try' | 'penalty' | 'advantage' | 'six-again' | null;
 /** Sim ticks per arm pose in the six-again circle. */
 export const SIX_AGAIN_POSE_TICKS = 3;
 
@@ -147,8 +147,9 @@ function phaseOf(s: Snapshot): string {
 
 export function refereeSignal(s: Snapshot): RefSignal {
   if (s.players.some((p) => p.tryTick !== undefined)) return 'try';
+  if (s.advantage) return 'advantage';
   const phase = s.phase?.kind ?? phaseOf(s);
-  if (phase === 'penalty') return 'penalty';
+  if (s.events.some(e => e.kind === 'penalty' && e.recalled) || phase === 'penalty') return 'penalty';
   if (s.sixAgainTick === undefined || (phase !== 'play' && phase !== 'tackle' && phase !== 'ruck')) return null;
   const age = s.tick - s.sixAgainTick;
   return age >= 0 && age < SIX_AGAIN_ARMS.length * SIX_AGAIN_POSE_TICKS ? 'six-again' : null;

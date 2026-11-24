@@ -267,6 +267,7 @@ export abstract class LiveContact extends LivePenalties {
     const back = scale({ x: -this.dir, y: 0 }, 1);
     switch (outcome) {
       case 'strip': {
+        if (this.recallAdvantage()) return;
         // One-on-one, he rips it free: the tackler is the new carrier.
         this.emit('strip', `${t.name} strips the ball from ${c.name}!`, t, credit);
         this.react(c, 'error');
@@ -333,11 +334,12 @@ export abstract class LiveContact extends LivePenalties {
     if (this.rng.next() < PENALTY.highShot + PENALTY.highShotHothead * hot) {
       this.lock(c, 'tackled', LIVE.contactTicks + LIVE.downTicks);
       this.lock(t, 'tackle', LIVE.contactTicks);
-      this.penalize(t.side, { ...c.body.pos }, `${t.name} — high shot`, t, 'high', hot > 0 ? announce(t.traits.find((x) => x.id === 'hothead')) : undefined);
+      this.penalize(c.body.pos, `${t.name} — high shot`, t, 'high', hot > 0 ? announce(t.traits.find((x) => x.id === 'hothead')) : undefined);
       return;
     }
     // Ball lost in the tackle (2f): a knock-on, more on a big hit and in the rain.
     if (this.rng.next() < lostInContactChance(outcome === 'big-hit', c.stats.handling, this.wx.handling)) {
+      if (this.recallAdvantage()) return;
       this.emit('error', `${c.name} loses the ball in the tackle — knock-on`, c);
       this.react(c, 'error');
       this.tagContact(c, [t]);
@@ -361,6 +363,7 @@ export abstract class LiveContact extends LivePenalties {
     // Held or smashed on the touchline: bundled into touch (2d).
     const nearTouch = Math.min(c.body.pos.y, FIELD_WIDTH - c.body.pos.y) < TOUCH.bundleNearM;
     if (nearTouch && this.rng.next() < (outcome === 'big-hit' ? TOUCH.bundleBigHit : TOUCH.bundle)) {
+      if (this.recallAdvantage()) return;
       this.emit('touch', `${t.name} bundles ${c.name} into touch`, t);
       this.tagContact(c, [t]);
       this.events[this.events.length - 1]!.detail = 'bundled';
@@ -581,6 +584,7 @@ export abstract class LiveContact extends LivePenalties {
       brickWall: wall,
     });
     if (this.rng.next() >= chance) return false;
+    if (this.recallAdvantage()) return true;
     if (this.phase.kind === 'play') {
       this.startImpactCarry(c);
       for (const d of men) this.spendImpactTackle(d, c);
@@ -623,6 +627,7 @@ export abstract class LiveContact extends LivePenalties {
   }
 
   protected score(scorer: Player): void {
+    this.takeAdvantage(scorer.side);
     this.endGoalLineStand('try');
     // A runner can ground it just after the catch; kick regathers and placements alone do not use a carry.
     if (this.phase.kind === 'play' && scorer.impact?.runAt === scorer.catchTick && scorer.impact.runM > 0) this.startImpactCarry(scorer);

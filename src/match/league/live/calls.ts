@@ -380,7 +380,9 @@ export abstract class LiveCalls extends LiveBase {
   protected expireCalls(): void {
     const atBreak = this.phase.kind === 'half-time' || this.phase.kind === 'full-time';
     if (atBreak && this.callAtk === null) return;
-    const newSet = atBreak || this.attacking !== this.callAtk || this.tackles < this.callTackles;
+    // A recalled penalty is a fresh start even when the failed play was on tackle zero.
+    const recalled = this.events.some(e => e.kind === 'penalty' && e.recalled);
+    const newSet = atBreak || recalled || this.attacking !== this.callAtk || this.tackles < this.callTackles;
     const tackled = this.tackles !== this.callTackles;
     this.countSet(newSet);
     this.announcePaid(this.judge.observe([...this.events], this.ballPos().x, !newSet && this.tackles > this.callTackles, newSet));

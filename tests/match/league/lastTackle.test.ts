@@ -134,8 +134,8 @@ describe('last tackle: in the sim', () => {
     // Held up at the line (#652) also rolls dice, so it is switched off too: with both off the match is
     // a65edf9's, as pinned here.
     // Early DH commitment (#672), attacking structures (#649), the centre shoulder
-    // read, later kicking mechanics, kick returns, goal-line stands and the dummy are off for this historical fingerprint.
-    const restore = applyTuning({ 'lastTackle.on': 0, 'heldUp.on': 0, 'live.dhDecisionLeadTicks': 0, 'shapes.on': 0, 'live.centreShoulderTicks': 0, 'longKick.on': 0, 'wingBomb.on': 0, 'secondKicker.on': 0, 'kickReturn.on': 0, 'goalLineStand.on': 0, 'bench.impact.on': 0, 'cornerCover.on': 0, 'live.dummyChance': 0 });
+    // read, later kicking mechanics, kick returns, goal-line stands, the dummy and advantage are off for this historical fingerprint.
+    const restore = applyTuning({ 'lastTackle.on': 0, 'heldUp.on': 0, 'live.dhDecisionLeadTicks': 0, 'shapes.on': 0, 'live.centreShoulderTicks': 0, 'longKick.on': 0, 'wingBomb.on': 0, 'secondKicker.on': 0, 'kickReturn.on': 0, 'goalLineStand.on': 0, 'bench.impact.on': 0, 'cornerCover.on': 0, 'live.dummyChance': 0, 'penalty.advantageTicks': 0 });
     try {
       expect(play(1)).toEqual(OFF_1);
       expect(play(11)).toEqual(OFF_11);

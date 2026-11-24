@@ -72,6 +72,8 @@ const WORDS: Readonly<Record<string, { word: string; tone: PopupTone; big?: bool
   'dead-ball': { word: 'DEAD BALL', tone: 'neutral' },
   'drop-out': { word: 'DROP-OUT', tone: 'neutral' },
   // Penalties (2e): over the man penalised; the captain's call over the taker; six again over the tackler.
+  advantage: { word: 'ADVANTAGE', tone: 'neutral' },
+  'advantage-over': { word: 'PLAY ON', tone: 'neutral' },
   penalty: { word: 'PENALTY!', tone: 'bad', big: true },
   'six-again': { word: 'SIX AGAIN!', tone: 'attack' },
   'penalty-choice': { word: 'TAP AND GO', tone: 'neutral' },
@@ -137,8 +139,8 @@ export function popupFor(e: SimEvent): Popup | null {
     return { word: 'MISSED!', sub: surnameOf(e.player).toUpperCase(), tone: 'bad', big: false, ms: POPUP_MS };
   }
   const big = w.big ?? false;
-  const word =
-    e.kind === 'kick' && e.detail && KICK_WORDS[e.detail]
+  const word = e.recalled ? 'BACK FOR PENALTY'
+    : e.kind === 'kick' && e.detail && KICK_WORDS[e.detail]
       ? KICK_WORDS[e.detail]!
       : e.kind === 'break-tackle' && e.detail === 'wrestle'
         ? LATE_BUST
@@ -162,6 +164,7 @@ export function popupFor(e: SimEvent): Popup | null {
   // A bonus try points at the zone it was grounded in (#77; zoneLayer.ts lights it).
   const sub = e.kind === 'try' && e.detail === 'bonus' ? BONUS_SUB
     : e.kind === 'dart' && e.detail === 'tired-marker' ? 'TIRED MARKER'
+    : e.kind === 'advantage' || e.kind === 'advantage-over' ? ''
     : (e.kind === 'signature-play' ? e.player ?? '' : surnameOf(e.player)).toUpperCase();
   const p: Popup = { word, sub, tone: w.tone, big, ms: big || e.kind === 'fresh-impact' ? POPUP_BIG_MS : POPUP_MS };
   if (e.trait) p.trait = e.trait.toUpperCase();

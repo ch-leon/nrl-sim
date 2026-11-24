@@ -159,7 +159,7 @@ export abstract class LiveKicks extends LiveClock {
   // ── Ball resolution ───────────────────────────────────────────────────────
   protected launchPendingKick(): void {
     const k = this.pendingKick;
-    if (!k || this.tick < k.at) return;
+    if (!k || this.tick < k.at || this.recallAdvantage()) return;
     this.offloadReceiver = null;
     this.pendingKick = null;
     const kicker = this.players[k.kicker]!;
@@ -252,7 +252,10 @@ export abstract class LiveKicks extends LiveClock {
       if (playKick && r && r.side !== playKick.side) r = this.playKickEdge(playKick, b.to) ?? r;
       if (!r || (b.via !== 'roll' && dist(r.body.pos, b.to) > (b.via === 'kick' ? LIVE.kickCatchReach : LIVE.catchReach))) {
         // Nobody under it: it comes down and bounces on in the direction it was going.
-        if (b.via === 'pass') this.emit('loose', r ? `${r.name} can't get to the pass — loose ball` : 'The pass goes to ground — loose ball', r);
+        if (b.via === 'pass') {
+          if (this.recallAdvantage()) return;
+          this.emit('loose', r ? `${r.name} can't get to the pass — loose ball` : 'The pass goes to ground — loose ball', r);
+        }
         if (b.bounces > 0) {
           // A grubber has done its hopping: it lies where it stopped.
           this.ball = { kind: 'loose', pos: { ...b.to }, vel: { x: 0, y: 0 } };
@@ -282,6 +285,7 @@ export abstract class LiveKicks extends LiveClock {
       this.interceptTrait = undefined;
       if (b.via === 'pass' && r.side === this.attacking && this.rng.next() < knockOnChance(r.stats.handling, pressured, false, spillExtra) * this.wx.handling) {
         // Spilled: the ball squirts forward and the defence takes over.
+        if (this.recallAdvantage()) return;
         this.emit('error', spillExtra > 0 ? `${r.name} can't hold the wild offload — knock-on` : `${r.name} spills it — knock-on`, r);
         this.react(r, 'error');
         this.lastTouch = r.side;
@@ -291,6 +295,7 @@ export abstract class LiveKicks extends LiveClock {
         if (this.siren) this.endHalf(); // a knock-on kills the ball
         return;
       }
+      if (r.side !== this.attacking && this.recallAdvantage()) return;
       this.ball = { kind: 'held', by: this.indexOf(r) };
       r.catchTick = this.tick;
       this.centreCarry = null;
@@ -560,6 +565,7 @@ export abstract class LiveKicks extends LiveClock {
 
   /** Possession changes hands where the ball is; a fresh set for the other side. */
   protected turnover(outcome: 'strip' | 'error' | 'turnover' = 'turnover', setAt?: Vec): void {
+    if (this.recallAdvantage()) return;
     this.retreat = null;
     this.offloadReceiver = null;
     this.pendingControl.home = this.pendingControl.away = null;
@@ -648,7 +654,7 @@ export abstract class LiveKicks extends LiveClock {
     const metres = Math.round((at.x - FIELD_LENGTH / 2) * kd);
     if (k.outcome === 'dead') {
       this.announcePaid(this.judge.kickoff(k.side, false, 'dead-on-full', metres));
-      this.penalize(k.side, { x: FIELD_LENGTH / 2, y: MID_Y }, 'the kick-off is dead on the full', this.players[this.lastKicker]!, 'kickoff', undefined, false);
+      this.penalize({ x: FIELD_LENGTH / 2, y: MID_Y }, 'the kick-off is dead on the full', this.players[this.lastKicker]!, 'kickoff');
       return true;
     }
     if (k.outcome === 'regather' && receiver !== null) {

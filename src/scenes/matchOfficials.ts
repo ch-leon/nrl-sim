@@ -353,7 +353,7 @@ export class MatchOfficials {
     this.refShadow.setPosition(x, y);
     // He faces the ball, and runs when play runs.
     const ball = this.world(cur.ball);
-    const left = ball.x < x;
+    const left = cur.advantage ? cur.advantage.dir < 0 : ball.x < x;
     const facing: Facing = ball.y < y - 4 ? 'back' : 'front';
     const ticks = Math.max(1, cur.tick - prev.tick);
     const speed = Math.hypot(p1.x - p0.x, p1.y - p0.y) / (ticks * TICK_S);
@@ -363,6 +363,9 @@ export class MatchOfficials {
     let stride: number | undefined;
     if (signal === 'try') {
       action = 'fistPump';
+      frame = 2;
+    } else if (signal === 'advantage') {
+      action = 'advantage';
       frame = 2;
     } else if (signal === 'penalty') {
       action = 'point';

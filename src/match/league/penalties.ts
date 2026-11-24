@@ -19,6 +19,10 @@ export const PENALTY = {
   /** A high shot in a made tackle: anyone, and this much more per level of Hothead. */
   highShot: 0.002,
   highShotHothead: 0.03,
+  /** Ticks of live play available after ordinary offside at the ruck (0 blows immediately). */
+  advantageTicks: 70,
+  /** Ground a carrier has to gain beyond the offence before calling advantage over. */
+  advantageGainM: 8,
   /** Points for a penalty goal (a drop kick in Nines). */
   goalPoints: 2,
   /** The captain takes the shot at goal when it is this likely to go over… */

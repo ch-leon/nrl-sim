@@ -27,7 +27,7 @@ export const BANDS: Partial<Record<CountKey, readonly [number, number]>> = {
 };
 
 /** The columns of the summary table. */
-const COLUMNS: readonly CountKey[] = ['tackles', 'lineBreaks', 'breaks', 'lateBusts', 'offloads', 'errors', 'kicks', 'tries', 'bonusTries', 'bigHits', 'runDowns', 'heldUp', 'heldUpMatches', 'dummyPasses', 'dummyBites', 'dummyBreaks', 'dummyTries', 'gassed', 'subs', 'goals', 'fieldGoals', 'touchFinds', 'fortyTwenties', 'deadBalls', 'kickMetres', 'penalties', 'sixAgains', 'penaltyGoals', 'sinBins', 'shortMin', 'binSwing', 'lostInContact', 'injuries', 'completion', 'grubbers', 'grubberTries', 'grubberRepeats', 'grubberDropouts', 'grubberTurnovers'];
+const COLUMNS: readonly CountKey[] = ['tackles', 'lineBreaks', 'breaks', 'lateBusts', 'offloads', 'errors', 'kicks', 'tries', 'bonusTries', 'bigHits', 'runDowns', 'heldUp', 'heldUpMatches', 'dummyPasses', 'dummyBites', 'dummyBreaks', 'dummyTries', 'gassed', 'subs', 'goals', 'fieldGoals', 'touchFinds', 'fortyTwenties', 'deadBalls', 'kickMetres', 'penalties', 'penaltiesWaived', 'sixAgains', 'penaltyGoals', 'sinBins', 'shortMin', 'binSwing', 'lostInContact', 'injuries', 'completion', 'grubbers', 'grubberTries', 'grubberRepeats', 'grubberDropouts', 'grubberTurnovers'];
 
 /** ✓ inside the §7 band, ↑ above, ↓ below, '' when the metric has no band. */
 export function bandMark(key: CountKey, v: number): string {
@@ -86,6 +86,8 @@ export function reportMarkdown(r: ReportInput): string {
     `${r.plan.seeds} matches per row, ${r.plan.minutes ? `${r.plan.minutes}-minute stretches, counts scaled to a ${MATCH_MINUTES}-minute match` : `whole matches (two ${MATCH_MINUTES / 2}-minute halves)`}; counts are both sides. Wins are on points. ` +
       `✓ inside the §7 target, ↑ above, ↓ below. A change marked * is bigger than luck explains (over 2 standard errors, flagged only with ${MIN_SEEDS_TO_FLAG}+ matches a row); unmarked ones may be noise.`,
     '',
+    'Penalties count whistles, including recalls. penaltiesWaived counts offsides where the referee called advantage over.',
+    '',
   );
   const scenarios = [...new Set(r.results.map((x) => x.scenario))];
   for (const sc of scenarios) {
@@ -106,7 +108,8 @@ export function reportMarkdown(r: ReportInput): string {
         const v = row.counts[k];
         if (!v) return '—';
         const mark = bandMark(k, v.mean);
-        const d = row === base ? '' : ` (${delta(v, base.counts[k], Math.min(row.seeds, base.seeds) >= MIN_SEEDS_TO_FLAG)})`;
+        const baseCount = base.counts[k];
+        const d = row !== base && baseCount ? ` (${delta(v, baseCount, Math.min(row.seeds, base.seeds) >= MIN_SEEDS_TO_FLAG)})` : '';
         return `${v.mean.toFixed(k.startsWith('grubber') ? 3 : 1)}${mark ? ` ${mark}` : ''}${d}`;
       });
       const side = tracked
@@ -125,9 +128,10 @@ export function reportMarkdown(r: ReportInput): string {
         for (const k of columns) {
           // A run from before a metric existed has nothing to compare it with.
           const before = p.counts[k];
-          if (!before) continue;
-          const d = delta(row.counts[k], before, Math.min(row.seeds, p.seeds) >= MIN_SEEDS_TO_FLAG);
-          if (d.endsWith('*')) moved.push(`${row.variant}: ${k} ${before.mean.toFixed(1)} → ${row.counts[k].mean.toFixed(1)} (${d})`);
+          const after = row.counts[k];
+          if (!before || !after) continue;
+          const d = delta(after, before, Math.min(row.seeds, p.seeds) >= MIN_SEEDS_TO_FLAG);
+          if (d.endsWith('*')) moved.push(`${row.variant}: ${k} ${before.mean.toFixed(1)} → ${after.mean.toFixed(1)} (${d})`);
         }
       }
       out.push(moved.length ? `**Changed since the previous run:** ${moved.join('; ')}` : '**Changed since the previous run:** nothing beyond noise.', '');

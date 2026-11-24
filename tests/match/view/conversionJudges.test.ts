@@ -13,9 +13,9 @@ const away = labSheet(DEFAULT_AWAY);
 const factory = (seed: number) => new LiveSim(home, away, seed);
 
 describe('touch judges at conversions', () => {
-  // These exact award and whistle ticks come from the engine before kick returns. Goal-line stands, impact interchanges, the corner dive and the open-play dummy are off with them.
+  // These exact award and whistle ticks come from the engine before kick returns. Goal-line stands, impact interchanges, the corner dive, the open-play dummy and penalty advantage are off with them.
   let restore: () => void;
-  beforeEach(() => { restore = applyTuning({ 'kickReturn.on': 0, 'goalLineStand.on': 0, 'bench.impact.on': 0, 'cornerCover.on': 0, 'live.dummyChance': 0 }); });
+  beforeEach(() => { restore = applyTuning({ 'kickReturn.on': 0, 'goalLineStand.on': 0, 'bench.impact.on': 0, 'cornerCover.on': 0, 'live.dummyChance': 0, 'penalty.advantageTicks': 0 }); });
   afterEach(() => { restore(); });
 
   it.each([

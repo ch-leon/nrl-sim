@@ -366,6 +366,24 @@ to 0.45 s of luck either way; only the winner's side can take it. The attacker f
 regather and the try; the defender grounds it for a 20 m restart. One that runs dead is
 unchanged. About 0.35 grubber tries a match between even sides (tuning §31).
 
+### 4.5 Penalty advantage
+
+After an ordinary offside at the play-the-ball, if the attacking side still has
+possession, the referee holds the penalty at its original mark and signals advantage
+with an extended arm. The same side has up to 3.5 seconds to gain 8 m downfield,
+break the line or score. Those outcomes count as advantage taken. A completed
+tackle without the gain, a lost ball, an attempted kick, a dead ball or expiry
+brings play back for the penalty. The usual captain's choice and the normal
+minimum distance from the try line apply to the original mark.
+
+High shots, bin-worthy fouls, offsides as possession changes on a handover, and
+dead-on-the-full kick-offs get the immediate whistle. A later high shot takes
+precedence over pending advantage. When a tackle ends without enough gain, the
+recall takes precedence over a six-again check. Once advantage is taken the
+usual tackle-count and six-again rules apply. The referee uses the existing
+offside and discipline rolls. The harness counts penalty whistles (including recalls)
+and waived offside separately. [Tuning §17](BAK-208-tuning.md#17-penalties-and-six-again-bak-207-51-2e)
+
 ## 5. Tactics by zone — *implemented in D (#98)*
 
 The field is five zones from the attacking side's view, by metres to the line it is
@@ -900,6 +918,7 @@ makes the break but can't finish it, the workhorse who is never quick and never 
 | #650 | Attacking bombs can go to either winger's corner when the chase can reach it — *awaiting lab sign-off*. Tuning §6 | §4.4 |
 | #650 | The dummy-half can find the deeper five-eighth in space when the halfback is pressured on the last tackle — *awaiting lab sign-off*. Tuning §6 | §4.4 |
 | #660 | A clean long kick or bomb catch can be returned into a gap with two support runners. Tuning §6 | §4.4 |
+| #659 | Offside advantage, with the referee signal and return to the original mark — *awaiting lab sign-off*. Tuning §17 | §4.5 |
 | #652.1 | Held up over the line: any defender on a carrier in contact at the line can hold him up (a lone tackler too, Leon 13 Nov 2026); play-the-ball 10 m out, the tackle counted — *awaiting lab sign-off*. Tuning §11 | §8.1 |
 | #652.2 | Fullbacks can make or miss a low cover tackle at the corner inside the last 10 m — *awaiting lab sign-off*. Tuning §11 | §8.1 |
 | #653 | An open-play carry can shape a pass and go itself. The nearest defender may bite or stay square. The ordinary tackle contest still applies — *awaiting lab sign-off*. Tuning §5 | §4.2 |

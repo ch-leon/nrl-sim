@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- **Penalty advantage.** After an ordinary offside at the ruck, the referee holds the whistle for up to 3.5 seconds while the attack still has the ball. Eight metres, a line break or a try takes the advantage. If the chance dies, play comes back to the original mark for the penalty. High shots and bin-worthy fouls are whistled at once. Ported from [draft PR #791](https://github.com/ch-leon/nrl-sim/pull/791). [#659](https://github.com/ch-leon/nrl-sim/issues/659).
+
 - **Dummy-and-go.** When a runner is available, a carrier can turn his shoulders and show the ball in both hands before pulling it back into his carry. The closest defender can slide toward the runner or stay square and close the carrier down. The normal tackle contest applies in both cases. Ported from [draft PR #790](https://github.com/ch-leon/nrl-sim/pull/790). First slice of [#653](https://github.com/ch-leon/nrl-sim/issues/653).
 
 - **Try-saving tackles in the corner.** A fullback can come across to cover an open run down the edge. If he reaches the runner before the line, he can dive at his legs for a tackle or miss and leave the runner free to ground it. The play-by-play calls each result. Ported from [draft PR #789](https://github.com/ch-leon/nrl-sim/pull/789). This slice of [#652](https://github.com/ch-leon/nrl-sim/issues/652).
