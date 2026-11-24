@@ -200,6 +200,8 @@ export interface SimEvent {
   detail?: string;
   /** The receiver's slot, when a cut-out names the man it was thrown to (N15.4). The view draws the line; the sim does not read it. */
   toSlot?: number;
+  /** A penalty called back to the original mark after advantage. */
+  recalled?: true;
   /** Read-only animation context for this contact outcome. */
   contact?: ContactSnap;
 }
@@ -237,6 +239,8 @@ export interface Snapshot {
   conversion?: ConversionSnap;
   /** The far and near touch judges, in that order at both ends of the pitch. */
   touchJudges?: readonly [TouchJudgeSnap, TouchJudgeSnap];
+  /** The referee's current advantage signal, reconstructed on every tick. */
+  advantage?: { side: Side; dir: 1 | -1 };
   /** Short state label for the lab readout (phase, set, tackle count...). */
   label: string;
   /** Events emitted on this tick. */

@@ -174,6 +174,7 @@ export class LiveSim extends LivePositioning implements MatchSim {
       this.quickTapPicture = null;
     }
     this.watchLineBreak(h);
+    this.stepAdvantage(h);
     this.watchBombContest();
     this.expireCalls();
     if (this.scripted || this.tucked >= 0) this.tidyPlays();
@@ -309,6 +310,7 @@ export class LiveSim extends LivePositioning implements MatchSim {
       ...(conversion ? { conversion } : {}),
       ...(this.touchJudges ? { touchJudges: this.touchJudges } : {}),
       ...(exits ? { interchangeExits: exits } : {}),
+      ...(this.advantage ? { advantage: { side: this.advantage.side, dir: this.dirOf(this.advantage.side) } } : {}),
       label: `${this.names[this.attacking]} ball · ${state} · ${this.points.home}–${this.points.away} · ${clockText(this.half, this.clockTicks * TICK_S)}${this.siren && (kind === 'play' || kind === 'tackle' || kind === 'ruck') ? ' · siren' : ''} · ${legs}${short}`,
       events: this.events,
       ...(this.sixAgainTick === undefined ? {} : { sixAgainTick: this.sixAgainTick }),

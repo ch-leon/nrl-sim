@@ -548,6 +548,7 @@ export abstract class LivePlay extends LiveKicks {
       if (!this.stepWrestle(ph, w)) return;
     } else if (this.tick < ph.t0 + LIVE.contactTicks) return;
     const c = this.players[ph.carrier]!;
+    if (this.settleTackleAdvantage(c)) return;
     if (inOwnInGoal(c.body.pos, this.dirOf(c.side))) {
       // Held up in his own in-goal: a goal-line drop-out (2d).
       this.emit('dead-ball', `${c.name} is held in his own in-goal — goal-line drop-out`, c);

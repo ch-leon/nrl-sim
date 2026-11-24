@@ -36,6 +36,7 @@ export abstract class LiveClock extends LiveSetPlays {
 
   /** The ball is dead after the siren: half-time, or full time. */
   protected endHalf(): void {
+    if (this.recallAdvantage()) return;
     this.endGoalLineStand('clock');
     this.goalLineSetPending = false;
     this.retreat = null;

@@ -83,7 +83,7 @@ export const NINES_PAGE: GuidePage = {
       heading: 'Penalties and six-again',
       bullets: [
         'Holding down after a long wrestle, or lying in the ruck, gives the attack six again.',
-        'Offside at the ruck (a Rush defence pays for its line speed) and high shots (Hotheads more often) give a penalty. The captain takes a shot at goal when it is likely and the clock or score says so, taps and goes inside 25 m, and otherwise kicks for touch and taps 10 m in.',
+        'Offside at the ruck (a Rush defence pays for its line speed) can play on if the attack has a chance to gain ground. If the chance goes, the referee brings play back to the original mark. High shots (Hotheads more often) get an immediate whistle. The captain takes a shot at goal when it is likely and the clock or score says so, taps and goes inside 25 m, and otherwise kicks for touch and taps 10 m in.',
         `A penalty can be a sin bin. He sits out ${F.sinBinMinutes} minutes of the match clock — a high shot, a professional foul on his own line, or repeat offences — and his side plays a man short until he is back.`,
       ],
     },

@@ -280,7 +280,7 @@ describe('five more calls (#396): each does what it says', () => {
     class PenaltySim extends LiveSim {
       awardHomePenalty() {
         const x = this.dirOf('home') > 0 ? FIELD_LENGTH - 28 : 28;
-        this.penalize('away', { x, y: MID_Y }, 'offside', this.at('away', 0), 'offside');
+        this.penalize({ x, y: MID_Y }, 'offside', this.at('away', 0), 'offside');
       }
     }
     const sim = new PenaltySim(H, A, 9, { length: { halves: 1, halfMinutes: 6 } });

@@ -200,7 +200,8 @@ describe('the bench and the sin bin (#642)', () => {
   it('a binned man walks off as the sim has him, then sits in his side’s bin until he is back on', () => {
     // The open-play dummy moves seed 6. Seed 27 with seven-minute halves has a far-side walk and a return.
     // With the dummy off, seed 6 still does. Seed 10 was that witness before the corner dive.
-    // The dummy moves it too, so both knobs are off for that check.
+    // The dummy moves it too, so both knobs are off for that check. Penalty advantage moves it again,
+    // so that check also sets advantageTicks to 0.
     const cycle = (seed: number) => {
       const sim = new LiveSim(home, away, seed, { length: { halves: 2, halfMinutes: 7 } });
       const saw = { walking: false, seated: false, returned: false };
@@ -235,7 +236,7 @@ describe('the bench and the sin bin (#642)', () => {
     const restore = applyTuning({ 'live.dummyChance': 0 });
     try {
       cycle(6);
-      const diveOff = applyTuning({ 'cornerCover.on': 0 });
+      const diveOff = applyTuning({ 'cornerCover.on': 0, 'penalty.advantageTicks': 0 });
       try { cycle(10); } finally { diveOff(); }
     } finally { restore(); }
   });

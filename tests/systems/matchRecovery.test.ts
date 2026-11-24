@@ -45,8 +45,8 @@ afterEach(() => {
   Reflect.deleteProperty(globalThis, 'localStorage');
 });
 
-// A held match from before the open-play dummy (revision 21) must restart.
-const previousEngine = matchEngineIdentity().replace(/^nrl-live-\d+-/, 'nrl-live-21-');
+// A held match from before penalty advantage (revision 22) must restart.
+const previousEngine = matchEngineIdentity().replace(/^nrl-live-\d+-/, 'nrl-live-22-');
 const badIds = [undefined, 'bad identity', 'nrl-live-999-00000000000000', previousEngine] as const;
 describe.each([null, DEV_TEST_PREFIX])('recovery namespace %s', namespace => {
   it.each(badIds)('restarts only this fixture on reload with identity %s, preserving once-only effects', engineId => {

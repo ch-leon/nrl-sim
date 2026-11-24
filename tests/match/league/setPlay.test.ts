@@ -421,18 +421,26 @@ describe('the lab and the harness', () => {
   // The five-eighth option moves seed 3's block play to 688. Seed 11's first breakdown is now
   // the home block play, so the home inside-ball breakdown is seed 22.
   // The open-play dummy moves that breakdown. Seed 36's home inside-ball breaks down at 1609.
-  // With the dummy off, seed 22 is still tick 2579.
-  it('the lab’s named seeds: a block play launched (seed 3, tick 688) and a home play breaking down (seed 36, tick 1609)', () => {
+  // Penalty advantage moves seed 36. Seeds 1–60: the first whose first home breakdown is an
+  // inside-ball is seed 10, at tick 2972. With advantage off, seed 36 is still tick 1609.
+  // With the dummy and advantage off, seed 22 is still tick 2579.
+  it('the lab’s named seeds: a block play launched (seed 3, tick 688) and a home inside-ball breakdown (seed 10, tick 2972)', () => {
     const lab = (seed: number): PlaySim =>
       new PlaySim(withPlays({ ...labSheet(DEFAULT_HOME, 'gen', { attack: 'grind' }), rotation: 'standard' }, true), withPlays({ ...labSheet(DEFAULT_AWAY, 'gen', {}), rotation: 'standard' }, true), seed, { energy: LEGS_ENERGY.fresh, weather: 'clear', calls: [] });
     const one = lab(3);
     const launch = until(one, (e) => e.kind === 'set-play' && e.side === 'home');
     expect([launch?.tick, launch?.detail, one.script?.outcome]).toEqual([688, 'block-play', 'ok']);
     expect(one.script?.decoys.map((d) => d.idx % 9)).toEqual([7]);
-    const thirtySix = lab(36);
-    const bd = until(thirtySix, (e) => e.kind === 'play-breaks-down' && e.side === 'home');
-    expect([bd?.tick, bd?.detail, bd?.side]).toEqual([1609, 'inside-ball', 'home']);
-    const restore = applyTuning({ 'live.dummyChance': 0 });
+    const ten = lab(10);
+    const bd = until(ten, (e) => e.kind === 'play-breaks-down' && e.side === 'home');
+    expect([bd?.tick, bd?.detail, bd?.side]).toEqual([2972, 'inside-ball', 'home']);
+    const advantageOff = applyTuning({ 'penalty.advantageTicks': 0 });
+    try {
+      const thirtySix = lab(36);
+      const oldHome = until(thirtySix, (e) => e.kind === 'play-breaks-down' && e.side === 'home');
+      expect([oldHome?.tick, oldHome?.detail, oldHome?.side]).toEqual([1609, 'inside-ball', 'home']);
+    } finally { advantageOff(); }
+    const restore = applyTuning({ 'live.dummyChance': 0, 'penalty.advantageTicks': 0 });
     try {
       const twentyTwo = lab(22);
       const old = until(twentyTwo, (e) => e.kind === 'play-breaks-down');

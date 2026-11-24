@@ -10,28 +10,94 @@ import { NINES } from '../rules';
 import { GOALS, goalChance, postsFor } from '../goals';
 import { PENALTY, choosePenalty, type PenaltyChoice } from '../penalties';
 import { twentySpot } from '../touch';
-import { BIN, binReason, binReasonText, sinBinChance } from '../sinbin';
+import { BIN, binReason, binReasonText, sinBinChance, type BinReason } from '../sinbin';
 import { LIVE } from './knobs';
 import { other, type Player, type Phase } from './types';
 import { LiveRestarts } from './restarts';
 
+interface OffsideAdvantage {
+  side: Side;
+  mark: Vec;
+  why: string;
+  offender: Pick<Player, 'side' | 'slot' | 'name'>;
+  until: number;
+}
+
 export abstract class LivePenalties extends LiveRestarts {
   // ── Penalties (2e) ────────────────────────────────────────────────────────
-  /**
-   * `offender` concedes a penalty at `spot` (brought out to 10 m from the line).
-   * The captain's call (penalties.ts): the shot at goal, a tap, or a kick for
-   * touch — each said and shown. After the siren only the shot keeps the half alive.
-   */
-  protected penalize(offender: Side, spot: Vec, why: string, culprit: Player, kind: string, trait?: string, bin = true): void {
+  protected advantage: OffsideAdvantage | null = null;
+
+  /** Returns true for a whistle. The existing discipline draw also decides whether an offside is safe to play through. */
+  protected penalize(spot: Vec, why: string, culprit: Player, kind: 'offside' | 'high' | 'kickoff', trait?: string): boolean {
+    const side = other(culprit.side);
+    const reason = kind === 'kickoff' ? null : this.binFor(culprit, spot, kind);
+    if (kind === 'offside' && reason === null && PENALTY.advantageTicks > 0 && !this.siren && this.holder()?.side === side) {
+      const { side: defending, slot, name } = culprit;
+      this.advantage ??= { side, mark: { ...spot }, why, offender: { side: defending, slot, name }, until: this.tick + PENALTY.advantageTicks };
+      this.emit('advantage', `Advantage to ${this.names[side]} — ${why}`, culprit);
+      return false;
+    }
+    // High shots, bin-worthy fouls and infringements at a dead ball take precedence.
+    this.advantage = null;
+    this.awardPenalty(spot, why, culprit, kind, trait, reason ? { culprit, reason } : undefined);
+    return true;
+  }
+
+  protected recallAdvantage(): boolean {
+    const a = this.advantage;
+    if (!a) return false;
+    this.advantage = null;
+    this.awardPenalty(a.mark, a.why, a.offender, 'offside', undefined, undefined, true);
+    return true;
+  }
+
+  protected takeAdvantage(side: Side): void {
+    const a = this.advantage;
+    if (!a || side !== a.side) return;
+    this.advantage = null;
+    this.emit('advantage-over', `Advantage over — play on, ${this.names[side]}`, a.offender);
+  }
+
+  /** A completed tackle settles the passage before six again. Returns true if it comes back. */
+  protected settleTackleAdvantage(carrier: Player): boolean {
+    if (this.gainedAdvantage(carrier)) {
+      this.takeAdvantage(carrier.side);
+      return false;
+    }
+    return this.recallAdvantage();
+  }
+
+  private gainedAdvantage(h: Player): boolean {
+    const a = this.advantage;
+    return !!a && h.side === a.side && (h.body.pos.x - a.mark.x) * this.dirOf(a.side) >= PENALTY.advantageGainM;
+  }
+
+  protected stepAdvantage(h: Player | null): void {
+    const a = this.advantage;
+    if (!a) return;
+    if (h?.side === a.side && this.phase.kind === 'play' && (this.gainedAdvantage(h) || this.lineBrokenBy === a.side)) this.takeAdvantage(a.side);
+    else if (this.tick >= a.until) this.recallAdvantage();
+  }
+
+  /** Use the original mark, the current clock and the normal captain's choice. */
+  private awardPenalty(
+    spot: Vec, why: string, culprit: Pick<Player, 'side' | 'slot' | 'name'>, kind: 'offside' | 'high' | 'kickoff',
+    trait?: string, bin?: { culprit: Player; reason: BinReason }, recalled = false,
+  ): void {
+    const offender = culprit.side;
     const award = other(offender);
     const dir = this.dirOf(award);
-    this.emit('penalty', `Penalty to ${this.names[award]} — ${why}`, culprit, trait);
-    this.events[this.events.length - 1]!.detail = kind;
+    this.emit('penalty', recalled ? `Penalty to ${this.names[award]} — no advantage, back to the mark` : `Penalty to ${this.names[award]} — ${why}`, culprit, trait);
+    const event = this.events[this.events.length - 1]!;
+    event.detail = kind;
+    if (recalled) event.recalled = true;
     if (this.goalLineRun?.side === offender) this.endGoalLineStand('turnover');
     this.goalLineSetPending = false;
-    // No sin bin for a kick-off dead on the full (#397).
-    if (bin) this.maybeBin(offender, culprit, spot, kind);
+    // No sin bin for a kick-off dead on the full (#397). The roll already happened in binFor.
+    if (kind !== 'kickoff' && this.toLineFor(award, spot) <= BIN.redZoneM) this.ownTwentyPens[offender]++;
+    if (bin) this.sendToBin(bin.culprit, bin.reason);
     this.pendingKick = null;
+    this.pendingGoal = null;
     this.kickFrom = null;
     this.outPending = null;
     this.overLineAt = -1;
@@ -125,16 +191,18 @@ export abstract class LivePenalties extends LiveRestarts {
    * roll on every penalty whatever the chance, so turning bins off with the
    * knobs leaves a match the same until a bin would have happened.
    */
-  private maybeBin(offender: Side, culprit: Player, spot: Vec, kind: string): void {
-    const award = other(offender);
-    const own20 = this.toLineFor(award, spot) <= BIN.redZoneM;
+  private binFor(culprit: Player, spot: Vec, kind: 'offside' | 'high'): BinReason | null {
+    const offender = culprit.side;
+    const own20 = this.toLineFor(other(offender), spot) <= BIN.redZoneM;
     const prior = this.ownTwentyPens[offender];
-    if (own20) this.ownTwentyPens[offender]++;
     const r = this.rng.next();
     const out = PLAYERS - this.side(offender).length;
     const sit = { high: kind === 'high', own20, prior, hitman: traitBoost(culprit.traits, 'hitman'), hothead: traitBoost(culprit.traits, 'hothead') };
-    if (out >= BIN.maxOut || r >= sinBinChance(sit)) return;
-    const reason = binReason(sit);
+    return out >= BIN.maxOut || r >= sinBinChance(sit) ? null : binReason(sit);
+  }
+
+  private sendToBin(culprit: Player, reason: BinReason): void {
+    const offender = culprit.side;
     culprit.binUntilS = this.matchSeconds + BIN.minutes * 60;
     culprit.binSpot = this.interchangeSpot(culprit);
     culprit.subFor = null;
@@ -192,7 +260,7 @@ export abstract class LivePenalties extends LiveRestarts {
   /** Off the boot: charged down, or in the air to the posts. */
   protected launchGoal(): void {
     const g = this.pendingGoal;
-    if (!g || this.tick < g.at) return;
+    if (!g || this.tick < g.at || this.recallAdvantage()) return;
     this.pendingGoal = null;
     const k = this.players[g.kicker]!;
     const dir = this.dirOf(k.side);
