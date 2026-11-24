@@ -5,6 +5,7 @@ import { lookUpFrame } from './lookUp';
 
 export const TOUCH_JUDGE_POSES = ['ready', 'watch', 'raise', 'up', 'waveOut', 'waveMidOut', 'waveAcross', 'waveMidIn', 'waveIn'] as const;
 export type TouchJudgePose = typeof TOUCH_JUDGE_POSES[number];
+export const TOUCH_JUDGE_JOG_FRAMES = 6;
 
 type Offset = ArmPose['hand'];
 interface FlagPose extends ArmPose {
@@ -15,6 +16,7 @@ interface FlagPose extends ArmPose {
 }
 
 const LOW: FlagPose = { elbow: [0, 4], hand: [1, 6], tip: [4, 11], hoist: [-2, -4], fly: [7, -1] };
+const SIDELINE: FlagPose = { elbow: [0, 4], hand: [3, 6], tip: [10, 4], hoist: [-5, 0], fly: [0, 6] };
 const ARMS: Record<TouchJudgePose, FlagPose> = {
   ready: LOW,
   watch: LOW,
@@ -27,12 +29,18 @@ const ARMS: Record<TouchJudgePose, FlagPose> = {
   waveIn: { elbow: [2, 5], hand: [-7, 4], tip: [-18, 3], hoist: [7, 1], fly: [0, 6] },
 };
 
-/** The standing referee/player registration, with a flag attached to the near hand. */
-export function drawTouchJudge(look: Appearance, kit: Kit, facing: Facing, pose: TouchJudgePose): PixelBuffer {
-  const arm = ARMS[pose];
-  const standing = drawPrototypePlayer(look, kit, 'idle', 0, facing, false, undefined, 0, undefined, arm);
-  const body = pose === 'watch' ? lookUpFrame(standing, look, kit, facing, 'idle', 0, undefined, 0, 1) : standing;
-  const { left, shoulderY } = prototypeUpperAt(look.build, 'idle', 0);
+/** The referee/player registration, with a flag attached to the near hand. */
+export function drawTouchJudge(look: Appearance, kit: Kit, facing: Facing, pose: TouchJudgePose | 'sideline', jog?: number): PixelBuffer {
+  const action = jog === undefined ? 'idle' : 'run';
+  const frame = jog ?? 0;
+  const stride = jog === undefined ? undefined : jog + 6;
+  const { left, shoulderY, swing } = prototypeUpperAt(look.build, action, frame, stride);
+  const armShift = Math.round(swing);
+  const arm: FlagPose = pose === 'sideline' ? {
+    ...SIDELINE, hand: [SIDELINE.hand[0] - armShift, SIDELINE.hand[1]], tip: [SIDELINE.tip[0] - armShift, SIDELINE.tip[1]],
+  } : ARMS[pose];
+  const base = drawPrototypePlayer(look, kit, action, frame, facing, false, stride, 0, undefined, arm);
+  const body = pose === 'watch' ? lookUpFrame(base, look, kit, facing, 'idle', 0, undefined, 0, 1) : base;
   const bodyWidth = look.build === 'stocky' ? 11 : look.build === 'athletic' ? 9 : 7;
   const shoulderX = left + bodyWidth - 2;
   const frameY = shoulderY + 2 + HEIGHT - PAINT_H - look.stature;

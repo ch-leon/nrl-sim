@@ -361,7 +361,7 @@ export class LivePlayback {
     this.recorder = new MatchRecorder({ home: home.clubId, away: away.clubId });
     this.commentator = new Commentator(opts.seed, { home: home.name, away: away.name }, { home, away }, { knockout: !!opts.goldenPoint });
     // Exactly the sim runMatch would play: same sheets, seed, weather, injury rate, difficulty and calls.
-    const simOpts: LiveOptions = { weather: opts.weather, calls: opts.calls, plans: this.plans, controls: this.controls, ...(opts.injuryRate !== undefined ? { injuryRate: opts.injuryRate } : {}), ...(opts.difficultyEdge ? { difficultyEdge: opts.difficultyEdge } : {}), ...(opts.aiCoach?.length ? { aiCoach: opts.aiCoach } : {}), ...(opts.aiRival ? { aiRival: opts.aiRival } : {}), ...(opts.breakRuleSides?.length ? { breakRuleSides: opts.breakRuleSides } : {}), ...(opts.goldenPoint ? { goldenPoint: true } : {}) };
+    const simOpts: LiveOptions = { touchJudges: true, weather: opts.weather, calls: opts.calls, plans: this.plans, controls: this.controls, ...(opts.injuryRate !== undefined ? { injuryRate: opts.injuryRate } : {}), ...(opts.difficultyEdge ? { difficultyEdge: opts.difficultyEdge } : {}), ...(opts.aiCoach?.length ? { aiCoach: opts.aiCoach } : {}), ...(opts.aiRival ? { aiRival: opts.aiRival } : {}), ...(opts.breakRuleSides?.length ? { breakRuleSides: opts.breakRuleSides } : {}), ...(opts.goldenPoint ? { goldenPoint: true } : {}) };
     this.simOpts = simOpts;
     this.factory = (seed) => new LiveSim(home, away, seed, simOpts);
     // Over the kick's trail, under the pop-ups. Built before a resume steps the sim, which clears it.

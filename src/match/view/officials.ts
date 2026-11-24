@@ -193,8 +193,8 @@ export const BENCH = {
   seats: 5,
   /** Metres from halfway to each bench's inner end. */
   fromHalfwayM: 5,
-  /** Metres beyond the touchline the bench stands. */
-  backM: 2.2,
+  /** Metres beyond touch, leaving the touch judge a clear line in front of the seats. */
+  backM: 3.1,
   /** Metres from the bench's outer end to the sin-bin seat. */
   binGapM: 3.2,
   /** A sin-binned man within this many metres of a touchline has reached it: he sits in the bin. */
