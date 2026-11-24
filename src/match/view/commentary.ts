@@ -150,6 +150,8 @@ export const LINES: Readonly<Record<string, readonly string[]>> = {
   blown: ['{player} has run out of gas.', '{player} is blowing hard.', '{player} has nothing left in the tank.'],
   injury: ['{player} is hurt in the tackle.', '{player} is down and hurt.', 'Trouble here: {player} is hurt.'],
   interchange: ['{player} comes on for {team}.', 'Interchange: {player} on.', '{player} is on off the bench.'],
+  'fresh-impact:carry': ['Fresh legs as {player} takes it up.', '{player} winds up on fresh legs.', 'Fresh legs for the carry from {player}.'],
+  'fresh-impact:tackle': ['Fresh legs as {player} gets a grip.', '{player} brings fresh legs to the tackle.', 'Fresh legs in contact from {player}.'],
   // ── Penalties (2e) and the captain's call ──
   'penalty:offside': ['Penalty to {other} — offside.', 'Offside! {player} gives away a penalty.', 'The ref pings {team} for offside.'],
   'penalty:high': ['High shot from {player} — penalty.', 'Penalty! {player} catches him high.', 'A high tackle — penalty to {other}.'],
@@ -229,7 +231,7 @@ const ENDS_KICK: ReadonlySet<string> = new Set([
 
 /** Lines that matter: a try, a sin bin, a clean break, a penalty, a kick that wins it, the whistles. The strip holds one a moment before any other line replaces it. */
 const IMPORTANT_KEYS: ReadonlySet<string> = new Set([
-  'try', 'try:bonus', 'line-break', '40-20', 'field-goal:good', 'held-up', 'goal-line-stand', 'penalty', 'penalty:offside', 'penalty:high',
+  'try', 'try:bonus', 'line-break', 'fresh-impact:carry', 'fresh-impact:tackle', '40-20', 'field-goal:good', 'held-up', 'goal-line-stand', 'penalty', 'penalty:offside', 'penalty:high',
   'sin-bin', 'sin-bin:high', 'sin-bin:professional', 'sin-bin:repeat', 'sin-bin:offside',
   'golden-point', 'half-time:lead', 'half-time:level', 'full-time:win', 'full-time:draw', 'full-time:golden-point',
 ]);
@@ -305,6 +307,8 @@ export function lineKey(e: SimEvent, kickInAir: boolean, score?: Readonly<Record
       return d === 'half' ? 'line-break:half' : 'line-break';
     case 'break-tackle':
       return d === 'wrestle' ? 'break-tackle:wrestle' : 'break-tackle';
+    case 'fresh-impact':
+      return d === 'tackle' ? 'fresh-impact:tackle' : 'fresh-impact:carry';
     case 'tackle':
       return e.trait ? 'tackle:drive' : 'tackle';
     case 'penalty':

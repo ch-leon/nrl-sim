@@ -13,6 +13,7 @@ import { fieldOffsetX, fieldToWorldPoint } from '../../../src/scenes/matchField'
 import { toFieldPt } from '../../../src/match/core/field';
 import { binnedSpot } from '../../../src/match/view/officials';
 import { NINES } from '../../../src/match/league/rules';
+import { applyTuning } from '../../../src/match/league/tuning';
 import type { PlayerPicture } from '../../../src/match/view/playerPicture';
 import type { Snapshot } from '../../../src/match/core/snapshot';
 import seed15Whistle from '../../fixtures/seed15-whistle.json';
@@ -33,13 +34,15 @@ function surface() {
 }
 
 /** A decided full-time match after golden point, using the lab's default sides and seven-minute halves.
- * The lead read reshuffles which seeds are level. Try seed 70 first; keep the original window as a fallback.
+ * The witness is the revision 16 match: impact interchanges are off, so seed 70 is still the decided one.
  * A draw at the end has no winner, so the pose check needs a decided score.
  */
 const GOLDEN_FROM = 28;
 const GOLDEN_SEEDS = [70, ...Array.from({ length: 60 }, (_, i) => GOLDEN_FROM + i).filter((seed) => seed !== 70)];
 
 function play(): Snapshot[] {
+  const restore = applyTuning({ 'bench.impact.on': 0 });
+  try {
   for (const seed of GOLDEN_SEEDS) {
     const sim = new LiveSim(labSheet(DEFAULT_HOME), labSheet(DEFAULT_AWAY), seed, { goldenPoint: true, length: { halves: 2, halfMinutes: 7 } });
     const snaps: Snapshot[] = [sim.snapshot()];
@@ -49,6 +52,7 @@ function play(): Snapshot[] {
     if (golden && final.score!.home !== final.score!.away) return snaps;
   }
   throw new Error('no decided golden-point match in the searched seeds');
+  } finally { restore(); }
 }
 
 describe('the whistle (#675)', () => {

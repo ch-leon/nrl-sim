@@ -21,6 +21,7 @@ import { ownLineX } from '../touch';
 import { LIVE } from './knobs';
 import { returnSupportSpots } from './kickReturn';
 import { GOAL_LINE_STAND } from '../goalLineStand';
+import { BENCH } from '../bench';
 import { other, type Player } from './types';
 import { LiveContact } from './contact';
 import { SHAPES, chooseShape, shapeEdge, shapeTarget, packetSlots, backDoorTarget, type AttackingShape, type ShapeKind } from '../attackingShapes';
@@ -725,7 +726,9 @@ export abstract class LivePositioning extends LiveContact {
       p.sprinting = p.wantsSprint && canSprint(p.gas);
       let max = p.body.maxSpeed * paceMult(p.gas, p.sprinting);
       if (p.sprinting && this.tick < p.burstUntil) max *= GAS.breakBurst;
+      const impact = p === h && this.phase.kind === 'play' && p.side === this.attacking ? p.impact : null;
       if (p === h) max *= LIVE.carrySpeed;
+      if (impact && impact.carryAt === p.catchTick && this.tick < impact.until) max *= 1 + BENCH.impact.pace;
       if (kickChase && p.side !== this.attacking) max *= speedMult(p.traits, 'jets');
       if (lineBroken && p.side !== this.attacking) max *= speedMult(p.traits, 'lastLine');
       max *= legsSpeed(p.energy);
@@ -740,6 +743,14 @@ export abstract class LivePositioning extends LiveContact {
       // Sprinting costs the legs more per metre than cruising.
       const metres = dist(from, p.body.pos);
       p.odometer += metres;
+      if (impact && impact.left > 0 && impact.carryAt !== p.catchTick) {
+        if (impact.runAt !== p.catchTick) {
+          impact.runAt = p.catchTick;
+          impact.runM = 0;
+        }
+        impact.runM += metres;
+        if (impact.runM >= BENCH.impact.carryM) this.startImpactCarry(p);
+      }
       const pressureCost = defensiveCost !== 1 && p.side !== this.attacking && this.onField(p) ? defensiveCost : 1;
       this.legs(p, metres * runCostMult(p.sprinting) * pressureCost, stopped ? 'stop' : standing ? 'walk' : 'no');
       if (p.jink) {

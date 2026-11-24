@@ -323,14 +323,23 @@ describe('measuring and reporting', () => {
     // balanced 0-0:137:6c911bf022e28778 / expansive 4-0:134:443f2da66ba81a8d.
     // Kick returns (engine revision 14) move Expansive and preserve the revision 12 replay with returns off.
     // Goal-line stands (engine revision 16) leave these two seed-1 pins where kick returns put them.
-    // With the stand off, each pin is that same revision 15 match.
-    { attack: 'balanced' as const, expected: '13-10:155:57426901f7cbc31f', standsOff: '13-10:155:57426901f7cbc31f' },
-    { attack: 'expansive' as const, expected: '0-1:138:b982bd41ff05e4eb', standsOff: '0-1:138:b982bd41ff05e4eb', beforeReturns: '0-6:147:52d52acd0272a5fe' },
-  ])('pins an even $attack / Slide match (seed 1)', async ({ attack, expected, standsOff, beforeReturns }) => {
+    // Impact interchanges (engine revision 17) are measured below. With the boost off, each pin is the revision 16 match.
+    // With the stand off as well, each pin is that same revision 15 match.
+    { attack: 'balanced' as const, expected: '13-10:155:57426901f7cbc31f', impactOff: '13-10:155:57426901f7cbc31f', standsOff: '13-10:155:57426901f7cbc31f' },
+    { attack: 'expansive' as const, expected: '0-1:138:b982bd41ff05e4eb', impactOff: '0-1:138:b982bd41ff05e4eb', standsOff: '0-1:138:b982bd41ff05e4eb', beforeReturns: '0-6:147:52d52acd0272a5fe' },
+  ])('pins an even $attack / Slide match (seed 1)', async ({ attack, expected, impactOff, standsOff, beforeReturns }) => {
     const replay = () => liveFingerprint(new LiveSim(sideSheet('H', { rating: 60, tactics: { attack } }), sideSheet('A', { rating: 60 }), 1));
     expect((await replay()).pin).toBe(expected);
     {
-      const restore = applyTuning({ 'goalLineStand.on': 0 });
+      const restore = applyTuning({ 'bench.impact.on': 0 });
+      try {
+        expect((await replay()).pin).toBe(impactOff);
+      } finally {
+        restore();
+      }
+    }
+    {
+      const restore = applyTuning({ 'goalLineStand.on': 0, 'bench.impact.on': 0 });
       try {
         expect((await replay()).pin).toBe(standsOff);
       } finally {
@@ -338,7 +347,7 @@ describe('measuring and reporting', () => {
       }
     }
     if (beforeReturns) {
-      const restore = applyTuning({ 'kickReturn.on': 0, 'goalLineStand.on': 0 });
+      const restore = applyTuning({ 'kickReturn.on': 0, 'goalLineStand.on': 0, 'bench.impact.on': 0 });
       try {
         expect((await replay()).pin).toBe(beforeReturns);
       } finally {
@@ -374,10 +383,11 @@ describe('measuring and reporting', () => {
     // plays-on 10-0:141:fb9bb3ff69ff1592 / plays-on-hard 1-0:146:2652be8270891c73.
     // Kick returns move plays-on. The Hard coach still calls a play on this seed.
     // Goal-line stands (engine revision 16) leave plays-on and move plays-on-hard
-    // from 0-10:148:ee54e8d79a90e3cf. With the stand off, each pin is the revision 15 match.
-    { name: 'plays-on', aiCoach: false, expected: '0-6:138:45572dfeb7a225d1', standsOff: '0-6:138:45572dfeb7a225d1', beforeReturns: '4-10:155:79024e6ce6d03277' },
-    { name: 'plays-on-hard', aiCoach: true, expected: '0-10:160:c9c6855002de5af6', standsOff: '0-10:148:ee54e8d79a90e3cf' },
-  ])('pins $name: an even Balanced / Slide match with set plays (seed 1)', async ({ aiCoach, expected, standsOff, beforeReturns }) => {
+    // from 0-10:148:ee54e8d79a90e3cf. Impact interchanges (engine revision 17) are measured below.
+    // With the boost off, each pin is the revision 16 match. With the stand off as well, the revision 15 match.
+    { name: 'plays-on', aiCoach: false, expected: '0-6:138:45572dfeb7a225d1', impactOff: '0-6:138:45572dfeb7a225d1', standsOff: '0-6:138:45572dfeb7a225d1', beforeReturns: '4-10:155:79024e6ce6d03277' },
+    { name: 'plays-on-hard', aiCoach: true, expected: '0-10:160:c9c6855002de5af6', impactOff: '0-10:160:c9c6855002de5af6', standsOff: '0-10:148:ee54e8d79a90e3cf' },
+  ])('pins $name: an even Balanced / Slide match with set plays (seed 1)', async ({ aiCoach, expected, impactOff, standsOff, beforeReturns }) => {
     const home = { ...sideSheet('H', { rating: 60 }), plays: ['block-play' as const, 'cut-out-winger' as const, 'kick-pass' as const] };
     const replay = () => liveFingerprint(new LiveSim(home, sideSheet('A', { rating: 60 }), 1, aiCoach ? { aiCoach: ['home'] } : {}));
     const { parts, pin } = await replay();
@@ -385,7 +395,15 @@ describe('measuring and reporting', () => {
     expect(parts.some((p) => p.includes(':coach-call:home:set-play:'))).toBe(aiCoach);
     expect(pin).toBe(expected);
     {
-      const restore = applyTuning({ 'goalLineStand.on': 0 });
+      const restore = applyTuning({ 'bench.impact.on': 0 });
+      try {
+        expect((await replay()).pin).toBe(impactOff);
+      } finally {
+        restore();
+      }
+    }
+    {
+      const restore = applyTuning({ 'goalLineStand.on': 0, 'bench.impact.on': 0 });
       try {
         expect((await replay()).pin).toBe(standsOff);
       } finally {
@@ -393,7 +411,7 @@ describe('measuring and reporting', () => {
       }
     }
     if (beforeReturns) {
-      const restore = applyTuning({ 'kickReturn.on': 0, 'goalLineStand.on': 0 });
+      const restore = applyTuning({ 'kickReturn.on': 0, 'goalLineStand.on': 0, 'bench.impact.on': 0 });
       try {
         expect((await replay()).pin).toBe(beforeReturns);
       } finally {
@@ -402,7 +420,7 @@ describe('measuring and reporting', () => {
     }
   });
   it('with punts into space off, plays-on-hard keeps the revision 9 pin', async () => {
-    const restore = applyTuning({ 'longKick.on': 0, 'wingBomb.on': 0, 'secondKicker.on': 0, 'kickReturn.on': 0, 'goalLineStand.on': 0 });
+    const restore = applyTuning({ 'longKick.on': 0, 'wingBomb.on': 0, 'secondKicker.on': 0, 'kickReturn.on': 0, 'goalLineStand.on': 0, 'bench.impact.on': 0 });
     try {
       const home = { ...sideSheet('H', { rating: 60 }), plays: ['block-play' as const, 'cut-out-winger' as const, 'kick-pass' as const] };
       const sim = new LiveSim(home, sideSheet('A', { rating: 60 }), 1, { aiCoach: ['home'] });

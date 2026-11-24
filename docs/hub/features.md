@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- **Impact interchanges.** A tired player jogs toward his bench while his replacement gets a short burst on a carry or extra grip on a tackle. Watch for **FRESH LEGS** on the first two involvements. Ported from [draft PR #785](https://github.com/ch-leon/nrl-sim/pull/785).
+
 - **Goal-line stands.** Repeat sets starting inside the opposition 20 draw the defence in toward the ruck and cost it more legs. The attack looks for a short forward drive, a wide shift or a kick into the corner. The third straight set gets a banner, commentary and a crowd swell. Ported from [draft PR #784](https://github.com/ch-leon/nrl-sim/pull/784).
 
 - At a penalty or 20 m restart, a captain can call a quick tap while defenders are still getting back. The taker nudges it with his boot and regathers, with **QUICK TAP!** on the pitch. Short defenders have to reach the 10 m line before tackling. Ported from [draft PR #783](https://github.com/ch-leon/nrl-sim/pull/783).

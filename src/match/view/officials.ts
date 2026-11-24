@@ -2,11 +2,12 @@
 // referee, the interchange bench and the sin bin. Pure functions of a snapshot
 // (no sim state, no RNG, no memory between frames), so pause, seek and replay put
 // everyone in the same place. Positions are sim metres (field.ts).
-import { FIELD_LENGTH, FIELD_WIDTH, IN_GOAL, toFieldPt } from '../core/field';
+import { FIELD_LENGTH, FIELD_WIDTH, IN_GOAL, INTERCHANGE_BENCH, benchSeat, toFieldPt } from '../core/field';
 import { fieldToWorldPoint } from '../../scenes/matchField';
 import { LIVE } from '../league/live';
 import { SIX_AGAIN_ARMS } from '../../art/match/bench';
-import type { PlayerSnap, Side, Snapshot } from '../core/snapshot';
+import { TICK_S } from '../core/engine';
+import { INTERCHANGE_EXIT_TICKS, type InterchangeExit, type PlayerSnap, type Side, type Snapshot } from '../core/snapshot';
 
 /**
  * The referee's knobs. He keeps a few metres off the play on the far side of it (the
@@ -187,14 +188,7 @@ export function benchSeated(sheet: BenchSheet, side: Side, s: Snapshot): string[
  * past it, each side's sin-bin seat at the end of its bench away from halfway.
  */
 export const BENCH = {
-  /** Metres between seats along the line. */
-  seatM: 2.4,
-  /** Seats painted on each bench (the sim's bench is four; a fifth for an injury swap). */
-  seats: 5,
-  /** Metres from halfway to each bench's inner end. */
-  fromHalfwayM: 5,
-  /** Metres beyond touch, leaving the touch judge a clear line in front of the seats. */
-  backM: 3.1,
+  ...INTERCHANGE_BENCH,
   /** Metres from the bench's outer end to the sin-bin seat. */
   binGapM: 3.2,
   /** A sin-binned man within this many metres of a touchline has reached it: he sits in the bin. */
@@ -206,9 +200,23 @@ function benchDir(side: Side): -1 | 1 {
   return side === 'home' ? -1 : 1;
 }
 
-/** A side's bench seat `i` (0 nearest halfway), sim metres. */
-export function benchSeat(side: Side, i: number): { x: number; y: number } {
-  return { x: FIELD_LENGTH / 2 + benchDir(side) * (BENCH.fromHalfwayM + i * BENCH.seatM), y: FIELD_WIDTH + BENCH.backM };
+export { benchSeat };
+
+/** The outgoing player jogs from the handoff to his seat under his own look. */
+export function benchJog(exit: InterchangeExit, seat: number, tick: number) {
+  const to = benchSeat(exit.side, seat);
+  const dx = to.x - exit.from.x, dy = to.y - exit.from.y;
+  const distance = Math.hypot(dx, dy);
+  const duration = Math.min(INTERCHANGE_EXIT_TICKS - 1, Math.ceil(distance / (5.8 * TICK_S)));
+  const age = tick - exit.tick;
+  if (age >= duration) return null;
+  const progress = Math.max(0, age / duration);
+  return {
+    x: exit.from.x + dx * progress,
+    y: exit.from.y + dy * progress,
+    to,
+    stride: 6 + (Math.floor(distance * progress / 0.32) % 6),
+  };
 }
 
 /** The sin-bin seat for a side's `n`th binned man (0 first), sim metres. */

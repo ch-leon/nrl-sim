@@ -4,6 +4,7 @@
 import { clamp, type Vec } from './vec';
 import { MATCH_PREVIEW } from '../preview';
 import { bootFieldLength } from '../fieldSettings';
+import type { Side } from './snapshot';
 
 /** Try-line to try-line. */
 export const FIELD_LENGTH = MATCH_PREVIEW?.fieldLength ?? bootFieldLength();
@@ -14,6 +15,14 @@ export const FIELD_WIDTH = 68;
 export const IN_GOAL = 10;
 /** Halfway across. */
 export const MID_Y = FIELD_WIDTH / 2;
+
+/** Both interchange benches are just outside the near touchline, either side of halfway. */
+export const INTERCHANGE_BENCH = { seats: 5, fromHalfwayM: 5, seatM: 2.4, backM: 3.1 } as const;
+
+export function benchSeat(side: Side, seat: number): Vec {
+  const { fromHalfwayM, seatM, backM } = INTERCHANGE_BENCH;
+  return { x: MID_X + (side === 'home' ? -1 : 1) * (fromHalfwayM + seat * seatM), y: FIELD_WIDTH + backM };
+}
 
 /** Engine-contract field point (ARCHITECTURE §6): fx 0..100 along, fy 0..100 across. */
 export interface FieldPt {

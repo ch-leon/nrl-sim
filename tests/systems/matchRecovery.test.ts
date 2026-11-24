@@ -45,8 +45,8 @@ afterEach(() => {
   Reflect.deleteProperty(globalThis, 'localStorage');
 });
 
-// A held match from before goal-line stands (revision 15) must restart.
-const previousEngine = matchEngineIdentity().replace(/^nrl-live-\d+-/, 'nrl-live-15-');
+// A held match from before impact interchanges (revision 16) must restart.
+const previousEngine = matchEngineIdentity().replace(/^nrl-live-\d+-/, 'nrl-live-16-');
 const badIds = [undefined, 'bad identity', 'nrl-live-999-00000000000000', previousEngine] as const;
 describe.each([null, DEV_TEST_PREFIX])('recovery namespace %s', namespace => {
   it.each(badIds)('restarts only this fixture on reload with identity %s, preserving once-only effects', engineId => {
