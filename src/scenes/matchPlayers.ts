@@ -50,9 +50,9 @@ export class PlayerFrameCache {
   }
   /** Same authored anchor as the cached frame; no pixel scan or second appearance catalogue. */
   ballAnchor(p: PlayerPicture): { x: number; y: number } {
-    const action = p.action === 'airCatch' && p.frame === 4 ? 'land' : p.action === 'catch' ? 'catch' : p.action === 'pass' ? 'pass' : 'carry';
+    const action = p.action === 'airCatch' && p.frame === 4 ? 'land' : p.action === 'catch' || p.action === 'pass' || p.action === 'dummyPass' ? p.action : 'carry';
     const frame = p.action === 'airCatch' && p.frame >= 4 ? 0 : p.frame;
-    const at = playerBallAnchor(this.look(p.who), action, frame, p.strideFrame, p.tired, p.movement);
+    const at = playerBallAnchor(this.look(p.who), action, frame, p.strideFrame, p.tired, p.movement, p.facing);
     return { x: p.left ? -at.x : at.x, y: at.y };
   }
   private evict(): void {

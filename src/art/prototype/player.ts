@@ -10,7 +10,7 @@ export { HEAD_OPTIONS, type Head, type Facing } from './head';
 
 export type Movement = 'drive' | 'brake' | 'cutBack' | 'cutForward' | 'shuffleBack' | 'shuffleForward' | 'backpedal';
 export type Build = 'lean' | 'athletic' | 'stocky';
-export type Action = 'idle' | 'run' | 'carry' | 'pass' | 'catch' | 'land' | 'call' | 'receive' | 'guard' | 'brace' | 'wrap' | 'ground' | 'ptb' | 'fend' | 'wrongFoot';
+export type Action = 'idle' | 'run' | 'carry' | 'pass' | 'dummyPass' | 'catch' | 'land' | 'call' | 'receive' | 'guard' | 'brace' | 'wrap' | 'ground' | 'ptb' | 'fend' | 'wrongFoot';
 /** Reactions (#667): the arms held still over standing or running legs. */
 export type ReactAction = 'headHands' | 'hips' | 'fold';
 /** An authored near-arm pose, in pixels from its shoulder, over the usual gait. */
@@ -171,6 +171,15 @@ export const HANDLING_POSES = {
   guard: [[3, 5], [6, 4]],
 } as const;
 
+/** Gather the ball, show it at arm's length, then pull it back across the chest. */
+const DUMMY_PASS_POSES = [
+  { lean: 1, head: 0, crouch: 1, reach: 3, drop: 2 },
+  { lean: 3, head: 2, crouch: 1, reach: 12, drop: 0 },
+  { lean: 1, head: 0, crouch: 0, reach: 2, drop: 3 },
+] as const;
+/** The same upper-body poses repeat with the boots facing the other way. */
+export const DUMMY_PASS_PHASES = DUMMY_PASS_POSES.length;
+
 /** Shoulder lean / crouch / head lead. The hips and planted boots do not follow the lean.
  * Cuts use two planted support beats; starts, stops and defensive steps add a gather beat.
  */
@@ -211,20 +220,21 @@ export function prototypeUpperAt(build: Build, action: Action | ReactAction, fra
   const bodyW = build === 'stocky' ? 11 : build === 'athletic' ? 9 : 7;
   // Reactions (#667) hold the arms still over standing or running legs: hands on head, hands on hips, arms folded.
   const react = action === 'headHands' || action === 'hips' || action === 'fold';
-  const running = strideFrame !== -1 && (action === 'run' || action === 'carry' || action === 'land' || action === 'catch' || action === 'call' || action === 'receive' || action === 'guard' || ((action === 'pass' || action === 'fend' || react) && strideFrame !== undefined));
+  const running = strideFrame !== -1 && (action === 'run' || action === 'carry' || action === 'land' || action === 'catch' || action === 'call' || action === 'receive' || action === 'guard' || ((action === 'pass' || action === 'dummyPass' || action === 'fend' || react) && strideFrame !== undefined));
   const gait = strideFrame === undefined ? f : strideFrame < 0 ? 0 : strideFrame % 6;
   const jog = running && strideFrame !== undefined && strideFrame >= 6;
   const motion = movement ? MOVEMENT_POSES[movement] : undefined;
   const cut = movement === 'cutBack' || movement === 'cutForward';
   const shuffle = movement === 'shuffleBack' || movement === 'shuffleForward';
   // Arms pump with the legs except while the hands are busy catching, passing or fending.
-  const weary = ['run', 'carry', 'land', 'idle', 'catch', 'pass', 'call', 'receive', 'guard'].includes(action) ? Math.max(0, Math.min(2, tired)) : 0;
+  const weary = ['run', 'carry', 'land', 'idle', 'catch', 'pass', 'dummyPass', 'call', 'receive', 'guard'].includes(action) ? Math.max(0, Math.min(2, tired)) : 0;
   const swing = running && (action === 'run' || action === 'carry' || action === 'land' || action === 'call' || (strideFrame !== undefined && f === 5 && action !== 'fend')) ? ARM_SWING[gait]! * (jog ? .5 : 1) * (weary > 1 ? .5 : 1) * (motion?.arms ?? 1) : 0;
   // Away from the shared contact picture a tackle and a beaten (or tackled) man each have a start,
   // a middle and an end over the pose's last frames: reach, wrap, drive low; jolt, rock back, regather.
   const beat = f < 2 ? 0 : f < 4 ? 1 : 2;
   const wrongFoot = action === 'wrongFoot' ? WRONG_FOOT_POSES[beat] : undefined;
-  const crouch = wrongFoot?.crouch ?? (action === 'guard' || action === 'land' ? 1 : action === 'wrap' ? [2, 3, 4][beat]! : action === 'brace' ? [3, 4, 1][beat]! : action === 'ptb' ? [6, 6, 3, 1, 0, 0][f]! : 0);
+  const dummy = action === 'dummyPass' ? DUMMY_PASS_POSES[f % DUMMY_PASS_PHASES] : undefined;
+  const crouch = dummy?.crouch ?? wrongFoot?.crouch ?? (action === 'guard' || action === 'land' ? 1 : action === 'wrap' ? [2, 3, 4][beat]! : action === 'brace' ? [3, 4, 1][beat]! : action === 'ptb' ? [6, 6, 3, 1, 0, 0][f]! : 0);
   const motionCrouch = motion ? motion.crouch - (shuffle && (gait === 1 || gait === 4) ? 1 : 0) : 0;
   // Tired legs no longer lift him into flight: the bob only dips.
   const bob = running && !motion ? Math.max(weary ? 0 : -1, (jog ? JOG_BOB : RUN_BOB)[gait]!) : 0;
@@ -237,12 +247,12 @@ export function prototypeUpperAt(build: Build, action: Action | ReactAction, fra
   // Tired, the hips keep the legs' reach and the shoulders sink toward them: a shorter, hunched trunk.
   const shoulderY = 20 + crouch + bob - breath + weary + motionCrouch;
   const hipLeft = CENTRE - Math.floor(bodyW / 2) + lean;
-  const shoulderLean = wrongFoot?.lean ?? motion?.lean ?? 0;
+  const shoulderLean = dummy?.lean ?? wrongFoot?.lean ?? motion?.lean ?? 0;
   const left = hipLeft + shoulderLean;
   // Head down and forward of the shoulders when tired or dejected: the neck sinks into the collar.
-  const headX = CENTRE - 7 + lean + (weary > 1 || hang > 1 ? 1 : 0) + shoulderLean + (motion?.head ?? 0);
+  const headX = CENTRE - 7 + lean + (weary > 1 || hang > 1 ? 1 : 0) + shoulderLean + (dummy?.head ?? motion?.head ?? 0);
   const headY = shoulderY - 17 + weary + hang;
-  return { f, running, gait, jog, motion, cut, shuffle, weary, lean, swing, beat, bob, breath, hipY, shoulderY, hipLeft, left, headX, headY, shoulderLean, wrongFoot };
+  return { f, running, gait, jog, motion, cut, shuffle, weary, lean, swing, beat, bob, breath, hipY, shoulderY, hipLeft, left, headX, headY, shoulderLean, wrongFoot, dummy };
 }
 
 /**
@@ -279,8 +289,10 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action | Re
   }
 
   const upper = prototypeUpperAt(a.build, action, frame, strideFrame, tired, movement);
-  const { f, running, gait, jog, cut, shuffle, lean, swing, beat, bob, breath, hipY, shoulderY, hipLeft, left, headX, headY, shoulderLean, wrongFoot } = upper;
+  const { f, running, gait, jog, cut, shuffle, lean, swing, beat, bob, breath, hipY, shoulderY, hipLeft, left, headX, headY, shoulderLean, wrongFoot, dummy } = upper;
   const legs = jog ? JOG_LEG : RUN_LEG;
+  const reverseBoots = dummy && f >= DUMMY_PASS_PHASES;
+  const legX = (x: number, width: number) => reverseBoots ? 2 * CENTRE - x - width + 1 : x;
   /** One running leg from its hip: thigh, sock to the boot, boot (toe forward). */
   const runLeg = (hipX: number, top: number, beat: number, thigh: number, boot: number, band: number | null) => {
     let [kx, ky, fx, lift] = legs[beat]!;
@@ -293,12 +305,13 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action | Re
     }
     const footY = 34 - lift;
     const kneeY = movement ? Math.min(top + ky + 1, footY - 2) : top + ky + 1;
-    line(hipX, top, hipX + kx, kneeY, thigh);
-    line(hipX + kx, kneeY, hipX + fx, footY, kit.sock);
-    if (band !== null) b.fillRect(hipX + kx, kneeY, thick, 1, band);
+    line(legX(hipX, thick), top, legX(hipX + kx, thick), kneeY, thigh);
+    line(legX(hipX + kx, thick), kneeY, legX(hipX + fx, thick), footY, kit.sock);
+    if (band !== null) b.fillRect(legX(hipX + kx, thick), kneeY, thick, 1, band);
     // Flat support boot with a heel/toe edge; lifted boots tuck under the knee.
-    b.fillRect(hipX + fx, footY, lift > 2 ? 4 : 5, 2, boot);
-    if (lift === 0) b.fillRect(hipX + fx, footY + 1, 5, 1, shade(boot, .78));
+    const bootWidth = lift > 2 ? 4 : 5;
+    b.fillRect(legX(hipX + fx, bootWidth), footY, bootWidth, 2, boot);
+    if (lift === 0) b.fillRect(legX(hipX + fx, 5), footY + 1, 5, 1, shade(boot, .78));
   };
 
   // Far limbs first; subdued shading separates them in crowded contact.
@@ -319,8 +332,8 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action | Re
   } else if (action === 'hips') {
     line(left + 2, shoulderY + 1, left - 3, shoulderY + 3, skinDark, 2);
     line(left - 3, shoulderY + 3, left, hipY - 1, skinDark, 2);
-  } else if (action === 'fold') {
-    // Folded arms are painted over the chest below.
+  } else if (action === 'fold' || dummy) {
+    // Both arms will be painted over the chest.
   } else if (wrongFoot?.reach) {
     line(left + 2, shoulderY + 1, left + wrongFoot.reach.farHand, shoulderY + 4, skinDark, 2);
   } else if (swing > 0) {
@@ -337,7 +350,7 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action | Re
 
   // Hand-authored chest clusters: broad shoulders, a lit breast and a tucked waist.
   // The same head/limb anchors keep every turn on the existing short-legged figure.
-  const torsoFacing = action === 'pass' && f < 4 ? facing === 'side' ? 'front' : 'side' : movementTorso(facing, movement, gait);
+  const torsoFacing = dummy ? facing : action === 'pass' && f < 4 ? facing === 'side' ? 'front' : 'side' : movementTorso(facing, movement, gait);
   const torso = TORSO_LAYERS[torsoFacing];
   const torsoLeft = left - (torsoFacing === 'side' ? 0 : 1);
   const torsoWidth = bodyW + (torsoFacing === 'side' ? 0 : 2);
@@ -407,12 +420,25 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action | Re
     handX = left + 1; handY = shoulderY + 5;
     line(shX + 1, shY - 1, shX + 1, shoulderY + 5, a.skin, 2);
     line(shX + 1, shoulderY + 5, handX, handY, a.skin, 2);
+  } else if (dummy) {
+    const at = dummyBallAt(dummy, shX, shY, facing);
+    // The far palm supports the top of the ball, the near forearm and palm cup the bottom.
+    line(left + 2, shY - 1, at.x + 3, at.y + 1, skinDark, 2);
+    const elbowX = Math.round((shX + at.x) / 2);
+    const elbowY = Math.max(shY, at.y + 4) + (dummy.reach > 3 ? 0 : 3);
+    handX = at.x + 3;
+    handY = at.y + 5;
+    line(shX, shY, elbowX, elbowY, a.skin, 2);
+    line(elbowX, elbowY, handX, handY, a.skin, 2);
+    if (possession) heldBall(at.x, at.y);
+    b.fillRect(at.x + 3, at.y, 3, 2, skinDark);
+    b.fillRect(handX, handY - 1, 3, 2, a.skin);
   } else if (action === 'carry' || action === 'land' || action === 'brace' || (action === 'catch' && f === 5)) {
     const pose = HANDLING_POSES.carry;
     handX = shX + pose.hand[0]; handY = shY + pose.hand[1];
     // A supporting far hand and a low near forearm leave the white ball panel exposed.
     line(shX - 3, shY + 2, shX + 4, shY + 6, skinDark, 2);
-    const at = handlingBallAt(upper, a.build, 'carry');
+    const at = handlingBallAt(upper, a.build, 'carry', facing);
     if (possession) heldBall(at.x, at.y);
     line(shX, shY, shX + pose.elbow[0], shY + pose.elbow[1], a.skin);
     line(shX + pose.elbow[0], shY + pose.elbow[1], handX, handY, a.skin, 2);
@@ -433,7 +459,7 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action | Re
     const pose = HANDLING_POSES[action][f]!;
     handX = shX + pose[0]; handY = shY + pose[1];
     line(shX - 3, shY + 1, handX - 2, handY + 2, skinDark, 2);
-    const at = handlingBallAt(upper, a.build, action);
+    const at = handlingBallAt(upper, a.build, action, facing);
     if (possession) heldBall(at.x, at.y);
     line(shX, shY, shX + 2, shY + 4, a.skin, 2);
     line(shX + 2, shY + 4, handX, handY, a.skin, 2);
@@ -485,7 +511,7 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action | Re
     b.fillRect(handX, handY, 2, 2, a.skin);
     b.set(handX + 1, handY, shade(a.skin, 1.12));
   }
-  if (a.tape && action !== 'headHands') b.fillRect(handX, handY - 1, 2, 2, 0xf6edda);
+  if (a.tape && action !== 'headHands') b.fillRect(handX, handY - (dummy ? 0 : 1), 2, 2, 0xf6edda);
   if (facing === 'back' && a.number !== undefined) {
     // The 3×5 hoarding digits, centred on the back; omitted on the front chest. Painted last:
     // from behind the arms and a tucked ball pass behind the jersey, so they never cover it.
@@ -502,17 +528,23 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action | Re
 }
 
 
-function handlingBallAt(p: ReturnType<typeof prototypeUpperAt>, build: Build, action: 'carry' | 'land' | 'catch' | 'pass'): { x: number; y: number } {
+function dummyBallAt({ reach, drop }: typeof DUMMY_PASS_POSES[number], shX: number, shY: number, facing: Facing): { x: number; y: number } {
+  const side = facing === 'front' ? 4 : facing === 'back' ? -7 : -2;
+  return { x: Math.min(WIDTH - BALL.w - 2, shX + reach), y: shY + (reach > 3 ? side : drop) };
+}
+
+function handlingBallAt(p: ReturnType<typeof prototypeUpperAt>, build: Build, action: 'carry' | 'land' | 'catch' | 'pass' | 'dummyPass', facing: Facing): { x: number; y: number } {
   const bodyW = build === 'stocky' ? 11 : build === 'athletic' ? 9 : 7;
   const shX = p.left + bodyW - 2, shY = p.shoulderY + 2;
+  if (p.dummy) return dummyBallAt(p.dummy, shX, shY, facing);
   const carry = action === 'carry' || action === 'land' || (action === 'catch' && p.f === 5);
   const target = carry ? HANDLING_POSES.carry.ball : HANDLING_POSES[action === 'pass' ? 'pass' : 'catch'][p.f]!;
   return { x: shX + target[0] - (carry ? 0 : 3), y: shY + target[1] - (carry ? 0 : 2) };
 }
 
 /** Centre of the embedded ball relative to the actor's feet, in the unmirrored painted frame. */
-export function playerBallAnchor(a: Appearance, action: 'carry' | 'land' | 'catch' | 'pass', frame: number, strideFrame?: number, tired = 0, movement?: Movement): { x: number; y: number } {
+export function playerBallAnchor(a: Appearance, action: 'carry' | 'land' | 'catch' | 'pass' | 'dummyPass', frame: number, strideFrame?: number, tired = 0, movement?: Movement, facing: Facing = 'front'): { x: number; y: number } {
   const p = prototypeUpperAt(a.build, action, frame, strideFrame, tired, movement);
-  const at = handlingBallAt(p, a.build, action);
+  const at = handlingBallAt(p, a.build, action, facing);
   return { x: at.x + 4.5 - CENTRE, y: at.y + 3.5 + HEIGHT - PAINT_H - a.stature - FOOT };
 }

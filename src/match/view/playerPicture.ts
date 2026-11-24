@@ -1,5 +1,5 @@
 import type { BombContestSnap, DummyPassSnap, PlayerSnap, Side, Snapshot } from '../core/snapshot';
-import type { Facing, Movement } from '../../art/prototype/player';
+import { DUMMY_PASS_PHASES, type Facing, type Movement } from '../../art/prototype/player';
 import { PLAYER_ANIMS, type PlayerAnim } from '../../art/match/players';
 import { LIVE } from '../league/live/knobs';
 import type { LivePlayerAction, Reaction } from '../../art/match/livePlayer';
@@ -56,6 +56,7 @@ export interface PictureContext extends MotionContext {
   incoming?: ReceivePicture;
   call?: ReceivePicture;
   dummyPass?: DummyPassSnap;
+  dummyReceiver?: Pick<PlayerSnap, 'x' | 'y'>;
   contactPlayers?: ReadonlySet<string>;
   /** A play-the-ball in progress (#665): the side defending it, where the ball is, and whether it is coming out. */
   ruck?: { side: Side; x: number; y: number; rising: boolean };
@@ -118,7 +119,12 @@ export function pictureContext(s: Snapshot, prev?: Snapshot): PictureContext {
   if (incoming) ctx.incoming = incoming;
   const call = callingPass(s);
   if (call) ctx.call = call;
-  if (s.dummyPass) ctx.dummyPass = s.dummyPass;
+  if (s.dummyPass) {
+    ctx.dummyPass = s.dummyPass;
+    const ref = s.dummyPass.receiver;
+    const receiver = s.players.find(p => p.side === ref.side && p.slot === ref.slot && p.who === ref.who);
+    if (receiver) ctx.dummyReceiver = receiver;
+  }
   if (s.contact) ctx.contactPlayers = new Set([s.contact.carrier, ...s.contact.defenders].map(p => `${p.side}/${p.slot}/${p.who}`));
   const up = prev && eyesUp(prev, s);
   if (up) ctx.eyesUp = up;
@@ -295,21 +301,29 @@ export function playerPicture(p: PlayerSnap, previous: PlayerSnap, tick: number,
     }
   }
   const dummy = ctx.dummyPass;
-  if (dummy && tick >= dummy.startedTick && tick < dummy.untilTick && possession && action === 'carry'
+  if (dummy && tick >= dummy.startedTick && tick < dummy.untilTick && possession && action === 'carry' && ctx.motionLive !== false
+    && !ctx.contactPlayers?.has(`${p.side}/${p.slot}/${p.who}`)
     && dummy.carrier.side === p.side && dummy.carrier.slot === p.slot && dummy.carrier.who === p.who) {
-    const progress = (tick - dummy.startedTick) / (dummy.untilTick - dummy.startedTick);
-    // Reach with both hands, bring the ball back across his chest, then run in the usual carry.
-    // The legs keep their stride and the pass painter draws the ball still in his hands.
-    action = 'pass';
-    frame = progress < .2 ? 2 : progress < .55 ? 1 : progress < .75 ? 3 : 4;
-    if (progress < .75) {
-      const hands = { headX: 0, headY: dummy.towardY };
-      facing = screenPlayerFacing(hands, hands, screenDir);
+    const duration = dummy.untilTick - dummy.startedTick;
+    const progress = (tick - dummy.startedTick) / duration;
+    if (progress < 2 / 3) {
+      const lane = { headX: 0, headY: dummy.towardY };
+      const receiver = ctx.dummyReceiver;
+      const aim = receiver ? { headX: receiver.x - p.x, headY: receiver.y - p.y } : lane;
+      const toward = screenPlayerFacing(aim, aim, screenDir);
+      // Keep the intended arm side when the runner is nearly directly above or below him.
+      if (Math.abs(screenHeading(aim.headX, aim.headY, screenDir).x) < .2) {
+        toward.left = screenFacing(lane, lane, screenDir).left;
+      }
+      action = 'dummyPass';
+      frame = duration >= 3 && progress < 1 / 9 ? 0 : progress < 4 / 9 ? 1 : 2;
+      // Aim the hands and shoulders at the runner while the boots continue on their original gait.
+      if (toward.left !== facing.left) frame += DUMMY_PASS_PHASES;
+      facing = toward;
     }
-    movement = undefined;
   }
   // Eyes on the bomb (#671): standing or running, ball elsewhere, one of the few under it.
   const lookUp = ctx.eyesUp?.who.has(`${p.side}/${p.slot}`) && (action === 'idle' || action === 'run') && !possession && !p.binned ? ctx.eyesUp.level : 0;
-  const tired = slump ? 2 : weary && (['run', 'carry', 'idle', 'call', 'receive', 'guard', 'catch', 'pass'].includes(action) || landing || travelEnd) ? weary : 0;
+  const tired = slump ? 2 : weary && (['run', 'carry', 'idle', 'call', 'receive', 'guard', 'catch', 'pass', 'dummyPass'].includes(action) || landing || travelEnd) ? weary : 0;
   return { who: p.who ?? `${p.side}/${p.slot}`, action, frame, lift, ...(strideFrame === undefined ? {} : { strideFrame }), ...(movement ? { movement } : {}), ...(teeFlip ? { teeFlip: true as const } : {}), ...(tired ? { tired } : {}), ...(lookUp ? { lookUp } : {}), ...facing, possession };
 }

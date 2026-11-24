@@ -35,7 +35,7 @@ describe('dummy-and-go in ordinary play', () => {
       expect(f.ball.holder).toEqual({ side: h.side, slot: h.slot });
       expect(f.ball.flight).toBeUndefined();
       const picture = playerPicture(h, carrier, f.tick, f.ball.holder, 1, pictureContext(f));
-      expect(picture).toMatchObject({ action: 'pass', possession: true });
+      expect(picture).toMatchObject({ action: tick < 2613 ? 'dummyPass' : 'carry', possession: true });
       expect(picture.strideFrame).toBeGreaterThanOrEqual(0);
     }
     const after = toTick(game, 2616);
