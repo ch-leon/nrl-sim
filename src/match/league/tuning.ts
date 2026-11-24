@@ -32,7 +32,7 @@ import { LONG_KICK, WING_BOMB } from './tactics';
 import { HELD_UP, WRESTLE } from './wrestle';
 import { GOAL_LINE_STAND } from './goalLineStand';
 import { BIN } from './sinbin';
-import { PLAYS } from './plays';
+import { PLAYS, POSTS_CHARGE } from './plays';
 import { DIFFICULTIES, DIFFICULTY } from '../../config';
 
 /**
@@ -91,6 +91,7 @@ export const KNOBS = {
   goals: GOALS,
   bin: BIN,
   plays: PLAYS,
+  postsCharge: POSTS_CHARGE,
   difficulty: DIFFICULTY_EDGE,
 } as const;
 

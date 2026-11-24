@@ -2,7 +2,7 @@
 // sim event to the pop-up word over the player's head, its tone and whether it
 // is a big moment (impact.ts gives it a tier). popupLayer.ts draws them.
 import { CALL_LABEL, isCoachCall } from '../league/calls';
-import { playOfDetail } from '../league/plays';
+import { POSTS_CHARGE_PLAY, playOfDetail } from '../league/plays';
 import type { SimEvent } from '../core/snapshot';
 
 export type PopupTone = 'attack' | 'defence' | 'neutral' | 'bad';
@@ -84,6 +84,7 @@ const WORDS: Readonly<Record<string, { word: string; tone: PopupTone; big?: bool
   // Set plays (#326): the play's short name over the man who calls it ("BLOCK PLAY!"), and a play
   // that breaks down over the man who tucks it. Neither is a big moment: a play's line break or try is.
   'set-play': { word: 'PLAY!', tone: 'attack' },
+  'signature-play': { word: `${POSTS_CHARGE_PLAY.short.toUpperCase()}!`, tone: 'attack' },
   'play-breaks-down': { word: 'BROKE DOWN', tone: 'neutral' },
 };
 
@@ -158,7 +159,8 @@ export function popupFor(e: SimEvent): Popup | null {
               : w.word;
   // A bonus try points at the zone it was grounded in (#77; zoneLayer.ts lights it).
   const sub = e.kind === 'try' && e.detail === 'bonus' ? BONUS_SUB
-    : e.kind === 'dart' && e.detail === 'tired-marker' ? 'TIRED MARKER' : surnameOf(e.player).toUpperCase();
+    : e.kind === 'dart' && e.detail === 'tired-marker' ? 'TIRED MARKER'
+    : (e.kind === 'signature-play' ? e.player ?? '' : surnameOf(e.player)).toUpperCase();
   const p: Popup = { word, sub, tone: w.tone, big, ms: big || e.kind === 'fresh-impact' ? POPUP_BIG_MS : POPUP_MS };
   if (e.trait) p.trait = e.trait.toUpperCase();
   return p;

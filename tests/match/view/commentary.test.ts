@@ -67,6 +67,7 @@ const SAMPLES: SimEvent[] = [
   // Set plays (#326): a coach's call, the launch, the breakdown, and one paying off.
   ev('coach-call', { detail: 'set-play:block-play' }), ev('set-play', { detail: 'block-play' }), ev('set-play', { detail: 'tap-rambo' }),
   ev('play-breaks-down', { detail: 'cut-out-winger' }), nobody('call-paid', { detail: 'set-play', side: 'home' }),
+  ...['signature-play', 'signature-breakdown', 'signature-success'].map(kind => ev(kind, { detail: 'posts-charge' })),
   nobody('siren'),
   nobody('half-time', { side: 'home' }), nobody('golden-point', { side: 'home' }),
   nobody('full-time', { side: 'home' }), nobody('full-time', { side: 'home', detail: 'golden-point' }),
@@ -279,6 +280,18 @@ describe('the ticker at 844×390', () => {
       .map(([key, l]) => `${key}: "${l}" (${l.length})`);
     expect(player.length).toBeGreaterThanOrEqual(20);
     expect(over).toEqual([]);
+  });
+
+  it('keeps the full player name in every signature line at the rename limit', () => {
+    const player = 'Mackenzie Tuilagi-Fonoti';
+    expect(player.length).toBe(24);
+    for (const key of ['signature-play', 'signature-breakdown', 'signature-success']) {
+      for (const template of LINES[key]!) {
+        const line = fillLine(template, { player });
+        expect(line).toContain(player);
+        expect(line!.length, key).toBeLessThanOrEqual(TICKER_FIT_CHARS);
+      }
+    }
   });
 
   it('names a club by its last word, as the report does', () => {

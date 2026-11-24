@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- **Posts charge.** A prop with Wrecking Ball II or III can call for a short ball from dummy-half near the posts. He straightens toward the uprights with a small first-contact edge. His full name is on the banner and the commentary credits a bust, fend or try. Either side can launch it once a half, and the line can still stop him. Ported from [draft PR #788](https://github.com/ch-leon/nrl-sim/pull/788). First signature from [#663](https://github.com/ch-leon/nrl-sim/issues/663).
+
 - **Directional wind on long punts.** The match seed fixes which way the wind blows. Punts carry further and come down sooner with it, while those kicked into it land shorter and hang longer. The wind holds its direction when the teams swap ends, changing who gets the help. The corner and halfway flags and wind streaks show the direction. Ported from [draft PR #787](https://github.com/ch-leon/nrl-sim/pull/787). This slice of [#661](https://github.com/ch-leon/nrl-sim/issues/661).
 
 - **The score and clock shape the last tackle.** In the final minute, a side within a converted try plays more ball inside the opposition 40. A side protecting a one- or two-point lead favours a territory punt when it has room to land one. Coach calls and set plays still lead. First slice of [#651](https://github.com/ch-leon/nrl-sim/issues/651). Ported from [draft PR #786](https://github.com/ch-leon/nrl-sim/pull/786).

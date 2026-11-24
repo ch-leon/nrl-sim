@@ -11,6 +11,7 @@ import type { Difficulty } from '../../config';
 import { PLAYS_BY_ID, playsOfFamily, type Play, type PlayFamily, type PlayFrom, type PlayId, type PlayMods, type RoleRef } from '../../data/plays';
 import { COUNTER_MATRIX } from './counterMatrix';
 import { zoneOf, type AttackPreset, type DefencePreset } from './presets';
+import { PROP } from './roles';
 
 /** The set-play knobs (tuning reference §37). Overridable by name in balance experiments (tuning.ts, group `plays`). */
 export const PLAYS = {
@@ -55,6 +56,34 @@ export const PLAYS = {
   aiPlays: { easy: 0, normal: 1, hard: 3 } as Record<Difficulty, number>,
 };
 
+export const POSTS_CHARGE = {
+  on: 1,
+  minTraitLevel: 2,
+  minToLineM: 3,
+  maxToLineM: 14,
+  maxFromPostsM: 10,
+  broken: 0.06,
+  wrestleFight: 0.18,
+};
+
+// A player's own script. The coach's purchasable playbook does not list it.
+export const POSTS_CHARGE_PLAY: Play<'posts-charge'> = {
+  id: 'posts-charge', name: 'Posts charge', short: 'Posts charge', style: 'grind', family: 'direct', from: ['ptb'],
+  when: { get toLineM() { return [POSTS_CHARGE.minToLineM, POSTS_CHARGE.maxToLineM] as const; }, tackles: [1, 4] },
+  roles: [{ who: PROP, job: 'caller', iq: 50 }],
+  script: [{ to: PROP, latM: 0 }],
+  decoys: [],
+  mods: { get broken() { return POSTS_CHARGE.broken; } },
+  price: 0,
+  blurb: 'The prop takes a short ball and drives straight at the posts.',
+};
+
+export type LivePlayId = PlayId | typeof POSTS_CHARGE_PLAY.id;
+
+export function livePlay(id: LivePlayId): Play<LivePlayId> {
+  return id === POSTS_CHARGE_PLAY.id ? POSTS_CHARGE_PLAY : PLAYS_BY_ID[id];
+}
+
 /** Which edge of the field: the left (wingers' and centre's lanes near y = 0) or the right. */
 export type Edge = 'left' | 'right';
 
@@ -96,7 +125,7 @@ export interface PlayFit {
  * worse one). Used by the engine, and later the Playbook and the tray caption,
  * so every "needs IQ" reads the same.
  */
-export function playFit(play: Play, nine: readonly PlayMan[], edge?: Edge): PlayFit {
+export function playFit(play: Play<LivePlayId>, nine: readonly PlayMan[], edge?: Edge): PlayFit {
   if (edge === undefined) {
     const l = playFit(play, nine, 'left');
     const r = playFit(play, nine, 'right');
@@ -116,12 +145,12 @@ export function playFit(play: Play, nine: readonly PlayMan[], edge?: Edge): Play
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
 
 /** The style term on the fail odds: a play of the side's own attack style breaks down less. */
-function styleTerm(play: Play, style: AttackPreset): number {
+function styleTerm(play: Play<LivePlayId>, style: AttackPreset): number {
   return play.style === style ? PLAYS.styleFail : 0;
 }
 
 /** The counter term: their defence reads the play's style (−1 in COUNTER_MATRIX) or leaves room for it (+1). */
-function counterTerm(play: Play, defence: DefencePreset): number {
+function counterTerm(play: Play<LivePlayId>, defence: DefencePreset): number {
   const c = COUNTER_MATRIX[play.style][defence];
   return c < 0 ? PLAYS.counterFail.against : c > 0 ? PLAYS.counterFail.for : 0;
 }
@@ -133,14 +162,14 @@ function counterTerm(play: Play, defence: DefencePreset): number {
  * attack preset, their defence. `fit` (the side's plan fit) is taken for the
  * success mods only (playBonus); the odds don't read it.
  */
-export function playOdds(play: Play, shortfall: number, style: AttackPreset, defence: DefencePreset): { fail: number; intercept: number } {
+export function playOdds(play: Play<LivePlayId>, shortfall: number, style: AttackPreset, defence: DefencePreset): { fail: number; intercept: number } {
   const fail = clamp(PLAYS.failBase + PLAYS.failPerPoint * shortfall + styleTerm(play, style) + counterTerm(play, defence), 0, PLAYS.failCap);
   const intercept = clamp((play.interceptBase ?? PLAYS.interceptBase) + PLAYS.interceptPerPoint * shortfall, 0, PLAYS.interceptCap);
   return { fail, intercept };
 }
 
 /** The success mods on the carrier's first contact: the play's own, × the side's plan fit when it plays the play's style (`bonusByFit`). */
-export function playBonus(play: Play, style: AttackPreset, fit: number): PlayMods {
+export function playBonus(play: Play<LivePlayId>, style: AttackPreset, fit: number): PlayMods {
   const k = PLAYS.bonusByFit > 0 && play.style === style ? fit : 1;
   const out: PlayMods = {};
   for (const [key, v] of Object.entries(play.mods) as [keyof PlayMods, number][]) out[key] = v * k;
@@ -169,7 +198,7 @@ export interface PlayFacts {
 }
 
 /** Why a play can't be run from here (plan §3.2), or null when it can: zone, tackle, launch point, side, a kick play's distance. */
-export function playWhen(play: Play, f: PlayFacts): string | null {
+export function playWhen(play: Play<LivePlayId>, f: PlayFacts): string | null {
   if (f.kickAway) return 'the kick’s away';
   if (f.last && !play.kick) return 'last tackle';
   if (!play.from.includes(f.from)) return 'not from here';
@@ -235,7 +264,7 @@ export function rivalPlays(style: AttackPreset, nine: readonly PlayMan[], diffic
 }
 
 /** "the block play", "the Rambo": a play named in a line of commentary. */
-export function playTitle(play: Play): string {
+export function playTitle(play: Play<LivePlayId>): string {
   return play.name.startsWith('The ') ? `the ${play.name.slice(4)}` : `the ${play.name.charAt(0).toLowerCase()}${play.name.slice(1)}`;
 }
 

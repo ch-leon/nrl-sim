@@ -58,8 +58,8 @@ export interface PlayMods {
   stepAgainst?: number;
 }
 
-export interface Play {
-  id: PlayId;
+export interface Play<Id extends string = PlayId> {
+  id: Id;
   name: string;
   /** For the pop-up, the tray tile and the result tag ("Block play +9m"). */
   short: string;

@@ -1829,6 +1829,22 @@ A botched play is mostly a wasted tackle: its caller tucks it (no step, no
 offload, no kick) and takes the tackle. The intercept band (fail × intercept)
 throws the pass to the lane defender; with nobody in the lane it is a breakdown.
 
+### Posts charge (#663)
+
+`match/league/plays.ts` (`POSTS_CHARGE`, group `postsCharge`). Uses the normal
+`plays.*` launch roll against the prop's 50 Footy IQ requirement, and can go
+from the play-the-ball on tackles 1–4. Each side has one launch a half and it
+takes the set's play. The ordinary short pass and catch still resolve live.
+
+| Knob | Default | Meaning |
+|---|---|---|
+| `postsCharge.on` | 1 | 0 disables the signature. `plays.on:0` also disables it. |
+| `postsCharge.minTraitLevel` | 2 | Minimum Wrecking Ball level for the prop on the field. |
+| `postsCharge.minToLineM` / `.maxToLineM` | 3 / 14 m | Minimum and maximum distance from the dummy-half's ball to the try line. |
+| `postsCharge.maxFromPostsM` | 10 m | Maximum sideways distance from the posts for both ruck and receiver. |
+| `postsCharge.broken` | +0.06 | Bust probability points on the first contact after a successful script, using the normal set-play fit scaling. |
+| `postsCharge.wrestleFight` | +0.18 | Multiplier added to the initial fight if that first contact turns into a wrestle. |
+
 
 ## Defensive retreat correction (#625, draft)
 
