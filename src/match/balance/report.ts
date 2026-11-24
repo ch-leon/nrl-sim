@@ -4,7 +4,7 @@
 // than luck would explain. Pure: results in, Markdown out.
 import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL } from '../league/presets';
 import { SIDE_COUNTS, MATCH_MINUTES, type CellResult, type CountKey, type Stat, type WatchStats } from './measure';
-import { LAST_TACKLES, ORIGINS } from './watch';
+import { LAST_TACKLES, ORIGINS, TAP_ORIGINS } from './watch';
 
 /**
  * §7 balance targets per full Nines match, both sides combined. Tackles, line
@@ -112,7 +112,7 @@ export function reportMarkdown(r: ReportInput): string {
       out.push(`| ${row.variant} | ${cells.join(' | ')} | ${pct(row.homeWin)}${row.draw > 0 ? ` (${pct(row.draw)} drawn)` : ''} |${side} ${row.wrestleSecs.toFixed(2)} | ${legsEnd(row)} |`);
     }
     out.push('');
-    out.push(...watchTable(rows, base));
+    out.push(...watchTable(rows, base), ...tapTable(rows));
     const prev = r.previous?.filter((x) => x.scenario === sc) ?? [];
     if (prev.length) {
       const moved: string[] = [];
@@ -195,6 +195,28 @@ function watchTable(rows: readonly CellResult[], base: CellResult): string[] {
   const w = base.watch;
   if (w) {
     out.push('', `_Tries ${sharesOf(w.origins, ORIGINS, base.seeds, base.minutes).perMatch.toFixed(1)} and last tackles ${sharesOf(w.lastTackles, LAST_TACKLES, base.seeds, base.minutes).perMatch.toFixed(1)} a match in the baseline row. Origins and last-tackle plays are shares of those; their ± test treats each try or last tackle as an independent draw. The attribution rules are in balance/README.md._`);
+  }
+  out.push('');
+  return out;
+}
+
+/** Same-origin comparisons in the written orientation, using the pooled tap counts. */
+function tapTable(rows: readonly CellResult[]): string[] {
+  if (!rows.some(row => row.watch?.taps)) return [];
+  const out = [
+    '| Variant | Tap mark | Quick / all | Quick % | Quick first play m (n) | Ordinary first play m (n) | Quick breaks | Ordinary breaks |',
+    '|---|---|---:|---:|---:|---:|---:|---:|',
+  ];
+  for (const row of rows) {
+    const taps = row.watch?.taps;
+    if (!taps) continue;
+    for (const origin of TAP_ORIGINS) {
+      const { quick, ordinary } = taps[origin];
+      const all = quick.taps + ordinary.taps;
+      const metres = (sample: typeof quick) => sample.completed ? `${(sample.metres / sample.completed).toFixed(1)} (${sample.completed})` : '—';
+      const breaks = (sample: typeof quick) => sample.completed ? `${sample.breaks}/${sample.completed}` : '—';
+      out.push(`| ${row.variant} | ${origin} | ${quick.taps}/${all} | ${all ? pct1(quick.taps / all) : '—'} | ${metres(quick)} | ${metres(ordinary)} | ${breaks(quick)} | ${breaks(ordinary)} |`);
+    }
   }
   out.push('');
   return out;

@@ -10,7 +10,7 @@ import { SHAPES } from './attackingShapes';
 import { FIT } from './fit';
 import { BASE, MOMENTUM, RACE } from './contest';
 import { PACE } from '../core/body';
-import { TOUCH } from './touch';
+import { QUICK_TAP, TOUCH } from './touch';
 import { PENALTY } from './penalties';
 import { FATIGUE } from './fatigue';
 import { GAS } from './gas';
@@ -73,6 +73,7 @@ export const KNOBS = {
   rules: NINES,
   bench: BENCH,
   touch: TOUCH,
+  quickTap: QUICK_TAP,
   penalty: PENALTY,
   weather: WEATHER,
   rating: RATING,

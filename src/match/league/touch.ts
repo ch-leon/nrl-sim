@@ -50,6 +50,21 @@ export const TOUCH = {
   dropOutSpreadM: 12,
 };
 
+export type TapOrigin = 'penalty' | '20m';
+
+/** A captain's read of a retreating defence at the mark (#658). */
+export const QUICK_TAP = {
+  on: 1,
+  /** At least this many nearby defenders are visibly short of their marks. */
+  shortMen: 2,
+  laneM: 22,
+  /** Depth still owed at Footy IQ 60, modified by the captain's IQ and Hothead level. */
+  shortM: 5,
+  iqPerPointM: 0.06,
+  hotheadPerLevelM: 1,
+  minShortM: 2,
+};
+
 /** Where a line from `from` to `to` first leaves the playing area, and how: over a touchline in the field of play, or dead (touch-in-goal, dead-ball line). Null if it stays in. */
 export function exitPoint(from: Vec, to: Vec): { at: Vec; how: 'touch' | 'dead' } | null {
   const minX = -IN_GOAL;
