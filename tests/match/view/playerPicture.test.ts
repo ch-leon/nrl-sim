@@ -31,7 +31,8 @@ describe('dummy-pass pictures', () => {
       const { cur, prev } = runner;
       const carrier = player(cur, fake.carrier), old = player(prev, fake.carrier);
       const ctx = pictureContext(cur, prev);
-      const ordinary = playerPicture(carrier, old, cur.tick, cur.ball.holder, flip, { ...ctx, dummyPass: undefined });
+      const { dummyPass: _dummyPass, ...carryCtx } = ctx;
+      const ordinary = playerPicture(carrier, old, cur.tick, cur.ball.holder, flip, carryCtx);
       const picture = playerPicture(carrier, old, cur.tick, cur.ball.holder, flip, ctx);
       return { carrier, ordinary, picture };
     };
