@@ -20,7 +20,7 @@
 import type { Side, SimEvent } from '../core/snapshot';
 import type { MatchEvent, MatchResult, TeamSheet } from '../../sim/events';
 import { CALL_LABEL, callIsPenalty, isCoachCall } from '../league/calls';
-import { POSTS_CHARGE_PLAY, playOfDetail, playShortTitle } from '../league/plays';
+import { PLAYS, POSTS_CHARGE_PLAY, playOfDetail, playShortTitle } from '../league/plays';
 import type { Play } from '../../data/plays';
 import { MID_Y } from '../core/field';
 import { NINES } from '../league/rules';
@@ -272,7 +272,29 @@ export interface Said {
   important: boolean;
   /** A tactic-counter read (#468). The strip does not hold it, and a repeat duel is said after it. */
   counter?: boolean;
+  /** The coach's set play just came off (#825). The playback's pay-off reads this; the sim does not. */
+  playHit?: PlayHit;
+  /** The coach's set play broke down (#825). A muted read, not a pay-off. */
+  playMiss?: boolean;
 }
+
+/** What a called play coming off looks like (#825): a bust, a clean line break, or a try. */
+export type PlayHit = 'bust' | 'break' | 'try';
+
+/** The event that is a called play coming off, or null. A half break is the plain thing. */
+export function playHitOf(kind: string, detail?: string): PlayHit | null {
+  if (kind === 'break-tackle') return 'bust';
+  if (kind === 'line-break' && detail !== 'half') return 'break';
+  if (kind === 'try') return 'try';
+  return null;
+}
+
+/** The fixed credit. Not picked from a list, so it never moves another line's choice. */
+export function playCalledCredit(title: string): string {
+  return `PLAY CALLED: ${title}`;
+}
+
+const ENDS_LIVE_PLAY = new Set(['tackle', 'big-hit', 'set-start', 'handover', 'half-time', 'full-time', 'intercept', 'strip']);
 
 /** Minutes with no score before a side's drought (or a scoreless match) is worth saying; the match is two halves of seven. */
 export const SPELL_MINUTES = 6;
@@ -460,6 +482,8 @@ export class Commentator {
    */
   private readonly calledPlay: Record<Side, Play | null> = { home: null, away: null };
   private readonly lastCalledPlay: Record<Side, Play | null> = { home: null, away: null };
+  /** The coach's play from its launch until the script ends (#825). Not read by the sim. */
+  private livePlay: { side: Side; play: Play; tick: number; credited: boolean } | null = null;
   /**
    * The match so far: only what the events, the score and the clock after each one
    * say, so a resumed or skipped stretch heard in order leaves the same memory as a
@@ -505,8 +529,10 @@ export class Commentator {
    */
   said(e: SimEvent, score?: Readonly<Record<Side, number>>, minute?: number, ballY?: number): Said[] {
     const main = this.main(e, score, minute, ballY);
-    const out: Said[] = main.text ? [{ text: main.text, important: isImportantKey(main.key, e.detail), ...(main.key.startsWith('counter:') ? { counter: true } : {}) }] : [];
+    const feel = this.noteLivePlay(e);
+    const out: Said[] = main.text ? [{ text: main.text, important: isImportantKey(main.key, e.detail), ...(main.key.startsWith('counter:') ? { counter: true } : {}), ...(feel.miss ? { playMiss: true } : {}) }] : [];
     for (const text of this.remember(e, score, minute)) out.push({ text, important: true });
+    if (feel.hit) out.push({ text: feel.hit.text, important: true, playHit: feel.hit.how });
     return out;
   }
 
@@ -623,6 +649,41 @@ export class Commentator {
   }
 
   /**
+   * The coach's play, once it has been launched (#825). A bust, a clean break or a try
+   * inside the script is "PLAY CALLED". A breakdown is a miss. Anything that ends the
+   * script (a tackle, a turnover, the next set) forgets it. The half's own launch never
+   * arms it. None of this picks a line, so the seed's choices stay put.
+   */
+  private noteLivePlay(e: SimEvent): { hit: { how: PlayHit; text: string } | null; miss: boolean } {
+    if (e.kind === 'set-play') return { hit: null, miss: false };
+    const live = this.livePlay;
+    if (!live) return { hit: null, miss: false };
+    if (e.tick - live.tick > PLAYS.scriptTicks) {
+      this.livePlay = null;
+      return { hit: null, miss: false };
+    }
+    const hit = e.side === live.side ? playHitOf(e.kind, e.detail) : null;
+    if (hit) {
+      if (live.credited) {
+        if (hit === 'try') this.livePlay = null;
+        return { hit: null, miss: false };
+      }
+      const text = playCalledCredit(playShortTitle(live.play));
+      if (hit === 'try') this.livePlay = null;
+      else this.livePlay = { ...live, credited: true };
+      return { hit: { how: hit, text }, miss: false };
+    }
+    const theirs = e.side !== undefined && e.side !== live.side;
+    const miss = e.kind === 'play-breaks-down' && e.side === live.side;
+    const ends = miss
+      || ENDS_LIVE_PLAY.has(e.kind)
+      || ((e.kind === 'kick' || e.kind === 'error' || e.kind === 'drop') && e.side === live.side)
+      || (theirs && (e.kind === 'error' || e.kind === 'drop'));
+    if (ends) this.livePlay = null;
+    return { hit: null, miss };
+  }
+
+  /**
    * Set plays (#326): a coach's play call is remembered until it runs; a launch is
    * the coach's when it is the play he called ('set-play'), else the half's own
    * ('set-play:half'); a paid-off `set-play` call names the play he last called
@@ -640,8 +701,9 @@ export class Commentator {
     }
     if (e.kind === 'set-play') {
       const p = playOfDetail(e.detail);
-      const coach = !!p && this.calledPlay[side] === p;
+      const coach = !!p && !!side && this.calledPlay[side] === p;
       this.calledPlay[side] = null;
+      this.livePlay = coach && side && p ? { side, play: p, tick: e.tick, credited: false } : null;
       return { key: coach ? 'set-play' : 'set-play:half', paid: null };
     }
     // Not knowing the play (a stretch it never heard), the call's own pay-off line.

@@ -318,6 +318,9 @@ export async function runMatchPlays(browser, sizes = [[844, 390], [667, 375], [5
               return b.hasAttribute('data-called') ? b.dataset.play : null;
             }, null, 'a callable early-tackle set play');
             called = play;
+            // The tap's banner is up in the same turn (#825): CALLED, and the play's name.
+            const flash = await page.locator('.nrl-mo-banner').textContent();
+            if (!flash?.includes('CALLED') || !flash.includes(SHORT[play])) problems.push(`no called banner after the tap ("${flash ?? ''}")`);
             // The call is in at the tap: COACH is shut for a screen reader at once, the tray itself a moment later (TRAY_CALLED_MS).
             if ((await page.locator('.nrl-mo-bar [data-coach]').getAttribute('aria-expanded')) !== 'false') problems.push('COACH still reads open after the play was called');
             if (!(await page.waitForSelector('.nrl-mo-calls[hidden]', { state: 'attached', timeout: 3000 }).then(() => true, () => false))) problems.push('the tray stayed open after the play was called');

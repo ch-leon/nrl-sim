@@ -672,6 +672,21 @@ export function listenForPress(): void {
 }
 
 /**
+ * A short buzz for a set-play tap (#825). `navigator.vibrate` where the browser has it
+ * (some Android Chrome); everywhere else, including iPhone Safari, this does nothing.
+ * It never throws, and it is not a match event.
+ */
+export function tapBuzz(ms = 12): boolean {
+  try {
+    const vibrate = typeof navigator !== 'undefined' ? navigator.vibrate : undefined;
+    if (typeof vibrate !== 'function') return false;
+    return vibrate(ms) !== false;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Hover and press fills (SuperCOOKED): a raised control a shade lighter, the orange a shade
  * lighter. The stylesheet below writes them as --nrl-raised-hover / --nrl-accent-hover; the
  * title, whose sheet is up before this one, reads them from here.
@@ -680,16 +695,19 @@ export const HOVER_FILL = { raised: '#233050', accent: '#ff8540' } as const;
 
 /** Motion (#597): every entrance and transition in src/ui takes its time, curve and travel from these. */
 const MOTION_TOKENS = `--nrl-dur-press: 120ms;
+  --nrl-dur-hit: 40ms;
   --nrl-dur-fast: 150ms;
   --nrl-dur-sheet: 180ms;
   --nrl-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --nrl-ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --nrl-rise: 12px;
   --nrl-pop: 0.97;
-  --nrl-press: 0.97;`;
+  --nrl-press: 0.97;
+  --nrl-play-press: 0.92;`;
 // The one reduced-motion rule (#597): travel and scale go, the fade stays. A keyframe that
 // moves does it by --nrl-rise (calc() for up, left and part-way), so it needs no rule of its own.
-const REDUCED_MOTION = '@media (prefers-reduced-motion: reduce) { :root { --nrl-rise: 0px; --nrl-pop: 1; --nrl-press: 1; } }';
+// --nrl-play-press is the set-play tile's harder tap (#825); it flattens with the other scales.
+const REDUCED_MOTION = '@media (prefers-reduced-motion: reduce) { :root { --nrl-rise: 0px; --nrl-pop: 1; --nrl-press: 1; --nrl-play-press: 1; } }';
 /** The same tokens for the title, whose sheet is up before this one is injected (#604). */
 export const MOTION_CSS = `:root { ${MOTION_TOKENS} }
 ${REDUCED_MOTION}`;
@@ -811,6 +829,13 @@ ${REDUCED_MOTION}
   background: var(--nrl-raised-hover);
   transform: scale(var(--nrl-press));
   transition: background-color var(--nrl-dur-press) ease, transform var(--nrl-dur-press) var(--nrl-ease-out);
+}
+/* A set play (#825): the tile shrinks the frame the finger lands, and the move is done
+   inside 100ms. --nrl-play-press is 1 under reduced motion, so the fill stays and the scale goes. */
+.nrl-btn.nrl-mo-tray-play:active:not(:disabled),
+.nrl-btn.nrl-mo-tray-play[data-pressed]:not(:disabled) {
+  transform: scale(var(--nrl-play-press));
+  transition: transform var(--nrl-dur-hit) var(--nrl-ease-out), background-color var(--nrl-dur-hit) ease;
 }
 /* The browser's own tap box goes (the presses above replace it), and a control's label can't be
    long-press selected, pop a callout or double-tap zoom. Fields, the Guide and News stay selectable. */

@@ -43,7 +43,7 @@ describe('motion tokens (#597)', () => {
   });
 
   it('one reduced-motion rule: no travel, no scaling, and the fades left alone', () => {
-    expect(CSS).toContain('@media (prefers-reduced-motion: reduce) { :root { --nrl-rise: 0px; --nrl-pop: 1; --nrl-press: 1; } }');
+    expect(CSS).toContain('@media (prefers-reduced-motion: reduce) { :root { --nrl-rise: 0px; --nrl-pop: 1; --nrl-press: 1; --nrl-play-press: 1; } }');
     // Switched off outright: only what never ends (the speed pill's pulse, the rotate card's turn).
     const off = SOURCES.flatMap(({ file, text }) => (text.match(/@media \(prefers-reduced-motion: reduce\) \{[^@]*?animation: none[^@]*?\}\s*\}/g) ?? []).map((block) => ({ file, block })));
     expect(off.map((o) => o.file).sort()).toEqual(['orientation.ts', 'screens/matchOverlay.ts']);
@@ -80,7 +80,7 @@ describe('motion tokens (#597)', () => {
         if (/^animation: none/.test(decl)) continue;
         // The endless pulse and the score box's colour flash are not entrances; they keep their own timing.
         if (/nrl-mo-slow|nrl-mo-scored/.test(decl)) continue;
-        expect(decl, file).toMatch(/var\(--nrl-dur-(press|fast|sheet)\)/);
+        expect(decl, file).toMatch(/var\(--nrl-dur-(press|hit|fast|sheet)\)/);
         // What is left once the tokens are out: no keyword curve but a colour's `ease`, no literal time.
         const literal = decl.replace(/var\(--[\w-]+\)/g, '');
         expect(literal, `${file}: ${decl}`).not.toMatch(/\bease-(out|in)\b/);
