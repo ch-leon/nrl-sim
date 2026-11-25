@@ -5,9 +5,9 @@
 // imports the pure match art only: no Phaser, no game state, no DOM.
 import { fixtureArtBuffers, paintFixtureArt, type FixtureKits } from './fixtureArt';
 import type { StadiumSigns } from '../../content/pack';
-import { warmGround, setStadiumSigns } from './stadium';
+import { warmGround, setStadiumSigns, type GroundLook } from './stadium';
 
-type ArtRequest = ({ warm: number } | { offsetX: number; kits: FixtureKits }) & { signs?: StadiumSigns };
+type ArtRequest = ({ warm: number } | { offsetX: number; kits: FixtureKits; ground?: GroundLook }) & { signs?: StadiumSigns };
 
 self.onmessage = (e: MessageEvent<ArtRequest>): void => {
   if (e.data.signs) setStadiumSigns(e.data.signs);
@@ -15,6 +15,6 @@ self.onmessage = (e: MessageEvent<ArtRequest>): void => {
     warmGround(e.data.warm);
     return;
   }
-  const art = paintFixtureArt(e.data.offsetX, e.data.kits);
+  const art = paintFixtureArt(e.data.offsetX, e.data.kits, e.data.ground);
   self.postMessage(art, { transfer: fixtureArtBuffers(art) });
 };

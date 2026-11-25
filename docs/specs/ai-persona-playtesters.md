@@ -132,6 +132,11 @@ The old idle/managed fast-forward path is retained.
   a forced sale is counted on that same warning) or was sacked with a missed
   solvency objective. A debt week is separate: a week that ended below zero, which
   is what raises the warning. Counts and the career-level rate are separate.
+- **Board:** each season that reaches a board review records the judged objectives
+  (the words, the kind when the review was observed, and whether it was met) and
+  whether that season sacked the club. The Markdown report names every missed
+  objective for a sacking. A premiership season that is also a sacking is called
+  out on its own line.
 - **Outliers:** attack × opposing defence and each taken play's win share versus
   games without that cell. Flag ≥15 percentage points difference only with at
   least 10 games in both groups. Tables show sample sizes and null comparisons.

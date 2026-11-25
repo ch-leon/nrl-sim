@@ -58,13 +58,16 @@ import { windDirection, type WindDirection } from '../match/league/weather';
 import { RING_STYLES, resolveKits } from '../art/match/kitClash';
 import { drawRing } from '../match/view/rings';
 import { teamLetters, teamLettersOn, teamTags } from '../ui/teamTag';
+import { groundForMatch } from '../art/match/ground';
 import {
+  CLASSIC_GROUND,
   CROSSBAR_Z,
   POST_GX,
   POST_GY,
   cameraWorldBounds,
   crowdSeats,
   type CrowdSeat,
+  type GroundLook,
 } from '../art/match/stadium';
 import { fixtureArtKey, fixtureArtPieces, paintFixtureArt, type FixtureArt } from '../art/match/fixtureArt';
 import { CROSSBAR_AX, CROSSBAR_AY, LIGHT_DX, LIGHT_DY, SHADOW_LENGTH, UPRIGHT_H, UPRIGHT_W } from '../art/match/props';
@@ -306,6 +309,8 @@ export class MatchScene extends Phaser.Scene {
   protected stadiumWind(): WindDirection { return this.wind; }
 
   private readonly offsetX = fieldOffsetX();
+  /** The ground this match paints: the club's buildings at home, the league's ground away. */
+  private ground: GroundLook = CLASSIC_GROUND;
   private art!: MatchArtRegistry;
   /** The stadium and players are up (N10.5: a live match may wait a moment for its art). */
   private built = false;
@@ -411,8 +416,19 @@ export class MatchScene extends Phaser.Scene {
     this.madePlayAt = 0;
   }
 
+  /** The saved ground for this fixture. The lab has no save and keeps the full stand. */
+  private groundNow(): GroundLook {
+    if (!this.fixture) return CLASSIC_GROUND;
+    try {
+      return groundForMatch(getState(), this.fixture);
+    } catch {
+      return CLASSIC_GROUND;
+    }
+  }
+
   create(): void {
     this.art = new MatchArtRegistry(this);
+    this.ground = this.groundNow();
     const kits = resolveKits(this.home, this.away);
     // N10.5 (#154): the stadium, crowd and kit atlases were painted ahead, in the art
     // worker, after last week, and uploaded in idle slices: this only places them. Not
@@ -420,10 +436,10 @@ export class MatchScene extends Phaser.Scene {
     // "Kick-off…" while the worker finishes and the rest goes up a texture a frame, so
     // the tap that started it returns at once; the lab paints here.
     const fixtureKitsNow = { home: kits.home, away: kits.away };
-    const key = fixtureArtKey(this.offsetX, fixtureKitsNow);
+    const key = fixtureArtKey(this.offsetX, fixtureKitsNow, this.ground);
     const art = takeFixtureArt(key);
     if (!this.live) {
-      this.build(kits, art ?? paintFixtureArt(this.offsetX, fixtureKitsNow));
+      this.build(kits, art ?? paintFixtureArt(this.offsetX, fixtureKitsNow, this.ground));
       return;
     }
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.teardown());
@@ -448,7 +464,7 @@ export class MatchScene extends Phaser.Scene {
     // is still CREATING, so it reads false and the match would never build.
     const live = (): boolean => token === this.buildToken;
     void (async () => {
-      const painted = art ?? (await fixtureArtFor(this.offsetX, fixtureKitsNow));
+      const painted = art ?? (await fixtureArtFor(this.offsetX, fixtureKitsNow, this.ground));
       if (!live()) return;
       takeFixtureArt(painted.key);
       this.art.adopt(fixtureArtPieces(painted)); // freed by teardown even if we never build
@@ -503,6 +519,7 @@ export class MatchScene extends Phaser.Scene {
       carrierDepth: (side, slot) => this.players[side][slot]?.sprite.depth ?? null,
       tags: teamTags(this.home.name, this.away.name),
       boardDepth: DEPTH_BOARD,
+      boardGround: this.ground,
       ...(lighting !== 'day' ? { boardGlow: { depth: DEPTH_GLOW, alpha: lighting === 'night' ? 0.85 : 0.55 } } : {}),
     });
     this.markerColors = { home: kits.rings.home, away: kits.rings.away };
@@ -554,7 +571,7 @@ export class MatchScene extends Phaser.Scene {
     this.data.set('away', this.away);
     attachMatchFx(this); // BAK-201: pooled try/big-hit/crowd particle FX (WU-14)
     // GitHub #16: rain/wind, dusk/night lighting (per fixture), stand reactions.
-    attachMatchAtmosphere(this, { weather: this.weather, fixture: this.fixture, wind: () => this.stadiumWind() });
+    attachMatchAtmosphere(this, { weather: this.weather, fixture: this.fixture, wind: () => this.stadiumWind(), ground: this.ground });
 
     // WU-12: overlay first (subscribes to 'match:event'/'match:finished'), then
     // the live playback, which plays the match and emits its events as they happen.
@@ -867,7 +884,7 @@ export class MatchScene extends Phaser.Scene {
   private spawnCrowd(atlas: string): void {
     const back = this.add.blitter(0, 0, atlas).setDepth(DEPTH_CROWD_BACK);
     const front = this.add.blitter(0, 0, atlas).setDepth(DEPTH_CROWD_FRONT);
-    const seats = crowdSeats()
+    const seats = crowdSeats(this.ground)
       .map((seat) => ({ seat, w: isoProject(seat.gx, seat.gy, seat.z, this.offsetX) }))
       .sort((p, q) => p.w.y - q.w.y); // bobs draw in insertion order → y-sorted
     for (const { seat, w } of seats) {
