@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- **The Bali trip waits for next season's league.** In a League career, a story card offered or still open when the season closes is answered once next season's league is confirmed, so a trip incident lands in the new year and no longer stops the league choice. A save already stuck this way is repaired on load. [#837](https://github.com/ch-leon/nrl-sim/issues/837).
+
 - **Set-play tap.** Calling a play from the match tray now hits at once: the tile lights under the finger, a CALLED banner names it, and a short sting plays. A buzz fires where the phone supports it. When the play comes off — a bust, a line break or a try — the camera pulls in, the crowd lifts, and the commentary credits PLAY CALLED. A breakdown stays a quiet read. Match results are unchanged. [PR #828](https://github.com/ch-leon/nrl-sim/pull/828). [#825](https://github.com/ch-leon/nrl-sim/issues/825).
 
 - **Story events in League career.** The Classic deck, including the wildcards and the Bali trip, now turns up in a League career. Cards follow the 25-week year, the trip is offered when the season closes, and a player away at Skills Camp or a booked event is not the subject of a card. A wildcard ban misses real fixtures. [#820](https://github.com/ch-leon/nrl-sim/issues/820).
