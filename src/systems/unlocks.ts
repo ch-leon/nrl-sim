@@ -4,7 +4,7 @@ import { bus } from '../core/events';
 import { registerTickHook, TICK_ORDER } from '../core/time';
 import { SEASON_ROUNDS } from '../config';
 import { FACILITY_CATALOG, type FacilityDefId } from '../data/facility';
-import { SCREEN_UNLOCK_LADDER, isScreenOpen, registerScreenUnlockSystem } from './screenUnlocks';
+import { SCREEN_UNLOCK_LADDER, careerResults, isScreenOpen, registerScreenUnlockSystem } from './screenUnlocks';
 
 export { isScreenOpen, screenLockReason, screensDue } from './screenUnlocks';
 
@@ -39,11 +39,11 @@ export function unlockReason(id: FacilityDefId): string {
 /** Pure: fixtures with results are played; scheduled home games and draws are not wins. */
 export function unlocksDue(state: GameState): FacilityDefId[] {
   if (!state.unlocks) return [];
-  const played = state.league.fixtures.filter((f) => f.round > 0 && f.result);
+  const played = careerResults(state);
   const home = played.some((f) => f.homeId === state.clubId);
   const win = played.some((f) => f.homeId === state.clubId
-    ? f.result!.homeScore > f.result!.awayScore
-    : f.awayId === state.clubId && f.result!.awayScore > f.result!.homeScore);
+    ? f.homeScore > f.awayScore
+    : f.awayId === state.clubId && f.awayScore > f.homeScore);
   return UNLOCK_LADDER.filter((row) => {
     if (state.season > 1) return true;
     switch (row.trigger) {

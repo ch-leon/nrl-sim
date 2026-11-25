@@ -190,8 +190,14 @@ export async function runDockTextSize(browser) {
       await page.waitForSelector('.nrl-tutorial', { state: 'detached' });
       // A contract inside 4 weeks: Squad's dot (#369) shows on the next state change (the text size, below).
       const who = await page.evaluate(() => {
-        const p = window.__nrlState().squad.find((x) => !x.junior && !x.departed);
-        p.contractWeeks = 2;
+        const s = window.__nrlState();
+        const p = s.squad.find((x) => !x.junior && !x.departed);
+        // A League career shows the weeks left on the deal, not a planted contractWeeks.
+        if (p.deal) {
+          p.deal.endSeason = s.season - 1;
+          delete p.deal.renewal;
+        }
+        p.contractWeeks = 0;
         return p.name;
       });
       rec.notes.push(`${who}'s contract ends in 2 weeks`);

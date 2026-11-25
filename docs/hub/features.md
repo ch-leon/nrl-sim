@@ -64,7 +64,7 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
-- **League career is the only mode.** A new club no longer asks Classic or League: it starts a League career in Local. An old Classic save shows “Classic mode has been retired. Start a new League career.” once, with Export save, and the slot is left empty. The save is archived, including on the iPhone app, so it does not come back at the next launch. [#819](https://github.com/ch-leon/nrl-sim/issues/819).
+- **League career is the only mode.** A new club no longer asks Classic or League: it starts a League career in Local. An old Classic save shows “Classic mode has been retired. Start a new League career.” once, with Export save, and the slot is left empty. The save is archived, including on the iPhone app, so it does not come back at the next launch. A home game still opens Finance and the coach's office, and a derby against the neighbour is still called on the match and in the news. [#819](https://github.com/ch-leon/nrl-sim/issues/819).
 
 - **A title season is not a sacking.** Finishing outside the board’s ladder target still meets that goal when the club reaches the grand final or wins the title, in Classic and in a League career. Winning the title never ends the season in a sacking, even if another goal is missed. A building goal only asks for facilities the cash can pay for. The persona report names the goal missed in every sacking. [#692](https://github.com/ch-leon/nrl-sim/issues/692) ([PR](https://github.com/ch-leon/nrl-sim/pull/826)).
 

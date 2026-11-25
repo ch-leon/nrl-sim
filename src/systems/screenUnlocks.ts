@@ -22,12 +22,28 @@ export function screenLockReason(state: GameState, id: string): string | null {
   return isScreenOpen(state, id) ? null : SCREEN_UNLOCK_LADDER.find((row) => row.id === id)?.reason ?? null;
 }
 
+/** Played competitive results. A Classic ladder is used when it has any; a League career's results live on its league instances. */
+export function careerResults(state: GameState): { homeId: string; awayId: string; homeScore: number; awayScore: number }[] {
+  const classic = state.league.fixtures.filter((f) => f.round > 0 && f.result);
+  if (classic.length || !state.competitions?.instances) return classic.map((f) => ({
+    homeId: f.homeId, awayId: f.awayId, homeScore: f.result!.homeScore, awayScore: f.result!.awayScore,
+  }));
+  const out: { homeId: string; awayId: string; homeScore: number; awayScore: number }[] = [];
+  for (const instance of state.competitions.instances) {
+    if (instance.definition.format.kind !== 'league') continue;
+    for (const f of instance.fixtures) {
+      if (!f.result) continue;
+      out.push({ homeId: f.homeId, awayId: f.awayId, homeScore: f.result.homeScore, awayScore: f.result.awayScore });
+    }
+  }
+  return out;
+}
+
 /** Pure; `round` lets the end-of-week hook open round 4 before that round starts. */
 export function screensDue(state: GameState, round = state.week): string[] {
+  const home = careerResults(state).some((f) => f.homeId === state.clubId);
   return SCREEN_UNLOCK_LADDER.filter((row) => !isScreenOpen(state, row.id) && (
-    state.season > 1 || (row.round === null
-      ? state.league.fixtures.some((f) => f.round > 0 && f.homeId === state.clubId && f.result !== undefined)
-      : round >= row.round)
+    state.season > 1 || (row.round === null ? home : round >= row.round)
   )).map((row) => row.id);
 }
 

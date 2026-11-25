@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { confirmStartingLeague, playTrials, BASE, OUT_ROOT, openNav, SHEET_EXIT, closeWeekSummary, log, skipFromPill, setupStep } from '../common.mjs';
+import { advanceOnce, confirmStartingLeague, playTrials, BASE, OUT_ROOT, openNav, SHEET_EXIT, closeWeekSummary, log, setupStep } from '../common.mjs';
 
 /** Facility ladder + both veteran exits, played through round 8 on the required phones. */
 export async function runUnlocks(browser) {
@@ -56,16 +56,13 @@ export async function runUnlocks(browser) {
       };
       await build('build-start', 4);
       for (let round = 1; round < 8; round++) {
-        await page.locator('[data-hud="advance"]').tap();
-        const ask = page.locator('[data-ask-proceed]');
-        await page.waitForFunction(() => document.querySelector('[data-ask-proceed]') || document.querySelector('.nrl-mo-controls'));
-        if (await ask.isVisible()) await ask.tap();
-        await page.waitForSelector('.nrl-mo-controls', { timeout: 60000 });
-        await skipFromPill(page);
-        await page.waitForSelector('.nrl-mo-ft [data-back-to-club]', { timeout: 120000 });
-        await page.locator('.nrl-mo-ft [data-back-to-club]').evaluate((n) => n.click());
-        // The week settles before the scene switch; nav must see the visible dock.
-        await page.waitForSelector('body:not(.nrl-match-active) .nrl-dock');
+        const what = await advanceOnce(page);
+        if (what === 'match') {
+          await page.locator('.nrl-mo-controls [data-pause]').tap();
+          await page.locator('.nrl-mo-sheet [data-skip]').tap();
+          await page.locator('.nrl-mo-ft [data-back-to-club]').evaluate((n) => n.click());
+          await page.waitForSelector('body:not(.nrl-match-active) .nrl-dock');
+        }
         await page.waitForFunction((week) => window.__nrlState().week === week, round + 1);
         report.rounds.push(await page.evaluate(() => ({ week: window.__nrlState().week, facilities: window.__nrlState().unlocks?.facilities })));
         if (round === 1) {
@@ -74,9 +71,10 @@ export async function runUnlocks(browser) {
           await shot('news');
           await page.keyboard.press('Escape');
         }
-        if (round === 4) await build('build-round5', 9);
+        if (round === 4) await build('build-round5', 8);
       }
-      await build('build-round8', 11);
+      const homeOffice = await page.evaluate(() => window.__nrlState().competitions.instances.some((i) => i.definition.format.kind === 'league' && i.fixtures.some((f) => f.homeId === window.__nrlState().clubId && f.result)));
+      await build('build-round8', homeOffice ? 11 : 10);
       await openNav(page, 'settings');
       await page.locator('.nrl-unlocks-open').tap();
       check(await page.evaluate(() => !!window.__nrlState().unlocks), 'Settings waits for confirmation');

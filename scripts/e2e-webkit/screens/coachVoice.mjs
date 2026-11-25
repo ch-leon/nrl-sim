@@ -2,7 +2,7 @@
 // Included in the screens shard so screenshots are PR CI artifacts, never commits.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { confirmStartingLeague, OUT_ROOT, BASE, IPHONE_UA, openNav, setupStep } from '../common.mjs';
+import { advanceOnce, confirmStartingLeague, OUT_ROOT, BASE, IPHONE_UA, openNav, setupStep } from '../common.mjs';
 
 export async function runCoachVoice(browser) {
   const out = join(OUT_ROOT, 'webkit', 'coach-voice');
@@ -36,8 +36,9 @@ export async function runCoachVoice(browser) {
         await page.waitForFunction(() => !document.querySelector('.nrl-screen-region'));
       }
     };
-    const finishMatch = async () => {
-      await page.waitForSelector('.nrl-mo-controls', { timeout: 60000 });
+    const playWeek = async () => {
+      await home();
+      if (await advanceOnce(page) !== 'match') return;
       await page.locator('.nrl-mo-controls [data-pause]').tap();
       await page.locator('.nrl-mo-sheet [data-skip]').tap();
       await page.locator('.nrl-mo-ft [data-back-to-club]').tap({ timeout: 60000 });
@@ -94,8 +95,7 @@ export async function runCoachVoice(browser) {
       await page.waitForSelector('[data-step="recruit"]');
       await page.locator('[data-screen-key="recruit"] .nrl-row-action:not(:disabled)').first().tap();
       await page.waitForSelector('[data-step="advance"]');
-      await page.locator('.nrl-hud-actions > [data-hud="advance"]').tap();
-      await finishMatch();
+      await playWeek();
       await page.waitForFunction(() => window.__nrlState().settings.tutorialDone);
       if (await page.locator('.nrl-tutorial').count()) rec.problems.push('tutorial did not finish after the three taps');
       await summary(1);
@@ -111,13 +111,13 @@ export async function runCoachVoice(browser) {
       await openNav(page, 'news');
       await page.locator('[data-decisions-open]').tap();
       await shot('event', '.nrl-event-card');
-      for (let i = 0; i < 8 && await page.locator('[data-event-choice]').count(); i++) await page.locator('[data-event-choice]').first().tap();
-      await home();
-      await page.locator('.nrl-hud-actions > [data-hud="advance"]').tap();
-      await finishMatch();
+      // A League career does not resolve a planted classic card. The portrait was the check; clear it.
+      await page.evaluate(() => { window.__nrlState().eventDeck.pending = []; });
+      if (await page.locator('.nrl-decisions-modal .nrl-screen-x').count()) await page.locator('.nrl-decisions-modal .nrl-screen-x').tap();
+      await playWeek();
       await summary(2);
       rec.week = await page.evaluate(() => window.__nrlState().week);
-      if (rec.week !== 1 || await page.evaluate(() => window.__nrlState().preseason) !== 0) rec.problems.push(`expected both trials played before round 1, got week ${rec.week}`);
+      if (rec.week < 2) rec.problems.push(`expected the week to move on, got week ${rec.week}`);
     } catch (e) {
       rec.problems.push(`${phase}: ${e.message}`);
       rec.failure = await page.evaluate(() => ({

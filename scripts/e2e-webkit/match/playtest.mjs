@@ -1,11 +1,11 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { confirmStartingLeague, closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, skipFromPill, squadMenu, setMatchSpeed, setupStep } from '../common.mjs';
+import { advanceToMatch, confirmStartingLeague, closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, skipFromPill, squadMenu, setMatchSpeed, setupStep } from '../common.mjs';
 
 /**
  * The phone play-test's guards (Wave 4 prompt 09, #399), at 667×375 (the narrowest
- * landscape phone): at Large and Larger text the ladder's places read in full, "10"
- * to "16" and not "1…" (its first column was 24px at every size, #410). Then back to
+ * landscape phone): at Large and Larger text the ladder's places read in full, including
+ * the last place (Local is eight clubs). Then back to
  * Normal, and two matches in one session at ×8: the half-time card comes up in both
  * (Phaser kept the first match's "card shown" for the second, so it never did, #408).
  */
@@ -142,9 +142,10 @@ export async function runPlaytest(browser, W = 667, H = 375) {
         tds.map((td) => ({ text: td.textContent, cut: td.scrollWidth > td.clientWidth + 1 })));
       rec.notes.push(`${places.length} places`);
       const cut = places.filter((p) => p.cut).map((p) => p.text);
+      const last = String(places.length);
       return [
         ...(cut.length ? [`places cut short: ${cut.join(', ')}`] : []),
-        ...(places.some((p) => p.text === '10') ? [] : ['no 10th place on the ladder']),
+        ...(places.some((p) => p.text === last) ? [] : [`place ${last} is not on the ladder`]),
       ];
     });
   }
@@ -157,12 +158,8 @@ export async function runPlaytest(browser, W = 667, H = 375) {
     await page.locator('.nrl-lineup-plan [data-plan-done]').tap();
     await step(`half-time-match-${m}`, async (rec) => {
       if (await page.locator('.nrl-screen-region').count()) await page.locator(SHEET_EXIT).tap();
-      await page.locator('.nrl-dock [data-hud="advance"]').tap();
-      for (let i = 0; i < 2; i++) {
-        const ask = page.locator('[data-confirm-advance], [data-ask-proceed]');
-        if (await ask.count()) await ask.first().tap();
-      }
-      await page.waitForSelector('.nrl-mo-controls', { timeout: 20000 });
+      // Local's first weeks are a trial, two rests, then another trial. Skip the rests.
+      await advanceToMatch(page);
       await setMatchSpeed(page, 8);
       // The card, or the second half under way without it. A half at ×8 is about a minute; room for a slow runner.
       const seen = await page.waitForFunction(() => {

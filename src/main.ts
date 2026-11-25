@@ -478,16 +478,15 @@ async function boot(): Promise<void> {
   function onChooseLeague(): HTMLElement {
     const state = getState();
     if (state.sacked || weekHeld() || playerMatchPending() || !leagueChoiceRequired(state)) return uiRoot;
-    const first = state.competitions!.leagueCareer!.phase === 'initial-choice';
-    return openLeagueSelection({onConfirmed: () => { if (first) void startLeagueGuidance(true); }});
+    return openLeagueSelection({onConfirmed: () => { void startLeagueGuidance(); }});
   }
 
-  async function startLeagueGuidance(intro = false): Promise<void> {
+  async function startLeagueGuidance(): Promise<void> {
     const state = getState();
     if (state.sacked || weekHeld() || playerMatchPending() || leagueChoiceRequired(state)) return;
     const installation = stateInstallation();
-    // Only the first confirm shows the intro. Continue never does, even if the hint was cleared.
-    if (intro && state.season === 1 && !state.settings.hintsSeen?.includes(EXPANSION_INTRO_HINT)) {
+    // The hint is what gates it, including Continue of a career that has not seen it yet.
+    if (state.season === 1 && !state.settings.hintsSeen?.includes(EXPANSION_INTRO_HINT)) {
       for (const text of expansionIntroLines(state, state.objectives).slice(0,2))
         bus.emit('ui:notify', { text, kind: 'info', quiet: true, from: 'coach' });
       await showExpansionIntro();

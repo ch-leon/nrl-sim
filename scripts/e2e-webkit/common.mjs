@@ -218,13 +218,56 @@ export async function setMatchSpeed(page, speed) {
   if (now !== String(speed)) throw new Error(`the speed button reads ×${now}, not ×${speed}`);
 }
 
+/**
+ * One PLAY WEEK. A League career may ask about closing event entries, then a decision,
+ * then either a match or a rest week that simply moves on.
+ * Returns 'match' or 'week'.
+ */
+export async function advanceOnce(page) {
+  const before = await page.evaluate(() => {
+    const s = window.__nrlState();
+    return `${s.season}:${s.week}:${s.preseason}`;
+  });
+  await page.locator('[data-hud="advance"]').first().tap();
+  const outcome = () => page.waitForFunction((b) => {
+    if (document.querySelector('.nrl-mo-controls')) return 'match';
+    if (document.querySelector('[data-skip-events]')) return 'events';
+    if (document.querySelector('[data-ask-proceed], [data-confirm-advance]')) return 'ask';
+    const s = window.__nrlState();
+    if (`${s.season}:${s.week}:${s.preseason}` !== b
+      && document.querySelector('body:not(.nrl-match-active) [data-hud="advance"]')) return 'week';
+    return null;
+  }, before, { timeout: 30000 }).then((h) => h.jsonValue());
+  let next = await outcome();
+  for (let i = 0; i < 4 && (next === 'events' || next === 'ask'); i++) {
+    const sel = next === 'events' ? '[data-skip-events]' : '[data-ask-proceed], [data-confirm-advance]';
+    await page.locator(sel).first().tap();
+    next = await outcome();
+  }
+  if (next === 'match') {
+    const go = page.locator('.nrl-mo-plan .nrl-mo-plan-go');
+    if (await go.count() && await go.first().isVisible()) await go.first().tap();
+  }
+  if (next !== 'match' && next !== 'week') throw new Error(`advance stopped at ${next}`);
+  return next;
+}
+
+/** Keep advancing rest weeks until a match is on screen. */
+export async function advanceToMatch(page) {
+  for (let i = 0; i < 8; i++) {
+    if (await advanceOnce(page) === 'match') return;
+  }
+  throw new Error('no match within 8 advances');
+}
+
 /** Play a real match through the phone controls, then wait for its held week. */
 export async function playPhoneWeek(page, onResult = async () => {}) {
   const before = await page.evaluate(() => { const s = window.__nrlState(); return `${s.season}:${s.week}:${s.preseason}`; });
   await openNav(page, 'club');
-  await page.locator('[data-hud="advance"]').tap();
-  await page.waitForFunction(() => document.querySelector('[data-ask-proceed]') || document.querySelector('.nrl-mo-controls'));
-  if (await page.locator('[data-ask-proceed]').isVisible()) await page.locator('[data-ask-proceed]').tap();
+  if (await advanceOnce(page) !== 'match') {
+    await page.waitForFunction(b => { const s = window.__nrlState(); return `${s.season}:${s.week}:${s.preseason}` !== b; }, before);
+    return;
+  }
   await page.locator('.nrl-mo-controls [data-skip-pill]').waitFor({ timeout: 60000 });
   await skipFromPill(page);
   await page.locator('.nrl-mo-ft [data-back-to-club]').waitFor({ timeout: 120000 });

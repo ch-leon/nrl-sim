@@ -37,7 +37,7 @@ export async function runExpansionIntro(browser) {
       await page.locator('[data-nrl-continue-1]').tap();
       await page.waitForFunction(() => !!window.__nrlGame);
       if (await page.locator('[data-expansion-intro]').count()) rec.problems.push('Continue repeated intro');
-      // Exercise old-save fallback too: the new-game path, not a flag alone, gates it.
+      // A career that has not recorded the hint sees the intro on Continue, then it stays seen.
       await ctx.addInitScript(() => {
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
@@ -52,8 +52,8 @@ export async function runExpansionIntro(browser) {
       });
       await page.reload();
       await page.locator('[data-nrl-continue-1]').tap();
-      await page.waitForFunction(() => !!window.__nrlGame);
-      if (await page.locator('[data-expansion-intro]').count()) rec.problems.push('old save showed intro');
+      await page.locator('[data-expansion-intro]').waitFor();
+      await page.locator('[data-expansion-work]').tap();
       rec.week = state.week;
     } catch (e) {
       rec.problems.push(e.message);
