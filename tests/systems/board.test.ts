@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   generateObjectives, generateLeagueObjectives, evaluateObjective, reviewObjectives, finalsPrize, finalsTarget,
+  buildsTheCashCovers, finalsObjectiveText,
   applyBoardReview, ensureObjectives, registerBoardSystem, sackedSummary, type SeasonOutcome,
 } from '../../src/systems/board';
 import { initLeague, PLAYER_ID } from '../../src/systems/fixtures';
@@ -51,7 +52,7 @@ describe('generateObjectives', () => {
     createNewGame('Test FC', 7); initLeague(getState());
     const s = getState();
     const expected = [
-      { id: 's1-finals', kind: 'finals', text: 'Finish in the top 9', target: 9, status: 'pending' },
+      { id: 's1-finals', kind: 'finals', text: finalsObjectiveText(9), target: 9, status: 'pending' },
       { id: 's1-rival', kind: 'beatRival', target: 0, rivalId: 'rival-brumbies', status: 'pending', text: 'Finish above Ballarat Bushrangers' },
     ];
     expect(generateObjectives(s)).toEqual(expected);
@@ -98,6 +99,23 @@ describe('generateObjectives', () => {
     expect(at('normal')).toBeGreaterThan(at('hard'));
   });
 
+  it('asks the build goal only for facilities the cash can pay for', () => {
+    expect(buildsTheCashCovers(0)).toBe(0);
+    expect(buildsTheCashCovers(7_999)).toBe(0);
+    expect(buildsTheCashCovers(8_000)).toBe(1);
+    expect(buildsTheCashCovers(15_999)).toBe(1);
+    expect(buildsTheCashCovers(16_000)).toBe(2);
+    expect(buildsTheCashCovers(200_000)).toBe(BOARD.BUILD_TARGET_EXTRA);
+    const s = fresh();
+    const buildSeason = Array.from({ length: 20 }, (_, i) => i + 1)
+      .find(season => generateObjectives({ ...s, season }).some(o => o.kind === 'build'))!;
+    expect(generateObjectives({ ...s, season: buildSeason, money: 0 }).some(o => o.kind === 'build')).toBe(false);
+    expect(generateObjectives({ ...s, season: buildSeason, money: 8_000 }).find(o => o.kind === 'build')!.target)
+      .toBe(s.facilities.length + 1);
+    expect(generateObjectives({ ...s, season: buildSeason, money: 16_000 }).find(o => o.kind === 'build')!.target)
+      .toBe(s.facilities.length + 2);
+  });
+
   it('may name a rival that exists in the league', () => {
     for (let seed = 1; seed <= 20; seed++) {
       const s = fresh(seed, 60);
@@ -126,6 +144,13 @@ describe('evaluateObjective', () => {
   it('build', () => {
     expect(evaluateObjective(mk({ kind: 'build', target: 1 }), s, outcome())).toBe(false);
   });
+  it('a grand final or the title meets the finals goal from outside the target', () => {
+    const o = mk({ target: 3 });
+    expect(evaluateObjective(o, s, outcome({ ladderPosition: 7 }))).toBe(false);
+    expect(evaluateObjective(o, s, outcome({ ladderPosition: 7, playedGrandFinal: true }))).toBe(true);
+    expect(evaluateObjective(o, s, outcome({ ladderPosition: 7, premiership: true }))).toBe(true);
+    expect(evaluateObjective(o, s, outcome({ ladderPosition: 3 }))).toBe(true);
+  });
 });
 
 describe('reviewObjectives', () => {
@@ -140,6 +165,41 @@ describe('reviewObjectives', () => {
     expect(good.patience).toBe(4);
     expect(good.reputation).toBeGreaterThan(s.reputation);
     expect(good.grant).toBeGreaterThan(0);
+  });
+
+  it('does not sack a premier who finished outside the finals target', () => {
+    const s0 = fresh();
+    const s = { ...s0, boardPatience: 1, objectives: [
+      { id: 'a', kind: 'finals' as const, text: 'Finish in the top 3', target: 3, status: 'pending' as const },
+    ] };
+    const review = reviewObjectives(s, outcome({ ladderPosition: 6, playedGrandFinal: true, premiership: true }));
+    expect(review.objectives[0]!.status).toBe('met');
+    expect(review.missed).toBe(0);
+    expect(review.sacked).toBe(false);
+    expect(review.patience).toBe(2);
+  });
+
+  it('does not sack a premier on one patience who misses another objective', () => {
+    const s0 = fresh();
+    const s = { ...s0, boardPatience: 1, objectives: [
+      { id: 'a', kind: 'finals' as const, text: 'Finish in the top 3', target: 3, status: 'pending' as const },
+      { id: 'b', kind: 'build' as const, text: 'Have 4 facilities built', target: 4, status: 'pending' as const },
+    ] };
+    const review = reviewObjectives(s, outcome({ ladderPosition: 6, playedGrandFinal: true, premiership: true }));
+    expect(review.objectives.map(o => o.status)).toEqual(['met', 'missed']);
+    expect(review.patience).toBe(0);
+    expect(review.sacked).toBe(false);
+  });
+
+  it('still sacks a grand-final loser on one patience who misses another objective', () => {
+    const s0 = fresh();
+    const s = { ...s0, boardPatience: 1, objectives: [
+      { id: 'a', kind: 'finals' as const, text: 'Finish in the top 3', target: 3, status: 'pending' as const },
+      { id: 'b', kind: 'build' as const, text: 'Have 4 facilities built', target: 4, status: 'pending' as const },
+    ] };
+    const review = reviewObjectives(s, outcome({ ladderPosition: 6, playedGrandFinal: true }));
+    expect(review.objectives.map(o => o.status)).toEqual(['met', 'missed']);
+    expect(review.sacked).toBe(true);
   });
 });
 
@@ -201,6 +261,22 @@ describe('applyBoardReview / sacking', () => {
     expect(s.sacked?.season).toBe(3);
     expect(seen).toHaveLength(1);
     expect(sackedSummary(s).reason).toContain('top 8');
+  });
+
+  it('a premiership does not sack when another goal is missed on one patience', () => {
+    fresh();
+    setState({ boardPatience: 1, objectives: [
+      { id: 'a', kind: 'finals', text: 'Finish in the top 3', target: 3, status: 'pending' },
+      { id: 'b', kind: 'build', text: 'Have 9 facilities built', target: 9, status: 'pending' },
+    ] });
+    const seen: string[] = [];
+    bus.on('board:sacked', (e) => seen.push(e.reason));
+    applyBoardReview(outcome({ ladderPosition: 7, playedGrandFinal: true, premiership: true }));
+    const s = getState();
+    expect(s.sacked).toBeUndefined();
+    expect(s.boardPatience).toBe(0);
+    expect(s.objectives.map(o => o.status)).toEqual(['met', 'missed']);
+    expect(seen).toEqual([]);
   });
 
   it('is not sacked while patience remains', () => {
