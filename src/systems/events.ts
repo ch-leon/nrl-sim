@@ -119,10 +119,11 @@ function effectParts(effects: readonly EventEffect[], opts?: { welfare?: boolean
 
 // ── Drawing ──────────────────────────────────────────────────────────────────
 
-/** The player's fit, signed squad members (juniors are not first-graders yet). */
+/** The player's fit, signed squad members (juniors are not first-graders yet).
+ *  A player booked for Skills Camp or Big Mick's, or already away, is not a card's subject. */
 function fitSquad(state: GameState): Player[] {
-  const away = awayPlayerIds(state);
-  return state.squad.filter(p => isSelectable(p,away) && !p.junior);
+  const reserved = reservedIds(state);
+  return state.squad.filter(p => isSelectable(p, reserved) && !p.junior);
 }
 
 /**

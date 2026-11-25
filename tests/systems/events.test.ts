@@ -605,11 +605,17 @@ describe('League career (#820)', () => {
     expect(getState().boardPatience).toBe(4);
 
     const star = subjectCandidates(s, 'star')[0]!;
+    const youngster = subjectCandidates(s, 'youngster')[0]!;
     const away = camp(s, star.id, star.name, 'away');
     expect(subjectCandidates(away, 'any').some((p) => p.id === star.id)).toBe(false);
     expect(subjectCandidates(away, 'star')[0]?.id).not.toBe(star.id);
 
     const booked = camp(s, star.id, star.name, 'booked');
+    expect(subjectCandidates(booked, 'any').some((p) => p.id === star.id)).toBe(false);
+    expect(subjectCandidates(booked, 'star')[0]?.id).not.toBe(star.id);
+    const bookedYoung = camp(s, youngster.id, youngster.name, 'booked');
+    expect(subjectCandidates(bookedYoung, 'youngster')[0]?.id).not.toBe(youngster.id);
+    expect(subjectCandidates(bookedYoung, 'any').some((p) => p.id === youngster.id)).toBe(false);
     const banned = applyEffects(booked, [{ kind: 'suspend', weeks: 2, source: 'event' }], {
       cardId: 'missedCurfew', reason: 'event: Missed curfew', subjectId: star.id, subjectName: star.name, now: 1,
     });
