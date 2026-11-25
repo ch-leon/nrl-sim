@@ -32,11 +32,11 @@ import { LiveView, type ViewSurface } from './liveView';
 import { BreakClock } from './walkOff';
 import { PopupLayer } from './popupLayer';
 import { callPaidPopup, popupFor } from './popups';
-import { impactTier, playImpact } from './impact';
+import { impactTier, playImpact, reducedMotion } from './impact';
 import { SprintLayer } from './sprintLayer';
 import { WrestleBar } from './wrestleBar';
 import { ZoneLayer, bonusTryEnd } from './zoneLayer';
-import { Commentator } from './commentary';
+import { Commentator, type PlayHit } from './commentary';
 import { HALF_BREAK, shownBreak } from './lineBreak';
 import { KickLayer, KickWatch, framingHeld, kickFrame, kickPoints, type Frame } from './kickLayer';
 import { TRAIT_FAST_FROM, TRAIT_SLOW_FACTOR, TRAIT_SLOW_MS, TraitLayer, TraitRoster } from './traitLayer';
@@ -279,6 +279,8 @@ export interface LivePlaybackOptions {
   keyMoments?: () => boolean;
   /** A call was judged, paid or not (#366): every side's, as it happens on screen. */
   onCallResult?: (v: CallVerdict) => void;
+  /** The coach's set play came off (#825): a brief zoom. Reduced motion is the scene's to drop. */
+  onPlayPayoff?: (how: PlayHit) => void;
   /** A resumed match: played on silently to this tick (the overlay still counts it) before the player takes over. */
   resumeAt?: number;
   /** A call, a plan change, the periodic write, Save & exit, or the app going to the background. False when the write did not land. */
@@ -705,6 +707,20 @@ export class LivePlayback {
   /** The slot each side's latest named event was about: who a call that pays off is shouted over (#639). */
   private readonly lastActor: Partial<Record<Side, number>> = {};
 
+  /** A bust, break or try off the play the coach called (#825): slow a bust, ask for the zoom, swell the crowd. */
+  private playPayoff(how: PlayHit): void {
+    if (how === 'bust' && !reducedMotion()) this.runner.slowMo(480, 0.45, 80);
+    this.opts.onPlayPayoff?.(how);
+    const at = toFieldPt(this.runner.cur.ball);
+    bus.emit('match:play-hit', { how, x: at.fx, y: at.fy });
+  }
+
+  /** The play broke down (#825): a quiet read, no zoom and no swell. */
+  private playMissed(): void {
+    const at = toFieldPt(this.runner.cur.ball);
+    bus.emit('match:play-hit', { how: 'miss', x: at.fx, y: at.fy });
+  }
+
   /**
    * Play the rest of the match at once: every event still reaches the overlay (the
    * full-time score), no pop-ups. With somewhere else to play, the match goes there
@@ -946,7 +962,15 @@ export class LivePlayback {
         else said.push(line);
       }
       const line = said[0]?.text ?? '';
-      if (!this.skipping) said.forEach((s, i) => this.opts.overlay?.comment(s.text, s.important ? 'important' : 'routine', i > 0));
+      if (!this.skipping) {
+        said.forEach((s, i) => {
+          this.opts.overlay?.comment(s.text, s.important ? 'important' : 'routine', i > 0);
+          // The player's own play (#825). A skipped stretch says the line and shows none of this.
+          if (e.side !== this.opts.coachSide) return;
+          if (s.playHit) this.playPayoff(s.playHit);
+          if (s.playMiss) this.playMissed();
+        });
+      }
       else if (line && e.kind === 'full-time') this.finalLine = line;
       if (e.kind === 'try' && !this.skipping) this.offerTryReplay(e.tick);
       if (e.kind === 'coach-call' || e.kind === 'call-paid') this.opts.overlay?.setCalls?.(this.sim.callsMade, this.sim.callsPaid);

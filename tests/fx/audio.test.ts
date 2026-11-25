@@ -13,6 +13,7 @@ import {
   pitchVariation,
   crowdLevel,
   crowdSwellFor,
+  playHitSwell,
   CROWD_OUT,
   SFX_PRESETS,
   AudioEngine,
@@ -71,7 +72,7 @@ describe('SFX_PRESETS', () => {
     expect(Object.keys(SFX_PRESETS).sort()).toEqual(
       ['build', 'cheer', 'click', 'coin', 'groan', 'tackle', 'try',
         'whistle', 'whistleLong', 'siren', 'boot', 'goal', 'miss', 'whoosh', 'tackleBig',
-        'stingWin', 'stingDraw', 'stingLoss', 'callPaid'].sort(),
+        'stingWin', 'stingDraw', 'stingLoss', 'callPaid', 'playCalled'].sort(),
     );
   });
   it('callPaid rises note to note (#639)', () => {
@@ -79,6 +80,16 @@ describe('SFX_PRESETS', () => {
     expect(f.length).toBe(3);
     expect(f[0]).toBeLessThan(f[1]!);
     expect(f[1]).toBeLessThan(f[2]!);
+  });
+  it('playCalled is a short hit, done inside a tenth of a second (#825)', () => {
+    const end = Math.max(
+      ...SFX_PRESETS.playCalled.tones.map((t) => t.start + t.duration),
+      ...SFX_PRESETS.playCalled.noises.map((n) => n.start + n.duration),
+    );
+    expect(end).toBeLessThanOrEqual(0.1);
+    expect(playHitSwell('try')).toBeGreaterThan(playHitSwell('break'));
+    expect(playHitSwell('break')).toBeGreaterThan(playHitSwell('bust'));
+    expect(playHitSwell('miss')).toBe(0);
   });
   it('a big hit is louder and lower than an ordinary tackle', () => {
     const t = SFX_PRESETS.tackle.tones[0];

@@ -2,7 +2,8 @@
 // Phaser scene: pooled texts that follow the player, drift up and fade.
 import Phaser from 'phaser';
 import type { Side } from '../core/snapshot';
-import { POPUP_LINE_H, TONE_COLOR, TRAIT_COLOR, placePopup, type Popup, type PopupBox, type PopupView } from './popups';
+import { reducedMotion } from './impact';
+import { POPUP_LINE_H, TONE_COLOR, TRAIT_COLOR, placePopup, popupPop, type Popup, type PopupBox, type PopupView } from './popups';
 
 interface Live {
   text: Phaser.GameObjects.Text;
@@ -16,6 +17,10 @@ interface Live {
   clear: number | null;
   /** Lines of text (for its height when clearing). */
   lines: number;
+  /** A set play's launch (#825): snap and overshoot, unless reduced motion is on. */
+  punch: boolean;
+  /** A breakdown (#825): the word stays, dimmer. */
+  muted: boolean;
   /** A trait line moves with the pop-up it belongs to. */
   parent?: Live;
 }
@@ -65,10 +70,13 @@ export class PopupLayer {
     const stacked = this.live.filter((l) => l.side === side && l.slot === slot).length;
     const lines = [p.word, ...(p.sub ? [p.sub] : []), ...(p.trait ? [p.trait] : [])];
     text.setText(lines);
-    text.setFontSize(p.big ? 22 : 16);
+    text.setFontSize(p.muted ? 14 : p.big ? 22 : 16);
     text.setColor(TONE_COLOR[p.tone]);
-    text.setAlpha(1).setVisible(true);
-    const main: Live = { text, side, slot, born: this.now, ms: p.ms, lift: BASE_LIFT + stacked * 18, clear: null, lines: lines.length };
+    text.setAlpha(p.muted ? 0.72 : 1).setVisible(true);
+    const main: Live = {
+      text, side, slot, born: this.now, ms: p.ms, lift: BASE_LIFT + stacked * 18, clear: null, lines: lines.length,
+      punch: !!p.punch && !reducedMotion(), muted: !!p.muted,
+    };
     this.live.push(main);
     // The trait line is a second text so it can carry its own colour.
     let traitText: Phaser.GameObjects.Text | null = null;
@@ -79,7 +87,7 @@ export class PopupLayer {
         const size = p.big ? TRAIT_FONT_PX.big : TRAIT_FONT_PX.small;
         traitText.setText(p.trait).setFontSize(size).setColor(TRAIT_COLOR).setAlpha(1).setVisible(true);
         // Tucked directly under the word and name (both texts hang from their bottom edge).
-        this.live.push({ text: traitText, side, slot, born: this.now, ms: p.ms, lift: BASE_LIFT + stacked * 18 - (size + 3), clear: 0, lines: 0, parent: main });
+        this.live.push({ text: traitText, side, slot, born: this.now, ms: p.ms, lift: BASE_LIFT + stacked * 18 - (size + 3), clear: 0, lines: 0, punch: false, muted: false, parent: main });
       }
     }
   }
@@ -109,8 +117,8 @@ export class PopupLayer {
       const u = (this.now - l.born) / l.ms;
       const at = feet(l.side, l.slot);
       if (!at) continue;
-      const pop = u < 0.12 ? 0.6 + (u / 0.12) * 0.4 : 1;
-      const alpha = u > FADE_FROM ? 1 - (u - FADE_FROM) / (1 - FADE_FROM) : 1;
+      const pop = popupPop(u, l.punch);
+      const alpha = (u > FADE_FROM ? 1 - (u - FADE_FROM) / (1 - FADE_FROM) : 1) * (l.muted ? 0.72 : 1);
       if (l.parent) {
         // The trait line rides with its shout. Clamping it on its own walks it onto another edge.
         // It fades last, so the skill's name is still whole when the shout has gone pale (#348 M9).

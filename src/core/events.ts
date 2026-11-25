@@ -72,6 +72,10 @@ export interface Events {
   'match:event': MatchEvent; // re-emitted during playback pacing
   /** One of the player's own calls paid off, on screen (not in a skipped stretch): the rising tone (#639). */
   'match:call-paid': { call: string };
+  /** The coach tapped a set play (#825). Presentation only: a sting and a spark. It does not make the call. */
+  'match:play-called': { x: number; y: number };
+  /** The coach's set play came off, or broke down (#825). Presentation only. */
+  'match:play-hit': { how: 'bust' | 'break' | 'try' | 'miss'; x: number; y: number };
   'match:finished': { fixture: Fixture; result: MatchResult };
   /** Structural fixture accepted once; report subscribers are presentation-only. */
   'match:committed': { fixture: Fixture; result: MatchResult };
