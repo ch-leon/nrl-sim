@@ -64,7 +64,7 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
-- **Set-play tap.** Calling a play from the match tray now hits at once: the tile lights under the finger, a CALLED banner names it, and a short sting plays. A buzz fires where the phone supports it. When the play comes off — a bust, a line break or a try — the camera pulls in, the crowd lifts, and the commentary credits PLAY CALLED. A breakdown stays a quiet read. Match results are unchanged. [#825](https://github.com/ch-leon/nrl-sim/issues/825).
+- **Set-play tap.** Calling a play from the match tray now hits at once: the tile lights under the finger, a CALLED banner names it, and a short sting plays. A buzz fires where the phone supports it. When the play comes off — a bust, a line break or a try — the camera pulls in, the crowd lifts, and the commentary credits PLAY CALLED. A breakdown stays a quiet read. Match results are unchanged. [PR #828](https://github.com/ch-leon/nrl-sim/pull/828). [#825](https://github.com/ch-leon/nrl-sim/issues/825).
 
 - **Open-side shifts through hands.** When a ruck is near one touchline and the support can get into position, balanced and wider sides can work the ball all the way to the opposite winger through normal catches and passes. Cover, handling errors and missing support can end the move. Short-side carries, coach calls and learned plays still have their place. Ported from [draft PR #799](https://github.com/ch-leon/nrl-sim/pull/799). [#798](https://github.com/ch-leon/nrl-sim/issues/798).
 
