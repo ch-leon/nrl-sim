@@ -96,6 +96,8 @@ interface SeasonEntry {
 
 const tickHooks = new Map<string, TickEntry>();
 const seasonHooks = new Map<string, SeasonEntry>();
+/** League career closes the year without rollSeasonOver. The Bali trip hooks here. */
+const leagueRolloverHooks = new Map<string, SeasonEntry>();
 
 /**
  * Monotonic insertion counter for stable tie-breaking. A single shared counter
@@ -143,6 +145,14 @@ export function registerSeasonHook(name: string, order: number, fn: SeasonHook):
   seasonHooks.set(name, { name, order, seq: seqCounter++, fn });
 }
 
+/**
+ * Runs once, after a League career season has closed and before that close is
+ * saved. Classic rollover stays on registerSeasonHook.
+ */
+export function registerLeagueRolloverHook(name: string, order: number, fn: SeasonHook): void {
+  leagueRolloverHooks.set(name, { name, order, seq: seqCounter++, fn });
+}
+
 export function unregisterSeasonHook(name: string): void {
   seasonHooks.delete(name);
 }
@@ -150,6 +160,7 @@ export function unregisterSeasonHook(name: string): void {
 /** Test helper: drop all season hooks. */
 export function clearSeasonHooks(): void {
   seasonHooks.clear();
+  leagueRolloverHooks.clear();
 }
 
 // ── Ordering ───────────────────────────────────────────────────────────────
@@ -411,6 +422,14 @@ function finishLeagueInterval(interval: LeagueInterval, settled: GameState): voi
   }
   if (!ownsInterval(interval)) return;
   setState(next);
+  if (!ownsInterval(interval)) return;
+  // Offer the season-end trip before the close is written, so a reload still has it.
+  if (final && getState().competitions?.leagueCareer?.phase === 'next-season-choice') {
+    for (const entry of sortedEntries(leagueRolloverHooks)) {
+      if (!ownsInterval(interval)) return;
+      entry.fn({ season: getState().season });
+    }
+  }
   if (!ownsInterval(interval)) return;
   // Once published, a failed storage write leaves the old checkpoint and its match together.
   interval.published = true;

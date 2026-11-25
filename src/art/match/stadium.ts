@@ -8,6 +8,12 @@
 //   • foreground — the low terraces + hoardings along the two near edges
 //     (bottom-left touchline, bottom-right dead-ball line). Everything here is in
 //     FRONT of every player, so it renders above them.
+//
+// The ground is a GroundLook (#824): Grandstand 0 is the hill, and 1–3 add a
+// stand with more rows and a roof; the Sponsor Board is signage and the Canteen
+// a food stall; seats fill with attendance ÷ capacity. Callers that pass nothing
+// get CLASSIC_GROUND, the full stand this file used to paint for every fixture.
+// The art worker receives that plain object. This file does not read a save.
 // Splitting by "behind all / in front of all" is what lets one static image per
 // layer depth-sort correctly against moving sprites; the only objects that need
 // per-sprite sorting on the field itself are the goalposts (see posts.ts).
@@ -58,6 +64,91 @@ const HILL_FAR = X0 - HILL_D;
 const FRONT_FAR = Y1 + FRONT_TIERS * TIER_D;
 const END_FAR = X1 + FRONT_TIERS * TIER_D;
 const TRY_A = IN_GOAL_DEPTH;
+
+// ── What this ground is (#824) ──────────────────────────────────────────────
+
+/** 0 is nothing built; 1–3 are the facility's levels. */
+export type GroundLevel = 0 | 1 | 2 | 3;
+
+/**
+ * How a match-day ground is drawn. Plain data: the art worker paints it, and the
+ * cache key includes it, so two fixtures with different stands do not share a texture.
+ * `fill` is attendance ÷ capacity, 0 empty … 1 a full house (the usual empty seats stay).
+ */
+export interface GroundLook {
+  stand: GroundLevel;
+  sponsor: GroundLevel;
+  canteen: GroundLevel;
+  fill: number;
+}
+
+/**
+ * The ground painted when nobody names one: six stand rows, the pie stall, no extra
+ * sponsor fascia, a full house. The lab and every existing caller keep this picture.
+ */
+export const CLASSIC_GROUND: GroundLook = { stand: 3, sponsor: 0, canteen: 2, fill: 1 };
+
+function asLevel(n: number, fallback: GroundLevel): GroundLevel {
+  if (!Number.isFinite(n)) return fallback;
+  if (n >= 3) return 3;
+  if (n >= 2) return 2;
+  if (n >= 1) return 1;
+  return 0;
+}
+
+/** Clamp a ground so a bad message cannot paint a fourth roof or a fill past full. */
+export function normalizeGround(ground?: GroundLook | null): GroundLook {
+  const g = ground ?? CLASSIC_GROUND;
+  const fill = Number.isFinite(g.fill) ? Math.min(1, Math.max(0, g.fill)) : 1;
+  return {
+    stand: asLevel(g.stand, 3),
+    sponsor: asLevel(g.sponsor, 0),
+    canteen: asLevel(g.canteen, 2),
+    fill: Math.round(fill * 1000) / 1000,
+  };
+}
+
+/** The back stand's size. Level 3 is the old fixed stand, so a full house matches it. */
+export interface StandProfile {
+  tiers: number;
+  wall: number;
+  overhang: number;
+  /** The back wall's gy. Null when the ground is the hill only. */
+  far: number | null;
+  /** Where a roof (or the hill ground's scoreboard pole) can take the board's feet. */
+  roofZ: number;
+}
+
+export function standProfile(ground: GroundLook = CLASSIC_GROUND): StandProfile {
+  const stand = normalizeGround(ground).stand;
+  if (stand === 0) return { tiers: 0, wall: 0, overhang: 0, far: null, roofZ: 72 };
+  const tiers = stand === 1 ? 2 : stand === 2 ? 4 : BACK_TIERS;
+  const wall = stand === 1 ? 14 : stand === 2 ? 18 : BACK_WALL_H;
+  const overhang = stand === 1 ? 0.55 : stand === 2 ? 0.85 : 1.2;
+  const far = Y0 - tiers * TIER_D;
+  const zTop = TIER_BASE + (tiers - 1) * TIER_RISE;
+  return { tiers, wall, overhang, far, roofZ: zTop + wall + 2 };
+}
+
+/** Near terraces: a step on the hill, two at a small stand, the full three from level 2. */
+function nearTierCount(ground: GroundLook): number {
+  const stand = normalizeGround(ground).stand;
+  return stand >= 2 ? FRONT_TIERS : stand === 1 ? 2 : 1;
+}
+
+/**
+ * Grid foot of the scoreboard, besides its gx (scoreboard.ts places that).
+ * On a stand it sits on the roof, where it always did at level 3. On the hill
+ * it sits on a pole behind the back touchline, clear of anyone on the pitch.
+ */
+export function scoreboardFoot(ground: GroundLook = CLASSIC_GROUND): { gy: number; z: number } {
+  const p = standProfile(ground);
+  if (p.far === null) return { gy: Y0 - 0.45, z: p.roofZ };
+  return { gy: p.far - p.overhang * 0.5, z: p.roofZ };
+}
+
+/** Halfway along the pitch, the scoreboard's gx (scoreboard.ts BOARD_GX). */
+export const SCORE_GX = 15 - 58 / 64;
 const TRY_B = FIELD_LONG - IN_GOAL_DEPTH;
 
 /**
@@ -409,15 +500,49 @@ function seatColor(kit: Kit, k: number): number {
   return k % 2 === 0 ? shade(kit.jersey, 0.85) : shade(kit.jersey, 0.7);
 }
 
-/** The back grandstand along the top-right touchline (gy < 0). */
-function paintBackStand(cv: Canvas3D, home: Kit): void {
-  const zTop = TIER_BASE + (BACK_TIERS - 1) * TIER_RISE;
-  const wallTop = zTop + BACK_WALL_H;
+/** A pole where the scoreboard stands when the ground has no roof to put it on. */
+function paintScorePole(cv: Canvas3D, ground: GroundLook): void {
+  const foot = scoreboardFoot(ground);
+  const b = cv.at(SCORE_GX, foot.gy, 0);
+  for (let y = 0; y < foot.z; y++) {
+    cv.buf.set(b.x, b.y - y, PAL.pole);
+    cv.buf.set(b.x + 1, b.y - y, PAL.poleShade);
+  }
+  cv.buf.fillRect(b.x - 10, b.y - foot.z, 22, 3, PAL.board);
+}
+
+/**
+ * The back grandstand along the top-right touchline (gy < 0).
+ * Level 3 uses the old fixed stand (BACK_TIERS, BACK_WALL_H, 1.2 tiles of roof).
+ * Sponsor levels paint panels into the fascia; level 0 leaves the hill and a pole.
+ */
+function paintBackStand(cv: Canvas3D, home: Kit, ground: GroundLook): void {
+  const profile = standProfile(ground);
+  if (profile.far === null) {
+    paintScorePole(cv, ground);
+    return;
+  }
+  const { tiers, wall: wallH, overhang, far } = profile;
+  const zTop = TIER_BASE + (tiers - 1) * TIER_RISE;
+  const wallTop = zTop + wallH;
+  const sponsor = normalizeGround(ground).sponsor;
   // Back wall + roof first (farthest).
-  cv.face({ gx: X0, gy: BACK_FAR }, { gx: X1, gy: BACK_FAR }, 0, wallTop, PAL.wall, (u, v) => {
+  cv.face({ gx: X0, gy: far }, { gx: X1, gy: far }, 0, wallTop, PAL.wall, (u, v) => {
     const px = Math.floor(u * (X1 - X0) * 32);
     const vv = Math.floor(v);
-    if (vv >= wallTop - 4) return vv >= wallTop - 2 ? home.trim : home.jersey; // fascia
+    if (vv >= wallTop - 4) {
+      // Sponsor panels sit in the fascia. None at level 0, so a full stand with no
+      // board is the old stripe of jersey and trim.
+      if (sponsor > 0) {
+        const panel = 22 + sponsor * 10;
+        const along = px % panel;
+        if (along > 2 && along < panel - 2 && vv <= wallTop - 1) {
+          if (sponsor === 3 && vv >= wallTop - 2) return PAL.lamp;
+          return along < panel / 2 ? home.jersey : home.trim;
+        }
+      }
+      return vv >= wallTop - 2 ? home.trim : home.jersey; // fascia
+    }
     if (vv > zTop + 4 && vv < wallTop - 7) {
       // Corporate-box windows.
       const inWin = px % 14 < 10 && vv % 8 < 5;
@@ -427,16 +552,16 @@ function paintBackStand(cv: Canvas3D, home: Kit): void {
   });
   cv.poly(
     [
-      { gx: X0, gy: BACK_FAR, z: wallTop },
-      { gx: X1, gy: BACK_FAR, z: wallTop },
-      { gx: X1, gy: BACK_FAR - 1.2, z: wallTop + 2 },
-      { gx: X0, gy: BACK_FAR - 1.2, z: wallTop + 2 },
+      { gx: X0, gy: far, z: wallTop },
+      { gx: X1, gy: far, z: wallTop },
+      { gx: X1, gy: far - overhang, z: wallTop + 2 },
+      { gx: X0, gy: far - overhang, z: wallTop + 2 },
     ],
     PAL.roof,
     (x, y) => ((x + y * 2) % 12 === 0 ? PAL.roofEdge : PAL.roof),
   );
   // Tiers back → front.
-  for (let k = BACK_TIERS - 1; k >= 0; k--) {
+  for (let k = tiers - 1; k >= 0; k--) {
     const g0 = Y0 - k * TIER_D;
     const g1 = g0 - TIER_D;
     const z = TIER_BASE + k * TIER_RISE;
@@ -470,13 +595,35 @@ function paintBackStand(cv: Canvas3D, home: Kit): void {
   }
   // Right end face (faces +gx): stepped profile.
   const prof: P3[] = [{ gx: X1, gy: Y0, z: 0 }];
-  for (let k = 0; k < BACK_TIERS; k++) {
+  for (let k = 0; k < tiers; k++) {
     const g0 = Y0 - k * TIER_D;
     const z = TIER_BASE + k * TIER_RISE;
     prof.push({ gx: X1, gy: g0, z }, { gx: X1, gy: g0 - TIER_D, z });
   }
-  prof.push({ gx: X1, gy: BACK_FAR, z: wallTop }, { gx: X1, gy: BACK_FAR - 1.2, z: wallTop + 2 }, { gx: X1, gy: BACK_FAR - 1.2, z: 0 });
+  prof.push({ gx: X1, gy: far, z: wallTop }, { gx: X1, gy: far - overhang, z: wallTop + 2 }, { gx: X1, gy: far - overhang, z: 0 });
   cv.poly(prof, PAL.standSide, (x, y) => (noise2(x, y, 21) < 0.05 ? shade(PAL.standSide, 0.92) : PAL.standSide));
+}
+
+/**
+ * Sponsor Board signage along the back hoarding, above the ad panels.
+ * Level 0 paints nothing. Each level is a longer run; level 3 adds a lamp strip.
+ */
+function paintSponsorSign(cv: Canvas3D, home: Kit, ground: GroundLook): void {
+  const level = normalizeGround(ground).sponsor;
+  if (level <= 0) return;
+  const span = level === 1 ? 6 : level === 2 ? 12 : X1 - X0;
+  const gx0 = (X0 + X1) / 2 - span / 2;
+  const gx1 = gx0 + span;
+  const gy = -HOARD;
+  const z0 = HOARD_H + 2;
+  const z1 = z0 + 6 + level * 5;
+  cv.face({ gx: gx0, gy }, { gx: gx1, gy }, z0, z1, home.jersey, (u, v) => {
+    const frame = u < 0.015 || u > 0.985 || v < z0 + 1.2 || v > z1 - 1.2;
+    if (frame) return PAL.board;
+    if (level === 3 && v > z1 - 3.2) return PAL.lamp;
+    if (level >= 2 && Math.floor(u * (level === 3 ? 5 : 3)) % 2 === 0) return home.trim;
+    return home.jersey;
+  });
 }
 
 /** Grassy hill behind the top-left dead-ball line (gx < 0). */
@@ -517,7 +664,7 @@ function paintHill(cv: Canvas3D): void {
   );
 }
 
-function paintCornerBlocks(cv: Canvas3D, home: Kit): void {
+function paintCornerBlocks(cv: Canvas3D, home: Kit, canteen: GroundLevel): void {
   // Back corner (farthest): club building with a fascia stripe.
   cv.box(HILL_FAR, BACK_FAR - 1.2, X0, Y0, 0, 58, PAL.roof, PAL.wall, shade(PAL.wall, 0.82));
   cv.face({ gx: HILL_FAR, gy: Y0 }, { gx: X0, gy: Y0 }, 50, 56, home.jersey);
@@ -526,6 +673,38 @@ function paintCornerBlocks(cv: Canvas3D, home: Kit): void {
   cv.box(X1, BACK_FAR - 1.2, X1 + 2.6, Y0, 0, 46, PAL.roof, PAL.wall, shade(PAL.wall, 0.82));
   cv.face({ gx: X1, gy: Y0 }, { gx: X1 + 2.6, gy: Y0 }, 38, 44, home.trim);
   cv.face({ gx: X1 + 2.6, gy: Y0 }, { gx: X1 + 2.6, gy: BACK_FAR - 1.2 }, 38, 44, shade(home.trim, 0.8));
+  paintCanteen(cv, canteen);
+}
+
+/** The food stall by the hill. Level 2 is the old pie kiosk; 1 is a hatch, 3 adds a cart. */
+function paintCanteen(cv: Canvas3D, level: GroundLevel): void {
+  if (level <= 0) return;
+  if (level === 1) {
+    const k0 = HILL_FAR + 1.1;
+    const k1 = X0 - 0.9;
+    const ky0 = Y1 + 0.55;
+    const ky1 = Y1 + 1.45;
+    cv.face({ gx: k0, gy: ky1 }, { gx: k1, gy: ky1 }, 0, 14, PAL.wall, (u, v) => {
+      const px = Math.floor(u * (k1 - k0) * 32);
+      if (v > 4 && v < 11 && px % 22 > 3 && px % 22 < 18) return v > 9 ? 0x2a2733 : 0x4e5f7a;
+      return v < 2 ? shade(PAL.wall, 0.85) : PAL.wall;
+    });
+    cv.face({ gx: k1, gy: ky1 }, { gx: k1, gy: ky0 }, 0, 14, shade(PAL.wall, 0.82));
+    cv.poly(
+      [
+        { gx: k0 - 0.08, gy: ky0, z: 16 },
+        { gx: k1 + 0.08, gy: ky0, z: 16 },
+        { gx: k1 + 0.08, gy: ky1 + 0.08, z: 13 },
+        { gx: k0 - 0.08, gy: ky1 + 0.08, z: 13 },
+      ],
+      0xd8443a,
+      (x, y) => {
+        const { gx } = isoUnproject(x + cv.ox + 0.5, y + cv.oy + 0.5 + 14, cv.offsetX);
+        return Math.floor(gx * 3) % 2 === 0 ? 0xd8443a : 0xf6f2e8;
+      },
+    );
+    return;
+  }
   // Left corner (near the hill's front): a pie kiosk with a striped awning.
   const k0 = HILL_FAR + 0.6;
   const k1 = X0 - 0.4;
@@ -547,6 +726,30 @@ function paintCornerBlocks(cv: Canvas3D, home: Kit): void {
     0xd8443a,
     (x, y) => {
       const { gx } = isoUnproject(x + cv.ox + 0.5, y + cv.oy + 0.5 + 21, cv.offsetX);
+      return Math.floor(gx * 3) % 2 === 0 ? 0xd8443a : 0xf6f2e8;
+    },
+  );
+  if (level < 3) return;
+  // A second hatch and a cart on the concourse: the upgraded canteen.
+  const c0 = X0 + 0.15;
+  const c1 = X0 + 1.35;
+  const cy0 = Y1 + 0.35;
+  const cy1 = Y1 + 1.35;
+  cv.face({ gx: c0, gy: cy1 }, { gx: c1, gy: cy1 }, 0, 12, 0xd8443a, (u, v) => {
+    const px = Math.floor(u * (c1 - c0) * 32);
+    if (v > 3 && v < 9 && px > 4 && px < 28) return 0xf6f2e8;
+    return v < 2 ? 0xf6f2e8 : 0xd8443a;
+  });
+  cv.poly(
+    [
+      { gx: c0 - 0.05, gy: cy0, z: 14 },
+      { gx: c1 + 0.05, gy: cy0, z: 14 },
+      { gx: c1 + 0.05, gy: cy1 + 0.08, z: 11 },
+      { gx: c0 - 0.05, gy: cy1 + 0.08, z: 11 },
+    ],
+    0xf6f2e8,
+    (x, y) => {
+      const { gx } = isoUnproject(x + cv.ox + 0.5, y + cv.oy + 0.5 + 12, cv.offsetX);
       return Math.floor(gx * 3) % 2 === 0 ? 0xd8443a : 0xf6f2e8;
     },
   );
@@ -576,16 +779,26 @@ export function floodlightLamps(offsetX: number): { x: number; y: number }[] {
  * (left end → right end, at mid-band height). The lighting pass lays its
  * "lit stand" glow along it.
  */
-export function backStandWindowBand(offsetX: number): { a: { x: number; y: number }; b: { x: number; y: number } } {
-  const zTop = TIER_BASE + (BACK_TIERS - 1) * TIER_RISE;
-  const z = zTop + (BACK_WALL_H - 3) / 2 + 2;
-  return { a: isoProject(X0, BACK_FAR, z, offsetX), b: isoProject(X1, BACK_FAR, z, offsetX) };
+export function backStandWindowBand(offsetX: number, ground: GroundLook = CLASSIC_GROUND): { a: { x: number; y: number }; b: { x: number; y: number } } {
+  const p = standProfile(ground);
+  if (p.far === null) {
+    const foot = scoreboardFoot(ground);
+    return { a: isoProject(SCORE_GX - 1, foot.gy, foot.z, offsetX), b: isoProject(SCORE_GX + 1, foot.gy, foot.z, offsetX) };
+  }
+  const zTop = TIER_BASE + (p.tiers - 1) * TIER_RISE;
+  const z = zTop + (p.wall - 3) / 2 + 2;
+  return { a: isoProject(X0, p.far, z, offsetX), b: isoProject(X1, p.far, z, offsetX) };
 }
 
-/** The back grandstand's tiers (seat rows) as a world-space segment at mid-rake. */
-export function backStandTiers(offsetX: number): { a: { x: number; y: number }; b: { x: number; y: number } } {
-  const gy = Y0 - (BACK_TIERS * TIER_D) / 2;
-  const z = TIER_BASE + ((BACK_TIERS - 1) * TIER_RISE) / 2;
+/** The back grandstand's tiers (seat rows) as a world-space segment at mid-rake. The hill, when there is no stand. */
+export function backStandTiers(offsetX: number, ground: GroundLook = CLASSIC_GROUND): { a: { x: number; y: number }; b: { x: number; y: number } } {
+  const p = standProfile(ground);
+  if (p.far === null) {
+    const z = HILL_BASE + (HILL_D * HILL_RISE) / 2;
+    return { a: isoProject(HILL_FAR + HILL_D / 2, Y0, z, offsetX), b: isoProject(HILL_FAR + HILL_D / 2, Y1, z, offsetX) };
+  }
+  const gy = Y0 - (p.tiers * TIER_D) / 2;
+  const z = TIER_BASE + ((p.tiers - 1) * TIER_RISE) / 2;
   return { a: isoProject(X0, gy, z, offsetX), b: isoProject(X1, gy, z, offsetX) };
 }
 
@@ -614,11 +827,13 @@ function paintTower(cv: Canvas3D, gx: number, gy: number, h: number): void {
   for (let i = 0; i < 18; i++) cv.buf.set(b.x + 2 + i, b.y + Math.floor(i / 2), 0x000000, 0.25);
 }
 
-/** Front terraces (in front of every player): rows rise toward the camera. */
-function paintFrontTerraces(cv: Canvas3D, away: Kit): void {
-  const zTop = FRONT_BASE + (FRONT_TIERS - 1) * FRONT_RISE;
+/** Front terraces (in front of every player): rows rise toward the camera. Three tiers is the old ground. */
+function paintFrontTerraces(cv: Canvas3D, away: Kit, tiers = FRONT_TIERS): void {
+  const zTop = FRONT_BASE + (tiers - 1) * FRONT_RISE;
+  const frontFar = Y1 + tiers * TIER_D;
+  const endFar = X1 + tiers * TIER_D;
   // Long side (gy > field): tiers from the field outward (nearest last).
-  for (let k = 0; k < FRONT_TIERS; k++) {
+  for (let k = 0; k < tiers; k++) {
     const g0 = Y1 + k * TIER_D;
     const g1 = g0 + TIER_D;
     const z = FRONT_BASE + k * FRONT_RISE;
@@ -636,14 +851,14 @@ function paintFrontTerraces(cv: Canvas3D, away: Kit): void {
     cv.line({ gx: X0, gy: g1, z }, { gx: X1, gy: g1, z }, PAL.riserTop);
   }
   // Rear wall facing the camera, with an away-colour banner stripe.
-  cv.face({ gx: X0, gy: FRONT_FAR }, { gx: X1, gy: FRONT_FAR }, 0, zTop, PAL.riser, (u, v) => {
+  cv.face({ gx: X0, gy: frontFar }, { gx: X1, gy: frontFar }, 0, zTop, PAL.riser, (u, v) => {
     if (v > zTop - 2) return PAL.riserTop;
     const px = Math.floor(u * (X1 - X0) * 32);
     if (v > 2 && v < zTop - 3) return Math.floor(px / 40) % 2 === 0 ? away.jersey : away.trim;
     return PAL.riser;
   });
   // End side (gx > field): same build, rising toward +gx.
-  for (let k = 0; k < FRONT_TIERS; k++) {
+  for (let k = 0; k < tiers; k++) {
     const g0 = X1 + k * TIER_D;
     const g1 = g0 + TIER_D;
     const z = FRONT_BASE + k * FRONT_RISE;
@@ -659,11 +874,11 @@ function paintFrontTerraces(cv: Canvas3D, away: Kit): void {
     );
     cv.line({ gx: g1, gy: Y0, z }, { gx: g1, gy: Y1, z }, PAL.riserTop);
   }
-  cv.face({ gx: END_FAR, gy: Y1 }, { gx: END_FAR, gy: Y0 }, 0, zTop, shade(PAL.riser, 0.85), (_u, v) =>
+  cv.face({ gx: endFar, gy: Y1 }, { gx: endFar, gy: Y0 }, 0, zTop, shade(PAL.riser, 0.85), (_u, v) =>
     v > zTop - 2 ? PAL.riserTop : shade(PAL.riser, 0.85),
   );
   // Each terrace's open end, so the step profile reads.
-  for (let k = 0; k < FRONT_TIERS; k++) {
+  for (let k = 0; k < tiers; k++) {
     const z = FRONT_BASE + k * FRONT_RISE;
     cv.face({ gx: X1, gy: Y1 + (k + 1) * TIER_D }, { gx: X1, gy: Y1 + k * TIER_D }, 0, z, PAL.standSide);
   }
@@ -699,17 +914,19 @@ export function warmGround(offsetX: number): void {
 }
 
 /** Paint the static background (everything behind the players). */
-export function paintBackground(offsetX: number, home: Kit, away: Kit): Canvas3D {
+export function paintBackground(offsetX: number, home: Kit, away: Kit, ground: GroundLook = CLASSIC_GROUND): Canvas3D {
+  const look = normalizeGround(ground);
   const b = stadiumWorldBounds(offsetX);
   const cv = new Canvas3D(b.x, b.y, b.width, b.height, offsetX);
   groundFor(offsetX, cv);
-  paintCornerBlocks(cv, home);
-  paintBackStand(cv, home);
+  paintCornerBlocks(cv, home, look.canteen);
+  paintBackStand(cv, home, look);
   paintHill(cv);
   const panels = panelsFor(home, away);
   // Back hoardings: along the top-right touchline, then the top-left end.
   blitBoard(cv, { gx: -HOARD, gy: -HOARD }, FIELD_LONG + 2 * HOARD, 1, panels, 0);
   blitBoard(cv, { gx: -HOARD, gy: FIELD_WIDE + HOARD }, FIELD_WIDE + 2 * HOARD, -1, panels, 3);
+  paintSponsorSign(cv, home, look);
   for (const t of FLOODLIGHT_TOWERS) paintTower(cv, t.gx, t.gy, t.h);
   return cv;
 }
@@ -731,14 +948,14 @@ export function foregroundWorldBounds(offsetX: number): WorldRect {
 }
 
 /** Paint the foreground layer (everything in front of the players). */
-export function paintForeground(offsetX: number, home: Kit, away: Kit): Canvas3D {
+export function paintForeground(offsetX: number, home: Kit, away: Kit, ground: GroundLook = CLASSIC_GROUND): Canvas3D {
   const b = foregroundWorldBounds(offsetX);
   const cv = new Canvas3D(b.x, b.y, b.width, b.height, offsetX);
   const panels = panelsFor(home, away);
   // Near hoardings first (they're behind the terraces from the camera).
   blitBoard(cv, { gx: -HOARD, gy: FIELD_WIDE + HOARD }, FIELD_LONG + 2 * HOARD, 1, panels, 5);
   blitBoard(cv, { gx: FIELD_LONG + HOARD, gy: FIELD_WIDE + HOARD }, FIELD_WIDE + 2 * HOARD, -1, panels, 1);
-  paintFrontTerraces(cv, away);
+  paintFrontTerraces(cv, away, nearTierCount(ground));
   return cv;
 }
 
@@ -774,7 +991,12 @@ const EMPTY = { stand: 0.1, hill: 0.22, terrace: 0.07 } as const;
  * Fans are drawn waist-up (crowd.ts), so a row's heads and shoulders stand over
  * the waists of the row in front.
  */
-export function crowdSeats(): CrowdSeat[] {
+export function crowdSeats(ground: GroundLook = CLASSIC_GROUND): CrowdSeat[] {
+  const look = normalizeGround(ground);
+  const tiers = standProfile(look).tiers;
+  const frontTiers = nearTierCount(look);
+  // A full house keeps the old empty shares. A short gate leaves seats bare in that proportion.
+  const emptyFor = (base: number): number => (look.fill >= 1 ? base : 1 - look.fill * (1 - base));
   const seats: CrowdSeat[] = [];
   let id = 0;
   const push = (s: Omit<CrowdSeat, 'r'>, emptyRate: number): CrowdSeat | null => {
@@ -786,16 +1008,17 @@ export function crowdSeats(): CrowdSeat[] {
     return seat;
   };
   const hillShare = (Y1 - Y0) / (Y1 - Y0 + (X1 - X0));
-  // Back grandstand: seats on the back half of each tread.
+  // Back grandstand: seats on the back half of each tread. None on the hill ground.
   const flagRow: CrowdSeat[] = [];
-  for (let k = 0; k < BACK_TIERS; k++) {
+  const flagTier = tiers >= 3 ? 2 : tiers - 1;
+  for (let k = 0; k < tiers; k++) {
     const gy = Y0 - k * TIER_D - TIER_D * 0.62;
     const z = TIER_BASE + k * TIER_RISE;
     for (let gx = X0 + 0.25; gx < X1 - 0.15; gx += SEAT_STEP) {
       const bay: CrowdBay = gx > FIELD_LONG * 0.74 ? 'away' : gx < FIELD_LONG * 0.2 ? 'home' : 'mixed';
       const along = hillShare + ((gx - X0) / (X1 - X0)) * (1 - hillShare);
-      const seat = push({ gx: gx + (noise2(id, 1, 5) - 0.5) * 0.06, gy, z, layer: 'back', view: 'front', bay, along }, EMPTY.stand);
-      if (seat && k === 2 && bay === 'home') flagRow.push(seat);
+      const seat = push({ gx: gx + (noise2(id, 1, 5) - 0.5) * 0.06, gy, z, layer: 'back', view: 'front', bay, along }, emptyFor(EMPTY.stand));
+      if (seat && k === flagTier && bay === 'home') flagRow.push(seat);
     }
   }
   // The hill: looser rows of home fans on the slope.
@@ -805,7 +1028,7 @@ export function crowdSeats(): CrowdSeat[] {
     const z = HILL_BASE + (X0 - gx) * HILL_RISE;
     for (let gy = Y0 + 0.3; gy < Y1 - 0.2; gy += 0.45) {
       const along = ((Y1 - gy) / (Y1 - Y0)) * hillShare;
-      const seat = push({ gx: gx + (noise2(id, 2, 5) - 0.5) * 0.2, gy: gy + (noise2(id, 4, 5) - 0.5) * 0.1, z, layer: 'back', view: 'front', bay: 'home', along }, EMPTY.hill);
+      const seat = push({ gx: gx + (noise2(id, 2, 5) - 0.5) * 0.2, gy: gy + (noise2(id, 4, 5) - 0.5) * 0.1, z, layer: 'back', view: 'front', bay: 'home', along }, emptyFor(EMPTY.hill));
       if (seat && r === 2) hillRow.push(seat);
     }
   }
@@ -818,15 +1041,15 @@ export function crowdSeats(): CrowdSeat[] {
   for (const t of [0.15, 0.4, 0.62, 0.85]) flagAt(hillRow, 'gy', Y0 + t * (Y1 - Y0));
   for (const at of [1.2, 4.2]) flagAt(flagRow, 'gx', at);
   // Front terraces (backs to the camera).
-  for (let k = 0; k < FRONT_TIERS; k++) {
+  for (let k = 0; k < frontTiers; k++) {
     const z = FRONT_BASE + k * FRONT_RISE;
     const gy = Y1 + k * TIER_D + 0.24;
     for (let gx = X0 + 0.25; gx < X1 - 0.15; gx += SEAT_STEP) {
-      push({ gx: gx + (noise2(id, 1, 9) - 0.5) * 0.08, gy, z, layer: 'front', view: 'back', bay: 'mixed' }, EMPTY.terrace);
+      push({ gx: gx + (noise2(id, 1, 9) - 0.5) * 0.08, gy, z, layer: 'front', view: 'back', bay: 'mixed' }, emptyFor(EMPTY.terrace));
     }
     const gxe = X1 + k * TIER_D + 0.24;
     for (let gy2 = Y0 + 0.25; gy2 < Y1 - 0.15; gy2 += SEAT_STEP) {
-      push({ gx: gxe, gy: gy2 + (noise2(id, 2, 9) - 0.5) * 0.08, z, layer: 'front', view: 'back', bay: gy2 > FIELD_WIDE * 0.6 ? 'away' : 'mixed' }, EMPTY.terrace);
+      push({ gx: gxe, gy: gy2 + (noise2(id, 2, 9) - 0.5) * 0.08, z, layer: 'front', view: 'back', bay: gy2 > FIELD_WIDE * 0.6 ? 'away' : 'mixed' }, emptyFor(EMPTY.terrace));
     }
   }
   return seats;

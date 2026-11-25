@@ -19,6 +19,8 @@ import { nextFixture } from '../systems/league';
 import { resolveKits } from '../art/match/kitClash';
 import { PixelBuffer, toTexture, type TextureHost } from '../art/pixel';
 import type { IdleSlice } from '../art/grounds';
+import { groundForMatch } from '../art/match/ground';
+import { CLASSIC_GROUND, type GroundLook } from '../art/match/stadium';
 import { fixtureArtKey, fixtureArtPieces, paintFixtureArt, reviveFixtureArt, type FixtureArt, type FixtureKits } from '../art/match/fixtureArt';
 import { fieldOffsetX } from './matchField';
 import { liveRingPixels } from '../match/view/ringTexture';
@@ -112,11 +114,11 @@ export function warmMatchArt(): void {
   }
 }
 
-function paintElsewhere(offsetX: number, kits: FixtureKits): Promise<FixtureArt> {
+function paintElsewhere(offsetX: number, kits: FixtureKits, ground: GroundLook): Promise<FixtureArt> {
   return new Promise((resolve) => {
     const w = artWorker();
     if (!w) {
-      resolve(paintFixtureArt(offsetX, kits));
+      resolve(paintFixtureArt(offsetX, kits, ground));
       return;
     }
     const done = (art: FixtureArt): void => {
@@ -128,25 +130,25 @@ function paintElsewhere(offsetX: number, kits: FixtureKits): Promise<FixtureArt>
     const fail = (): void => {
       if (worker === w) worker = null;
       w.terminate();
-      done(paintFixtureArt(offsetX, kits));
+      done(paintFixtureArt(offsetX, kits, ground));
     };
     const timer = setTimeout(fail, ART_WORKER_TIMEOUT_MS);
     w.onmessage = (e: MessageEvent<FixtureArt>) => done(reviveFixtureArt(e.data));
     w.onerror = fail;
     try {
-      w.postMessage({ offsetX, kits, signs: activePack().vocab.stadiumSigns });
+      w.postMessage({ offsetX, kits, ground, signs: activePack().vocab.stadiumSigns });
     } catch {
       fail();
     }
   });
 }
 
-/** The art for these kits: the one painted ahead, the one being painted, or a new painting. */
-export function fixtureArtFor(offsetX: number, kits: FixtureKits): Promise<FixtureArt> {
-  const key = fixtureArtKey(offsetX, kits);
+/** The art for these kits and this ground: the one painted ahead, the one being painted, or a new painting. */
+export function fixtureArtFor(offsetX: number, kits: FixtureKits, ground: GroundLook = CLASSIC_GROUND): Promise<FixtureArt> {
+  const key = fixtureArtKey(offsetX, kits, ground);
   if (ready?.key === key) return Promise.resolve(ready);
   if (pending?.key === key) return pending.promise;
-  const promise = tail.then(() => paintElsewhere(offsetX, kits)).then((art) => {
+  const promise = tail.then(() => paintElsewhere(offsetX, kits, ground)).then((art) => {
     if (pending?.promise === promise) pending = null;
     if (ready && ready !== art) dropUploads?.(ready);
     ready = art;
@@ -261,14 +263,14 @@ export function initMatchArtAhead(host: ArtAheadHost): () => void {
       return;
     }
     queued = false;
-    const sides = nextFixtureSides(getState());
+    const state = getState();
+    const sides = nextFixtureSides(state);
     if (!sides) return;
     const kits = resolveSideKits(sides[0], sides[1]);
-    void fixtureArtFor(fieldOffsetX(), { home: kits.home, away: kits.away });
+    const fixture = nextFixture(state.league.fixtures, state.week, PLAYER_ID);
+    void fixtureArtFor(fieldOffsetX(), { home: kits.home, away: kits.away }, fixture ? groundForMatch(state, fixture) : CLASSIC_GROUND);
     // The players' rings and, after dark, the light maps (dry or wet: the weather is
     // rolled at kick-off) too, one per idle slice; both are kept for the match.
-    const state = getState();
-    const fixture = nextFixture(state.league.fixtures, state.week, PLAYER_ID);
     const lighting = lightingForFixture(fixture, state.season);
     // Once a fixture: any state change looks again, and the cached art needs no second look.
     const warmKey = `${kits.ringStyles.home}${kits.rings.home}|${kits.ringStyles.away}${kits.rings.away}|${lighting}`;

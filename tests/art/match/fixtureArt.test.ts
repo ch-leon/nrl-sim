@@ -56,7 +56,11 @@ describe('fixture art (N10.5)', () => {
     expect(back.key).toBe(art.key);
   });
 
-  it('is keyed by the kit design: a kit change is a new key, the same kits the same key', () => {
+  it('is keyed by the kit design and the ground: either change is a new key', () => {
+    const hill = { stand: 0 as const, sponsor: 0 as const, canteen: 0 as const, fill: 0.6 };
+    expect(fixtureArtKey(offsetX, kits, hill)).not.toBe(art.key);
+    expect(paintFixtureArt(offsetX, kits, hill).key).toBe(fixtureArtKey(offsetX, kits, hill));
+    expect(fixtureArtKey(offsetX, kits, { stand: 3, sponsor: 0, canteen: 2, fill: 1 })).toBe(art.key);
     expect(fixtureArtKey(offsetX, kitsOf())).toBe(art.key);
     setKitDesign('fa-home', { pattern: 'hoops', trim: '#00ff00', alt: { jersey: '#000000', trim: '#ffffff', pattern: 'plain' } });
     try {

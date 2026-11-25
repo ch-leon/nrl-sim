@@ -49,12 +49,15 @@ import {
   type Lighting,
 } from '../art/match/atmosphere';
 import {
+  CLASSIC_GROUND,
   FLOODLIGHT_TOWERS,
   HOARD,
   backStandTiers,
   backStandWindowBand,
   crowdSeats,
   floodlightLamps,
+  standProfile,
+  type GroundLook,
 } from '../art/match/stadium';
 import { isoProject, isoUnproject } from '../art/match/iso3d';
 import { shirtForSeat, shirtSide } from '../art/match/crowd';
@@ -85,6 +88,8 @@ export interface AtmosphereOptions {
   season?: number;
   /** Override prefers-reduced-motion (tests / settings). */
   reducedMotion?: boolean;
+  /** The ground on screen. Omitted, the lights and streamers use the full stand. */
+  ground?: GroundLook;
 }
 
 export interface AtmosphereHandle {
@@ -157,6 +162,7 @@ export function attachMatchAtmosphere(scene: Phaser.Scene, opts: AtmosphereOptio
   const reduced = opts.reducedMotion ?? prefersReducedMotion();
   const budget = atmosphereParticles(weather, lighting, reduced);
   const offsetX = fieldOffsetX();
+  const look = opts.ground ?? CLASSIC_GROUND;
   const cam = scene.cameras.main;
 
   ensureTextures(scene);
@@ -198,7 +204,7 @@ export function attachMatchAtmosphere(scene: Phaser.Scene, opts: AtmosphereOptio
         );
       }
     }
-    const banks = spawnLights(scene, grade, offsetX, add);
+    const banks = spawnLights(scene, grade, offsetX, add, look);
     // Dusk and night (#673): the floodlights come on bank by bank over the first seconds,
     // from the wall clock. A day fixture, and reduced motion, have them as they were.
     if (lighting !== 'day' && !reduced && banks.length > 0) {
@@ -306,7 +312,7 @@ export function attachMatchAtmosphere(scene: Phaser.Scene, opts: AtmosphereOptio
   const home = scene.data?.get('home') as { clubId?: string; colors?: [string, string] } | undefined;
   const away = scene.data?.get('away') as { clubId?: string; colors?: [string, string] } | undefined;
   const seats = { home: [] as Pt[], away: [] as Pt[], all: [] as Pt[] };
-  for (const seat of crowdSeats()) {
+  for (const seat of crowdSeats(look)) {
     if (seat.layer !== 'back') continue; // the stands that face the camera
     const w = isoProject(seat.gx, seat.gy, seat.z, offsetX);
     const pt = { x: w.x, y: w.y - 18 }; // a fan's head (crowd.ts: waist-up, 20 px)
@@ -412,6 +418,7 @@ function spawnLights(
   grade: AtmosphereGrade,
   offsetX: number,
   add: <T extends Phaser.GameObjects.GameObject>(o: T) => T,
+  ground: GroundLook = CLASSIC_GROUND,
 ): BankLight[] {
   const lamps = floodlightLamps(offsetX);
   const banks: BankLight[] = [];
@@ -461,8 +468,8 @@ function spawnLights(
       );
       banks.push({ o: img, alpha, bank: last });
     };
-    strip(backStandWindowBand(offsetX), 34, grade.standGlow * 0.55, 0xffdc9a);
-    strip(backStandTiers(offsetX), 90, grade.standGlow * 0.32, 0xfff0d0);
+    if (standProfile(ground).far !== null) strip(backStandWindowBand(offsetX, ground), 34, grade.standGlow * 0.55, 0xffdc9a);
+    strip(backStandTiers(offsetX, ground), standProfile(ground).far === null ? 50 : 90, grade.standGlow * 0.32, 0xfff0d0);
   }
 
   if (grade.glow > 0) {

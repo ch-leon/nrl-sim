@@ -33,6 +33,7 @@ import type { PlayerSnap, Side, Snapshot } from '../match/core/snapshot';
 import { BENCH, REF, SIX_AGAIN_POSE_TICKS, benchJog, benchSeat, benchSeated, binSeat, binnedSpot, refCoversCarrier, refereeSignal, refereeSpot, type BenchSheet } from '../match/view/officials';
 import type { MatchArtRegistry } from './matchArt';
 import { BOARD_TEX_H, BOARD_TEX_W, boardColor, drawScoreboard, flashWord, scoreboardOrigin, type BoardState } from '../art/match/scoreboard';
+import type { GroundLook } from '../art/match/stadium';
 import { reducedMotion } from '../match/view/impact';
 import { breakKind } from '../match/view/walkOff';
 import type { WindDirection } from '../match/league/weather';
@@ -87,6 +88,8 @@ export interface OfficialsOptions {
   /** The sides' short tags (the score bug's) and the scoreboard's depth (behind the pitch). */
   tags: readonly [string, string];
   boardDepth: number;
+  /** The ground the board stands on. Omitted, it keeps the full-stand roof. */
+  boardGround?: GroundLook;
   /** After dark the board's LEDs glow through the night grade: an additive copy at this depth and strength (none by day). */
   boardGlow?: { depth: number; alpha: number };
 }
@@ -213,7 +216,7 @@ export class MatchOfficials {
     // The scoreboard on the grandstand roof (#673): one texture, repainted when what it shows changes.
     this.boardColors = [boardColor(opts.kits.home), boardColor(opts.kits.away)];
     this.board = new Canvas(scene, art, 'scoreboard', BOARD_TEX_W, BOARD_TEX_H);
-    const o = scoreboardOrigin(opts.offsetX);
+    const o = scoreboardOrigin(opts.offsetX, opts.boardGround);
     scene.add.image(o.x, o.y, this.board.key).setOrigin(0, 0).setDepth(opts.boardDepth);
     if (opts.boardGlow) {
       scene.add.image(o.x, o.y, this.board.key).setOrigin(0, 0).setDepth(opts.boardGlow.depth).setAlpha(opts.boardGlow.alpha).setBlendMode(BLEND_ADD);

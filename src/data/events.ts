@@ -88,7 +88,11 @@ export type SubjectRule =
 
 /** Conditions for a card to be drawn. Every listed condition must hold. */
 export interface EventConditions {
-  /** Inclusive season-week range. */
+  /**
+   * Inclusive season-week range on the Classic calendar (AU regular season is
+   * 1–24, finals 25–27). A League career maps that scale onto its 25-week year,
+   * so 1–4 stays the pre-season block and 1–24 stays outside the finals.
+   */
   weeks?: [number, number];
   /** Inclusive reputation range. */
   reputation?: [number, number];

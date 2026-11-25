@@ -5,6 +5,9 @@ import { bus } from '../../src/core/events';
 import { createNewGame, getState } from '../../src/core/state';
 import { initLeague, PLAYER_ID } from '../../src/systems/fixtures';
 import { fixtureArtKey, fixtureArtBuffers, fixtureArtPieces, paintFixtureArt, type FixtureKits } from '../../src/art/match/fixtureArt';
+import type { GroundLook } from '../../src/art/match/stadium';
+import { groundForMatch } from '../../src/art/match/ground';
+import { nextFixture } from '../../src/systems/league';
 import { clearFixtureArt, fixtureArtFor, fixtureKits, initMatchArtAhead, nextFixtureSides, takeFixtureArt } from '../../src/scenes/matchArtAhead';
 import { fieldOffsetX } from '../../src/scenes/matchField';
 
@@ -20,12 +23,12 @@ function stubWorker(mode: 'paint' | 'error'): void {
     constructor() { built++; }
     onmessage: ((e: { data: unknown }) => void) | null = null;
     onerror: (() => void) | null = null;
-    postMessage(msg: { offsetX: number; kits: FixtureKits } | { warm: number }): void {
+    postMessage(msg: { offsetX: number; kits: FixtureKits; ground?: GroundLook } | { warm: number }): void {
       if ('warm' in msg) { warmed++; return; }
       posted++;
       setTimeout(() => {
         if (mode === 'error') return this.onerror?.();
-        const art = paintFixtureArt(msg.offsetX, msg.kits);
+        const art = paintFixtureArt(msg.offsetX, msg.kits, msg.ground);
         this.onmessage?.({ data: structuredClone(art, { transfer: fixtureArtBuffers(art) }) });
       }, 0);
     }
@@ -99,11 +102,15 @@ describe('the next fixture painted ahead (N10.5)', () => {
     expect(sides).not.toBeNull();
     const [home, away] = sides!;
     expect([home.clubId, away.clubId]).toContain(PLAYER_ID);
+    const state = getState();
+    const fixture = nextFixture(state.league.fixtures, state.week, PLAYER_ID)!;
+    const kits = fixtureKits(home, away);
+    const ground = groundForMatch(state, fixture);
     stubWorker('paint');
     const off = initMatchArtAhead({ textures: () => null, busy: () => false });
     await new Promise((r) => setTimeout(r, 0)); // the look is scheduled, not inside the tap
-    const key = fixtureArtKey(offsetX, fixtureKits(home, away));
-    await fixtureArtFor(offsetX, fixtureKits(home, away)); // the painting already under way
+    const key = fixtureArtKey(offsetX, kits, ground);
+    await fixtureArtFor(offsetX, kits, ground); // the painting already under way
     expect(warmed).toBe(1); // the ground first, then the fixture
     expect(posted).toBe(1);
     expect(takeFixtureArt(key)).not.toBeNull();
