@@ -29,6 +29,7 @@ import {
   fieldToWorld,
   facilityToWorld,
   matchEffectFor,
+  playSparkCount,
 } from './particleMath';
 import { fieldWorldBounds, fieldOffsetX, colorToInt } from '../scenes/matchField';
 
@@ -40,6 +41,7 @@ export {
   fieldToWorld,
   facilityToWorld,
   matchEffectFor,
+  playSparkCount,
   type MatchFxEffect,
 } from './particleMath';
 
@@ -178,6 +180,21 @@ export function attachMatchFx(scene: Phaser.Scene): FxHandle {
 
   const emitters = [tryBurst, goldShower, bigHitRing, crowdHome, crowdAway];
 
+  const motionReduced = (): boolean => {
+    try {
+      return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    } catch {
+      return false;
+    }
+  };
+  const sparkAt = (how: 'call' | 'bust' | 'break' | 'try' | 'miss', x: number, y: number): void => {
+    const n = playSparkCount(how);
+    if (n === 0 || motionReduced()) return;
+    const w = project(x, y);
+    // The try burst's pool: a new emitter would push the scene over its particle ceiling.
+    tryBurst.explode(n, w.x, w.y);
+  };
+
   // Prefer the scene's true iso projection (MatchScene.fieldToWorld) so bursts
   // land exactly where the ball/dots are; the AABB-linear helper is the
   // fallback (and remains the pure, unit-tested path).
@@ -209,6 +226,8 @@ export function attachMatchFx(scene: Phaser.Scene): FxHandle {
 
   const offs: Array<() => void> = [
     bus.on('match:event', onEvent),
+    bus.on('match:play-called', ({ x, y }) => sparkAt('call', x, y)),
+    bus.on('match:play-hit', ({ how, x, y }) => sparkAt(how, x, y)),
     bus.on('match:finished', stopCrowd),
   ];
 

@@ -25,6 +25,18 @@ export const MATCH_CAPS = {
   crowdAway: 30, // drifting specks along the other sideline
 } as const;
 
+/**
+ * How many sparks a set-play moment throws (#825), from the try burst's pool so the
+ * scene's particle ceiling stays put. A breakdown throws none.
+ */
+export function playSparkCount(how: 'call' | 'bust' | 'break' | 'try' | 'miss'): number {
+  if (how === 'miss') return 0;
+  if (how === 'try') return 16;
+  if (how === 'break') return 12;
+  if (how === 'bust') return 10;
+  return 8;
+}
+
 export const GROUNDS_CAPS = {
   coinSparkle: 20, // coin-sparkle burst near the HUD money corner
   dustPuff: 12, // grey dust at a placed facility

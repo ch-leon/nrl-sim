@@ -134,7 +134,7 @@ describe('a press under the finger (#604)', () => {
   });
 
   it('no separate reduced-motion rule: --nrl-press is 1 there, so a press keeps its fill and loses its scale', () => {
-    expect(CSS).toContain('@media (prefers-reduced-motion: reduce) { :root { --nrl-rise: 0px; --nrl-pop: 1; --nrl-press: 1; } }');
+    expect(CSS).toContain('@media (prefers-reduced-motion: reduce) { :root { --nrl-rise: 0px; --nrl-pop: 1; --nrl-press: 1; --nrl-play-press: 1; } }');
     for (const { file, text } of SOURCES) {
       for (const m of text.matchAll(/@media \(prefers-reduced-motion: reduce\) \{/g)) {
         expect(text.slice(m.index, blockEnd(text, m.index + m[0].length)), file).not.toContain(':active');

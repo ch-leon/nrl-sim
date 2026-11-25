@@ -34,7 +34,9 @@ export type SfxName =
   | 'whistle' | 'whistleLong' | 'siren' | 'boot' | 'goal' | 'miss' | 'whoosh' | 'tackleBig'
   | 'stingWin' | 'stingDraw' | 'stingLoss'
   // A coach's call paid off (#639).
-  | 'callPaid';
+  | 'callPaid'
+  // The set-play tap itself (#825): a short hit, not the pay-off.
+  | 'playCalled';
 
 export type MusicTrack = 'grounds' | 'match';
 
@@ -224,6 +226,14 @@ export const SFX_PRESETS: Record<SfxName, SfxPreset> = {
       { type: 'triangle', freq: 196, start: 0.9, duration: 0.9, gain: 0.28, attack: 0.01 },
     ],
     noises: [],
+  },
+  // The set-play tap (#825): a crack and two short squares, done inside a tenth of a second.
+  playCalled: {
+    tones: [
+      { type: 'square', freq: 494, start: 0, duration: 0.04, gain: 0.32, attack: 0.001 },
+      { type: 'square', freq: 740, start: 0.035, duration: 0.055, gain: 0.26, attack: 0.001 },
+    ],
+    noises: [{ filter: 'bandpass', freqStart: 2400, freqEnd: 600, Q: 0.7, start: 0, duration: 0.05, gain: 0.4, attack: 0.001 }],
   },
   // A coach's call paid off (#639): three sine notes rising (A5, D6, F#6), light and short.
   callPaid: {
@@ -460,6 +470,14 @@ export function crowdLevel(x: number | null, momentum: number): number {
   const toLine = Math.min(at, 100 - at);
   const zone = Math.min(Math.max((30 - toLine) / 30, 0), 1);
   return CROWD_BASE + CROWD_ZONE * zone + CROWD_MOMENTUM * Math.min(Math.abs(momentum) / 100, 1);
+}
+
+/** How hard the crowd lifts when the coach's set play comes off (#825). A miss lifts nothing. */
+export function playHitSwell(how: 'bust' | 'break' | 'try' | 'miss'): number {
+  if (how === 'try') return CROWD_SWELL['try']!;
+  if (how === 'break') return CROWD_SWELL['clean-break']!;
+  if (how === 'bust') return 0.16;
+  return 0;
 }
 
 /** The swell a match event adds to the crowd (0 for most). */
@@ -950,6 +968,11 @@ export class AudioEngine {
     this.unsubs.push(bus.on('match:clean-break', () => this.onCleanBreak()));
     this.unsubs.push(bus.on('match:goal-line-stand', ({ x }) => this.onGoalLineStand(x)));
     this.unsubs.push(bus.on('match:call-paid', () => this.playSfx('callPaid')));
+    this.unsubs.push(bus.on('match:play-called', () => this.playSfx('playCalled')));
+    this.unsubs.push(bus.on('match:play-hit', ({ how }) => {
+      if (how === 'miss') this.playSfx('miss', { gain: 0.35 });
+      else this.setCrowdBase(crowdLevel(this.ballX, this.momentum), playHitSwell(how));
+    }));
     this.unsubs.push(bus.on('ui:notify', () => this.playSfx('click')));
     this.unsubs.push(
       bus.on('match:started', ({ home, away }) => {

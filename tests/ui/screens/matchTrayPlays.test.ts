@@ -14,6 +14,8 @@ import {
   playCaption,
   renderCoachBadge,
   trayHidden,
+  calledBanner,
+  pressPlayTile,
   trayPlayEls,
   trayPlays,
   trayPlaysKey,
@@ -26,7 +28,8 @@ import {
 import { PLAYS } from '../../../src/match/league/plays';
 import { callResultText, unlockLevel, type CallVerdict, type CoachCall } from '../../../src/match/league/calls';
 import type { PlayId } from '../../../src/data/plays';
-import { popupFor } from '../../../src/match/view/popups';
+import { popupFor, popupPop } from '../../../src/match/view/popups';
+import { CSS } from '../../../src/ui/dom';
 import { Commentator, LINES } from '../../../src/match/view/commentary';
 import type { SimEvent } from '../../../src/match/core/snapshot';
 import { SET_PLAYS_FOOTNOTE, coachCallsPageData } from '../../../src/ui/coachCallsText';
@@ -89,6 +92,23 @@ describe('the tray’s Plays section (#326)', () => {
     tiles[0]!.click();
     tiles[2]!.click();
     expect(called).toEqual(['block-play', 'kick-pass']);
+  });
+
+  it('lights a play tile the moment the finger lands, and a refused tile stays dark (#825)', () => {
+    const tiles = buttonsOf(trayPlayEls(three, () => {}));
+    pressPlayTile(tiles[0]!, true);
+    expect(tiles[0]!.getAttribute('data-pressed')).toBe('');
+    pressPlayTile(tiles[0]!, false);
+    expect(tiles[0]!.hasAttribute('data-pressed')).toBe(false);
+    pressPlayTile(tiles[1]!, true);
+    expect(tiles[1]!.hasAttribute('data-pressed')).toBe(false);
+    expect(CSS).toContain('transform: scale(var(--nrl-play-press))');
+    expect(CSS).toContain('transition: transform var(--nrl-dur-hit)');
+    expect(CSS).toContain('--nrl-dur-hit: 40ms');
+  });
+
+  it('the called banner names the play over the next play-the-ball (#825)', () => {
+    expect(calledBanner('Block play')).toEqual({ head: 'CALLED', who: 'Block play', sub: 'Next play-the-ball', tone: 'score' });
   });
 
   it('keys the section on what each tile says, so a tile is not rebuilt under the finger', () => {
@@ -177,12 +197,14 @@ describe('the result tag over COACH for a play (#326)', () => {
 describe('the pop-ups for a play (#326)', () => {
   const ev = (kind: string, detail?: string): SimEvent => ({ tick: 5, kind, text: '', side: 'home', slot: 5, player: 'Jarrah Kavanagh', ...(detail ? { detail } : {}) });
   it('shouts the play’s short name in caps over the caller, not as a big moment', () => {
-    expect(popupFor(ev('set-play', 'block-play'))).toMatchObject({ word: 'BLOCK PLAY!', sub: 'KAVANAGH', tone: 'attack', big: false });
+    expect(popupFor(ev('set-play', 'block-play'))).toMatchObject({ word: 'BLOCK PLAY!', sub: 'KAVANAGH', tone: 'attack', big: false, punch: true });
+    expect(popupPop(0.04, true)).toBeGreaterThan(popupPop(0.04, false));
+    expect(popupPop(0.5, true)).toBe(1);
     expect(popupFor(ev('set-play', 'tap-rambo'))?.word).toBe('RAMBO!');
     expect(popupFor(ev('set-play'))?.word).toBe('PLAY!');
   });
   it('a breakdown is neutral and small', () => {
-    expect(popupFor(ev('play-breaks-down', 'cut-out-winger'))).toMatchObject({ word: 'BROKE DOWN', sub: 'KAVANAGH', tone: 'neutral', big: false });
+    expect(popupFor(ev('play-breaks-down', 'cut-out-winger'))).toMatchObject({ word: 'BROKE DOWN', sub: 'KAVANAGH', tone: 'neutral', big: false, muted: true });
   });
   it('a play is not a key moment by itself: the ×1/×2 pacing is unchanged', () => {
     const k = new KeyMoments();
@@ -230,6 +252,43 @@ describe('the commentary for a play (#326)', () => {
     expect(said('call-paid:play', paid, fill)).toBe(true);
     const cold = new Commentator(3, { home: 'Shellharbour Scorpions', away: 'Zone Test FC' }).line(box('call-paid', { detail: 'set-play', tick: 4 }));
     expect(said('call-paid', cold, { ...fill, call: 'set play' })).toBe(true);
+  });
+
+  it('credits PLAY CALLED on a bust, a break or a try, and a breakdown is a miss (#825)', () => {
+    const c = new Commentator(3, { home: 'Shellharbour Scorpions', away: 'Zone Test FC' });
+    const arm = (): void => {
+      c.line(ev('coach-call', { detail: 'set-play:block-play', tick: 2 }));
+      c.line(ev('set-play', { detail: 'block-play', tick: 10 }));
+    };
+    arm();
+    const bust = c.said(ev('break-tackle', { tick: 20 }));
+    expect(bust.some((s) => s.text === 'PLAY CALLED: the block play' && s.playHit === 'bust')).toBe(true);
+    expect(c.said(ev('line-break', { tick: 28 })).some((s) => s.playHit)).toBe(false);
+    // The half's own launch is not the coach's play.
+    const half = new Commentator(3, { home: 'Shellharbour Scorpions', away: 'Zone Test FC' });
+    half.line(ev('set-play', { detail: 'block-play', tick: 10 }));
+    expect(half.said(ev('break-tackle', { tick: 20 })).some((s) => s.playHit)).toBe(false);
+    // A clean break and a try, inside the script.
+    const br = new Commentator(3, { home: 'Shellharbour Scorpions', away: 'Zone Test FC' });
+    br.line(ev('coach-call', { detail: 'set-play:block-play', tick: 2 }));
+    br.line(ev('set-play', { detail: 'block-play', tick: 10 }));
+    expect(br.said(ev('line-break', { tick: 30 })).some((s) => s.playHit === 'break')).toBe(true);
+    const tr = new Commentator(3, { home: 'Shellharbour Scorpions', away: 'Zone Test FC' });
+    tr.line(ev('coach-call', { detail: 'set-play:block-play', tick: 2 }));
+    tr.line(ev('set-play', { detail: 'block-play', tick: 10 }));
+    expect(tr.said(ev('try', { tick: 40 })).some((s) => s.playHit === 'try')).toBe(true);
+    // Past the script, or after it breaks down: no credit. The breakdown itself is the muted read.
+    const late = new Commentator(3, { home: 'Shellharbour Scorpions', away: 'Zone Test FC' });
+    late.line(ev('coach-call', { detail: 'set-play:block-play', tick: 2 }));
+    late.line(ev('set-play', { detail: 'block-play', tick: 10 }));
+    expect(late.said(ev('break-tackle', { tick: 71 })).some((s) => s.playHit)).toBe(false);
+    const down = new Commentator(3, { home: 'Shellharbour Scorpions', away: 'Zone Test FC' });
+    down.line(ev('coach-call', { detail: 'set-play:block-play', tick: 2 }));
+    down.line(ev('set-play', { detail: 'block-play', tick: 10 }));
+    const miss = down.said(ev('play-breaks-down', { detail: 'block-play', tick: 18 }));
+    expect(miss.some((s) => s.playMiss)).toBe(true);
+    expect(miss.some((s) => s.playHit)).toBe(false);
+    expect(down.said(ev('try', { tick: 24 })).some((s) => s.playHit)).toBe(false);
   });
 });
 
