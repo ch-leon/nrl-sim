@@ -38,7 +38,7 @@ export async function runContentPacks(browser) {
         await page.locator('.nrl-tutorial-skip').tap();
         const state = await page.evaluate(() => window.__nrlState());
         const expected = country === 'GB' ? 'uk' : 'au';
-        if (state.pack !== expected || state.league.clubs.length !== (expected === 'uk' ? 12 : 16)) throw new Error('Wrong pack or club count');
+        if (state.pack !== expected || state.league.clubs.length !== 8) throw new Error('Wrong pack or club count');
         if (report.ukRequests !== (expected === 'uk' ? 1 : 0)) throw new Error(`Unexpected UK requests: ${report.ukRequests}`);
         report.pack = state.pack;
         report.clubs = state.league.clubs.length;

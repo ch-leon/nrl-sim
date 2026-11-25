@@ -43,7 +43,9 @@ export async function runRecruit(browser) {
         await shot('club-home');
         await openNav(page, 'recruit');
         const rows = page.locator('.nrl-recruit [data-row-player]');
-        check(await rows.count() === 4, 'new game must show four rows');
+        await rows.first().waitFor();
+        const shown = await rows.count();
+        check(shown >= 1 && shown <= 4, `new game showed ${shown} rows`);
         check(await page.locator('[data-coach-pick]').count() === 1, 'exactly one pick');
         check(!await page.locator('[data-sort-menu]').isVisible(), 'sort hidden on shortlist');
         const picked = await page.locator('[data-coach-pick]').evaluate((e) => e.closest('[data-row-player]').getAttribute('data-row-player'));

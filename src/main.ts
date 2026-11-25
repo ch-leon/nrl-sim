@@ -487,7 +487,7 @@ async function boot(): Promise<void> {
     const installation = stateInstallation();
     // The hint is what gates it, including Continue of a career that has not seen it yet.
     if (state.season === 1 && !state.settings.hintsSeen?.includes(EXPANSION_INTRO_HINT)) {
-      for (const text of expansionIntroLines(state, state.objectives).slice(0,2))
+      for (const text of expansionIntroLines(state, state.objectives))
         bus.emit('ui:notify', { text, kind: 'info', quiet: true, from: 'coach' });
       await showExpansionIntro();
     }

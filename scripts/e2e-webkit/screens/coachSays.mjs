@@ -2,7 +2,7 @@
 // Evidence goes to the existing screens CI artifact, never into git.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { confirmStartingLeague, OUT_ROOT, BASE, IPHONE_UA, reachProblems, skipFromPill, setupStep } from '../common.mjs';
+import { advanceOnce, confirmStartingLeague, OUT_ROOT, BASE, IPHONE_UA, reachProblems, skipFromPill, setupStep } from '../common.mjs';
 
 export async function runCoachSays(browser) {
   const out = join(OUT_ROOT, 'webkit', 'coach-says');
@@ -47,8 +47,7 @@ export async function runCoachSays(browser) {
         });
         await page.locator('.nrl-nav [data-nav-home]').tap();
         if (await page.locator('.nrl-club-home-coach').count()) throw new Error('Coach row leaked into landscape HUD');
-        await page.locator('.nrl-hud-actions > [data-hud="advance"]').tap();
-        await page.waitForSelector('.nrl-mo-controls', { timeout: 60000 });
+        if (await advanceOnce(page) !== 'match') throw new Error('the first week did not start a match');
         await skipFromPill(page);
         await page.waitForSelector('.nrl-mo-ft [data-back-to-club]', { timeout: 120000 });
         // Clear generated cards so the summary has one known line. Salaries no

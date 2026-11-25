@@ -181,9 +181,12 @@ export async function runDevSettings(browser) {
     await page.setViewportSize({ width: 844, height: 390 });
     await page.waitForTimeout(300);
     if (await page.locator('[data-nrl-league-selection]').count()) await confirmStartingLeague(page);
-    if (await page.locator('[data-expansion-work]').count()) await page.locator('[data-expansion-work]').tap();
-    if (await page.locator('.nrl-tutorial-skip').count()) {
-      await page.locator('.nrl-tutorial-skip').tap();
+    // The intro is mounted after confirm returns. Wait for it, then the tutorial.
+    const work = page.locator('[data-expansion-work]');
+    if (await work.waitFor({ timeout: 15000 }).then(() => true).catch(() => false)) await work.tap();
+    const skipTut = page.locator('.nrl-tutorial-skip');
+    if (await skipTut.waitFor({ timeout: 15000 }).then(() => true).catch(() => false)) {
+      await skipTut.tap();
       await page.locator('.nrl-tutorial').waitFor({ state: 'detached' });
     }
     await advanceToMatch(page);

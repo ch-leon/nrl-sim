@@ -42,7 +42,7 @@ export async function runDerby(browser) {
       let found = false;
       for (let i = 0; i < 20 && !found; i++) {
         const next = await page.locator('[data-hud="next"]').innerText();
-        if (/Larrikins/i.test(next)) {
+        if (/Launceston/i.test(next)) {
           await openNav(page, 'news');
           const preview = page.getByText('Derby week against Launceston Larrikins.', { exact: false }).last();
           await preview.scrollIntoViewIfNeeded();

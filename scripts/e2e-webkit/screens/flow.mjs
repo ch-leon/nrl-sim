@@ -193,6 +193,8 @@ export async function runFlow(browser, { w: W, h: H, text }) {
     await club();
     const w0 = await week();
     await menuPick('To season end');
+    const skipEvents = page.locator('[data-skip-events]');
+    if (await skipEvents.waitFor({ timeout: 3000 }).then(() => true).catch(() => false)) await skipEvents.tap();
     await page.waitForSelector('[data-advance-ask]');
     await page.waitForTimeout(250); // the dialog's entrance (#606): its buttons are measured at full size
     const q = (await page.locator('[data-ask-question]').textContent().catch(() => '')) ?? '';

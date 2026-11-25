@@ -265,7 +265,9 @@ export function startTutorial(force = false): void {
   if (!force && !shouldAutoStart(s.settings)) return;
   // #370: arm the first-visit hints (a replay brings them back). Before the DOM
   // guard so the node tests see it.
-  setState({ settings: { ...s.settings, hintsSeen: [] } });
+  // Arm the first-visit hints. Keep the expansion intro, which was marked as the card opened.
+  const seen = s.settings.hintsSeen?.includes('expansion-intro') ? ['expansion-intro'] : [];
+  setState({ settings: { ...s.settings, hintsSeen: seen } });
   // DOM-less environments (node unit tests): nothing to render.
   if (typeof document === 'undefined') return;
 

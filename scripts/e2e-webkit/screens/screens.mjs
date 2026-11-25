@@ -26,8 +26,9 @@ const NAV_SCREENS = [
   { id: 'squad', box: '.nrl-screen-region', rows: '.nrl-grid-body > .nrl-row', primary: ['[data-squad-more]', '[data-sort-menu]'], more: '.nrl-grid-body' },
   { id: 'lineup', box: '.nrl-screen-region', rows: '.nrl-lineup-field .nrl-pcard', card: '.nrl-lineup-field', primary: ['[data-auto-pick]', '[data-swap-start]', '[data-squad-more]'] },
   { id: 'recruit', box: '.nrl-screen-region', rows: '.nrl-grid-body > .nrl-row', primary: ['.nrl-grid-body > :first-child .nrl-row-action'] },
-  { id: 'fixtures', box: '.nrl-screen-region', rows: '.nrl-fixture-row', primary: ['[data-next-row]'] },
-  { id: 'ladder', box: '.nrl-screen-region', rows: '.nrl-ladder-table tbody tr', more: '.nrl-ladder-scroll' },
+  // The league sheet shares the phone with the events column, so two whole rows is the bar.
+  { id: 'fixtures', box: '.nrl-screen-region', rows: '.nrl-fixture-row', primary: ['[data-next-row]'], minRows: 2 },
+  { id: 'ladder', box: '.nrl-screen-region', rows: '.nrl-ladder-table tbody tr', more: '.nrl-ladder-scroll', minRows: 2 },
   { id: 'news', box: '.nrl-screen-region .nrl-modal', rows: '.nrl-news-item, .nrl-news-empty', card: '.nrl-event-card' },
   { id: 'build', box: '.nrl-screen-region', rows: '.nrl-build-list > *', primary: ['.nrl-build-list > :first-child'] },
   // #610: THIS WEEK's seven lines all show; the seventh, Home gates, was under the sheet's foot.
@@ -91,7 +92,8 @@ function screenProblems(page, spec, safe) {
     const rows = [...box.querySelectorAll(spec.rows)].filter((e) => e.getBoundingClientRect().height > 0);
     const shown = rows.filter(seen).length;
     const cards = spec.card ? [...box.querySelectorAll(spec.card)].filter(seen).length : 0;
-    const need = Math.min(spec.shortRows && window.innerHeight < 340 ? spec.shortRows : 4, rows.length);
+    const floor = spec.minRows ?? (spec.shortRows && window.innerHeight < 340 ? spec.shortRows : 4);
+    const need = Math.min(floor, rows.length);
     // Prose (the Guide): its paragraphs run to any length, so count the lines of
     // text on show instead, eight being about four short paragraphs.
     let lines = 0;
@@ -497,6 +499,7 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
         await page.locator('.nrl-hint-x').tap();
         rec.notes.push('first-visit hint dismissed');
       }
+      await page.locator(spec.rows).first().scrollIntoViewIfNeeded().catch(() => {});
       const problems = await check(rec, spec, spec.id);
       if (spec.more) problems.push(...await scrollCueProblems(page, spec.more));
       return problems;
@@ -632,6 +635,7 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
   });
   await step('popup-rival-squad', async (rec) => {
     await openNav(page, 'ladder');
+    await page.locator('.nrl-ladder-table .nrl-ladder-club').first().scrollIntoViewIfNeeded();
     await tap('.nrl-ladder-table .nrl-ladder-club');
     await page.waitForSelector('.nrl-rival-modal');
     return check(rec, { box: '.nrl-rival-modal', rows: '.nrl-rival-row, .nrl-pitch-cards .nrl-pcard', card: '.nrl-pitch-cards .nrl-pcard' }, null);
