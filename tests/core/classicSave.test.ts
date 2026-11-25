@@ -1,14 +1,31 @@
 import { describe, expect, it } from 'vitest';
-import { isClassicSave, isLeagueCareerCalendar } from '../../src/core/classicSave';
-import { createNewGame } from '../../src/core/state';
+import { CLASSIC_CLUB_COUNT, isClassicSave, isLeagueCareerCalendar } from '../../src/core/classicSave';
+import { createNewGame, SAVE_VERSION, type GameState } from '../../src/core/state';
+import { initLeague } from '../../src/systems/fixtures';
+import { prepareLeagueCareer } from '../../src/systems/leagueCareerSetup';
+
+function classicCareer(name: string, seed: number): GameState {
+  const state = createNewGame(name, seed);
+  state.league = initLeague(state);
+  return state;
+}
 
 describe('isClassicSave', () => {
   it('recognises a Classic career: a versioned save with no League career and no structural calendar', () => {
-    const classic = createNewGame('Cavehole Crushers', 4);
+    const classic = classicCareer('Cavehole Crushers', 4);
     expect(classic.competitions).toBeUndefined();
+    expect(classic.league.clubs).toHaveLength(CLASSIC_CLUB_COUNT);
     expect(isClassicSave(classic)).toBe(true);
     expect(isClassicSave(JSON.stringify(classic))).toBe(true);
-    expect(isClassicSave({ version: 35, clubName: 'Old', season: 3, week: 8 })).toBe(true);
+    expect(isClassicSave({ version: 35, clubName: 'Old', season: 3, week: 8 })).toBe(false);
+  });
+
+  it('never classes a real League career, or a save newer than this game, as Classic', async () => {
+    const career = await prepareLeagueCareer({ clubName: 'Local', seed: 4 });
+    expect(isClassicSave(career)).toBe(false);
+    expect(isClassicSave(JSON.stringify(career))).toBe(false);
+    const future = classicCareer('Newer', 4);
+    expect(isClassicSave({ ...future, version: SAVE_VERSION + 1 })).toBe(false);
   });
 
   it('leaves a League career, including one whose calendar is structural', () => {

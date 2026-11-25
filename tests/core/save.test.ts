@@ -7,6 +7,13 @@ import {
 } from '../../src/core/save';
 import { showTitleFlow, type TitleChoice } from '../../src/ui/title';
 import { createNewGame, getState, SAVE_VERSION, type GameState } from '../../src/core/state';
+import { initLeague } from '../../src/systems/fixtures';
+
+function classicCareer(name: string, seed: number): GameState {
+  const state = createNewGame(name, seed);
+  state.league = initLeague(state);
+  return state;
+}
 import { bus } from '../../src/core/events';
 import { DEFAULT_PLAYER_COLORS, isValidColorPair } from '../../src/config';
 import { retiredSaveKey } from '../../src/core/storageKeys';
@@ -352,7 +359,7 @@ describe('showTitleFlow', () => {
   });
 
   it('archives a Classic save that needs a lineup repair instead of loading it', () => {
-    const s = createNewGame('Missing selection', 525);
+    const s = classicCareer('Missing selection', 525);
     delete (s.lineup as unknown as Record<string, unknown>).captain;
     const original = JSON.stringify(s, null, 2);
     storage.map.set(slotKey(1), original);

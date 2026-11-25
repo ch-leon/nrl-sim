@@ -49,13 +49,14 @@ function retirementReady(): NativeCheckpointResult | null {
  * Does not touch the live slot. Off iPhone, and for a playtest career, this is
  * `inactive`.
  */
-export async function acknowledgeClassicArchive(slot: number, raw: string): Promise<NativeCheckpointResult> {
+export async function acknowledgeClassicArchive(slot: number, stored: string): Promise<NativeCheckpointResult> {
   const early = retirementReady();
   if (early) return early;
   const archive = retiredSaveKey(slot);
   if (!isMirroredKey(archive)) return 'unavailable';
   const {storage, mirror} = active!;
-  return mirror.confirm(archive, raw, () => storage.getItem(archive) === raw, boot!.signal);
+  if (storage.getItem(archive) !== stored) return 'failed';
+  return mirror.confirm(archive, stored, () => storage.getItem(archive) === stored, boot!.signal);
 }
 
 /**

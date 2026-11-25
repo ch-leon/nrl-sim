@@ -21,7 +21,7 @@ import { applyMomentumEvent, decayMomentum } from '../sim/weather';
 import { getState, setState, setMatchSettings, type GameState } from '../core/state';
 import { el, button, openModal, closeModal, screenKey, segmented } from '../ui/dom';
 import { TEXT_SIZES, textSizeOf } from '../ui/textSize';
-import { applyNamesFile, downloadNames, downloadSave, getActiveSlot, importIntoSlot, pickSaveFile, save } from '../core/save';
+import { applyNamesFile, deleteRetiredSave, downloadNames, downloadRetiredSave, downloadSave, getActiveSlot, importIntoSlot, pickSaveFile, readRetiredSaves, save, SLOT_COUNT } from '../core/save';
 import { BRAND } from '../brand';
 import { startTutorial } from '../ui/tutorial';
 import { canInstall, promptInstall } from './pwa';
@@ -1356,6 +1356,27 @@ export function initAudioUi(): () => void {
       );
     }, { class: 'nrl-btn-outline' }), button('Names file…', () => namesAsk(), { class: 'nrl-settings-names nrl-btn-outline' }));
   };
+  const retiredRow = el('div', { class: 'nrl-settings-retired', attrs: { 'data-retired-saves': '' } });
+  const renderRetired = (): void => {
+    const rows: HTMLElement[] = [];
+    for (let slot = 1; slot <= SLOT_COUNT; slot++) {
+      readRetiredSaves(slot).forEach((raw, index) => {
+        let club = 'Classic career';
+        try {
+          const parsed = JSON.parse(raw) as { clubName?: unknown };
+          if (typeof parsed.clubName === 'string' && parsed.clubName) club = parsed.clubName;
+        } catch { /* the bytes are still exportable */ }
+        const exp = button('Export', () => downloadRetiredSave(slot, index), { class: 'nrl-btn-outline' });
+        exp.setAttribute('data-retired-export', `${slot}-${index}`);
+        const del = button('Delete', () => { deleteRetiredSave(slot, index); renderRetired(); }, { class: 'nrl-btn-outline' });
+        del.setAttribute('data-retired-delete', `${slot}-${index}`);
+        rows.push(el('div', { class: 'nrl-audio-row nrl-settings-pair', attrs: { 'data-retired-save': `${slot}-${index}` } },
+          el('span', { text: `Slot ${slot} · ${club}` }), exp, del));
+      });
+    }
+    retiredRow.replaceChildren(...(rows.length ? [el('span', { class: 'nrl-settings-label', text: 'Retired Classic saves' }), ...rows] : []));
+    retiredRow.hidden = rows.length === 0;
+  };
 
   const openAllRow = el('div', { class: 'nrl-audio-row nrl-unlocks-row' });
   const syncUnlocks = (): void => {
@@ -1391,6 +1412,7 @@ export function initAudioUi(): () => void {
         label('Your save', 'nrl-settings-save-label'),
         el('div', { class: 'nrl-audio-row nrl-audio-btnrow nrl-settings-pair' }, exportBtn, replayBtn),
         importRow,
+        retiredRow,
         installRow, openAllRow),
     ),
     // #398: text only, so it costs the popup no row; under the right column, as in the mockup.
@@ -1411,6 +1433,7 @@ export function initAudioUi(): () => void {
     slider.value = String(Math.round(clampVolume(getState().settings.volume) * 100));
     showVolume();
     importIdle();
+    renderRetired();
     openModal(content, SETTINGS_MODAL);
   };
 }

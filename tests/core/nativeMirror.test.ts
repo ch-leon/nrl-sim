@@ -3,7 +3,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   __setStorage, deleteSlot, listSlotMeta, loadSlot, markClassicRetirementShown, retireClassicSlotDurable, save, setActiveSlot, type StorageLike,
 } from '../../src/core/save';
-import { createNewGame, getState } from '../../src/core/state';
+import { createNewGame, getState, type GameState } from '../../src/core/state';
+import { initLeague } from '../../src/systems/fixtures';
+
+function classicCareer(name: string, seed: number): GameState {
+  const state = createNewGame(name, seed);
+  state.league = initLeague(state);
+  return state;
+}
 import {
   classicRetiredNoticeKey, COMMERCIAL_FIRST_RUN_KEY, CORRUPT_SAVE_KEY, DEV_TEST_BACKUP_KEY, DEV_TEST_DISPLACED_KEY, DEV_TEST_PREFIX, DEVICE_ID_KEY,
   ENTITLEMENTS_CACHE_KEY, ENTITLEMENTS_STUB_KEY, IOS_INSTALL_HINT_KEY, LABS_KEY, LEGACY_SAVE_KEY, LOG_MODE_KEY,
@@ -463,7 +470,7 @@ describe('native outcome acknowledgement', () => {
   it('a retired Classic save is archived natively and does not return after the web view is wiped', async () => {
     const { native, storage, mirror } = start();
     __setStorage(storage);
-    const classic = JSON.stringify({ version: 35, clubName: 'Old', season: 2, week: 4 });
+    const classic = JSON.stringify(classicCareer('Old Town', 4));
     storage.setItem(slotKey(1), classic);
     storage.setItem(saveMetaKey(1), '{"saveVersion":35}');
     storage.setItem(liveMatchKey(1), 'live');
@@ -484,7 +491,7 @@ describe('native outcome acknowledgement', () => {
   it('confirms the native archive before the live slot can be marked deleted', async () => {
     const {native, storage, mirror} = start();
     __setStorage(storage);
-    const classic = JSON.stringify({ version: 35, clubName: 'Old', season: 2, week: 4 });
+    const classic = JSON.stringify(classicCareer('Old Town', 4));
     storage.setItem(slotKey(1), classic);
     await mirror.idle();
     native.calls.length = 0;
@@ -509,6 +516,25 @@ describe('native outcome acknowledgement', () => {
     const slotGone = native.calls.findIndex((c) => c.op === 'write' && c.name === F(slotKey(1)) + '.gone');
     expect(archiveWrite).toBeGreaterThanOrEqual(0);
     expect(slotGone).toBeGreaterThan(archiveWrite);
+  });
+
+  it('a wiped web view restores a native-only Classic save into the archive, not the live slot', async () => {
+    const native = fakeFiles();
+    const classic = JSON.stringify(classicCareer('Old Town', 8));
+    native.files.set(fileForKey(slotKey(1)), classic);
+    const storage = fakeStorage();
+    const mirror = new NativeMirror(native.api, quiet());
+    await mirror.sync(storage, []);
+    expect(storage.getItem(slotKey(1))).toBe(classic);
+    __setStorage(storage);
+    begin(true)(storage, mirror);
+    const retired = await retireClassicSlotDurable(1);
+    expect(retired).toMatchObject({ slot: 1, raw: classic, emptied: true });
+    expect(storage.getItem(slotKey(1))).toBeNull();
+    expect(storage.getItem(retiredSaveKey(1))).toBe(classic);
+    const wiped = await afterWipe(native);
+    expect(wiped.has(slotKey(1))).toBe(false);
+    expect(wiped.get(retiredSaveKey(1))).toBe(classic);
   });
 
   it('a playtest retirement is not written onto the normal career mirror', async () => {

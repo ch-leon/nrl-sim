@@ -114,6 +114,9 @@ async function newCareer(page) {
   await page.fill('[data-nrl-clubname]', 'Analytics Test FC');
   await setupStep(page, 3);
   await page.click('[data-nrl-start]');
+  await page.locator('[data-nrl-league-selection]').waitFor({ timeout: 60000 });
+  await page.locator('[data-nrl-league-confirm]').click();
+  await page.locator('[data-nrl-league-selection]').waitFor({ state: 'detached', timeout: 60000 });
   await page.click('[data-expansion-work]');
   await page.waitForSelector('.nrl-dock');
   const skip = page.locator('.nrl-tutorial-skip');

@@ -3,9 +3,17 @@ import { __resetDemo, FIRST_RUN_KEY, recordFirstRun } from '../../src/commercial
 import { __setCommercial } from '../../src/commercial/flags';
 import {
   __setStorage, getSlotSummaries, loadSlot, slotKey, writeSlot,
-  markClassicRetirementShown, readRetiredSave, retireClassicSlot, retireClassicSlots,
+  installImportedSave, markClassicRetirementShown, readRetiredSave, readRetiredSaves, retireClassicSlot, retireClassicSlots,
 } from '../../src/core/save';
-import { createNewGame } from '../../src/core/state';
+import { CLASSIC_RETIRED_TEXT } from '../../src/core/classicSave';
+import { createNewGame, type GameState } from '../../src/core/state';
+import { initLeague } from '../../src/systems/fixtures';
+
+function classicCareer(name: string, seed: number): GameState {
+  const state = createNewGame(name, seed);
+  state.league = initLeague(state);
+  return state;
+}
 import { classicRetiredNoticeKey, DEV_TEST_PREFIX, retiredSaveKey } from '../../src/core/storageKeys';
 import { setCareerNamespace } from '../../src/core/storage/local';
 import { stubLocalStorage } from '../commercial/memStorage';
@@ -20,7 +28,7 @@ afterEach(() => {
 describe('retiring a Classic save', () => {
   it('archives the raw bytes, empties the slot, and asks once', () => {
     const storage = stubLocalStorage();
-    const state = createNewGame('Old Club', 9);
+    const state = classicCareer('Old Club', 9);
     writeSlot(1, state);
     const raw = storage.getItem(slotKey(1))!;
     const first = retireClassicSlot(1);
@@ -40,7 +48,7 @@ describe('retiring a Classic save', () => {
 
   it('does not delete the slot when the archive cannot be stored', () => {
     const storage = stubLocalStorage();
-    writeSlot(2, createNewGame('Keep', 3));
+    writeSlot(2, classicCareer('Keep', 3));
     const raw = storage.getItem(slotKey(2))!;
     storage.setItem = (key, value) => {
       if (key === retiredSaveKey(2)) throw new Error('quota');
@@ -67,7 +75,7 @@ describe('retiring a Classic save', () => {
     const normal = JSON.stringify({ version: 35, clubName: 'Normal' });
     storage.setItem(slotKey(1), normal);
     setCareerNamespace(DEV_TEST_PREFIX);
-    writeSlot(1, createNewGame('Playtest', 2));
+    writeSlot(1, classicCareer('Playtest', 2));
     const retired = retireClassicSlot(1);
     expect(retired?.emptied).toBe(true);
     expect(storage.getItem(slotKey(1))).toBe(normal);
@@ -75,11 +83,35 @@ describe('retiring a Classic save', () => {
     expect(storage.getItem(DEV_TEST_PREFIX + retiredSaveKey(1))).toBe(retired!.raw);
   });
 
+  it('keeps a second Classic career beside the first instead of replacing it', () => {
+    const storage = stubLocalStorage();
+    writeSlot(1, classicCareer('First', 9));
+    const first = storage.getItem(slotKey(1))!;
+    expect(retireClassicSlot(1)?.emptied).toBe(true);
+    writeSlot(1, classicCareer('Second', 11));
+    const second = storage.getItem(slotKey(1))!;
+    expect(second).not.toBe(first);
+    expect(retireClassicSlot(1)?.emptied).toBe(true);
+    expect(readRetiredSaves(1)).toEqual([first, second]);
+    expect(storage.getItem(slotKey(1))).toBeNull();
+    expect(loadSlot(1).status).toBe('empty');
+  });
+
+  it('refuses a Classic import and does not install it', () => {
+    const storage = stubLocalStorage();
+    const classic = JSON.stringify(classicCareer('Imported', 6));
+    const res = installImportedSave(classic, 1);
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.message).toBe(CLASSIC_RETIRED_TEXT);
+    expect(storage.getItem(slotKey(1))).toBeNull();
+    expect(readRetiredSaves(1)).toEqual([]);
+  });
+
   it('does not change the commercial first-run record', () => {
     const storage = stubLocalStorage();
     __setCommercial(true);
     __resetDemo();
-    writeSlot(1, createNewGame('Old Club', 5));
+    writeSlot(1, classicCareer('Old Club', 5));
     recordFirstRun(getSlotSummaries(), 1000);
     const recorded = storage.getItem(FIRST_RUN_KEY);
     expect(JSON.parse(recorded!)).toEqual({ at: 1000, slots: [{ slot: 1, clubName: 'Old Club' }] });

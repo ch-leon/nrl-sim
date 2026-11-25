@@ -34,7 +34,7 @@ import { DEFAULT_TACTICS } from '../match/league/presets';
 import { bus } from './events';
 import { registerTickHook, TICK_ORDER, unregisterTickHook, weekHeld, activePaidCupCheckpoint, leagueIntervalSaveHeld, failedIntervalProblem, failedIntervalCheckpoint, type IntervalCheckpoint } from './time';
 import { clearLiveMatch, isLiveMatchRecord, parseLiveMatch, LIVE_MATCH_EXPORT_FIELD, peelLiveMatchExport, readLiveMatch, writeLiveMatch } from '../systems/liveMatchRecord';
-import { isClassicSave } from './classicSave';
+import { CLASSIC_RETIRED_TEXT, isClassicSave } from './classicSave';
 import { acknowledgeClassicArchive, acknowledgeClassicSlotGone, nativeCheckpointRequired } from './storage/nativeCheckpoint';
 import { classicRetiredNoticeKey, CORRUPT_SAVE_KEY, LEGACY_SAVE_KEY, liveMatchKey, retiredSaveKey, slotKey } from './storageKeys';
 import { BRAND } from '../brand';
@@ -830,12 +830,37 @@ function retirementNoticeSeen(store: LocalSaveStore, slot: number): boolean {
   catch { return false; }
 }
 
+/** A bundle of retired careers. One career is stored as itself, so an older archive still reads. */
+const RETIRED_BUNDLE = 'nrl-retired-saves';
+
+/** Every archived career in a retired-save value, oldest first. Never throws. */
+export function decodeRetiredSaves(value: string | null): string[] {
+  if (value === null) return [];
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
+      && (parsed as { kind?: unknown }).kind === RETIRED_BUNDLE
+      && Array.isArray((parsed as { saves?: unknown }).saves)
+      && (parsed as { saves: unknown[] }).saves.every((s) => typeof s === 'string')) {
+      return (parsed as { saves: string[] }).saves;
+    }
+  } catch { /* a single raw career */ }
+  return [value];
+}
+
+function encodeRetiredSaves(saves: readonly string[]): string | null {
+  if (saves.length === 0) return null;
+  if (saves.length === 1) return saves[0]!;
+  return JSON.stringify({ kind: RETIRED_BUNDLE, saves });
+}
+
 /**
- * Keep the raw Classic bytes under the retired-save key. The live slot stays until
- * `commitClassicRetirement`, so an iPhone mirror can finish the archive before the
- * slot is marked deleted. Never throws. Null when the slot is not Classic.
+ * Keep the raw Classic bytes under the retired-save key. A different career already
+ * archived for this slot stays; the new one is added beside it. The live slot stays
+ * until `commitClassicRetirement`, so an iPhone mirror can finish the archive before
+ * the slot is marked deleted. Never throws. Null when the slot is not Classic.
  */
-function stageClassicArchive(slot: number): { slot: number; raw: string } | ClassicRetirement | null {
+function stageClassicArchive(slot: number): { slot: number; raw: string; stored: string } | ClassicRetirement | null {
   const store = getStore();
   if (!store) return null;
   let raw: string | null;
@@ -843,13 +868,17 @@ function stageClassicArchive(slot: number): { slot: number; raw: string } | Clas
   catch { return null; }
   if (raw === null || !isClassicSave(raw)) return null;
   const key = retiredSaveKey(slot);
-  let archived = false;
+  let stored: string;
   try {
-    if (store.storage.getItem(key) !== raw) store.storage.setItem(key, raw);
-    archived = store.storage.getItem(key) === raw;
-  } catch { archived = false; }
-  if (!archived) return { slot, raw, emptied: false, notify: true };
-  return { slot, raw };
+    const kept = decodeRetiredSaves(store.storage.getItem(key));
+    if (!kept.includes(raw)) kept.push(raw);
+    const next = encodeRetiredSaves(kept);
+    if (next === null) return { slot, raw, emptied: false, notify: true };
+    if (store.storage.getItem(key) !== next) store.storage.setItem(key, next);
+    stored = store.storage.getItem(key) ?? '';
+    if (stored !== next || !decodeRetiredSaves(stored).includes(raw)) return { slot, raw, emptied: false, notify: true };
+  } catch { return { slot, raw, emptied: false, notify: true }; }
+  return { slot, raw, stored };
 }
 
 /** Empty the slot once its archive is durable. Never throws. */
@@ -890,7 +919,7 @@ export async function retireClassicSlotDurable(slot: number): Promise<ClassicRet
   if ('emptied' in staged) return staged;
   let ack: 'confirmed' | 'inactive' | string = 'inactive';
   if (nativeCheckpointRequired()) {
-    try { ack = await acknowledgeClassicArchive(staged.slot, staged.raw); }
+    try { ack = await acknowledgeClassicArchive(staged.slot, staged.stored); }
     catch { ack = 'failed'; }
     if (ack !== 'confirmed' && ack !== 'inactive') return { slot: staged.slot, raw: staged.raw, emptied: false, notify: true };
   }
@@ -921,10 +950,30 @@ export async function retireClassicSlotsDurable(): Promise<ClassicRetirement[]> 
   return out;
 }
 
-/** The archived Classic save for `slot`, or null. Never throws. */
+/** Every archived Classic career for `slot`, oldest first. Never throws. */
+export function readRetiredSaves(slot: number): string[] {
+  try { return decodeRetiredSaves(getStore()?.storage.getItem(retiredSaveKey(slot)) ?? null); }
+  catch { return []; }
+}
+
+/** The oldest archived Classic save for `slot`, or null. Never throws. */
 export function readRetiredSave(slot: number): string | null {
-  try { return getStore()?.storage.getItem(retiredSaveKey(slot)) ?? null; }
-  catch { return null; }
+  return readRetiredSaves(slot)[0] ?? null;
+}
+
+/** Drop one archived career. The others stay. Never throws. */
+export function deleteRetiredSave(slot: number, index: number): void {
+  const store = getStore();
+  if (!store) return;
+  try {
+    const key = retiredSaveKey(slot);
+    const saves = decodeRetiredSaves(store.storage.getItem(key));
+    if (index < 0 || index >= saves.length) return;
+    saves.splice(index, 1);
+    const next = encodeRetiredSaves(saves);
+    if (next === null) store.storage.removeItem(key);
+    else store.storage.setItem(key, next);
+  } catch { /* the list can be tried again */ }
 }
 
 /** Remember that this slot's retirement message has been shown. Never throws. */
@@ -933,12 +982,13 @@ export function markClassicRetirementShown(slot: number): void {
   catch { /* the message can show once more; the archive is already kept */ }
 }
 
-/** Hand the player the archived Classic save, the same way Export original does. */
-export function downloadRetiredSave(slot: number): void {
+/** Hand the player one archived Classic save, the same way Export original does. */
+export function downloadRetiredSave(slot: number, index = 0): void {
   try {
-    const raw = readRetiredSave(slot);
-    if (raw === null || typeof document === 'undefined') return;
-    deliverFile(`career-slot-${slot}-retired.json`, raw, { onShareFailed: shareFailed });
+    const raw = readRetiredSaves(slot)[index];
+    if (raw === undefined || typeof document === 'undefined') return;
+    const name = index === 0 ? `career-slot-${slot}-retired.json` : `career-slot-${slot}-retired-${index + 1}.json`;
+    deliverFile(name, raw, { onShareFailed: shareFailed });
   } catch {
     bus.emit('ui:notify', { text: 'Could not read the archived save. It has been kept; try again when storage is available.', kind: 'danger' });
   }
@@ -1238,6 +1288,7 @@ export function installImportedSave(text: string, slot: number): ImportResult {
   // eligible for matchday's week-start restart after the career is installed.
   const peeled = peelLiveMatchExport(text);
   if (peeled.bad) return { ok: false, message: 'the match in this file could not be read.' };
+  if (isClassicSave(peeled.text)) return { ok: false, message: CLASSIC_RETIRED_TEXT };
   const res = importSave(peeled.text);
   if (!res.ok) return res;
   if (inconsistentChallengeReplay(res.state,peeled.live)) return {ok:false,message:CHALLENGE_REPLAY_PROBLEM};
@@ -1293,7 +1344,7 @@ export function installImportedSave(text: string, slot: number): ImportResult {
 export function importIntoSlot(text: string, slot: number): GameState | null {
   const res = installImportedSave(text, slot);
   if (!res.ok) {
-    if (res.message) bus.emit('ui:notify', { text: `Import failed: ${res.message}`, kind: 'danger' });
+    if (res.message) bus.emit('ui:notify', { text: res.message === CLASSIC_RETIRED_TEXT ? CLASSIC_RETIRED_TEXT : `Import failed: ${res.message}`, kind: 'danger' });
     return null;
   }
   // The import now owns the active slot: this page's game must not save over it on

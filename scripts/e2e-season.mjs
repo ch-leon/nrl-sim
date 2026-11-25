@@ -478,6 +478,9 @@ async function play() {
     await page.fill('[data-nrl-clubname]', 'Phone Test FC');
     await setupStep(page, 3);
     await tap('[data-nrl-start]');
+    await page.locator('[data-nrl-league-selection]').waitFor({ timeout: 60000 });
+    await tap('[data-nrl-league-confirm]');
+    await page.locator('[data-nrl-league-selection]').waitFor({ state: 'detached', timeout: 60000 });
     await tap('[data-expansion-work]');
     await page.waitForSelector('.nrl-dock');
     await wait(1000);

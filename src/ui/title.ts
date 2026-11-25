@@ -693,7 +693,7 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
           const free = getSlotSummaries().find((x) => x.status === 'empty');
           if (!free) return showSlots('All slots are full — delete one before importing.');
           const res = installImportedSave(text, free.slot);
-          if (!res.ok) return showSlots(res.message ? `Import failed: ${res.message}` : 'Import failed: could not write to storage.');
+          if (!res.ok) return showSlots(res.message === CLASSIC_RETIRED_TEXT ? CLASSIC_RETIRED_TEXT : res.message ? `Import failed: ${res.message}` : 'Import failed: could not write to storage.');
           showSlots(res.repairs.length ? res.repairs[0]!.notification : undefined, 'info');
         });
       });

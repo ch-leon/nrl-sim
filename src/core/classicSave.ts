@@ -3,12 +3,18 @@
 // and never throws, so a Classic save can be recognised before anything tries to
 // load it.
 //
-// Classic: a save object (it has a numeric version) with no competitions.leagueCareer,
-// whose competitions calendar is not a League career calendar. A League career
-// calendar is the structural calendar (mode 'structural') shared by a League
-// career and an isolated developer prototype. Those stay where they are. Anything
-// that is not a save object (corrupt text, a future shape we cannot even parse)
-// is not Classic: the existing corrupt / future handling keeps it.
+// Classic needs positive evidence: a version this game understands, and the
+// 16-club league. A missing leagueCareer is not enough, so a later League shape
+// is not archived. A save newer than SAVE_VERSION is not Classic: it keeps the
+// "Update the game" message. A League career calendar is the structural calendar
+// (mode 'structural') shared by a League career and an isolated developer
+// prototype. Those stay where they are. Anything that is not a save object
+// (corrupt text, a future shape we cannot even parse) is not Classic.
+
+import { SAVE_VERSION } from './state';
+
+/** Player club plus the 15 Classic rivals. */
+export const CLASSIC_CLUB_COUNT = 16;
 
 const record = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
 
@@ -28,14 +34,22 @@ export function isLeagueCareerCalendar(competitions: unknown): boolean {
   return record(calendar) && calendar.mode === 'structural';
 }
 
+/** The old 16-club table: each club is an object with an id. */
+function isClassicLeague(save: Record<string, unknown>): boolean {
+  const league = save.league;
+  if (!record(league) || !Array.isArray(league.clubs) || league.clubs.length !== CLASSIC_CLUB_COUNT) return false;
+  return league.clubs.every((club) => record(club) && typeof club.id === 'string');
+}
+
 /** True when the payload is a Classic career save. Never throws. */
 export function isClassicSave(raw: unknown): boolean {
   const save = asSave(raw);
-  if (!save || typeof save.version !== 'number') return false;
+  if (!save || typeof save.version !== 'number' || !Number.isInteger(save.version)) return false;
+  if (save.version < 1 || save.version > SAVE_VERSION) return false;
   const competitions = save.competitions;
   if (record(competitions) && competitions.leagueCareer != null) return false;
   if (isLeagueCareerCalendar(competitions)) return false;
-  return true;
+  return isClassicLeague(save);
 }
 
 /** The one-time line a retired Classic career shows. */

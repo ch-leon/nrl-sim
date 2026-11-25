@@ -7,7 +7,14 @@ import { DIFFICULTY_BLURB, TITLE_CSS, loadingTip, showLeagueLoading, showTitleFl
 import { GROUND_MAX, NAME_MAX } from '../../src/data/names';
 import { DEFAULT_DIFFICULTY, DIFFICULTIES, DIFFICULTY } from '../../src/config';
 import { deleteSlot, readRetiredSave, slotKey, writeSlot } from '../../src/core/save';
-import { createNewGame } from '../../src/core/state';
+import { createNewGame, type GameState } from '../../src/core/state';
+import { initLeague } from '../../src/systems/fixtures';
+
+function classicCareer(name: string, seed: number): GameState {
+  const state = createNewGame(name, seed);
+  state.league = initLeague(state);
+  return state;
+}
 import { retiredSaveKey } from '../../src/core/storageKeys';
 import { bus } from '../../src/core/events';
 import { CLASSIC_RETIRED_TEXT } from '../../src/core/classicSave';
@@ -466,7 +473,7 @@ describe('League setup destination', () => {
   });
 
   it('archives a Classic save once, leaves the slot empty, and can export it', () => {
-    const original = createNewGame('Classic Club', 54);
+    const original = classicCareer('Classic Club', 54);
     writeSlot(1, original);
     const raw = localStorage.getItem(slotKey(1))!;
     const root = new StubNode('div');

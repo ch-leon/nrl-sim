@@ -349,6 +349,9 @@ async function run() {
     // Start is disabled ("Loading towns…") until the town list is in (#613); a DOM click before that does nothing.
     await page.waitForFunction(() => !document.querySelector('[data-nrl-start]')?.disabled);
     await clickTimed('[data-nrl-start]');
+    await page.locator('[data-nrl-league-selection]').waitFor({ timeout: 60000 });
+    await page.locator('[data-nrl-league-confirm]').click();
+    await page.locator('[data-nrl-league-selection]').waitFor({ state: 'detached', timeout: 60000 });
     await page.locator('[data-expansion-work]').tap();
     await page.waitForFunction(() => document.querySelector('.nrl-dock') && window.__nrlGame?.scene.isActive('Grounds'));
   });
