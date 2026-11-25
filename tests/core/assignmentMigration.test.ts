@@ -36,7 +36,8 @@ type Save = Record<string, unknown> & {
  * migration, Skills Camp, the Open Cup offer, money, the calendar) must not move.
  */
 function withoutMatchResults(save: Save): unknown {
-  const { squad: _squad, potmTally: _potm, competitions, ...rest } = save;
+  // Story cards are drawn on the replay (#820). The captured week-5 file predates that.
+  const { squad: _squad, potmTally: _potm, competitions, eventDeck: _deck, ...rest } = save;
   const { instances: _instances, ...otherCompetitions } = competitions;
   return { ...rest, competitions: otherCompetitions };
 }
@@ -116,8 +117,10 @@ it.each(['au', 'uk'] as const)(
     // The slot holds what was played, in the current save version.
     expect(bytes.get(slotKey(1))).toBe(JSON.stringify({ ...replayed, version: SAVE_VERSION }));
     if (sameEngine) {
-      expect(replayed).toEqual(w5);
-      expect(bytes.get(slotKey(1))).toBe(JSON.stringify({ ...w5, version: SAVE_VERSION }));
+      const { eventDeck: _replayedDeck, ...replayedRest } = replayed;
+      const { eventDeck: _capturedDeck, ...capturedRest } = w5;
+      expect(replayedRest).toEqual(capturedRest);
+      expect(bytes.get(slotKey(1))).toBe(JSON.stringify({ ...replayed, version: SAVE_VERSION }));
     }
     const parked = installImportedSave(JSON.stringify({ ...w5, [LIVE_MATCH_EXPORT_FIELD]: live }), 1);
     if (!parked.ok) throw Error(parked.message);
