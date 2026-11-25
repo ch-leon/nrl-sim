@@ -38,7 +38,12 @@ export async function runContentPacks(browser) {
         await page.locator('.nrl-tutorial-skip').tap();
         const state = await page.evaluate(() => window.__nrlState());
         const expected = country === 'GB' ? 'uk' : 'au';
-        if (state.pack !== expected || state.league.clubs.length !== 8) throw new Error('Wrong pack or club count');
+        const marker = expected === 'uk' ? 'rival-uk-buntings' : 'rival-larrikins';
+        const local = state.competitions?.instances?.find((i) => i.definition?.format?.kind === 'league' && i.entrantIds?.includes(state.clubId));
+        // A League career keeps the whole regional world on the save (24 clubs) and plays in a division of 8.
+        if (state.pack !== expected || state.league.clubs.length !== 24 || local?.entrantIds.length !== 8 || !state.league.clubs.some((c) => c.id === marker)) {
+          throw new Error(`Wrong pack or club count (${state.pack}, world ${state.league.clubs.length}, league ${local?.entrantIds.length})`);
+        }
         if (report.ukRequests !== (expected === 'uk' ? 1 : 0)) throw new Error(`Unexpected UK requests: ${report.ukRequests}`);
         report.pack = state.pack;
         report.clubs = state.league.clubs.length;
