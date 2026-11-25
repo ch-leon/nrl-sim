@@ -7,6 +7,8 @@ live gameplay change; work still open below has not shipped.
 
 ## Now
 
+- **Open-side shifts through hands.** A wide ruck can move the ball to the far winger through ordinary catches and passes. Cover, a missing link or a coach call ends it. Lab sign-off remains open. Ported from [draft PR #799](https://github.com/ch-leon/nrl-sim/pull/799).
+
 - **Repeat one-on-ones.** A repeat win names both players and links them on the pitch. The first win keeps the commentator's own line, and a tactic counter is never replaced. Lab sign-off remains open. Ported from [draft PR #792](https://github.com/ch-leon/nrl-sim/pull/792).
 
 - **Penalty advantage.** An ordinary offside at the ruck can play on for 3.5 seconds. Eight metres, a break or a try takes it; otherwise the penalty returns to the mark. Lab sign-off remains open. Ported from [draft PR #791](https://github.com/ch-leon/nrl-sim/pull/791).

@@ -34,8 +34,9 @@ function surface() {
 }
 
 /** A decided full-time match after golden point, using the lab's default sides and seven-minute halves.
- * Impact interchanges stay off. The open-play dummy moves seed 20 off golden point. Seed 103 is a
- * decided one (14–15). With the dummy off, seed 20 is still the decided 13–12 golden-point match.
+ * Impact interchanges stay off. Seeds 1–160: the first decided golden-point match is seed 29
+ * (26–31). With the shift off, seed 103 is still the decided 14–15. The open-play dummy moves
+ * seed 20 off golden point; with the dummy off as well, seed 20 is still the decided 13–12.
  * A draw at the end has no winner, so the pose check needs a decided score.
  */
 function goldenSnaps(seed: number): Snapshot[] {
@@ -54,12 +55,16 @@ function decidedGolden(snaps: Snapshot[]): boolean {
 function play(): Snapshot[] {
   const restore = applyTuning({ 'bench.impact.on': 0 });
   try {
-    const snaps = goldenSnaps(103);
-    if (!decidedGolden(snaps)) throw new Error('seed 103 is not a decided golden-point match');
-    const old = applyTuning({ 'live.dummyChance': 0 });
+    const snaps = goldenSnaps(29);
+    if (!decidedGolden(snaps)) throw new Error('seed 29 is not a decided golden-point match');
+    const shiftOff = applyTuning({ 'shapes.openSide.on': 0 });
     try {
-      if (!decidedGolden(goldenSnaps(20))) throw new Error('seed 20 is not a decided golden-point match with the dummy off');
-    } finally { old(); }
+      if (!decidedGolden(goldenSnaps(103))) throw new Error('seed 103 is not a decided golden-point match with the shift off');
+      const old = applyTuning({ 'live.dummyChance': 0 });
+      try {
+        if (!decidedGolden(goldenSnaps(20))) throw new Error('seed 20 is not a decided golden-point match with the dummy off');
+      } finally { old(); }
+    } finally { shiftOff(); }
     return snaps;
   } finally { restore(); }
 }

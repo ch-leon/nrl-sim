@@ -3,6 +3,7 @@
 // firing: more of the thing the trait is for, named on the event, replayable.
 import { describe, it, expect } from 'vitest';
 import { LiveSim } from '../../../src/match/league/live';
+import { applyTuning } from '../../../src/match/league/tuning';
 import { OPEN, contestOdds, interceptChance, stepChance, AVERAGE } from '../../../src/match/league/contest';
 import { EDGE_COST, TRAIT_PTS, bootMult, contestTraits, interceptTraits, speedMult, stepTraits } from '../../../src/match/league/traits';
 import { kickTarget, pickReceiver } from '../../../src/match/league/tactics';
@@ -30,10 +31,11 @@ function sheet(id: string, traits: (i: number) => TraitInstance[] | undefined = 
   };
 }
 
-function events(home: TeamSheet, away: TeamSheet, seeds: number, seconds: number): SimEvent[] {
+function events(home: TeamSheet, away: TeamSheet, seeds: number | readonly number[], seconds: number): SimEvent[] {
   const out: SimEvent[] = [];
   const n = Math.round(seconds / TICK_S);
-  for (let s = 1; s <= seeds; s++) {
+  const list = typeof seeds === 'number' ? Array.from({ length: seeds }, (_, i) => i + 1) : seeds;
+  for (const s of list) {
     const sim = new LiveSim(home, away, s);
     for (let i = 0; i < n; i++) {
       sim.step();
@@ -168,11 +170,20 @@ describe('traits in the live sim', () => {
     expect(count(pm, 'cut-out', 'home')).toBeGreaterThan(0);
     expect(count(control, 'cut-out')).toBe(0);
     // Eight seeds (four until held up at the line, #652, and the last-tackle call, #650, together left them without a long kick or bomb).
-    const boot = events(sheet('H', (i) => (i === 5 ? T('bigBoot', 2) : undefined)), sheet('A'), 8, SECS);
+    // The open-side shift lets seed 5's five-eighth kick a long ball, so that seed is not in the named set.
+    // Seeds 1–4 and 6–8 are still all the halfback's. With the shift off, seeds 1–8 are all named again.
+    const bootHome = sheet('H', (i) => (i === 5 ? T('bigBoot', 2) : undefined));
+    const boot = events(bootHome, sheet('A'), [1, 2, 3, 4, 6, 7, 8], SECS);
     // Big Boot shapes the long kicks and bombs (distance and accuracy); grubbers and chips are placement, not power.
     const kicks = boot.filter((e) => e.kind === 'kick' && e.side === 'home' && (e.detail === 'long' || e.detail === 'bomb'));
     expect(kicks.length).toBeGreaterThan(0);
     expect(kicks.every((e) => e.trait === 'Big Boot II')).toBe(true);
+    const shiftOff = applyTuning({ 'shapes.openSide.on': 0 });
+    try {
+      const old = events(bootHome, sheet('A'), 8, SECS).filter((e) => e.kind === 'kick' && e.side === 'home' && (e.detail === 'long' || e.detail === 'bomb'));
+      expect(old.length).toBeGreaterThan(0);
+      expect(old.every((e) => e.trait === 'Big Boot II')).toBe(true);
+    } finally { shiftOff(); }
   });
   it('replays identically with traits, and an empty trait list is the same as none', () => {
     const traited = sheet('H', (i) => (i % 2 ? T('jets', 2) : T('lastLine')));

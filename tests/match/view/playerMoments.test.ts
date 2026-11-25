@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { applyTuning } from '../../../src/match/league/tuning';
 import { playerPicture } from '../../../src/match/view/playerPicture';
 import type { PlayerSnap } from '../../../src/match/core/snapshot';
 const p: PlayerSnap = { side: 'home', slot: 0, who: 'captain', x: 50, y: 20, pose: 'kick', headX: 1, speed: 0 };
@@ -97,6 +98,9 @@ it('turns the recovered tee kicker toward his current direction while leaving th
 it('uses the pinned seed8 aerial and try handoffs, with deterministic scorer entry and a single knee-slide drop', async () => {
   // Current default structures (#649) move the first try to 570 (Dane Addison);
   // the opening aerial 120 and the actual try's 20-tick recovery remain.
+  // The open-side shift keeps the aerial at 120. Seed 8's first try is now tick 1914,
+  // and the dive / rise handoffs are still 9, 10, 19 and 20 ticks after it.
+  // With only the shift off, the try handoff is still 579 / 580 / 589 / 590.
   const { LiveSim } = await import('../../../src/match/league/live');
   const { labSheet, DEFAULT_HOME, DEFAULT_AWAY } = await import('../../../src/match/lab/sheets');
   const { pictureContext } = await import('../../../src/match/view/playerPicture');
@@ -108,9 +112,9 @@ it('uses the pinned seed8 aerial and try handoffs, with deterministic scorer ent
   let before = sim.snapshot();
   let recovered: ReturnType<typeof cache.get> | undefined;
   const seen = new Set<string>();
-  for (let tick = 1; tick <= 590; tick++) {
+  for (let tick = 1; tick <= 1934; tick++) {
     sim.step(); const s = sim.snapshot();
-    if ([120, 124, 125, 126, 579, 580, 589, 590].includes(tick)) {
+    if ([120, 124, 125, 126, 1923, 1924, 1933, 1934].includes(tick)) {
       const holder = s.ball.holder!;
       expect(holder).not.toBeNull();
       const man = s.players.find(p => p.side === holder.side && p.slot === holder.slot)!;
@@ -127,10 +131,10 @@ it('uses the pinned seed8 aerial and try handoffs, with deterministic scorer ent
         expect(cache.get(man.side, carry).data).toEqual(pixels.data); seen.add('carry-end');
       }
       if (tick === 126) expect(picture.action).toBe('carry');
-      if (tick === 579) { expect(picture).toMatchObject({ action: 'dive', frame: 5 }); recovered = pixels; }
-      if (tick === 580) { expect(picture).toMatchObject({ action: 'tryRise', frame: 0 }); expect(pixels.data).toEqual(recovered!.data); seen.add('ground-rise'); }
-      if (tick === 589) { expect(picture).toMatchObject({ action: 'tryRise', frame: 5 }); recovered = pixels; }
-      if (tick === 590) {
+      if (tick === 1923) { expect(picture).toMatchObject({ action: 'dive', frame: 5 }); recovered = pixels; }
+      if (tick === 1924) { expect(picture).toMatchObject({ action: 'tryRise', frame: 0 }); expect(pixels.data).toEqual(recovered!.data); seen.add('ground-rise'); }
+      if (tick === 1933) { expect(picture).toMatchObject({ action: 'tryRise', frame: 5 }); recovered = pixels; }
+      if (tick === 1934) {
         expect(picture.frame).toBe(0); expect(pixels.data).toEqual(recovered!.data); seen.add('rise-cheer');
         playerPicture(man, was, tick + 20, holder, -1);
         expect(playerPicture(man, was, tick, holder, 1, context)).toEqual(picture);
@@ -139,6 +143,35 @@ it('uses the pinned seed8 aerial and try handoffs, with deterministic scorer ent
     before = s;
   }
   expect(seen.size).toBe(5);
+  const shiftOff = applyTuning({ 'shapes.openSide.on': 0 });
+  try {
+    const old = new LiveSim(home, away, 8);
+    let oldBefore = old.snapshot();
+    let oldRecovered: ReturnType<typeof cache.get> | undefined;
+    const oldSeen = new Set<string>();
+    for (let tick = 1; tick <= 590; tick++) {
+      old.step(); const s = old.snapshot();
+      if ([579, 580, 589, 590].includes(tick)) {
+        const ball = s.ball.holder!;
+        expect(ball).not.toBeNull();
+        const man = s.players.find(q => q.side === ball.side && q.slot === ball.slot)!;
+        const was = oldBefore.players.find(q => q.side === man.side && q.slot === man.slot)!;
+        const context = pictureContext(s, oldBefore);
+        const picture = playerPicture(man, was, tick, ball, 1, context);
+        const pixels = cache.get(man.side, picture);
+        if (tick === 579) { expect(picture).toMatchObject({ action: 'dive', frame: 5 }); oldRecovered = pixels; }
+        if (tick === 580) { expect(picture).toMatchObject({ action: 'tryRise', frame: 0 }); expect(pixels.data).toEqual(oldRecovered!.data); oldSeen.add('ground-rise'); }
+        if (tick === 589) { expect(picture).toMatchObject({ action: 'tryRise', frame: 5 }); oldRecovered = pixels; }
+        if (tick === 590) {
+          expect(picture.frame).toBe(0); expect(pixels.data).toEqual(oldRecovered!.data); oldSeen.add('rise-cheer');
+          playerPicture(man, was, tick + 20, ball, -1);
+          expect(playerPicture(man, was, tick, ball, 1, context)).toEqual(picture);
+        }
+      }
+      oldBefore = s;
+    }
+    expect([...oldSeen].sort()).toEqual(['ground-rise', 'rise-cheer']);
+  } finally { shiftOff(); }
   let slider: typeof p | undefined;
   for (let i = 0; i < 60; i++) {
     const candidate = { ...p, who: `slider-${i}`, pose: 'celebrate', tryTick: 100, celebrationTick: 100 };

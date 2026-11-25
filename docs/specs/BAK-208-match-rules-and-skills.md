@@ -466,6 +466,25 @@ The initial slice added no decoy or carrier-line contest. The bounded lead read
 for the back-door packet is described below; carrier-line contests remain separate
 work. The initial structures remain subject to browser and standard-harness comparison.
 
+### Open-side shifts through hands
+
+An ordinary ruck clearly to one side of midfield can start a shift to the far
+winger before the final two tackles. Affected players must be able to run to
+their lanes during the tackle and play-the-ball. The chance varies with the
+attack preset, and the existing shape draw is used unless a learned playbook
+was equipped. A set play that launches, coach instruction or manual input
+takes priority. A side with an idle learned playbook can still shift.
+
+Dummy-half has to find the first receiver in the normal passing window. Each
+following receiver must be free, behind the passer and in reach. The ball moves
+early when there is room to pass. Immediate cover, a missing link, a wait too long
+or an interruption sends the carrier back to ordinary play. Normal catching,
+interception and tackling decide how far the shift gets. On the last tackle,
+the existing wide-pass decision looks to the open side if an eligible target
+there has comparable room. The kick, run and pass weights stay the same.
+`shapes.openSide.on:0` restores the preceding shapes and last-tackle receiver,
+and consumes no extra roll. With the knob on, recovery engine revision is 24.
+
 ### Ordinary back-door support (#649)
 
 `shapes.backDoor.on:1` adds one ordinary structure without changing the existing

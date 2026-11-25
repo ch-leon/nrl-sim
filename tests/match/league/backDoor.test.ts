@@ -237,7 +237,7 @@ describe('ordinary back-door option (#649)',()=>{
 
   it('off preserves the preceding ordinary-shapes event and RNG fingerprint exactly',async()=>{
     // Keep later kicking, return, goal-line, dummy and advantage mechanics off for this fingerprint.
-    restores.push(applyTuning({'shapes.backDoor.on':0,'longKick.on':0,'wingBomb.on':0,'secondKicker.on':0,'kickReturn.on':0,'goalLineStand.on':0,'bench.impact.on':0,'cornerCover.on':0,'live.dummyChance':0,'penalty.advantageTicks':0}));
+    restores.push(applyTuning({'shapes.openSide.on':0,'shapes.backDoor.on':0,'longKick.on':0,'wingBomb.on':0,'secondKicker.on':0,'kickReturn.on':0,'goalLineStand.on':0,'bench.impact.on':0,'cornerCover.on':0,'live.dummyChance':0,'penalty.advantageTicks':0}));
     const sim=new LiveSim(sideSheet('H',{rating:60}),sideSheet('A',{rating:60}),1),parts:string[]=[];
     const rng=(sim as unknown as {rng:{next:()=>number}}).rng,next=rng.next.bind(rng);let draws=0;
     rng.next=()=>{draws++;return next();};

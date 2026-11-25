@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 
 afterEach(() => { vi.unstubAllGlobals(); vi.resetModules(); });
 
-it('uses revision twenty-three and separates recovery identities by the actual frozen field', async () => {
+it('uses revision twenty-four and separates recovery identities by the actual frozen field', async () => {
   const identities: string[] = [];
   const revisions: number[] = [];
   const accepts: ((engineId: string) => boolean)[] = [];
@@ -19,12 +19,12 @@ it('uses revision twenty-three and separates recovery identities by the actual f
     accepts.push(engineId => liveMatchSameRules({ engineId, halfMinutes: NINES.halfMinutes }));
   }
   expect(new Set(identities).size).toBe(3);
-  expect(revisions).toEqual([23, 23, 23]);
+  expect(revisions).toEqual([24, 24, 24]);
   for (let current = 0; current < identities.length; current++) {
     for (let saved = 0; saved < identities.length; saved++) {
       expect(accepts[current]!(identities[saved]!)).toBe(current === saved);
     }
-    for (const prior of [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]) {
+    for (const prior of [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]) {
       const otherEngine = identities[current]!.replace(/^nrl-live-\d+-/, `nrl-live-${prior}-`);
       expect(accepts[current]!(otherEngine)).toBe(false);
     }
