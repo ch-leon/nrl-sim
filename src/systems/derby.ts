@@ -40,12 +40,12 @@ export function isDerbyFixture(state: DerbyState, fixture: Fixture): boolean {
     || (fixture.awayId === state.clubId && fixture.homeId === rival));
 }
 
-/** This week's club matches: the Classic round, or a League career's calendar slot. Trials are not derbies. */
+/** This week's club matches: the Classic round, or a League career's calendar slot, trials included. */
 function slotFixtures(state: GameState, slot: number): Fixture[] {
   if (!hasStructuralCalendar(state)) return state.league.fixtures.filter((f) => f.round === slot);
   const out: Fixture[] = [];
   for (const instance of state.competitions!.instances) {
-    if (instance.definition.format.kind === 'exhibition') continue;
+    // A trial against the neighbour is still a derby.
     for (const fixture of instance.fixtures) {
       if (fixture.slot !== slot) continue;
       out.push(fixtureBridge({ instance, fixture }));

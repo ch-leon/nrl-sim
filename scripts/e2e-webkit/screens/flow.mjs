@@ -254,6 +254,7 @@ export async function runFlow(browser, { w: W, h: H, text }) {
       if (from > 23) break;
       await menuPick('×4 weeks');
       await page.waitForTimeout(200);
+      if (await page.locator('[data-skip-events]').count()) await tap('[data-skip-events]');
       if (await page.locator('[data-advance-confirm]').count()) {
         out.push('×4 weeks asked to confirm');
         await tap('[data-confirm-advance]');

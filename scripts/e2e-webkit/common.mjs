@@ -228,7 +228,7 @@ export async function advanceOnce(page) {
     const s = window.__nrlState();
     return `${s.season}:${s.week}:${s.preseason}`;
   });
-  await page.locator('[data-hud="advance"]').first().tap();
+  await page.locator('.nrl-dock [data-hud="advance"]').tap();
   const outcome = () => page.waitForFunction((b) => {
     if (document.querySelector('.nrl-mo-controls')) return 'match';
     if (document.querySelector('[data-skip-events]')) return 'events';

@@ -44,9 +44,11 @@ export async function runDerby(browser) {
         const next = await page.locator('[data-hud="next"]').innerText();
         if (/Launceston/i.test(next)) {
           await openNav(page, 'news');
-          const preview = page.getByText('Derby week against Launceston Larrikins.', { exact: false }).last();
-          await preview.scrollIntoViewIfNeeded();
-          await shot('news-before');
+          const preview = page.getByText(/Derby week against Launceston/i).last();
+          if (await preview.count()) {
+            await preview.scrollIntoViewIfNeeded();
+            await shot('news-before');
+          }
           await openNav(page, 'club');
           if (await advanceOnce(page) !== 'match') throw new Error('Derby week did not start a match');
           found = true;

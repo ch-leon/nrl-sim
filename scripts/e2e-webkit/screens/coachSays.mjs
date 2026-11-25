@@ -29,9 +29,9 @@ export async function runCoachSays(browser) {
       // to this test game's in-memory state, exposed by the existing ?e2e hook.
       await page.evaluate(() => {
         const s = window.__nrlState();
-        const positions = ['fullback', 'winger', 'winger', 'centre', 'five-eighth', 'halfback', 'hooker', 'prop', 'second-row'];
-        s.squad.forEach((p, i) => { p.position = positions[i % 9]; p.injuredWeeks = 0; p.suspendedWeeks = 0; });
-        s.lineup.starters = s.squad.slice(0, 9).map((p) => p.id);
+        // Keep the generated nines lineup. Rewriting every player onto the nine
+        // positions makes the career fail its own checks, and Play Week does nothing.
+        s.squad.forEach((p) => { p.injuredWeeks = 0; p.suspendedWeeks = 0; });
         s.objectives = [];
         s.eventDeck.pending = [];
         s.settings.weekSummary = true;

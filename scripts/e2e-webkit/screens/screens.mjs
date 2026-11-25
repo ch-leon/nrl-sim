@@ -28,7 +28,7 @@ const NAV_SCREENS = [
   { id: 'recruit', box: '.nrl-screen-region', rows: '.nrl-grid-body > .nrl-row', primary: ['.nrl-grid-body > :first-child .nrl-row-action'] },
   // The league sheet shares the phone with the events column, so two whole rows is the bar.
   { id: 'fixtures', box: '.nrl-screen-region', rows: '.nrl-fixture-row', primary: ['[data-next-row]'], minRows: 2 },
-  { id: 'ladder', box: '.nrl-screen-region', rows: '.nrl-ladder-table tbody tr', more: '.nrl-ladder-scroll', minRows: 2 },
+  { id: 'ladder', box: '.nrl-screen-region', rows: '.nrl-ladder-table tbody tr', more: '.nrl-league-calendar .nrl-league-ladder', minRows: 2 },
   { id: 'news', box: '.nrl-screen-region .nrl-modal', rows: '.nrl-news-item, .nrl-news-empty', card: '.nrl-event-card' },
   { id: 'build', box: '.nrl-screen-region', rows: '.nrl-build-list > *', primary: ['.nrl-build-list > :first-child'] },
   // #610: THIS WEEK's seven lines all show; the seventh, Home gates, was under the sheet's foot.
