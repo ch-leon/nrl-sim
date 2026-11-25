@@ -22,8 +22,12 @@ import { sponsorReturn } from '../../systems/economy';
 import { matchIncomeTier } from '../../systems/matchIncome';
 import { leagueSeasonView } from '../../systems/leagueSeasonView';
 import { officeUnlockLine } from '../coachCallsText';
+import { FACILITY_CATALOG, type FacilityDefId } from '../../data/facility';
 
 const percent = (x: number): string => `${Math.round(x * 100)}%`;
+/** A facility's build price, read from the catalog so the guide cannot drift from it (#836). */
+const price = (id: FacilityDefId): string => fmtMoney(FACILITY_CATALOG[id].cost);
+const seats = (level: 1 | 2 | 3): string => ECON.CAPACITY[level]!.toLocaleString('en-AU');
 /** The `footyIQ` stat as the content pack names it (#361): "Footy IQ", and "footy IQ" mid-sentence. */
 const IQ = activePack().vocab.iqStat;
 const IQ_INLINE = inlineIqStat(activePack());
@@ -56,7 +60,7 @@ export function sponsorBullet(club: GameState | (Pick<GameState, 'reputation' | 
 export function coachsOfficeBullet(club: Pick<GameState, 'facilities'> | null = clubNow()): string {
   const level = (club?.facilities ?? []).reduce((m, f) => (f.defId === 'coachsOffice' ? Math.max(m, f.level) : m), 0);
   const yours = level > 0 ? `Yours is level ${level}. ` : '';
-  return `Coach’s Office ($30,000): IQ, handling and kicking, and morale, and it unlocks coach calls (Office ▸ Coach calls lists them all). ${yours}${officeUnlockLine(level)}`;
+  return `Coach’s Office (${price('coachsOffice')}): IQ, handling and kicking, and morale, and it unlocks coach calls (Office ▸ Coach calls lists them all). ${yours}${officeUnlockLine(level)}`;
 }
 
 /**
@@ -327,11 +331,11 @@ export const CLUB_PAGES: readonly GuidePage[] = [
         // A getter, so the Coach's Office line names what the club's next level unlocks each time the page is shown.
         get bullets(): string[] {
           return [
-            `Training Paddock ($8,000): speed and stamina. Weights Room ($15,000): strength. Team Gym ($40,000): strength, speed and stamina. Video Room ($18,000): ${IQ_INLINE}.`,
+            `Training Paddock (${price('trainingPaddock')}): speed and stamina. Weights Room (${price('weightsRoom')}): strength. Team Gym (${price('teamGym')}): strength, speed and stamina. Video Room (${price('videoRoom')}): ${IQ_INLINE}.`,
             coachsOfficeBullet(),
-            'Physio Centre ($22,000): stamina, and injuries heal a week faster. Medical Bay ($35,000): injuries heal faster by its level.',
-            `Canteen ($12,000): morale. Sponsor Board ($10,000, one only): ${fmtMoney(ECON.SPONSOR_BASE)} a week plus ${fmtMoney(ECON.SPONSOR_PER_REP)} a reputation point (up to ${fmtMoney(ECON.SPONSOR_CAP)}), more at levels 2 and 3. Grandstand ($120,000, one only): seats 3,500, 5,000 or 6,500.`,
-            'Academy ($60,000): handling, kicking and IQ, more and better juniors each pre-season. Scout Office ($25,000): a better free-agent pool and signing fees 10% cheaper per level.',
+            `Physio Centre (${price('physioCentre')}): stamina, and injuries heal a week faster. Medical Bay (${price('medicalBay')}): injuries heal faster by its level.`,
+            `Canteen (${price('canteen')}): morale. Sponsor Board (${price('sponsorBoard')}, one only): 3% / 9% / 18% of the match base on played matches at levels 1 / 2 / 3. Grandstand (${price('grandstand')}, one only): seats ${seats(1)}, ${seats(2)} or ${seats(3)}, and home matches pay 15% / 45% / 90% more of the base.`,
+            `Academy (${price('academy')}): handling, kicking and IQ, more and better juniors each pre-season. Scout Office (${price('scoutOffice')}): a better free-agent pool and signing fees 10% cheaper per level.`,
           ];
         },
       },
@@ -358,7 +362,7 @@ export function guidePageForCareer(page: GuidePage, state: GameState | null = cl
     { heading: 'Choosing next season', text: 'Choose a league before play begins. At the end of the full calendar, review the completed year and deliberately choose any earned league. Time stays paused at that choice; confirming runs ageing, contracts and the new schedule once. League choice never lowers the club’s attained capacity.' },
     ...page.sections.slice(1),
   ] };
-  if (page.id === 'events') return { ...page, sections: [{ text: 'Decision-card events and optional competition offers are not enabled in this League career. Your saved fixtures are the competitions you actually entered; no event cash or season-end trip is promised.' }] };
+  if (page.id === 'events') return { ...page, sections: [...page.sections, { heading: 'In a League career', text: 'Cards follow the saved calendar. A card about the next match waits for a real fixture, never a rest week, and a player away at Skills Camp or booked for an event is never its subject. A ban counts down on fixtures played. The trip away is offered when the season closes. The Open Cup, Skills Camp and Big Mick’s events are offered on their own screens.' }] };
   if (page.id === 'money') return { ...page, sections: page.sections.map(section => section.heading === 'Coming in'
     ? { ...section, bullets: [...section.bullets!.slice(0, 2), sponsorBullet(state), rewards,
       'Match payments follow the chosen sporting division, even when the club retains a higher salary-cap capacity. Choosing an easier league does not reduce that capacity.'] } : section) };

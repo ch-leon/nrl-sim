@@ -59,6 +59,12 @@ export function finalsObjectiveText(top: number): string {
  * catalog build, capped at `BUILD_TARGET_EXTRA`. Zero when the cash cannot
  * buy one: that goal is left off, because a club cannot go into the red to meet it.
  */
+/** Every catalog facility built and at level 3: anything more would only be a duplicate. */
+export function everyFacilityMaxed(facilities: GameState['facilities']): boolean {
+  return (Object.keys(FACILITY_CATALOG) as (keyof typeof FACILITY_CATALOG)[])
+    .every(id => facilities.some(f => f.defId === id && f.level === 3));
+}
+
 export function buildsTheCashCovers(money: number): number {
   const cheapest = Math.min(...Object.values(FACILITY_CATALOG).map((f) => f.cost));
   if (cheapest <= 0) return BOARD.BUILD_TARGET_EXTRA;
@@ -106,9 +112,10 @@ function objectivesForField(state: GameState, top: number): Objective[] {
       text: `Finish above ${rival.name}${derby ? ", our derby rival" : ""}`,
     });
   } else {
-    // The draw is already consumed. A goal the cash cannot pay for is not set.
+    // The draw is already consumed. A goal the cash cannot pay for is not set,
+    // and neither is one for a club with every facility already at its top level (#836).
     const extra = buildsTheCashCovers(state.money);
-    if (extra > 0) {
+    if (extra > 0 && !everyFacilityMaxed(state.facilities)) {
       const target = state.facilities.length + extra;
       out.push({ id: `s${season}-build`, kind: 'build', target, status: 'pending', text: `Have ${target} facilities built` });
     }

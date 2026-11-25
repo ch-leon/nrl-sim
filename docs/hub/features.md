@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- **Guide prices match the game.** The Grounds page reads every facility price from the facility list, so the Grandstand now shows $30,000 and the Sponsor Board its match-based income instead of an old weekly figure. The Events page no longer says story cards are off in a League career. The board stops setting a building goal once every facility is at level 3.
+
 - **Set-play tap.** Calling a play from the match tray now hits at once: the tile lights under the finger, a CALLED banner names it, and a short sting plays. A buzz fires where the phone supports it. When the play comes off — a bust, a line break or a try — the camera pulls in, the crowd lifts, and the commentary credits PLAY CALLED. A breakdown stays a quiet read. Match results are unchanged. [PR #828](https://github.com/ch-leon/nrl-sim/pull/828). [#825](https://github.com/ch-leon/nrl-sim/issues/825).
 
 - **Story events in League career.** The Classic deck, including the wildcards and the Bali trip, now turns up in a League career. Cards follow the 25-week year, the trip is offered when the season closes, and a player away at Skills Camp or a booked event is not the subject of a card. A wildcard ban misses real fixtures. [#820](https://github.com/ch-leon/nrl-sim/issues/820).
