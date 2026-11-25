@@ -44,7 +44,8 @@ export async function runContentPacks(browser) {
         if (state.pack !== expected || state.league.clubs.length !== 24 || local?.entrantIds.length !== 8 || !state.league.clubs.some((c) => c.id === marker)) {
           throw new Error(`Wrong pack or club count (${state.pack}, world ${state.league.clubs.length}, league ${local?.entrantIds.length})`);
         }
-        if (report.ukRequests !== (expected === 'uk' ? 1 : 0)) throw new Error(`Unexpected UK requests: ${report.ukRequests}`);
+        // AU never fetches a UK chunk. A UK League career fetches the pack and the career profile, each its own file.
+        if ((expected === 'uk') !== (report.ukRequests > 0)) throw new Error(`Unexpected UK requests: ${report.ukRequests}`);
         report.pack = state.pack;
         report.clubs = state.league.clubs.length;
         await playTrials(page);

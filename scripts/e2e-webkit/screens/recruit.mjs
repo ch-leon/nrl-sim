@@ -83,7 +83,8 @@ export async function runRecruit(browser) {
         }
         await page.locator(SHEET_EXIT).tap();
         await openNav(page, 'recruit');
-        check(await rows.count() === 4, 'reopening resets shortlist');
+        // A reach player, or a thin affordable pool, makes the shortlist shorter than four. Reopening returns to that same list.
+        check(await rows.count() === shown, 'reopening resets shortlist');
         const before = await page.evaluate(() => ({ bank: window.__nrlState().money, squad: window.__nrlState().squad.length }));
         await page.locator(`[data-row-player="${picked}"] .nrl-row-action`).tap();
         check(await page.evaluate((id) => window.__nrlState().squad.some((p) => p.id === id), picked), 'pick signed');
