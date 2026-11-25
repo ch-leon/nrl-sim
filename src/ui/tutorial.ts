@@ -97,9 +97,11 @@ export const STEPS: readonly TutorialStep[] = [
     id: 'recruit',
     // The default sort is by rating, so the first enabled SIGN is the best player the club can afford.
     text: 'Tap Sign on the best player you can afford; leave enough for the bills.',
+    // A player's page opened over the list covers it: his Sign (on its Deal tab), else ◂ back to the list.
     anchor:
       `[data-screen-key="recruit"] .nrl-row:has(.nrl-row-action:not(:disabled)), ` +
-      `[data-screen-key="recruit"] .nrl-row-action:not(:disabled), ${inSquad('recruit')}`,
+      `[data-screen-key="recruit"] .nrl-row-action:not(:disabled), ` +
+      `.nrl-player-modal [data-player-action="sign"]:not(:disabled), .nrl-player-modal .nrl-back, ${inSquad('recruit')}`,
     advanceOn: 'player:signed',
     opens: 'recruit',
     tap: 2,
@@ -506,6 +508,7 @@ function renderStep(): void {
 function findAnchor(selector: string): { el: HTMLElement; fallback: boolean } | null {
   const root: ParentNode = document.getElementById('ui-root') ?? document;
   const choices = selector.split(',');
+  let firstCovered: HTMLElement | null = null;
   for (const [i, choice] of choices.entries()) {
     let found: HTMLElement | null;
     try {
@@ -517,10 +520,33 @@ function findAnchor(selector: string): { el: HTMLElement; fallback: boolean } | 
     }
     if (!found) continue;
     const r = found.getBoundingClientRect();
+    if (r.width === 0 || r.height === 0) continue;
+    // Under another screen (a player's page over the list): the next choice, if one is on top.
+    if (covered(found)) {
+      firstCovered ??= found;
+      continue;
+    }
     // On a nav tab when the step is about something on a screen: the screen was closed.
-    if (r.width > 0 && r.height > 0) return { el: found, fallback: i > 0 && !choices[0]!.trim().startsWith('.nrl-nav') && found.closest('.nrl-nav') !== null };
+    return { el: found, fallback: i > 0 && !choices[0]!.trim().startsWith('.nrl-nav') && found.closest('.nrl-nav') !== null };
   }
-  return null;
+  // Every choice covered: keep the first, unringed (renderCutout), rather than strand the bubble.
+  return firstCovered ? { el: firstCovered, fallback: false } : null;
+}
+
+/**
+ * Whether something else is on top of `node` where it is in sight: another screen or
+ * sheet opened over it. The tutorial's own bubble and the toast lane don't count. A
+ * node scrolled out of sight is not covered (its ring just waits for it).
+ */
+function covered(node: HTMLElement): boolean {
+  if (typeof document === 'undefined' || typeof document.elementsFromPoint !== 'function') return false;
+  const seen = visiblePart(node.getBoundingClientRect(), clipBoxes(node));
+  if (!seen) return false;
+  for (const hit of document.elementsFromPoint((seen.left + seen.right) / 2, (seen.top + seen.bottom) / 2)) {
+    if (hit.closest('.nrl-tutorial, .nrl-toast-lane')) continue;
+    return hit !== node && !node.contains(hit);
+  }
+  return false;
 }
 
 /** The sheets that rise as they open (nrl-sheet-up in ui/dom.ts): a screen, and Office's tiles. */
@@ -613,11 +639,12 @@ function onScrollOrResize(fn: () => void): () => void {
 
 /**
  * Ring the part of the anchor that is in sight (pointer-events:none, so it stays
- * tappable). Scrolled out of view, the ring goes and the whole screen dims until
- * it is back, instead of a ring left over whatever scrolled into its place.
+ * tappable). Scrolled out of view or under another screen, the ring goes and the
+ * whole screen dims until it is back: the ring only ever marks something that can be
+ * tapped now, never whatever took its place.
  */
 function renderCutout(a: ActiveTutorial, anchorEl: HTMLElement): void {
-  const seen = visiblePart(anchorEl.getBoundingClientRect(), clipBoxes(anchorEl));
+  const seen = covered(anchorEl) ? null : visiblePart(anchorEl.getBoundingClientRect(), clipBoxes(anchorEl));
   const old = a.overlay.querySelector<HTMLElement>('.nrl-tutorial-cutout');
   if (!seen) {
     old?.remove();

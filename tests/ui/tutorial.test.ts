@@ -85,6 +85,10 @@ describe('STEPS: three guided taps (#370)', () => {
     expect(byId.get('build')!.anchor!.split(',')[0]).toContain('[data-screen-key="build"] [data-facility="trainingPaddock"]');
     // The first enabled SIGN under the default rating sort: the best player the club can afford.
     expect(byId.get('recruit')!.anchor!.split(',')[0]).toContain('[data-screen-key="recruit"] .nrl-row:has(.nrl-row-action:not(:disabled))');
+    // A player's page over the list: his Sign, else back to the list, before the Squad fallbacks.
+    const choices = byId.get('recruit')!.anchor!.split(',').map((c) => c.trim());
+    expect(choices.indexOf('.nrl-player-modal [data-player-action="sign"]:not(:disabled)')).toBe(2);
+    expect(choices.indexOf('.nrl-player-modal .nrl-back')).toBe(3);
     expect(byId.get('advance')!.anchor).toBe('.nrl-hud-actions .nrl-btn');
     // The placement step frames the bar on the grass and moves on once the bar is up.
     expect(byId.get('build')!.until).toBe('.nrl-placebar:not([hidden])');
