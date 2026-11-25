@@ -47,16 +47,22 @@ describe('dummy-and-go in ordinary play', () => {
   it('lets a defender who stayed square make a normal tackle and finish the fake at contact', () => {
     // Seed 1's square at 4695 was the draft's witness. On the previous engine seed 6 stayed square at 4050.
     // Seeds 1–12, Reapers v Crocs: the first square dummy that is tackled by that defender is seed 5 at 1077
-    // (contact at 1080, tackle at 1092).
-    const game = sim(5);
-    const fake = toTick(game, 1077);
-    const cue = fake.dummyPass!;
-    expect(cue.bit).toBe(false);
-    expect(fake.events).toContainEqual(expect.objectContaining({ kind: 'dummy-pass', detail: 'square' }));
-    const contact = toTick(game, 1080);
-    expect(contact.dummyPass).toBeUndefined();
-    expect(contact.contact?.defenders[0]).toEqual(cue.defender);
-    expect(toTick(game, 1092).events).toContainEqual(expect.objectContaining({ kind: 'tackle', slot: cue.defender.slot, side: cue.defender.side }));
+    // (contact at 1080, tackle at 1092). With only the shift off, seed 6 at 4050 is still that tackle
+    // (contact at 4055, tackle at 4062).
+    const square = (seed: number, fakeTick: number, contactTick: number, tackleTick: number) => {
+      const game = sim(seed);
+      const fake = toTick(game, fakeTick);
+      const cue = fake.dummyPass!;
+      expect(cue.bit).toBe(false);
+      expect(fake.events).toContainEqual(expect.objectContaining({ kind: 'dummy-pass', detail: 'square' }));
+      const contact = toTick(game, contactTick);
+      expect(contact.dummyPass).toBeUndefined();
+      expect(contact.contact?.defenders[0]).toEqual(cue.defender);
+      expect(toTick(game, tackleTick).events).toContainEqual(expect.objectContaining({ kind: 'tackle', slot: cue.defender.slot, side: cue.defender.side }));
+    };
+    square(5, 1077, 1080, 1092);
+    const shiftOff = applyTuning({ 'shapes.openSide.on': 0 });
+    try { square(6, 4050, 4055, 4062); } finally { shiftOff(); }
   });
 
   it('restores the ordinary carry when the attempt knob is off', () => {

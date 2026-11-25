@@ -16,7 +16,8 @@ describe('moment presentation facts', () => {
     // receiver (#649) it has no grubber, and seed 1 had them all. The open-play dummy takes
     // seed 1's grubber. Seed 3 had every fact until the open-side shift. Seeds 1–12, seven-minute
     // halves: the first whose set is punt, high, grubber, try, rise and drop is seed 1.
-    // With the shift and the dummy off, seed 1 still has that set.
+    // With only the shift off, seed 3 still has that set. With the shift and the dummy off,
+    // seed 1 still has it.
     // Observe its whole match rather than depending on the opening carries.
     while (!sim.finished) {
       sim.step(); control.step();
@@ -43,6 +44,25 @@ describe('moment presentation facts', () => {
       }
     }
     expect(found).toEqual(new Set(['punt', 'high', 'grubber', 'try', 'rise', 'drop']));
+    const facts = (seed: number): Set<string> => {
+      const match = new LiveSim(home, away, seed, opts);
+      const got = new Set<string>();
+      while (!match.finished) {
+        match.step();
+        const s = match.snapshot();
+        for (const p of s.players) {
+          if (p.kick) got.add(p.kick.kind);
+          if (p.aerialCatchTick === s.tick) got.add('high');
+          if (p.tryTick !== undefined) {
+            got.add('try');
+            if (s.tick === p.tryTick + 10 && p.pose === 'celebrate') got.add('rise');
+          }
+        }
+      }
+      return got;
+    };
+    const shiftOff = applyTuning({ 'shapes.openSide.on': 0 });
+    try { expect(facts(3)).toEqual(found); } finally { shiftOff(); }
     const restore = applyTuning({ 'shapes.openSide.on': 0, 'live.dummyChance': 0 });
     try {
       const old = new LiveSim(home, away, 1, opts);

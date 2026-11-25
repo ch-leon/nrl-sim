@@ -417,16 +417,25 @@ describe('measuring and reporting', () => {
     // so that pin stays the revision 20 match. The score-and-clock slice does not move these pins on its own.
     // The open-play dummy (engine revision 22) re-pins the default. The nested replays set live.dummyChance to 0.
     // Penalty advantage (engine revision 23) re-pins the default. The nested replays set advantageTicks to 0.
-    // The open-side shift (engine revision 24) re-pins the default. The nested replays set shapes.openSide.on to 0.
-    { name: 'plays-on', aiCoach: false, expected: '0-0:148:6cb3adb47355ad51', beforeAdvantage: '0-0:141:fda5337fbb712425', clockOff: '0-6:138:45572dfeb7a225d1', impactOff: '0-6:133:bb5c0142e24364b4', standsOff: '0-6:133:bb5c0142e24364b4', beforeReturns: '4-10:155:79024e6ce6d03277' },
-    { name: 'plays-on-hard', aiCoach: true, expected: '10-12:159:9237577aa9e1009f', beforeAdvantage: '0-1:127:4657084cf21aa913', clockOff: '0-10:160:c9c6855002de5af6', impactOff: '0-10:160:c9c6855002de5af6', standsOff: '0-10:148:ee54e8d79a90e3cf' },
-  ])('pins $name: an even Balanced / Slide match with set plays (seed 1)', async ({ aiCoach, expected, beforeAdvantage, clockOff, impactOff, standsOff, beforeReturns }) => {
+    // The open-side shift (engine revision 24) re-pins the default. The nested replays set shapes.openSide.on to 0
+    // together with the older knobs. plays-on also replays with only the shift off, which is main's pin.
+    { name: 'plays-on', aiCoach: false, expected: '0-0:148:6cb3adb47355ad51', shiftOff: '6-0:149:d9681f7bf5670fb2', beforeAdvantage: '0-0:141:fda5337fbb712425', clockOff: '0-6:138:45572dfeb7a225d1', impactOff: '0-6:133:bb5c0142e24364b4', standsOff: '0-6:133:bb5c0142e24364b4', beforeReturns: '4-10:155:79024e6ce6d03277' },
+    { name: 'plays-on-hard', aiCoach: true, expected: '10-12:159:9237577aa9e1009f', shiftOff: undefined, beforeAdvantage: '0-1:127:4657084cf21aa913', clockOff: '0-10:160:c9c6855002de5af6', impactOff: '0-10:160:c9c6855002de5af6', standsOff: '0-10:148:ee54e8d79a90e3cf' },
+  ])('pins $name: an even Balanced / Slide match with set plays (seed 1)', async ({ aiCoach, expected, shiftOff, beforeAdvantage, clockOff, impactOff, standsOff, beforeReturns }) => {
     const home = { ...sideSheet('H', { rating: 60 }), plays: ['block-play' as const, 'cut-out-winger' as const, 'kick-pass' as const] };
     const replay = () => liveFingerprint(new LiveSim(home, sideSheet('A', { rating: 60 }), 1, aiCoach ? { aiCoach: ['home'] } : {}));
     const { parts, pin } = await replay();
     expect(parts.some((p) => p.includes(':set-play:home:'))).toBe(true);
     expect(parts.some((p) => p.includes(':coach-call:home:set-play:'))).toBe(aiCoach);
     expect(pin).toBe(expected);
+    if (shiftOff) {
+      const restore = applyTuning({ 'shapes.openSide.on': 0 });
+      try {
+        expect((await replay()).pin).toBe(shiftOff);
+      } finally {
+        restore();
+      }
+    }
     {
       const restore = applyTuning({ 'shapes.openSide.on': 0, 'penalty.advantageTicks': 0 });
       try {

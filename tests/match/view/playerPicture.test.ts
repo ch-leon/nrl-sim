@@ -3,6 +3,7 @@ import { JOG_SPEED, REACT_HOLD_TICKS, STRIDE_METRES, pictureContext, playerPictu
 import { FATIGUE } from '../../../src/match/league/fatigue';
 import type { PlayerSnap, Snapshot } from '../../../src/match/core/snapshot';
 import { LiveSim, LIVE } from '../../../src/match/league/live';
+import { applyTuning } from '../../../src/match/league/tuning';
 import { labSheet } from '../../../src/match/lab/sheets';
 import { Runner } from '../../../src/match/core/engine';
 import { FACING_BAND, SIDE_BAND, screenFacing, screenPlayerFacing, screenHeading } from '../../../src/match/view/screenFacing';
@@ -24,8 +25,8 @@ describe('dummy-pass pictures', () => {
   });
   // Seed 6's square at 4050 moved with the open-side shift. Seeds 1–5, Reapers v Crocs: the first
   // square dummy still on screen four ticks later is seed 1, fake at 6223 and cleared at 6228.
-  // Seed 2's bite is unchanged.
-  it.each([[2, 2607, 2613], [1, 6223, 6228]])('shows, retracts and clears on time in seed %i', (seed, start, end) => {
+  // Seed 2's bite is unchanged. With only the shift off, seed 6 at 4050–4055 still shows it.
+  const showsDummy = (seed: number, start: number, end: number) => {
     const runner = new Runner(n => new LiveSim(labSheet('rival-reapers'), labSheet('rival-crocs'), n), seed);
     runner.seek(start);
     const fake = runner.cur.dummyPass!;
@@ -55,6 +56,11 @@ describe('dummy-pass pictures', () => {
     runner.seek(end);
     const { picture, ordinary } = current(1);
     expect(picture).toEqual(ordinary);
+  };
+  it.each([[2, 2607, 2613], [1, 6223, 6228]])('shows, retracts and clears on time in seed %i', showsDummy);
+  it('with only the shift off, seed 6 still shows, retracts and clears on time', () => {
+    const restore = applyTuning({ 'shapes.openSide.on': 0 });
+    try { showsDummy(6, 4050, 4055); } finally { restore(); }
   });
 });
 describe('successful step pictures', () => {

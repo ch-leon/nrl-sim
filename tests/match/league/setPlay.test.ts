@@ -440,8 +440,9 @@ describe('the lab and the harness', () => {
   // The open-play dummy moves that breakdown. Seed 36's home inside-ball breaks down at 1609.
   // Penalty advantage moves seed 36. Seeds 1–60: the first whose first home breakdown is an
   // inside-ball was seed 10, at tick 2972. The open-side shift moves it. The first such
-  // breakdown is seed 6, at tick 11899. With the shift and advantage off, seed 36 is still
-  // tick 1609. With the shift, the dummy and advantage off, seed 22 is still tick 2579.
+  // breakdown is seed 6, at tick 11899. With only the shift off, seed 10 is still tick 2972.
+  // With the shift and advantage off, seed 36 is still tick 1609. With the shift, the dummy
+  // and advantage off, seed 22 is still tick 2579.
   it('the lab’s named seeds: a block play launched (seed 3, tick 688) and a home inside-ball breakdown (seed 6, tick 11899)', () => {
     const lab = (seed: number): PlaySim =>
       new PlaySim(withPlays({ ...labSheet(DEFAULT_HOME, 'gen', { attack: 'grind' }), rotation: 'standard' }, true), withPlays({ ...labSheet(DEFAULT_AWAY, 'gen', {}), rotation: 'standard' }, true), seed, { energy: LEGS_ENERGY.fresh, weather: 'clear', calls: [] });
@@ -452,6 +453,12 @@ describe('the lab and the harness', () => {
     const six = lab(6);
     const bd = until(six, (e) => e.kind === 'play-breaks-down' && e.side === 'home');
     expect([bd?.tick, bd?.detail, bd?.side]).toEqual([11899, 'inside-ball', 'home']);
+    const shiftOff = applyTuning({ 'shapes.openSide.on': 0 });
+    try {
+      const ten = lab(10);
+      const oldBd = until(ten, (e) => e.kind === 'play-breaks-down' && e.side === 'home');
+      expect([oldBd?.tick, oldBd?.detail, oldBd?.side]).toEqual([2972, 'inside-ball', 'home']);
+    } finally { shiftOff(); }
     const advantageOff = applyTuning({ 'shapes.openSide.on': 0, 'penalty.advantageTicks': 0 });
     try {
       const thirtySix = lab(36);

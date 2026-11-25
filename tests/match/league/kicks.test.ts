@@ -113,34 +113,48 @@ describe('kicks in the live sim', () => {
   });
   it('a grubber is a chase: some of them score, and most of them do not', () => {
     // Full matches, so the red-zone chase actually happens. The reward is real
-    // and it is not the way most sets end. Seeds 1–16 no longer score one after the
-    // open-side shift. Seeds 1–26 of these seven-minute halves score twice, and most
-    // grubbers still do not.
-    let grubbers = 0;
-    let tries = 0;
-    const home = sheet('H');
-    const away = sheet('A');
-    for (let s = 1; s <= 26; s++) {
-      // Historical fourteen-minute exposure keeps both successful and failed red-zone chases.
-      const sim = new LiveSim(home, away, s, { length: { halves: 2, halfMinutes: 7 } });
-      let open: { side: string; tick: number } | null = null;
-      while (!sim.finished && sim.tick < 80_000) {
-        sim.step();
-        for (const e of sim.tickEvents) {
-          if (e.kind === 'kick' && e.detail === 'grubber' && e.side) {
-            grubbers++;
-            open = { side: e.side, tick: e.tick };
-          } else if (open && e.kind === 'try' && e.side === open.side && e.tick - open.tick <= 240) {
-            tries++;
-            open = null;
-          } else if (open && (e.kind === 'kick' || e.kind === 'dead-ball' || e.kind === 'half-time' || e.kind === 'full-time')) open = null;
+    // and it is not the way most sets end. Seeds 1–16 of these seven-minute halves
+    // were the original sample: more than 16 grubbers, and more than one of them
+    // scored. The open-side shift moves that sample off a score. Seeds 1–26 score
+    // twice. The grubber floor stays one per seed, so 26 seeds ask for more than 26.
+    // The try floor stays at more than one successful chase: two scores in 16 seeds
+    // was the original bar, and this sample still clears it.
+    const chase = (seeds: number): { grubbers: number; tries: number } => {
+      let grubbers = 0;
+      let tries = 0;
+      const home = sheet('H');
+      const away = sheet('A');
+      for (let s = 1; s <= seeds; s++) {
+        // Historical fourteen-minute exposure keeps both successful and failed red-zone chases.
+        const sim = new LiveSim(home, away, s, { length: { halves: 2, halfMinutes: 7 } });
+        let open: { side: string; tick: number } | null = null;
+        while (!sim.finished && sim.tick < 80_000) {
+          sim.step();
+          for (const e of sim.tickEvents) {
+            if (e.kind === 'kick' && e.detail === 'grubber' && e.side) {
+              grubbers++;
+              open = { side: e.side, tick: e.tick };
+            } else if (open && e.kind === 'try' && e.side === open.side && e.tick - open.tick <= 240) {
+              tries++;
+              open = null;
+            } else if (open && (e.kind === 'kick' || e.kind === 'dead-ball' || e.kind === 'half-time' || e.kind === 'full-time')) open = null;
+          }
         }
       }
-    }
-    expect(grubbers).toBeGreaterThan(16);
-    expect(tries).toBeGreaterThan(1);
-    expect(tries).toBeLessThan(grubbers * 0.45);
-  }, 30_000);
+      return { grubbers, tries };
+    };
+    const wide = chase(26);
+    expect(wide.grubbers).toBeGreaterThan(26);
+    expect(wide.tries).toBeGreaterThan(1);
+    expect(wide.tries).toBeLessThan(wide.grubbers * 0.45);
+    const shiftOff = applyTuning({ 'shapes.openSide.on': 0 });
+    try {
+      const old = chase(16);
+      expect(old.grubbers).toBeGreaterThan(16);
+      expect(old.tries).toBeGreaterThan(1);
+      expect(old.tries).toBeLessThan(old.grubbers * 0.45);
+    } finally { shiftOff(); }
+  }, 60_000);
   it('kicks get chased: the kicking side regathers some, and catchers spill some under pressure', () => {
     expect(esOpening.filter((e) => e.kind === 'regather').length).toBeGreaterThan(0);
     expect(esOpening.filter((e) => e.kind === 'drop').length).toBeGreaterThan(0);

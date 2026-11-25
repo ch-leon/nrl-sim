@@ -31,7 +31,8 @@ describe('corner cover in ordinary live matches', () => {
   // Penalty advantage moves seed 47. Seeds 1–120, Reapers v Wolves: the first ankle
   // try-saver by the away fullback on the home winger, inside the last 10 m, was seed 79
   // at tick 3037. The open-side shift moves it. The first such save is seed 38 at tick 868
-  // (ruck at 877). With the shift and advantage off, seed 47 at 4707 is still that clip,
+  // (ruck at 877). With only the shift off, seed 79 at 3037 is still that save.
+  // With the shift and advantage off, seed 47 at 4707 is still that clip,
   // and with the dummy off as well seed 47 at 6952 still is. Seed 19's miss at 2991 is unchanged.
   const expectSave = (seed: number, from: number, until: number) => {
     const [save, ...after] = replay(seed, from, until);
@@ -63,6 +64,8 @@ describe('corner cover in ordinary live matches', () => {
 
   it('lets an on-field fullback make a low tackle on a winger short of the line', () => {
     expectSave(38, 868, 878);
+    const shiftOff = applyTuning({ 'shapes.openSide.on': 0 });
+    try { expectSave(79, 3037, 3047); } finally { shiftOff(); }
     const advantageOff = applyTuning({ 'shapes.openSide.on': 0, 'penalty.advantageTicks': 0 });
     try {
       expectSave(47, 4707, 4717);

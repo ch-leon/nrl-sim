@@ -200,7 +200,8 @@ describe('the bench and the sin bin (#642)', () => {
   it('a binned man walks off as the sim has him, then sits in his side’s bin until he is back on', () => {
     // The open-play dummy moves seed 6. Seed 27 with seven-minute halves had a far-side walk and a return.
     // The open-side shift moves seed 27. Seeds 1–40, rating 62 v 58, seven-minute halves: the first
-    // far-side walk that sits and returns is seed 10. With the dummy off, seed 6 still does. Seed 10
+    // far-side walk that sits and returns is seed 10. With only the shift off, seed 27 still does.
+    // With the dummy off, seed 6 still does. Seed 10
     // was that witness before the corner dive. The dummy moves it too, so both knobs are off for that
     // check. Penalty advantage moves it again, and the shift does too, so that check also sets
     // advantageTicks and shapes.openSide.on to 0.
@@ -235,6 +236,8 @@ describe('the bench and the sin bin (#642)', () => {
       expect(saw).toEqual({ walking: true, seated: true, returned: true });
     };
     cycle(10);
+    const shiftOff = applyTuning({ 'shapes.openSide.on': 0 });
+    try { cycle(27); } finally { shiftOff(); }
     const restore = applyTuning({ 'shapes.openSide.on': 0, 'live.dummyChance': 0 });
     try {
       cycle(6);

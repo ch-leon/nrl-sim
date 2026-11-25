@@ -169,9 +169,15 @@ describe('kick contests in the live sim (#99)', () => {
     // from before the corner dive, is one again with the dummy off. Penalty advantage
     // moves that live grounding. The open-side shift moves both. Seeds 1–60, Balanced /
     // Slide: the first race the attacker scores is seed 1, and the first a defender
-    // grounds is seed 5. With the shift and advantage off, seed 5 still grounds it.
+    // grounds is seed 5. With only the shift off, seed 45 still scores and seed 7 still
+    // grounds it. With the shift and advantage off, seed 5 still grounds it.
     expect(races(play([1], () => true, 'balanced').es).scored).toBeGreaterThan(0);
     expect(races(play([5], () => true, 'balanced').es).grounded).toBeGreaterThan(0);
+    const shiftOff = applyTuning({ 'shapes.openSide.on': 0 });
+    try {
+      expect(races(play([45], () => true, 'balanced').es).scored).toBeGreaterThan(0);
+      expect(races(play([7], () => true, 'balanced').es).grounded).toBeGreaterThan(0);
+    } finally { shiftOff(); }
     const advantageOff = applyTuning({ 'shapes.openSide.on': 0, 'penalty.advantageTicks': 0 });
     try {
       expect(races(play([5], () => true, 'balanced').es).grounded).toBeGreaterThan(0);
