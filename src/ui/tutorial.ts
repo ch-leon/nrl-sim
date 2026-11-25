@@ -19,6 +19,7 @@ import { coachLine } from './coachVoice';
 import { coachAddress } from './coachName';
 import { bus, type Events } from '../core/events';
 import { getState, setState, type GameState } from '../core/state';
+import { save } from '../core/save';
 import { FACILITY_CATALOG } from '../data/facility';
 import { el, button, mount, ensureStyles, onScreenChange, SCREEN_KEY_ATTR } from './dom';
 
@@ -222,6 +223,8 @@ interface ActiveTutorial {
   offToast: (() => void) | null;
   /** Stops waiting for the anchor's sheet to finish its entrance (#611). */
   offSheet: (() => void) | null;
+  /** Stops moving the ring with a scroll or a resize. */
+  offScroll: (() => void) | null;
 }
 
 let active: ActiveTutorial | null = null;
@@ -275,7 +278,7 @@ export function startTutorial(force = false): void {
     attrs: { 'data-tutorial': 'overlay' },
   });
   mount(overlay);
-  active = { index: firstStepIndex(getState()), overlay, offEvent: null, retryTimer: null, offMatch: holdForMatch(overlay), replay: force, offToast: null, offSheet: null };
+  active = { index: firstStepIndex(getState()), overlay, offEvent: null, retryTimer: null, offMatch: holdForMatch(overlay), replay: force, offToast: null, offSheet: null, offScroll: null };
   renderStep();
 }
 
@@ -329,6 +332,9 @@ export function endTutorial(completed = false): void {
   const s = getState();
   if (!s.settings.tutorialDone) {
     setState({ settings: { ...s.settings, tutorialDone: true } });
+    // Saved now: the week's autosave ran before the last tap ended the run, so an app
+    // killed before the next save brought the tutorial back.
+    save(getState());
   }
   if (completed) bus.emit('ui:notify', { text: TUTORIAL_END_TEXT, kind: 'info', from: 'coach' });
 }
@@ -352,6 +358,10 @@ function clearStepBindings(a: ActiveTutorial): void {
   if (a.offSheet) {
     a.offSheet();
     a.offSheet = null;
+  }
+  if (a.offScroll) {
+    a.offScroll();
+    a.offScroll = null;
   }
 }
 
@@ -468,6 +478,10 @@ function renderStep(): void {
       dockClear(a.overlay.querySelector('.nrl-tutorial-bubble')!, now);
     }
   };
+  // The ring moves with a scroll (the recruit list, the build grid) on the frame it scrolls, not on the next poll.
+  a.offScroll = onScrollOrResize(() => {
+    if (active === a && STEPS[a.index] === step && !a.overlay.hidden && shown) renderCutout(a, shown);
+  });
   // #412: an Undo toast coming or going re-docks the bubble at once, not on the next poll.
   a.offToast = watchToasts(() => {
     if (active === a && STEPS[a.index] === step && !a.overlay.hidden) follow();
@@ -544,15 +558,85 @@ function scrollAnchorIntoView(anchorEl: HTMLElement): void {
   }
 }
 
-/** Position the `.nrl-tutorial-cutout` frame over the anchor (pointer-events:none, so the anchor stays tappable). */
+/** Room between the anchor and its ring: inside the 6px gap between build cards and list rows, so the ring never crosses the next one. */
+export const RING_PAD = 3;
+
+/**
+ * The part of `box` its clipping boxes (its scrolling ancestors and the screen)
+ * leave in sight, or null when it is scrolled out of view. Pure.
+ */
+export function visiblePart(box: Box, clips: readonly Box[]): Box | null {
+  let { left, top, right, bottom } = box;
+  for (const c of clips) {
+    left = Math.max(left, c.left);
+    top = Math.max(top, c.top);
+    right = Math.min(right, c.right);
+    bottom = Math.min(bottom, c.bottom);
+  }
+  return right > left && bottom > top ? { left, top, right, bottom } : null;
+}
+
+/** The boxes that clip `node`: each ancestor that does not let it overflow, then the screen. */
+function clipBoxes(node: HTMLElement): Box[] {
+  const out: Box[] = [];
+  if (typeof getComputedStyle === 'function') {
+    for (let p = node.parentElement; p && p !== document.body; p = p.parentElement) {
+      const s = getComputedStyle(p);
+      if (s.overflowX !== 'visible' || s.overflowY !== 'visible') out.push(p.getBoundingClientRect());
+    }
+  }
+  if (typeof window !== 'undefined') out.push({ left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight });
+  return out;
+}
+
+/** Call `fn` once a frame while anything scrolls or the screen resizes; returns the teardown. */
+function onScrollOrResize(fn: () => void): () => void {
+  if (typeof document === 'undefined' || typeof document.addEventListener !== 'function') return () => {};
+  let queued = false;
+  const frame = (cb: () => void): void => {
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(cb);
+    else setTimeout(cb, 16);
+  };
+  const tick = (): void => {
+    if (queued) return;
+    queued = true;
+    frame(() => { queued = false; fn(); });
+  };
+  // Capture: a scroll inside a sheet does not bubble to the document.
+  document.addEventListener('scroll', tick, { capture: true, passive: true });
+  window.addEventListener?.('resize', tick);
+  return () => {
+    document.removeEventListener('scroll', tick, { capture: true });
+    window.removeEventListener?.('resize', tick);
+  };
+}
+
+/**
+ * Ring the part of the anchor that is in sight (pointer-events:none, so it stays
+ * tappable). Scrolled out of view, the ring goes and the whole screen dims until
+ * it is back, instead of a ring left over whatever scrolled into its place.
+ */
 function renderCutout(a: ActiveTutorial, anchorEl: HTMLElement): void {
-  const r = anchorEl.getBoundingClientRect();
-  const pad = 6;
-  const cutout = a.overlay.querySelector<HTMLElement>('.nrl-tutorial-cutout') ?? a.overlay.appendChild(el('div', { class: 'nrl-tutorial-cutout' }));
-  cutout.style.top = `${r.top - pad}px`;
-  cutout.style.left = `${r.left - pad}px`;
-  cutout.style.width = `${r.width + pad * 2}px`;
-  cutout.style.height = `${r.height + pad * 2}px`;
+  const seen = visiblePart(anchorEl.getBoundingClientRect(), clipBoxes(anchorEl));
+  const old = a.overlay.querySelector<HTMLElement>('.nrl-tutorial-cutout');
+  if (!seen) {
+    old?.remove();
+    return;
+  }
+  const box = {
+    top: `${seen.top - RING_PAD}px`,
+    left: `${seen.left - RING_PAD}px`,
+    width: `${seen.right - seen.left + RING_PAD * 2}px`,
+    height: `${seen.bottom - seen.top + RING_PAD * 2}px`,
+  };
+  if (old && old.style.top === box.top && old.style.left === box.left && old.style.width === box.width && old.style.height === box.height) return;
+  // A moved ring is a new ring: iOS WebKit kept painting the old one where it was first
+  // measured (12px low, mid-rise of its sheet) after its top had changed, until a scroll.
+  const cutout = el('div', { class: 'nrl-tutorial-cutout' });
+  Object.assign(cutout.style, box);
+  // First in the overlay, so the bubble paints over its dim.
+  if (old) old.replaceWith(cutout);
+  else a.overlay.insertBefore(cutout, a.overlay.firstChild);
 }
 
 /** Bubble docks, tried in order until one leaves the anchor uncovered (More's sheet fills the bottom-left dock, #344). */
@@ -729,6 +813,7 @@ export const TUTORIAL_CSS = `
 }
 .nrl-tutorial-cutout {
   position: fixed;
+  box-sizing: border-box; /* its 2px border inside the box renderCutout sets, so the ring is even on every side */
   pointer-events: none;
   border: 2px solid var(--nrl-accent, #ff6b1a);
   border-radius: 12px;

@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- **Tutorial fixes from the iPhone Simulator.** The tutorial's orange ring fits what it points at (it reached into the next card) and moves with the list; scrolled out of view, it goes until the target is back. On iPhone it no longer stays where it was drawn while its screen slid up. Finishing the tutorial is saved straight away, so an app closed after the first match does not start it again. A long press over the match controls no longer selects text on iPhone. [#838](https://github.com/ch-leon/nrl-sim/issues/838).
+
 - **Story events in League career.** The Classic deck, including the wildcards and the Bali trip, now turns up in a League career. Cards follow the 25-week year, the trip is offered when the season closes, and a player away at Skills Camp or a booked event is not the subject of a card. A wildcard ban misses real fixtures. [#820](https://github.com/ch-leon/nrl-sim/issues/820).
 
 - **A title season is not a sacking.** Finishing outside the board’s ladder target still meets that goal when the club reaches the grand final or wins the title, in Classic and in a League career. Winning the title never ends the season in a sacking, even if another goal is missed. A building goal only asks for facilities the cash can pay for. The persona report names the goal missed in every sacking. [#692](https://github.com/ch-leon/nrl-sim/issues/692) ([PR](https://github.com/ch-leon/nrl-sim/pull/826)).

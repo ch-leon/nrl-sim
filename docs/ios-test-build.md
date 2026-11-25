@@ -48,10 +48,18 @@ xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug \
   -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
 ```
 
-**The app has not run in the Simulator yet.** On Leon's Mac, Xcode 27.2 needs a newer
-CoreSimulator than is installed, so no simulator boots until someone with the admin
-password runs `sudo xcodebuild -runFirstLaunch` (or opens Xcode and accepts "Install
-additional components").
+**It runs in the Simulator** (first run 2026-11-25, iPhone 18 Pro, iOS 27.2). A Mac with
+Xcode but no simulator runtime (`xcrun simctl runtime list` shows none) needs one first:
+`xcodebuild -downloadPlatform iOS` (about 8 GB, no admin password). Capacitor's CLI needs
+Node 22 or newer for `npx cap sync ios`. From the command line, with the app built as above
+into `-derivedDataPath <dir>`:
+
+```bash
+xcrun simctl install booted <dir>/Build/Products/Debug-iphonesimulator/App.app
+xcrun simctl launch --console-pty booted au.com.supercooked.bigrugbycoach.dev
+```
+
+`--console-pty` prints the web view's `console.log` lines (`⚡️ [log] - …`) to the terminal.
 
 ## Run it on Leon's iPhone (by hand)
 
@@ -107,8 +115,8 @@ Phase 2 of the spec ([commercial-saves.md, "Native mirror"](specs/commercial-sav
   shows only once the share completes; cancelling shows nothing. **Import** is the
   normal file picker.
 
-**Checks by hand** (Simulator or phone). None has been run yet: the Simulator could not
-boot on the build Mac, so Phase 2 is compiled, not run.
+**Checks by hand** (Simulator or phone). 1 and 2 passed in the Simulator on 2026-11-25;
+3 to 5 have not been run.
 
 1. **Files appear after a save.** Start a career, play a week. In the Simulator:
    `xcrun simctl get_app_container booted au.com.supercooked.bigrugbycoach.dev data`,
@@ -134,8 +142,9 @@ submission (spec Phase 6).
 
 ## What the iPhone build does differently
 
-What the project is set up to do. Nobody has seen the app run yet (see the Simulator note
-above), so the behaviour marked *not yet checked* is intended, not observed.
+What the project is set up to do. The app has run in the Simulator (see the note above),
+but the behaviour marked *not yet checked* has not been looked at there or on a phone: it
+is intended, not observed.
 
 - **Landscape only, iPhone only.** Portrait is not in the app's supported orientations
   (`Info.plist`), so the phone never turns the game upright and the rotate card never
