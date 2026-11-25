@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- **The Big Three.** A new League career's Premier League has three clubs well above the rest: in AU the Redcliffe Reapers (78), Woolloomooloo Wolves (76) and Southport Stingrays (74); in the UK the Ashcombe Lanterns, Yewbridge Runners and Bramblewick Foundry. They carry an 18-player squad under a $750k cap and grow toward their own level rather than the league's, so they stay ahead. The other five Premier clubs stay at 57 to 65. The board never asks a club to finish above all three, or above any one of them unless it is the derby. Careers started before this keep their old Premier League.
+
 - **Set-play tap.** Calling a play from the match tray now hits at once: the tile lights under the finger, a CALLED banner names it, and a short sting plays. A buzz fires where the phone supports it. When the play comes off — a bust, a line break or a try — the camera pulls in, the crowd lifts, and the commentary credits PLAY CALLED. A breakdown stays a quiet read. Match results are unchanged. [PR #828](https://github.com/ch-leon/nrl-sim/pull/828). [#825](https://github.com/ch-leon/nrl-sim/issues/825).
 
 - **Story events in League career.** The Classic deck, including the wildcards and the Bali trip, now turns up in a League career. Cards follow the 25-week year, the trip is offered when the season closes, and a player away at Skills Camp or a booked event is not the subject of a card. A wildcard ban misses real fixtures. [#820](https://github.com/ch-leon/nrl-sim/issues/820).
