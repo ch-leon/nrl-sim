@@ -19,7 +19,8 @@ import { getState, type GameState, type PendingEvent } from '../core/state';
 import type { AdvanceRun } from '../core/advance';
 import { remainingTarget, targetSpan, type AdvanceTarget } from '../core/advanceRules';
 import { cardById } from '../data/events';
-import { absWeek, chooseEvent, describeChoice, fillText } from '../systems/events';
+import { chooseEvent, describeChoice, fillText } from '../systems/events';
+import { elapsedInterval } from '../core/season';
 import { hasStaff } from '../systems/staff';
 import { NEW_CONTRACT_WEEKS } from '../systems/freeagency';
 import { fmtMoney } from '../utils/money';
@@ -64,8 +65,12 @@ export interface DecisionView {
  * takes its default, so 1 means the next Advance Week does. A season-end card
  * (the season-end trip) expires in the week it is offered: 1 from the start.
  */
-export function advancesLeft(ev: Pick<PendingEvent, 'expiresAt'>, state: Pick<GameState, 'season' | 'week'>): number {
-  return Math.max(1, ev.expiresAt - absWeek(state.season, state.week) + 1);
+export function advancesLeft(
+  ev: Pick<PendingEvent, 'expiresAt'>,
+  state: Pick<GameState, 'season' | 'week'> & Partial<Pick<GameState, 'competitions'>>,
+): number {
+  // The same clock that stamps expiresAt: Classic weeks, or a League career's elapsed intervals.
+  return Math.max(1, ev.expiresAt - elapsedInterval(state) + 1);
 }
 
 /** Pending event cards as plain view data, oldest first. Cards no longer in the deck are skipped. */

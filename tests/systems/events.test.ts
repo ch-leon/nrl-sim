@@ -1,19 +1,30 @@
 import { createLegacyGame as createNewGame } from '../helpers/legacyGame';
 // tests/systems/events.test.ts — random events deck (GitHub #75).
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
-  absWeek, applyEffects, chooseEvent, describeEffects, drawEvent, eventsTick, fillText, isEligible,
+  absWeek, applyEffects, applySeasonEvents, chooseEvent, describeEffects, drawEvent, eventsTick, fillText, isEligible,
   plantPending, registerEventsSystem, resolveEvent, rivalStars, subjectCandidates, tickModifiers, weekResult,
 } from '../../src/systems/events';
-import { EVENT_CARDS, cardById, type EventCardDef, type EventEffect } from '../../src/data/events';
+import { EVENT_CARDS, cardById, closedGatesFlag, type EventCardDef, type EventEffect } from '../../src/data/events';
 import { initLeague, registerFixturesSystem, PLAYER_ID } from '../../src/systems/fixtures';
-import { getState, setState, type GameState, type PendingEvent } from '../../src/core/state';
+import { createNewGame as startCareer, getState, loadState, setState, type GameState, type PendingEvent } from '../../src/core/state';
 import { bus } from '../../src/core/events';
 import { advanceWeek, clearSeasonHooks, clearTickHooks, clearHeldWeek, registerTickHook, weekHeld, withFastForward } from '../../src/core/time';
+import { setCareerNamespace } from '../../src/core/storage/local';
+import { DEV_TEST_PREFIX } from '../../src/core/storageKeys';
+import { competitions, progress, profile, clubIds, entrySnapshots } from '../data/leagueCareerFixtures';
+import { leagueEntryReceiptId } from '../../src/data/leagueCareer';
+import { competitionLadder } from '../../src/systems/competitionCalendar';
+import { freshCapAccount } from '../../src/systems/cap';
+import { isolateMiniatureLeagueProgression } from '../helpers/miniatureLeague';
 import { makeRng } from '../../src/utils/rng';
 import { EVENTS, WEEKS_PER_SEASON } from '../../src/config';
 import { marketWage, overallRating } from '../../src/data/player';
 import { signingFee } from '../../src/systems/freeagency';
+import { prepareLeagueCareer } from '../../src/systems/leagueCareerSetup';
+import { elapsedInterval } from '../../src/core/season';
+import { CAMP_RULES, type CampRecord } from '../../src/data/playerAssignments';
+import { selectPack } from '../../src/content';
 
 beforeEach(() => {
   bus.clear();
@@ -502,5 +513,253 @@ describe('plantPending (the e2e card hook, #424)', () => {
     fresh(7);
     expect(plantPending('baliTrip')).toBe(true);
     expect(planted('baliTrip')!.subjectId).toBeUndefined();
+  });
+});
+
+describe('League career (#820)', () => {
+  /** A prepared League year. Week windows are read on the 25-week calendar. */
+  const leagueYear = async (seed = 7): Promise<GameState> => {
+    selectPack('au');
+    return prepareLeagueCareer({ clubName: 'League FC', seed });
+  };
+
+  const atWeek = (s: GameState, week: number): GameState => ({
+    ...s,
+    week,
+    competitions: {
+      ...s.competitions!,
+      calendar: { ...s.competitions!.calendar!, elapsedIntervals: week - 1 },
+    },
+  });
+
+  const quiet = (s: GameState): GameState => ({
+    ...s,
+    eventDeck: {
+      ...s.eventDeck,
+      pending: [],
+      lastDrawn: 10_000,
+      cooldowns: Object.fromEntries(EVENT_CARDS.map((c) => [c.id, 10_000])),
+    },
+  });
+
+  const camp = (s: GameState, playerId: string, playerName: string, status: 'booked' | 'away'): GameState => {
+    const record: CampRecord = {
+      id: `skills-camp:s${s.season}:${s.clubId}`,
+      season: s.season, clubId: s.clubId, pack: 'au', instanceId: 'league', fixtureId: 'fx', opponentId: 'rival',
+      rules: CAMP_RULES, revision: 0, status,
+      booking: { participantId: playerId, participantName: playerName, bookedWeek: 1, focus: null },
+      reason: null, award: null, awardBasis: null,
+    };
+    return { ...s, competitions: { ...s.competitions!, assignments: [record] } };
+  };
+
+  const played = (s: GameState, week: number, win: boolean): GameState => {
+    const club = s.clubId;
+    const instances = s.competitions!.instances.map((instance) => ({
+      ...instance,
+      fixtures: instance.fixtures.map((fixture) => {
+        if (fixture.slot !== week || (fixture.homeId !== club && fixture.awayId !== club)) return fixture;
+        const home = fixture.homeId === club;
+        const winnerId = win ? club : home ? fixture.awayId : fixture.homeId;
+        return {
+          ...fixture, status: 'completed' as const,
+          result: { homeScore: winnerId === fixture.homeId ? 10 : 0, awayScore: winnerId === fixture.awayId ? 10 : 0, winnerId, decider: 'score' as const },
+        };
+      }),
+    }));
+    return { ...s, competitions: { ...s.competitions!, instances } };
+  };
+
+  it('maps Classic week windows onto the 25-week year and skips match cards on a rest week', async () => {
+    const s = await leagueYear();
+    const rich = { ...s, money: 50_000 };
+    expect(isEligible(card('preseasonCamp'), atWeek(rich, 2), 2)).toBe(true);
+    expect(isEligible(card('preseasonCamp'), atWeek(rich, 4), 4)).toBe(true);
+    expect(isEligible(card('preseasonCamp'), atWeek(rich, 5), 5)).toBe(false);
+    expect(isEligible(card('shortsSponsor'), atWeek(s, 19), 19)).toBe(true);
+    expect(isEligible(card('shortsSponsor'), atWeek(s, 20), 20)).toBe(false);
+    expect(isEligible(card('tvFeature'), atWeek(s, 2), 2)).toBe(false);
+    expect(isEligible(card('tvFeature'), atWeek(s, 3), 3)).toBe(false);
+    expect(isEligible(card('tvFeature'), atWeek(s, 5), 5)).toBe(true);
+    expect(isEligible(card('tvFeature'), atWeek(s, 24), 24)).toBe(false);
+    const flagged = { ...atWeek(s, 8), eventDeck: { ...s.eventDeck, flags: ['baliIncident'] } };
+    expect(isEligible(card('baliHangover'), flagged, 8)).toBe(true);
+    expect(isEligible(card('baliHangover'), { ...flagged, week: 9 }, 9)).toBe(false);
+  });
+
+  it('applies a choice, including board patience, and refuses a player who is away or already assigned', async () => {
+    const s = await leagueYear();
+    loadState(s);
+    setState({ eventDeck: withPending(getState(), { cardId: 'billboardSponsor', id: 'bb' }).eventDeck });
+    const before = getState().money;
+    expect(chooseEvent('bb', 0)).toBe(true);
+    expect(getState().money).toBe(before + 5_000);
+    expect(chooseEvent('bb', 0)).toBe(false);
+
+    loadState(s);
+    setState({
+      boardPatience: 5,
+      eventDeck: withPending(getState(), { cardId: 'baliHangover', id: 'hang' }).eventDeck,
+    });
+    expect(chooseEvent('hang', 1)).toBe(true);
+    expect(getState().boardPatience).toBe(4);
+
+    const star = subjectCandidates(s, 'star')[0]!;
+    const youngster = subjectCandidates(s, 'youngster')[0]!;
+    const away = camp(s, star.id, star.name, 'away');
+    expect(subjectCandidates(away, 'any').some((p) => p.id === star.id)).toBe(false);
+    expect(subjectCandidates(away, 'star')[0]?.id).not.toBe(star.id);
+
+    const booked = camp(s, star.id, star.name, 'booked');
+    expect(subjectCandidates(booked, 'any').some((p) => p.id === star.id)).toBe(false);
+    expect(subjectCandidates(booked, 'star')[0]?.id).not.toBe(star.id);
+    const bookedYoung = camp(s, youngster.id, youngster.name, 'booked');
+    expect(subjectCandidates(bookedYoung, 'youngster')[0]?.id).not.toBe(youngster.id);
+    expect(subjectCandidates(bookedYoung, 'any').some((p) => p.id === youngster.id)).toBe(false);
+    const banned = applyEffects(booked, [{ kind: 'suspend', weeks: 2, source: 'event' }], {
+      cardId: 'missedCurfew', reason: 'event: Missed curfew', subjectId: star.id, subjectName: star.name, now: 1,
+    });
+    expect(banned.state.squad.find((p) => p.id === star.id)?.suspendedWeeks ?? 0).toBe(0);
+    const free = applyEffects(s, [{ kind: 'suspend', weeks: [2, 3], source: 'event' }], {
+      cardId: 'nightOut', reason: 'event: A night out', subjectId: star.id, subjectName: star.name, now: 1,
+    }, makeRng(1));
+    expect(free.state.squad.find((p) => p.id === star.id)?.suspendedWeeks).toBeGreaterThanOrEqual(2);
+    expect(free.state.squad.find((p) => p.id === star.id)?.suspendedWeeks).toBeLessThanOrEqual(3);
+  });
+
+  it('counts a ban down on real fixtures and holds a next-match modifier across a rest week', async () => {
+    const s = await leagueYear();
+    const id = s.squad[0]!.id;
+    let banned = quiet({ ...s, squad: s.squad.map((p) => (p.id === id ? { ...p, suspendedWeeks: 2 } : p)) });
+    banned = eventsTick(atWeek(banned, 2)).state;
+    expect(banned.squad.find((p) => p.id === id)?.suspendedWeeks).toBe(2);
+    banned = eventsTick(atWeek(banned, 3)).state;
+    expect(banned.squad.find((p) => p.id === id)?.suspendedWeeks).toBe(2);
+    banned = eventsTick(atWeek(banned, 4)).state;
+    expect(banned.squad.find((p) => p.id === id)?.suspendedWeeks).toBe(1);
+    banned = eventsTick(atWeek(banned, 5)).state;
+    expect(banned.squad.find((p) => p.id === id)?.suspendedWeeks).toBe(0);
+
+    const modifier = quiet(s);
+    modifier.eventDeck.modifiers = [{
+      id: 'tv', cardId: 'tvFeature', label: 'TV feature: win next week', trigger: 'win', weeksLeft: 1,
+      effects: [{ kind: 'reputation', amount: 4 }],
+    }];
+    const rested = eventsTick(atWeek(modifier, 2));
+    expect(rested.state.eventDeck.modifiers).toHaveLength(1);
+    expect(rested.state.reputation).toBe(s.reputation);
+    const won = eventsTick(played(atWeek(modifier, 5), 5, true));
+    expect(won.state.reputation).toBe(s.reputation + 4);
+    expect(won.state.eventDeck.modifiers).toHaveLength(0);
+  });
+
+  it('offers the Bali trip once per League rollover, and the hangover can follow', async () => {
+    const opened = await leagueYear();
+    const closed = atWeek(opened, 25);
+    closed.competitions!.calendar!.elapsedIntervals = 25;
+    closed.competitions!.calendar!.status = 'awaiting-next-season';
+    closed.competitions!.leagueCareer = { ...closed.competitions!.leagueCareer!, phase: 'next-season-choice' };
+    const first = applySeasonEvents(closed);
+    expect(first.eventDeck.pending.map((p) => p.cardId)).toContain('baliTrip');
+    expect(applySeasonEvents(first)).toBe(first);
+    const trip = first.eventDeck.pending.find((p) => p.cardId === 'baliTrip')!;
+    expect(trip.expiresAt).toBe(elapsedInterval(closed));
+
+    const nextYear = {
+      ...first, season: 2, week: 25,
+      competitions: {
+        ...first.competitions!,
+        calendar: { ...first.competitions!.calendar!, season: 2, elapsedIntervals: 50, status: 'awaiting-next-season' as const },
+      },
+      eventDeck: { ...first.eventDeck, pending: [] },
+    };
+    const second = applySeasonEvents(nextYear);
+    expect(second.eventDeck.pending.map((p) => p.cardId)).toContain('baliTrip');
+
+    const letThem = resolveEvent(first, trip.id, 0, trip.expiresAt, false)!;
+    const flagged = letThem.state.eventDeck.flags.includes('baliIncident')
+      ? letThem.state
+      : { ...letThem.state, eventDeck: { ...letThem.state.eventDeck, flags: [...letThem.state.eventDeck.flags, 'baliIncident'] } };
+    const early = { ...flagged, season: 2, week: 2, competitions: { ...flagged.competitions!, calendar: { ...flagged.competitions!.calendar!, season: 2, status: 'active' as const, elapsedIntervals: 26 } } };
+    expect(isEligible(card('baliHangover'), early, elapsedInterval(early))).toBe(true);
+  });
+
+  it('draws about one card every 3.5 weeks, closes the gates on the real next fixture, and reloads the same', async () => {
+    const seeds = [1, 2, 3, 4, 5];
+    let total = 0;
+    const run = async (seed: number): Promise<string[]> => {
+      let s = await leagueYear(seed);
+      const draws: string[] = [];
+      for (let week = 1; week <= 25; week++) {
+        const t = eventsTick(atWeek(s, week));
+        if (t.drawn) draws.push(t.drawn.cardId);
+        s = t.state;
+      }
+      return draws;
+    };
+    for (const seed of seeds) {
+      const draws = await run(seed);
+      total += draws.length;
+      expect(draws.filter((id) => id === 'baliTrip')).toHaveLength(0);
+    }
+    const weeksPerCard = (seeds.length * 25) / total;
+    expect(weeksPerCard).toBeGreaterThanOrEqual(3);
+    expect(weeksPerCard).toBeLessThanOrEqual(4);
+    expect(await run(11)).toEqual(await run(11));
+
+    let storm: ReturnType<typeof drawEvent> = null;
+    const base = atWeek(await leagueYear(4), 5);
+    const only = {
+      ...base.eventDeck,
+      lastDrawn: 0,
+      cooldowns: Object.fromEntries(EVENT_CARDS.filter((c) => c.id !== 'matchDayStorm').map((c) => [c.id, 9_999])),
+    };
+    for (let seed = 0; !storm && seed < 40; seed++) storm = drawEvent({ ...base, eventDeck: { ...only, rng: seed } }, elapsedInterval(base), makeRng(seed));
+    expect(storm?.cardId).toBe('matchDayStorm');
+    const slot = Number(storm!.vars?.matchSlot);
+    expect(slot).toBeGreaterThan(base.week);
+    const resolved = resolveEvent({ ...base, eventDeck: { ...base.eventDeck, pending: [storm!] } }, storm!.id, 1, elapsedInterval(base))!;
+    expect(resolved.state.eventDeck.flags).toContain(closedGatesFlag(base.season, slot));
+
+    const saved = JSON.parse(JSON.stringify(base)) as GameState;
+    expect(eventsTick(saved).state.eventDeck).toEqual(eventsTick(JSON.parse(JSON.stringify(saved)) as GameState).state.eventDeck);
+  });
+
+  it('offers the Bali trip when the League season closes, before the close is saved', () => {
+    isolateMiniatureLeagueProgression();
+    setCareerNamespace(DEV_TEST_PREFIX);
+    try {
+      startCareer('League close', 573);
+      const c = competitions();
+      c.calendar!.status = 'active';
+      c.calendar!.elapsedIntervals = 4;
+      c.leagueCareer = {
+        ...progress(), phase: 'active', accepted: {
+          season: 1, startInterval: 0, leagueId: profile.startingDivisionId,
+          ...entrySnapshots(c, 1, profile.startingDivisionId),
+          receiptId: leagueEntryReceiptId(profile.id, 1, 'player', profile.startingDivisionId),
+          allocationPolicy: 'adjacent-vacancy-v1', movements: [],
+        },
+      };
+      setState({
+        week: 5, preseason: 0, competitions: c,
+        league: {
+          fixtures: [], ladder: competitionLadder(c.instances[0]!),
+          clubs: clubIds.map((id) => ({
+            id, name: id, colors: ['#000000', '#ffffff'] as [string, string], strength: 44,
+            ...(id === 'player' ? {} : { squad: [], cash: 60_000, capAccount: freshCapAccount('local') }),
+          })),
+        },
+        objectives: [{ id: 's1-finals', kind: 'finals', text: 'Finish first', target: 1, status: 'pending' }],
+      });
+      registerEventsSystem();
+      advanceWeek();
+      const closed = getState();
+      expect(closed.competitions!.leagueCareer!.phase).toBe('next-season-choice');
+      expect(closed.eventDeck.pending.some((p) => p.cardId === 'baliTrip')).toBe(true);
+    } finally {
+      vi.restoreAllMocks();
+      setCareerNamespace(null);
+    }
   });
 });
