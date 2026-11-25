@@ -37,6 +37,8 @@ export function closeLeagueSeason(state: GameState): GameState {
   const reputation = applySeasonReputation(next.reputation, {ladderPosition: position, clubCount: instance.entrantIds.length,
     finalsWins: played.filter(f => !(f.stageId === finalStage?.id && f.round === finalStage.rounds) && f.result!.winnerId === state.clubId).length,
     playedGrandFinal, premiership: outcome.premiership}).reputation;
+  // #692: premiership and playedGrandFinal are part of this review. Reaching the
+  // final meets the ladder goal; a League title is never a sacking.
   const board = reviewObjectives({...next, reputation}, outcome);
   next = {...next, reputation: board.reputation, boardPatience: board.patience, objectives: board.objectives,
     ...(board.sacked && !state.sacked ? {sacked: {season: state.season, reason: sackingReason(board)}} : {})};

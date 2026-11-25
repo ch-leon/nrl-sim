@@ -1,6 +1,6 @@
 import { FINANCE_LINES, type FinanceLine } from '../../core/state';
 import type { SoakResult } from '../soak';
-import type { CareerMatch, DiaryRow } from './metrics';
+import type { CareerMatch, CareerSeason, DiaryRow } from './metrics';
 
 const mean = (xs: number[]): number | null => xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
 const median = (xs: number[]): number | null => {
@@ -210,6 +210,27 @@ function weeklyMean(rows: DiaryRow[][]): { elapsed: number; season: number; week
   }
   return out;
 }
+/** One line per season that has a judged board, so a sacking can be read from the report. */
+export function boardNotes(seasons: readonly CareerSeason[]): string[] {
+  const lines: string[] = [];
+  for (const s of seasons) {
+    const board = s.board;
+    if (!board) continue;
+    const met = board.objectives.filter(o => o.met).map(o => o.text);
+    const missed = board.objectives.filter(o => !o.met).map(o => o.text);
+    const parts = [
+      met.length ? `met ${met.join('; ')}` : '',
+      missed.length ? `missed ${missed.join('; ')}` : (board.objectives.length ? 'nothing missed' : 'no objectives recorded'),
+    ].filter(Boolean);
+    const mark = `${board.sacked ? ' sacked' : ''}${s.premiership ? ' (premiership)' : ''}`;
+    lines.push(`- S${s.season}${mark}: ${parts.join('; ')}.`);
+  }
+  const silent = seasons.filter(s => s.board?.sacked && !s.board.objectives.some(o => !o.met));
+  if (silent.length) lines.push(`- Sacking without a recorded miss: ${silent.map(s => `S${s.season}`).join(', ')}.`);
+  const titleSack = seasons.filter(s => s.premiership && s.board?.sacked);
+  if (titleSack.length) lines.push(`- WARNING: sacked in a premiership season (${titleSack.map(s => `S${s.season}`).join(', ')}).`);
+  return lines;
+}
 const csvCell = (v: string | number): string => {
   const s = String(v);
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -249,7 +270,7 @@ export function personaReport(runs: readonly SoakResult[], comparison: ReturnTyp
     '',
     'Cash and the salary cap are separate. cap_used, cap_limit, cap_next and cap_protected are the season commitments; the cash_ columns are the bank. Salaries, upkeep and overhead do not leave the bank. A signing takes the annual fee and cap room; a renewal is free and queued; a release pays the payout or is refused. Careers start on the current save and round-trip through the production importer. A save from before this finance format is refused and kept. Potential stars are visible on every player; there is no separate scout-fog concealment. The Scout Office still changes the free-agent pool and the signing fee, and the min-maxer builds one. Watchability work is how the match is drawn; these runs play the same headless live sim and do not render it.',
     '',
-    'Balance flags, not failures: money looks easy when a completed season ends more than $150,000 above the opening cash and nobody goes into debt; money looks hard when completed seasons end below zero; a solvency sacking in at least a quarter of careers is flagged on its own. Cash is climbing fast above $5,000 a week. Ceilings are early when more than 20% of a season-1 squad cannot take another point. XP is steep when the median star arrives in under 8 weeks, and flat when fewer than 25% of opening players gain a star in a run of three or more seasons. Broke means a bankruptcy warning (the balance went below zero; a forced sale is counted on that same warning) or a sacking for a missed solvency objective. A debt week is a week that ended below zero, which is what raises the warning.',
+    'Balance flags, not failures: money looks easy when a completed season ends more than $150,000 above the opening cash and nobody goes into debt; money looks hard when completed seasons end below zero; a solvency sacking in at least a quarter of careers is flagged on its own. Cash is climbing fast above $5,000 a week. Ceilings are early when more than 20% of a season-1 squad cannot take another point. XP is steep when the median star arrives in under 8 weeks, and flat when fewer than 25% of opening players gain a star in a run of three or more seasons. Broke means a bankruptcy warning (the balance went below zero; a forced sale is counted on that same warning) or a sacking for a missed solvency objective. A debt week is a week that ended below zero, which is what raises the warning. Each season\'s board goals are listed under the career, and a sacking names every goal that was missed.',
     '',
     'The diary splits XP into training and match. That split is an estimate rebuilt from the sheets and the weekly formula. It can fall short of XP gained when an event or a facility built the same week adds XP the estimate does not see. XP gained is the observed change.',
     '',
@@ -288,9 +309,11 @@ export function personaReport(runs: readonly SoakResult[], comparison: ReturnTyp
     if (!r.career || !r.persona) continue;
     const c = r.career;
     const single = summarisePersonas([r])[0]!;
+    const notes = boardNotes(c.seasons);
     lines.push(`### ${r.persona.id} / ${r.difficulty ?? 'normal'} / ${r.pack ?? 'au'} / seed ${r.seed}`, '',
       `Regular: ${pct(single.regularWinRate)} wins / ${single.regularGames} games; finals: ${pct(single.finalsWinRate)} wins / ${single.finalsGames} games; finals share: ${pct(single.finalsShare)} / ${single.completedSeasons} completed seasons. Weeks: ${c.weeks}; to 70/80/90: ${Object.values(c.weeksToOverall).map(w => w ?? 'unreached').join(' / ')}; broke: ${c.broke}; weeks in debt: ${c.debtWeeks}. Opening players gaining a star: ${c.stars.gained}/${c.stars.tracked}.`, '',
       table(['Season', 'Completed', 'End cash', 'Minimum cash', ...FINANCE_LINES], c.seasons.map(s => [s.season, String(s.completed), fmt(s.money, 0), fmt(s.minMoney, 0), ...FINANCE_LINES.map(k => fmt(s.finance[k], 0))])), '',
+      ...(notes.length ? ['Board objectives. A sacking names every goal that was missed.', '', ...notes, ''] : []),
       `Save round-trips: ${c.saves.length}; repairs: ${c.saves.reduce((n, s) => n + s.repairs.length, 0)}; unrecoverable: ${c.saves.filter(s => !s.ok).length}. Stability: ${JSON.stringify(c.stability)}.`, '',
       ...c.saves.flatMap(s => [...s.repairs.map(p => `- S${s.season} repair ${p.field}: ${p.problem} → ${p.repair}`), ...(!s.ok ? [`- S${s.season} unloadable: ${s.message}`] : [])]),
       ...r.problems.map(p => `- ${p}`), '');

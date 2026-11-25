@@ -1,6 +1,6 @@
 import { currentRound } from '../../core/season';
 import { bus, type Events } from '../../core/events';
-import { FINANCE_LINES, getState, loadState, type FinanceLine, type GameState, type Player, type PlacedFacility } from '../../core/state';
+import { FINANCE_LINES, getState, loadState, type FinanceLine, type GameState, type Objective, type Player, type PlacedFacility } from '../../core/state';
 import { importSave } from '../../core/save';
 import { PROGRESSION } from '../../config';
 import { isFinalsRound, finalsSeeds } from '../../systems/fixtures';
@@ -60,6 +60,11 @@ export interface CareerSeason {
   pointsSpent: number;
   starsGained: number;
   players: SeasonPlayer[];
+  /** Judged board goals for this season, and whether the board sacked the club. */
+  board?: {
+    sacked: boolean;
+    objectives: { text: string; kind?: Objective['kind']; met: boolean }[];
+  };
 }
 export interface DiaryRow {
   elapsed: number;
@@ -196,6 +201,26 @@ export function observeCareer(rating: (s: GameState) => number) {
   let weekStartMoney: number | null = null;
   let weekForced = 0;
   const cohort = new Map<string, { startStars: number; starWeek: number | null; potentialWeek: number | null }>();
+  const judged = new Map<number, NonNullable<CareerSeason['board']>>();
+  /** Snapshot goals that are already met or missed. Pending goals are the next season's. */
+  function rememberJudged(endedSeason?: number): void {
+    const s = getState();
+    const reviewed = s.objectives.filter(o => o.status === 'met' || o.status === 'missed');
+    if (!reviewed.length) return;
+    const tagged = reviewed.map(o => /^s(\d+)-/.exec(o.id)?.[1]).find((n): n is string => n !== undefined);
+    const season = tagged ? Number(tagged) : (endedSeason ?? s.sacked?.season ?? s.season);
+    judged.set(season, {
+      sacked: s.sacked?.season === season,
+      objectives: reviewed.map(o => ({ text: o.text, kind: o.kind, met: o.status === 'met' })),
+    });
+  }
+  function boardFor(season: number): CareerSeason['board'] {
+    const snapped = judged.get(season);
+    if (snapped) return snapped;
+    const review = getState().history.find(h => h.season === season)?.review?.board;
+    if (!review) return undefined;
+    return { sacked: review.sacked, objectives: review.objectives.map(o => ({ text: o.text, met: o.met })) };
+  }
   for (const p of getState().squad) {
     const stars = playerStars(p);
     cohort.set(p.id, { startStars: stars, starWeek: null, potentialWeek: p.ceilings && stars >= potentialStars(p) ? 0 : null });
@@ -218,9 +243,15 @@ export function observeCareer(rating: (s: GameState) => number) {
     }),
     bus.on('board:sacked', e => {
       // Board reasons quote the failed objective; use its structured kind, not text matching.
+      rememberJudged();
       const cashFailure = getState().objectives.some(o => o.kind === 'solvent' && o.status === 'missed');
       if (e && cashFailure) { metrics.moneySackings++; metrics.broke = true; }
     }),
+    bus.on('ui:notify', e => {
+      // The review toast fires while the judged goals are still on the state, before the next season's are set.
+      if (e.text.startsWith('Board: ')) rememberJudged();
+    }),
+    bus.on('season:ended', e => { rememberJudged(e.season); }),
     bus.on('match:started', m => { active = m; }),
     bus.on('match:finished', ({ fixture, result }) => {
       const s = getState();
@@ -283,6 +314,7 @@ export function observeCareer(rating: (s: GameState) => number) {
     const rows = metrics.diary.filter(d => d.season === currentSeason);
     const history = s.history.find(h => h.season === currentSeason);
     const ladder = history?.ladderPosition ?? (s.league.ladder.findIndex(r => r.clubId === s.clubId) + 1 || null);
+    const board = boardFor(currentSeason);
     return { season: currentSeason, completed, elapsedWeeks: metrics.weeks, broke: metrics.broke,
       failures: metrics.stability.crashes + metrics.stability.invariantFailures, money: s.money, minMoney, finance: { ...finance }, madeFinals,
       ladder, premiership: history?.premiership ?? false, debtWeeks: rows.filter(d => d.inDebt).length,
@@ -291,7 +323,7 @@ export function observeCareer(rating: (s: GameState) => number) {
       xpGained: rows.reduce((n, d) => n + d.xpGained, 0), xpTraining: rows.reduce((n, d) => n + d.xpTraining, 0),
       xpMatch: rows.reduce((n, d) => n + d.xpMatch, 0), levelUps: rows.reduce((n, d) => n + d.levelUps, 0),
       pointsSpent: rows.reduce((n, d) => n + d.pointsSpent, 0), starsGained: rows.reduce((n, d) => n + d.starsGained, 0),
-      players: s.squad.map(playerRow) };
+      players: s.squad.map(playerRow), ...(board ? { board } : {}) };
   }
   function afterWeek(log?: WeekLog): void {
     const s = getState();

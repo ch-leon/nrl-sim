@@ -77,6 +77,11 @@ describe('objectiveRisk: finals (#368)', () => {
     expect(objectiveRisk(finals(8), onLadder(base(), 8, TEN_ON_20, 11))).toBe('at-risk');
   });
 
+  it('stays a ladder read during the season: the grand final is judged at the end', () => {
+    // 11th and four points off 4th, with eight rounds left. Still at risk. A final that has not been played does not clear it.
+    expect(objectiveRisk(finals(4), onLadder(base(), 16, TEN_ON_20, RISK_ROUNDS_LEFT))).toBe('at-risk');
+  });
+
   it('off track once the rounds left cannot close the gap (2 points a win)', () => {
     expect(objectiveRisk(finals(8), onLadder(base(), 14, TEN_ON_20, 3))).toBe('at-risk'); // 6 = 3 × 2
     expect(objectiveRisk(finals(8), onLadder(base(), 13, TEN_ON_20, 3))).toBe('off-track'); // 7 > 6
