@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- **Story events in League career.** The Classic deck, including the wildcards and the Bali trip, now turns up in a League career. Cards follow the 25-week year, the trip is offered when the season closes, and a player away at Skills Camp or a booked event is not the subject of a card. A wildcard ban misses real fixtures. [#820](https://github.com/ch-leon/nrl-sim/issues/820).
+
 - **A title season is not a sacking.** Finishing outside the board’s ladder target still meets that goal when the club reaches the grand final or wins the title, in Classic and in a League career. Winning the title never ends the season in a sacking, even if another goal is missed. A building goal only asks for facilities the cash can pay for. The persona report names the goal missed in every sacking. [#692](https://github.com/ch-leon/nrl-sim/issues/692) ([PR](https://github.com/ch-leon/nrl-sim/pull/826)).
 
 - **A ground that grows** ([PR #827](https://github.com/ch-leon/nrl-sim/pull/827)). A home match draws the hill until you build a Grandstand, then a stand with more rows and a roof at each level. The Sponsor Board is signage and the Canteen a food stall. Seats fill with that day's attendance against capacity. An away ground follows the home club's league: smaller in Local, the full ground in the Premier League. [#824](https://github.com/ch-leon/nrl-sim/issues/824).

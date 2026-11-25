@@ -10,7 +10,7 @@ import { awaitingCampReplay } from './parkedLeagueFixture';
 // else is announced in the news with the outcome line.
 import { getState, setState, type ActiveModifier, type GameState, type PendingEvent, type Player, type RivalClub } from '../core/state';
 import { bus } from '../core/events';
-import { registerSeasonHook, registerTickHook, TICK_ORDER, weekHeld } from '../core/time';
+import { registerLeagueRolloverHook, registerSeasonHook, registerTickHook, TICK_ORDER, weekHeld } from '../core/time';
 import { earnMoney } from '../data/club';
 import { overallRating } from '../data/player';
 import { TRAITS, traitLevel, withTrait, type TraitLevel } from '../data/traits';
@@ -23,13 +23,14 @@ import { signingFee } from './freeagency';
 import { hasStaff, WELFARE_CARDS } from './staff';
 import { isFieldable, isSelectable } from './lineup';
 import { awayPlayerIds } from './playerAssignments';
+import { clubReservations } from './playerAvailability';
 import { reviewSuspension, withSuspension } from './suspension';
 import { makeRng, type Rng } from '../utils/rng';
 import { fmtMoney } from '../utils/money';
 import { clampMorale } from './morale';
 import { getCurrentFixture, PLAYER_ID } from './fixtures';
 import { elapsedInterval } from '../core/season';
-import { hasStructuralCalendar } from './competitionCalendar';
+import { fixtureBridge, hasStructuralCalendar } from './competitionCalendar';
 
 /** Tick order: after morale (55) so a card's morale change isn't drifted the same week, before free agency (60). */
 export const EVENTS_TICK_ORDER = 58;
@@ -118,10 +119,11 @@ function effectParts(effects: readonly EventEffect[], opts?: { welfare?: boolean
 
 // ── Drawing ──────────────────────────────────────────────────────────────────
 
-/** The player's fit, signed squad members (juniors are not first-graders yet). */
+/** The player's fit, signed squad members (juniors are not first-graders yet).
+ *  A player booked for Skills Camp or Big Mick's, or already away, is not a card's subject. */
 function fitSquad(state: GameState): Player[] {
-  const away = awayPlayerIds(state);
-  return state.squad.filter(p => isSelectable(p,away) && !p.junior);
+  const reserved = reservedIds(state);
+  return state.squad.filter(p => isSelectable(p, reserved) && !p.junior);
 }
 
 /**
@@ -133,10 +135,11 @@ export function incidentWeight(p: Player): number {
   return 1 + traitLevel(p.traits, 'hothead') * 2 + (p.morale < 45 ? 2 : 0);
 }
 
-/** Who an incident can land on: fit seniors, or any senior if the whole squad is out. */
+/** Who an incident can land on: fit seniors, or any senior if the whole squad is out.
+ *  A player away at Skills Camp or booked for one is not in the pool. */
 function incidentPool(state: GameState): Player[] {
-  const away = awayPlayerIds(state);
-  const seniors = state.squad.filter(p => !p.junior && !away.has(p.id));
+  const reserved = reservedIds(state);
+  const seniors = state.squad.filter(p => !p.junior && !reserved.has(p.id));
   const fit = seniors.filter((p) => isFieldable(p));
   return [...(fit.length > 0 ? fit : seniors)].sort((a, b) => a.id.localeCompare(b.id));
 }
@@ -196,6 +199,66 @@ function fixtureInRound(state: GameState, round: number) {
   return state.league.fixtures.find((f) => f.round === round && (f.homeId === PLAYER_ID || f.awayId === PLAYER_ID));
 }
 
+/** League career runs the deck. A structural prototype still only expires old cards. */
+function leagueCareerEvents(state: Pick<GameState, 'competitions'>): boolean {
+  return !!state.competitions?.leagueCareer && hasStructuralCalendar(state);
+}
+
+/**
+ * Classic week windows, read on a League career year. A 25-week year maps onto
+ * the 27-week Classic scale, so weeks 1–4 stay the pre-season block and the
+ * finals sit past a [1, 24] window. Equal lengths stay as written.
+ */
+function cardWeek(state: GameState): number {
+  const slots = leagueCareerEvents(state) ? state.competitions!.calendar!.slots.length : 0;
+  if (!slots || slots === WEEKS_PER_SEASON) return state.week;
+  return 1 + Math.floor((state.week - 1) * WEEKS_PER_SEASON / slots);
+}
+
+/** Players committed to Skills Camp or an individual event, booked or already away. */
+function reservedIds(state: GameState): ReadonlySet<string> {
+  return new Set(clubReservations(state).map((r) => r.playerId));
+}
+
+/** The club's fixture in the current slot, including one already played this week. */
+function clubFixtureThisWeek(state: GameState): ReturnType<typeof getCurrentFixture> {
+  if (!leagueCareerEvents(state)) return getCurrentFixture(state, state.clubId);
+  const club = state.clubId;
+  let open: ReturnType<typeof getCurrentFixture> = undefined;
+  for (const instance of state.competitions!.instances) {
+    if (instance.season !== state.season || !['scheduled', 'active', 'completed'].includes(instance.status)) continue;
+    for (const fixture of instance.fixtures) {
+      if (fixture.slot !== state.week || fixture.status === 'cancelled' || fixture.status === 'pending') continue;
+      if (fixture.homeId !== club && fixture.awayId !== club) continue;
+      const bridge = fixtureBridge({ instance, fixture });
+      if (bridge.result) return bridge;
+      open = bridge;
+    }
+  }
+  return open;
+}
+
+/** The club's next real fixture after this week. A rest week has none for match cards. */
+function nextMatchFixture(state: GameState): { homeId: string; awayId: string; slot: number } | null {
+  if (!leagueCareerEvents(state)) {
+    const next = fixtureInRound(state, state.week + 1);
+    return next ? { homeId: next.homeId, awayId: next.awayId, slot: next.round } : null;
+  }
+  const slots = state.competitions!.calendar!.slots;
+  if (slots[state.week - 1]?.kind === 'rest') return null;
+  const club = state.clubId;
+  let best: { homeId: string; awayId: string; slot: number } | null = null;
+  for (const instance of state.competitions!.instances) {
+    if (instance.season !== state.season || (instance.status !== 'scheduled' && instance.status !== 'active')) continue;
+    for (const fixture of instance.fixtures) {
+      if (fixture.status !== 'scheduled' || fixture.slot === undefined || fixture.slot <= state.week) continue;
+      if (fixture.homeId !== club && fixture.awayId !== club) continue;
+      if (!best || fixture.slot < best.slot) best = { homeId: fixture.homeId, awayId: fixture.awayId, slot: fixture.slot };
+    }
+  }
+  return best;
+}
+
 /** Is `card` allowed this week? `now` is the absolute week of the tick drawing it.
  *  Pass `{ rollover: true }` from the season hook; the weekly draw leaves it off,
  *  so a trip card is never drawn mid-season. */
@@ -206,15 +269,16 @@ export function isEligible(card: EventCardDef, state: GameState, now: number, op
   if (deck.pending.some((p) => p.cardId === card.id)) return false;
   const w = card.when;
   if (w?.flag && !(deck.flags ?? []).includes(w.flag)) return false;
-  if (w?.weeks && (state.week < w.weeks[0] || state.week > w.weeks[1])) return false;
+  const week = cardWeek(state);
+  if (w?.weeks && (week < w.weeks[0] || week > w.weeks[1])) return false;
   if (w?.reputation && (state.reputation < w.reputation[0] || state.reputation > w.reputation[1])) return false;
   if (w?.minMoney !== undefined && state.money < w.minMoney) return false;
   if (w?.minFacilities !== undefined && state.facilities.length < w.minFacilities) return false;
   if (w?.nextMatch) {
-    const next = fixtureInRound(state, state.week + 1);
+    const next = nextMatchFixture(state);
     if (!next) return false;
-    if (w.nextMatch === 'home' && next.homeId !== PLAYER_ID) return false;
-    if (w.nextMatch === 'away' && next.awayId !== PLAYER_ID) return false;
+    if (w.nextMatch === 'home' && next.homeId !== state.clubId) return false;
+    if (w.nextMatch === 'away' && next.awayId !== state.clubId) return false;
   }
   if (card.subject && subjectCandidates(state, card.subject).length === 0) return false;
   return true;
@@ -275,6 +339,8 @@ export function drawEvent(state: GameState, now: number, rng: Rng): PendingEvent
     ev.subjectId = who.id;
     ev.subjectName = who.name;
   }
+  const upcoming = leagueCareerEvents(state) && card.when?.nextMatch ? nextMatchFixture(state) : null;
+  if (upcoming) ev.vars = { ...(ev.vars ?? {}), matchSlot: String(upcoming.slot) };
   return ev;
 }
 
@@ -358,7 +424,8 @@ export function applyEffects(state: GameState, effects: readonly EventEffect[], 
         break;
       }
       case 'suspend': {
-        if (ctx.subjectId && awayPlayerIds(s).has(ctx.subjectId)) break;
+        // A ban is never added on top of Skills Camp or another assignment.
+        if (ctx.subjectId && reservedIds(s).has(ctx.subjectId)) break;
         const rolled = typeof e.weeks === 'number' ? e.weeks : rng.int(e.weeks[0], e.weeks[1]);
         const granted = reviewSuspension(s, { weeks: rolled, source: e.source, cause: ctx.reason }, rng);
         const put = withSuspension(s, ctx.subjectId, granted);
@@ -456,8 +523,10 @@ export function resolveEvent(state: GameState, eventId: string, index: number, n
   const choice = card.choices[index];
   if (!choice) return null;
   const rng = makeRng(without.eventDeck.rng);
+  const slot = Number(ev.vars?.matchSlot);
+  const round = Number.isInteger(slot) && slot > 0 ? slot : ev.week + 1;
   const applied = applyEffects(without, choice.effects, {
-    cardId: card.id, match: { season: ev.season, round: ev.week + 1 }, reason: `event: ${card.title}`, subjectId: ev.subjectId, subjectName: ev.subjectName,
+    cardId: card.id, match: { season: ev.season, round }, reason: `event: ${card.title}`, subjectId: ev.subjectId, subjectName: ev.subjectName,
     rivalId: ev.rivalId, fee: ev.fee, now, clubName: state.clubName, vars: ev.vars,
   }, rng);
   applied.state = { ...applied.state, eventDeck: { ...applied.state.eventDeck, rng: rng.state() } };
@@ -490,7 +559,7 @@ export function outcomeTail(effects: readonly EventEffect[], rolls: readonly boo
 
 /** "win" / "loss" / "draw" for the player's fixture this week, or null (bye / unplayed). */
 export function weekResult(state: GameState): 'win' | 'loss' | 'draw' | null {
-  const fx = getCurrentFixture(state, PLAYER_ID);
+  const fx = clubFixtureThisWeek(state);
   if (!fx?.result) return null;
   const us = fx.homeId === PLAYER_ID ? fx.result.homeScore : fx.result.awayScore;
   const them = fx.homeId === PLAYER_ID ? fx.result.awayScore : fx.result.homeScore;
@@ -500,6 +569,8 @@ export function weekResult(state: GameState): 'win' | 'loss' | 'draw' | null {
 /** Fire this week's modifiers and count them down (pure). */
 export function tickModifiers(state: GameState, now: number): Applied {
   const result = weekResult(state);
+  // A "win next week" waits for the next real fixture, not a rest or bye week.
+  const fixtureWeek = !leagueCareerEvents(state) || !!clubFixtureThisWeek(state);
   let s: GameState = state;
   const money: Applied['money'] = [];
   const news: Applied['news'] = [];
@@ -516,7 +587,8 @@ export function tickModifiers(state: GameState, now: number): Applied {
         news.push({ text: `${m.label}: ${describeEffects(m.effects)}.`, kind: m.trigger === 'loss' ? 'info' : 'success' });
       }
     }
-    if (m.weeksLeft > 1) kept.push({ ...m, weeksLeft: m.weeksLeft - 1 });
+    const hold = !fixtureWeek && m.trigger !== 'weekly';
+    if (hold || m.weeksLeft > 1) kept.push({ ...m, weeksLeft: hold ? m.weeksLeft : m.weeksLeft - 1 });
   }
   s = { ...s, eventDeck: { ...s.eventDeck, modifiers: kept } };
   return { state: s, money, news };
@@ -534,6 +606,8 @@ export interface EventsTick extends Applied {
 /** Count a ban down by one week. The medics do not hurry it (#324). */
 function tickSuspensions(state: GameState): GameState {
   if (!state.squad.some((p) => (p.suspendedWeeks ?? 0) > 0)) return state;
+  // In a League career a ban is served on real fixtures, so a rest week does not count.
+  if (leagueCareerEvents(state) && !clubFixtureThisWeek(state)) return state;
   return {
     ...state,
     squad: state.squad.map((p) => {
@@ -544,7 +618,7 @@ function tickSuspensions(state: GameState): GameState {
 }
 
 export function eventsTick(state: GameState): EventsTick {
-  if (hasStructuralCalendar(state)) {
+  if (hasStructuralCalendar(state) && !state.competitions?.leagueCareer) {
     // Time still expires old cards/modifiers; prototype events never apply effects.
     const now = elapsedInterval(state);
     const next = tickSuspensions(state);
@@ -604,7 +678,8 @@ function commit(a: Applied): void {
 /** The player picked choice `index` on a pending card. Returns false if it no longer exists. */
 export function chooseEvent(eventId: string, index: number): boolean {
   const s = getState();
-  if (awaitingCampReplay(s) || hasStructuralCalendar(s) || weekHeld()) return false;
+  if (awaitingCampReplay(s) || weekHeld()) return false;
+  if (hasStructuralCalendar(s) && !s.competitions?.leagueCareer) return false;
   const r = resolveEvent(s, eventId, index, elapsedInterval(s));
   if (!r) return false;
   commit(r);
@@ -617,7 +692,7 @@ export function chooseEvent(eventId: string, index: number): boolean {
  * takes its default before that match.
  */
 export function applySeasonEvents(state: GameState): GameState {
-  if (state.sacked || hasStructuralCalendar(state)) return state;
+  if (state.sacked || (hasStructuralCalendar(state) && !state.competitions?.leagueCareer)) return state;
   const now = elapsedInterval(state);
   const pending = [...state.eventDeck.pending];
   const cooldowns = { ...state.eventDeck.cooldowns };
@@ -632,7 +707,9 @@ export function applySeasonEvents(state: GameState): GameState {
       week: state.week,
       expiresAt: now,
     });
-    cooldowns[card.id] = now + card.cooldown;
+    // A League year is shorter than the Classic cooldown, and the trip is still once a year.
+    const span = leagueCareerEvents(state) ? Math.min(card.cooldown, state.competitions!.calendar!.slots.length) : card.cooldown;
+    cooldowns[card.id] = now + span;
     added = true;
   }
   if (!added) return state;
@@ -704,7 +781,7 @@ export function plantPending(cardId: string): boolean {
 export function registerEventsSystem(): void {
   registerTickHook('events-rollover', TICK_ORDER.match - 5, () => {
     const s = getState();
-    if (s.sacked || hasStructuralCalendar(s)) return;
+    if (s.sacked || (hasStructuralCalendar(s) && !s.competitions?.leagueCareer)) return;
     const due = resolveDueRollovers(s, elapsedInterval(s));
     if (due.state !== s) commit(due);
   });
@@ -716,13 +793,23 @@ export function registerEventsSystem(): void {
   registerSeasonHook('events-season', 25, () => {
     const s = getState();
     if (hasStructuralCalendar(s)) return;
-    const next = applySeasonEvents(s);
-    if (next === s) return;
-    setState({ eventDeck: next.eventDeck });
-    for (const ev of next.eventDeck.pending) {
-      if (s.eventDeck.pending.some((p) => p.id === ev.id)) continue;
-      const card = cardById(ev.cardId);
-      if (card) bus.emit('ui:notify', { text: `Decision needed: ${card.title}. Open News to choose.`, kind: 'info' });
-    }
+    offerSeasonCards(s);
   });
+  registerLeagueRolloverHook('events-league-season', 25, () => {
+    const s = getState();
+    if (s.sacked || !s.competitions?.leagueCareer) return;
+    offerSeasonCards(s);
+  });
+}
+
+/** Put season-end cards (the Bali trip) in front of the player and say so. */
+function offerSeasonCards(s: GameState): void {
+  const next = applySeasonEvents(s);
+  if (next === s) return;
+  setState({ eventDeck: next.eventDeck });
+  for (const ev of next.eventDeck.pending) {
+    if (s.eventDeck.pending.some((p) => p.id === ev.id)) continue;
+    const card = cardById(ev.cardId);
+    if (card) bus.emit('ui:notify', { text: `Decision needed: ${card.title}. Open News to choose.`, kind: 'info' });
+  }
 }
