@@ -1,7 +1,7 @@
 // tests/ui/screens/board.test.ts — Staff & Board (3k): how each board objective
 // stands, read the way the board will at the season's end. Pure; no DOM.
 import { describe, it, expect } from 'vitest';
-import { objectiveStatus, OBJECTIVE_STATUS_LABEL } from '../../../src/ui/screens/board';
+import { objectiveCardText, objectiveStatus, OBJECTIVE_STATUS_LABEL } from '../../../src/ui/screens/board';
 import type { GameState, LadderRow, Objective } from '../../../src/core/state';
 
 const row = (clubId: string, played = 2): LadderRow => ({ clubId, played, wins: 0, draws: 0, losses: 0, pointsFor: 0, pointsAgainst: 0, points: 0 });
@@ -28,6 +28,12 @@ describe('objectiveStatus (3k)', () => {
     expect(objectiveStatus(obj('build', 3), club(['player']))).toBe('at-risk');
     expect(objectiveStatus(obj('beatRival', 0, { rivalId: 'r' }), club(['player', 'r']))).toBe('on-track');
     expect(objectiveStatus(obj('beatRival', 0, { rivalId: 'r' }), club(['r', 'player']))).toBe('at-risk');
+  });
+
+  it('says the grand final or the title counts, including on an older ladder line', () => {
+    expect(objectiveCardText(obj('finals', 8, { text: 'Finish in the top 8' }))).toBe('Finish in the top 8 (the grand final or the title counts)');
+    expect(objectiveCardText(obj('finals', 8, { text: 'Finish in the top 8 (the grand final or the title counts)' }))).toBe('Finish in the top 8 (the grand final or the title counts)');
+    expect(objectiveCardText(obj('build', 2, { text: 'Have 2 facilities built' }))).toBe('Have 2 facilities built');
   });
 
   it('every status has its chip', () => {

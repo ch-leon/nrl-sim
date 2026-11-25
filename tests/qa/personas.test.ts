@@ -12,7 +12,7 @@ import { PERSONAS, personaById } from '../../src/qa/personas';
 import { createPersonaManager, effectValue } from '../../src/qa/personas/policy';
 import { measuredMatch } from '../../src/qa/soak';
 import { careerRoundTrip, observeCareer, type CareerMatch } from '../../src/qa/personas/metrics';
-import { compareBaseline, makeBaseline, outliers, personaReport, summarisePersonas } from '../../src/qa/personas/report';
+import { boardNotes, compareBaseline, makeBaseline, outliers, personaReport, summarisePersonas } from '../../src/qa/personas/report';
 import { runSoak, FINANCE_LINES, type SoakResult } from '../../src/qa/soak';
 
 const stable = ({ ms: _elapsed, ...r }: SoakResult) => r;
@@ -153,6 +153,41 @@ describe('AI personas (#534)', () => {
     future.career!.seasons[1]!.failures = 5;
     const early = baseline.cases.filter(c => c.endpoint === 'season:1');
     expect(compareBaseline([future], { ...baseline, cases: early }).warnings).toEqual([]);
+  });
+
+  it('records each season\'s board goals and names the miss on a sacking', () => {
+    bus.clear();
+    createLegacyGame('Board', 3);
+    initLeague(getState());
+    const observer = observeCareer(() => 50);
+    setState({
+      season: 2,
+      objectives: [
+        { id: 's1-finals', kind: 'finals', text: 'Finish in the top 4 (the grand final or the title counts)', target: 4, status: 'met' },
+        { id: 's1-build', kind: 'build', text: 'Have 4 facilities built', target: 4, status: 'missed' },
+      ],
+      sacked: { season: 1, reason: 'The board ran out of patience.' },
+      history: [{ season: 1, ladderPosition: 6, premiership: false }],
+    });
+    bus.emit('ui:notify', { text: 'Board: 1 met, 1 missed. Patience 0/5.', kind: 'danger', quiet: true });
+    observer.beforeWeek();
+    observer.afterWeek();
+    observer.finish();
+    observer.dispose();
+    const season = observer.metrics.seasons.find(s => s.season === 1);
+    expect(season?.board).toEqual({
+      sacked: true,
+      objectives: [
+        { text: 'Finish in the top 4 (the grand final or the title counts)', kind: 'finals', met: true },
+        { text: 'Have 4 facilities built', kind: 'build', met: false },
+      ],
+    });
+    expect(boardNotes(observer.metrics.seasons).join('\n')).toContain('S1 sacked: met Finish in the top 4 (the grand final or the title counts); missed Have 4 facilities built.');
+    const r: SoakResult = { seed: 1, mode: 'persona', persona: personaById('newcomer'), career: observer.metrics,
+      start: { bestNine: 50, rivalMean: 50, rivalRange: [50, 60] }, seasons: [], problems: [], ms: 0 };
+    const report = personaReport([r], { compared: 0, warnings: [] });
+    expect(report).toContain('missed Have 4 facilities built');
+    expect(report).not.toContain('sacked in a premiership season');
   });
 
   it('uses expected values for visible money, risk and temporary card effects', () => {

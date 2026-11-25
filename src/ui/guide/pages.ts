@@ -308,7 +308,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
         heading: 'Reputation and the board',
         bullets: [
           'Reputation moves with the finish: the top four gain (+4 for first, down to +1), the bottom four lose (−1 to −4), each finals win adds 1 and a lost grand final 3. It then settles 10% of the way back toward 30, so a club has to keep earning it.',
-          `The board sets objectives each season (a ladder finish, beating a rival, or building) and keeps 5 points of patience: a missed objective costs one, a clean sweep earns one back, zero and you are sacked. Cash is not an objective. Each one met pays ${fmtMoney(BOARD.GRANT_PER_MET)} and ${BOARD.REP_PER_MET} reputation. Easy pays ${percent(DIFFICULTY.easy.prize)} of the grant and Hard ${percent(DIFFICULTY.hard.prize)}.`,
+          `The board sets objectives each season (a ladder finish, beating a rival, or building) and keeps 5 points of patience: a missed objective costs one, a clean sweep earns one back, and zero means the sack. Reaching the grand final, or winning the premiership, meets the ladder finish from any place on the table, and a premiership season is never a sacking. Cash is not an objective. A building goal asks only for facilities the cash can pay for when the goals are set, at the cheapest build price, and it is left off when the cash cannot buy one. Each one met pays ${fmtMoney(BOARD.GRANT_PER_MET)} and ${BOARD.REP_PER_MET} reputation. Easy pays ${percent(DIFFICULTY.easy.prize)} of the grant and Hard ${percent(DIFFICULTY.hard.prize)}.`,
         ],
       },
       {
@@ -370,7 +370,7 @@ export function guidePageForCareer(page: GuidePage, state: GameState | null = cl
     { text: `${view.division.name}: ${view.fieldSize} clubs, ${view.regularRounds} regular rounds. ${definition.standings!.win} points for a win, ${definition.standings!.draw} for a draw and ${definition.standings!.loss} for a loss. Ties use ${definition.standings!.tieBreakers.map(t => t.replace(/-/g, ' ')).join(', ')} in that order.` },
     { heading: 'Finals and dates', text: `${view.finalsSize ? `Top ${view.finalsSize} qualify for finals.` : 'No finals this season.'} ${dates}. A tied knockout plays ${rules.goldenPointMinutes} minutes of golden point; if still tied, ${tie}.` },
     { heading: 'Permanent league access', text: `${view.goal} A minor premiership is a separate honour. A cancelled, withdrawn or missing final does not award a title. There is no automatic promotion or relegation.` },
-    { heading: 'Rewards and the board', text: `${rewards} The board’s saved objectives use this league’s field. Results affect reputation and patience; missing an objective costs one patience, a clean sweep earns one back, and zero means dismissal.` },
+    { heading: 'Rewards and the board', text: `${rewards} The board’s saved objectives use this league’s field. Results affect reputation and patience; missing an objective costs one patience, a clean sweep earns one back, and zero means dismissal. Reaching this league’s final, or winning the title, meets the ladder finish from any place, and a title season is never a sacking.` },
     { heading: 'Your current objectives', bullets: state.objectives.map(o => o.text) },
     page.sections[page.sections.length - 1]!,
   ] };
