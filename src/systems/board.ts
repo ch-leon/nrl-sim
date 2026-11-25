@@ -11,6 +11,7 @@ import { registerSeasonHook } from '../core/time';
 import { hasStructuralCalendar } from './competitionCalendar';
 import { leagueSeasonView, remainingLeagueFixtures, type LeagueReadState } from './leagueSeasonView';
 import { earnMoney } from '../data/club';
+import { FACILITY_CATALOG } from '../data/facility';
 import { makeRng } from '../utils/rng';
 import { fmtMoney } from '../utils/money';
 import { BOARD, PRIZE, SEASON_ROUNDS, WEEKS_PER_SEASON, difficultyMultipliers, scaledMoney } from '../config';
@@ -46,6 +47,24 @@ export function finalsTarget(state: Pick<GameState, 'reputation' | 'settings'>):
   return Math.max(3, Math.min(12, Math.round(12 - state.reputation / 10) + shift));
 }
 
+/** Shown on a finals goal: the table place, or the grand final, or the title. */
+export const FINALS_OBJECTIVE_CLAUSE = 'the grand final or the title counts';
+
+export function finalsObjectiveText(top: number): string {
+  return `Finish in the top ${top} (${FINALS_OBJECTIVE_CLAUSE})`;
+}
+
+/**
+ * How many new facilities a building goal may demand. Priced at the cheapest
+ * catalog build, capped at `BUILD_TARGET_EXTRA`. Zero when the cash cannot
+ * buy one: that goal is left off, because a club cannot go into the red to meet it.
+ */
+export function buildsTheCashCovers(money: number): number {
+  const cheapest = Math.min(...Object.values(FACILITY_CATALOG).map((f) => f.cost));
+  if (cheapest <= 0) return BOARD.BUILD_TARGET_EXTRA;
+  return Math.max(0, Math.min(BOARD.BUILD_TARGET_EXTRA, Math.floor(Math.max(0, money) / cheapest)));
+}
+
 /**
  * The board's goals for `state.season`: a finals target, and a derby, rival or
  * building goal when the club is known enough. Cash solvency is not a goal:
@@ -69,7 +88,7 @@ function objectivesForField(state: GameState, top: number): Objective[] {
   const rng = makeRng(state.season * 7919 + state.league.clubs.length * 31 + 17);
   const season = state.season;
   const out: Objective[] = [
-    { id: `s${season}-finals`, kind: 'finals', text: `Finish in the top ${top}`, target: top, status: 'pending' },
+    { id: `s${season}-finals`, kind: 'finals', text: finalsObjectiveText(top), target: top, status: 'pending' },
   ];
   const derby = derbyRival(state);
   if (state.reputation < 25 && !derby) return out;
@@ -87,16 +106,25 @@ function objectivesForField(state: GameState, top: number): Objective[] {
       text: `Finish above ${rival.name}${derby ? ", our derby rival" : ""}`,
     });
   } else {
-    const target = state.facilities.length + BOARD.BUILD_TARGET_EXTRA;
-    out.push({ id: `s${season}-build`, kind: 'build', target, status: 'pending', text: `Have ${target} facilities built` });
+    // The draw is already consumed. A goal the cash cannot pay for is not set.
+    const extra = buildsTheCashCovers(state.money);
+    if (extra > 0) {
+      const target = state.facilities.length + extra;
+      out.push({ id: `s${season}-build`, kind: 'build', target, status: 'pending', text: `Have ${target} facilities built` });
+    }
   }
   return out;
 }
 
-/** Is `o` met, given the end-of-season state and outcome? */
+/**
+ * Is `o` met, given the end-of-season state and outcome?
+ * A finals goal is met by the ladder target, by reaching the grand final
+ * (or a League career's final), or by winning the title.
+ */
 export function evaluateObjective(o: Objective, state: GameState, outcome: SeasonOutcome): boolean {
   switch (o.kind) {
-    case 'finals': return outcome.ladderPosition > 0 && outcome.ladderPosition <= o.target;
+    case 'finals': return outcome.premiership || outcome.playedGrandFinal
+      || (outcome.ladderPosition > 0 && outcome.ladderPosition <= o.target);
     case 'solvent': return state.money >= o.target;
     case 'build': return state.facilities.length >= o.target;
     case 'beatRival': {
@@ -116,7 +144,13 @@ export interface BoardReview {
   sacked: boolean;
 }
 
-/** Pure season review: mark objectives, move patience/reputation, decide the sack. */
+/**
+ * Pure season review: mark objectives, move patience/reputation, decide the sack.
+ * Patience stays a five-point scale: one off per miss, one back for a clean sweep.
+ * A premiership (Classic, or a League career's finals title) is never a sacking,
+ * even when another goal is missed and patience lands on zero. The next season
+ * starts from that patience.
+ */
 export function reviewObjectives(state: GameState, outcome: SeasonOutcome): BoardReview {
   const objectives = state.objectives.map((o): Objective =>
     ({ ...o, status: evaluateObjective(o, state, outcome) ? 'met' : 'missed' }));
@@ -130,7 +164,7 @@ export function reviewObjectives(state: GameState, outcome: SeasonOutcome): Boar
     reputation: Math.min(100, state.reputation + met * BOARD.REP_PER_MET),
     // The cash grant scales with difficulty; the reputation for meeting one does not.
     grant: scaledMoney(met * BOARD.GRANT_PER_MET, difficultyMultipliers(state.settings.difficulty).prize),
-    sacked: patience <= 0,
+    sacked: !outcome.premiership && patience <= 0,
   };
 }
 

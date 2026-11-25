@@ -190,11 +190,39 @@ describe('League interval gate', () => {
     expect(run.weeksPlayed).toBe(0);expect(run.stop.kind).toBe(phase==='normal namespace'?'stopped':'choice-required');expect(getState()).toBe(before);expect(tick).not.toHaveBeenCalled();
   });
   it('records a sacking without a grant or revival and announces it once at the new close', () => {
-    setCareerNamespace(DEV_TEST_PREFIX);const s=closingState();s.boardPatience=1;
+    setCareerNamespace(DEV_TEST_PREFIX);const s=closingState();
+    const league=s.competitions!.instances[0]!;const other=league.entrantIds.find(id=>id!=='player')!;const final=league.fixtures[2]!;
+    final.result={homeScore:final.homeId===other?12:0,awayScore:final.awayId===other?12:0,winnerId:other,decider:'score'};league.winnerId=other;
+    s.boardPatience=1;
     s.objectives=[{id:'impossible',kind:'build',text:'Build 100 facilities',target:100,status:'pending'}];
     setState(s);const sacked=vi.fn();bus.on('board:sacked',sacked);advanceWeek();
     expect(getState().sacked).toMatchObject({season:1});expect(getState().money).toBe(s.money);expect(sacked).toHaveBeenCalledTimes(1);
     const closed=getState();advanceWeek();advanceWeeks(2);expect(getState()).toBe(closed);expect(sacked).toHaveBeenCalledTimes(1);
+  });
+  it('does not sack a League title, and reaching the final meets the ladder objective', () => {
+    const won = closingState(); won.boardPatience = 1;
+    won.objectives = [
+      { id: 's1-finals', kind: 'finals', text: 'Finish in the top 0', target: 0, status: 'pending' },
+      { id: 's1-build', kind: 'build', text: 'Build 100 facilities', target: 100, status: 'pending' },
+    ];
+    const titled = closeLeagueSeason(won);
+    expect(titled.history[0]!.premiership).toBe(true);
+    expect(titled.objectives.map(o => o.status)).toEqual(['met', 'missed']);
+    expect(titled.sacked).toBeUndefined();
+    expect(titled.boardPatience).toBe(0);
+    expect(titled.history[0]!.review!.board).toMatchObject({ sacked: false, missed: 1 });
+    expect(validateLeagueHistory(titled)).toBeNull();
+
+    const lost = closingState();
+    const league = lost.competitions!.instances[0]!; const other = league.entrantIds.find(id => id !== 'player')!; const final = league.fixtures[2]!;
+    final.result = { homeScore: final.homeId === other ? 12 : 0, awayScore: final.awayId === other ? 12 : 0, winnerId: other, decider: 'score' }; league.winnerId = other;
+    lost.boardPatience = 5;
+    lost.objectives = [{ id: 's1-finals', kind: 'finals', text: 'Finish in the top 0', target: 0, status: 'pending' }];
+    const finalist = closeLeagueSeason(lost);
+    expect(finalist.history[0]!.premiership).toBe(false);
+    expect(finalist.objectives[0]!.status).toBe('met');
+    expect(finalist.sacked).toBeUndefined();
+    expect(validateLeagueHistory(finalist)).toBeNull();
   });
   it.each(['immediate', 'held'])('a throwing %s close stops once without losing its saved interval', async path => {
     setCareerNamespace(DEV_TEST_PREFIX);

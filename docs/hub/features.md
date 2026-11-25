@@ -1,6 +1,6 @@
 # Features
 
-Last updated: 2026-11-24
+Last updated: 2026-11-25
 
 What's in the game, with the PR that added each.
 
@@ -63,6 +63,8 @@ What's in the game, with the PR that added each.
 - Android test APK ([PR](https://github.com/ch-leon/nrl-sim/pull/394)); CI ([PR](https://github.com/ch-leon/nrl-sim/pull/442))
 
 ## Recently added
+
+- **A title season is not a sacking.** Finishing outside the board’s ladder target still meets that goal when the club reaches the grand final or wins the title, in Classic and in a League career. Winning the title never ends the season in a sacking, even if another goal is missed. A building goal only asks for facilities the cash can pay for. The persona report names the goal missed in every sacking. [#692](https://github.com/ch-leon/nrl-sim/issues/692) ([PR](https://github.com/ch-leon/nrl-sim/pull/826)).
 
 - **Open-side shifts through hands.** When a ruck is near one touchline and the support can get into position, balanced and wider sides can work the ball all the way to the opposite winger through normal catches and passes. Cover, handling errors and missing support can end the move. Short-side carries, coach calls and learned plays still have their place. Ported from [draft PR #799](https://github.com/ch-leon/nrl-sim/pull/799). [#798](https://github.com/ch-leon/nrl-sim/issues/798).
 

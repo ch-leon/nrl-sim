@@ -373,3 +373,27 @@ Minimal existing previews show per-match sponsor/venue income and upfront staff
 prices; a complete cap/contract/receipt screen is still #561. This slice does not
 claim #562 multi-season balance sign-off, funded transfers, cap upgrades, or a
 new contract-length/release policy.
+
+## Board objectives (#692)
+
+Solvency is not a board goal. A season has the ladder finish, and, once the club
+is known enough, either a rival or a building goal.
+
+The ladder finish is met by the table target, by reaching the grand final, or by
+winning the title. In a League career the same rule uses that league’s final and
+its finals title. A title season is never a sacking, in Classic or in League
+career, even when another goal is missed and patience lands on zero. Patience
+still moves: a miss costs one, a clean sweep returns one, and the cap stays at
+five. With solvency gone a season has one or two goals, so a bad year costs one
+or two points rather than three. Five points is still several poor seasons. The
+next season starts from whatever patience the title season left, including zero.
+
+The building goal asks for up to two facilities beyond the count already built
+(`BOARD.BUILD_TARGET_EXTRA`). It asks only for as many as the cash can pay for
+at the cheapest catalog build when the goals are set, and it is left off when
+the cash cannot buy one. The private draw that chooses rival or building is
+still consumed, so later seasons stay on the same sequence. Cash itself is not
+judged.
+
+The persona report records each season’s judged objectives and, for every
+sacking, which goal was missed.

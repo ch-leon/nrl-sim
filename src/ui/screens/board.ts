@@ -9,7 +9,7 @@ import { getState, type GameState, type Objective } from '../../core/state';
 import { getActiveSlot } from '../../core/save';
 import { BOARD } from '../../config';
 import { fmtMoney } from '../../utils/money';
-import { objectiveLine, objectiveRisk, sackedSummary } from '../../systems/board';
+import { FINALS_OBJECTIVE_CLAUSE, objectiveLine, objectiveRisk, sackedSummary } from '../../systems/board';
 import { financeSummary } from './finance';
 import { ladderPosition } from '../../systems/fixtures';
 import { ATTACK_COACHES, ATTACK_SPECIALITIES, STAFF, STAFF_ROLES, attackCoach, attackCoachRefusal, attackCoachWage, hireAttackCoach, hireStaff, releaseStaff, staffWage, STAFF_APPOINTMENT_PRICES } from '../../systems/staff';
@@ -47,6 +47,15 @@ export function objectiveStatus(o: Objective, state: Pick<GameState, 'money' | '
   }
 }
 
+/**
+ * The words on the objective card. A finals goal from before this rule still
+ * reads as a ladder place; the card says the grand final or the title counts.
+ */
+export function objectiveCardText(o: Objective): string {
+  if (o.kind !== 'finals' || o.text.toLowerCase().includes(FINALS_OBJECTIVE_CLAUSE)) return o.text;
+  return `${o.text} (${FINALS_OBJECTIVE_CLAUSE})`;
+}
+
 /** The detail after the objective's text ("currently 4th", "now $120,000"), from objectiveLine. */
 function objectiveDetail(o: Objective, state: GameState): string {
   const line = objectiveLine(o, state);
@@ -80,7 +89,7 @@ export function buildObjectivesSection(state: GameState): HTMLElement {
       const st: ObjectiveStatus = now === 'on-track' || now === 'at-risk' ? objectiveRisk(o, state, runway) : now;
       const detail = objectiveDetail(o, state);
       box.append(el('div', { class: `nrl-board-obj nrl-board-${o.status}`, attrs: { 'data-objective': o.kind, 'data-status': st } },
-        el('div', { class: 'nrl-board-obj-text' }, el('span', { text: o.text }), ...(detail ? [el('small', { text: detail })] : [])),
+        el('div', { class: 'nrl-board-obj-text' }, el('span', { text: objectiveCardText(o) }), ...(detail ? [el('small', { text: detail })] : [])),
         el('span', { class: `nrl-board-status nrl-board-status-${st}`, text: OBJECTIVE_STATUS_LABEL[st] })));
     }
   }
@@ -253,7 +262,7 @@ export const BOARD_CSS = `
 /* Each objective a ringed card with one status chip. */
 .nrl-board-obj { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--nrl-panel); border: 1px solid var(--nrl-line); border-radius: 12px; padding: 8px 10px; font-size: 0.875rem; }
 .nrl-board-obj-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
-.nrl-board-obj-text > span { font-weight: 600; }
+.nrl-board-obj-text > span { font-weight: 600; overflow-wrap: break-word; }
 .nrl-board-obj-text small { font-size: 0.6875rem; color: var(--nrl-muted); }
 .nrl-board-status { display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: 11px; border: 1px solid currentColor; font-size: 0.6875rem; font-weight: 700; white-space: nowrap; background: color-mix(in srgb, currentColor 12%, transparent); }
 .nrl-board-status-on-track, .nrl-board-status-met { color: var(--nrl-pos); }
