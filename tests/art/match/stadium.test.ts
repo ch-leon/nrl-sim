@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { kitFromColors } from '../../../src/art/match/kit';
 import {
+  CLASSIC_GROUND,
   PAL,
   POST_GY,
   cameraWorldBounds,
@@ -9,6 +10,8 @@ import {
   paintBackground,
   paintForeground,
   stadiumWorldBounds,
+  standProfile,
+  type GroundLook,
 } from '../../../src/art/match/stadium';
 import { isoProject, isoUnproject } from '../../../src/art/match/iso3d';
 import { FIELD_LONG, FIELD_WIDE, IN_GOAL_DEPTH, bonusZoneGrid, fieldOffsetX, fieldToWorldPoint, fieldWorldBounds } from '../../../src/scenes/matchField';
@@ -110,9 +113,37 @@ describe('paintBackground / paintForeground', () => {
     }
   });
 
-  it('is deterministic', () => {
+  it('is deterministic, and naming the classic ground changes nothing', () => {
     const again = paintBackground(off, home, away);
     expect(sameData(again.buf.data, bg.buf.data)).toBe(true);
+    expect(sameData(paintBackground(off, home, away, CLASSIC_GROUND).buf.data, bg.buf.data)).toBe(true);
+    expect(sameData(paintForeground(off, home, away, CLASSIC_GROUND).buf.data, fg.buf.data)).toBe(true);
+  });
+
+  it('grows a stand, a sponsor board and a canteen, and leaves the hill bare', () => {
+    const look = (stand: 0 | 1 | 2 | 3, sponsor = stand, canteen = stand): GroundLook => ({ stand, sponsor, canteen, fill: 1 });
+    const at = (cv: ReturnType<typeof paintBackground>, gx: number, gy: number, z: number) => {
+      const w = isoProject(gx, gy, z, off);
+      return cv.buf.get(Math.floor(w.x - cv.ox), Math.floor(w.y - cv.oy)).color;
+    };
+    const roof = standProfile(CLASSIC_GROUND);
+    const gx = (FIELD_LONG) / 2;
+    const hill = paintBackground(off, home, away, look(0, 0, 0));
+    const small = paintBackground(off, home, away, look(1));
+    const mid = paintBackground(off, home, away, look(2));
+    const big = paintBackground(off, home, away, look(3));
+    const roofPx = at(bg, gx, roof.far!, roof.roofZ - 8);
+    expect(at(hill, gx, roof.far!, roof.roofZ - 8)).not.toBe(roofPx);
+    expect(at(small, gx, roof.far!, roof.roofZ - 8)).not.toBe(roofPx);
+    expect(at(big, gx, roof.far!, roof.roofZ - 8)).toBe(roofPx);
+    const midRoof = standProfile(look(2));
+    expect(midRoof.tiers).toBeGreaterThan(standProfile(look(1)).tiers);
+    expect(midRoof.tiers).toBeLessThan(roof.tiers);
+    expect(at(mid, gx, midRoof.far!, midRoof.roofZ - 6)).not.toBe(at(small, gx, midRoof.far!, midRoof.roofZ - 6));
+    // Sponsor signage and the canteen change pixels the bare hill does not.
+    expect(sameData(paintBackground(off, home, away, look(0, 3, 0)).buf.data, hill.buf.data)).toBe(false);
+    expect(sameData(paintBackground(off, home, away, look(0, 0, 3)).buf.data, hill.buf.data)).toBe(false);
+    expect(sameData(paintForeground(off, home, away, look(0)).buf.data, fg.buf.data)).toBe(false);
   });
 
   it('foreground leaves the playing field transparent (it only frames the near edges)', () => {
@@ -141,6 +172,23 @@ describe('crowdSeats', () => {
     expect(seats.some((s) => s.layer === 'back' && s.view === 'front')).toBe(true);
     expect(seats.some((s) => s.layer === 'front' && s.view === 'back')).toBe(true);
     expect(new Set(seats.map((s) => s.bay)).size).toBe(3);
+  });
+
+  it('a shorter stand and a short gate seat fewer people; the hill has no away bay facing us', () => {
+    const full = seats;
+    const half = crowdSeats({ stand: 3, sponsor: 0, canteen: 2, fill: 0.5 });
+    const hill = crowdSeats({ stand: 0, sponsor: 0, canteen: 0, fill: 1 });
+    const small = crowdSeats({ stand: 1, sponsor: 1, canteen: 1, fill: 1 });
+    const mid = crowdSeats({ stand: 2, sponsor: 2, canteen: 2, fill: 1 });
+    expect(half.length).toBeLessThan(full.length * 0.75);
+    expect(half.length).toBeGreaterThan(full.length * 0.35);
+    expect(hill.length).toBeLessThan(small.length);
+    expect(small.length).toBeLessThan(mid.length);
+    expect(mid.length).toBeLessThan(full.length);
+    expect(hill.filter((s) => s.view === 'front' && s.bay === 'away')).toHaveLength(0);
+    expect(hill.filter((s) => s.flag)).toHaveLength(4);
+    expect(crowdSeats({ stand: 3, sponsor: 0, canteen: 2, fill: 0 })).toHaveLength(0);
+    expect(small.length).toBeLessThan(2000);
   });
 
   it('no seat is on the playing field', () => {

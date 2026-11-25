@@ -1,11 +1,13 @@
 # Roadmap
 
-Last updated: 2026-11-24
+Last updated: 2026-11-25
 
 Status checked against GitHub on 7 Nov 2026. Merged tooling is not the same as a
 live gameplay change; work still open below has not shipped.
 
 ## Now
+
+- **A ground that grows** ([#824](https://github.com/ch-leon/nrl-sim/issues/824)): home matches show the Grandstand, Sponsor Board and Canteen you have built, and the crowd fills with the gate. Away grounds follow the league, small in Local and full in the Premier League.
 
 - **Open-side shifts through hands.** A wide ruck can move the ball to the far winger through ordinary catches and passes. Cover, a missing link or a coach call ends it. Lab sign-off remains open. Ported from [draft PR #799](https://github.com/ch-leon/nrl-sim/pull/799).
 

@@ -1,6 +1,6 @@
 # Features
 
-Last updated: 2026-11-24
+Last updated: 2026-11-25
 
 What's in the game, with the PR that added each.
 
@@ -63,6 +63,8 @@ What's in the game, with the PR that added each.
 - Android test APK ([PR](https://github.com/ch-leon/nrl-sim/pull/394)); CI ([PR](https://github.com/ch-leon/nrl-sim/pull/442))
 
 ## Recently added
+
+- **A ground that grows.** A home match draws the hill until you build a Grandstand, then a stand with more rows and a roof at each level. The Sponsor Board is signage and the Canteen a food stall. Seats fill with that day's attendance against capacity. An away ground follows the home club's league: smaller in Local, the full ground in the Premier League. [#824](https://github.com/ch-leon/nrl-sim/issues/824).
 
 - **Open-side shifts through hands.** When a ruck is near one touchline and the support can get into position, balanced and wider sides can work the ball all the way to the opposite winger through normal catches and passes. Cover, handling errors and missing support can end the move. Short-side carries, coach calls and learned plays still have their place. Ported from [draft PR #799](https://github.com/ch-leon/nrl-sim/pull/799). [#798](https://github.com/ch-leon/nrl-sim/issues/798).
 

@@ -6,7 +6,7 @@
 import { PixelBuffer, mix, shade } from '../pixel';
 import { OUTLINE, luminance, type Kit } from './kit';
 import { drawText, textWidth, GLYPH_H } from './font';
-import { BACK_FAR, BACK_TIERS, BACK_WALL_H, TIER_BASE, TIER_RISE } from './stadium';
+import { BACK_FAR, BACK_TIERS, BACK_WALL_H, TIER_BASE, TIER_RISE, scoreboardFoot, type GroundLook } from './stadium';
 import { isoProject } from './iso3d';
 
 /** The face, flat: two lines of double-size text. */
@@ -26,9 +26,10 @@ export const BOARD_FOOT_Z = TIER_BASE + (BACK_TIERS - 1) * TIER_RISE + BACK_WALL
 export const BOARD_TEX_W = BOARD_W + 2;
 export const BOARD_TEX_H = BOARD_H + Math.ceil(BOARD_W / 2) + LEG_H + 2;
 
-/** World position of the painted buffer's top-left corner. */
-export function scoreboardOrigin(offsetX: number): { x: number; y: number } {
-  const foot = isoProject(BOARD_GX, BOARD_GY, BOARD_FOOT_Z, offsetX);
+/** World position of the painted buffer's top-left corner. A named ground puts it on that roof, or on the hill's pole. */
+export function scoreboardOrigin(offsetX: number, ground?: GroundLook): { x: number; y: number } {
+  const placed = ground ? scoreboardFoot(ground) : { gy: BOARD_GY, z: BOARD_FOOT_Z };
+  const foot = isoProject(BOARD_GX, placed.gy, placed.z, offsetX);
   return { x: Math.round(foot.x) - 1, y: Math.round(foot.y) - LEG_H - BOARD_H - 1 };
 }
 
