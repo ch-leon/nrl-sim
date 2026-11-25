@@ -110,7 +110,8 @@ export const ECON = {
 
 // Board objectives, finals prize money and the sacking state (GitHub #47).
 // Patience is the board's tolerance: each missed objective costs one point, a
-// clean sweep earns one back, and zero means the player is sacked.
+// clean sweep earns one back, and zero means the player is sacked. A premiership
+// season is never a sacking, even when patience lands on zero (#692).
 export const BOARD = {
   MAX_PATIENCE: 5,
   START_PATIENCE: 5,
