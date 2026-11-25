@@ -6,7 +6,7 @@
 // painting them in the scene.
 import { PixelBuffer } from '../pixel';
 import type { Kit } from './kit';
-import { paintBackground, paintForeground } from './stadium';
+import { CLASSIC_GROUND, normalizeGround, paintBackground, paintForeground, type GroundLook } from './stadium';
 import { buildCrowdAtlas, crowdShirts, type CrowdAtlasFrame } from './crowd';
 
 /**
@@ -51,9 +51,13 @@ export interface FixtureArt {
   crowd: AtlasPixels;
 }
 
-/** The cache key for a fixture's art: the field offset and both kits, field by field. */
-export function fixtureArtKey(offsetX: number, kits: FixtureKits): string {
-  return JSON.stringify([offsetX, kits.home, kits.away]);
+/**
+ * The cache key for a fixture's art: the field offset, both kits, and the ground.
+ * A bigger stand, a new sponsor board or a different gate is a different painting.
+ */
+export function fixtureArtKey(offsetX: number, kits: FixtureKits, ground: GroundLook = CLASSIC_GROUND): string {
+  const g = normalizeGround(ground);
+  return JSON.stringify([offsetX, kits.home, kits.away, g.stand, g.sponsor, g.canteen, g.fill]);
 }
 
 /**
@@ -82,11 +86,12 @@ export function chunkLayer(prefix: string, cv: { buf: PixelBuffer; ox: number; o
 }
 
 /** Paint a fixture's art (about 0.4 s headless, most of it the background). */
-export function paintFixtureArt(offsetX: number, kits: FixtureKits): FixtureArt {
+export function paintFixtureArt(offsetX: number, kits: FixtureKits, ground: GroundLook = CLASSIC_GROUND): FixtureArt {
+  const look = normalizeGround(ground);
   return {
-    key: fixtureArtKey(offsetX, kits),
-    bg: chunkLayer('match-bg', paintBackground(offsetX, kits.home, kits.away)),
-    fg: chunkLayer('match-fg', paintForeground(offsetX, kits.home, kits.away)),
+    key: fixtureArtKey(offsetX, kits, look),
+    bg: chunkLayer('match-bg', paintBackground(offsetX, kits.home, kits.away, look)),
+    fg: chunkLayer('match-fg', paintForeground(offsetX, kits.home, kits.away, look)),
     crowd: buildCrowdAtlas(crowdShirts(kits.home, kits.away)),
   };
 }

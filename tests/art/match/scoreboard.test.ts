@@ -1,11 +1,11 @@
 // #673: the ground's scoreboard and the floodlights coming on.
 import { describe, it, expect } from 'vitest';
 import { kitFromColors } from '../../../src/art/match/kit';
-import { BOARD_TEX_H, BOARD_TEX_W, boardColor, drawBoardFace, drawScoreboard, flashWord, scoreboardOrigin } from '../../../src/art/match/scoreboard';
+import { BOARD_FOOT_Z, BOARD_GX, BOARD_GY, BOARD_TEX_H, BOARD_TEX_W, boardColor, drawBoardFace, drawScoreboard, flashWord, scoreboardOrigin } from '../../../src/art/match/scoreboard';
 import { LIGHTS_FLICKER_MS, floodlightRamp, lightsOnMs } from '../../../src/art/match/atmosphere';
 import { fieldOffsetX, fieldToWorldPoint } from '../../../src/scenes/matchField';
 import { CENTRE, FOOT, HEIGHT, WIDTH } from '../../../src/art/prototype/player';
-import { cameraWorldBounds } from '../../../src/art/match/stadium';
+import { CLASSIC_GROUND, SCORE_GX, cameraWorldBounds, scoreboardFoot } from '../../../src/art/match/stadium';
 
 const home = kitFromColors(['#8e1c1c', '#f2c14e'], 'rival-reapers');
 const away = kitFromColors(['#1b1d22', '#2d3436'], 'dark-side');
@@ -46,6 +46,27 @@ describe('the scoreboard (#673)', () => {
       for (let fy = -12; fy <= 112; fy += 2) {
         const w = fieldToWorldPoint(fx, fy, offsetX);
         // His frame, mirrored either way, lifted for a high take (6 px).
+        const p = { x0: w.x - Math.max(CENTRE, WIDTH - CENTRE), x1: w.x + Math.max(CENTRE, WIDTH - CENTRE), y0: w.y - FOOT - 6, y1: w.y + HEIGHT - FOOT };
+        const overlap = p.x0 < board.x1 && p.x1 > board.x0 && p.y0 < board.y1 && p.y1 > board.y0;
+        expect(overlap, `${fx},${fy}`).toBe(false);
+      }
+    }
+    const cam = cameraWorldBounds(offsetX);
+    expect(board.y0).toBeGreaterThan(cam.y);
+    expect(board.x1).toBeLessThan(cam.x + cam.width);
+  });
+
+  it('sits on the full stand’s roof, and on a pole clear of the pitch when the ground is a hill', () => {
+    expect(SCORE_GX).toBe(BOARD_GX);
+    const roof = scoreboardFoot(CLASSIC_GROUND);
+    expect(roof.gy).toBeCloseTo(BOARD_GY, 9);
+    expect(roof.z).toBe(BOARD_FOOT_Z);
+    const offsetX = fieldOffsetX();
+    const o = scoreboardOrigin(offsetX, { stand: 0, sponsor: 0, canteen: 0, fill: 1 });
+    const board = { x0: o.x, y0: o.y, x1: o.x + BOARD_TEX_W, y1: o.y + BOARD_TEX_H };
+    for (let fx = 0; fx <= 100; fx += 4) {
+      for (let fy = 0; fy <= 100; fy += 4) {
+        const w = fieldToWorldPoint(fx, fy, offsetX);
         const p = { x0: w.x - Math.max(CENTRE, WIDTH - CENTRE), x1: w.x + Math.max(CENTRE, WIDTH - CENTRE), y0: w.y - FOOT - 6, y1: w.y + HEIGHT - FOOT };
         const overlap = p.x0 < board.x1 && p.x1 > board.x0 && p.y0 < board.y1 && p.y1 > board.y0;
         expect(overlap, `${fx},${fy}`).toBe(false);
