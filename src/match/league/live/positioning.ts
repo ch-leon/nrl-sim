@@ -6,7 +6,7 @@ import type { Side } from '../../core/snapshot';
 import { add, clamp, dist, type Vec } from '../../core/vec';
 import { FIVE_EIGHTH, KICKER, ROLES, formationTarget } from '../roles';
 import { gapTarget, intercept, supportSpots, type Candidate } from '../tactics';
-import type { AttackPlan } from '../presets';
+import type { AttackPlan, AttackPreset } from '../presets';
 import { speedMult } from '../traits';
 import { SECOND_KICKER } from '../lastTackle';
 import { FATIGUE, afterRun, legsSpeed, tiredness } from '../fatigue';
@@ -23,7 +23,7 @@ import { GOAL_LINE_STAND } from '../goalLineStand';
 import { BENCH } from '../bench';
 import { other, type Player } from './types';
 import { LiveContact } from './contact';
-import { SHAPES, chooseShape, shapeEdge, shapeTarget, packetSlots, backDoorTarget, type AttackingShape, type ShapeKind } from '../attackingShapes';
+import { SHAPES, chooseShape, shapeEdge, shapeTarget, packetSlots, backDoorTarget, openSideLine, openSideOf, type AttackingShape, type ShapeKind } from '../attackingShapes';
 
 export abstract class LivePositioning extends LiveContact {
   /** Prepare during actual contact, then retain through its ruck; null latches overrides/endings. */
@@ -34,7 +34,7 @@ export abstract class LivePositioning extends LiveContact {
     if (ph.kind === 'play' || ph.shape !== undefined || (ph.kind === 'ruck' && ph.handover && ph.stage !== 'dh')) return;
     const tackle = this.tackles + (ph.kind === 'tackle' ? 1 : 0);
     if (tackle >= SET_TACKLES) { ph.shape = null; return; }
-    if (this.sheetPlays[this.attacking].length || this.scripted || this.pendingPlay[this.attacking]
+    if (this.scripted || this.pendingPlay[this.attacking]
       || this.pendingControl[this.attacking] || this.callState[this.attacking].attack) { ph.shape = null; return; }
     const origin = ph.kind === 'tackle' ? this.players[ph.carrier]!.body.pos : this.mark;
     const reach = ph.kind === 'tackle' ? SHAPES.contactReachM : SHAPES.setupReachM;
@@ -61,14 +61,44 @@ export abstract class LivePositioning extends LiveContact {
     const feasible = { pod: Number.isFinite(pod.cost), edge: Number.isFinite(cost('edge')), backDoor: !!back && Number.isFinite(back.cost) };
     const toLine = this.toLineFor(this.attacking, origin);
     const standPressure = this.goalLinePressure(this.attacking, origin);
-    const choice = chooseShape(this.tactics[this.attacking].attack, tackle,
-      toLine, origin.y, this.rng.next(), this.dir, feasible, standPressure);
+    // A learned playbook still draws no ordinary pod, edge or back-door. An open-side
+    // shift can use the same one roll; with the knob off that roll is the shape draw.
+    const equipped = this.sheetPlays[this.attacking].length > 0;
+    const preset = this.tactics[this.attacking].attack;
+    const roll = equipped ? null : this.rng.next();
+    if (this.tryOpenSide(origin, reach, tackle, toLine, preset, roll)) return;
+    if (roll === null) { ph.shape = null; return; }
+    const choice = chooseShape(preset, tackle, toLine, origin.y, roll, this.dir, feasible, standPressure);
     ph.shape = { ...choice, ...(choice.kind === 'pod' ? {edge:pod.edge,linkSlot:pod.linkSlot} : {}),
       ...(choice.kind === 'back-door' && back ? {edge:back.edge,backDoor:back.backDoor} : {}),
       side: this.attacking, dir: this.dir, startedTick: this.tick };
   }
 
-  protected currentAttackShape() {
+  /** A wide ruck can send the ball through hands. The shape draw itself is unchanged when it does not. */
+  private tryOpenSide(origin: Vec, reach: number, tackle: number, toLine: number, preset: AttackPreset, roll: number | null): boolean {
+    const ph = this.phase;
+    if (ph.kind !== 'tackle' && ph.kind !== 'ruck') return false;
+    const wide = SHAPES.openSide;
+    const edge = wide.on > 0 ? openSideOf(origin.y) : 0;
+    const chance = wide.chance[preset];
+    if (!edge || chance <= 0 || (roll !== null && roll >= chance) || tackle > SET_TACKLES - 3
+      || toLine >= FIELD_LENGTH - wide.ownLineM || (ph.kind === 'ruck' && ph.handover)) return false;
+    const wing = this.at(this.attacking, edge > 0 ? 2 : 1);
+    const dh = this.dummyHalf(this.attacking);
+    const carrier = this.players[ph.carrier]!;
+    const available = (p: Player) => this.onField(p) && p.subFor === null && !this.locked(p)
+      && p !== dh && p !== carrier && this.tick >= p.busyUntil;
+    if (!available(wing)) return false;
+    const ref = (p: Player) => ({ side: p.side, slot: p.slot, who: p.key, pos: p.body.pos });
+    const links = this.side(this.attacking).filter(p => p !== wing && available(p)).map(ref);
+    const line = openSideLine(this.behindRuck(origin), this.dir, ref(wing), links, reach);
+    if (!line || (roll ?? this.rng.next()) >= chance) return false;
+    ph.shape = { kind: 'spread', dir: this.dir, side: this.attacking, edge, startedTick: this.tick,
+      openSide: { line, receiving: 0 } };
+    return true;
+  }
+
+  protected currentAttackShape(): AttackingShape | null {
     const ph = this.phase;
     if (SHAPES.on <= 0 || (ph.kind !== 'tackle' && ph.kind !== 'ruck' && ph.kind !== 'play') || !ph.shape
       || ph.shape.side !== this.attacking || ph.shape.dir !== this.dir || this.scripted) return null;
@@ -78,6 +108,21 @@ export abstract class LivePositioning extends LiveContact {
     })) return null;
     if (ph.kind === 'play' && (this.pendingKick || this.ball.kind === 'loose'
       || (this.ball.kind === 'flight' && this.ball.via !== 'pass'))) return null;
+    if (ph.shape.openSide) {
+      const { line, receiving } = ph.shape.openSide;
+      if (SHAPES.openSide.on <= 0 || this.pendingControl[this.attacking] || this.pendingPlay[this.attacking]
+        || this.callState[this.attacking].attack || line.slice(receiving).some(({ player }) => {
+          const p = this.at(player.side, player.slot);
+          return p.key !== player.who || !this.onField(p) || p.subFor !== null || this.locked(p) || this.tick < p.busyUntil;
+        })) return null;
+      if (ph.kind === 'play') {
+        const { player } = line[receiving]!;
+        const expected = this.indexOf(this.at(player.side, player.slot));
+        const ball = this.ball;
+        const actual = ball.kind === 'flight' ? ball.receiver : ball.kind === 'held' ? ball.by : null;
+        if (actual !== expected || (receiving === line.length - 1 && this.ball.kind === 'held')) return null;
+      }
+    }
     if (ph.shape.kind === 'back-door') {
       const b = ph.shape.backDoor;
       if (SHAPES.backDoor.on <= 0 || !b) return null;
@@ -424,9 +469,14 @@ export abstract class LivePositioning extends LiveContact {
     const handoverMarkers = ph.kind === 'ruck' && ph.handover && ph.stage !== 'dh' ? this.currentMarkers() : [];
     const spots = supportSpots(anchor, this.dir);
     const broken = this.lineBroken();
+    const wide = shape?.openSide;
+    const wideAnchor = wide && ph.kind !== 'play'
+      ? this.behindRuck(ph.kind === 'tackle' ? this.players[ph.carrier]!.body.pos : this.mark) : anchor;
+    const wideNext = (wide?.receiving ?? 0) + (ph.kind === 'play' ? 1 : 0);
     for (const p of attackers) {
       const role = ROLES[p.slot]!;
       const returnSupport = kickReturn ? this.kickReturnSupportIndex(kickReturn, p) : -1;
+      const widePlace = wide?.line.findIndex(({ player }) => p.slot === player.slot) ?? -1;
       p.through = false;
       if (this.targetRetreat(p)) continue;
       if (handoverMarkers.includes(p)) {
@@ -470,6 +520,11 @@ export abstract class LivePositioning extends LiveContact {
         }
       } else if (p === this.dummyHalf(atk) && (ph.kind === 'tackle' || ph.kind === 'ruck')) {
         p.target = this.dummyHalfSpot();
+      } else if (wide && widePlace >= wideNext) {
+        p.target = clampToGround({
+          x: wideAnchor.x - this.dir * (SHAPES.openSide.depthM + (widePlace - wideNext) * SHAPES.openSide.stackM),
+          y: wide.line[widePlace]!.y,
+        }, 1);
       } else if (splitSpot && (p.slot === KICKER || p.slot === FIVE_EIGHTH)) {
         // The halfback sets up flatter on the open side. His partner drops back on the other side before the heel.
         const primary = p.slot === KICKER;

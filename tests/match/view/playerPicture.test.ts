@@ -22,7 +22,10 @@ describe('dummy-pass pictures', () => {
     expect(picture.frame % DUMMY_PASS_PHASES).toBe(1);
     expect(playerPicture(p, p, 121, carrier, 1, { dummyPass }).action).toBe('carry');
   });
-  it.each([[2, 2607, 2613], [6, 4050, 4055]])('shows, retracts and clears on time in seed %i', (seed, start, end) => {
+  // Seed 6's square at 4050 moved with the open-side shift. Seeds 1–5, Reapers v Crocs: the first
+  // square dummy still on screen four ticks later is seed 1, fake at 6223 and cleared at 6228.
+  // Seed 2's bite is unchanged.
+  it.each([[2, 2607, 2613], [1, 6223, 6228]])('shows, retracts and clears on time in seed %i', (seed, start, end) => {
     const runner = new Runner(n => new LiveSim(labSheet('rival-reapers'), labSheet('rival-crocs'), n), seed);
     runner.seek(start);
     const fake = runner.cur.dummyPass!;

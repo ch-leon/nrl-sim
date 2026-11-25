@@ -83,7 +83,9 @@ describe('contact animations follow the sim', () => {
     // the one change the code documents is a bust out of a held tackle, which becomes the bump-off.
     let contacts = 0; let drawnTicks = 0; let busts = 0; const variantsSeen = new Set<string>();
     const changes: string[] = [];
-    for (const seed of [4, 9, 23]) {
+    // Seeds 4, 9 and 23 still draw the contacts. Seeds 1–3 of the same five-minute
+    // matches: the first bump out of a held tackle is seed 3.
+    for (const seed of [3, 4, 9, 23]) {
       const sim = new LiveSim(sideSheet('H', { rating: 62 }), sideSheet('A', { rating: 58 }), seed, { length: { halves: 2, halfMinutes: 5 } });
       let state: ContactAnimation | null = null;
       const drawn = new Map<string, string[]>();

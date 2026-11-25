@@ -182,7 +182,7 @@ describe('five more calls (#396): when the sim takes them', () => {
     expect(refused).toContain('no penalty');
     // Every refusal the pair gave has a caption for the tray.
     for (const r of refused) expect(callCaption(r, false).length, r).toBeGreaterThan(0);
-    const restore = applyTuning({ 'live.dummyChance': 0 });
+    const restore = applyTuning({ 'shapes.openSide.on': 0, 'live.dummyChance': 0 });
     try {
       let old = 0;
       for (const seed of BEFORE_DUMMY_PENALTY_SEEDS) {
@@ -268,7 +268,7 @@ describe('five more calls (#396): each does what it says', () => {
       }
     }
     expect(made).toBeGreaterThan(0);
-    const restore = applyTuning({ 'live.dummyChance': 0 });
+    const restore = applyTuning({ 'shapes.openSide.on': 0, 'live.dummyChance': 0 });
     try {
       let old = 0;
       for (const seed of BEFORE_DUMMY_PENALTY_SEEDS) old += afterCalls(play(seed, 'take-two'), 'take-two').length;

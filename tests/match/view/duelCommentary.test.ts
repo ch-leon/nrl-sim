@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import type Phaser from 'phaser';
 import { LivePlayback, type LivePlaybackScene } from '../../../src/match/view/livePlayback';
 import { sideSheet } from '../../../src/match/balance/measure';
+import { applyTuning } from '../../../src/match/league/tuning';
 import type { MatchOverlayHandle } from '../../../src/ui/screens/matchOverlay';
 import type { TeamTactics } from '../../../src/match/league/presets';
 import type { SimEvent } from '../../../src/match/core/snapshot';
@@ -61,10 +62,18 @@ const COMPRESSED: Partial<TeamTactics> = { attack: 'balanced', defence: 'compres
 
 describe('a tactic counter survives a tagged clean bust', () => {
   it('keeps the All-out read on a first win', () => {
-    const { event, heard } = hear(ALL_OUT, SLIDE, 1, 2480);
+    // Rating 70, clear, All-out v Slide, seeds 1–8: the first tagged clean bust whose
+    // playback line is the counter read is seed 1 at tick 1950. With the shift off,
+    // seed 1 at 2480 is still that read.
+    const { event, heard } = hear(ALL_OUT, SLIDE, 1, 1950);
     expect(event.duel).toBeTruthy();
     expect(heard.map(h => h.text)).toEqual(['All-out breaks through Slide.']);
     expect(heard[0]!.weight).toBe('routine');
+    const shiftOff = applyTuning({ 'shapes.openSide.on': 0 });
+    try {
+      const old = hear(ALL_OUT, SLIDE, 1, 2480);
+      expect(old.heard.map(h => h.text)).toEqual(['All-out breaks through Slide.']);
+    } finally { shiftOff(); }
   });
 
   it('says the Expansive read on a first win', () => {
@@ -81,11 +90,23 @@ describe('a tactic counter survives a tagged clean bust', () => {
     expect(second.heard[0]).toMatchObject({ weight: 'routine', follow: false });
     expect(second.heard[1]).toMatchObject({ weight: 'important', follow: true });
 
-    const later = hear(ALL_OUT, SLIDE, 2, 5898);
+    // Seeds 1–12, rating 70, All-out v Slide: the first later repeat that keeps a counter
+    // line is seed 12 at tick 4390. With the shift off, seed 2 at 5898 is still the
+    // fourth-win read.
+    const later = hear(ALL_OUT, SLIDE, 12, 4390);
     expect(later.heard.map(h => h.text)).toEqual([
-      'All-out finds a gap in Slide.',
-      'H halfback 5 busts through A hooker 6 for win number 4!',
+      'All-out breaks through Slide.',
+      'H prop 7 busts through A five-eighth 4 for win number 3!',
     ]);
     expect(later.heard[1]).toMatchObject({ weight: 'routine', follow: true });
+    const shiftOff = applyTuning({ 'shapes.openSide.on': 0 });
+    try {
+      const old = hear(ALL_OUT, SLIDE, 2, 5898);
+      expect(old.heard.map(h => h.text)).toEqual([
+        'All-out finds a gap in Slide.',
+        'H halfback 5 busts through A hooker 6 for win number 4!',
+      ]);
+      expect(old.heard[1]).toMatchObject({ weight: 'routine', follow: true });
+    } finally { shiftOff(); }
   });
 });

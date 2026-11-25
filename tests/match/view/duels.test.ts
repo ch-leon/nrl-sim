@@ -3,6 +3,7 @@ import { Runner } from '../../../src/match/core/engine';
 import type { DuelPlayer, SimEvent } from '../../../src/match/core/snapshot';
 import { labSheet } from '../../../src/match/lab/sheets';
 import { LiveSim } from '../../../src/match/league/live';
+import { applyTuning } from '../../../src/match/league/tuning';
 import { DuelTimeline } from '../../../src/match/view/duels';
 
 const runner: DuelPlayer = { side: 'home', who: 'runner-id', slot: 3, name: 'Alex Lane' };
@@ -52,4 +53,24 @@ it('finds the first step-then-bust repeat and hears the first win when resumed f
   live.reseed(1);
   memory.sync(live.history);
   expect(memory.result(bust)).toBeUndefined();
+
+  // Seeds 1–60 still find seed 3 first with the shift on. With it off, the same
+  // seeks are the same two wins: the shift does not move this pair.
+  const shiftOff = applyTuning({ 'shapes.openSide.on': 0 });
+  try {
+    const again = new Runner(seed => new LiveSim(home, away, seed), 3);
+    const quiet = new DuelTimeline();
+    again.seek(3418);
+    again.step();
+    const oldStep = again.cur.events.find(e => e.kind === 'step')!;
+    quiet.sync(again.history);
+    expect(oldStep.text).toBe('Cruz Goalby steps Rhys Iliffe!');
+    expect(quiet.result(oldStep)?.text).toBe('Cruz Goalby steps Rhys Iliffe.');
+    again.seek(5423);
+    again.step();
+    const oldBust = again.cur.events.find(e => e.kind === 'break-tackle')!;
+    quiet.sync(again.history);
+    expect(oldBust.text).toBe('Cruz Goalby busts through Rhys Iliffe');
+    expect(quiet.result(oldBust)?.text).toBe('Cruz Goalby busts through Rhys Iliffe again!');
+  } finally { shiftOff(); }
 }, 30_000);

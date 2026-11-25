@@ -17,7 +17,7 @@ import { INTERCHANGE_EXIT_TICKS, type InterchangeExit, type PlayerSnap, type Sid
  */
 export const REF = {
   /** Metres off the play. */
-  offM: 7.25,
+  offM: 8,
   /** The play he follows: this share the ball, the rest the middle of the bodies on the field (so a pass or a kick moves him at a man's pace, not the ball's). Small, as the ball's own snap onto a holder moves him by this share of it. */
   ballShare: 0.15,
   /**

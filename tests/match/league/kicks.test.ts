@@ -113,12 +113,14 @@ describe('kicks in the live sim', () => {
   });
   it('a grubber is a chase: some of them score, and most of them do not', () => {
     // Full matches, so the red-zone chase actually happens. The reward is real
-    // and it is not the way most sets end.
+    // and it is not the way most sets end. Seeds 1–16 no longer score one after the
+    // open-side shift. Seeds 1–26 of these seven-minute halves score twice, and most
+    // grubbers still do not.
     let grubbers = 0;
     let tries = 0;
     const home = sheet('H');
     const away = sheet('A');
-    for (let s = 1; s <= 16; s++) {
+    for (let s = 1; s <= 26; s++) {
       // Historical fourteen-minute exposure keeps both successful and failed red-zone chases.
       const sim = new LiveSim(home, away, s, { length: { halves: 2, halfMinutes: 7 } });
       let open: { side: string; tick: number } | null = null;

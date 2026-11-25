@@ -133,6 +133,8 @@ export interface RuckDecision {
   decidedAt: number; until: number; kicker: boolean; cancelled?: true;
   secondKicker?: true;
   tiredMarker?: true;
+  /** The pass is the next man in an open-side shift, not a fresh receiver draw. */
+  openSide?: true;
 }
 
 export type Phase =

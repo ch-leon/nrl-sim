@@ -259,8 +259,11 @@ describe('the launch and the script (plan §3.3)', () => {
 
   it('an intercept flies to the lane defender', () => {
     let intercepts = 0;
-    // Keep multiple trajectories; seed 6 supplies the real interception at 1134 after attacking structures (#649).
-    for (const seed of [1, 2, 6]) {
+    // Keep multiple trajectories; seed 6 supplied the interception after attacking structures (#649).
+    // The open-side shift empties that lane. Seeds 1–80, one seven-minute half, launch roll forced
+    // to 0.0001: the first seed whose intercept reaches a lane defender is seed 43.
+    // With the shift off, seeds 1, 2 and 6 still produce one.
+    for (const seed of [1, 2, 6, 43]) {
       const sim = new PlaySim(flat(['block-play', 'second-man']), A, seed, { length: { halves: 1, halfMinutes: 7 } });
       sim.force = 0.0001;
       let thrown = -1;
@@ -280,6 +283,20 @@ describe('the launch and the script (plan §3.3)', () => {
       }
     }
     expect(intercepts).toBeGreaterThan(0);
+    const shiftOff = applyTuning({ 'shapes.openSide.on': 0 });
+    try {
+      let old = 0;
+      for (const seed of [1, 2, 6]) {
+        const sim = new PlaySim(flat(['block-play', 'second-man']), A, seed, { length: { halves: 1, halfMinutes: 7 } });
+        sim.force = 0.0001;
+        while (!sim.finished) {
+          const before = sim.playsRun.intercepted.home;
+          sim.step();
+          if (sim.playsRun.intercepted.home > before) old++;
+        }
+      }
+      expect(old).toBeGreaterThan(0);
+    } finally { shiftOff(); }
   }, 60_000);
 
   it('a tap launches a razzle play: the halfback takes it, and the decoys run', () => {
@@ -422,25 +439,26 @@ describe('the lab and the harness', () => {
   // the home block play, so the home inside-ball breakdown is seed 22.
   // The open-play dummy moves that breakdown. Seed 36's home inside-ball breaks down at 1609.
   // Penalty advantage moves seed 36. Seeds 1–60: the first whose first home breakdown is an
-  // inside-ball is seed 10, at tick 2972. With advantage off, seed 36 is still tick 1609.
-  // With the dummy and advantage off, seed 22 is still tick 2579.
-  it('the lab’s named seeds: a block play launched (seed 3, tick 688) and a home inside-ball breakdown (seed 10, tick 2972)', () => {
+  // inside-ball was seed 10, at tick 2972. The open-side shift moves it. The first such
+  // breakdown is seed 6, at tick 11899. With the shift and advantage off, seed 36 is still
+  // tick 1609. With the shift, the dummy and advantage off, seed 22 is still tick 2579.
+  it('the lab’s named seeds: a block play launched (seed 3, tick 688) and a home inside-ball breakdown (seed 6, tick 11899)', () => {
     const lab = (seed: number): PlaySim =>
       new PlaySim(withPlays({ ...labSheet(DEFAULT_HOME, 'gen', { attack: 'grind' }), rotation: 'standard' }, true), withPlays({ ...labSheet(DEFAULT_AWAY, 'gen', {}), rotation: 'standard' }, true), seed, { energy: LEGS_ENERGY.fresh, weather: 'clear', calls: [] });
     const one = lab(3);
     const launch = until(one, (e) => e.kind === 'set-play' && e.side === 'home');
     expect([launch?.tick, launch?.detail, one.script?.outcome]).toEqual([688, 'block-play', 'ok']);
     expect(one.script?.decoys.map((d) => d.idx % 9)).toEqual([7]);
-    const ten = lab(10);
-    const bd = until(ten, (e) => e.kind === 'play-breaks-down' && e.side === 'home');
-    expect([bd?.tick, bd?.detail, bd?.side]).toEqual([2972, 'inside-ball', 'home']);
-    const advantageOff = applyTuning({ 'penalty.advantageTicks': 0 });
+    const six = lab(6);
+    const bd = until(six, (e) => e.kind === 'play-breaks-down' && e.side === 'home');
+    expect([bd?.tick, bd?.detail, bd?.side]).toEqual([11899, 'inside-ball', 'home']);
+    const advantageOff = applyTuning({ 'shapes.openSide.on': 0, 'penalty.advantageTicks': 0 });
     try {
       const thirtySix = lab(36);
       const oldHome = until(thirtySix, (e) => e.kind === 'play-breaks-down' && e.side === 'home');
       expect([oldHome?.tick, oldHome?.detail, oldHome?.side]).toEqual([1609, 'inside-ball', 'home']);
     } finally { advantageOff(); }
-    const restore = applyTuning({ 'live.dummyChance': 0, 'penalty.advantageTicks': 0 });
+    const restore = applyTuning({ 'shapes.openSide.on': 0, 'live.dummyChance': 0, 'penalty.advantageTicks': 0 });
     try {
       const twentyTwo = lab(22);
       const old = until(twentyTwo, (e) => e.kind === 'play-breaks-down');

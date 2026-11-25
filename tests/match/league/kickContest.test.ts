@@ -167,11 +167,12 @@ describe('kick contests in the live sim (#99)', () => {
     // With kick returns on, neutral Balanced / Slide seed 45 wins the race and
     // scores. The open-play dummy moves seed 7's grounding. Seed 5, the grounding
     // from before the corner dive, is one again with the dummy off. Penalty advantage
-    // moves that live grounding. Seeds 1–40, Balanced / Slide: the first race a
-    // defender grounds is seed 7. With advantage off, seed 5 still grounds it.
-    expect(races(play([45], () => true, 'balanced').es).scored).toBeGreaterThan(0);
-    expect(races(play([7], () => true, 'balanced').es).grounded).toBeGreaterThan(0);
-    const advantageOff = applyTuning({ 'penalty.advantageTicks': 0 });
+    // moves that live grounding. The open-side shift moves both. Seeds 1–60, Balanced /
+    // Slide: the first race the attacker scores is seed 1, and the first a defender
+    // grounds is seed 5. With the shift and advantage off, seed 5 still grounds it.
+    expect(races(play([1], () => true, 'balanced').es).scored).toBeGreaterThan(0);
+    expect(races(play([5], () => true, 'balanced').es).grounded).toBeGreaterThan(0);
+    const advantageOff = applyTuning({ 'shapes.openSide.on': 0, 'penalty.advantageTicks': 0 });
     try {
       expect(races(play([5], () => true, 'balanced').es).grounded).toBeGreaterThan(0);
       const restore = applyTuning({ 'live.dummyChance': 0 });

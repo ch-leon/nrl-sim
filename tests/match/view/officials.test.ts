@@ -198,10 +198,12 @@ describe('the bench and the sin bin (#642)', () => {
   });
 
   it('a binned man walks off as the sim has him, then sits in his side’s bin until he is back on', () => {
-    // The open-play dummy moves seed 6. Seed 27 with seven-minute halves has a far-side walk and a return.
-    // With the dummy off, seed 6 still does. Seed 10 was that witness before the corner dive.
-    // The dummy moves it too, so both knobs are off for that check. Penalty advantage moves it again,
-    // so that check also sets advantageTicks to 0.
+    // The open-play dummy moves seed 6. Seed 27 with seven-minute halves had a far-side walk and a return.
+    // The open-side shift moves seed 27. Seeds 1–40, rating 62 v 58, seven-minute halves: the first
+    // far-side walk that sits and returns is seed 10. With the dummy off, seed 6 still does. Seed 10
+    // was that witness before the corner dive. The dummy moves it too, so both knobs are off for that
+    // check. Penalty advantage moves it again, and the shift does too, so that check also sets
+    // advantageTicks and shapes.openSide.on to 0.
     const cycle = (seed: number) => {
       const sim = new LiveSim(home, away, seed, { length: { halves: 2, halfMinutes: 7 } });
       const saw = { walking: false, seated: false, returned: false };
@@ -232,11 +234,11 @@ describe('the bench and the sin bin (#642)', () => {
       }
       expect(saw).toEqual({ walking: true, seated: true, returned: true });
     };
-    cycle(27);
-    const restore = applyTuning({ 'live.dummyChance': 0 });
+    cycle(10);
+    const restore = applyTuning({ 'shapes.openSide.on': 0, 'live.dummyChance': 0 });
     try {
       cycle(6);
-      const diveOff = applyTuning({ 'cornerCover.on': 0, 'penalty.advantageTicks': 0 });
+      const diveOff = applyTuning({ 'shapes.openSide.on': 0, 'cornerCover.on': 0, 'penalty.advantageTicks': 0 });
       try { cycle(10); } finally { diveOff(); }
     } finally { restore(); }
   });

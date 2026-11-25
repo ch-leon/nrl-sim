@@ -1,6 +1,6 @@
 // Ordinary PTB structures (#649) and the defender's read of a real lead run.
-import { FIELD_WIDTH } from '../core/field';
-import { clamp, type Vec } from '../core/vec';
+import { FIELD_WIDTH, MID_Y } from '../core/field';
+import { clamp, dist, type Vec } from '../core/vec';
 import { formationTarget, ROLES } from './roles';
 import type { AttackPreset } from './presets';
 import type { AttackShapeSnap, ContactPlayer } from '../core/snapshot';
@@ -12,6 +12,8 @@ export interface AttackingShape extends AttackShapeSnap {
   secondPass?: { startedTick: number; leadTo: Vec; supportTo: Vec };
   /** One line defender's brief read. Null closes it for the rest of this packet. */
   leadRead?: { defender: ContactPlayer; until: number } | null;
+  /** Receivers' lanes for a normal long-side shift, from first receiver to winger. */
+  openSide?: { line: { player: ContactPlayer; y: number }[]; receiving: number };
 }
 /** Weights/multipliers and authored metres; exposed to the harness as shapes.*. */
 export const SHAPES = {
@@ -27,7 +29,47 @@ export const SHAPES = {
   edge: { halfDepth: 4, halfWidth: 6, linkDepth: 5.5, linkWidth: 12, wingDepth: 7, wingWidth: 18 },
   backDoor: { on: 1, callerDepth: 4, callerWidth: 6, leadDepth: 3, leadWidth: 8, supportDepth: 6, supportWidth: 0, leadAheadM: 3, trailDepthM: 2, leadClearM: 0.5, sweepWidthM: 15, sweepLeadTicks: 5 },
   leadDecoy: { on: 1, reachM: 8, shadeM: 2, readTicks: 8 },
+  openSide: {
+    on: 1,
+    chance: { grind: 0.15, balanced: 0.45, expansive: 0.65, 'kick-chase': 0.20, 'all-out': 0.55 },
+    imbalanceM: 12, spacingM: 10.5, depthM: 3.25, stackM: 1.25, ownLineM: 16,
+    handsTicks: 5, waitTicks: 13, pressureM: 1.8, lastMinWidthM: 6, lastCoverEdgeM: 3,
+  },
 };
+
+/** The long side only when the ball is clearly on one side of the field. */
+export function openSideOf(y: number): 1 | -1 | 0 {
+  return y < MID_Y - SHAPES.openSide.imbalanceM ? 1 : y > MID_Y + SHAPES.openSide.imbalanceM ? -1 : 0;
+}
+
+/** Each runner needs a lane he can actually get to before the dummy-half passes. */
+export function openSideLine(origin: Vec, dir: 1 | -1, wing: ContactPlayer & { pos: Vec },
+  links: readonly (ContactPlayer & { pos: Vec })[], reach: number): NonNullable<AttackingShape['openSide']>['line'] | null {
+  const { spacingM, depthM, stackM } = SHAPES.openSide;
+  const yEnd = ROLES[wing.slot]!.lane;
+  const steps = Math.ceil(Math.abs(yEnd - origin.y) / spacingM);
+  if (steps > links.length + 1) return null;
+  const ordered = [...links].sort((a, b) => (a.pos.y - b.pos.y) * Math.sign(yEnd - origin.y));
+  let best: NonNullable<AttackingShape['openSide']>['line'] | null = null;
+  let bestCost = Infinity;
+  const line: NonNullable<AttackingShape['openSide']>['line'] = [];
+  function fit(i: number, start: number, cost: number): void {
+    const target = { x: origin.x - dir * (depthM + i * stackM), y: origin.y + (yEnd - origin.y) * (i + 1) / steps };
+    const last = i === steps - 1;
+    for (const [j, { pos, ...player }] of (last ? [wing] : ordered.slice(start, ordered.length - (steps - i - 2))).entries()) {
+      const travel = dist(target, pos);
+      if (travel > reach || cost + travel >= bestCost) continue;
+      line.push({ player, y: target.y });
+      if (last) {
+        best = [...line];
+        bestCost = cost + travel;
+      } else fit(i + 1, start + j + 1, cost + travel);
+      line.pop();
+    }
+  }
+  fit(0, 0, 0);
+  return best;
+}
 export function shapeWeights(preset: AttackPreset, tackle: number, toLine: number, y: number): Record<ShapeKind, number> {
   const w = { ...SHAPES.weights[preset] };
   if (SHAPES.backDoor.on <= 0) w['back-door'] = 0;

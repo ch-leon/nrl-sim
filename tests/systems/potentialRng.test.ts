@@ -57,6 +57,8 @@ import { contractsEndingSoon } from '../../src/systems/contracts';
 // that pin and the wind pin under it are taken with live.dummyChance at 0.
 // Penalty advantage (revision 23) leaves this seed-1 career on the same stream.
 // It moves the corner-off season, so that pin and the wind pin under it also set advantageTicks to 0.
+// The open-side shift (revision 24) leaves this seed-1 career on the same stream.
+// It moves the corner-off season, so that pin and the wind pin under it also set shapes.openSide.on to 0.
 // Both AI modes still compare UI-read and no-read runs, and AI=0 pins this stream.
 const MAIN_SEED_AFTER_SEASON = 3782523015;
 const BEFORE_CORNER_COVER = 1950957202;
@@ -93,7 +95,7 @@ describe('the rng stream (#369)', () => {
         const dummyOff = applyTuning({ 'live.dummyChance': 0 });
         try {
           expect(season(false).seed).toBe(MAIN_SEED_AFTER_SEASON);
-          const coverOff = applyTuning({ 'cornerCover.on': 0, 'penalty.advantageTicks': 0 });
+          const coverOff = applyTuning({ 'cornerCover.on': 0, 'penalty.advantageTicks': 0, 'shapes.openSide.on': 0 });
           try {
             expect(season(false).seed).toBe(BEFORE_CORNER_COVER);
             const windOff = applyTuning({ 'weather.windPuntOn': 0 });

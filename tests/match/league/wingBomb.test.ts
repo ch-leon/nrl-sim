@@ -222,7 +222,7 @@ describe('ordinary attacking bombs to the winger’s corner (#650)', () => {
     if (!mariners) throw new Error('Expected the Mariners bomb to the low corner');
     expect(mariners.to.y).toBeLessThanOrEqual(12);
     expect(mariners.to.x - mariners.from.x).toBeLessThan(0);
-    const diveOff = applyTuning({ 'cornerCover.on': 0, 'live.dummyChance': 0 });
+    const diveOff = applyTuning({ 'shapes.openSide.on': 0, 'cornerCover.on': 0, 'live.dummyChance': 0 });
     let seed42: ReturnType<BombSim['firstCornerBomb']>;
     try {
       seed42 = new BombSim(labSheet('rival-reapers', 'gen', chase), labSheet('rival-wolves', 'gen', chase), 42).firstCornerBomb(3_600, 1);
