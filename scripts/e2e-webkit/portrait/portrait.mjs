@@ -187,14 +187,8 @@ export async function runPortrait(browser) {
         await page.screenshot({ path: join(OUT, `bali-${w}x${h}-choice${choice}.png`) });
         await page.locator(`[data-event-choice="${choice}"]`).tap();
         await page.waitForTimeout(150);
-        // A League career keeps the classic deck from resolving. The card was measured; clear the plant so the match can start.
-        const structural = await page.evaluate(() => !!window.__nrlState().competitions?.calendar);
-        if (!structural) {
-          if (await page.locator('.nrl-event-card').count()) problems.push(`${w}×${h}: choice ${choice} did not resolve`);
-          if (await page.evaluate(() => window.__nrlState().eventDeck.pending.length)) problems.push(`${w}×${h}: choice ${choice} left the card pending`);
-        } else {
-          await page.evaluate(() => { window.__nrlState().eventDeck.pending = []; });
-        }
+        if (await page.locator('.nrl-event-card').count()) problems.push(`${w}×${h}: choice ${choice} did not resolve`);
+        if (await page.evaluate(() => window.__nrlState().eventDeck.pending.length)) problems.push(`${w}×${h}: choice ${choice} left the card pending`);
         if (await page.locator('.nrl-decisions-modal .nrl-screen-x').count()) await page.locator('.nrl-decisions-modal .nrl-screen-x').tap();
       }
       rec.notes.push(`${w}×${h}: both choices tapped`);
