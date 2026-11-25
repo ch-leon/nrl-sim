@@ -75,7 +75,7 @@ describe('STEPS: three guided taps (#370)', () => {
   it('names the paddock as the catalog does, and says what each tap does', () => {
     expect(byId.get('build')!.text).toBe(`Coach, tap ${FACILITY_CATALOG.trainingPaddock.name} to build one.`);
     expect(byId.get('place')!.text).toBe('Pick a green spot, then Build here.');
-    expect(byId.get('recruit')!.text).toMatch(/Sign on the best player you can afford/);
+    expect(byId.get('recruit')!.text).toBe('Sign a player you can afford, and leave enough for the bills.');
     expect(byId.get('advance')!.text).toMatch(/Play Week/);
   });
 
@@ -83,12 +83,9 @@ describe('STEPS: three guided taps (#370)', () => {
     expect(byId.get('build')!.opens).toBe('build');
     expect(byId.get('recruit')!.opens).toBe('recruit');
     expect(byId.get('build')!.anchor!.split(',')[0]).toContain('[data-screen-key="build"] [data-facility="trainingPaddock"]');
-    // The first enabled SIGN under the default rating sort: the best player the club can afford.
-    expect(byId.get('recruit')!.anchor!.split(',')[0]).toContain('[data-screen-key="recruit"] .nrl-row:has(.nrl-row-action:not(:disabled))');
-    // A player's page over the list: his Sign, else back to the list, before the Squad fallbacks.
+    // Who to sign is a choice: the whole list is rung, not one row; a player's page over it, whole, in its place.
     const choices = byId.get('recruit')!.anchor!.split(',').map((c) => c.trim());
-    expect(choices.indexOf('.nrl-player-modal [data-player-action="sign"]:not(:disabled)')).toBe(2);
-    expect(choices.indexOf('.nrl-player-modal .nrl-back')).toBe(3);
+    expect(choices.slice(0, 2)).toEqual(['[data-screen-key="recruit"] .nrl-screen-body', '.nrl-player-modal']);
     expect(byId.get('advance')!.anchor).toBe('.nrl-hud-actions .nrl-btn');
     // The placement step frames the bar on the grass and moves on once the bar is up.
     expect(byId.get('build')!.until).toBe('.nrl-placebar:not([hidden])');

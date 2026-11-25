@@ -95,13 +95,10 @@ export const STEPS: readonly TutorialStep[] = [
   },
   {
     id: 'recruit',
-    // The default sort is by rating, so the first enabled SIGN is the best player the club can afford.
-    text: 'Tap Sign on the best player you can afford; leave enough for the bills.',
-    // A player's page opened over the list covers it: his Sign (on its Deal tab), else ◂ back to the list.
-    anchor:
-      `[data-screen-key="recruit"] .nrl-row:has(.nrl-row-action:not(:disabled)), ` +
-      `[data-screen-key="recruit"] .nrl-row-action:not(:disabled), ` +
-      `.nrl-player-modal [data-player-action="sign"]:not(:disabled), .nrl-player-modal .nrl-back, ${inSquad('recruit')}`,
+    // Who to sign is the coach's choice, so the ring takes the whole list, not one row; a
+    // player's page opened over it is rung whole in its place (Sign is on its Deal tab).
+    text: 'Sign a player you can afford, and leave enough for the bills.',
+    anchor: `[data-screen-key="recruit"] .nrl-screen-body, .nrl-player-modal, ${inSquad('recruit')}`,
     advanceOn: 'player:signed',
     opens: 'recruit',
     tap: 2,
