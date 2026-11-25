@@ -111,7 +111,6 @@ export async function runLeagueSelection(browser) {
       const town = towns.find(t => t.country === (pack === 'uk' ? 'GB' : 'AU'));
       await page.locator('[data-nrl-town]').fill(`${town.name}, ${town.region}, ${town.country}`);
       await setupStep(page);
-      await page.locator('[data-nrl-career-mode-league]').tap();
       await shot('new-game');
       await page.evaluate(() => {
         window.__leagueLoadingObserved = false;

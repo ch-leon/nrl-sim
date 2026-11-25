@@ -1,6 +1,7 @@
 // Developer settings' playtest career (#519). A career of its own, set up with a
 // Direct attack coach hired and Block play bought and taken into the match, so a
 // merged feature can be watched straight away without advancing Leon's career.
+// A fresh one is a League career (#819). Classic is not started here.
 //
 // Isolation: the playtest career lives under DEV_TEST_PREFIX (core/storage/local.ts
 // inCareerNamespace), so it never writes a normal slot. Setting one up saves the
@@ -19,8 +20,8 @@ import { flushSaveMeta, getActiveSlot, lockSaves, saveIfChanged, SLOT_COUNT } fr
 import { getState, setState } from '../core/state';
 import { careerNamespace, setCareerNamespace, browserStorage, type StorageLike } from '../core/storage/local';
 import {
-  CORRUPT_SAVE_KEY, DEV_TEST_BACKUP_KEY, DEV_TEST_DISPLACED_KEY, DEV_TEST_PREFIX, DEVICE_ID_KEY, LEGACY_SAVE_KEY,
-  liveMatchKey, recoveryKey, saveMetaKey, slotKey,
+  classicRetiredNoticeKey, CORRUPT_SAVE_KEY, DEV_TEST_BACKUP_KEY, DEV_TEST_DISPLACED_KEY, DEV_TEST_PREFIX, DEVICE_ID_KEY, LEGACY_SAVE_KEY,
+  liveMatchKey, recoveryKey, retiredSaveKey, saveMetaKey, slotKey,
 } from '../core/storageKeys';
 import { weekHeld } from '../core/time';
 import { advanceInProgress } from '../core/advance';
@@ -33,7 +34,9 @@ import { setTestCareer, testCareer, turnAllOff, type TestCareerMarker } from './
 /** Every key a career keeps: what the backup holds and what the playtest namespace may hold. */
 export function careerKeys(slots = SLOT_COUNT): string[] {
   const keys = [LEGACY_SAVE_KEY, CORRUPT_SAVE_KEY, DEVICE_ID_KEY];
-  for (let slot = 1; slot <= slots; slot++) keys.push(slotKey(slot), saveMetaKey(slot), liveMatchKey(slot), recoveryKey(slot));
+  for (let slot = 1; slot <= slots; slot++) {
+    keys.push(slotKey(slot), saveMetaKey(slot), liveMatchKey(slot), recoveryKey(slot), retiredSaveKey(slot), classicRetiredNoticeKey(slot));
+  }
   return keys;
 }
 
@@ -249,6 +252,23 @@ export const PLAYTEST_CLUB = 'Playtest XIII';
 export const PLAYTEST_COACH = 'Dev Tester';
 /** One seed, so every playtest career starts from the same club. */
 export const PLAYTEST_SEED = 519;
+
+/** A fresh playtest career is a League career in slot 1. Classic is not started (#819). */
+export function freshPlaytestLeagueStart(): {
+  clubName: string;
+  coachName: string;
+  seed: number;
+  difficulty: 'normal';
+  destination: { slot: 1; expectedOriginal: null };
+} {
+  return {
+    clubName: PLAYTEST_CLUB,
+    coachName: PLAYTEST_COACH,
+    seed: PLAYTEST_SEED,
+    difficulty: 'normal',
+    destination: { slot: 1, expectedOriginal: null },
+  };
+}
 
 /**
  * The preset, through the game's own routes on a new career already loaded: the

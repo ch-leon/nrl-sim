@@ -291,6 +291,10 @@ export const CLUB_PAGES: readonly GuidePage[] = [
     screen: 'ladder',
     sections: [
       {
+        heading: 'League career',
+        text: 'League career is the only mode. A new club starts in Local, in Australia or the UK: eight clubs, and a finals title unlocks the next league. An old Classic save can be exported and is not loaded.',
+      },
+      {
         text: `${activePack().clubs.length + 1} clubs play ${SEASON_ROUNDS} rounds: 2 points for a win, 1 for a draw, points difference splits ties. The Ladder tab shows every club’s form (the last five), and a club’s name opens its squad. The Fixtures tab previews your next match.`,
       },
       {

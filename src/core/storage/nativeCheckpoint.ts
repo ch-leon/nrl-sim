@@ -1,8 +1,8 @@
 // Challenge outcomes on iPhone must be recoverable before the game reveals them.
 // The caller captures the physical slot key, the verified save bytes and its
 // gameplay ownership before awaiting. Ordinary saves never wait on this bridge.
-import { SAVE_SLOT_PREFIX } from '../storageKeys';
-import type { StorageLike } from './local';
+import { classicRetiredNoticeKey, LEGACY_SAVE_KEY, liveMatchKey, retiredSaveKey, SAVE_SLOT_PREFIX, saveMetaKey, slotKey } from '../storageKeys';
+import { careerNamespace, type StorageLike } from './local';
 import { isMirroredKey, type NativeMirror } from './nativeMirror';
 import { isIosNative } from './platform';
 
@@ -35,4 +35,33 @@ export function acknowledgeNativeCheckpoint(key: string, payload: string): Promi
   if (!active || !boot || !key.startsWith(SAVE_SLOT_PREFIX) || !isMirroredKey(key)) return Promise.resolve('unavailable');
   const {storage, mirror} = active;
   return mirror.confirm(key, payload, () => storage.getItem(key) === payload, boot.signal);
+}
+
+/**
+ * A retired Classic slot must not come back from the native mirror (#819). Confirms
+ * the archived bytes, then confirms the live slot (and the meta, live-match and
+ * legacy keys beside it) are gone. A playtest career is not mirrored: this does
+ * nothing there, so it cannot write the archive onto the normal career's keys.
+ * Off iPhone this is `inactive`.
+ */
+export async function acknowledgeRetiredClassicSave(slot: number, raw: string): Promise<NativeCheckpointResult> {
+  if (!ios) return 'inactive';
+  if (careerNamespace() !== null) return 'inactive';
+  if (!active || !boot) return 'unavailable';
+  const archive = retiredSaveKey(slot);
+  const live = slotKey(slot);
+  if (!isMirroredKey(archive) || !isMirroredKey(live)) return 'unavailable';
+  const {storage, mirror} = active;
+  const signal = boot.signal;
+  const archived = await mirror.confirm(archive, raw, () => storage.getItem(archive) === raw, signal);
+  if (archived !== 'confirmed') return archived;
+  const goneKeys = [live, saveMetaKey(slot), liveMatchKey(slot), ...(slot === 1 ? [LEGACY_SAVE_KEY] : [])];
+  for (const key of goneKeys) {
+    const gone = await mirror.confirmGone(key, () => storage.getItem(key) === null, signal);
+    if (gone !== 'confirmed') return gone;
+  }
+  const notice = classicRetiredNoticeKey(slot);
+  const noted = storage.getItem(notice);
+  if (noted === null || !isMirroredKey(notice)) return 'confirmed';
+  return mirror.confirm(notice, noted, () => storage.getItem(notice) === noted, signal);
 }

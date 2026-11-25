@@ -1,11 +1,13 @@
 # Roadmap
 
-Last updated: 2026-11-24
+Last updated: 2026-11-25
 
 Status checked against GitHub on 7 Nov 2026. Merged tooling is not the same as a
 live gameplay change; work still open below has not shipped.
 
 ## Now
+
+- **League career only.** New clubs start a League career in Local. Classic saves are archived, not loaded ([#819](https://github.com/ch-leon/nrl-sim/issues/819)). Removing the Classic-only season code and moving the old test harnesses across is the follow-up, after [#820](https://github.com/ch-leon/nrl-sim/issues/820) and [#692](https://github.com/ch-leon/nrl-sim/issues/692).
 
 - **Open-side shifts through hands.** A wide ruck can move the ball to the far winger through ordinary catches and passes. Cover, a missing link or a coach call ends it. Lab sign-off remains open. Ported from [draft PR #799](https://github.com/ch-leon/nrl-sim/pull/799).
 

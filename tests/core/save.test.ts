@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
-  save, load, clearSave, hasSave, enableAutosave,
+  save, load, clearSave, hasSave, enableAutosave, writeSlot,
   SAVE_KEY, CORRUPT_KEY, __setStorage, slotKey, setActiveSlot, getSlotSummaries, deleteSlot,
   migrateState, exportSave, importSave, importIntoSlot, MIGRATIONS,
   type StorageLike,
@@ -9,6 +9,9 @@ import { showTitleFlow, type TitleChoice } from '../../src/ui/title';
 import { createNewGame, getState, SAVE_VERSION, type GameState } from '../../src/core/state';
 import { bus } from '../../src/core/events';
 import { DEFAULT_PLAYER_COLORS, isValidColorPair } from '../../src/config';
+import { retiredSaveKey } from '../../src/core/storageKeys';
+import { CLASSIC_RETIRED_TEXT } from '../../src/core/classicSave';
+import { leagueSlotState } from '../helpers/leagueSlot';
 
 // Setup data loads asynchronously; save-slot tests use a synthetic catalogue.
 vi.mock('../../src/data/towns.json', () => ({ default: [
@@ -336,7 +339,7 @@ describe('showTitleFlow', () => {
   });
 
   it('with a save: Continue resolves {continue}', async () => {
-    save(createNewGame('Existing', 1));
+    writeSlot(1, await leagueSlotState('Existing'));
     const root = makeStubEl('div');
     const p = showTitleFlow(root as unknown as HTMLElement);
     await vi.dynamicImportSettled();
@@ -348,24 +351,22 @@ describe('showTitleFlow', () => {
     expect(root.children.length).toBe(0);
   });
 
-  it('shows the repair warning and recovery copy before continuing a repaired career', async () => {
+  it('archives a Classic save that needs a lineup repair instead of loading it', () => {
     const s = createNewGame('Missing selection', 525);
     delete (s.lineup as unknown as Record<string, unknown>).captain;
     const original = JSON.stringify(s, null, 2);
     storage.map.set(slotKey(1), original);
     const root = makeStubEl('div');
-    const choice = showTitleFlow(root as unknown as HTMLElement);
-    const card = root.querySelector('[data-nrl-slot-1]')!;
-    expect(card.children.some(c => c.textContent.includes('Career lineup repaired'))).toBe(true);
-    expect(root.querySelector('[data-nrl-recovery-1-0]')).not.toBeNull();
-    expect(storage.map.get(slotKey(1))).toBe(original);
-    root.querySelector('[data-nrl-continue-1]')!.click();
-    expect(await choice).toEqual({ mode: 'continue' });
-    expect(load()!.lineup.captain).toBeNull();
+    void showTitleFlow(root as unknown as HTMLElement);
+    const retired = root.querySelector('[data-nrl-classic-retired]')!;
+    expect(retired.children.some((c) => c.textContent.includes(CLASSIC_RETIRED_TEXT))).toBe(true);
+    expect(root.querySelector('[data-nrl-continue-1]')).toBeNull();
+    expect(storage.map.get(slotKey(1))).toBeUndefined();
+    expect(storage.map.get(retiredSaveKey(1))).toBe(original);
   });
 
   it('with a save: New game opens the setup step, and Start asks before replacing the season (#350 T2)', async () => {
-    save(createNewGame('Existing', 1));
+    writeSlot(1, await leagueSlotState('Existing'));
     const root = makeStubEl('div');
     let settled = false;
     const p = showTitleFlow(root as unknown as HTMLElement).then((c) => { settled = true; return c; });
@@ -391,8 +392,8 @@ describe('showTitleFlow', () => {
     expect(await p).toMatchObject({ mode: 'new', clubName: 'Bulldogs' });
   });
 
-  it('Back from the setup step returns to the slot cards', () => {
-    save(createNewGame('Existing', 1));
+  it('Back from the setup step returns to the slot cards', async () => {
+    writeSlot(1, await leagueSlotState('Existing'));
     const root = makeStubEl('div');
     void showTitleFlow(root as unknown as HTMLElement);
     root.querySelector('[data-nrl-new-1]')!.click();
@@ -605,9 +606,8 @@ describe('title flow slots', () => {
   });
 
   it('shows three slots; Continue on slot 2 makes it the active slot', async () => {
-    save(createNewGame('One', 1));
-    setActiveSlot(2);
-    save(createNewGame('Two', 2));
+    writeSlot(1, await leagueSlotState('One'));
+    writeSlot(2, await leagueSlotState('Two'));
     setActiveSlot(1);
     const root = makeStubEl('div');
     const p = showTitleFlow(root as unknown as HTMLElement);
@@ -620,7 +620,7 @@ describe('title flow slots', () => {
   });
 
   it('New Game on an empty slot targets that slot', async () => {
-    save(createNewGame('One', 1));
+    writeSlot(1, await leagueSlotState('One'));
     const root = makeStubEl('div');
     const p = showTitleFlow(root as unknown as HTMLElement);
     await vi.dynamicImportSettled();
@@ -633,8 +633,8 @@ describe('title flow slots', () => {
     expect(hasSave(3)).toBe(true);
   });
 
-  it('Delete needs a second click and then empties the slot', () => {
-    save(createNewGame('One', 1));
+  it('Delete needs a second click and then empties the slot', async () => {
+    writeSlot(1, await leagueSlotState('One'));
     const root = makeStubEl('div');
     void showTitleFlow(root as unknown as HTMLElement);
     root.querySelector('[data-nrl-delete-1]')!.click();
@@ -644,27 +644,29 @@ describe('title flow slots', () => {
     expect(root.querySelector('[data-nrl-delete-1]')).toBeNull();
   });
 
-  it('a rejected slot stays visible with raw recovery and requires confirmation before Start over', async () => {
+  it('an unreadable slot stays put when Start is pressed, with its export, until it is deleted', async () => {
     const raw = 'original rejected bytes';
     storage.map.set(slotKey(1), raw);
     const root = makeStubEl('div');
-    const result = showTitleFlow(root as unknown as HTMLElement);
+    void showTitleFlow(root as unknown as HTMLElement);
     expect(root.querySelector('[data-nrl-slot-label-1]')!.textContent).toBe('Unreadable save');
     expect(root.querySelector('[data-nrl-recover-1]')).not.toBeNull();
     expect(root.querySelector('[data-nrl-continue-1]')).toBeNull();
     root.querySelector('[data-nrl-new-1]')!.click();
     await vi.dynamicImportSettled();
     root.querySelector('[data-nrl-start]')!.click();
+    // A new League career does not overwrite an unreadable save. Delete does, on the second tap.
     expect(storage.map.get(slotKey(1))).toBe(raw);
-    root.querySelector('[data-nrl-start-confirm]')!.click();
-    expect((await result).mode).toBe('new');
-    expect(hasSave(1)).toBe(false);
-    save(createNewGame('Deliberate replacement', 522));
-    expect(load()?.clubName).toBe('Deliberate replacement');
+    expect(root.querySelector('[data-nrl-slot-label-1]')!.textContent).toBe('Unreadable save');
+    root.querySelector('[data-nrl-delete-1]')!.click();
+    root.querySelector('[data-nrl-delete-1]')!.click();
+    expect(storage.map.get(slotKey(1))).toBeUndefined();
   });
 
   it('a future-version slot offers Delete but not Continue or New', () => {
-    storage.map.set(slotKey(1), JSON.stringify({ ...createNewGame('F', 1), version: 99 }));
+    storage.map.set(slotKey(1), JSON.stringify({
+      ...createNewGame('F', 1), version: 99, competitions: { leagueCareer: { phase: 'active' } },
+    }));
     const root = makeStubEl('div');
     void showTitleFlow(root as unknown as HTMLElement);
     expect(root.querySelector('[data-nrl-continue-1]')).toBeNull();

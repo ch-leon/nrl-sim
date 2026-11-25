@@ -34,7 +34,8 @@ import { DEFAULT_TACTICS } from '../match/league/presets';
 import { bus } from './events';
 import { registerTickHook, TICK_ORDER, unregisterTickHook, weekHeld, activePaidCupCheckpoint, leagueIntervalSaveHeld, failedIntervalProblem, failedIntervalCheckpoint, type IntervalCheckpoint } from './time';
 import { clearLiveMatch, isLiveMatchRecord, parseLiveMatch, LIVE_MATCH_EXPORT_FIELD, peelLiveMatchExport, readLiveMatch, writeLiveMatch } from '../systems/liveMatchRecord';
-import { CORRUPT_SAVE_KEY, LEGACY_SAVE_KEY, liveMatchKey, slotKey } from './storageKeys';
+import { isClassicSave } from './classicSave';
+import { classicRetiredNoticeKey, CORRUPT_SAVE_KEY, LEGACY_SAVE_KEY, liveMatchKey, retiredSaveKey, slotKey } from './storageKeys';
 import { BRAND } from '../brand';
 import { cleanName } from '../data/names';
 import { allPlayers, renameClubsPatch, renamePlayersPatch, validClubColors, type ClubEdit } from '../systems/rename';
@@ -810,6 +811,82 @@ export function downloadOriginalSave(slot: number, recoveryIndex?: number): void
     deliverFile(`career-slot-${slot}-${recoveryIndex === undefined ? 'original' : `recovery-${recoveryIndex + 1}`}.json`, raw, { onShareFailed: shareFailed });
   } catch {
     bus.emit('ui:notify', { text: 'Could not read the original save. It has been kept; try again when storage is available.', kind: 'danger' });
+  }
+}
+
+export interface ClassicRetirement {
+  slot: number;
+  /** The raw save bytes, archived when `emptied` is true and still in the slot otherwise. */
+  raw: string;
+  /** The slot no longer holds the career. False when the archive could not be kept. */
+  emptied: boolean;
+  /** Show the one-time message. False once that slot has already been told, or when nothing changed. */
+  notify: boolean;
+}
+
+function retirementNoticeSeen(store: LocalSaveStore, slot: number): boolean {
+  try { return store.storage.getItem(classicRetiredNoticeKey(slot)) === '1'; }
+  catch { return false; }
+}
+
+/**
+ * Move a Classic career out of `slot`. The raw bytes are written to the retired-save
+ * key first and read back; only then is the slot emptied. A failed archive leaves
+ * the slot untouched. A League career, a structural calendar and anything that is
+ * not a Classic save are left alone. Never throws.
+ */
+export function retireClassicSlot(slot: number): ClassicRetirement | null {
+  const store = getStore();
+  if (!store) return null;
+  let raw: string | null;
+  try { raw = store.read(slot); }
+  catch { return null; }
+  if (raw === null || !isClassicSave(raw)) return null;
+  const key = retiredSaveKey(slot);
+  let archived = false;
+  try {
+    if (store.storage.getItem(key) !== raw) store.storage.setItem(key, raw);
+    archived = store.storage.getItem(key) === raw;
+  } catch { archived = false; }
+  if (!archived) return { slot, raw, emptied: false, notify: true };
+  try { deleteSlot(slot); } catch { /* the read below decides whether it actually went */ }
+  let left: string | null;
+  try { left = store.read(slot); }
+  catch { return { slot, raw, emptied: false, notify: true }; }
+  if (left !== null) return { slot, raw, emptied: false, notify: true };
+  return { slot, raw, emptied: true, notify: !retirementNoticeSeen(store, slot) };
+}
+
+/** Retire every Classic slot. Slots that are not Classic are absent from the list. */
+export function retireClassicSlots(): ClassicRetirement[] {
+  const out: ClassicRetirement[] = [];
+  for (let slot = 1; slot <= SLOT_COUNT; slot++) {
+    const retired = retireClassicSlot(slot);
+    if (retired) out.push(retired);
+  }
+  return out;
+}
+
+/** The archived Classic save for `slot`, or null. Never throws. */
+export function readRetiredSave(slot: number): string | null {
+  try { return getStore()?.storage.getItem(retiredSaveKey(slot)) ?? null; }
+  catch { return null; }
+}
+
+/** Remember that this slot's retirement message has been shown. Never throws. */
+export function markClassicRetirementShown(slot: number): void {
+  try { getStore()?.storage.setItem(classicRetiredNoticeKey(slot), '1'); }
+  catch { /* the message can show once more; the archive is already kept */ }
+}
+
+/** Hand the player the archived Classic save, the same way Export original does. */
+export function downloadRetiredSave(slot: number): void {
+  try {
+    const raw = readRetiredSave(slot);
+    if (raw === null || typeof document === 'undefined') return;
+    deliverFile(`career-slot-${slot}-retired.json`, raw, { onShareFailed: shareFailed });
+  } catch {
+    bus.emit('ui:notify', { text: 'Could not read the archived save. It has been kept; try again when storage is available.', kind: 'danger' });
   }
 }
 

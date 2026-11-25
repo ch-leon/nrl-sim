@@ -6,10 +6,12 @@ import { StubNode, stubDocument } from './stubDom';
 import { DIFFICULTY_BLURB, TITLE_CSS, loadingTip, showLeagueLoading, showTitleFlow, type TitleChoice } from '../../src/ui/title';
 import { GROUND_MAX, NAME_MAX } from '../../src/data/names';
 import { DEFAULT_DIFFICULTY, DIFFICULTIES, DIFFICULTY } from '../../src/config';
-import { deleteSlot, writeSlot, slotKey } from '../../src/core/save';
+import { deleteSlot, readRetiredSave, slotKey, writeSlot } from '../../src/core/save';
 import { createNewGame } from '../../src/core/state';
+import { retiredSaveKey } from '../../src/core/storageKeys';
 import { bus } from '../../src/core/events';
-import { careerFixture } from '../helpers/playerCareer';
+import { CLASSIC_RETIRED_TEXT } from '../../src/core/classicSave';
+import { leagueSlotState } from '../helpers/leagueSlot';
 
 describe('the build label (#350 T1)', () => {
   it('sits in the corner, and after the setup on an iPhone SE on its side, never over the panel', () => {
@@ -51,8 +53,8 @@ describe('difficulty guidance at setup (#480)', () => {
     expect((await result).difficulty).toBe('normal');
   });
 
-  it.each([1, 2, 3])('hides the hint when slot %s has a career, then shows it after deletion', (slot) => {
-    writeSlot(slot, createNewGame('Test club', 1));
+  it.each([1, 2, 3])('hides the hint when slot %s has a career, then shows it after deletion', async (slot) => {
+    writeSlot(slot, await leagueSlotState('Test club'));
     const root = new StubNode('div');
     void showTitleFlow(root as unknown as HTMLElement);
     const empty = slot === 1 ? 2 : 1;
@@ -304,10 +306,10 @@ describe('one yellow button on the slots screen (#613)', () => {
   /** The hooks of every button in the primary yellow. */
   const yellow = (root: StubNode): string[] =>
     root.querySelectorAll('.nrl-title-btn-go').map((b) => Object.keys(b.attrs).find((k) => k.startsWith('data-nrl-'))!);
-  /** Write a career to `slot` as if at `at` (ms): SaveMeta.updatedAt is what orders the saves. */
-  const saveAt = (slot: number, at: number): void => {
+  /** Write a League career to `slot` as if at `at` (ms): SaveMeta.updatedAt is what orders the saves. */
+  const saveAt = async (slot: number, at: number): Promise<void> => {
     const now = vi.spyOn(Date, 'now').mockReturnValue(at);
-    writeSlot(slot, createNewGame(`Club ${slot}`, slot));
+    writeSlot(slot, await leagueSlotState(`Club ${slot}`));
     now.mockRestore();
   };
   const slotsScreen = (): StubNode => {
@@ -326,25 +328,25 @@ describe('one yellow button on the slots screen (#613)', () => {
     expect(TITLE_CSS).toContain('.nrl-title-btn-row, .nrl-title-btn-row:hover { background: transparent; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);');
   });
 
-  it.each([1, 2, 3])('with one save, in slot %s, it is that Continue and no New game', (slot) => {
-    saveAt(slot, 1000);
+  it.each([1, 2, 3])('with one save, in slot %s, it is that Continue and no New game', async (slot) => {
+    await saveAt(slot, 1000);
     expect(yellow(slotsScreen())).toEqual([`data-nrl-continue-${slot}`]);
   });
 
-  it('with several saves it is Continue on the one written last', () => {
-    saveAt(1, 2000);
-    saveAt(3, 1000);
+  it('with several saves it is Continue on the one written last', async () => {
+    await saveAt(1, 2000);
+    await saveAt(3, 1000);
     const two = slotsScreen();
     expect(yellow(two)).toEqual(['data-nrl-continue-1']);
     expect(two.querySelector('[data-nrl-continue-3]')!.className).toBe('nrl-title-btn nrl-title-btn-row');
-    saveAt(2, 3000);
+    await saveAt(2, 3000);
     expect(yellow(slotsScreen())).toEqual(['data-nrl-continue-2']);
-    saveAt(3, 4000);
+    await saveAt(3, 4000);
     expect(yellow(slotsScreen())).toEqual(['data-nrl-continue-3']);
   });
 
-  it('saves with no time kept (from before meta) fall to the first filled slot', () => {
-    for (const slot of [2, 3]) localStorage.setItem(`nrl-sim-save-slot-${slot}`, JSON.stringify(createNewGame(`Club ${slot}`, slot)));
+  it('saves with no time kept (from before meta) fall to the first filled slot', async () => {
+    for (const slot of [2, 3]) localStorage.setItem(`nrl-sim-save-slot-${slot}`, JSON.stringify(await leagueSlotState(`Club ${slot}`)));
     expect(yellow(slotsScreen())).toEqual(['data-nrl-continue-2']);
   });
 
@@ -445,19 +447,49 @@ describe('League setup destination', () => {
   beforeEach(() => { stubLocalStorage(); stubDocument(); });
   afterEach(() => vi.unstubAllGlobals());
 
-  it('shows both choices and carries the captured occupied save through confirmation', async () => {
-    const original = createNewGame('Existing club', 54);
-    writeSlot(1,original);
+  it('starts a League career and carries the occupied save through confirmation', async () => {
+    const original = await leagueSlotState('Existing club');
+    writeSlot(1, original);
     const root = new StubNode('div');
     const choice = showTitleFlow(root as unknown as HTMLElement);
+    expect(root.querySelector('[data-nrl-career-mode-classic]')).toBeNull();
+    expect(root.querySelector('[data-nrl-career-mode-league]')).toBeNull();
+    expect(root.querySelector('[data-nrl-classic-retired]')).toBeNull();
     root.querySelector('[data-nrl-new-1]')!.click();
     await vi.dynamicImportSettled();
-    expect(root.querySelector('[data-nrl-career-mode-classic]')!.getAttribute('aria-pressed')).toBe('true');
-    root.querySelector('[data-nrl-career-mode-league]')!.click();
     root.querySelector('[data-nrl-start]')!.click();
     root.querySelector('[data-nrl-start-confirm]')!.click();
-    expect(await choice).toMatchObject({careerMode:'league',destination:{slot:1,expectedOriginal:JSON.stringify(original)}});
+    expect(await choice).toMatchObject({
+      mode: 'new', careerMode: 'league', destination: { slot: 1, expectedOriginal: JSON.stringify(original) },
+    });
     expect(localStorage.getItem(slotKey(1))).toBe(JSON.stringify(original));
+  });
+
+  it('archives a Classic save once, leaves the slot empty, and can export it', () => {
+    const original = createNewGame('Classic Club', 54);
+    writeSlot(1, original);
+    const raw = localStorage.getItem(slotKey(1))!;
+    const root = new StubNode('div');
+    void showTitleFlow(root as unknown as HTMLElement);
+    expect(root.querySelector('[data-nrl-classic-retired]')!.textContent).toContain(CLASSIC_RETIRED_TEXT);
+    expect(root.querySelector('[data-nrl-classic-export-1]')!.textContent).toBe('Export save');
+    expect(root.querySelector('[data-nrl-classic-new]')!.textContent).toBe('Start new League career');
+    expect(root.querySelector('[data-nrl-continue-1]')).toBeNull();
+    expect(root.querySelector('[data-nrl-slot-1]')!.getAttribute('data-empty')).toBe('');
+    expect(localStorage.getItem(slotKey(1))).toBeNull();
+    expect(localStorage.getItem(retiredSaveKey(1))).toBe(raw);
+    expect(readRetiredSave(1)).toBe(raw);
+    root.querySelector('[data-nrl-classic-new]')!.click();
+    expect(root.querySelector('[data-nrl-career-mode-classic]')).toBeNull();
+    expect(root.querySelector('[data-nrl-setup-step]')!.getAttribute('data-nrl-setup-step')).toBe('1');
+    const again = new StubNode('div');
+    void showTitleFlow(again as unknown as HTMLElement);
+    expect(again.querySelector('[data-nrl-classic-retired]')).toBeNull();
+    again.querySelector('[data-nrl-back]')!.click();
+    expect(again.querySelector('[data-nrl-classic-retired]')).toBeNull();
+    expect(again.querySelector('[data-nrl-continue-1]')).toBeNull();
+    expect(again.querySelector('[data-nrl-slot-1]')!.getAttribute('data-empty')).toBe('');
+    expect(readRetiredSave(1)).toBe(raw);
   });
 
   it('returns failed starts to the slot list even if all slots remain empty', () => {
@@ -561,13 +593,15 @@ describe('a new club in three steps (SuperCOOKED 12–14)', () => {
     const hint = root.querySelector('[data-nrl-difficulty-hint]')!;
     expect(hint.closest('[data-nrl-difficulty-easy]')).not.toBeNull();
     expect(root.querySelector('[data-nrl-open-all]')!.parentNode!.textContent).toBe("I've played before: open every building and Office tile now");
+    expect(root.querySelector('[data-nrl-career-mode-classic]')).toBeNull();
+    expect(root.querySelector('[data-nrl-career-mode-league]')).toBeNull();
   });
 });
 
 describe('the save slots (SuperCOOKED 11)', () => {
-  it('a season\'s exports, New club and Delete are behind its ⋯, one open at a time', () => {
-    writeSlot(1, createNewGame('One', 1));
-    writeSlot(2, createNewGame('Two', 2));
+  it('a season\'s exports, New club and Delete are behind its ⋯, one open at a time', async () => {
+    writeSlot(1, await leagueSlotState('One'));
+    writeSlot(2, await leagueSlotState('Two'));
     const root = new StubNode('div');
     void showTitleFlow(root as unknown as HTMLElement);
     const card = (n: number): StubNode => root.querySelector(`[data-nrl-slot-${n}]`)!;
@@ -590,8 +624,8 @@ describe('the save slots (SuperCOOKED 11)', () => {
     expect(root.querySelector('[data-nrl-new-3]')!.textContent).toBe('New club');
   });
 
-  it('the save written last says so, and its Continue is the one with ▸', () => {
-    writeSlot(1, createNewGame('One', 1));
+  it('the save written last says so, and its Continue is the one with ▸', async () => {
+    writeSlot(1, await leagueSlotState('One'));
     const root = new StubNode('div');
     void showTitleFlow(root as unknown as HTMLElement);
     expect(root.querySelector('[data-nrl-slot-1]')!.hasAttribute('data-last')).toBe(true);
@@ -621,23 +655,13 @@ describe('slot cards carry the ladder place (SuperCOOKED 11)', () => {
   beforeEach(() => { stubLocalStorage(); stubDocument(); });
   afterEach(() => vi.unstubAllGlobals());
 
-  it('adds the club\'s place once a round is in, and leaves it off before', () => {
-    const fresh = createNewGame('Fresh FC', 3);
+  it('names the season and week, and leaves the ladder place off before a round is in', async () => {
+    const fresh = await leagueSlotState('Fresh FC');
     writeSlot(1, fresh);
-    // A real league (every club on the ladder); after a round, two clubs are ahead of ours: third.
-    const played = structuredClone(careerFixture(4));
-    let ahead = 0;
-    played.league.ladder = played.league.ladder.map((r) => {
-      const mine = r.clubId === played.clubId;
-      const up = !mine && ahead < 2;
-      if (up) ahead++;
-      return { ...r, played: 1, wins: up ? 1 : 0, draws: 0, losses: up ? 0 : 1, pointsFor: mine ? 30 : 20, pointsAgainst: 20, points: up ? 2 : 0 };
-    });
-    writeSlot(2, played);
     const root = new StubNode('div');
     void showTitleFlow(root as unknown as HTMLElement);
-    const when = (slot: number) => root.querySelector(`[data-nrl-slot-${slot}]`)!.querySelector('.nrl-title-when')!.textContent;
-    expect(when(1)).toBe(`Season ${fresh.season} · Week ${fresh.week}`);
-    expect(when(2)).toBe(`Season ${played.season} · Week ${played.week} · 3rd`);
+    const when = root.querySelector('[data-nrl-slot-1]')!.querySelector('.nrl-title-when')!.textContent;
+    expect(when).toBe(`Season ${fresh.season} · Week ${fresh.week}`);
+    expect(when).not.toMatch(/ · \d/);
   });
 });

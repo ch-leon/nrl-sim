@@ -60,3 +60,19 @@ export const LOG_MODE_KEY = 'nrlsim.logMode';
 export function recoveryKey(slot: number): string {
   return `nrl-sim-save-recovery-${slot}`;
 }
+
+/**
+ * A Classic career taken out of its slot (#819). The value is the raw save, so it
+ * can still be exported. It is not a live slot. `nrl-sim-save-retired-<slot>`.
+ */
+export const RETIRED_SAVE_PREFIX = 'nrl-sim-save-retired-';
+/** Set once the retirement message has been shown for that slot. */
+export const CLASSIC_RETIRED_NOTICE_PREFIX = 'nrl-sim-classic-retired-notice-';
+
+export function retiredSaveKey(slot: number): string {
+  return `${RETIRED_SAVE_PREFIX}${slot}`;
+}
+
+export function classicRetiredNoticeKey(slot: number): string {
+  return `${CLASSIC_RETIRED_NOTICE_PREFIX}${slot}`;
+}

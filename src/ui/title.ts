@@ -2,7 +2,8 @@
 // right, each slot's exports, New club and Delete behind its ⋯. Setting up a new club
 // (SuperCOOKED 12–14) is three steps with a step bar and ◂ Back on each: 1 Town (one
 // search over the offline town list), 2 Club (names and colours with a live jersey),
-// 3 Start (the club in one card, career mode, difficulty, the veteran switch, Start).
+// 3 Start (the club in one card, difficulty, the veteran switch, Start). A new club
+// is always a League career (#819). There is no Classic / League choice.
 // The loading screen (SuperCOOKED 10) is showLeagueLoading.
 //
 // Built from document.createElement and one <style> element, no dom.ts helpers:
@@ -13,9 +14,14 @@
 // (data-nrl-setup-step on the panel), so every field keeps its value going back
 // and forth, and Start reads them all.
 
+import { CLASSIC_RETIRED_TEXT, isClassicSave } from '../core/classicSave';
 import {
-  captureSlot, deleteSlot, downloadOriginalSave, exportRecoverySaves, getSlotSummaries, installImportedSave, listSlotMeta, pickSaveFile, setActiveSlot, type SlotSummary,
+  captureSlot, deleteSlot, downloadOriginalSave, downloadRetiredSave, exportOriginalSave, exportRecoverySaves,
+  getSlotSummaries, installImportedSave, listSlotMeta, markClassicRetirementShown, pickSaveFile,
+  readRetiredSave, retireClassicSlots, setActiveSlot, type ClassicRetirement, type SlotSummary,
 } from '../core/save';
+import { factsOf } from '../core/storage/meta';
+import { acknowledgeRetiredClassicSave } from '../core/storage/nativeCheckpoint';
 import { cleanName, GROUND_MAX, NAME_MAX } from '../data/names';
 import type { LeagueCareerDestination } from '../systems/leagueCareerSetup';
 import type { GameState } from '../core/state';
@@ -51,7 +57,6 @@ export type TitleChoice = {
   groundName?: string;
 } & (
   | { mode: 'continue' }
-  | { mode: 'new'; careerMode: 'classic' }
   | { mode: 'new'; careerMode: 'league'; destination: LeagueCareerDestination }
 );
 
@@ -287,7 +292,7 @@ ${MOTION_CSS}
 .nrl-title-swatch:active:not(:disabled) { transform: scale(var(--nrl-press)); transition: transform var(--nrl-dur-press) var(--nrl-ease-out); }
 .nrl-title-swatch-why { font-size: 0.6875rem; line-height: 1.3; color: ${C.muted}; }
 
-/* 3 Start: the club in one card, career mode, difficulty as three cards. */
+/* 3 Start: the club in one card, difficulty as three cards. */
 .nrl-title-panel-start { display: flex; flex-direction: column; gap: 10px; }
 .nrl-title-summary { display: flex; align-items: center; gap: 14px; padding: 8px 8px 8px 14px; border-radius: 14px; background: ${C.navy}; border: 1px solid ${C.line}; }
 .nrl-title-summary img { width: 48px; height: 52px; flex: 0 0 auto; image-rendering: pixelated; }
@@ -298,10 +303,13 @@ ${MOTION_CSS}
 .nrl-title-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .nrl-title-choices { display: flex; flex-wrap: wrap; gap: 6px; }
 .nrl-title-pick { background: ${C.raised}; }
-/* Switch the fill and ink together so the newly selected mode is readable on the tap frame. */
-.nrl-title .nrl-title-career-mode[aria-pressed] { transition: transform var(--nrl-dur-press) var(--nrl-ease-out); }
-.nrl-title-career-mode[aria-pressed="false"] { color: #fff; }
 .nrl-title-pick[aria-pressed="true"], .nrl-title-pick[aria-pressed="true"]:hover, .nrl-title-pick[aria-pressed="true"]:active:not(:disabled) { background: ${C.text}; color: ${C.onAccent}; }
+/* A Classic career, archived: one message, then the slot is empty. */
+.nrl-title-retired { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-radius: 12px;
+  background: ${C.panel}; border: 1px solid ${C.line}; }
+.nrl-title-retired p { margin: 0; font-size: 0.8125rem; line-height: 1.35; }
+.nrl-title-retired-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.nrl-title-retired-actions .nrl-title-btn { white-space: normal; text-align: center; }
 .nrl-title-difs { display: flex; gap: 8px; }
 .nrl-title-pick.nrl-title-dif { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: stretch; gap: 6px; padding: 12px 14px;
   border-radius: 14px; background: ${C.panel}; box-shadow: inset 0 0 0 1px ${C.line}; text-align: left; white-space: normal;
@@ -508,13 +516,22 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
       }
     };
 
+    /** A Classic career the archive could not take out of the slot. Never offer Continue on it. */
+    const stillClassic = (slot: number): boolean => {
+      try {
+        const raw = exportOriginalSave(slot);
+        return raw !== null && isClassicSave(raw);
+      } catch { return false; }
+    };
+
     const slotCard = (s: SlotSummary, isPrimary: boolean): HTMLElement => {
+      const held = s.status === 'ok' && stillClassic(s.slot);
       const lead = isPrimary ? 'nrl-title-btn-go' : 'nrl-title-btn-row';
       const card = mk('div', 'nrl-title-card');
       card.setAttribute(`data-nrl-slot-${s.slot}`, '');
       if (s.status === 'empty') card.setAttribute('data-empty', '');
       // The save written last carries the screen's one orange (#613) and says so.
-      const last = isPrimary && s.status === 'ok';
+      const last = isPrimary && s.status === 'ok' && !held;
       if (last) card.setAttribute('data-last', '');
       card.appendChild(mk('div', 'nrl-title-slotno', last ? `Slot ${s.slot} · Last played` : `Slot ${s.slot}`));
       const club = mk('div', 'nrl-title-club',
@@ -528,11 +545,12 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
       if (s.message) card.appendChild(mk('div', 'nrl-title-warn', s.message));
 
       // The card's one button: Continue on a season, New club where there is none to continue.
-      if (s.status === 'ok') {
+      // A Classic career that could not be archived is not a season to continue.
+      if (s.status === 'ok' && !held) {
         const cont = mkButton(isPrimary ? 'Continue ▸' : 'Continue', `data-nrl-continue-${s.slot}`, lead);
         cont.addEventListener('click', () => finish(s.slot, { mode: 'continue' }));
         card.appendChild(cont);
-      } else if (s.status !== 'future') {
+      } else if (!held && s.status !== 'future') {
         const newBtn = mkButton(isPrimary ? 'New club ▸' : 'New club', `data-nrl-new-${s.slot}`, lead);
         newBtn.addEventListener('click', () => showSetup(s));
         card.appendChild(newBtn);
@@ -553,13 +571,25 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
         }
         if (originals.length) what.push('export');
       } catch { /* unreadable storage is already described on the card */ }
-      if (s.status === 'ok') {
+      if (s.status === 'ok' && !held) {
         const newBtn = mkButton('New club', `data-nrl-new-${s.slot}`, 'nrl-title-btn-small');
         newBtn.addEventListener('click', () => showSetup(s));
         menu.appendChild(newBtn);
         what.push('new club');
       }
-      if (s.status !== 'empty') {
+      const archived = s.status === 'empty' ? readRetiredSave(s.slot) : null;
+      if (archived) {
+        const exp = mkButton('Export save', `data-nrl-classic-export-${s.slot}`, 'nrl-title-btn-small');
+        exp.addEventListener('click', () => downloadRetiredSave(s.slot));
+        menu.appendChild(exp);
+        what.push('export');
+      }
+      if (held) {
+        const recover = mkButton('Export save', `data-nrl-classic-export-${s.slot}`, 'nrl-title-btn-small');
+        recover.addEventListener('click', () => downloadOriginalSave(s.slot));
+        menu.appendChild(recover);
+        what.push('export');
+      } else if (s.status !== 'empty') {
         const recover = mkButton('Export original', `data-nrl-recover-${s.slot}`, 'nrl-title-btn-small');
         recover.addEventListener('click', () => downloadOriginalSave(s.slot));
         menu.appendChild(recover);
@@ -600,14 +630,15 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
     const primarySlot = (summaries: SlotSummary[]): number | undefined => {
       const meta = listSlotMeta();
       const when = (slot: number): number => meta.find((m) => m.slot === slot)?.meta?.updatedAt ?? 0;
-      const saved = summaries.filter((s) => s.status === 'ok');
+      const saved = summaries.filter((s) => s.status === 'ok' && !stillClassic(s.slot));
       if (saved.length) return saved.reduce((a, b) => (when(b.slot) > when(a.slot) ? b : a)).slot;
       return summaries.find((s) => s.status === 'empty')?.slot;
     };
 
     // A message for the player (a failed import or load, a repaired save): a toast over the title
     // (§6), danger unless it is good news, rather than a line under the slots.
-    const showSlots = (notice?: string, kind: 'danger' | 'info' = 'danger'): void => {
+    const showSlots = (notice?: string, kind: 'danger' | 'info' = 'danger', pending?: ClassicRetirement[]): void => {
+      const retired = (pending ?? retireClassicSlots()).filter((r) => r.notify);
       main.replaceChildren();
       main.setAttribute('class', 'nrl-title-main nrl-title-main-slots');
       overlay.appendChild(build);
@@ -617,6 +648,32 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
       for (const e of titleHeading()) brand.appendChild(e);
       main.appendChild(brand);
       const side = mk('div', 'nrl-title-side');
+      if (retired.length) {
+        const box = mk('div', 'nrl-title-retired');
+        box.setAttribute('data-nrl-classic-retired', '');
+        box.setAttribute('role', 'status');
+        box.appendChild(mk('p', '', CLASSIC_RETIRED_TEXT));
+        const actions = mk('div', 'nrl-title-retired-actions');
+        for (const r of retired) {
+          const club = factsOf(r.raw).club;
+          const exp = mkButton('Export save', `data-nrl-classic-export-${r.slot}`, 'nrl-title-btn-small');
+          if (club) exp.setAttribute('aria-label', `Export save, ${club}`);
+          exp.addEventListener('click', () => (r.emptied ? downloadRetiredSave(r.slot) : downloadOriginalSave(r.slot)));
+          actions.appendChild(exp);
+          if (r.emptied) {
+            markClassicRetirementShown(r.slot);
+            void acknowledgeRetiredClassicSave(r.slot, r.raw);
+          }
+        }
+        const startNew = retired.find((r) => r.emptied);
+        if (startNew) {
+          const go = mkButton('Start new League career', 'data-nrl-classic-new');
+          go.addEventListener('click', () => showSetup({ slot: startNew.slot, status: 'empty' }));
+          actions.appendChild(go);
+        }
+        box.appendChild(actions);
+        side.appendChild(box);
+      }
       const slots = mk('div', 'nrl-title-slots');
       // Each season's ladder place for its card (mockup 11), the HUD's own standing.
       const summaries = getSlotSummaries((st) => ladderStanding(st).rank);
@@ -833,7 +890,7 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
       const sec = swatches('Second colour', 'Secondary', 'data-nrl-secondary', PLAYER_SECONDARY_COLORS, (c) => { secondary = c; });
       colours.appendChild(mk('span', 'nrl-title-swatch-why', "Faded = too close, or a real local club's colours"));
 
-      // ── 3 Start: the club in a card, career mode, difficulty.
+      // ── 3 Start: the club in a card, difficulty. A new club is a League career.
       const startPanel = panel(3, 'nrl-title-panel-start');
       const summary = mk('div', 'nrl-title-summary');
       const summaryKit = mk('img', '');
@@ -850,27 +907,6 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
       edit.addEventListener('click', () => goTo(2));
       summary.appendChild(edit);
       startPanel.appendChild(summary);
-
-      let careerMode: 'classic' | 'league' = 'classic';
-      const modes = mk('div', 'nrl-title-choices');
-      modes.setAttribute('role', 'group');
-      modes.setAttribute('aria-label', 'Career mode');
-      for (const mode of ['classic', 'league'] as const) {
-        const btn = mkButton(mode === 'classic' ? 'Classic' : 'League', 'data-nrl-career-mode-' + mode, 'nrl-title-pick nrl-title-career-mode');
-        btn.setAttribute('aria-pressed', String(careerMode === mode));
-        btn.addEventListener('click', () => {
-          careerMode = mode;
-          for (const option of ['classic','league'])
-            modes.querySelector('[data-nrl-career-mode-' + option + ']')?.setAttribute('aria-pressed', String(careerMode === option));
-          go.replaceChildren();
-          go.appendChild(start);
-        });
-        modes.appendChild(btn);
-      }
-      const modeRow = mk('div', 'nrl-title-row');
-      modeRow.appendChild(mk('span', 'nrl-title-label', 'Career mode'));
-      modeRow.appendChild(modes);
-      startPanel.appendChild(modeRow);
 
       const diffBox = mk('div', 'nrl-title-difs');
       diffBox.setAttribute('role', 'group');
@@ -1053,9 +1089,13 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
       townInput.addEventListener('change', applyTown);
       goTo(1);
 
-      const begin = (destination?: LeagueCareerDestination): void => {
+      const begin = (): void => {
         if (!namesOk()) return;
-        if (careerMode === 'classic' && s.status !== 'empty') deleteSlot(s.slot);
+        const { raw, result } = captureSlot(s.slot);
+        if (result.status !== 'ok' && result.status !== 'empty') return showSlots(result.message);
+        // A Classic career stays put until it is archived. Never overwrite the only copy.
+        if (raw !== null && isClassicSave(raw)) return showSlots();
+        const destination: LeagueCareerDestination = { slot: s.slot, expectedOriginal: raw };
         const club = cleanName(input.value);
         const name = club.ok ? club.name : DEFAULT_CLUB_NAME;
         const coach = cleanName(coachInput.value);
@@ -1064,7 +1104,7 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
         const home = selected
           ? { town, region: selected.region, country: selected.country, lat: selected.lat, lon: selected.lon }
           : { town };
-        finish(s.slot, { mode: 'new', ...(destination ? {careerMode: 'league', destination} : {careerMode: 'classic'}), seed, clubName: name, ...(coach.ok ? { coachName: coach.name } : {}), difficulty, ...(veteran.checked ? { openAll: true } : {}), colors: [primary, secondary],
+        finish(s.slot, { mode: 'new', careerMode: 'league', destination, seed, clubName: name, ...(coach.ok ? { coachName: coach.name } : {}), difficulty, ...(veteran.checked ? { openAll: true } : {}), colors: [primary, secondary],
           home, groundName: groundName.ok ? groundName.name : groundForTown(town || name, selected?.id ?? town) });
       };
       // Start waits for the town list, and says so while it does (#613).
@@ -1073,17 +1113,13 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
       const ready = (): void => { start.textContent = 'Start season ▸'; start.disabled = false; };
       start.addEventListener('click', () => {
         if (start.disabled || !namesOk()) return;
-        let destination: LeagueCareerDestination | undefined;
-        let occupant = s;
-        if (careerMode === 'league') {
-          const {raw, result} = captureSlot(s.slot);
-          if (result.status !== 'ok' && result.status !== 'empty') return showSlots(result.message);
-          destination = {slot: s.slot, expectedOriginal: raw};
-          occupant = result.status === 'empty' ? {slot: s.slot, status:'empty'} : {
-            slot: s.slot, status: 'ok', clubName: result.state.clubName, season: result.state.season, week: result.state.week,
-          };
-        }
-        if (occupant.status === 'empty') return begin(destination);
+        const { raw, result } = captureSlot(s.slot);
+        if (result.status !== 'ok' && result.status !== 'empty') return showSlots(result.message);
+        if (raw !== null && isClassicSave(raw)) return showSlots();
+        const occupant = result.status === 'empty' ? { slot: s.slot, status: 'empty' as const } : {
+          slot: s.slot, status: 'ok' as const, clubName: result.state.clubName, season: result.state.season, week: result.state.week,
+        };
+        if (occupant.status === 'empty') return begin();
         // A season (or an unreadable save) is in this slot: say what Start replaces first.
         go.replaceChildren();
         const what = occupant.status === 'ok' ? `${occupant.clubName} (S${occupant.season} W${occupant.week})` : 'the unreadable save';
@@ -1092,7 +1128,7 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
         ask.setAttribute('role', 'alert');
         go.appendChild(ask);
         const yes = mkButton('Start over', 'data-nrl-start-confirm');
-        yes.addEventListener('click', () => begin(destination));
+        yes.addEventListener('click', () => begin());
         go.appendChild(yes);
         const no = mkButton('Cancel', 'data-nrl-start-cancel');
         no.addEventListener('click', () => { go.replaceChildren(); go.appendChild(start); });
@@ -1122,10 +1158,14 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
     };
 
     // Fresh install (all slots empty): go straight to setting up a club in slot 1.
-    const summaries = getSlotSummaries();
+    // A Classic career is archived first, and its message is shown once, before that.
     if (error) showSlots(error);
-    else if (summaries.every((x) => x.status === 'empty')) showSetup(summaries[0]!);
-    else showSlots();
+    else {
+      const retired = retireClassicSlots();
+      const summaries = getSlotSummaries();
+      if (retired.some((r) => r.notify) || !summaries.every((x) => x.status === 'empty')) showSlots(undefined, 'danger', retired);
+      else showSetup(summaries[0]!);
+    }
 
     root.appendChild(overlay);
   });

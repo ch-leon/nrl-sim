@@ -1,6 +1,6 @@
 # Features
 
-Last updated: 2026-11-24
+Last updated: 2026-11-25
 
 What's in the game, with the PR that added each.
 
@@ -34,7 +34,7 @@ What's in the game, with the PR that added each.
 
 ## League and season
 
-- 16 clubs, 24 rounds, top-8 finals (`src/content/au.ts`)
+- League career is the only mode. A new club starts in Local, in Australia or the UK: eight clubs in Local, Championship and Premier League. A finals title unlocks the next league (`src/content/career/`). An old Classic save is archived and can be exported; it is not loaded.
 - Rivals sign ([PR](https://github.com/ch-leon/nrl-sim/pull/386)) and switch plans ([PR](https://github.com/ch-leon/nrl-sim/pull/319))
 - Fictional names, rename in-game ([PR](https://github.com/ch-leon/nrl-sim/pull/401))
 - Easy, Normal, Hard ([PR](https://github.com/ch-leon/nrl-sim/pull/153))
@@ -63,6 +63,8 @@ What's in the game, with the PR that added each.
 - Android test APK ([PR](https://github.com/ch-leon/nrl-sim/pull/394)); CI ([PR](https://github.com/ch-leon/nrl-sim/pull/442))
 
 ## Recently added
+
+- **League career is the only mode.** A new club no longer asks Classic or League: it starts a League career in Local. An old Classic save shows “Classic mode has been retired. Start a new League career.” once, with Export save, and the slot is left empty. The save is archived, including on the iPhone app, so it does not come back at the next launch. [#819](https://github.com/ch-leon/nrl-sim/issues/819).
 
 - **Open-side shifts through hands.** When a ruck is near one touchline and the support can get into position, balanced and wider sides can work the ball all the way to the opposite winger through normal catches and passes. Cover, handling errors and missing support can end the move. Short-side carries, coach calls and learned plays still have their place. Ported from [draft PR #799](https://github.com/ch-leon/nrl-sim/pull/799). [#798](https://github.com/ch-leon/nrl-sim/issues/798).
 
@@ -119,7 +121,7 @@ What's in the game, with the PR that added each.
 - **Contested bombs.** The chaser and receiver plant and leap as an open-play bomb comes down. The player who takes it gathers it in the air. On a spill, both land empty-handed and the ball bounces free. Ported from [draft PR #761](https://github.com/ch-leon/nrl-sim/pull/761). [Match rules](../specs/BAK-208-match-rules-and-skills.md#44-kicks--first-slice-implemented-long-bomb-grubber-chip-cross-field)
 
 - **SuperCOOKED look, Phase 6 (screens with no mockup):** Contracts in the Recruit row look (a Renew that can't go says why on the row); the rival squad opens on the pitch in their kit, read-only, with the list a tap away; the expansion intro in the season review's layout with one Carry on; Coach calls and the Playbook as tile grids (calls grouped by Coach's Office level, locked groups saying what opens them; each play's IQ check as a pill); the Guide as a topic list beside the page; History's records and season books and Finance's Season P&L and Ledger as label/value rows and mono tables; the long-advance question and the update bar in the confirm and toast looks. Nothing was taken out ([docs/specs/ui-supercooked.md](../specs/ui-supercooked.md)).
-- **SuperCOOKED look, Phase 5 (App):** the title shows the wordmark beside three save-slot cards: your last-played club gets the one orange Continue, and each save's exports, New club and Delete sit behind its ⋯. A new club is set up in three steps (Town, Club, Start) with a step bar and ◂ Back on each: one big town search, then the names, colours (a faded colour says why) and the drawn player in your kit, then a summary card, career mode, difficulty as three cards and the "played before" tick box. The league loading screen, the tutorial bubble (the screen dims round the ringed target), the weekly summary (four blocks with the board's mood as a pill), the season review (a finish banner, then the season in two columns), Settings, the sacked card and the paywall take the new look. Nothing was taken out ([docs/specs/ui-supercooked.md](../specs/ui-supercooked.md)).
+- **SuperCOOKED look, Phase 5 (App):** the title shows the wordmark beside three save-slot cards: your last-played club gets the one orange Continue, and each save's exports, New club and Delete sit behind its ⋯. A new club is set up in three steps (Town, Club, Start) with a step bar and ◂ Back on each: one big town search, then the names, colours (a faded colour says why) and the drawn player in your kit, then a summary card, difficulty as three cards and the "played before" tick box. The league loading screen, the tutorial bubble (the screen dims round the ringed target), the weekly summary (four blocks with the board's mood as a pill), the season review (a finish banner, then the season in two columns), Settings, the sacked card and the paywall take the new look. Nothing was taken out ([docs/specs/ui-supercooked.md](../specs/ui-supercooked.md)).
 - **Nearby defender honours the back-door lead.** During a back-door play, the nearest free line defender within 8 m of the lead holds his depth and shades across toward that runner for up to eight ticks (0.4 s). Committed tacklers keep tracking the half. Markers, retreating defenders and the fullback keep their jobs. He returns to his line when the pass goes, the run stops being a threat, or the time is up, and that play does not pick a replacement. Pass, catch and contact odds are unchanged. `shapes.leadDecoy.on:0` leaves the line as it was. [PR #762](https://github.com/ch-leon/nrl-sim/pull/762), ported from [draft PR #744](https://github.com/ch-leon/nrl-sim/pull/744) onto the back-door packet in [PR #722](https://github.com/ch-leon/nrl-sim/pull/722), part of [#649](https://github.com/ch-leon/nrl-sim/issues/649).
 
 - **Events on the club home** ([PR #752](https://github.com/ch-leon/nrl-sim/pull/752)): the Events card names Big Mick, Skills Camp and Open Cup, shows the nearest deadline and opens their booking screens. Play Week and fast-forward warn before unentered opportunities close, including the later-opening Invitational. Coaches can review or deliberately continue without entering; missed entries explain when they return.
@@ -154,7 +156,7 @@ What's in the game, with the PR that added each.
 
 - **SuperCOOKED look, Phase 0 (Foundations):** the game is now **Big Coach** ("a SuperCOOKED game"): the SuperCOOKED palette (navy and ink, one orange primary a screen, green good / amber watch / red bad), self-hosted Oswald, Inter, JetBrains Mono and Archivo Black, the text wordmark on the title and the rotate card, an ink dock and toasts, white selected tabs inside sheets, and PLAY WEEK turning navy while a sheet has its own primary. Adds the shared parts later phases build screens from (status pill, stars, stat tile, player card, confirm dialog, empty state, locked tile). Layout and behaviour are unchanged ([docs/specs/ui-supercooked.md](../specs/ui-supercooked.md)).
 
-- **League career is live.** Start in Local in Australia or the UK. A finals title unlocks the next league permanently. At season review, choose where to play next year. Moving down preserves the club’s salary-cap capacity, and each match pays at the chosen division’s rate. Existing Classic careers keep their format. [Merged PR #719](https://github.com/ch-leon/nrl-sim/pull/719) · [Verification](../status/2026-11-league-selection.md)
+- **League career is the game.** Start in Local in Australia or the UK. A finals title unlocks the next league permanently. At season review, choose where to play next year. Moving down preserves the club’s salary-cap capacity, and each match pays at the chosen division’s rate. Classic careers are retired rather than loaded. [Merged PR #719](https://github.com/ch-leon/nrl-sim/pull/719) · [Verification](../status/2026-11-league-selection.md)
 
 - **Back-door support runs:** a fourth ordinary attacking shape. A forward starts his lead run as the ball is heeled and the fullback sweeps wide from depth, so the half can pass behind the lead to the fullback running onto the ball. Who gets the ball is still the ordinary receiver choice, with the usual pass, catch and interception odds; a different pass, a coach call or a set play ends the option. `shapes.backDoor.on:0` restores the three-shape match exactly. [PR #722](https://github.com/ch-leon/nrl-sim/pull/722), part of [#649](https://github.com/ch-leon/nrl-sim/issues/649).
 

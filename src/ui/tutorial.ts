@@ -11,7 +11,8 @@
 // wired later from the settings popup (see REPLAY note at the bottom).
 //
 // #370: the first session is three guided taps (build a Training Paddock, sign a
-// player, Advance Week) in place of the 11-step tour; what the old steps
+// player, Advance Week) in place of the 11-step tour. There is one mode, the
+// League career (#819): these taps never offer a Classic career. What the old steps
 // explained about Lineup, News, Finance and Contracts is a one-line hint the
 // first time each screen opens (HINTS, settings.hintsSeen). DECISION (Leon).
 

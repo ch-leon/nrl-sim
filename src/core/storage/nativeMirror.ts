@@ -30,8 +30,8 @@
 //    file before the next write goes on, never deleted.
 
 import {
-  COMMERCIAL_FIRST_RUN_KEY, DEVICE_ID_KEY, ENTITLEMENTS_CACHE_KEY, ENTITLEMENTS_STUB_KEY, IOS_INSTALL_HINT_KEY, LABS_KEY,
-  LEGACY_SAVE_KEY, LIVE_MATCH_PREFIX, LOG_MODE_KEY, SAVE_META_PREFIX, SAVE_SLOT_PREFIX, recoveryKey,
+  CLASSIC_RETIRED_NOTICE_PREFIX, COMMERCIAL_FIRST_RUN_KEY, DEVICE_ID_KEY, ENTITLEMENTS_CACHE_KEY, ENTITLEMENTS_STUB_KEY, IOS_INSTALL_HINT_KEY, LABS_KEY,
+  LEGACY_SAVE_KEY, LIVE_MATCH_PREFIX, LOG_MODE_KEY, RETIRED_SAVE_PREFIX, SAVE_META_PREFIX, SAVE_SLOT_PREFIX, recoveryKey,
 } from '../storageKeys';
 import type { StorageLike } from './local';
 
@@ -84,7 +84,10 @@ const MIRRORED_KEYS: ReadonlySet<string> = new Set([
   ENTITLEMENTS_CACHE_KEY, ENTITLEMENTS_STUB_KEY, COMMERCIAL_FIRST_RUN_KEY,
 ]);
 const RECOVERY_PREFIX = recoveryKey(0).slice(0, -1);
-const MIRRORED_PER_SLOT = [SAVE_SLOT_PREFIX, SAVE_META_PREFIX, LIVE_MATCH_PREFIX, RECOVERY_PREFIX];
+const MIRRORED_PER_SLOT = [
+  SAVE_SLOT_PREFIX, SAVE_META_PREFIX, LIVE_MATCH_PREFIX, RECOVERY_PREFIX,
+  RETIRED_SAVE_PREFIX, CLASSIC_RETIRED_NOTICE_PREFIX,
+];
 
 /** Does the native mirror keep this key? */
 export function isMirroredKey(key: string): boolean {
@@ -102,6 +105,12 @@ interface PendingCheck {
   finish: (result: Confirmation) => void;
 }
 
+interface PendingGone {
+  absent: () => boolean;
+  result: Promise<Confirmation>;
+  finish: (result: Confirmation) => void;
+}
+
 type Log = (message: string, error?: unknown) => void;
 const warn: Log = (message, error) => console.warn(`nrl-sim: ${message}`, error);
 
@@ -109,6 +118,7 @@ export class NativeMirror {
   /** The op to apply next, per key: the latest one asked for. */
   private readonly next = new Map<string, Op>();
   private readonly checks = new Map<string, PendingCheck>();
+  private readonly gone = new Map<string, PendingGone>();
   private readonly running = new Set<string>();
   private idleWaiters: Array<() => void> = [];
 
@@ -152,6 +162,41 @@ export class NativeMirror {
     this.checks.set(key, check);
     signal.addEventListener('abort', abort, {once: true});
     if (!this.running.has(key)) void this.drain(key);
+    return result;
+  }
+
+  /**
+   * Confirm the native copy of `key` cannot come back: a delete marker, or no
+   * recoverable file. If a copy remains and `absent` still says the web view has
+   * no value, erase it and check once more. A key the web view holds again is
+   * left alone (`superseded`).
+   */
+  confirmGone(key: string, absent: () => boolean, signal: AbortSignal): Promise<Confirmation> {
+    try {
+      if (!absent() || signal.aborted) return Promise.resolve('superseded');
+    } catch {
+      return Promise.resolve('failed');
+    }
+    const existing = this.gone.get(key);
+    if (existing) return existing.result;
+
+    let resolve!: (outcome: Confirmation) => void;
+    const result = new Promise<Confirmation>(r => { resolve = r; });
+    const abort = () => check.finish('superseded');
+    const timer = setTimeout(() => check.finish('timeout'), 5000);
+    const check: PendingGone = {
+      absent, result,
+      finish: outcome => {
+        if (this.gone.get(key) !== check) return;
+        this.gone.delete(key);
+        clearTimeout(timer);
+        signal.removeEventListener('abort', abort);
+        resolve(outcome);
+      },
+    };
+    this.gone.set(key, check);
+    signal.addEventListener('abort', abort, {once: true});
+    this.enqueue(key, { kind: 'remove' });
     return result;
   }
 
@@ -231,6 +276,8 @@ export class NativeMirror {
   private enqueue(key: string, op: Op): void {
     const check = this.checks.get(key);
     if (check && (op.kind === 'remove' || op.value !== check.value)) check.finish('superseded');
+    const gone = this.gone.get(key);
+    if (gone && op.kind === 'set') gone.finish('superseded');
     this.next.set(key, op);
     if (!this.running.has(key)) void this.drain(key);
   }
@@ -242,8 +289,10 @@ export class NativeMirror {
         const op = this.next.get(key);
         if (!op) {
           const check = this.checks.get(key);
-          if (!check) break;
-          await this.verify(key, check);
+          if (check) { await this.verify(key, check); continue; }
+          const gone = this.gone.get(key);
+          if (!gone) break;
+          await this.verifyGone(key, gone);
           continue;
         }
         this.next.delete(key);
@@ -280,6 +329,31 @@ export class NativeMirror {
       this.log(`native checkpoint for ${key} could not be confirmed`, error);
       check.finish('failed');
     }
+  }
+
+  private async verifyGone(key: string, check: PendingGone): Promise<void> {
+    const owned = () => this.gone.get(key) === check && check.absent();
+    try {
+      if (!owned()) { check.finish('superseded'); return; }
+      if (await this.restorable(key)) {
+        if (!owned()) { check.finish('superseded'); return; }
+        await this.erase(key);
+        if (!owned()) { check.finish('superseded'); return; }
+        if (await this.restorable(key)) { check.finish('failed'); return; }
+      }
+      check.finish(owned() ? 'confirmed' : 'superseded');
+    } catch (error) {
+      this.log(`native delete of ${key} could not be confirmed`, error);
+      check.finish('failed');
+    }
+  }
+
+  /** True when boot would put this key back: a recoverable file and no delete marker. */
+  private async restorable(key: string): Promise<boolean> {
+    const file = fileForKey(key);
+    const names = await this.files.list();
+    if (names.includes(file + SUFFIXES.gone)) return false;
+    return names.includes(file + SUFFIXES.ready) || names.includes(file);
   }
 
   /** Exactly the copy boot would recover: a delete marker wins, then .ready, then the final file. */

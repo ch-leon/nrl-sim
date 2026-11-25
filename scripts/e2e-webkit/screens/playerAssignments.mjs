@@ -128,7 +128,6 @@ export async function runPlayerAssignments(browser) {
     await page.goto(BASE);
     await page.locator('[data-nrl-town]').fill(`${town.name}, ${town.region}, ${town.country}`);
     await setupStep(page);
-    await page.locator('[data-nrl-career-mode-league]').click();
     await page.locator('[data-nrl-start]').click();
     await page.locator('[data-nrl-league-selection]').waitFor({ timeout: 60000 });
     assert(!await page.locator('[data-camp-card]').count(), 'Camp appeared before the league was chosen');
