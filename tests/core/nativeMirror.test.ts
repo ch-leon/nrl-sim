@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  __setStorage, deleteSlot, listSlotMeta, loadSlot, markClassicRetirementShown, retireClassicSlot, save, setActiveSlot, type StorageLike,
+  __setStorage, deleteSlot, listSlotMeta, loadSlot, markClassicRetirementShown, retireClassicSlotDurable, save, setActiveSlot, type StorageLike,
 } from '../../src/core/save';
 import { createNewGame, getState } from '../../src/core/state';
 import {
@@ -469,7 +469,7 @@ describe('native outcome acknowledgement', () => {
     storage.setItem(liveMatchKey(1), 'live');
     storage.setItem(LEGACY_SAVE_KEY, classic);
     await mirror.idle();
-    expect(retireClassicSlot(1)).toMatchObject({ slot: 1, raw: classic, emptied: true, notify: true });
+    expect(await retireClassicSlotDurable(1)).toMatchObject({ slot: 1, raw: classic, emptied: true, notify: true });
     markClassicRetirementShown(1);
     expect(await acknowledgeRetiredClassicSave(1, classic)).toBe('confirmed');
     const restored = await afterWipe(native);
@@ -479,6 +479,36 @@ describe('native outcome acknowledgement', () => {
     expect(restored.has(LEGACY_SAVE_KEY)).toBe(false);
     expect(restored.get(retiredSaveKey(1))).toBe(classic);
     expect(restored.get(classicRetiredNoticeKey(1))).toBe('1');
+  });
+
+  it('confirms the native archive before the live slot can be marked deleted', async () => {
+    const {native, storage, mirror} = start();
+    __setStorage(storage);
+    const classic = JSON.stringify({ version: 35, clubName: 'Old', season: 2, week: 4 });
+    storage.setItem(slotKey(1), classic);
+    await mirror.idle();
+    native.calls.length = 0;
+    const release = native.hold();
+    const retiring = retireClassicSlotDurable(1);
+    const goneWrite = (name: string): boolean => name.endsWith('.txt.gone');
+    try {
+      await vi.waitFor(() => {
+        expect(native.calls.some((c) => c.op === 'write' && c.name === F(retiredSaveKey(1)) + '.tmp')).toBe(true);
+      });
+      // The archive write checks for an old delete marker. It must not write one, and the live slot stays.
+      expect(native.calls.some((c) => c.op === 'write' && goneWrite(c.name))).toBe(false);
+      expect(storage.getItem(slotKey(1))).toBe(classic);
+    } finally {
+      release();
+    }
+    const retired = await retiring;
+    expect(retired).toMatchObject({ slot: 1, raw: classic, emptied: true });
+    expect(storage.getItem(slotKey(1))).toBeNull();
+    expect(storage.getItem(retiredSaveKey(1))).toBe(classic);
+    const archiveWrite = native.calls.findIndex((c) => c.op === 'write' && c.name === F(retiredSaveKey(1)) + '.tmp');
+    const slotGone = native.calls.findIndex((c) => c.op === 'write' && c.name === F(slotKey(1)) + '.gone');
+    expect(archiveWrite).toBeGreaterThanOrEqual(0);
+    expect(slotGone).toBeGreaterThan(archiveWrite);
   });
 
   it('a playtest retirement is not written onto the normal career mirror', async () => {

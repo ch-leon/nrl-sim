@@ -2,7 +2,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
-import { BASE, OUT_ROOT, IPHONE_UA, log, setupStep } from '../common.mjs';
+import { confirmStartingLeague, BASE, OUT_ROOT, IPHONE_UA, log, setupStep } from '../common.mjs';
 
 export async function runTownSetup(browser) {
   const out = join(OUT_ROOT, 'webkit', 'town-setup');
@@ -44,6 +44,7 @@ export async function runTownSetup(browser) {
         await setupStep(page, 3);
         await page.screenshot({ path: join(out, `${tag}-start.png`) });
         await start.tap();
+        await confirmStartingLeague(page);
         await page.locator('[data-expansion-work]').tap();
         await page.waitForFunction(() => window.__nrlState?.()?.home);
         const state = await page.evaluate(() => window.__nrlState());

@@ -35,6 +35,7 @@ import { bus } from './events';
 import { registerTickHook, TICK_ORDER, unregisterTickHook, weekHeld, activePaidCupCheckpoint, leagueIntervalSaveHeld, failedIntervalProblem, failedIntervalCheckpoint, type IntervalCheckpoint } from './time';
 import { clearLiveMatch, isLiveMatchRecord, parseLiveMatch, LIVE_MATCH_EXPORT_FIELD, peelLiveMatchExport, readLiveMatch, writeLiveMatch } from '../systems/liveMatchRecord';
 import { isClassicSave } from './classicSave';
+import { acknowledgeClassicArchive, acknowledgeClassicSlotGone, nativeCheckpointRequired } from './storage/nativeCheckpoint';
 import { classicRetiredNoticeKey, CORRUPT_SAVE_KEY, LEGACY_SAVE_KEY, liveMatchKey, retiredSaveKey, slotKey } from './storageKeys';
 import { BRAND } from '../brand';
 import { cleanName } from '../data/names';
@@ -830,12 +831,11 @@ function retirementNoticeSeen(store: LocalSaveStore, slot: number): boolean {
 }
 
 /**
- * Move a Classic career out of `slot`. The raw bytes are written to the retired-save
- * key first and read back; only then is the slot emptied. A failed archive leaves
- * the slot untouched. A League career, a structural calendar and anything that is
- * not a Classic save are left alone. Never throws.
+ * Keep the raw Classic bytes under the retired-save key. The live slot stays until
+ * `commitClassicRetirement`, so an iPhone mirror can finish the archive before the
+ * slot is marked deleted. Never throws. Null when the slot is not Classic.
  */
-export function retireClassicSlot(slot: number): ClassicRetirement | null {
+function stageClassicArchive(slot: number): { slot: number; raw: string } | ClassicRetirement | null {
   const store = getStore();
   if (!store) return null;
   let raw: string | null;
@@ -849,12 +849,56 @@ export function retireClassicSlot(slot: number): ClassicRetirement | null {
     archived = store.storage.getItem(key) === raw;
   } catch { archived = false; }
   if (!archived) return { slot, raw, emptied: false, notify: true };
+  return { slot, raw };
+}
+
+/** Empty the slot once its archive is durable. Never throws. */
+function commitClassicRetirement(slot: number, raw: string): ClassicRetirement {
   try { deleteSlot(slot); } catch { /* the read below decides whether it actually went */ }
   let left: string | null;
-  try { left = store.read(slot); }
+  try { left = getStore()?.read(slot) ?? null; }
   catch { return { slot, raw, emptied: false, notify: true }; }
   if (left !== null) return { slot, raw, emptied: false, notify: true };
-  return { slot, raw, emptied: true, notify: !retirementNoticeSeen(store, slot) };
+  const store = getStore();
+  return { slot, raw, emptied: true, notify: store ? !retirementNoticeSeen(store, slot) : true };
+}
+
+/**
+ * Move a Classic career out of `slot`. The raw bytes are written to the retired-save
+ * key first and read back; only then is the slot emptied. A failed archive leaves
+ * the slot untouched. On iPhone this is not enough: the native archive and the slot
+ * delete run at the same time. Use `retireClassicSlotDurable` there. A League career,
+ * a structural calendar and anything that is not a Classic save are left alone.
+ * Never throws.
+ */
+export function retireClassicSlot(slot: number): ClassicRetirement | null {
+  const staged = stageClassicArchive(slot);
+  if (!staged) return null;
+  if ('emptied' in staged) return staged;
+  return commitClassicRetirement(staged.slot, staged.raw);
+}
+
+/**
+ * Archive, wait until the iPhone mirror has the archive, then delete the live slot.
+ * A web-view wipe in between still has the native archive, and the slot is not
+ * marked deleted until that copy exists. Off iPhone the confirm is immediate.
+ * Never throws.
+ */
+export async function retireClassicSlotDurable(slot: number): Promise<ClassicRetirement | null> {
+  const staged = stageClassicArchive(slot);
+  if (!staged) return null;
+  if ('emptied' in staged) return staged;
+  let ack: 'confirmed' | 'inactive' | string = 'inactive';
+  if (nativeCheckpointRequired()) {
+    try { ack = await acknowledgeClassicArchive(staged.slot, staged.raw); }
+    catch { ack = 'failed'; }
+    if (ack !== 'confirmed' && ack !== 'inactive') return { slot: staged.slot, raw: staged.raw, emptied: false, notify: true };
+  }
+  const done = commitClassicRetirement(staged.slot, staged.raw);
+  if (done.emptied && ack === 'confirmed') {
+    try { await acknowledgeClassicSlotGone(staged.slot); } catch { /* the archive is already confirmed */ }
+  }
+  return done;
 }
 
 /** Retire every Classic slot. Slots that are not Classic are absent from the list. */
@@ -862,6 +906,16 @@ export function retireClassicSlots(): ClassicRetirement[] {
   const out: ClassicRetirement[] = [];
   for (let slot = 1; slot <= SLOT_COUNT; slot++) {
     const retired = retireClassicSlot(slot);
+    if (retired) out.push(retired);
+  }
+  return out;
+}
+
+/** The iPhone order: each archive is confirmed before that slot is deleted. */
+export async function retireClassicSlotsDurable(): Promise<ClassicRetirement[]> {
+  const out: ClassicRetirement[] = [];
+  for (let slot = 1; slot <= SLOT_COUNT; slot++) {
+    const retired = await retireClassicSlotDurable(slot);
     if (retired) out.push(retired);
   }
   return out;

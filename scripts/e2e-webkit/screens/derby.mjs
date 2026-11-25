@@ -1,7 +1,7 @@
 // Real new-game setup and watched/skip result, with screenshots in the CI artifact only.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { playTrials, BASE, OUT_ROOT, openNav, closeWeekSummary, log, skipFromPill, setupStep } from '../common.mjs';
+import { confirmStartingLeague, playTrials, BASE, OUT_ROOT, openNav, closeWeekSummary, log, skipFromPill, setupStep } from '../common.mjs';
 
 export async function runDerby(browser) {
   const out = join(OUT_ROOT, 'webkit', 'derby');
@@ -27,6 +27,7 @@ export async function runDerby(browser) {
       await setupStep(page);
       await page.locator('[data-nrl-open-all]').check(); // expose Staff & Board for its screenshot
       await page.locator('[data-nrl-start]').tap();
+      await confirmStartingLeague(page);
       await page.locator('[data-expansion-work]').tap();
       await page.waitForFunction(() => window.__nrlState);
       await page.locator('.nrl-tutorial-skip').tap();

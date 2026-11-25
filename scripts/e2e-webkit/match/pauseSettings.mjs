@@ -1,6 +1,6 @@
 import { mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, reachProblems, setMatchSpeed, setupStep } from '../common.mjs';
+import { confirmStartingLeague, closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, reachProblems, setMatchSpeed, setupStep } from '../common.mjs';
 
 /**
  * #421 and #414 at 667×375 and 844×390: in a match, ❚❚ → Settings (text size Large)
@@ -40,6 +40,7 @@ export async function runPauseSettings(browser) {
       await page.goto(BASE);
       await setupStep(page);
       await page.locator('[data-nrl-start]').tap();
+      await confirmStartingLeague(page);
       await page.locator('[data-expansion-work]').tap();
       await page.locator('.nrl-tutorial-skip').tap();
       await page.locator('.nrl-dock [data-hud="advance"]').tap();

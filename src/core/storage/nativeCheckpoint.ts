@@ -37,24 +37,39 @@ export function acknowledgeNativeCheckpoint(key: string, payload: string): Promi
   return mirror.confirm(key, payload, () => storage.getItem(key) === payload, boot.signal);
 }
 
-/**
- * A retired Classic slot must not come back from the native mirror (#819). Confirms
- * the archived bytes, then confirms the live slot (and the meta, live-match and
- * legacy keys beside it) are gone. A playtest career is not mirrored: this does
- * nothing there, so it cannot write the archive onto the normal career's keys.
- * Off iPhone this is `inactive`.
- */
-export async function acknowledgeRetiredClassicSave(slot: number, raw: string): Promise<NativeCheckpointResult> {
+function retirementReady(): NativeCheckpointResult | null {
   if (!ios) return 'inactive';
   if (careerNamespace() !== null) return 'inactive';
   if (!active || !boot) return 'unavailable';
+  return null;
+}
+
+/**
+ * Confirm the archived Classic bytes are the copy a wiped web view would restore.
+ * Does not touch the live slot. Off iPhone, and for a playtest career, this is
+ * `inactive`.
+ */
+export async function acknowledgeClassicArchive(slot: number, raw: string): Promise<NativeCheckpointResult> {
+  const early = retirementReady();
+  if (early) return early;
   const archive = retiredSaveKey(slot);
+  if (!isMirroredKey(archive)) return 'unavailable';
+  const {storage, mirror} = active!;
+  return mirror.confirm(archive, raw, () => storage.getItem(archive) === raw, boot!.signal);
+}
+
+/**
+ * Confirm the live slot, its meta, its live-match record and (for slot 1) the
+ * legacy key are gone. Call this only after `acknowledgeClassicArchive` has
+ * confirmed, so a wipe cannot find the slot marked deleted and the archive missing.
+ */
+export async function acknowledgeClassicSlotGone(slot: number): Promise<NativeCheckpointResult> {
+  const early = retirementReady();
+  if (early) return early;
   const live = slotKey(slot);
-  if (!isMirroredKey(archive) || !isMirroredKey(live)) return 'unavailable';
-  const {storage, mirror} = active;
-  const signal = boot.signal;
-  const archived = await mirror.confirm(archive, raw, () => storage.getItem(archive) === raw, signal);
-  if (archived !== 'confirmed') return archived;
+  if (!isMirroredKey(live)) return 'unavailable';
+  const {storage, mirror} = active!;
+  const signal = boot!.signal;
   const goneKeys = [live, saveMetaKey(slot), liveMatchKey(slot), ...(slot === 1 ? [LEGACY_SAVE_KEY] : [])];
   for (const key of goneKeys) {
     const gone = await mirror.confirmGone(key, () => storage.getItem(key) === null, signal);
@@ -64,4 +79,15 @@ export async function acknowledgeRetiredClassicSave(slot: number, raw: string): 
   const noted = storage.getItem(notice);
   if (noted === null || !isMirroredKey(notice)) return 'confirmed';
   return mirror.confirm(notice, noted, () => storage.getItem(notice) === noted, signal);
+}
+
+/**
+ * A retired Classic slot must not come back from the native mirror (#819). Confirms
+ * the archived bytes, then confirms the live slot is gone. The caller must already
+ * have deleted the slot; to keep that order, use `retireClassicSlotDurable`.
+ */
+export async function acknowledgeRetiredClassicSave(slot: number, raw: string): Promise<NativeCheckpointResult> {
+  const archived = await acknowledgeClassicArchive(slot, raw);
+  if (archived !== 'confirmed') return archived;
+  return acknowledgeClassicSlotGone(slot);
 }

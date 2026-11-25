@@ -11,7 +11,7 @@ import { getState, loadState, stateInstallation, type GameState } from './core/s
 import { isClassicSave } from './core/classicSave';
 import {
   enableAutosave, getActiveSlot, getSlotSummaries, hasSave, loadSlot, markClassicRetirementShown,
-  retireClassicSlot, save, setActiveSlot, writeSlot,
+  retireClassicSlot, retireClassicSlotDurable, save, setActiveSlot, writeSlot,
 } from './core/save';
 import { showLeagueLoading, showTitleFlow, type TitleChoice } from './ui/title';
 import { EXPANSION_INTRO_HINT, showExpansionIntro } from './ui/expansionIntro';
@@ -78,6 +78,7 @@ import { commercialEnabled } from './commercial/flags';
 import { initCommercial, recordFirstRun } from './commercial/demo';
 import { openPaywall } from './ui/screens/paywall';
 import { announcePlaytest, applyPlaytestPreset, bootCareerNamespace, freshPlaytestLeagueStart, markPlaytestBuilt, setMatchSceneProbe } from './labs/devCareer';
+import { nativeCheckpointRequired } from './core/storage/nativeCheckpoint';
 import { syncDevMarker } from './labs/marker';
 import { startAnalytics, track } from './analytics';
 import { dockTab } from './analytics/events';
@@ -160,7 +161,7 @@ async function boot(): Promise<void> {
     setActiveSlot(1);
     // A Classic playtest career is archived, not resumed. The native mirror does not
     // keep this namespace, so there is nothing to confirm on the phone.
-    const retired = retireClassicSlot(1);
+    const retired = nativeCheckpointRequired() ? await retireClassicSlotDurable(1) : retireClassicSlot(1);
     if (retired?.emptied) markClassicRetirementShown(1);
     // Its save gone (site data cleared, or a Classic career just archived): build a League career.
     if (!hasSave(1)) playtest.fresh = true;
@@ -478,14 +479,15 @@ async function boot(): Promise<void> {
     const state = getState();
     if (state.sacked || weekHeld() || playerMatchPending() || !leagueChoiceRequired(state)) return uiRoot;
     const first = state.competitions!.leagueCareer!.phase === 'initial-choice';
-    return openLeagueSelection({onConfirmed: () => { if (first) void startLeagueGuidance(); }});
+    return openLeagueSelection({onConfirmed: () => { if (first) void startLeagueGuidance(true); }});
   }
 
-  async function startLeagueGuidance(): Promise<void> {
+  async function startLeagueGuidance(intro = false): Promise<void> {
     const state = getState();
     if (state.sacked || weekHeld() || playerMatchPending() || leagueChoiceRequired(state)) return;
     const installation = stateInstallation();
-    if (state.season === 1 && !state.settings.hintsSeen?.includes(EXPANSION_INTRO_HINT)) {
+    // Only the first confirm shows the intro. Continue never does, even if the hint was cleared.
+    if (intro && state.season === 1 && !state.settings.hintsSeen?.includes(EXPANSION_INTRO_HINT)) {
       for (const text of expansionIntroLines(state, state.objectives).slice(0,2))
         bus.emit('ui:notify', { text, kind: 'info', quiet: true, from: 'coach' });
       await showExpansionIntro();

@@ -1,6 +1,6 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, reachProblems, setupStep } from '../common.mjs';
+import { confirmStartingLeague, closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, reachProblems, setupStep } from '../common.mjs';
 
 // A phone that opens already upright (390×844, the portrait pair of 844×390).
 // The rotate card covers the title, the menus, the grounds and the match, and
@@ -99,6 +99,7 @@ export async function runPortrait(browser) {
     // The new club's three steps (SuperCOOKED 12–14), by DOM clicks under the card like Start.
     await setupStep(page, 3, { dom: true });
     await press('[data-nrl-start]');
+    await confirmStartingLeague(page, press);
     await press('[data-expansion-work]');
     await page.waitForSelector('.nrl-dock');
     await asleep('opened upright');

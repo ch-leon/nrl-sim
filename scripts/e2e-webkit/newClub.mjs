@@ -28,6 +28,20 @@ export async function setupStep(page, n = 3, { dom = false } = {}) {
   throw new Error(`the new club's setup did not reach step ${n}`);
 }
 
+/**
+ * After Start, the new club is a League career waiting on its first league.
+ * Confirm that league so the expansion intro and the tutorial can show.
+ * `press` is for a phone held upright, where the rotate card covers the chooser
+ * and only a DOM click lands.
+ */
+export async function confirmStartingLeague(page, press) {
+  await page.locator('[data-nrl-league-selection]').waitFor({ timeout: 60000 });
+  await page.waitForFunction(() => document.querySelector('[data-nrl-league-confirm]')?.getAttribute('aria-disabled') !== 'true');
+  if (press) await press('[data-nrl-league-confirm]');
+  else await page.locator('[data-nrl-league-confirm]').tap();
+  await page.locator('[data-nrl-league-selection]').waitFor({ state: 'detached', timeout: 60000 });
+}
+
 /** Open save slot `slot`'s ⋯ on the title: its exports, New club over a season, and Delete. */
 export async function slotMenu(page, slot) {
   await page.locator(`[data-nrl-slot-${slot}]`).waitFor();

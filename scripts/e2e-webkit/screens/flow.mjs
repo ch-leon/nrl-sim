@@ -1,4 +1,4 @@
-import { playTrials } from '../common.mjs';
+import { confirmStartingLeague, playTrials } from '../common.mjs';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, setupStep, slotMenu } from '../common.mjs';
@@ -132,6 +132,7 @@ export async function runFlow(browser, { w: W, h: H, text }) {
     }));
     await shot('t1-at-check');
     await tap('[data-nrl-start]');
+    await confirmStartingLeague(page);
     await page.locator('[data-expansion-work]').tap();
     await page.waitForSelector('.nrl-tutorial-skip');
     await tap('.nrl-tutorial-skip');

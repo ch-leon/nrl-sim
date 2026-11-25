@@ -1,6 +1,6 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, skipFromPill, squadMenu, setMatchSpeed, setupStep } from '../common.mjs';
+import { confirmStartingLeague, closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, skipFromPill, squadMenu, setMatchSpeed, setupStep } from '../common.mjs';
 
 /**
  * The phone play-test's guards (Wave 4 prompt 09, #399), at 667×375 (the narrowest
@@ -50,6 +50,7 @@ export async function runPlaytest(browser, W = 667, H = 375) {
     await page.goto(BASE);
     await setupStep(page);
     await page.locator('[data-nrl-start]').tap();
+    await confirmStartingLeague(page);
     await page.locator('[data-expansion-work]').tap();
     await page.locator('.nrl-tutorial-skip').tap();
     // A fixed strong-pack rival fixture makes the displayed style deterministic.

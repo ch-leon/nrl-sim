@@ -1,6 +1,6 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, skipFromPill, setMatchSpeed, setupStep } from '../common.mjs';
+import { confirmStartingLeague, closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, skipFromPill, setMatchSpeed, setupStep } from '../common.mjs';
 
 /**
  * Developer settings (#519), the real route on an iPhone, in landscape:
@@ -75,6 +75,7 @@ export async function runDevSettings(browser) {
     await page.goto(BASE);
     await setupStep(page);
     await page.locator('[data-nrl-start]').tap();
+    await confirmStartingLeague(page);
     await page.locator('[data-expansion-work]').tap();
     if (await page.locator('.nrl-tutorial-skip').count()) await page.locator('.nrl-tutorial-skip').tap();
     await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));

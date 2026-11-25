@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
-export { setupStep, setupStepNow, slotMenu } from './newClub.mjs';
+export { confirmStartingLeague, setupStep, setupStepNow, slotMenu } from './newClub.mjs';
 
 /**
  * The weekly summary card (#368) opens after each advance once the club is back.

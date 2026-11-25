@@ -18,10 +18,10 @@ import { CLASSIC_RETIRED_TEXT, isClassicSave } from '../core/classicSave';
 import {
   captureSlot, deleteSlot, downloadOriginalSave, downloadRetiredSave, exportOriginalSave, exportRecoverySaves,
   getSlotSummaries, installImportedSave, listSlotMeta, markClassicRetirementShown, pickSaveFile,
-  readRetiredSave, retireClassicSlots, setActiveSlot, type ClassicRetirement, type SlotSummary,
+  readRetiredSave, retireClassicSlots, retireClassicSlotsDurable, setActiveSlot, type ClassicRetirement, type SlotSummary,
 } from '../core/save';
 import { factsOf } from '../core/storage/meta';
-import { acknowledgeRetiredClassicSave } from '../core/storage/nativeCheckpoint';
+import { acknowledgeRetiredClassicSave, nativeCheckpointRequired } from '../core/storage/nativeCheckpoint';
 import { cleanName, GROUND_MAX, NAME_MAX } from '../data/names';
 import type { LeagueCareerDestination } from '../systems/leagueCareerSetup';
 import type { GameState } from '../core/state';
@@ -638,6 +638,10 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
     // A message for the player (a failed import or load, a repaired save): a toast over the title
     // (§6), danger unless it is good news, rather than a line under the slots.
     const showSlots = (notice?: string, kind: 'danger' | 'info' = 'danger', pending?: ClassicRetirement[]): void => {
+      if (!pending && nativeCheckpointRequired()) {
+        void retireClassicSlotsDurable().then((retired) => showSlots(notice, kind, retired));
+        return;
+      }
       const retired = (pending ?? retireClassicSlots()).filter((r) => r.notify);
       main.replaceChildren();
       main.setAttribute('class', 'nrl-title-main nrl-title-main-slots');
@@ -1159,13 +1163,17 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
 
     // Fresh install (all slots empty): go straight to setting up a club in slot 1.
     // A Classic career is archived first, and its message is shown once, before that.
-    if (error) showSlots(error);
-    else {
-      const retired = retireClassicSlots();
-      const summaries = getSlotSummaries();
-      if (retired.some((r) => r.notify) || !summaries.every((x) => x.status === 'empty')) showSlots(undefined, 'danger', retired);
-      else showSetup(summaries[0]!);
-    }
+    // On iPhone the archive is confirmed before the slot is deleted, so this waits.
+    const openSaved = (retired: ClassicRetirement[]): void => {
+      if (error) showSlots(error, 'danger', retired);
+      else {
+        const summaries = getSlotSummaries();
+        if (retired.some((r) => r.notify) || !summaries.every((x) => x.status === 'empty')) showSlots(undefined, 'danger', retired);
+        else showSetup(summaries[0]!);
+      }
+    };
+    if (nativeCheckpointRequired()) void retireClassicSlotsDurable().then(openSaved);
+    else openSaved(retireClassicSlots());
 
     root.appendChild(overlay);
   });

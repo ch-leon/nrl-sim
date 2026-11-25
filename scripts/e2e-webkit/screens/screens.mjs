@@ -1,6 +1,6 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, squadMenu, reachProblems, setupStep, slotMenu } from '../common.mjs';
+import { confirmStartingLeague, closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, squadMenu, reachProblems, setupStep, slotMenu } from '../common.mjs';
 
 // ── Landscape screens (#336, #344, #347, #343, #351) ─────────────────────────
 // Every nav screen and the main popups on a phone held sideways. Each must show
@@ -360,6 +360,7 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
     await page.fill('[data-nrl-clubname]', 'Landscape FC');
     await setupStep(page, 3);
     await tap('[data-nrl-start]');
+    await confirmStartingLeague(page);
     await page.locator('[data-expansion-work]').tap();
     await page.waitForSelector('.nrl-tutorial-skip');
     await tap('.nrl-tutorial-skip');

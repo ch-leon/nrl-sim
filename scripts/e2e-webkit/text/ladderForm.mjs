@@ -1,4 +1,4 @@
-import { playTrials } from '../common.mjs';
+import { confirmStartingLeague, playTrials } from '../common.mjs';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, setupStep } from '../common.mjs';
@@ -50,6 +50,7 @@ export async function runLadderForm(browser) {
     await page.goto(BASE);
     await setupStep(page);
     await page.locator('[data-nrl-start]').tap();
+    await confirmStartingLeague(page);
     await page.locator('[data-expansion-work]').tap();
     await page.locator('.nrl-tutorial-skip').tap();
       await playTrials(page);

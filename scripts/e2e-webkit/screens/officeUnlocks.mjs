@@ -1,7 +1,7 @@
 // #482: real season-one Office play-through; screenshots live in the CI artifact.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { playTrials, BASE, OUT_ROOT, IPHONE_UA, closeWeekSummary, SHEET_EXIT, setupStep } from '../common.mjs';
+import { confirmStartingLeague, playTrials, BASE, OUT_ROOT, IPHONE_UA, closeWeekSummary, SHEET_EXIT, setupStep } from '../common.mjs';
 
 export async function runOfficeUnlocks(browser) {
   const out = join(OUT_ROOT, 'webkit', 'office-unlocks');
@@ -28,6 +28,7 @@ export async function runOfficeUnlocks(browser) {
       await setupStep(page);
       await page.locator('[data-nrl-difficulty-easy]').tap();
       await page.locator('[data-nrl-start]').tap();
+      await confirmStartingLeague(page);
       await page.locator('[data-expansion-work]').tap();
       await page.locator('.nrl-tutorial-skip').tap();
       await playTrials(page);
