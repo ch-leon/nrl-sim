@@ -13,6 +13,7 @@ import {
   fieldToWorld,
   facilityToWorld,
   matchEffectFor,
+  playSparkCount,
 } from '../../src/fx/particleMath';
 import { TILE_W, TILE_H } from '../../src/config';
 
@@ -53,6 +54,13 @@ describe('particleMath.matchEffectFor', () => {
   it('maps try and big-hit to their discrete effects', () => {
     expect(matchEffectFor('try')).toBe('try');
     expect(matchEffectFor('big-hit')).toBe('big-hit');
+  });
+
+  it('a set play sparks on the tap and the pay-off, and not when it breaks down (#825)', () => {
+    expect(playSparkCount('call')).toBeGreaterThan(0);
+    expect(playSparkCount('try')).toBeGreaterThan(playSparkCount('bust'));
+    expect(playSparkCount('miss')).toBe(0);
+    expect(playSparkCount('try')).toBeLessThanOrEqual(MATCH_CAPS.tryBurst);
   });
 
   it('returns null for kinds with no discrete burst', () => {

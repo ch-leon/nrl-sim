@@ -787,6 +787,15 @@ export function trayPlaysOn(plays: readonly TrayPlay[]): number {
  * the play's short name on top and playCaption under it. A play that can be
  * called makes it (`onPlay`); one that can't is greyed and says why.
  */
+/**
+ * The set-play tile under the finger (#825). Down lights it the same frame, before the
+ * click makes the call; up, cancel or leave clears it. A refused tile stays as it is.
+ */
+export function pressPlayTile(el: { disabled?: boolean; setAttribute(name: string, value: string): void; removeAttribute(name: string): void }, down: boolean): void {
+  if (down && !el.disabled) el.setAttribute('data-pressed', '');
+  else el.removeAttribute('data-pressed');
+}
+
 export function trayPlayEls(plays: readonly TrayPlay[], onPlay: (play: PlayId) => void): HTMLButtonElement[] {
   return plays.map((p) => {
     const play = PLAYS_BY_ID[p.play];
@@ -802,8 +811,17 @@ export function trayPlayEls(plays: readonly TrayPlay[], onPlay: (play: PlayId) =
     const need = p.worst.short > 0 ? `${p.worst.name} has footy IQ ${Math.round(p.worst.iq)}, ${p.worst.short} short` : 'every man has the footy IQ it needs';
     b.title = `${play.name}: ${p.pending ? 'called, at the next play-the-ball' : need}`;
     b.disabled = p.why !== null || p.pending;
+    b.addEventListener('pointerdown', () => pressPlayTile(b, true));
+    b.addEventListener('pointerup', () => pressPlayTile(b, false));
+    b.addEventListener('pointercancel', () => pressPlayTile(b, false));
+    b.addEventListener('pointerleave', () => pressPlayTile(b, false));
     return b;
   });
+}
+
+/** The banner the moment a set play is tapped (#825): over the action, before the play-the-ball. */
+export function calledBanner(label: string): BannerText {
+  return { head: 'CALLED', who: label, sub: 'Next play-the-ball', tone: 'score' };
 }
 
 /** The tray's key for its Plays section: rebuilt only when a tile's text or state changes. */
@@ -1178,6 +1196,8 @@ export interface MatchOverlayHandle {
   slot?(name: 'coach' | 'plan' | 'speed'): HTMLElement;
   /** The coach's call just went in (its name, for the log if the commentary has no line for it). */
   noteCall?(label: string): void;
+  /** A set play was just tapped (#825): "CALLED" over the action. A try or sin-bin banner stays. */
+  flashCalled?(label: string): void;
   /** The coach tray is open: the Replay chip and the call tag step out from over it. */
   setTrayOpen?(on: boolean): void;
   /** Possession so far [home, away] in percent (the half-time sheet's summary). */
@@ -1835,6 +1855,11 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
     noteCall(label: string): void {
       pendingCall = label;
     },
+    flashCalled(label: string): void {
+      if (!banner.hidden && (bannerWasTry || banner.dataset.tone === 'bin')) return;
+      showMoment(calledBanner(label));
+      holdBanner(1100);
+    },
     setTrayOpen(on: boolean): void {
       root.classList.toggle('nrl-mo-tray-open', on);
       // The Replay try chip steps out from over the tray at once, and back when it shuts (#348).
@@ -2196,6 +2221,11 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 .nrl-mo-tray-plays-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 /* A set play (41): an orange edge, so it reads as the playbook's, in line with the calls. */
 .nrl-btn.nrl-mo-tray-call.nrl-mo-tray-play { padding: 0 8px; box-shadow: inset 0 0 0 1px var(--nrl-accent); }
+/* The finger is down (#825): the play's orange, the same frame, before the click lands. Text stays in rem. */
+.nrl-btn.nrl-mo-tray-play[data-pressed]:not(:disabled),
+.nrl-btn.nrl-mo-tray-play[data-pressed]:not(:disabled):hover,
+.nrl-btn.nrl-mo-tray-play[data-pressed]:not(:disabled):active { background: var(--nrl-accent); color: var(--nrl-on-accent); }
+.nrl-mo-tray-play[data-pressed] span { color: var(--nrl-on-accent); }
 /* A tall screen (a tablet) has room for the mockup's 64px tiles; a phone on its side keeps 44 so the tray never scrolls (#396). */
 @media (min-height: 560px) {
   html:not([data-text-size]) .nrl-btn.nrl-mo-tray-call { height: 64px; }

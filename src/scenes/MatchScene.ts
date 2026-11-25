@@ -23,8 +23,9 @@ import { ControlsLayer } from '../match/view/controlsLayer';
 import Phaser from 'phaser';
 import { CameraController } from '../world/camera';
 import { cssZoom, screenDensity } from '../world/viewport';
+import { toFieldPt } from '../match/core/field';
 import { bus } from '../core/events';
-import { button, getRoot, mount } from '../ui/dom';
+import { button, getRoot, mount, tapBuzz } from '../ui/dom';
 import { MATCH_NOT_SAVED_TEXT, MATCH_SAVED_TEXT, SKIPPING_EXIT_TEXT } from '../ui/hud';
 import type { TeamSheet, MatchEvent, WeatherKind } from '../sim/events';
 import { getState, setState, type Fixture } from '../core/state';
@@ -638,6 +639,7 @@ export class MatchScene extends Phaser.Scene {
         speed: this.rememberedSpeed(),
         keyMoments: () => this.keyMomentsOn(),
         onCallResult: (v) => this.showCallResult(v),
+        onPlayPayoff: (how) => this.zoomForCalledPlay(how),
         ...(live.coachSide ? { coachSide: live.coachSide } : {}),
       });
       this.mountPlaybackControls(this.playback.getSpeed());
@@ -1480,10 +1482,27 @@ export class MatchScene extends Phaser.Scene {
     if (pb.call(this.callSide, 'set-play', play) === null) {
       this.madePlay = play;
       this.madePlayAt = pb.tick;
-      this.overlay?.noteCall?.(PLAYS_BY_ID[play].short);
+      const name = PLAYS_BY_ID[play].short;
+      this.overlay?.noteCall?.(name);
+      // The same turn as the click (#825): the banner, the sting and a buzz. The call itself is unchanged.
+      this.overlay?.flashCalled?.(name);
+      const at = toFieldPt(pb.controlPicture.ball);
+      bus.emit('match:play-called', { x: at.fx, y: at.fy });
+      tapBuzz();
       this.shutTrayCalled(`[data-play="${play}"]`);
     }
     this.refreshCallChips();
+  }
+
+  /**
+   * A called play came off (#825): pull in on the carrier for a beat. A try already
+   * zooms on its own event. Reduced motion leaves the camera where it is.
+   */
+  private zoomForCalledPlay(how: 'bust' | 'break' | 'try'): void {
+    if (how === 'try' || reducedMotion()) return;
+    this.beatZoom = ZOOM_DEFAULT + 1;
+    this.zoomTarget = this.viewZoom(this.beatZoom);
+    this.closeUpUntil = this.time.now + 900;
   }
 
   // ── What each call did (#366): a tag over COACH for two seconds ──────────

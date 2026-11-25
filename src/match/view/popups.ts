@@ -18,6 +18,10 @@ export interface Popup {
   ms: number;
   /** Third line: the special skill that fired ("DANCING FEET II"), in the trait colour. */
   trait?: string;
+  /** A set play just called (#825): the word snaps in. The layer drops the snap under reduced motion. */
+  punch?: boolean;
+  /** A play that broke down (#825): the same word, drawn quieter. */
+  muted?: boolean;
 }
 
 /** Trait line colour: the one colour no tone uses, so a firing trait always reads. */
@@ -168,7 +172,23 @@ export function popupFor(e: SimEvent): Popup | null {
     : (e.kind === 'signature-play' ? e.player ?? '' : surnameOf(e.player)).toUpperCase();
   const p: Popup = { word, sub, tone: w.tone, big, ms: big || e.kind === 'fresh-impact' ? POPUP_BIG_MS : POPUP_MS };
   if (e.trait) p.trait = e.trait.toUpperCase();
+  // The launch snaps; a breakdown stays the small neutral word, drawn quieter (#825).
+  if (e.kind === 'set-play') p.punch = true;
+  if (e.kind === 'play-breaks-down') p.muted = true;
   return p;
+}
+
+/**
+ * How big a shout is through its life (0..1), before the camera's zoom.
+ * A punched one (#825) starts small, overshoots, and settles; the ordinary one eases up once.
+ */
+export function popupPop(u: number, punch: boolean): number {
+  if (punch) {
+    if (u < 0.08) return 0.4 + (u / 0.08) * 0.8;
+    if (u < 0.16) return 1.2 - ((u - 0.08) / 0.08) * 0.2;
+    return 1;
+  }
+  return u < 0.12 ? 0.6 + (u / 0.12) * 0.4 : 1;
 }
 
 /** Text colour per tone (team colour is applied by the layer for attack/defence when known). */
