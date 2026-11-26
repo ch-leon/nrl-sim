@@ -46,6 +46,7 @@ export async function runRecruit(browser) {
         await rows.first().waitFor();
         const shown = await rows.count();
         check(shown >= 1 && shown <= 4, `new game showed ${shown} rows`);
+        const shortlist = await rows.evaluateAll((ns) => ns.map((n) => n.getAttribute('data-row-player')));
         check(await page.locator('[data-coach-pick]').count() === 1, 'exactly one pick');
         check(!await page.locator('[data-sort-menu]').isVisible(), 'sort hidden on shortlist');
         const picked = await page.locator('[data-coach-pick]').evaluate((e) => e.closest('[data-row-player]').getAttribute('data-row-player'));
@@ -84,7 +85,9 @@ export async function runRecruit(browser) {
         await page.locator(SHEET_EXIT).tap();
         await openNav(page, 'recruit');
         // A reach player, or a thin affordable pool, makes the shortlist shorter than four. Reopening returns to that same list.
-        check(await rows.count() === shown, 'reopening resets shortlist');
+        await rows.first().waitFor();
+        const reopened = await rows.evaluateAll((ns) => ns.map((n) => n.getAttribute('data-row-player')));
+        check(reopened.join(',') === shortlist.join(','), `reopening resets shortlist to the same players (${reopened.length} of ${shown})`);
         const before = await page.evaluate(() => ({ bank: window.__nrlState().money, squad: window.__nrlState().squad.length }));
         await page.locator(`[data-row-player="${picked}"] .nrl-row-action`).tap();
         check(await page.evaluate((id) => window.__nrlState().squad.some((p) => p.id === id), picked), 'pick signed');
