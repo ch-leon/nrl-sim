@@ -418,7 +418,7 @@ export function createHud(opts: HudOpts = {}): Hud {
   const cardCount = el('span', { class: 'nrl-decisions-chip-count' });
   const cardChip = el('div', { class: 'nrl-decisions-chip nrl-decisions-card', attrs: { role: 'status', 'data-card-chip': '' } },
     cardN, el('span', { class: 'nrl-decisions-chip-text' }, cardCount, el('span', { class: 'nrl-decisions-chip-top', text: 'Card week' })),
-    button('Pick', () => opts.onCards?.(), { class: 'nrl-decisions-review' }));
+    button('Pick', () => opts.onCards?.(), { class: 'nrl-card-chip-pick' }));
   cardChip.hidden = true;
 
   // #368: the board objective most at risk, in the decisions chip's style under it; a tap opens Staff & Board.

@@ -161,7 +161,7 @@ describe('the HUD chip', () => {
     const chip = body().querySelector('[data-card-chip]')!;
     expect(chip.hidden).toBe(false);
     expect(chip.words()).toContain('3 PICKS');
-    chip.querySelector('.nrl-decisions-review')!.click();
+    chip.querySelector('.nrl-card-chip-pick')!.click();
     expect(open).toHaveBeenCalledOnce();
     setState({ cardWeek: { ...s.cardWeek!, owed: 1 } });
     expect(chip.words()).toContain('1 PICK');
