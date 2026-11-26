@@ -9,11 +9,15 @@ import { registerFinanceSystem } from '../../src/systems/economy';
 import { tickModifiers } from '../../src/systems/events';
 import { TRAIT_IDS } from '../../src/data/traits';
 import { initLeague } from '../../src/systems/fixtures';
+import { leagueSlotState } from '../helpers/leagueSlot';
 import { getState } from '../../src/core/state';
 import type { ImmediateEffect } from '../../src/data/events';
 
 let bytes: Map<string, string>;
 const fresh = (): GameState => createNewGame('Checker regression', 525);
+// A League career for the imports that must succeed: a Classic one is refused on import (#819).
+const leagueCareer = await leagueSlotState('Checker regression');
+const freshLeague = (): GameState => structuredClone(leagueCareer);
 const modifier = (): ActiveModifier => ({
   id: 'merchDeal-1-0', cardId: 'merchDeal', label: 'Merch royalties',
   trigger: 'weekly', weeksLeft: 2, effects: [{ kind: 'money', amount: 900 }],
@@ -70,7 +74,7 @@ describe('complete finance rows (checker P1)', () => {
     }
   });
   it('keeps finite signed extra ledger values unchanged', () => {
-    const s = fresh(); s.finance = [{ ...emptyFinance(1), extra: -25.5 } as GameState['finance'][number]];
+    const s = freshLeague(); s.finance = [{ ...emptyFinance(1), extra: -25.5 } as GameState['finance'][number]];
     const source = JSON.stringify(s);
     bytes.set(slotKey(1), source);
     const loaded = loadSlot();
@@ -79,7 +83,7 @@ describe('complete finance rows (checker P1)', () => {
     expect(installImportedSave(source, 2)).toMatchObject({ ok: true, outcome: 'valid' });
   });
   it('accepts signed finite ledger amounts unchanged and books the next wage movement without NaN', () => {
-    const s = fresh(); s.finance = [{ ...emptyFinance(1), wages: -500, other: -100.5, gate: 200 }];
+    const s = freshLeague(); s.finance = [{ ...emptyFinance(1), wages: -500, other: -100.5, gate: 200 }];
     const source = JSON.stringify(s);
     bytes.set(slotKey(1), source);
     const loaded = loadSlot();
@@ -153,7 +157,7 @@ describe('modifier payloads (checker P1)', () => {
   ];
   it.each(effects)('accepts the valid ImmediateEffect payload %j unchanged', effect => {
     expect(isImmediateEffect(effect)).toBe(true);
-    const s = fresh(); s.eventDeck.modifiers = [{ ...modifier(), effects: [effect] }];
+    const s = freshLeague(); s.eventDeck.modifiers = [{ ...modifier(), effects: [effect] }];
     const source = JSON.stringify(s);
     bytes.set(slotKey(1), source);
     const result = loadSlot();

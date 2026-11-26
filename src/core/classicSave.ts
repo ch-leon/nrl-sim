@@ -17,7 +17,8 @@ import { SAVE_VERSION } from './state';
 export const CLASSIC_CLUB_COUNT = 16;
 /** Player club plus the 11 UK Classic rivals. */
 export const UK_CLASSIC_CLUB_COUNT = 12;
-const CLASSIC_CLUB_COUNTS: readonly number[] = [CLASSIC_CLUB_COUNT, UK_CLASSIC_CLUB_COUNT];
+/** 0: a Classic career saved before its league was initialised (main.ts fills it at boot). */
+const CLASSIC_CLUB_COUNTS: readonly number[] = [CLASSIC_CLUB_COUNT, UK_CLASSIC_CLUB_COUNT, 0];
 
 const record = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
 
@@ -37,7 +38,7 @@ export function isLeagueCareerCalendar(competitions: unknown): boolean {
   return record(calendar) && calendar.mode === 'structural';
 }
 
-/** The old single table (16 AU clubs or 12 UK clubs): each club is an object with an id. */
+/** The old single table (16 AU clubs or 12 UK clubs, or not yet filled): each club is an object with an id. */
 function isClassicLeague(save: Record<string, unknown>): boolean {
   const league = save.league;
   if (!record(league) || !Array.isArray(league.clubs) || !CLASSIC_CLUB_COUNTS.includes(league.clubs.length)) return false;

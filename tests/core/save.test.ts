@@ -460,8 +460,8 @@ describe('load: legacy and future saves', () => {
     expect(notes[0].text).toMatch(/newer version/i);
   });
 
-  it('the legacy single save appears in slot 1, then the legacy key is removed', () => {
-    const s = createNewGame('Legacy', 3);
+  it('the legacy single save appears in slot 1, then the legacy key is removed', async () => {
+    const s = await leagueSlotState('Legacy');
     const raw = JSON.stringify(s);
     storage.map.set(SAVE_KEY, raw);
     const sums = getSlotSummaries();
@@ -473,8 +473,8 @@ describe('load: legacy and future saves', () => {
     expect(load()).toEqual({ ...s, version: SAVE_VERSION });
   });
 
-  it('adds the ladder place the caller reads, and leaves it off at 0 or when the read throws (SuperCOOKED 11)', () => {
-    storage.map.set(slotKey(1), JSON.stringify(createNewGame('Placed', 3)));
+  it('adds the ladder place the caller reads, and leaves it off at 0 or when the read throws (SuperCOOKED 11)', async () => {
+    storage.map.set(slotKey(1), JSON.stringify(await leagueSlotState('Placed')));
     expect(getSlotSummaries()[0]).not.toHaveProperty('ladder');
     expect(getSlotSummaries(() => 4)[0]).toMatchObject({ status: 'ok', clubName: 'Placed', ladder: 4 });
     expect(getSlotSummaries(() => 0)[0]).not.toHaveProperty('ladder');
@@ -483,9 +483,9 @@ describe('load: legacy and future saves', () => {
     expect(broken).not.toHaveProperty('ladder');
   });
 
-  it('keeps the legacy key when the slot write fails, and still shows it in slot 1', () => {
+  it('keeps the legacy key when the slot write fails, and still shows it in slot 1', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const raw = JSON.stringify(createNewGame('Keep', 3));
+    const raw = JSON.stringify(await leagueSlotState('Keep'));
     storage.map.set(SAVE_KEY, raw);
     const failing: StorageLike = {
       getItem: (k) => storage.getItem(k),
@@ -510,10 +510,10 @@ describe('load: legacy and future saves', () => {
 });
 
 describe('slots', () => {
-  it('saves to the active slot independently', () => {
-    save(createNewGame('A', 1));
+  it('saves to the active slot independently', async () => {
+    save(await leagueSlotState('A'));
     setActiveSlot(2);
-    save(createNewGame('B', 2));
+    save(await leagueSlotState('B'));
     expect(getSlotSummaries().map((s) => s.clubName)).toEqual(['A', 'B', undefined]);
     expect(load()!.clubName).toBe('B');
     setActiveSlot(1);
@@ -554,8 +554,8 @@ describe('export / import', () => {
     expect(storage.map.has(slotKey(2))).toBe(false);
   });
 
-  it('importIntoSlot writes a current state to the slot', () => {
-    const s = createNewGame('Imp', 5);
+  it('importIntoSlot writes a current state to the slot', async () => {
+    const s = await leagueSlotState('Imp');
     const out = importIntoSlot(JSON.stringify(s), 2);
     expect(out).toEqual(s);
     setActiveSlot(2);

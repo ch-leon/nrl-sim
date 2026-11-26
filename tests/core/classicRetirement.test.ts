@@ -6,9 +6,9 @@ import { __resetDemo, FIRST_RUN_KEY, recordFirstRun } from '../../src/commercial
 import { __setCommercial } from '../../src/commercial/flags';
 import {
   __setStorage, capturePlayerSlot, captureSlot, classicSlots, firstRunSlotSummaries, flushSaveMeta, getSlotSummaries, hasSave,
-  installImportedSave, listSlotMeta, loadCareer, loadSlot, setActiveSlot, slotKey, writeSlot,
+  installImportedSave, listSlotMeta, loadCareer, loadSlot, setActiveSlot, slotHasLeagueData, slotKey, writeSlot,
 } from '../../src/core/save';
-import { CLASSIC_RETIRED_TEXT } from '../../src/core/classicSave';
+import { CLASSIC_RETIRED_TEXT, isClassicSave } from '../../src/core/classicSave';
 import { createNewGame, type GameState } from '../../src/core/state';
 import { initLeague } from '../../src/systems/fixtures';
 import { DEV_TEST_PREFIX, LEGACY_SAVE_KEY, liveMatchKey } from '../../src/core/storageKeys';
@@ -179,5 +179,111 @@ describe('Classic saves are ignored, never deleted', () => {
     writeSlot(1, classicCareer('Old Club', 5));
     recordFirstRun(firstRunSlotSummaries(), 1000);
     expect(JSON.parse(storage.getItem(FIRST_RUN_KEY)!)).toEqual({ at: 1000, slots: [{ slot: 1, clubName: 'Old Club' }] });
+  });
+});
+
+describe('slotHasLeagueData: a slot is empty only when all its keys hold nothing or Classic (#819 r6)', () => {
+  it('a Classic career with its own meta and its own parked match: no League data, an empty slot', () => {
+    const storage = stubLocalStorage();
+    const classic = classicCareer('Old Club', 9);
+    writeSlot(1, classic);
+    flushSaveMeta();
+    storage.setItem(liveMatchKey(1), matchFor(classic));
+    expect(slotHasLeagueData(1)).toBe(false);
+    expect(capturePlayerSlot(1).result.status).toBe('empty');
+  });
+
+  it('a League career under the legacy key behind a Classic slot 1 makes it occupied', async () => {
+    const storage = stubLocalStorage();
+    storage.setItem(slotKey(1), JSON.stringify(classicCareer('Old Club', 9)));
+    storage.setItem(LEGACY_SAVE_KEY, JSON.stringify(await leagueSlotState('Hidden')));
+    expect(slotHasLeagueData(1)).toBe(true);
+    expect(capturePlayerSlot(1).result.status).toBe('ok');
+    expect(getSlotSummaries()[0]).toMatchObject({ status: 'ok', classic: true });
+    expect(loadCareer(1).status).toBe('empty');
+  });
+
+  it('a checkpoint that is not the Classic career\'s own, or is unreadable, makes it occupied', async () => {
+    const storage = stubLocalStorage();
+    writeSlot(2, classicCareer('Old Club', 9));
+    flushSaveMeta();
+    const league = await leagueSlotState('Elsewhere');
+    const fixture = { competitionId: 'league', fixtureId: 'f1' };
+    storage.setItem(liveMatchKey(2), JSON.stringify({ ...JSON.parse(matchFor(league)), ...fixture }));
+    expect(slotHasLeagueData(2)).toBe(true);
+    const own = JSON.parse(matchFor(classicCareer('Old Club', 9)));
+    storage.setItem(liveMatchKey(2), JSON.stringify({ ...own, week: own.week + 3 }));
+    expect(slotHasLeagueData(2)).toBe(true);
+    storage.setItem(liveMatchKey(2), '{not json');
+    expect(slotHasLeagueData(2)).toBe(true);
+    expect(getSlotSummaries()[1]?.status).toBe('ok');
+  });
+
+  it('meta that does not describe the Classic payload makes it occupied', async () => {
+    const storage = stubLocalStorage();
+    writeSlot(3, await leagueSlotState('League'));
+    flushSaveMeta();
+    storage.setItem(slotKey(3), JSON.stringify(classicCareer('Old Club', 9)));
+    expect(slotHasLeagueData(3)).toBe(true);
+  });
+
+  it('a League slot has League data; an empty slot has none', async () => {
+    stubLocalStorage();
+    writeSlot(1, await leagueSlotState('League'));
+    expect(slotHasLeagueData(1)).toBe(true);
+    expect(slotHasLeagueData(2)).toBe(false);
+  });
+});
+
+describe('the commercial first-run record matches main (#819 r6)', () => {
+  it('leaves out a released v26 Classic save, which main showed as unreadable', () => {
+    const storage = stubLocalStorage();
+    __setCommercial(true);
+    __resetDemo();
+    storage.setItem(slotKey(1), JSON.stringify({ ...classicCareer('Released', 5), version: 26 }));
+    writeSlot(2, classicCareer('Current', 6));
+    recordFirstRun(firstRunSlotSummaries(), 1000);
+    expect(JSON.parse(storage.getItem(FIRST_RUN_KEY)!)).toEqual({ at: 1000, slots: [{ slot: 2, clubName: 'Current' }] });
+  });
+
+  it('leaves out an unreadable save, as main did', () => {
+    const storage = stubLocalStorage();
+    __setCommercial(true);
+    __resetDemo();
+    storage.setItem(slotKey(1), '{broken');
+    recordFirstRun(firstRunSlotSummaries(), 1000);
+    expect(JSON.parse(storage.getItem(FIRST_RUN_KEY)!)).toEqual({ at: 1000, slots: [] });
+  });
+});
+
+describe('a Classic save captured before league initialisation is Classic too (#819 r6)', () => {
+  const early = (): GameState => createNewGame('Early', 3);
+
+  it('is recognised, never loaded for Continue, and its slot reads empty', () => {
+    const storage = stubLocalStorage();
+    expect(early().league.clubs).toEqual([]);
+    expect(isClassicSave(JSON.stringify(early()))).toBe(true);
+    writeSlot(1, early());
+    const raw = storage.getItem(slotKey(1));
+    expect(loadCareer(1).status).toBe('empty');
+    expect(getSlotSummaries()[0]?.status).toBe('empty');
+    expect(storage.getItem(slotKey(1))).toBe(raw);
+  });
+
+  it('is never migrated out of the legacy key', () => {
+    const storage = stubLocalStorage();
+    const raw = JSON.stringify(early());
+    storage.setItem(LEGACY_SAVE_KEY, raw);
+    readEverything();
+    expect(storage.getItem(slotKey(1))).toBeNull();
+    expect(storage.getItem(LEGACY_SAVE_KEY)).toBe(raw);
+  });
+
+  it('is refused on import', () => {
+    const storage = stubLocalStorage();
+    const res = installImportedSave(JSON.stringify(early()), 1);
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.message).toBe(CLASSIC_RETIRED_TEXT);
+    expect(storage.getItem(slotKey(1))).toBeNull();
   });
 });
