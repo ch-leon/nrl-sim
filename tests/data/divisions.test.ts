@@ -34,7 +34,8 @@ describe('authored regional career profiles', () => {
       if (existing.home) expect(retained?.home).not.toBe(existing.home);
     }
     expect(profile.divisions.map(d => d.rank)).toEqual([0, 1, 2]);
-    expect(profile.divisions.map(d => d.ratingMean)).toEqual([44, 54, 64]);
+    // Premier's 61 is its five ordinary clubs; the Big Three sit above it (#840).
+    expect(profile.divisions.map(d => d.ratingMean)).toEqual([44, 54, 61]);
     expect(profile.divisions.every(d => d.regularRounds === 14 && d.finalsSize === 4 && d.entrants.length === 8)).toBe(true);
     const ids = profile.divisions.flatMap(d => d.entrants.map(e => e.clubId));
     expect(new Set(ids).size).toBe(24);
@@ -118,10 +119,12 @@ describe('dormant regional world construction', () => {
     expect(world.clubs).toHaveLength(24);
     expect(world.squad).toHaveLength(20);
     expect(world.clubs.find(c => c.id === 'player')).not.toHaveProperty('squad');
-    expect(world.clubs.filter(c => c.id !== 'player').every(c => c.squad?.length === 20)).toBe(true);
+    // The Big Three (#840) carry 18-player squads; every other rival carries 20.
+    expect(Object.keys(world.bigThree!)).toHaveLength(3);
+    expect(world.clubs.filter(c => c.id !== 'player').every(c => c.squad?.length === (c.id in world.bigThree! ? 18 : 20))).toBe(true);
     const allPlayers = [...world.squad, ...world.clubs.flatMap(c => c.squad ?? [])];
-    expect(allPlayers).toHaveLength(480);
-    expect(new Set(allPlayers.map(p => p.id)).size).toBe(480);
+    expect(allPlayers).toHaveLength(474);
+    expect(new Set(allPlayers.map(p => p.id)).size).toBe(474);
     expect(allPlayers.every(p => isPlayer(p))).toBe(true);
     expect(allPlayers.every(p => p.xp === 0 && p.level === 1 && p.unspentPoints === 0)).toBe(true);
     expect(allPlayers.every(p => shownStats(p.position).every(key => p.ceilings[key]! >= p.stats[key]))).toBe(true);

@@ -36,7 +36,8 @@ it.each(['AU', 'GB'])('prepares and installs the complete regional opening gate 
   expect(candidate.freeAgents).toHaveLength(12);
   expect(candidate.playerPopulation.shortlistIds).toEqual(candidate.freeAgents.map(p => p.id));
   const people = [...candidate.squad,...candidate.league.clubs.flatMap(c => c.squad ?? []),...candidate.freeAgents];
-  expect(new Set(people.map(p => p.id)).size).toBe(492);
+  // 20-player rivals, 18-player Big Three (#840), the player's 20 and 12 free agents.
+  expect(new Set(people.map(p => p.id)).size).toBe(486);
   expect(candidate.league.clubs.find(c => c.id === candidate.clubId)?.colors).toEqual(options.colors);
   expect(candidate).toMatchObject({ home:request.home, coachName:'Coach',groundName:'The Park' });
   expect(await startLeagueCareer(request)).toEqual({ok:true,state:candidate});

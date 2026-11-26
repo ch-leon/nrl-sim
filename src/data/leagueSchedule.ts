@@ -104,7 +104,8 @@ export function buildSavedLeagueSchedule(source: CompetitionCareerState, season:
 
   const templates = savedTrialDefinitions(world.profile.id, leagues, current, calendar.slots);
   const nextLeagues = world.divisions.map((d, i) => buildDivisionLeague(world.profile.id, d.id, leagues[i]!.definition, season, fields[d.id]!, scheduleSeed));
-  const nextWorld = { profile: { ...world.profile }, divisions: world.divisions.map((d, i) => ({ ...d, instanceId: nextLeagues[i]!.id })) };
+  const nextWorld: CompetitionWorldMetadata = { profile: { ...world.profile }, divisions: world.divisions.map((d, i) => ({ ...d, instanceId: nextLeagues[i]!.id })),
+    ...(world.bigThree ? { bigThree: { ...world.bigThree } } : {}) };
   const trials: CompetitionInstance[] = [];
   for (const [i, division] of nextWorld.divisions.entries()) {
     trials.push(...buildDivisionTrialFixtures(world.profile.id, division.id, nextLeagues[i]!, scheduleSeed, trials.length, templates[i]!));
