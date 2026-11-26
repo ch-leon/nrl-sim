@@ -9,7 +9,7 @@ import { IndividualChallengeScene, bindIndividualChallengeGame } from './scenes/
 import { bus, type Events } from './core/events';
 import { getState, loadState, stateInstallation, type GameState } from './core/state';
 import {
-  deleteClassicSlots, enableAutosave, getActiveSlot, getSlotSummaries, hasSave, loadSlot, save, setActiveSlot, writeSlot,
+  captureSlot, classicSlots, enableAutosave, firstRunSlotSummaries, getActiveSlot, hasSave, loadCareer, save, setActiveSlot, writeSlot,
 } from './core/save';
 import { showLeagueLoading, showTitleFlow, type TitleChoice } from './ui/title';
 import { EXPANSION_INTRO_HINT, showExpansionIntro } from './ui/expansionIntro';
@@ -153,24 +153,24 @@ async function boot(): Promise<void> {
   syncDevMarker();
   // #362: the careers already here before the first commercial run keep the full game.
   // A playtest career's slots are not those careers, so it records nothing.
-  if (commercialEnabled() && !playtest) recordFirstRun(getSlotSummaries());
+  // A Classic career reads as an empty slot (#819), but the first-run record keeps what main records.
+  if (commercialEnabled() && !playtest) recordFirstRun(firstRunSlotSummaries());
   if (playtest) {
     setActiveSlot(1);
-    // A Classic playtest career is deleted (#819); the title does this for normal slots.
-    deleteClassicSlots();
-    // Its save gone (site data cleared, or a Classic career just deleted): build a League career.
-    if (!hasSave(1)) playtest.fresh = true;
+    // Its save gone (site data cleared), or only a Classic career there (#819, which reads
+    // as empty and is overwritten by the new League career): build a League career.
+    if (!hasSave(1) || classicSlots().includes(1)) playtest.fresh = true;
   }
   let choice: TitleChoice = playtest
-    ? (playtest.fresh ? { mode: 'new' as const, careerMode: 'league', ...freshPlaytestLeagueStart() } : { mode: 'continue' as const })
+    ? (playtest.fresh ? { mode: 'new' as const, careerMode: 'league', ...freshPlaytestLeagueStart(captureSlot(1).raw) } : { mode: 'continue' as const })
     : await showTitleFlow(uiRoot);
   // Rejection is not an empty career: stay at recovery instead of installing defaults.
-  let loaded = loadSlot();
+  let loaded = loadCareer();
   let freshGame = false;
   for (;;) {
     if ((choice.mode === 'continue' || playtest?.fresh) && loaded.status !== 'ok' && loaded.status !== 'empty') {
       choice = await showTitleFlow(uiRoot, loaded.message);
-      loaded = loadSlot();
+      loaded = loadCareer();
       continue;
     }
     if (choice.mode === 'continue' && loaded.status === 'ok') {
@@ -180,7 +180,7 @@ async function boot(): Promise<void> {
     }
     if (choice.mode !== 'new') {
       choice = await showTitleFlow(uiRoot);
-      loaded = loadSlot();
+      loaded = loadCareer();
       continue;
     }
     freshGame = !playtest;
@@ -212,7 +212,7 @@ async function boot(): Promise<void> {
     } finally { loading.remove(); }
     if (!failure) break;
     choice = await showTitleFlow(uiRoot, failure);
-    loaded = loadSlot();
+    loaded = loadCareer();
   }
   if (getState().league.clubs.length === 0) initLeague(getState(), choice.colors);
   if (playtest?.fresh) {

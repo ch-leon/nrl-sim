@@ -110,8 +110,6 @@ export class NativeMirror {
   private readonly next = new Map<string, Op>();
   private readonly checks = new Map<string, PendingCheck>();
   private readonly running = new Set<string>();
-  /** Keys with a native copy that the boot sync could not put back into the web view. */
-  private readonly unrestoredKeys = new Set<string>();
   private idleWaiters: Array<() => void> = [];
 
   constructor(private readonly files: NativeFiles, private readonly log: Log = warn) {}
@@ -157,15 +155,6 @@ export class NativeMirror {
     return result;
   }
 
-  /**
-   * True when the last boot sync found a native copy of `key` it could not restore
-   * (unreadable, or the web view refused it, e.g. over quota). The web view's
-   * missing value is then not the whole truth.
-   */
-  unrestored(key: string): boolean {
-    return this.unrestoredKeys.has(key);
-  }
-
   /** Resolves once every queued native write has finished (or failed). */
   idle(): Promise<void> {
     if (this.running.size === 0) return Promise.resolve();
@@ -205,23 +194,18 @@ export class NativeMirror {
         current = storage.getItem(key);
       } catch (err) {
         this.log(`storage unreadable, ${key} not synced`, err);
-        this.unrestoredKeys.add(key);
         return;
       }
       if (current === null) {
         if (entry.gone) { this.remove(key); return; } // deleted: finish the removal
         const text = await this.readFirst([entry.ready, entry.final]);
-        if (text === null) {
-          if (entry.ready !== undefined || entry.final !== undefined) this.unrestoredKeys.add(key);
-          return;
-        }
+        if (text === null) return;
         try {
           storage.setItem(key, text);
           if (storage.getItem(key) !== text) throw new Error('Restored bytes did not match');
           restored.push(key);
         } catch (err) {
           this.log(`native copy of ${key} not restored`, err);
-          this.unrestoredKeys.add(key);
         }
         return;
       }

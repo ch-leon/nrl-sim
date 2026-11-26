@@ -356,14 +356,15 @@ describe('showTitleFlow', () => {
     expect(root.children.length).toBe(0);
   });
 
-  it('deletes a Classic save that needs a lineup repair instead of loading it', () => {
+  it('ignores a Classic save that needs a lineup repair: no Continue, and its bytes stay', () => {
     const s = classicCareer('Missing selection', 525);
     delete (s.lineup as unknown as Record<string, unknown>).captain;
-    storage.map.set(slotKey(1), JSON.stringify(s, null, 2));
+    const original = JSON.stringify(s, null, 2);
+    storage.map.set(slotKey(1), original);
     const root = makeStubEl('div');
     void showTitleFlow(root as unknown as HTMLElement);
     expect(root.querySelector('[data-nrl-continue-1]')).toBeNull();
-    expect(storage.map.get(slotKey(1))).toBeUndefined();
+    expect(storage.map.get(slotKey(1))).toBe(original);
   });
 
   it('with a save: New game opens the setup step, and Start asks before replacing the season (#350 T2)', async () => {

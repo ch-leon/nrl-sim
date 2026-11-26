@@ -16,7 +16,7 @@
 
 import { CLASSIC_RETIRED_TEXT } from '../core/classicSave';
 import {
-  captureSlot, deleteClassicSlots, deleteSlot, downloadOriginalSave, exportRecoverySaves, getSlotSummaries, installImportedSave, listSlotMeta, pickSaveFile, setActiveSlot, type SlotSummary,
+  capturePlayerSlot, classicSlots, deleteSlot, downloadOriginalSave, exportRecoverySaves, getSlotSummaries, installImportedSave, listSlotMeta, pickSaveFile, setActiveSlot, type SlotSummary,
 } from '../core/save';
 import { cleanName, GROUND_MAX, NAME_MAX } from '../data/names';
 import type { LeagueCareerDestination } from '../systems/leagueCareerSetup';
@@ -467,6 +467,11 @@ export function showLeagueLoading(root: HTMLElement): HTMLElement {
  * player's choice, after making that slot active so load()/save() target it,
  * then removes itself.
  */
+/** The Classic notice shows once per launch, the first time a title finds a Classic save. */
+let classicNoticeDue = true;
+/** Test hook: show the Classic notice again. */
+export function __resetClassicNotice(): void { classicNoticeDue = true; }
+
 export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleChoice> {
   return new Promise<TitleChoice>((resolve) => {
     listenForPress();
@@ -1049,7 +1054,7 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
       const ready = (): void => { start.textContent = 'Start season ▸'; start.disabled = false; };
       start.addEventListener('click', () => {
         if (start.disabled || !namesOk()) return;
-        const {raw, result} = captureSlot(s.slot);
+        const {raw, result} = capturePlayerSlot(s.slot);
         if (result.status !== 'ok' && result.status !== 'empty') return showSlots(result.message);
         const destination: LeagueCareerDestination = {slot: s.slot, expectedOriginal: raw};
         const occupant: SlotSummary = result.status === 'empty' ? {slot: s.slot, status:'empty'} : {
@@ -1093,8 +1098,10 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
       });
     };
 
-    // Classic careers are deleted on load (#819, at the owner's request), with one notice.
-    const retired = deleteClassicSlots();
+    // A Classic career is no longer loadable (#819): its slot reads as empty, and starting a
+    // League career there overwrites it. Nothing is deleted. Say so once per launch.
+    const retired = classicNoticeDue ? classicSlots() : [];
+    if (retired.length) classicNoticeDue = false;
     // Fresh install (all slots empty): go straight to setting up a club in slot 1.
     const summaries = getSlotSummaries();
     if (error) showSlots(error);

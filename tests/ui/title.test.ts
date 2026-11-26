@@ -3,7 +3,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { stubLocalStorage } from '../commercial/memStorage';
 import { StubNode, stubDocument } from './stubDom';
-import { DIFFICULTY_BLURB, TITLE_CSS, loadingTip, showLeagueLoading, showTitleFlow, type TitleChoice } from '../../src/ui/title';
+import { __resetClassicNotice, DIFFICULTY_BLURB, TITLE_CSS, loadingTip, showLeagueLoading, showTitleFlow, type TitleChoice } from '../../src/ui/title';
 import { GROUND_MAX, NAME_MAX } from '../../src/data/names';
 import { DEFAULT_DIFFICULTY, DIFFICULTIES, DIFFICULTY } from '../../src/config';
 import { deleteSlot, slotKey, writeSlot } from '../../src/core/save';
@@ -470,17 +470,19 @@ describe('League setup destination', () => {
     expect(localStorage.getItem(slotKey(1))).toBe(JSON.stringify(original));
   });
 
-  it('deletes a Classic save on load, says so once, and leaves the slot empty for a League career', async () => {
+  it('shows a Classic save as an empty slot, says so once, deletes nothing, and a League career replaces it', async () => {
     writeSlot(1, classicCareer('Classic Club', 54));
+    const classic = localStorage.getItem(slotKey(1))!;
     const league = await leagueSlotState('League Club');
     writeSlot(2, league);
     const kept = localStorage.getItem(slotKey(2));
     const said: string[] = [];
     bus.on('ui:notify', (e) => { said.push(e.text); });
+    __resetClassicNotice();
     const root = new StubNode('div');
-    void showTitleFlow(root as unknown as HTMLElement);
+    const choice = showTitleFlow(root as unknown as HTMLElement);
     expect(said).toEqual([CLASSIC_RETIRED_TEXT]);
-    expect(localStorage.getItem(slotKey(1))).toBeNull();
+    expect(localStorage.getItem(slotKey(1))).toBe(classic);
     expect(localStorage.getItem(slotKey(2))).toBe(kept);
     expect(root.querySelector('[data-nrl-continue-1]')).toBeNull();
     expect(root.querySelector('[data-nrl-slot-1]')!.getAttribute('data-empty')).toBe('');
@@ -488,7 +490,14 @@ describe('League setup destination', () => {
     const again = new StubNode('div');
     void showTitleFlow(again as unknown as HTMLElement);
     expect(said).toEqual([CLASSIC_RETIRED_TEXT]);
-    expect(again.querySelector('[data-nrl-new-1]')).not.toBeNull();
+    // New club on the Classic slot: no Start over prompt, as for an empty slot, and the
+    // League career is written over exactly those Classic bytes.
+    root.querySelector('[data-nrl-new-1]')!.click();
+    await vi.dynamicImportSettled();
+    root.querySelector('[data-nrl-start]')!.click();
+    expect(root.querySelector('[data-nrl-start-confirm]')).toBeNull();
+    expect(await choice).toMatchObject({ mode: 'new', careerMode: 'league', destination: { slot: 1, expectedOriginal: classic } });
+    expect(localStorage.getItem(slotKey(1))).toBe(classic);
   });
 
   it('returns failed starts to the slot list even if all slots remain empty', () => {

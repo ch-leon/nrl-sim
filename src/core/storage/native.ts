@@ -22,20 +22,6 @@ function browserMirrorBoot(): MirrorBoot {
 }
 
 let previousBoot: ReturnType<typeof startNativeMirror> | undefined;
-/** The last iOS boot's outcome, or undefined off iOS / before boot. */
-let lastBoot: Awaited<ReturnType<typeof startNativeMirror>> | undefined;
-
-/**
- * True when the web view may not hold the whole truth for any of `keys` (unprefixed
- * storage keys): on iOS before the mirror is active, after it failed to start, or
- * when the boot sync could not restore one of them. Off iOS, false. Never throws.
- */
-export function nativeSavesUnsure(keys: readonly string[]): boolean {
-  if (!lastBoot) return isIosNative();
-  if (lastBoot.start !== 'active' || !lastBoot.mirror) return true;
-  const mirror = lastBoot.mirror;
-  return keys.some((key) => mirror.unrestored(key));
-}
 
 /**
  * main.ts awaits this before anything reads a save, and only in the iOS app.
@@ -55,8 +41,7 @@ export async function bootNativeMirror(boot = browserMirrorBoot()): Promise<Mirr
       return boot.install(storage, mirror);
     }});
   })();
-  lastBoot = await previousBoot;
-  return lastBoot.start;
+  return (await previousBoot).start;
 }
 
 /** How a file the player exports leaves the game. */

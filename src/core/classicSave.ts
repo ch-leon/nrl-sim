@@ -5,7 +5,7 @@
 //
 // Classic needs positive evidence: a version this game understands, and the
 // Classic league table (16 clubs in AU, 12 in the UK pack). A missing leagueCareer is not enough, so a later League shape
-// is not deleted. A save newer than SAVE_VERSION is not Classic: it keeps the
+// is not ignored. A save newer than SAVE_VERSION is not Classic: it keeps the
 // "Update the game" message. A League career calendar is the structural calendar
 // (mode 'structural') shared by a League career and an isolated developer
 // prototype. Those stay where they are. Anything that is not a save object
