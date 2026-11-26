@@ -2,10 +2,64 @@
 // Screenshots stay in CI's e2e-webkit-screens artifact.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { confirmStartingLeague, BASE, OUT_ROOT, IPHONE_UA, openNav, SHEET_EXIT, setupStep } from '../common.mjs';
+import { confirmStartingLeague, BASE, OUT_ROOT, IPHONE_UA, openNav, reachProblems, SHEET_EXIT, setupStep } from '../common.mjs';
+
+export async function runRecruitTutorial(browser) {
+  let failures = 0;
+  for (const [width, height] of [[844, 390], [667, 375], [390, 844]]) {
+    for (const cardWeek of [false, true]) {
+      const tag = `${width}x${height}, card week ${cardWeek ? 'on' : 'off'}`;
+      // The game shows a rotate card on coarse-pointer portrait devices. Check the playable portrait layout.
+      const phone = width > height;
+      const ctx = await browser.newContext({ viewport: { width, height }, hasTouch: phone, isMobile: phone, deviceScaleFactor: 2, userAgent: IPHONE_UA });
+      await ctx.addInitScript((enabled) => {
+        localStorage.setItem('nrlsim.iosInstallHintShown', '1');
+        if (enabled) localStorage.setItem('nrl-sim-labs', JSON.stringify({ visible: true, on: { 'card-week': true }, hintsSeen: [] }));
+      }, cardWeek);
+      const page = await ctx.newPage();
+      page.setDefaultTimeout(10000);
+      const press = (selector) => page.locator(selector).click();
+      try {
+        await page.goto(BASE);
+        await setupStep(page);
+        if (cardWeek) await page.locator('[data-nrl-card-week]').check();
+        await press('[data-nrl-start]');
+        await confirmStartingLeague(page, press);
+        await press('[data-expansion-work]');
+        await press('[data-screen-key="build"] [data-facility="trainingPaddock"]');
+        await press('.nrl-placebar [data-place-go]');
+
+        const bubble = '.nrl-tutorial-bubble[data-step="recruit"]';
+        const list = '[data-screen-key="recruit"] .nrl-screen-body';
+        const toast = page.locator('.nrl-toast-action');
+        await toast.waitFor({ state: 'visible' });
+        await page.locator(bubble).waitFor({ state: 'attached' });
+        await page.locator(list).waitFor();
+        if (cardWeek) await page.locator('[data-card-chip] .nrl-card-chip-pick').waitFor();
+        await toast.waitFor({ state: 'detached' }); // Let the build Undo expire naturally.
+
+        const problems = await reachProblems(page, bubble, [
+          '[data-screen-key="recruit"] [data-seg="squad"]',
+          `${bubble} .nrl-tutorial-skip`,
+        ]);
+        if (await page.locator(`${bubble}:is(.nrl-tutorial-top, .nrl-tutorial-right, [data-aside])`).count()) {
+          problems.push('Recruit bubble did not return to its bottom dock after Undo expired');
+        }
+        if (problems.length) throw new Error(problems.join('; '));
+        console.log(`ok recruit tutorial ${tag}`);
+      } catch (err) {
+        failures++;
+        console.log(`FAIL recruit tutorial ${tag} — ${err.message}`);
+      } finally {
+        await ctx.close();
+      }
+    }
+  }
+  return failures;
+}
 
 export async function runRecruit(browser) {
-  let failures = 0;
+  let failures = await runRecruitTutorial(browser);
   for (const [width, height] of [[667, 375], [844, 390]]) {
     for (const difficulty of ['easy', 'hard']) {
       const tag = `${width}x${height}-${difficulty}`;

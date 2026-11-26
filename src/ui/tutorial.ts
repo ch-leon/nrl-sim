@@ -75,6 +75,7 @@ const inSquad = (id: string): string => `[data-seg="${id}"], ${tab('squad')}`;
 
 /** The paddock's name as the catalog has it, so a rename follows (#361 owns the names). */
 const PADDOCK = FACILITY_CATALOG.trainingPaddock.name;
+const RECRUIT_LIST = '[data-screen-key="recruit"] .nrl-screen-body';
 
 export const STEPS: readonly TutorialStep[] = [
   {
@@ -100,7 +101,7 @@ export const STEPS: readonly TutorialStep[] = [
     // free agent's page opened over it is rung whole in its place (Sign is on its Deal tab).
     // A squad man's page has no Sign (Renew, Sell, Release), so it gets no ring.
     text: 'Sign a player you can afford, and leave enough for the bills.',
-    anchor: `[data-screen-key="recruit"] .nrl-screen-body, .nrl-player-modal.nrl-player-free, ${inSquad('recruit')}`,
+    anchor: `${RECRUIT_LIST}, .nrl-player-modal.nrl-player-free, ${inSquad('recruit')}`,
     advanceOn: 'player:signed',
     opens: 'recruit',
     tap: 2,
@@ -727,7 +728,10 @@ function watchToasts(fn: () => void): () => void {
  */
 function dockClear(bubble: HTMLElement, anchorEl: HTMLElement): void {
   const pad = 6;
-  const a = anchorEl.getBoundingClientRect();
+  // The ring spans the Recruit list. Keep its bubble clear of the Squad / Recruit tabs
+  // so the bottom dock is available again when the Undo toast expires.
+  const tabs = anchorEl.matches(RECRUIT_LIST) ? anchorEl.closest('.nrl-recruit')?.querySelector('.nrl-sq-tabs') : null;
+  const a = (tabs ?? anchorEl).getBoundingClientRect();
   const anchor = { left: a.left - pad, right: a.right + pad, top: a.top - pad, bottom: a.bottom + pad };
   const base = bubble.classList.contains('nrl-tutorial-bar') ? 'nrl-tutorial-bubble nrl-tutorial-bar' : 'nrl-tutorial-bubble';
   const toast = undoToastBox();
