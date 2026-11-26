@@ -34,15 +34,15 @@ import { autoPick } from '../systems/lineup';
 import { DEFAULT_TACTICS } from '../match/league/presets';
 import { bus } from './events';
 import { registerTickHook, TICK_ORDER, unregisterTickHook, weekHeld, activePaidCupCheckpoint, leagueIntervalSaveHeld, failedIntervalProblem, failedIntervalCheckpoint, type IntervalCheckpoint } from './time';
-import { clearLiveMatch, isLiveMatchRecord, parseLiveMatch, LIVE_MATCH_EXPORT_FIELD, peelLiveMatchExport, readLiveMatch, writeLiveMatch } from '../systems/liveMatchRecord';
+import { clearLiveMatch, isLiveMatchRecord, parseLiveMatch, LIVE_MATCH_EXPORT_FIELD, peelLiveMatchExport, readLiveMatch, writeLiveMatch, type LiveMatchRecord } from '../systems/liveMatchRecord';
 import { CLASSIC_RETIRED_TEXT, isClassicSave } from './classicSave';
 import { CORRUPT_SAVE_KEY, LEGACY_SAVE_KEY, liveMatchKey, saveMetaKey, slotKey } from './storageKeys';
 import { BRAND } from '../brand';
 import { cleanName } from '../data/names';
 import { allPlayers, renameClubsPatch, renamePlayersPatch, validClubColors, type ClubEdit } from '../systems/rename';
 import { browserStorage, inCareerNamespace, LocalSaveStore, type StorageLike } from './storage/local';
-import { nextMeta } from './storage/meta';
-import { deliverFile } from './storage/native';
+import { checksumOf, nextMeta, parseMeta } from './storage/meta';
+import { deliverFile, nativeSavesUnsure } from './storage/native';
 import type { SaveMeta, SlotListing } from './storage/types';
 
 export { slotKey } from './storageKeys';
@@ -818,12 +818,65 @@ export function downloadOriginalSave(slot: number, recoveryIndex?: number): void
   }
 }
 
+/** A live-match record's fixture is this career's own: same week, its club playing, both clubs in its league. */
+function careerOwnsMatch(career: Record<string, unknown>, record: LiveMatchRecord): boolean {
+  const clubs = (career.league as { clubs?: unknown } | undefined)?.clubs;
+  const ids = new Set(Array.isArray(clubs) ? clubs.map((c) => (c as { id?: unknown } | null)?.id) : []);
+  return record.season === career.season && record.week === career.week
+    && (record.homeId === career.clubId || record.awayId === career.clubId)
+    && ids.has(record.homeId) && ids.has(record.awayId);
+}
+
+/** Thrown inside the cleanup when a slot cannot be judged with certainty this load. */
+class ClassicCleanupUnsure extends Error {}
+
+/**
+ * What to delete from one slot: only bytes positively identified as Classic, key by key.
+ * The slot key and (slot 1) the legacy key when Classic; the meta only when its checksum
+ * is a Classic payload's; the live-match record only when the Classic career is the one
+ * career here that owns it. Throws ClassicCleanupUnsure on anything it cannot read or parse.
+ */
+function classicKeysIn(storage: StorageLike, slot: number): string[] {
+  const careerKeys = [slotKey(slot), ...(slot === 1 ? [LEGACY_SAVE_KEY] : [])];
+  const careers: { key: string; raw: string; parsed: Record<string, unknown>; classic: boolean }[] = [];
+  for (const key of careerKeys) {
+    const raw = storage.getItem(key);
+    if (raw === null) continue;
+    let parsed: unknown;
+    try { parsed = JSON.parse(raw); } catch { throw new ClassicCleanupUnsure(`${key} does not parse`); }
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) throw new ClassicCleanupUnsure(`${key} is not a save`);
+    careers.push({ key, raw, parsed: parsed as Record<string, unknown>, classic: isClassicSave(raw) });
+  }
+  const classic = careers.filter((c) => c.classic);
+  if (classic.length === 0) return [];
+  const doomed = classic.map((c) => c.key);
+  const metaRaw = storage.getItem(saveMetaKey(slot));
+  if (metaRaw !== null) {
+    const meta = parseMeta(metaRaw);
+    if (!meta) throw new ClassicCleanupUnsure('the slot meta does not parse');
+    const describes = careers.filter((c) => checksumOf(c.raw) === meta.checksum);
+    if (describes.length > 0 && describes.every((c) => c.classic)) doomed.push(saveMetaKey(slot));
+  }
+  const matchRaw = storage.getItem(liveMatchKey(slot));
+  if (matchRaw !== null) {
+    const record = parseLiveMatch(matchRaw);
+    if (!record) throw new ClassicCleanupUnsure('the live-match record does not parse');
+    const owners = careers.filter((c) => careerOwnsMatch(c.parsed, record));
+    // Unknown or shared ownership: keep it.
+    if (owners.length === 1 && owners[0]!.classic) doomed.push(liveMatchKey(slot));
+  }
+  return doomed;
+}
+
 /**
  * Delete every Classic career (#819). Intentional, at the owner's request: Classic is
- * retired, and its saves are not kept. A slot whose own key holds a Classic career loses
- * that key, its meta and its live-match record; for slot 1 a Classic career under the
- * legacy key goes too. League careers and everything else are left untouched. Idempotent:
- * running it again finds nothing. Returns the slots that held a Classic career. Never throws.
+ * retired, and its saves are not kept. Only bytes positively identified as Classic are
+ * removed, one key at a time (never a slot-wide remove): a Classic slot key and slot 1's
+ * Classic legacy key, the meta whose checksum is a Classic payload's, and a live-match
+ * record that only the Classic career owns. League careers and anything of unknown
+ * ownership stay. A slot that cannot be judged with certainty (a key that will not read
+ * or parse, or on iPhone a native copy the boot could not restore) is left whole until
+ * the next load. Idempotent. Returns the slots a Classic career was deleted from. Never throws.
  */
 export function deleteClassicSlots(): number[] {
   const store = getStore();
@@ -831,24 +884,15 @@ export function deleteClassicSlots(): number[] {
   const out: number[] = [];
   for (let slot = 1; slot <= SLOT_COUNT; slot++) {
     try {
-      const storage = store.storage;
-      const own = storage.getItem(slotKey(slot));
-      const legacy = slot === 1 ? storage.getItem(LEGACY_SAVE_KEY) : null;
-      const ownClassic = own !== null && isClassicSave(own);
-      const legacyClassic = legacy !== null && isClassicSave(legacy);
-      if (!ownClassic && !legacyClassic) continue;
-      // The meta and live match belong to the visible career: the slot key, or the legacy key it reads through to.
-      const visibleClassic = ownClassic || own === null;
-      // store.remove also drops any queued meta write, and for slot 1 the legacy key,
-      // so it is used unless a League career sits under that legacy key.
-      if (visibleClassic && (legacy === null || legacyClassic)) store.remove(slot);
-      else {
-        if (ownClassic) { storage.removeItem(slotKey(slot)); storage.removeItem(saveMetaKey(slot)); }
-        if (legacyClassic) storage.removeItem(LEGACY_SAVE_KEY);
-      }
-      if (visibleClassic) storage.removeItem(liveMatchKey(slot));
+      const keys = [slotKey(slot), saveMetaKey(slot), liveMatchKey(slot), ...(slot === 1 ? [LEGACY_SAVE_KEY] : [])];
+      if (careerNamespace() === null && nativeSavesUnsure(keys)) continue;
+      const doomed = classicKeysIn(store.storage, slot);
+      if (doomed.length === 0) continue;
+      for (const key of doomed) store.storage.removeItem(key);
       out.push(slot);
-    } catch (error) { console.warn('nrl-sim: could not delete a Classic career', error); }
+    } catch (error) {
+      if (!(error instanceof ClassicCleanupUnsure)) console.warn('nrl-sim: could not delete a Classic career', error);
+    }
   }
   return out;
 }

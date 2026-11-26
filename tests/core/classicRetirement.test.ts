@@ -12,6 +12,15 @@ import { setCareerNamespace } from '../../src/core/storage/local';
 import { stubLocalStorage } from '../commercial/memStorage';
 import { leagueSlotState } from '../helpers/leagueSlot';
 
+/** A valid live-match record for `career`'s own fixture this week, with a coaching call at tick 47. */
+function matchFor(career: GameState, tick = 47): string {
+  const away = career.league.clubs.find((c) => c.id !== career.clubId)!.id;
+  return JSON.stringify({
+    season: career.season, week: career.week, round: 1, homeId: career.clubId, awayId: away, seed: 7,
+    calls: [{ tick: 40, side: 'home', call: 'hit-up' }], tick,
+  });
+}
+
 function classicCareer(name: string, seed: number): GameState {
   const state = createNewGame(name, seed);
   state.league = initLeague(state);
@@ -29,8 +38,9 @@ afterEach(() => {
 describe('deleting Classic saves', () => {
   it('deletes a Classic career with its meta and live-match checkpoint, and the slot reads empty', () => {
     const storage = stubLocalStorage();
-    writeSlot(2, classicCareer('Old Club', 9));
-    storage.setItem(liveMatchKey(2), JSON.stringify({ season: 1, week: 3, fixtureId: 'f-3' }));
+    const classic = classicCareer('Old Club', 9);
+    writeSlot(2, classic);
+    storage.setItem(liveMatchKey(2), matchFor(classic));
     flushSaveMeta();
     expect(storage.getItem(saveMetaKey(2))).not.toBeNull();
     expect(deleteClassicSlots()).toEqual([2]);
@@ -66,8 +76,9 @@ describe('deleting Classic saves', () => {
 
   it('a slot-1 Classic career read through the legacy key goes, with its meta and live match', () => {
     const storage = stubLocalStorage();
-    storage.setItem(LEGACY_SAVE_KEY, JSON.stringify(classicCareer('Legacy', 12)));
-    storage.setItem(liveMatchKey(1), '{"week":2}');
+    const legacy = classicCareer('Legacy', 12);
+    storage.setItem(LEGACY_SAVE_KEY, JSON.stringify(legacy));
+    storage.setItem(liveMatchKey(1), matchFor(legacy));
     expect(loadSlot(1).status).toBe('ok');
     expect(deleteClassicSlots()).toEqual([1]);
     expect(storage.getItem(LEGACY_SAVE_KEY)).toBeNull();
@@ -77,14 +88,19 @@ describe('deleting Classic saves', () => {
 
   it('a Classic legacy copy goes, but the League career in slot 1 and its live match stay', async () => {
     const storage = stubLocalStorage();
-    writeSlot(1, await leagueSlotState('League'));
+    const leagueState = await leagueSlotState('League');
+    writeSlot(1, leagueState);
+    flushSaveMeta();
     const league = storage.getItem(slotKey(1));
-    storage.setItem(liveMatchKey(1), '{"week":5}');
+    const meta = storage.getItem(saveMetaKey(1));
+    const match = matchFor(leagueState);
+    storage.setItem(liveMatchKey(1), match);
     storage.setItem(LEGACY_SAVE_KEY, JSON.stringify(classicCareer('Legacy', 12)));
     expect(deleteClassicSlots()).toEqual([1]);
     expect(storage.getItem(LEGACY_SAVE_KEY)).toBeNull();
     expect(storage.getItem(slotKey(1))).toBe(league);
-    expect(storage.getItem(liveMatchKey(1))).toBe('{"week":5}');
+    expect(storage.getItem(saveMetaKey(1))).toBe(meta);
+    expect(storage.getItem(liveMatchKey(1))).toBe(match);
   });
 
   it('a League career under the legacy key is not touched when slot 1 is Classic', () => {
@@ -95,6 +111,57 @@ describe('deleting Classic saves', () => {
     expect(deleteClassicSlots()).toEqual([1]);
     expect(storage.getItem(slotKey(1))).toBeNull();
     expect(storage.getItem(LEGACY_SAVE_KEY)).toBe(league);
+  });
+
+  // Codex r4 blocker 1: Classic in slot 1, a League career under the legacy key, and
+  // the League match parked mid-match. The checkpoint is the League career's: it stays.
+  it('keeps the legacy League career\'s live match when slot 1 holds a Classic career', async () => {
+    const storage = stubLocalStorage();
+    writeSlot(1, classicCareer('Slot One', 9));
+    const leagueState = await leagueSlotState('Legacy League');
+    const league = JSON.stringify(leagueState);
+    storage.setItem(LEGACY_SAVE_KEY, league);
+    const match = matchFor(leagueState, 47);
+    storage.setItem(liveMatchKey(1), match);
+    expect(deleteClassicSlots()).toEqual([1]);
+    expect(storage.getItem(slotKey(1))).toBeNull();
+    expect(storage.getItem(LEGACY_SAVE_KEY)).toBe(league);
+    expect(storage.getItem(liveMatchKey(1))).toBe(match);
+    const loaded = loadSlot(1);
+    expect(loaded.status === 'ok' && loaded.state.clubName).toBe('Legacy League');
+  });
+
+  it('keeps a live match whose owner it cannot prove', () => {
+    const storage = stubLocalStorage();
+    const classic = classicCareer('Old Club', 9);
+    writeSlot(2, classic);
+    const stranger = JSON.stringify({ ...JSON.parse(matchFor(classic)), homeId: 'not-a-club' , awayId: 'nor-this' });
+    storage.setItem(liveMatchKey(2), stranger);
+    expect(deleteClassicSlots()).toEqual([2]);
+    expect(storage.getItem(slotKey(2))).toBeNull();
+    expect(storage.getItem(liveMatchKey(2))).toBe(stranger);
+  });
+
+  it('leaves the whole slot for the next load when a key will not parse', () => {
+    const storage = stubLocalStorage();
+    writeSlot(2, classicCareer('Old Club', 9));
+    const raw = storage.getItem(slotKey(2));
+    storage.setItem(liveMatchKey(2), '{not json');
+    expect(deleteClassicSlots()).toEqual([]);
+    expect(storage.getItem(slotKey(2))).toBe(raw);
+    expect(storage.getItem(liveMatchKey(2))).toBe('{not json');
+    storage.removeItem(liveMatchKey(2));
+    expect(deleteClassicSlots()).toEqual([2]);
+  });
+
+  it('leaves slot 1 whole when the legacy key will not parse', () => {
+    const storage = stubLocalStorage();
+    writeSlot(1, classicCareer('Slot One', 9));
+    const raw = storage.getItem(slotKey(1));
+    storage.setItem(LEGACY_SAVE_KEY, 'garbled');
+    expect(deleteClassicSlots()).toEqual([]);
+    expect(storage.getItem(slotKey(1))).toBe(raw);
+    expect(storage.getItem(LEGACY_SAVE_KEY)).toBe('garbled');
   });
 
   it('deletes a playtest Classic career under its own prefix and leaves the normal slot', () => {
