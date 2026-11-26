@@ -35,7 +35,7 @@ premium game with a free demo and a one-off unlock
 
 ## Where things stand (as of 25 Nov 2026)
 
-- **One mode.** League career is the only way to start a club. It begins in Local. A Classic save is deleted on load, at the owner's request, with a one-time message, and the slot is left empty. Classic-only code is a later removal ([#819](https://github.com/ch-leon/nrl-sim/issues/819)).
+- **One mode.** League career is the only way to start a club. It begins in Local. A Classic save is no longer loadable: its slot shows as empty, with a one-time message, and it is overwritten when you start a League career in that slot. Nothing is deleted automatically. Classic-only code is a later removal ([#819](https://github.com/ch-leon/nrl-sim/issues/819)).
 
 ## Where things stood (7 Nov 2026)
 

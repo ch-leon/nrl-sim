@@ -301,7 +301,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
     sections: [
       {
         heading: 'League career',
-        text: 'League career is the only mode. A new club starts in Local, in Australia or the UK: eight clubs, and a finals title unlocks the next league. Classic mode has been retired: an old Classic save is deleted when the game loads.',
+        text: 'League career is the only mode. A new club starts in Local, in Australia or the UK: eight clubs, and a finals title unlocks the next league. Classic mode has been retired: an old Classic save is no longer loadable, and its slot shows as empty. It is overwritten when you start a League career in that slot.',
       },
       {
         text: `${LOCAL.name}: ${LOCAL.entrants.length} clubs play ${LOCAL.regularRounds} rounds, home and away: 2 points for a win, 1 for a draw, points difference splits ties. The Ladder tab shows every club’s form (the last five), and a club’s name opens its squad. The Fixtures tab previews your next match.`,

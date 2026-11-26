@@ -58,7 +58,8 @@ describe('GUIDE_PAGES', () => {
     expect(ladder).toContain('Local League: 8 clubs play 14 rounds');
     expect(ladder).toContain('The top 4 play the finals');
     expect(ladder).not.toMatch(/top eight|quarter final|1 v 8/);
-    expect(ladder).toContain('an old Classic save is deleted when the game loads');
+    expect(ladder).toContain('an old Classic save is no longer loadable');
+    expect(ladder).not.toMatch(/deleted/);
     expect(ladder).not.toMatch(/exported/);
     const week = page('week');
     expect(week).toContain('14 league rounds, then finals for the top 4');
