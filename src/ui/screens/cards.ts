@@ -4,7 +4,7 @@ import { getState, type CardHistoryEntry, type GameState } from '../../core/stat
 import { CARD_WEEK, cardDefById } from '../../data/cards';
 import { overallRating } from '../../data/player';
 import { ROMAN, TRAITS, traitLevel } from '../../data/traits';
-import { activeCardStaff, cardHandView, discardHeldCard, pickBlocked, playChosenCard, type CardFaceView } from '../../systems/cardWeek';
+import { activeCardStaff, cardHandView, discardHeldCard, pickBlocked, playChosenCard, preferredCardOffer, type CardFaceView } from '../../systems/cardWeek';
 import { POSITION_SHORT } from '../../systems/lineup';
 import { staffTitle } from '../../systems/staff';
 import { cardAction, cardFacts, cardProblem, cardTargets, ensureCardStyles, openCardPick, picksWaitingText } from '../cardWeek';
@@ -74,10 +74,27 @@ export function openCardsScreen(): HTMLElement | null {
     const count = cw.offers.length;
     const pick = cardAction('Pick', () => openCardPick(), blocked, true);
     pick.setAttribute('data-cards-pick', '');
-    content.append(el('section', { class: 'nrl-cards-picks' },
-      el('div', {}, el('h3', { text: 'Picks waiting' }),
-        el('p', { text: count ? picksWaitingText(count, cw.starterLeft) : 'No picks waiting.' })),
-      ...(count ? [pick] : [])));
+    const waiting = el('section', {},
+      el('div', { class: 'nrl-cards-picks' },
+        el('div', {}, el('h3', { text: 'Picks waiting' }),
+          el('p', { text: count ? picksWaitingText(count, cw.starterLeft) : 'No picks waiting.' })),
+        ...(count ? [pick] : [])));
+    if (count > 1) {
+      const preferred = preferredCardOffer(state);
+      const list = el('div', { class: 'nrl-cards-offers' });
+      for (const [index, offer] of cw.offers.entries()) {
+        const label = offer.kind === 'starter' ? `Starter pick ${index + 1}`
+          : `Match pick · Season ${offer.season}, Week ${offer.week}`;
+        const open = cardAction(label, () => openCardPick(offer.grant), blocked);
+        open.setAttribute('data-cards-offer', String(offer.grant));
+        if (offer === preferred && offer.kind !== 'starter') open.append(el('span', { class: 'nrl-cards-latest', text: 'Latest' }));
+        list.append(open);
+      }
+      waiting.append(list);
+    } else if (count === 1) {
+      pick.setAttribute('data-cards-offer', String(cw.offers[0]!.grant));
+    }
+    content.append(waiting);
     if (count && blocked) content.append(cardProblem(blocked));
 
     const hand = cardHandView(state);

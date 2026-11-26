@@ -329,6 +329,9 @@ describe('card week (#846, v36)', () => {
     expect(isCardWeek({ ...cw, offers: [{ ...first, kind: 'match' }, ...remaining] })).toBe(false);
     expect(isCardWeek({ ...cw, grants: 0 })).toBe(false);
     expect(isCardWeek({ ...cw, seenGrant: cw.grants + 1 })).toBe(false);
+    expect(isCardWeek({ ...cw, offers: [{ ...first, grant: remaining[0]!.grant }, ...remaining] })).toBe(false);
+    expect(isCardWeek({ ...cw, offers: [{ ...first, seen: true }, ...remaining] })).toBe(false);
+    expect(isCardWeek({ ...cw, seenGrant: first!.grant, offers: [{ ...first, seen: true }, ...remaining] })).toBe(true);
     const held = { cardId: cards[0]!.cardId, level: 1, offered: cards[0], gotSeason: 1, gotWeek: 1 };
     expect(isCardWeek({ ...cw, hand: [held] })).toBe(true);
     expect(isCardWeek({ ...cw, hand: Array(6).fill(held) })).toBe(false);

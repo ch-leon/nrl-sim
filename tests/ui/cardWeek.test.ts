@@ -8,7 +8,7 @@ import { bus } from '../../src/core/events';
 import { getState, loadState, setState, type GameState } from '../../src/core/state';
 import { __setLabs } from '../../src/labs/flags';
 import { prepareLeagueCareer } from '../../src/systems/leagueCareerSetup';
-import { cardOfferView, chooseCard, plantCard } from '../../src/systems/cardWeek';
+import { cardOfferView, cardWeekTick, chooseCard, plantCard } from '../../src/systems/cardWeek';
 import { closeModal, closeScreen, dialogOpen, el, openModal } from '../../src/ui/dom';
 import { cardChipCount, initCardWeekPick, lastMatchView, openCardPick, picksWaitingText, replacesLine, tierLabel, traitTargetRows } from '../../src/ui/cardWeek';
 import { openCardsScreen } from '../../src/ui/screens/cards';
@@ -199,65 +199,136 @@ describe('Cards and new grants', () => {
     expect(getState().cardWeek!.hand).toEqual([]);
   });
 
-  it('disables both actions when the hand is full until the player discards a specific card', async () => {
-    const s = plant(await fresh(), 'cashInjection');
-    loadState(s);
+  it('allows Play now with a full hand and requires a discard before taking a sixth card', async () => {
+    loadState(await fresh());
     for (let i = 0; i < 5; i++) {
       loadState(plant(getState(), 'cashInjection'));
       expect(chooseCard(0).ok).toBe(true);
     }
     loadState(plant(getState(), 'cashInjection'));
+    const hand = getState().cardWeek!.hand;
+    const money = getState().money;
     openCardPick();
     expect(pick().querySelector('[data-card-choice="0"]')!.disabled).toBe(true);
-    expect(pick().querySelector('[data-card-play-now="0"]')!.disabled).toBe(true);
+    const play = pick().querySelector('[data-card-play-now="0"]')!;
+    expect(play.disabled).toBe(false);
+    play.click();
+    expect(getState().cardWeek!.hand).toEqual(hand);
+    expect(getState().money).toBe(money + 15_000);
+    loadState(plant(getState(), 'cashInjection'));
+    openCardPick();
     pick().querySelector('[data-card-make-room]')!.click();
     pick().querySelector('[data-card-discard="2"]')!.click();
     expect(getState().cardWeek!.hand).toHaveLength(4);
-    expect(pick().querySelector('[data-card-choice="0"]')!.disabled).toBe(false);
     pick().querySelector('[data-card-choice="0"]')!.click();
     expect(getState().cardWeek!.hand).toHaveLength(5);
   });
 
-  it('opens once per grant even at the same queue length, waits behind a dialog, and stays closed on reload', async () => {
+  it('opens actual new League picks through every entry point, even with three starters and a full match queue', async () => {
     const s = await fresh();
+    const league = s.competitions!.instances.find(i => i.definition.format.kind === 'league' && i.entrantIds.includes(s.clubId))!;
+    const matches = league.fixtures.filter(f => (f.homeId === s.clubId || f.awayId === s.clubId) && f.slot !== undefined)
+      .sort((a, b) => a.slot! - b.slot!).slice(0, 5);
+    expect(matches).toHaveLength(5);
     vi.useFakeTimers();
     loadState(s);
     const stop = initCardWeekPick();
     vi.advanceTimersByTime(50);
-    expect(pick()).not.toBeNull();
-    expect(getState().cardWeek!.seenGrant).toBe(3);
+    expect(pick().getAttribute('data-card-grant')).toBe('1');
+    expect(getState().cardWeek!.offers.map(o => o.seen)).toEqual([true, undefined, undefined]);
     closeModal();
-    openModal(el('p', { text: 'Week summary' }));
-    setState({ cardWeek: { ...getState().cardWeek!, grants: 4 } });
-    bus.emit('week:advanced', { season: s.season, week: s.week + 1 });
-    vi.advanceTimersByTime(400);
-    expect(pick()).toBeNull();
-    closeModal();
-    vi.advanceTimersByTime(400);
-    expect(pick()).not.toBeNull();
-    closeModal();
-    vi.advanceTimersByTime(500);
-    expect(pick()).toBeNull();
+
+    for (const [i, fixture] of matches.entries()) {
+      // Hold the auto prompt behind the actual summary until the test dismisses it.
+      openModal(el('p', { text: 'Week summary' }));
+      const before = weekSnapshot(getState());
+      const state = getState();
+      const next = cardWeekTick({
+        ...state, week: fixture.slot!,
+        competitions: { ...state.competitions!, instances: state.competitions!.instances.map(instance => instance.id === league.id ? {
+          ...instance, fixtures: instance.fixtures.map(f => f.id === fixture.id ? {
+            ...f, status: 'completed', result: { homeScore: 10, awayScore: 0, decider: 'score', winnerId: f.homeId },
+          } : f),
+        } : instance) },
+      });
+      loadState({ ...next, week: fixture.slot! + 1 });
+      const cw = getState().cardWeek!;
+      const newest = cw.offers[cw.offers.length - 1]!;
+      expect(cw).toMatchObject({ starterLeft: 3, owed: Math.min(3, i + 1), grants: i + 4 });
+      expect(newest).toMatchObject({ kind: 'match', grant: i + 4, week: fixture.slot });
+      const assertShown = () => {
+        expect(pick().getAttribute('data-card-grant')).toBe(String(newest.grant));
+        const choices = pick().querySelectorAll('[data-card-choice]');
+        expect(choices.map(c => c.getAttribute('data-card-id'))).toEqual(newest.cards.map(c => c.cardId));
+        expect(choices.some(c => !c.disabled)).toBe(true);
+      };
+
+      vi.advanceTimersByTime(400);
+      expect(pick()).toBeNull();
+      closeModal();
+      openCardsScreen();
+      const screen = body().querySelector('[data-cards-screen]')!;
+      expect(screen.querySelectorAll('[data-cards-offer]')).toHaveLength(cw.offers.length);
+      screen.querySelector('[data-cards-offer="2"]')!.click();
+      expect(pick().getAttribute('data-card-grant')).toBe('2');
+      expect(getState().cardWeek!.offers.find(o => o.grant === newest.grant)!.seen).toBeUndefined();
+      closeModal();
+      closeScreen();
+
+      bus.emit('week:advanced', { season: s.season, week: getState().week });
+      vi.advanceTimersByTime(400);
+      assertShown();
+      closeModal();
+      expect(getState().cardWeek!.offers.find(o => o.grant === newest.grant)!.seen).toBe(true);
+      vi.advanceTimersByTime(500);
+      expect(pick()).toBeNull();
+
+      const summary = weekSummary(before, weekSnapshot(getState()));
+      expect(summary.newCardPicks).toBe(1);
+      openWeekSummary(summary, { onAdvance: () => {}, onPick: () => { openCardPick(); } });
+      body().querySelector('.nrl-summary-pick')!.querySelector('.nrl-btn-outline')!.click();
+      assertShown();
+      closeModal();
+
+      openCardsScreen();
+      body().querySelector('[data-cards-screen]')!.querySelector('[data-cards-pick]')!.click();
+      assertShown();
+      closeModal();
+      closeScreen();
+    }
+    expect(getState().cardWeek!.history.map(h => h.action)).toEqual(['expire', 'expire']);
+    expect(getState().cardWeek!.offers.map(o => o.grant)).toEqual([1, 2, 3, 6, 7, 8]);
     stop();
     loadState(JSON.parse(JSON.stringify(getState())));
     const stopReload = initCardWeekPick();
     vi.advanceTimersByTime(500);
     expect(pick()).toBeNull();
     stopReload();
+
+    openCardsScreen();
+    body().querySelector('[data-cards-offer="6"]')!.click();
+    expect(pick().getAttribute('data-card-grant')).toBe('6');
+    pick().querySelectorAll('[data-card-choice]').find(c => !c.disabled)!.click();
+    expect(getState().cardWeek!.offers.map(o => o.grant)).toEqual([1, 2, 3, 7, 8]);
+    expect(getState().cardWeek!.starterLeft).toBe(3);
+    expect(getState().cardWeek!.owed).toBe(2);
   });
 
-  it('links the weekly summary to a pick even when a full queue kept the waiting count the same', async () => {
+  it('keeps older match grants unshown when opening a newer match first', async () => {
     const s = await fresh();
-    loadState(s);
-    const before = weekSnapshot(s);
-    const summary = weekSummary(before, weekSnapshot({ ...s, week: s.week + 1, cardWeek: { ...s.cardWeek!, grants: 4 } }));
-    expect(summary.newCardPicks).toBe(1);
-    openWeekSummary(summary, { onAdvance: () => {}, onPick: () => { openCardPick(); } });
-    const line = body().querySelector('.nrl-summary-pick')!;
-    expect(line.words()).toContain('New card pick');
-    line.querySelector('.nrl-btn-outline')!.click();
-    expect(pick()).not.toBeNull();
+    const matchOffers = [4, 5].map(grant => ({ ...s.cardWeek!.offers[0]!, kind: 'match' as const, grant }));
+    loadState({ ...s, cardWeek: { ...s.cardWeek!, offers: [...s.cardWeek!.offers, ...matchOffers], grants: 5, owed: 2 } });
+    vi.useFakeTimers();
+    const stop = initCardWeekPick();
+    openCardPick();
+    expect(pick().getAttribute('data-card-grant')).toBe('5');
+    expect(getState().cardWeek!.offers[3]!.seen).toBeUndefined();
+    closeModal();
+    vi.advanceTimersByTime(400);
+    expect(pick().getAttribute('data-card-grant')).toBe('4');
+    stop();
   });
+
 });
 
 describe('the title option', () => {

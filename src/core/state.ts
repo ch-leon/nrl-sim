@@ -305,6 +305,9 @@ export interface CardOffer {
   cards: OfferedCard[];
   kind: 'starter' | 'match' | 'decree';
   fromClubId?: string;
+  /** Missing only in v37 saves written before picks could be opened individually. */
+  grant?: number;
+  seen?: true;
 }
 
 type CardLevel = import('../data/traits').TraitLevel;
@@ -345,7 +348,7 @@ export interface CardWeekState {
   owed: number;
   offers: CardOffer[];
   grants: number;
-  /** The last grant acknowledged by opening Pick, even if the player left it waiting. */
+  /** The highest grant actually shown. Waiting offers track their own acknowledgement. */
   seenGrant: number;
   hand: HandCard[];
   active: ActiveCard[];

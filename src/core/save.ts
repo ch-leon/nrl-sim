@@ -25,9 +25,9 @@ import { currentCalendarFixtures, fixtureBridge, hasStructuralCalendar, recoverU
 // localStorage, or over a Map-backed fake a Node-env unit test injects. Every key
 // comes from src/core/storageKeys.ts, frozen whatever the game is called.
 
-import { fillCardOffers } from '../systems/cardWeek';
-import { CARD_PASS, CARD_WEEK, cardDefById } from '../data/cards';
-import type { ActiveCard, CardHistoryEntry, CardOffer, CardWeekState, Fixture, GameState } from './state';
+import { fillCardOffers, identifyCardOffers } from '../systems/cardWeek';
+import { CARD_PASS, CARD_WEEK } from '../data/cards';
+import type { CardHistoryEntry, CardOffer, CardWeekState, Fixture, GameState } from './state';
 import { hasV33Fields, isCardWeekV36, validateInput, validateCurrent, type SaveRepair } from './saveValidation';
 import { emptyFinance, getState, SAVE_VERSION, setState, stateInstallation } from './state';
 import { fromLegacy, isTraitId, traitLevel, type TraitInstance } from '../data/traits';
@@ -124,7 +124,7 @@ interface MigrationStep {
 }
 
 type CardWeekV36 = Pick<CardWeekState, 'rng' | 'owed' | 'history' | 'cardPlayers' | 'cardTraits' | 'lastMatch'>
-  & { offer: Omit<CardOffer, 'kind'> | null };
+  & { offer: Omit<CardOffer, 'kind' | 'grant' | 'seen'> | null };
 
 function migrateCardWeek(old: RawState): RawState {
   if (old.cardWeek === undefined) return old;
@@ -136,15 +136,8 @@ function migrateCardWeek(old: RawState): RawState {
   // Preserve a resolved pick even if the old counter did not count it.
   const waiting = Math.max(legacy.owed, offer ? 1 : 0);
   const starterLeft = Math.min(waiting, Math.max(0, CARD_WEEK.STARTER_PICKS - history.length));
-  const active: ActiveCard[] = state.staff.flatMap((member): ActiveCard[] => {
-    const hire = history.find((h) => {
-      const def = cardDefById(h.cardId);
-      return h.season === member.hiredSeason && def?.kind === 'staff'
-        && (typeof def.role === 'string' ? def.role === member.role
-          : member.role === 'attackCoach' && def.role.attackCoach === member.speciality);
-    });
-    return hire ? [{ cardId: hire.cardId, kind: 'staff', level: 1, member }] : [];
-  });
+  // v36 records the staff card ID and date, but no identity for the person
+  // hired. A paid hire can fill the same role later in the same season.
   const cardTraits = legacy.cardTraits.map((entry) => {
     const player = state.squad.find((p) => p.id === entry.playerId);
     const level = player && traitLevel(player.traits, entry.trait);
@@ -154,7 +147,7 @@ function migrateCardWeek(old: RawState): RawState {
   return { ...old, cardWeek: fillCardOffers({ ...state, cardWeek: {
     ...kept, starterLeft, owed: waiting - starterLeft,
     offers: offer ? [{ ...offer, kind: starterLeft > 0 ? 'starter' : 'match' }] : [],
-    grants, seenGrant: grants, history, cardTraits, hand: [], active, decree: null,
+    grants, seenGrant: 0, history, cardTraits, hand: [], active: [], decree: null,
     rerolls: { season: state.season, week: state.week, count: 0 },
     strikes: { season: state.season, count: 0, lossRun: 0, log: [] },
   } }).cardWeek };
@@ -455,10 +448,12 @@ function migrateChecked(raw: unknown): MigrateResult {
     const problem = leagueCareerStateProblem(state);
     // #837: a trip answered at the league choice. Kept only if the repaired career passes every check.
     const trip = problem ? repairClosedSeasonTrip(state) : null;
-    if (trip && !leagueCareerStateProblem(trip.state)) return { ok: true, outcome: 'repaired', state: trip.state, repairs: [trip.repair] };
+    const identifyOffers = (loaded: GameState): GameState => loaded.cardWeek
+      ? { ...loaded, cardWeek: identifyCardOffers(loaded.cardWeek) } : loaded;
+    if (trip && !leagueCareerStateProblem(trip.state)) return { ok: true, outcome: 'repaired', state: identifyOffers(trip.state), repairs: [trip.repair] };
     return problem ? { ok: false, outcome: problem.reason === 'unsupported' ? 'unsupported' : 'unrecoverable',
       reason: 'corrupt', message: problem.message }
-      : { ok: true, outcome: 'valid', state, repairs: [] };
+      : { ok: true, outcome: 'valid', state: identifyOffers(state), repairs: [] };
   }
   const inputProblem = validateInput(cur, version);
   if (inputProblem) return { ok: false, outcome: 'unrecoverable', reason: 'corrupt', message: inputProblem };

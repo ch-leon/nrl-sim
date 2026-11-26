@@ -66,9 +66,19 @@ export async function runCardWeek(browser) {
     await checkPick(page, false);
     await page.screenshot({ animations: 'disabled', path: join(out, '667x375-pick.png') });
 
+    await page.locator('.nrl-card-modal .nrl-screen-x').tap();
+    await page.locator('[data-screen="cards"]').tap();
+    const offers = page.locator(`${CARDS} [data-cards-offer]`);
+    await offers.last().waitFor();
+    assert.equal(await offers.count(), 3);
+    const grant = await offers.nth(1).getAttribute('data-cards-offer');
+    await offers.nth(1).tap();
+    assert.equal(await page.locator(PICK).getAttribute('data-card-grant'), grant);
+
     await page.locator(`${PICK} [data-card-choice]`).first().tap();
     await page.locator(`${PICK} [data-card-choice]`).first().tap();
     await page.locator('.nrl-card-modal .nrl-screen-x').tap();
+    await page.locator('[data-screen="club"]').tap();
     const tab = page.locator('[data-screen="cards"]');
     assert.ok(await tab.locator('.nrl-nav-label').evaluate(el => el.scrollWidth <= el.clientWidth));
     assert.equal(await tab.locator('[data-nav-badge]').getAttribute('data-count'), '1');

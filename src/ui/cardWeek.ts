@@ -4,7 +4,7 @@ import { advanceInProgress } from '../core/advance';
 import { saveIfChanged } from '../core/save';
 import { CARD_WEEK, cardDefById, type CardTier } from '../data/cards';
 import { ROMAN, TRAITS } from '../data/traits';
-import { cardHandView, cardOfferView, chooseCard, discardHeldCard, passPick, pickBlocked, playChosenCard, type CardFaceView } from '../systems/cardWeek';
+import { cardHandView, cardOfferView, chooseCard, discardHeldCard, passPick, pickBlocked, playChosenCard, preferredCardOffer, unshownCardOffer, type CardFaceView } from '../systems/cardWeek';
 import { POSITION_SHORT } from '../systems/lineup';
 import { fmtMoney } from '../utils/money';
 import { el, button, openModal, closeModal, activeScreen, dialogOpen, ensureStyles } from './dom';
@@ -149,9 +149,11 @@ function matchOnScreen(): boolean {
 }
 
 /** Open the saved pick and acknowledge this grant, including when opened manually. */
-export function openCardPick(): HTMLElement | null {
+export function openCardPick(grant?: number): HTMLElement | null {
   const s = getState();
-  if (!cardChipCount(s) || advanceInProgress() || matchOnScreen()) return null;
+  const offer = grant === undefined ? preferredCardOffer(s) : s.cardWeek?.offers.find(o => o.grant === grant);
+  if (!offer || advanceInProgress() || matchOnScreen()) return null;
+  let showing = offer.grant;
   ensureCardStyles();
   const content = el('div', { class: 'nrl-card-pick', attrs: { 'data-card-pick': '' } });
   let step: Step = { kind: 'cards' };
@@ -159,9 +161,12 @@ export function openCardPick(): HTMLElement | null {
   let problem = '';
 
   const choose = (index: number, play = false, targetId?: string): void => {
-    const r = play ? playChosenCard('pick', index, targetId) : chooseCard(index);
+    const r = play ? playChosenCard('pick', index, targetId, showing) : chooseCard(index, showing);
     problem = r.ok ? '' : r.reason;
-    if (r.ok) outcome = r.outcome;
+    if (r.ok) {
+      outcome = r.outcome;
+      showing = preferredCardOffer(getState())?.grant;
+    }
     step = { kind: 'cards' };
     if (r.ok && cardChipCount(getState()) === 0) {
       closeModal();
@@ -174,11 +179,13 @@ export function openCardPick(): HTMLElement | null {
   const back = (): void => { step = { kind: 'cards' }; problem = ''; render(); };
   const render = (): void => {
     const state = getState();
-    const view = cardOfferView(state);
+    const view = cardOfferView(state, showing);
     content.replaceChildren();
     if (!view.cards.length) { closeModal(); return; }
+    const displayed = state.cardWeek!.offers.find(o => o.grant === showing);
+    content.setAttribute('data-card-grant', String(showing));
     content.append(el('div', { class: 'nrl-card-head' },
-      el('h2', { text: 'Pick a card' }),
+      el('h2', { text: displayed?.kind === 'match' ? 'Match pick' : 'Pick a card' }),
       el('p', { class: 'nrl-decisions-count', text: picksWaitingText(view.owed, view.starterLeft), attrs: { 'data-card-owed': String(view.owed) } })));
     if (outcome) content.append(el('p', { class: 'nrl-card-outcome', text: outcome, attrs: { 'data-card-outcome': '', role: 'status' } }));
     if (problem) content.append(el('p', { class: 'nrl-card-problem', text: problem, attrs: { role: 'alert' } }));
@@ -236,9 +243,10 @@ export function openCardPick(): HTMLElement | null {
     }
     if (step.kind === 'pass') {
       const yes = cardAction('Pass', () => {
-        const r = passPick();
+        const r = passPick(showing);
         if (!r.ok) { problem = r.reason; step = { kind: 'cards' }; render(); return; }
         outcome = 'Pick passed.';
+        showing = preferredCardOffer(getState())?.grant;
         step = { kind: 'cards' };
         if (!cardChipCount(getState())) { closeModal(); return; }
         render();
@@ -251,15 +259,18 @@ export function openCardPick(): HTMLElement | null {
       actions.append(pass);
     }
     content.append(actions, lastMatchPanel(lastMatchView(state)));
+    if (displayed?.grant !== undefined && !displayed.seen) {
+      const cw = state.cardWeek!;
+      setState({ cardWeek: {
+        ...cw, seenGrant: Math.max(cw.seenGrant, displayed.grant),
+        offers: cw.offers.map(o => o === displayed ? { ...o, seen: true } : o),
+      } });
+      saveIfChanged(getState());
+    }
   };
 
   const node = openModal(content, { class: 'nrl-decisions-modal nrl-card-modal', region: true, closeButton: true });
   render();
-  const cw = s.cardWeek!;
-  if (cw.seenGrant < cw.grants && !pickBlocked(s)) {
-    setState({ cardWeek: { ...cw, seenGrant: cw.grants } });
-    saveIfChanged(getState());
-  }
   return node;
 }
 
@@ -272,12 +283,12 @@ export function initCardWeekPick(summaryPending: () => boolean = () => false): (
 
   const tryShow = (): void => {
     const s = getState();
-    const cw = s.cardWeek;
-    if (!cw?.offers.length || cw.seenGrant >= cw.grants || s.sacked) { stopPoll(); return; }
+    const offer = unshownCardOffer(s);
+    if (!offer || s.sacked) { stopPoll(); return; }
     if (pickBlocked(s) || advanceInProgress() || summaryPending() || dialogOpen() || activeScreen() !== null
       || isTutorialActive() || matchOnScreen() || document.querySelector('[data-expansion-intro]')) return;
-    openCardPick();
     stopPoll();
+    openCardPick(offer.grant);
   };
   const soon = (): void => {
     if (timer) clearTimeout(timer);
@@ -286,7 +297,7 @@ export function initCardWeekPick(summaryPending: () => boolean = () => false): (
   };
   const offWeek = bus.on('week:advanced', soon);
   const offState = bus.on('state:changed', (s) => {
-    if (!poll && s.cardWeek?.offers.length && s.cardWeek.seenGrant < s.cardWeek.grants && !s.sacked) soon();
+    if (!poll && unshownCardOffer(s) && !s.sacked) soon();
   });
   soon();
   return () => {
@@ -369,6 +380,9 @@ export const CARD_CSS = `
 .nrl-cards-content summary { cursor: pointer; min-height: 44px; align-content: center; font-weight: 700; }
 .nrl-cards-picks { display: flex; gap: 0.5rem; justify-content: space-between; align-items: center; padding-right: 44px; }
 .nrl-cards-picks .nrl-btn { min-height: 44px; }
+.nrl-cards-offers { display: flex; flex-wrap: wrap; gap: 0.375rem; margin-top: 0.375rem; }
+.nrl-cards-offers .nrl-btn { min-height: 44px; height: auto; white-space: normal; }
+.nrl-cards-latest { margin-left: 0.375rem; font-size: 0.75em; color: var(--nrl-accent); }
 .nrl-cards-hand { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; }
 .nrl-card-hint { color: var(--nrl-muted); font-size: 0.8125rem; }
 @media (orientation: portrait) {

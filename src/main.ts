@@ -301,7 +301,7 @@ async function boot(): Promise<void> {
       if (typeof next === 'string') return next;
       setState({ cardWeek: next.cardWeek! });
       closeModal();
-      openCardPick();
+      openCardPick(next.cardWeek!.offers[0]?.grant);
       return null;
     };
     // scripts/e2e-webkit.mjs fires a burst of toasts at the lane (#339).

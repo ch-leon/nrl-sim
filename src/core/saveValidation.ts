@@ -258,10 +258,21 @@ function isActiveCard(v: unknown): boolean {
 export function isCardWeek(v: unknown): boolean {
   if (!cardWeekCommon(v) || !integer(v.starterLeft, 0, CARD_WEEK.STARTER_PICKS) || !integer(v.owed, 0, CARD_WEEK.MAX_OWED)) return false;
   const starterLeft = v.starterLeft;
-  if (!Array.isArray(v.offers) || v.offers.length !== starterLeft + v.owed
-    || !v.offers.every((o, i) => cardOffer(o) && (i < starterLeft ? o.kind === 'starter' : oneOf(o.kind, ['match', 'decree']))
-      && (o.fromClubId === undefined || text(o.fromClubId)))) return false;
-  if (!integer(v.grants, v.offers.length) || !integer(v.seenGrant, 0, v.grants)) return false;
+  if (!Array.isArray(v.offers) || v.offers.length !== starterLeft + v.owed) return false;
+  const grants = v.grants;
+  const seenGrant = v.seenGrant;
+  if (!integer(grants, v.offers.length) || !integer(seenGrant, 0, grants)) return false;
+  const identified = v.offers.some(o => record(o) && o.grant !== undefined);
+  let previous = 0;
+  for (const [i, o] of v.offers.entries()) {
+    if (!cardOffer(o) || (i < starterLeft ? o.kind !== 'starter' : !oneOf(o.kind, ['match', 'decree']))
+      || (o.fromClubId !== undefined && !text(o.fromClubId))) return false;
+    if (identified) {
+      if (!integer(o.grant, previous + 1, grants)) return false;
+      previous = o.grant;
+    }
+    if (o.seen !== undefined && (o.seen !== true || !integer(o.grant, 1, seenGrant))) return false;
+  }
   if (!Array.isArray(v.hand) || v.hand.length > CARD_WEEK.HAND_CAP || !v.hand.every(h => record(h) && isOfferedCard(h.offered)
     && record(h.offered) && h.cardId === h.offered.cardId && integer(h.level, 1, 3)
     && integer(h.gotSeason, 1) && integer(h.gotWeek, 1))) return false;

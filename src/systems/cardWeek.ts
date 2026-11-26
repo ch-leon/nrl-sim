@@ -187,20 +187,66 @@ function pickWeighted(cards: readonly CardDef[], rng: Rng): CardDef | null {
  * weighted, each resolved. Fewer only when fewer can be offered. Rolls the card
  * week's own stream and returns its new state with the offer.
  */
-export function drawOffer(state: GameState, kind: CardOffer['kind'] = 'match', skipId?: string): { offer: CardOffer | null; rng: number } {
+export function drawOffer(state: GameState, kind: CardOffer['kind'] = 'match', waiting: readonly CardOffer[] = []): { offer: CardOffer | null; rng: number } {
   const cw = state.cardWeek;
   if (!cw) return { offer: null, rng: 0 };
   const rng = makeRng(cw.rng);
-  let left = CARDS.filter((c) => c.id !== skipId && eligibleBeforeDice(state, c));
+  let left = CARDS.filter((c) => eligibleBeforeDice(state, c));
+  const signature = (cards: readonly OfferedCard[]): string => cards.map(c => c.cardId).sort().join(',');
+  const repeats = new Set(waiting.map(o => signature(o.cards)));
   const cards: OfferedCard[] = [];
-  while (cards.length < CARD_WEEK.OFFER_SIZE && left.length > 0) {
-    const def = pickWeighted(left, rng);
-    if (!def) break;
+  const drawNext = (): void => {
+    const def = pickWeighted(left, rng)!;
     left = left.filter((c) => c !== def);
     const card = resolveCard(state, def, rng);
     if (card) cards.push(card);
+  };
+  while (cards.length < CARD_WEEK.OFFER_SIZE && left.length > 0) drawNext();
+
+  let chosen = cards.slice();
+  // Keep the normal weighted draw unless it repeats a waiting pick. In that
+  // case consider the remaining eligible cards in weighted order as well.
+  if (chosen.length > 0 && repeats.has(signature(chosen))) {
+    while (left.length > 0) drawNext();
+    const findFresh = (prefix: OfferedCard[], start: number): OfferedCard[] | undefined => {
+      if (prefix.length === chosen.length) return repeats.has(signature(prefix)) ? undefined : prefix;
+      for (let i = start; i <= cards.length - (chosen.length - prefix.length); i++) {
+        const found = findFresh([...prefix, cards[i]!], i + 1);
+        if (found) return found;
+      }
+      return undefined;
+    };
+    chosen = findFresh([], 0) ?? chosen;
   }
-  return { offer: cards.length > 0 ? { season: state.season, week: state.week, kind, cards } : null, rng: rng.state() };
+  return { offer: chosen.length ? { season: state.season, week: state.week, kind, cards: chosen } : null, rng: rng.state() };
+}
+
+/** Give old v37 queues stable IDs. Their watermark could have been set by a different offer. */
+export function identifyCardOffers(cw: CardWeekState): CardWeekState {
+  if (cw.offers.every(o => o.grant !== undefined)) return cw;
+  return { ...cw, offers: cw.offers.map((o, i) => ({
+    ...o, grant: cw.grants - cw.offers.length + i + 1,
+  })) };
+}
+
+/** The newest waiting match offer, or the first starter pick if there are no match picks. */
+export function preferredCardOffer(state: GameState): CardOffer | undefined {
+  const cw = state.cardWeek;
+  return cw && (cw.owed ? cw.offers[cw.offers.length - 1] : cw.offers[0]);
+}
+
+export function unshownCardOffer(state: GameState): CardOffer | undefined {
+  const cw = state.cardWeek;
+  if (!cw) return undefined;
+  for (let i = cw.offers.length - 1; i >= cw.starterLeft; i--) {
+    const offer = cw.offers[i]!;
+    if (!offer.seen) return offer;
+  }
+  return cw.seenGrant === 0 ? cw.offers[0] : undefined;
+}
+
+function offerIndex(cw: CardWeekState, grant?: number): number {
+  return grant === undefined ? 0 : cw.offers.findIndex(o => o.grant === grant);
 }
 
 /** Fill the opening queue. Migration can supply the already-resolved v36 pick first. */
@@ -210,12 +256,12 @@ export function fillCardOffers(state: GameState): GameState {
   let rng = cw.rng;
   while (offers.length < cw.starterLeft + cw.owed) {
     const kind = offers.length < cw.starterLeft ? 'starter' : 'match';
-    const draw = drawOffer({ ...state, cardWeek: { ...cw, rng } }, kind);
+    const draw = drawOffer({ ...state, cardWeek: { ...cw, rng } }, kind, offers);
     if (!draw.offer) break;
     offers.push(draw.offer);
     rng = draw.rng;
   }
-  return { ...state, cardWeek: { ...cw, offers, rng } };
+  return { ...state, cardWeek: identifyCardOffers({ ...cw, offers, rng }) };
 }
 
 /**
@@ -236,7 +282,7 @@ export function plantCard(state: GameState, cardId: string): GameState | string 
   const current = cw.offers[0];
   const rest = (current?.cards ?? []).filter((c) => c.cardId !== cardId);
   const offer: CardOffer = {
-    ...(current ?? { season: state.season, week: state.week, kind: 'match' }),
+    ...(current ?? { season: state.season, week: state.week, kind: 'match', grant: cw.grants + 1 }),
     cards: [card, ...rest].slice(0, CARD_WEEK.OFFER_SIZE),
   };
   return { ...state, cardWeek: {
@@ -293,21 +339,30 @@ function recordCard(cw: CardWeekState, when: Pick<GameState, 'season' | 'week'>,
   return [...cw.history, { cardId, season: when.season, week: when.week, action }];
 }
 
-function spendPick(cw: CardWeekState, history: CardHistoryEntry[]): CardWeekState {
+function spendPick(cw: CardWeekState, at: number, history: CardHistoryEntry[]): CardWeekState {
+  const starter = cw.offers[at]!.kind === 'starter';
   return {
-    ...cw, history, offers: cw.offers.slice(1),
-    starterLeft: Math.max(0, cw.starterLeft - 1),
-    owed: cw.owed - (cw.starterLeft === 0 ? 1 : 0),
+    ...cw, history, offers: cw.offers.filter((_, index) => index !== at),
+    starterLeft: cw.starterLeft - Number(starter),
+    owed: cw.owed - Number(!starter),
   };
 }
 
+function pickedCard(cw: CardWeekState, index: number, grant?: number): { at: number; card: OfferedCard } | string {
+  const at = offerIndex(cw, grant);
+  const offer = cw.offers[at];
+  if (!offer) return grant === undefined ? 'No pick is waiting.' : 'That pick is no longer waiting.';
+  const card = offer.cards[index];
+  return card ? { at, card } : 'There is no card there.';
+}
+
 /** Keep a resolved card for later. Only the pick and hand change. */
-export function takeCard(state: GameState, index: number): GameState | string {
+export function takeCard(state: GameState, index: number, grant?: number): GameState | string {
   const cw = state.cardWeek;
   if (!cw) return 'This career has no card week.';
-  if (!cw.offers[0]) return 'No pick is waiting.';
-  const card = cw.offers[0].cards[index];
-  if (!card) return 'There is no card there.';
+  const picked = pickedCard(cw, index, grant);
+  if (typeof picked === 'string') return picked;
+  const { at, card } = picked;
   const def = cardDefById(card.cardId);
   if (!def || def.kind !== card.kind) return 'That card is no longer in the deck.';
   const refusal = gambleRefusal(state, def);
@@ -315,7 +370,7 @@ export function takeCard(state: GameState, index: number): GameState | string {
   if (cw.hand.length >= CARD_WEEK.HAND_CAP) return 'Your hand is full. Play or discard a card first.';
   const held: HandCard = { cardId: card.cardId, offered: card, level: 1, gotSeason: state.season, gotWeek: state.week };
   return { ...state, cardWeek: {
-    ...spendPick(cw, recordCard(cw, state, card.cardId, 'take')), hand: [...cw.hand, held],
+    ...spendPick(cw, at, recordCard(cw, state, card.cardId, 'take')), hand: [...cw.hand, held],
   } };
 }
 
@@ -325,7 +380,14 @@ export function playCard(state: GameState, index: number, targetId?: string): Ca
   if (!cw) return 'This career has no card week.';
   const held = cw.hand[index];
   if (!held) return 'There is no card there.';
-  const card = held.offered;
+  const result = applyCard(state, held.offered, held.level, targetId);
+  if (typeof result === 'string') return result;
+  const next = result.state.cardWeek!;
+  return { ...result, state: { ...result.state, cardWeek: { ...next, hand: cw.hand.filter((_, i) => i !== index) } } };
+}
+
+function applyCard(state: GameState, card: OfferedCard, level: TraitLevel, targetId?: string): CardTake | string {
+  const cw = state.cardWeek!;
   const def = cardDefById(card.cardId);
   if (!def || def.kind !== card.kind) return 'That card is no longer in the deck.';
   const refusal = gambleRefusal(state, def);
@@ -359,7 +421,7 @@ export function playCard(state: GameState, index: number, targetId?: string): Ca
       const out = appointFeeWaived(s, hireOf(def), card.name);
       if (typeof out === 'string') return out;
       s = out;
-      active = [...active, { kind: 'staff', cardId: def.id, level: held.level, member: s.staff[s.staff.length - 1]! }];
+      active = [...active, { kind: 'staff', cardId: def.id, level, member: s.staff[s.staff.length - 1]! }];
       news.push({ text: `${def.title}: ${card.name} joins, appointment fee waived.`, kind: 'success' });
       break;
     }
@@ -397,7 +459,7 @@ export function playCard(state: GameState, index: number, targetId?: string): Ca
   }
 
   const next: CardWeekState = {
-    ...cw, active, hand: cw.hand.filter((_, i) => i !== index),
+    ...cw, active,
     history: recordCard(cw, state, def.id, 'play'),
     cardPlayers: joined ? [...cw.cardPlayers, joined.id] : cw.cardPlayers,
     cardTraits: traitGiven
@@ -408,9 +470,14 @@ export function playCard(state: GameState, index: number, targetId?: string): Ca
 }
 
 /** Take and play as one operation, so a refused play leaves the pick waiting. */
-export function playPickCard(state: GameState, index: number, targetId?: string): CardTake | string {
-  const taken = takeCard(state, index);
-  return typeof taken === 'string' ? taken : playCard(taken, taken.cardWeek!.hand.length - 1, targetId);
+export function playPickCard(state: GameState, index: number, targetId?: string, grant?: number): CardTake | string {
+  const cw = state.cardWeek;
+  if (!cw) return 'This career has no card week.';
+  const picked = pickedCard(cw, index, grant);
+  if (typeof picked === 'string') return picked;
+  const { at, card } = picked;
+  const spent = spendPick(cw, at, recordCard(cw, state, card.cardId, 'take'));
+  return applyCard({ ...state, cardWeek: spent }, card, 1, targetId);
 }
 
 export function discardCard(state: GameState, index: number): GameState | string {
@@ -424,11 +491,12 @@ export function discardCard(state: GameState, index: number): GameState | string
 }
 
 /** Pass even if none of the three cards can currently be played. */
-export function passCard(state: GameState): GameState | string {
+export function passCard(state: GameState, grant?: number): GameState | string {
   const cw = state.cardWeek;
   if (!cw) return 'This career has no card week.';
-  if (!cw.offers[0]) return 'No pick is waiting.';
-  return { ...state, cardWeek: spendPick(cw, recordCard(cw, state, CARD_PASS, 'pass')) };
+  const at = offerIndex(cw, grant);
+  if (!cw.offers[at]) return grant === undefined ? 'No pick is waiting.' : 'That pick is no longer waiting.';
+  return { ...state, cardWeek: spendPick(cw, at, recordCard(cw, state, CARD_PASS, 'pass')) };
 }
 
 // ── The week ─────────────────────────────────────────────────────────────────
@@ -446,29 +514,13 @@ export function playedLeagueMatch(state: GameState): boolean {
 export function cardWeekTick(state: GameState): GameState {
   const cw = state.cardWeek;
   if (!cw || !playedLeagueMatch(state)) return state;
-  let { offer, rng } = drawOffer(state);
+  const { offer, rng } = drawOffer(state, 'match', cw.offers);
   if (!offer) return state;
-  // If the same three card ids came up, try a different mix. Keep the full draw
-  // when fewer cards are eligible and excluding one would shrink the pick.
-  const sameCards = (a: CardOffer, b: CardOffer): boolean => a.cards.length === b.cards.length
-    && a.cards.every((card) => b.cards.some((other) => other.cardId === card.cardId));
-  const repeated = cw.offers.find((waiting) => sameCards(waiting, offer!));
-  if (repeated) {
-    for (const card of repeated.cards) {
-      const fresh = drawOffer({ ...state, cardWeek: { ...cw, rng } }, 'match', card.cardId);
-      rng = fresh.rng;
-      if (fresh.offer && fresh.offer.cards.length === offer.cards.length
-        && !cw.offers.some((waiting) => sameCards(waiting, fresh.offer!))) {
-        offer = fresh.offer;
-        break;
-      }
-    }
-  }
   const full = cw.owed === CARD_WEEK.MAX_OWED;
   const waiting = full ? cw.offers.filter((_, i) => i !== cw.starterLeft) : cw.offers;
   return { ...state, cardWeek: {
     ...cw, rng, owed: full ? cw.owed : cw.owed + 1, grants: cw.grants + 1,
-    offers: [...waiting, offer],
+    offers: [...waiting, { ...offer, grant: cw.grants + 1 }],
     history: full ? recordCard(cw, state, 'expired', 'expire') : cw.history,
   } };
 }
@@ -571,14 +623,15 @@ function cardFaceView(state: GameState, card: OfferedCard, index: number): CardF
   return [view];
 }
 
-export function cardOfferView(state: GameState): { owed: number; starterLeft: number; cards: (CardFaceView & { takeRefusal: string | null })[] } {
+export function cardOfferView(state: GameState, grant?: number): { owed: number; starterLeft: number; cards: (CardFaceView & { takeRefusal: string | null })[] } {
   const cw = state.cardWeek;
-  if (!cw?.offers[0]) return { owed: 0, starterLeft: 0, cards: [] };
+  const offer = cw?.offers[offerIndex(cw, grant)];
+  if (!cw || !offer) return { owed: 0, starterLeft: 0, cards: [] };
   const blocked = pickBlocked(state);
-  const cards = cw.offers[0].cards.flatMap((card, index) => cardFaceView(state, card, index).map((view) => {
-    const taken = blocked ?? takeCard(state, index);
+  const cards = offer.cards.flatMap((card, index) => cardFaceView(state, card, index).map((view) => {
+    const taken = blocked ?? takeCard(state, index, grant);
     const takeRefusal = typeof taken === 'string' ? taken : null;
-    const probe = typeof taken === 'string' ? taken : playCard(taken, cw.hand.length, view.targets?.[0]?.playerId);
+    const probe = blocked ?? playPickCard(state, index, view.targets?.[0]?.playerId, grant);
     return { ...view, takeRefusal, refusal: playRefusal(view, probe) };
   }));
   return { owed: cw.offers.length, starterLeft: cw.starterLeft, cards };
@@ -625,18 +678,18 @@ function commit(t: CardTake): void {
 
 type CardActionResult = { ok: true; outcome: string } | { ok: false; reason: string };
 
-export function chooseCard(index: number): CardActionResult {
+export function chooseCard(index: number, grant?: number): CardActionResult {
   const s = getState();
-  const out = pickBlocked(s) ?? takeCard(s, index);
+  const out = pickBlocked(s) ?? takeCard(s, index, grant);
   if (typeof out === 'string') return { ok: false, reason: out };
   setState({ cardWeek: out.cardWeek! });
   saveIfChanged(getState());
   return { ok: true, outcome: `${cardDefById(out.cardWeek!.hand[out.cardWeek!.hand.length - 1]!.cardId)!.title} added to your hand.` };
 }
 
-export function playChosenCard(source: 'pick' | 'hand', index: number, targetId?: string): CardActionResult {
+export function playChosenCard(source: 'pick' | 'hand', index: number, targetId?: string, grant?: number): CardActionResult {
   const s = getState();
-  const out = pickBlocked(s) ?? (source === 'pick' ? playPickCard(s, index, targetId) : playCard(s, index, targetId));
+  const out = pickBlocked(s) ?? (source === 'pick' ? playPickCard(s, index, targetId, grant) : playCard(s, index, targetId));
   if (typeof out === 'string') return { ok: false, reason: out };
   commit(out);
   saveIfChanged(getState());
@@ -653,11 +706,11 @@ export function discardHeldCard(index: number): CardActionResult {
 }
 
 /** The player passed the pick on show. Refused only where a take would be (a held week, the league choice). */
-export function passPick(): { ok: true } | { ok: false; reason: string } {
+export function passPick(grant?: number): { ok: true } | { ok: false; reason: string } {
   const s = getState();
   const blocked = pickBlocked(s);
   if (blocked) return { ok: false, reason: blocked };
-  const out = passCard(s);
+  const out = passCard(s, grant);
   if (typeof out === 'string') return { ok: false, reason: out };
   setState({ cardWeek: out.cardWeek! });
   saveIfChanged(getState());
