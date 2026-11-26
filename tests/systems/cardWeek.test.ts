@@ -126,7 +126,13 @@ describe('a new card-week career', () => {
 describe('each card does what its face says', () => {
   it('a player card brings a better man than the club has there, with no fee, on the cap', async () => {
     const s = await career(29);
+    const clubBest = Math.max(...s.squad.map(overallRating));
     for (const def of CARDS.filter((c) => c.kind === 'player')) {
+      // The position of the club's best player gets no card (the star-position rule).
+      if (def.kind === 'player' && cardFloor(s.squad, def.position) >= clubBest) {
+        expect(typeof plantCard(s, def.id)).toBe('string');
+        continue;
+      }
       const p = planted(s, def.id);
       const card = first(p);
       if (card.kind !== 'player') throw new Error('not a player card');
@@ -264,6 +270,13 @@ describe('the card floor', () => {
       // The margin, then each stat within ±AROUND_SPREAD of it.
       expect(rating).toBeLessThanOrEqual(floor + PLAYER_CARD_MARGIN.grey + AROUND_SPREAD);
     }
+  });
+
+  it('offers no player card at the position of the club\'s best player', async () => {
+    const s = withStar(await career(97), 'halfback');
+    // The star is the halfback: a gold halfback built on his rating would land in the 90s.
+    expect(typeof plantCard(s, 'starHalfback')).toBe('string');
+    expect(typeof plantCard(s, 'fullbackSigning')).not.toBe('string');
   });
 
   it('falls back to a related position, then to anyone, when nobody plays there', async () => {

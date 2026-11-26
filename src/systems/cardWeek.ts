@@ -141,6 +141,8 @@ export function replacementFor(state: GameState, position: Position, salary: num
 function resolvePlayer(state: GameState, def: Extract<CardDef, { kind: 'player' | 'dilemma' }>, rng: Rng): OfferedCard | null {
   const position = def.kind === 'player' ? def.position : weakestPosition(state.squad);
   const floor = cardFloor(state.squad, position);
+  // No card at the position of the club's best player: built on his rating, a gold man there came out in the 90s.
+  if (floor >= Math.max(0, ...state.squad.map(overallRating))) return null;
   const target = Math.min(99, floor + def.margin);
   for (let i = 0; i < CARD_WEEK.PLAYER_TRIES; i++) {
     const player = generatePlayerAround(rng, target, { position });

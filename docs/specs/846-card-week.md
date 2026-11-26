@@ -43,7 +43,8 @@ with none of those either, the best man anywhere by his rating there. A star fro
 unrelated position does not set it: at 0.8 fit a 85-rated halfback would read 68 at
 fullback, and a grey fullback card would land near 70 in a league whose clubs average
 in the 40s. The card's man is generated around floor + margin (each stat within ±6 of
-that) and must rate strictly above the floor.
+that) and must rate strictly above the floor. No player card is offered at the position
+of the club's best player: built on his rating, a gold man there came out in the 90s.
 
 **Full squad or no cap room.** The card names the man the newcomer replaces: the weakest
 at his position first, then the weakest player outside the starting nine, whose release
