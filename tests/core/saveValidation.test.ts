@@ -1,7 +1,7 @@
 import { shownStats } from '../../src/data/player';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createNewGame, getState, SAVE_VERSION, type GameState } from '../../src/core/state';
-import { isPlayer, isPlayerStats, isPlacedFacility, REPAIR_NOTICE } from '../../src/core/saveValidation';
+import { isCardWeek, isPlayer, isPlayerStats, isPlacedFacility, REPAIR_NOTICE, validateInput } from '../../src/core/saveValidation';
 import { __setStorage, __unlockSaves, exportRecoverySaves, getSlotSummaries, importSave, installImportedSave, loadSlot, migrateState, MIGRATIONS, setActiveSlot, writeSlot } from '../../src/core/save';
 import { initLeague } from '../../src/systems/fixtures';
 import { CLASSIC_RETIRED_TEXT } from '../../src/core/classicSave';
@@ -298,4 +298,40 @@ it.each([0, 101, -1, NaN, Infinity, '50', null])('rejects invalid individual cei
   const key = shownStats(p.position)[0]!;
   s.squad[0] = { ...p, ceilings: { ...p.ceilings, [key]: value } } as typeof p;
   expect(migrateState(s).ok).toBe(false);
+});
+
+describe('card week (#846, v36)', () => {
+  const league = async () => {
+    const { prepareLeagueCareer } = await import('../../src/systems/leagueCareerSetup');
+    return prepareLeagueCareer({ clubName: 'Card FC', seed: 7, cardWeek: true });
+  };
+
+  it('accepts a card-week League career as it was made', async () => {
+    const s = await league();
+    expect(isCardWeek(s.cardWeek)).toBe(true);
+    expect(migrateState(JSON.parse(JSON.stringify(s)))).toMatchObject({ ok: true, outcome: 'valid' });
+  });
+
+  it('rejects picks owed out of bounds, unknown, repeated or too many cards, and a card that does not match its kind', async () => {
+    const cw = (await league()).cardWeek!;
+    const cards = cw.offer!.cards;
+    expect(isCardWeek({ ...cw, owed: 4 })).toBe(false);
+    expect(isCardWeek({ ...cw, owed: -1 })).toBe(false);
+    expect(isCardWeek({ ...cw, offer: { ...cw.offer!, cards: [{ cardId: 'nope', kind: 'cash' }] } })).toBe(false);
+    expect(isCardWeek({ ...cw, offer: { ...cw.offer!, cards: [cards[0]!, cards[0]!] } })).toBe(false);
+    expect(isCardWeek({ ...cw, offer: { ...cw.offer!, cards: [...cards, { cardId: 'cashInjection', kind: 'cash' }] } })).toBe(false);
+    expect(isCardWeek({ ...cw, offer: { ...cw.offer!, cards: [{ cardId: 'cashInjection', kind: 'trait' }] } })).toBe(false);
+    expect(isCardWeek({ ...cw, offer: { ...cw.offer!, cards: [{ cardId: 'setPlay', kind: 'setPlay', playId: 'no-such-play' }] } })).toBe(false);
+    expect(isCardWeek({ ...cw, offer: null, owed: 0 })).toBe(true);
+    expect(isCardWeek({ ...cw, cardPlayers: ['a', 'a'] })).toBe(false);
+    expect(isCardWeek({ ...cw, lastMatch: { season: 1, week: 5, opponentName: 'Them', rows: [{ playerId: 'x', name: 'X', tries: -1, tackles: 0, lineBreaks: 0 }] } })).toBe(false);
+  });
+
+  it('rejects a card week on a career that is not a League career, and on a save before v36', async () => {
+    const s = await league();
+    const classic = { ...fresh(), cardWeek: s.cardWeek };
+    expect(validateInput(classic as never, SAVE_VERSION)).toBe('Invalid save data: card week.');
+    expect(validateInput({ ...s } as never, 35)).toBe('Invalid save data: card week.');
+    expect(migrateState({ ...JSON.parse(JSON.stringify(s)), version: 35 })).toMatchObject({ ok: false, message: expect.stringMatching(/card week/i) });
+  });
 });

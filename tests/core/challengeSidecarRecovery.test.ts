@@ -1,14 +1,14 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, expect, it, vi } from 'vitest';
 import { __setStorage, loadSlot, setActiveSlot } from '../../src/core/save';
-import type { GameState } from '../../src/core/state';
+import { SAVE_VERSION, type GameState } from '../../src/core/state';
 import { liveMatchKey, slotKey } from '../../src/core/storageKeys';
 import { changeChallenge } from '../../src/systems/individualChallenges';
 import { readLiveMatch } from '../../src/systems/liveMatchRecord';
 import { CHALLENGE_REPLAY_PROBLEM } from '../../src/systems/parkedLeagueFixture';
 
 function fixture(week: number): GameState {
-  return {...JSON.parse(readFileSync(new URL(`../fixtures/saves/v34-challenges/v34-au-week-${week}.json`, import.meta.url), 'utf8')), version:35};
+  return {...JSON.parse(readFileSync(new URL(`../fixtures/saves/v34-challenges/v34-au-week-${week}.json`, import.meta.url), 'utf8')), version:SAVE_VERSION};
 }
 function checked(result: ReturnType<typeof changeChallenge>): GameState {
   if (!result.ok) throw Error(result.message);

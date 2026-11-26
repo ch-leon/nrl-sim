@@ -13,7 +13,7 @@ import { button, el, openModal, closeModal } from '../ui/dom';
 export const DEV_SETTINGS_TITLE = 'Developer settings';
 
 export function labsPanelModel(on: (id: string) => boolean) {
-  return EXPERIMENTS.map((e) => ({ ...e, on: on(e.id), smallPrint: 'Changes take effect at the next match.' }));
+  return EXPERIMENTS.map((e) => ({ ...e, on: on(e.id), smallPrint: 'smallPrint' in e ? e.smallPrint : 'Changes take effect at the next match.' }));
 }
 
 /** Browser-local physical field choice; applying restarts the frozen geometry. */

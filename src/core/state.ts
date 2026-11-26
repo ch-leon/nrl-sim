@@ -130,8 +130,8 @@ export interface LeagueState {
 export type WeatherKind = 'clear' | 'rain' | 'wind';
 
 /** v30 adds player histories, v31 optional league progression, and v32 exact
- * protected agreements. v33 adds Open Cup entry and v34 optional Skills Camp records. v35 adds individual challenge checkpoints. Finance state migrates from v28; v27 requires a new career. */
-export const SAVE_VERSION = 35;
+ * protected agreements. v33 adds Open Cup entry and v34 optional Skills Camp records. v35 adds individual challenge checkpoints. v36 adds the optional card week (#846). Finance state migrates from v28; v27 requires a new career. */
+export const SAVE_VERSION = 36;
 
 /** The hires the facilities don't cover (N14.5), and the attack coach who opens set plays to buy (#326). */
 export type StaffRole = 'assistantCoach' | 'analyst' | 'welfare' | 'attackCoach';
@@ -283,6 +283,47 @@ export interface EventDeckState {
   flags: string[];
 }
 
+/**
+ * One card on show in a card-week pick (#846), resolved when it was drawn so a
+ * save and reload shows the same offer. `cardId` keys into data/cards.ts.
+ * A player card (and the dilemma) carries the generated man (no durable id
+ * yet: he gets one when he joins), his salary, and who he replaces when the
+ * squad or the cap has no room. A staff card carries the hire's name, a set
+ * play card the play.
+ */
+export type OfferedCard =
+  | { cardId: string; kind: 'player' | 'dilemma'; player: Player; salary: number; replacesId?: string; replacesName?: string }
+  | { cardId: string; kind: 'staff'; name: string }
+  | { cardId: string; kind: 'setPlay'; playId: import('../data/plays').PlayId }
+  | { cardId: string; kind: 'trait' | 'cash' };
+
+/** The three cards on show (fewer only when fewer could be offered), and when they were drawn. */
+export interface CardOffer { season: number; week: number; cards: OfferedCard[] }
+
+/** One line of the last match's impact (#846): what a player who played did. */
+export interface LastMatchRow { playerId: string; name: string; tries: number; tackles: number; lineBreaks: number }
+export interface LastMatchImpact { season: number; week: number; opponentName: string; rows: LastMatchRow[] }
+
+/**
+ * A card-week career (#846, Labs): a pick of one card from three, owed before
+ * round 1 and after each League match. Present only on a League career that
+ * chose it; absent, the career plays exactly as before.
+ */
+export interface CardWeekState {
+  /** Its own seeded stream: drawing cards never moves rngSeed or the events deck. */
+  rng: number;
+  /** Picks waiting, 0..CARD_WEEK.MAX_OWED. */
+  owed: number;
+  offer: CardOffer | null;
+  /** Every card taken, oldest first. A pick passed is recorded as cardId 'pass' (data/cards.ts CARD_PASS). */
+  history: { cardId: string; season: number; week: number }[];
+  /** Ids of the players who joined from a card. */
+  cardPlayers: string[];
+  /** The traits trait cards gave, by player: the pick screen marks them. */
+  cardTraits: { playerId: string; trait: import('../data/traits').TraitId }[];
+  lastMatch?: LastMatchImpact;
+}
+
 /** Set once the board sacks the player; the save is kept so it can be reviewed. */
 export interface SackedInfo { season: number; reason: string }
 
@@ -331,6 +372,8 @@ export interface GameState {
   objectives: Objective[]; // this season's board objectives (#47)
   sacked?: SackedInfo;
   eventDeck: EventDeckState; // random events (#75)
+  /** Card week (#846): present only on a League career started with it. */
+  cardWeek?: CardWeekState;
   /** The player's kit design (#79). Absent = the look derived from the club colours. */
   kit?: import('../art/match/kit').KitDesign;
   /**
@@ -403,6 +446,8 @@ export interface NewGameOptions {
   difficulty?: Difficulty | undefined;
   coachName?: string | undefined;
   openAll?: boolean | undefined;
+  /** Card week (#846, Labs). Only a League career reads it (leagueCareerSetup.ts). */
+  cardWeek?: boolean | undefined;
   home?: GameState['home'];
   groundName?: string | undefined;
 }
@@ -519,6 +564,13 @@ export function buildNewGameState(
  *  drawing from the main RNG, so adding it changed no existing squad or league. */
 export function newEventDeck(seed: number): EventDeckState {
   return { rng: (seed ^ 0x9e3779b9) >>> 0, pending: [], cooldowns: {}, lastDrawn: 0, modifiers: [], flags: [] };
+}
+
+/** A new card week's state (#846): three picks owed and nothing drawn yet. Its
+ *  stream is derived from the game seed like the events deck's, with its own
+ *  constant, so it never shares a roll with the deck or the main RNG. */
+export function newCardWeek(seed: number): CardWeekState {
+  return { rng: (seed ^ 0x85ebca6b) >>> 0, owed: 3 /* CARD_WEEK.START_OWED, data/cards.ts */, offer: null, history: [], cardPlayers: [], cardTraits: [] };
 }
 
 /**

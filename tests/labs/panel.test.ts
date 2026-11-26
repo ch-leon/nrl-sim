@@ -5,6 +5,10 @@ it('describes every switch, its effect and when it applies', () => {
     id: 'match-controls', label: 'Match controls',
     note: 'Retro Bowl style: swipe to pass, step and kick on your own sets. Results count.',
     on: false, smallPrint: 'Changes take effect at the next match.',
+  }, {
+    id: 'card-week', label: 'Card week',
+    note: 'New League careers can tick "Card week (test)": pick one card from three after each League match. Existing careers are unaffected.',
+    on: false, smallPrint: 'Shows the option when you start a new League career. A card-week career keeps its cards if you switch this off.',
   }]);
   expect(labsPanelModel((id) => id === 'match-controls')[0]!.on).toBe(true);
 });

@@ -22,6 +22,7 @@ import { assignmentOwnerProblem } from '../systems/assignmentEvidence';
 import { competitionInstanceId, validateCompetitions } from '../data/competition';
 import { FINANCE_TIERS, tierForRank } from '../data/financeRules';
 import { canonicalLeagueJson, validateLeagueHistory } from '../data/leagueCareer';
+import { CARD_WEEK, cardDefById } from '../data/cards';
 
 export interface SaveRepair { field: string; problem: string; repair: string; rationale: string; notification: string }
 export const REPAIR_NOTICE = 'Career lineup repaired. The original save has been kept in recovery.';
@@ -211,6 +212,44 @@ function settledCupProblem(state: GameState): string | null {
   return null;
 }
 
+/**
+ * The card week (#846, v36): its stream, picks owed (0..CARD_WEEK.MAX_OWED),
+ * the offer (known, different cards, each resolved for its kind), the cards
+ * taken (or 'pass'), the card players, the card traits and the last match's lines.
+ */
+export function isCardWeek(v: unknown): boolean {
+  if (!record(v) || !integer(v.rng, 0, 0xffffffff) || !integer(v.owed, 0, CARD_WEEK.MAX_OWED)) return false;
+  if (!Array.isArray(v.history) || !v.history.every(h => record(h) && text(h.cardId) && integer(h.season, 1) && integer(h.week, 1))) return false;
+  if (!strings(v.cardPlayers) || !unique(v.cardPlayers)) return false;
+  if (!Array.isArray(v.cardTraits) || !v.cardTraits.every(t => record(t) && text(t.playerId) && knownTrait(t.trait))
+    || !unique(v.cardTraits.map(t => `${(t as Record<string, unknown>).playerId}:${(t as Record<string, unknown>).trait}`))) return false;
+  if (v.offer !== null) {
+    const o = v.offer;
+    if (!record(o) || !integer(o.season, 1) || !integer(o.week, 1) || !Array.isArray(o.cards) || o.cards.length < 1 || o.cards.length > CARD_WEEK.OFFER_SIZE) return false;
+    if (!o.cards.every(isOfferedCard) || !unique(o.cards.map(c => (c as Record<string, unknown>).cardId))) return false;
+  }
+  if (v.lastMatch !== undefined) {
+    const m = v.lastMatch;
+    if (!record(m) || !integer(m.season, 1) || !integer(m.week, 1) || typeof m.opponentName !== 'string' || !Array.isArray(m.rows)) return false;
+    if (!m.rows.every(r => record(r) && text(r.playerId) && text(r.name) && integer(r.tries) && integer(r.tackles) && integer(r.lineBreaks))) return false;
+  }
+  return true;
+}
+
+function isOfferedCard(c: unknown): boolean {
+  if (!record(c) || !text(c.cardId)) return false;
+  const def = cardDefById(c.cardId);
+  if (!def || c.kind !== def.kind) return false;
+  switch (def.kind) {
+    case 'player': case 'dilemma':
+      return isPlayer(c.player) && integer(c.salary, 1)
+        && (c.replacesId === undefined ? c.replacesName === undefined : text(c.replacesId) && text(c.replacesName));
+    case 'staff': return text(c.name);
+    case 'setPlay': return isPlayId(c.playId);
+    case 'trait': case 'cash': return true;
+  }
+}
+
 export function hasV33Fields(v: Record<string, unknown>): boolean {
   if ('competitionRewards' in v) return true;
   if (record(v.league) && Array.isArray(v.league.clubs) && v.league.clubs.some(c => record(c) && 'reputation' in c)) return true;
@@ -269,6 +308,7 @@ export function validateInput(v: Record<string, unknown>, version: number, runni
   }
   if ('individualChallenges' in v || (version < 35 && record(v.competitions) && 'individualChallenges' in v.competitions)) return fail('individual challenge version');
   if (version < 30 && 'playerPopulation' in v) return fail('player population version');
+  if (v.cardWeek !== undefined && (version < 36 || !isCardWeek(v.cardWeek) || !record(v.competitions) || v.competitions.leagueCareer === undefined)) return fail('card week');
   if (clubs.size && !clubs.has('player')) return fail('player club reference');
   if (v.competitions !== undefined) {
     if (version < 25) return fail('competition metadata version');

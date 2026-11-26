@@ -41,11 +41,14 @@ import { HINTS } from './tutorial';
 import { bus } from '../core/events';
 import { ladderStanding } from '../systems/board';
 import { ordinal } from './hud';
+import { experimentOn } from '../labs/flags';
 
 export type TitleChoice = {
   clubName?: string;
   coachName?: string;
   openAll?: boolean;
+  /** Card week (#846, Labs): only a League career takes it, and only with the Labs switch on. */
+  cardWeek?: boolean;
   difficulty?: Difficulty;
   colors?: [string, string];
   seed?: number;
@@ -228,6 +231,7 @@ ${MOTION_CSS}
 .nrl-title-setup[data-nrl-setup-step="3"] ~ .nrl-title-setupfoot > [data-nrl-next] { display: none; }
 .nrl-title-veteran { flex: 1 1 10rem; min-width: 0; display: flex; align-items: center; gap: 10px; min-height: 44px;
   font-size: 0.8125rem; line-height: 1.3; color: ${C.text2}; cursor: pointer; }
+.nrl-title-veteran[hidden] { display: none; }
 .nrl-title-veteran input { width: 20px; height: 20px; flex: 0 0 auto; margin: 0; accent-color: ${C.accent}; }
 .nrl-title-go { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 6px 8px; }
 /* Start over? reads first, then Cancel, then Start over on the right (SuperCOOKED §4's confirm). */
@@ -895,6 +899,16 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
       veteranRow.appendChild(veteran);
       veteranRow.appendChild(mk('span', '', "I've played before: open every building and Office tile now"));
       foot.appendChild(veteranRow);
+      // Card week (#846): a Labs test, offered on a League career only while its switch is on.
+      const cardWeek = experimentOn('card-week') ? mk('input', '') : null;
+      const cardWeekRow = cardWeek ? mk('label', 'nrl-title-veteran') : null;
+      if (cardWeek && cardWeekRow) {
+        cardWeek.type = 'checkbox';
+        cardWeek.setAttribute('data-nrl-card-week', '');
+        cardWeekRow.appendChild(cardWeek);
+        cardWeekRow.appendChild(mk('span', '', 'Card week (test): pick a card after each League match'));
+        foot.appendChild(cardWeekRow);
+      }
       foot.appendChild(build);
       const next = mkButton('Next ▸', 'data-nrl-next', 'nrl-title-btn-go');
       foot.appendChild(next);
@@ -1046,7 +1060,7 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
         const home = selected
           ? { town, region: selected.region, country: selected.country, lat: selected.lat, lon: selected.lon }
           : { town };
-        finish(s.slot, { mode: 'new', careerMode: 'league', destination, seed, clubName: name, ...(coach.ok ? { coachName: coach.name } : {}), difficulty, ...(veteran.checked ? { openAll: true } : {}), colors: [primary, secondary],
+        finish(s.slot, { mode: 'new', careerMode: 'league', destination, seed, clubName: name, ...(coach.ok ? { coachName: coach.name } : {}), difficulty, ...(veteran.checked ? { openAll: true } : {}), ...(cardWeek?.checked ? { cardWeek: true } : {}), colors: [primary, secondary],
           home, groundName: groundName.ok ? groundName.name : groundForTown(town || name, selected?.id ?? town) });
       };
       // Start waits for the town list, and says so while it does (#613).
