@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { CLASSIC_CLUB_COUNT, isClassicSave, isLeagueCareerCalendar } from '../../src/core/classicSave';
+import { CLASSIC_CLUB_COUNT, UK_CLASSIC_CLUB_COUNT, isClassicSave, isLeagueCareerCalendar } from '../../src/core/classicSave';
+import { preparePack, selectPack } from '../../src/content';
 import { createNewGame, SAVE_VERSION, type GameState } from '../../src/core/state';
 import { initLeague } from '../../src/systems/fixtures';
 import { prepareLeagueCareer } from '../../src/systems/leagueCareerSetup';
@@ -18,6 +19,21 @@ describe('isClassicSave', () => {
     expect(isClassicSave(classic)).toBe(true);
     expect(isClassicSave(JSON.stringify(classic))).toBe(true);
     expect(isClassicSave({ version: 35, clubName: 'Old', season: 3, week: 8 })).toBe(false);
+  });
+
+  it('recognises a UK Classic career, whose single table had 12 clubs', async () => {
+    await preparePack('uk');
+    try {
+      const uk = createNewGame('Ashcombe Old Boys', 7, { home: { town: 'Ashcombe', country: 'GB' } });
+      uk.league = initLeague(uk);
+      expect(uk.pack).toBe('uk');
+      expect(uk.league.clubs).toHaveLength(UK_CLASSIC_CLUB_COUNT);
+      expect(isClassicSave(uk)).toBe(true);
+      expect(isClassicSave(JSON.stringify(uk))).toBe(true);
+      // Neither count alone is enough without the rest of the evidence.
+      expect(isClassicSave({ ...uk, competitions: { leagueCareer: { phase: 'active' } } })).toBe(false);
+      expect(isClassicSave({ ...uk, league: { ...uk.league, clubs: uk.league.clubs.slice(0, 8) } })).toBe(false);
+    } finally { selectPack('au'); }
   });
 
   it('never classes a real League career, or a save newer than this game, as Classic', async () => {

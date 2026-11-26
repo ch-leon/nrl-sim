@@ -4,7 +4,7 @@
 // load it.
 //
 // Classic needs positive evidence: a version this game understands, and the
-// 16-club league. A missing leagueCareer is not enough, so a later League shape
+// Classic league table (16 clubs in AU, 12 in the UK pack). A missing leagueCareer is not enough, so a later League shape
 // is not archived. A save newer than SAVE_VERSION is not Classic: it keeps the
 // "Update the game" message. A League career calendar is the structural calendar
 // (mode 'structural') shared by a League career and an isolated developer
@@ -13,8 +13,11 @@
 
 import { SAVE_VERSION } from './state';
 
-/** Player club plus the 15 Classic rivals. */
+/** Player club plus the 15 AU Classic rivals. */
 export const CLASSIC_CLUB_COUNT = 16;
+/** Player club plus the 11 UK Classic rivals. */
+export const UK_CLASSIC_CLUB_COUNT = 12;
+const CLASSIC_CLUB_COUNTS: readonly number[] = [CLASSIC_CLUB_COUNT, UK_CLASSIC_CLUB_COUNT];
 
 const record = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
 
@@ -34,10 +37,10 @@ export function isLeagueCareerCalendar(competitions: unknown): boolean {
   return record(calendar) && calendar.mode === 'structural';
 }
 
-/** The old 16-club table: each club is an object with an id. */
+/** The old single table (16 AU clubs or 12 UK clubs): each club is an object with an id. */
 function isClassicLeague(save: Record<string, unknown>): boolean {
   const league = save.league;
-  if (!record(league) || !Array.isArray(league.clubs) || league.clubs.length !== CLASSIC_CLUB_COUNT) return false;
+  if (!record(league) || !Array.isArray(league.clubs) || !CLASSIC_CLUB_COUNTS.includes(league.clubs.length)) return false;
   return league.clubs.every((club) => record(club) && typeof club.id === 'string');
 }
 
