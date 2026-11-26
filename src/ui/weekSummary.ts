@@ -39,6 +39,7 @@ const STAT_WORD: Readonly<Record<keyof PlayerStats, string>> = {
 
 /** What the card compares: the club as it stood at one moment. Plain data, kept in memory only. */
 export interface WeekSnapshot {
+  cardGrants?: number;
   season: number;
   week: number;
   preseason?: GameState['preseason'];
@@ -55,6 +56,7 @@ export interface WeekSnapshot {
 export function weekSnapshot(s: GameState, runwayWeeks: number | null = null): WeekSnapshot {
   const chip = boardChip(s, runwayWeeks);
   return {
+    ...(s.cardWeek ? { cardGrants: s.cardWeek.grants } : {}),
     season: s.season,
     week: s.week,
     ...(s.competitions?.leagueCareer ? { elapsedIntervals: s.competitions.calendar!.elapsedIntervals } : {}),
@@ -75,6 +77,7 @@ export const WATCHING_PATIENCE = 3;
 export type BoardMood = 'happy' | 'watching' | 'worried';
 
 export interface WeekSummary {
+  newCardPicks?: number;
   /** Advances the card covers: 1 for a week, more for a ▾ run. */
   weeks: number;
   title: string;
@@ -160,7 +163,9 @@ export function weekSummary(before: WeekSnapshot, after: WeekSnapshot): WeekSumm
     ? `patience ${after.boardPatience}/${BOARD.MAX_PATIENCE}`
     : `patience ${before.boardPatience} → ${after.boardPatience}/${BOARD.MAX_PATIENCE}`;
   const why = after.board ? `${after.board.text} (${RISK_WORD[after.board.risk].toLowerCase()})` : 'every objective on track';
+  const newCardPicks = (after.cardGrants ?? 0) - (before.cardGrants ?? 0);
   return {
+    ...(newCardPicks > 0 ? { newCardPicks } : {}),
     weeks,
     title,
     gains: gains.slice(0, TOP_GAINS).map((g) => `${g.name} +${fmtGain(g.by)} ${STAT_WORD[g.stat]}`),
@@ -240,7 +245,7 @@ function section(title: string, lines: readonly HTMLElement[], empty: string): H
 }
 
 /** The card (SuperCOOKED 60): four blocks (Training, Money, Injuries & bans, Board) over Close and Play week. */
-export function openWeekSummary(v: WeekSummary, opts: { onAdvance: () => void; coach?: CoachSuggestion }): HTMLElement {
+export function openWeekSummary(v: WeekSummary, opts: { onAdvance: () => void; coach?: CoachSuggestion; onPick?: () => void }): HTMLElement {
   const squad = sidelineLines(v);
   const moneyIn = v.money.filter((m) => m.amount > 0).map((m) => `${m.label} ${fmtMoneyShort(m.amount)}`);
   const moneyOut = v.money.filter((m) => m.amount < 0).map((m) => `${m.label} ${fmtMoneyShort(-m.amount)}`);
@@ -275,6 +280,9 @@ export function openWeekSummary(v: WeekSummary, opts: { onAdvance: () => void; c
       el('h2', { text: v.title }),
       coachLine(opts.coach?.screen ? opts.coach.text : summaryRemark(v))),
     cols,
+    ...(v.newCardPicks && opts.onPick ? [el('div', { class: 'nrl-summary-pick' },
+      el('p', { text: v.newCardPicks === 1 ? 'New card pick' : `${v.newCardPicks} new card picks` }),
+      button('Pick', opts.onPick, { class: 'nrl-btn-outline' }))] : []),
     el('div', { class: 'nrl-decisions-actions' }, close, advance));
   return openModal(content, { class: 'nrl-summary-modal', region: true, closeButton: true });
 }
@@ -287,7 +295,7 @@ export function openWeekSummary(v: WeekSummary, opts: { onAdvance: () => void; c
  * switching it back on never shows weeks it was off for. `onAdvance` is the
  * HUD's Advance Week (pending decisions still ask first). Returns unsubscribe.
  */
-export function initWeekSummary(opts: { onAdvance: () => void; runwayWeeks: (s: GameState) => number | null }): () => void {
+export function initWeekSummary(opts: { onAdvance: () => void; runwayWeeks: (s: GameState) => number | null; onPick?: () => void }): { pending: () => boolean; destroy: () => void } {
   const snap = (): WeekSnapshot => weekSnapshot(getState(), opts.runwayWeeks(getState()));
   let before = snap();
   let due = false;
@@ -321,6 +329,7 @@ export function initWeekSummary(opts: { onAdvance: () => void; runwayWeeks: (s: 
     if (weeksBetween(before, after) <= 0) { before = after; return; }
     openWeekSummary(weekSummary(before, after), {
       onAdvance: opts.onAdvance,
+      ...(opts.onPick ? { onPick: opts.onPick } : {}),
       coach: coachSays(s, { decisions: pendingDecisionCount(s), runwayWeeks: opts.runwayWeeks(s) }),
     });
     before = after;
@@ -338,10 +347,13 @@ export function initWeekSummary(opts: { onAdvance: () => void; runwayWeeks: (s: 
     if (!poll) poll = setInterval(tryShow, 400);
   });
   const offState = bus.on('state:changed', () => { if (due) soon(); });
-  return () => {
-    offWeek();
-    offState();
-    if (timer) clearTimeout(timer);
-    if (poll) clearInterval(poll);
+  return {
+    pending: () => due && getState().settings.weekSummary !== false,
+    destroy: () => {
+      offWeek();
+      offState();
+      if (timer) clearTimeout(timer);
+      if (poll) clearInterval(poll);
+    },
   };
 }

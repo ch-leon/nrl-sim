@@ -13,9 +13,10 @@ export type CardTier = 'grey' | 'gold';
 /** Picks and owing (#846). Tuning values: Leon changes these. */
 export const CARD_WEEK = {
   /** Picks waiting when a card-week career starts (before round 1). */
-  START_OWED: 3,
-  /** The most picks that can wait; a League match past it adds nothing. */
+  STARTER_PICKS: 3,
+  /** The most match picks that can wait; a new grant replaces the oldest at the cap. */
   MAX_OWED: 3,
+  HAND_CAP: 5,
   /** Cards on show in a pick. */
   OFFER_SIZE: 3,
   /** Tries at generating a player card's man before the card sits this pick out. */

@@ -10,8 +10,8 @@ export let FIRST_NAMES: readonly string[] = activePack().names.first;
 export let SURNAMES: readonly string[] = activePack().names.last;
 
 /** `${pick(FIRST_NAMES)} ${pick(SURNAMES)}` using the seeded RNG. */
-export function randomName(rng: Rng): string {
-  return `${rng.pick(FIRST_NAMES)} ${rng.pick(SURNAMES)}`;
+export function randomName(rng: Rng, names = activePack().names): string {
+  return `${rng.pick(names.first)} ${rng.pick(names.last)}`;
 }
 
 // ── Renames (#398) ───────────────────────────────────────────────────────────

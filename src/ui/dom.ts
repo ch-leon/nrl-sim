@@ -609,7 +609,7 @@ export function openModal(
       { class: 'nrl-modal-backdrop nrl-screen-backdrop', onClick: () => closeScreen() },
       box,
     );
-    return openScreen(backdrop, undefined, opts.key);
+    return openScreen(backdrop, opts.onRemove, opts.key);
   }
 
   const swap = dialogOpen() || closedThisFrame;
@@ -1318,6 +1318,34 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
 .nrl-hub-chips > * { flex-shrink: 0; }
 .nrl-hub-chips:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
 body.nrl-match-active .nrl-hub-chips { display: none; }
+#ui-root:has(> .nrl-screen-region) > .nrl-hub-chips:has([data-card-chip]:not([hidden])) {
+  left: auto;
+  right: calc(12px + var(--nrl-safe-r));
+  z-index: 51;
+}
+#ui-root:has(> .nrl-hub-chips [data-card-chip]:not([hidden])) > .nrl-screen-region {
+  margin-top: 54px;
+}
+.nrl-dock-tabs [data-screen="cards"] .nrl-nav-dot[data-count] {
+  width: auto; min-width: 1rem; height: 1rem; border-radius: 1rem;
+  display: grid; place-items: center; font-size: 0.625rem; line-height: 1;
+  color: var(--nrl-on-accent); background: var(--nrl-accent);
+}
+.nrl-dock-tabs [data-screen="cards"] .nrl-nav-dot[data-count]::after { content: attr(data-count); }
+@media (max-width: 760px) {
+  .nrl-dock-tabs:has(> [data-screen="cards"]) > .nrl-btn { padding: 0 4px; gap: 0; }
+  .nrl-dock-tabs:has(> [data-screen="cards"]) :is(.nrl-nav-caret, .nrl-nav-room) { display: none; }
+  .nrl-dock-tabs:has(> [data-screen="cards"]) > .nrl-btn > .nrl-nav-dot { position: absolute; top: 2px; right: 2px; }
+  .nrl-dock-tabs > .nrl-btn[data-screen="cards"] { overflow: visible; }
+  .nrl-dock-tabs > .nrl-btn[data-screen="cards"] > .nrl-nav-dot[data-count] { top: -4px; right: 0; }
+}
+.nrl-decisions-chip.nrl-decisions-card[data-card-chip] { padding-block: 4px; }
+.nrl-decisions-card[data-card-chip] .nrl-btn.nrl-card-chip-pick { min-height: 44px; height: 44px; }
+.nrl-decisions-card[data-card-chip] .nrl-btn.nrl-card-chip-pick::after { inset: 0; }
+.nrl-summary-pick { display: flex; gap: 0.5rem; align-items: center; justify-content: space-between; }
+.nrl-summary-pick .nrl-btn { min-height: 44px; }
+.nrl-rotate-card [data-portrait-cards] { min-height: 44px; }
+
 .nrl-home-events {
   pointer-events: auto; width: 340px; max-width: 100%; min-width: 0;
   display: flex; flex-direction: column; align-items: flex-start; gap: 3px;

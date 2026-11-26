@@ -1,6 +1,6 @@
 # Features
 
-Last updated: 2026-11-25
+Last updated: 2026-11-26
 
 What's in the game, with the PR that added each.
 
@@ -46,7 +46,7 @@ What's in the game, with the PR that added each.
 ## UI and accessibility
 
 - Broadcast Quiet look ([PR](https://github.com/ch-leon/nrl-sim/pull/381))
-- 5-tab bar ([PR](https://github.com/ch-leon/nrl-sim/pull/436)). On a phone, the game plays in landscape: holding it upright covers everything with “Turn your phone sideways”, and the Android app locks to landscape.
+- 5-tab bar ([PR](https://github.com/ch-leon/nrl-sim/pull/436)). On a phone, the game plays in landscape: holding it upright shows “Turn your phone sideways” with a Cards shortcut in Card week careers, and the Android app locks to landscape.
 - Three-tap onboarding, Undo ([PR](https://github.com/ch-leon/nrl-sim/pull/380))
 - Text size, non-colour cues ([PR](https://github.com/ch-leon/nrl-sim/pull/385))
 - Touch polish: press feedback, motion tokens, mis-tap guards, scroll cues ([PR](https://github.com/ch-leon/nrl-sim/pull/617))
@@ -66,7 +66,7 @@ What's in the game, with the PR that added each.
 
 - **Tutorial fixes from the iPhone Simulator.** The tutorial's orange ring fits what it points at (it reached into the next card) and moves with the list; scrolled out of view, it goes until the target is back. It only singles out one thing when the step names one (the Training Paddock, Build here, Play Week). Who to sign is your choice, so that step rings the whole player list, or the whole player page if you open one, and Mick says "Sign a player you can afford". On iPhone it no longer stays where it was drawn while its screen slid up. Finishing the tutorial is saved straight away, so an app closed after the first match does not start it again. A long press over the match controls no longer selects text on iPhone. [#838](https://github.com/ch-leon/nrl-sim/issues/838).
 
-- **Card week (Labs test).** Off by default. With Developer settings → Experiments → Card week on, a new League career can tick "Card week (test)". The career then gets three card picks before round 1 and one more after each League match, up to three waiting. Each pick shows three cards (a player who joins with no fee, a staff hire with the fee waived, a free set play, a trait for a player you choose, cash, or a stronger player for a point of board patience); take one or pass. The pick screen also shows each player's tries, line breaks and tackles from the last match. Other careers are unchanged. [#846](https://github.com/ch-leon/nrl-sim/issues/846).
+- **Card week (Labs test).** Off by default. With Developer settings → Experiments → Card week on, a new League career can tick “Card week (test)”. Three starter picks have their own allowance. Each League match, including a final, deals a fresh pick. When three match picks are already waiting, the oldest expires and the game tells you. The Cards screen shows waiting picks, a five-card hand, active recruits, traits and staff, and a history. Take a card for later or play it immediately. The pick still shows the last match’s tries, line breaks and tackles. [Original experiment](https://github.com/ch-leon/nrl-sim/pull/847).
 
 - **League career is the only mode.** A new club no longer asks Classic or League: it starts a League career in Local. An old Classic save is no longer loadable: its slot shows as empty, and the title says “Classic mode has been retired. Start a new League career.” once per launch. Nothing is deleted automatically; the Classic save is overwritten when you start a League career in that slot. League saves are not touched. Import of a Classic file is refused with the same message. A home game still opens Finance and the coach's office, and a derby against the neighbour is still called on the match and in the news, including a trial. On a phone the ladder column scrolls so the table stays reachable under the event cards. [#819](https://github.com/ch-leon/nrl-sim/issues/819) [#834](https://github.com/ch-leon/nrl-sim/issues/834).
 
