@@ -797,7 +797,7 @@ export const LEAGUE_CSS = `
 .nrl-league-calendar-fixtures .nrl-fixtures-round { white-space: normal; }
 .nrl-screen.nrl-league { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 18px; }
 .nrl-league-col { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-@media (max-height: 360px) {
+@media (max-height: 420px) {
   .nrl-league-calendar .nrl-league-ladder { display: block; overflow-y: auto; overscroll-behavior: contain; }
   .nrl-league-calendar .nrl-ladder-scroll { overflow: visible; }
 }

@@ -1,6 +1,6 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, skipFromPill, setMatchSpeed, setupStep } from '../common.mjs';
+import { advanceToMatch, confirmStartingLeague, closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, skipFromPill, setMatchSpeed, setupStep } from '../common.mjs';
 
 /**
  * Developer settings (#519), the real route on an iPhone, in landscape:
@@ -75,6 +75,7 @@ export async function runDevSettings(browser) {
     await page.goto(BASE);
     await setupStep(page);
     await page.locator('[data-nrl-start]').tap();
+    await confirmStartingLeague(page);
     await page.locator('[data-expansion-work]').tap();
     if (await page.locator('.nrl-tutorial-skip').count()) await page.locator('.nrl-tutorial-skip').tap();
     await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
@@ -179,12 +180,16 @@ export async function runDevSettings(browser) {
     // 5. The real route: the first match at ×1, Block play called from the tray, ×2.
     await page.setViewportSize({ width: 844, height: 390 });
     await page.waitForTimeout(300);
-    await page.locator('.nrl-dock [data-hud="advance"]').tap();
-    for (let i = 0; i < 2; i++) {
-      const ask = page.locator('[data-confirm-advance], [data-ask-proceed]');
-      if (await ask.count()) await ask.first().tap();
+    if (await page.locator('[data-nrl-league-selection]').count()) await confirmStartingLeague(page);
+    // The intro is mounted after confirm returns. Wait for it, then the tutorial.
+    const work = page.locator('[data-expansion-work]');
+    if (await work.waitFor({ timeout: 15000 }).then(() => true).catch(() => false)) await work.tap();
+    const skipTut = page.locator('.nrl-tutorial-skip');
+    if (await skipTut.waitFor({ timeout: 15000 }).then(() => true).catch(() => false)) {
+      await skipTut.tap();
+      await page.locator('.nrl-tutorial').waitFor({ state: 'detached' });
     }
-    await page.waitForSelector('.nrl-mo-controls', { timeout: 30000 });
+    await advanceToMatch(page);
     await page.locator('.nrl-mo-bar [data-coach]').waitFor({ timeout: 30000 });
     if ((await page.locator('.nrl-mo-controls .nrl-mo-speed').getAttribute('data-speed')) !== '1') throw new Error('the match did not open at ×1');
     let called = false;

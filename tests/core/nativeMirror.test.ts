@@ -723,7 +723,7 @@ describe('boot on iOS, through save.ts', () => {
     const boot = main.slice(main.indexOf('async function boot()'));
     const mirror = boot.indexOf('if (isIosNative()) await bootNativeMirror();');
     expect(mirror).toBeGreaterThan(0);
-    for (const read of ['bootCareerNamespace(', 'getSlotSummaries(', 'hasSave(', 'showTitleFlow(', 'loadSlot(', 'readLiveMatch(', 'initLandscapeGuard(']) {
+    for (const read of ['bootCareerNamespace(', 'firstRunSlotSummaries(', 'hasSave(', 'showTitleFlow(', 'loadCareer(', 'readLiveMatch(', 'initLandscapeGuard(']) {
       expect(boot.indexOf(read), read).toBeGreaterThan(mirror);
     }
   });

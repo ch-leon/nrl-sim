@@ -1,7 +1,7 @@
 // #482: real season-one Office play-through; screenshots live in the CI artifact.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { playTrials, BASE, OUT_ROOT, IPHONE_UA, closeWeekSummary, SHEET_EXIT, setupStep } from '../common.mjs';
+import { confirmStartingLeague, leagueUnlockProgress, playSkippedWeek, playTrials, BASE, OUT_ROOT, IPHONE_UA, closeWeekSummary, SHEET_EXIT, setupStep } from '../common.mjs';
 
 export async function runOfficeUnlocks(browser) {
   const out = join(OUT_ROOT, 'webkit', 'office-unlocks');
@@ -28,6 +28,7 @@ export async function runOfficeUnlocks(browser) {
       await setupStep(page);
       await page.locator('[data-nrl-difficulty-easy]').tap();
       await page.locator('[data-nrl-start]').tap();
+      await confirmStartingLeague(page);
       await page.locator('[data-expansion-work]').tap();
       await page.locator('.nrl-tutorial-skip').tap();
       await playTrials(page);
@@ -39,32 +40,29 @@ export async function runOfficeUnlocks(browser) {
       await page.waitForSelector('[data-screen-key="finance"]');
       await page.screenshot({ path: join(out, `${width}x${height}-locked-money-tap.png`) });
       await page.locator(SHEET_EXIT).tap();
+      // Staff and Contracts open on league rounds played (#844), not calendar weeks.
       let homeSeen = false;
-      while (await page.evaluate(() => window.__nrlState().week < 12)) {
-        const week = await page.evaluate(() => window.__nrlState().week);
-        await page.locator('[data-hud="advance"]').tap();
-        await page.waitForFunction(() => document.querySelector('.nrl-mo-controls') || document.querySelector('[data-ask-proceed]'), null, { timeout: 60000 });
-        if (await page.locator('[data-ask-proceed]').count()) await page.locator('[data-ask-proceed]').tap();
-        console.log(`Office ${width}x${height} playing round ${week}`);
-        await page.waitForSelector('.nrl-mo-controls', { timeout: 60000 });
-        const plan = page.locator('.nrl-mo-plan .nrl-mo-plan-go');
-        if (await plan.isVisible()) await plan.tap();
-        await page.locator('.nrl-mo-controls [data-pause]').tap();
-        console.log(`Office ${width}x${height} round ${week} paused`);
-        await page.locator('.nrl-mo-sheet [data-skip]').tap();
-        console.log(`Office ${width}x${height} round ${week} skipping`);
-        await page.locator('[data-back-to-club]:visible').first().tap({ timeout: 60000 });
-        await page.waitForFunction((w) => window.__nrlState().week > w, week, { timeout: 60000 });
+      for (let i = 0; i < 30 && (await leagueUnlockProgress(page)).round < 12; i++) {
+        const before = await leagueUnlockProgress(page);
+        console.log(`Office ${width}x${height} playing week ${before.week} (league round ${before.round})`);
+        await playSkippedWeek(page);
+        const progress = await leagueUnlockProgress(page);
         const state = await page.evaluate(() => window.__nrlState());
-        if (!homeSeen && state.league.fixtures.some((f) => f.homeId === state.clubId && f.result)) {
+        if (!homeSeen && progress.home) {
           const tiles = await shot('first-home');
           if (tiles.find((t) => t.id === 'finance')?.locked) record.problems.push('Finance still locked after first home game');
           homeSeen = true;
         }
-        if (state.week === 4 && !state.unlocks?.screens?.includes('staff')) record.problems.push('Staff not open at round 4');
+        // No screens list (or no unlocks record) means every screen is open.
+        const staffOpen = state.unlocks?.screens === undefined || state.unlocks.screens.includes('staff');
+        if (progress.round >= 4 && !staffOpen) record.problems.push(`Staff not open at league round ${progress.round}`);
       }
+      if ((await leagueUnlockProgress(page)).round < 12) record.problems.push('never reached league round 12');
       const end = await shot('round-12');
-      for (const id of ['finance', 'staff', 'contracts']) if (end.find((t) => t.id === id)?.locked) record.problems.push(`${id} locked at round 12`);
+      for (const id of ['staff', 'contracts']) if (end.find((t) => t.id === id)?.locked) record.problems.push(`${id} locked at round 12`);
+      const finance = end.find((t) => t.id === 'finance');
+      if (homeSeen && finance?.locked) record.problems.push('Finance still locked after a home game');
+      if (!homeSeen && finance && !finance.locked) record.problems.push('Finance opened with no home game');
       // The guide lines remain readable in News after a run.
       await page.locator('[data-nav-more]').tap();
       await page.locator('.nrl-nav-sheet [data-screen="news"]').tap();

@@ -180,7 +180,6 @@ describe('the title option', () => {
     const result = showTitleFlow(root as unknown as HTMLElement);
     await vi.dynamicImportSettled();
     const box = root.querySelector('[data-nrl-card-week]');
-    root.querySelector('[data-nrl-career-mode-league]')!.click();
     if (box) (box as unknown as HTMLInputElement).checked = tick;
     root.querySelector('[data-nrl-start]')!.click();
     root.querySelector('[data-nrl-start-confirm]')?.click();

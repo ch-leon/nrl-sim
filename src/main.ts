@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { packForCountry, preparePack } from './content';
+import { preparePack } from './content';
 import './ui/fonts';
 import { BRAND } from './brand';
 import { BootScene } from './scenes/BootScene';
@@ -7,8 +7,10 @@ import { GroundsScene } from './scenes/GroundsScene';
 import { MatchScene } from './scenes/MatchScene';
 import { IndividualChallengeScene, bindIndividualChallengeGame } from './scenes/IndividualChallengeScene';
 import { bus, type Events } from './core/events';
-import { createNewGame, getState, loadState, setState, stateInstallation, type GameState } from './core/state';
-import { enableAutosave, getActiveSlot, getSlotSummaries, hasSave, loadSlot, save, setActiveSlot } from './core/save';
+import { getState, loadState, setState, stateInstallation, type GameState } from './core/state';
+import {
+  captureSlot, classicSlots, enableAutosave, firstRunSlotSummaries, getActiveSlot, hasSave, loadCareer, save, setActiveSlot, slotHasLeagueData, writeSlot,
+} from './core/save';
 import { showLeagueLoading, showTitleFlow, type TitleChoice } from './ui/title';
 import { EXPANSION_INTRO_HINT, showExpansionIntro } from './ui/expansionIntro';
 import { expansionIntroLines } from './ui/expansionCopy';
@@ -75,7 +77,7 @@ import { isLabHash } from './match/lab/controller';
 import { commercialEnabled } from './commercial/flags';
 import { initCommercial, recordFirstRun } from './commercial/demo';
 import { openPaywall } from './ui/screens/paywall';
-import { announcePlaytest, applyPlaytestPreset, bootCareerNamespace, markPlaytestBuilt, PLAYTEST_CLUB, PLAYTEST_COACH, PLAYTEST_SEED, setMatchSceneProbe } from './labs/devCareer';
+import { announcePlaytest, applyPlaytestPreset, bootCareerNamespace, freshPlaytestLeagueStart, markPlaytestBuilt, setMatchSceneProbe } from './labs/devCareer';
 import { syncDevMarker } from './labs/marker';
 import { startAnalytics, track } from './analytics';
 import { dockTab } from './analytics/events';
@@ -153,22 +155,24 @@ async function boot(): Promise<void> {
   syncDevMarker();
   // #362: the careers already here before the first commercial run keep the full game.
   // A playtest career's slots are not those careers, so it records nothing.
-  if (commercialEnabled() && !playtest) recordFirstRun(getSlotSummaries());
+  // A Classic career reads as an empty slot (#819), but the first-run record keeps what main records.
+  if (commercialEnabled() && !playtest) recordFirstRun(firstRunSlotSummaries());
   if (playtest) {
     setActiveSlot(1);
-    // Its save gone (site data cleared): build it again rather than start a stray new game.
-    if (!hasSave(1)) playtest.fresh = true;
+    // Its save gone (site data cleared), or only a Classic career there (#819, which reads
+    // as empty and is overwritten by the new League career): build a League career.
+    if (!hasSave(1) || (classicSlots().includes(1) && !slotHasLeagueData(1))) playtest.fresh = true;
   }
   let choice: TitleChoice = playtest
-    ? (playtest.fresh ? { mode: 'new' as const, careerMode: 'classic', clubName: PLAYTEST_CLUB, coachName: PLAYTEST_COACH, seed: PLAYTEST_SEED, difficulty: 'normal' as const } : { mode: 'continue' as const })
+    ? (playtest.fresh ? { mode: 'new' as const, careerMode: 'league', ...freshPlaytestLeagueStart(captureSlot(1).raw) } : { mode: 'continue' as const })
     : await showTitleFlow(uiRoot);
   // Rejection is not an empty career: stay at recovery instead of installing defaults.
-  let loaded = loadSlot();
+  let loaded = loadCareer();
   let freshGame = false;
   for (;;) {
     if ((choice.mode === 'continue' || playtest?.fresh) && loaded.status !== 'ok' && loaded.status !== 'empty') {
       choice = await showTitleFlow(uiRoot, loaded.message);
-      loaded = loadSlot();
+      loaded = loadCareer();
       continue;
     }
     if (choice.mode === 'continue' && loaded.status === 'ok') {
@@ -176,28 +180,41 @@ async function boot(): Promise<void> {
       loadState(loaded.state);
       break;
     }
-    freshGame = !playtest;
-    const clubName = choice.clubName ?? 'Cavehole Crushers';
-    if (choice.mode === 'new' && choice.careerMode === 'league') {
-      const loading = showLeagueLoading(uiRoot);
-      let failure: string | undefined;
-      try {
-        await nextFrame();
-        const { startLeagueCareer } = await import('./systems/leagueCareerSetup');
-        const result = await startLeagueCareer({...choice, clubName, seed: choice.seed ?? Date.now() >>> 0}, choice.destination);
-        if (!result.ok) failure = result.message;
-      } catch {
-        failure = 'The League career could not be opened. Check your storage and try again.';
-      } finally { loading.remove(); }
-      if (!failure) break;
-      choice = await showTitleFlow(uiRoot, failure);
-      loaded = loadSlot();
+    if (choice.mode !== 'new') {
+      choice = await showTitleFlow(uiRoot);
+      loaded = loadCareer();
       continue;
     }
-    clearLiveMatch();
-    await preparePack(packForCountry(choice.home?.country));
-    createNewGame(clubName, choice.seed, choice);
-    break;
+    freshGame = !playtest;
+    const clubName = choice.clubName ?? 'Cavehole Crushers';
+    const loading = showLeagueLoading(uiRoot);
+    let failure: string | undefined;
+    try {
+      await nextFrame();
+      const seed = choice.seed ?? (Date.now() >>> 0);
+      if (playtest) {
+        // startLeagueCareer refuses the playtest namespace. Prepare the same League
+        // career and write it through the prefixed store, which never touches a normal slot.
+        const { prepareLeagueCareer } = await import('./systems/leagueCareerSetup');
+        const state = await prepareLeagueCareer({ ...choice, clubName, seed });
+        if (!writeSlot(choice.destination.slot, state, choice.destination.expectedOriginal)) {
+          failure = 'The new League career could not be saved. Check your storage and try again.';
+        } else {
+          commitUndo();
+          clearLiveMatch(choice.destination.slot);
+          loadState(state);
+        }
+      } else {
+        const { startLeagueCareer } = await import('./systems/leagueCareerSetup');
+        const result = await startLeagueCareer({ ...choice, clubName, seed }, choice.destination);
+        if (!result.ok) failure = result.message;
+      }
+    } catch {
+      failure = 'The League career could not be opened. Check your storage and try again.';
+    } finally { loading.remove(); }
+    if (!failure) break;
+    choice = await showTitleFlow(uiRoot, failure);
+    loaded = loadCareer();
   }
   if (getState().league.clubs.length === 0) initLeague(getState(), choice.colors);
   if (playtest?.fresh) {
@@ -466,16 +483,16 @@ async function boot(): Promise<void> {
   function onChooseLeague(): HTMLElement {
     const state = getState();
     if (state.sacked || weekHeld() || playerMatchPending() || !leagueChoiceRequired(state)) return uiRoot;
-    const first = state.competitions!.leagueCareer!.phase === 'initial-choice';
-    return openLeagueSelection({onConfirmed: () => { if (first) void startLeagueGuidance(); }});
+    return openLeagueSelection({onConfirmed: () => { void startLeagueGuidance(); }});
   }
 
   async function startLeagueGuidance(): Promise<void> {
     const state = getState();
     if (state.sacked || weekHeld() || playerMatchPending() || leagueChoiceRequired(state)) return;
     const installation = stateInstallation();
+    // The hint is what gates it, including Continue of a career that has not seen it yet.
     if (state.season === 1 && !state.settings.hintsSeen?.includes(EXPANSION_INTRO_HINT)) {
-      for (const text of expansionIntroLines(state, state.objectives).slice(0,2))
+      for (const text of expansionIntroLines(state, state.objectives))
         bus.emit('ui:notify', { text, kind: 'info', quiet: true, from: 'coach' });
       await showExpansionIntro();
     }

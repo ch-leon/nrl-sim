@@ -12,8 +12,10 @@ import { NINES } from '../../match/league/rules';
 import { TACTIC_BLURB } from '../tacticsBlurbs';
 import { getState, type GameState } from '../../core/state';
 import { fmtMoney } from '../../utils/money';
-import { BOARD, DIFFICULTY, ECON, LEAGUE, PRIZE, SQUAD_MIN, SEASON_ROUNDS, FINALS_WEEKS, WEEKS_PER_SEASON, TRAINING_FOCUS, WILDCARDS } from '../../config';
+import { BOARD, DIFFICULTY, ECON, LEAGUE, PRIZE, SQUAD_MIN, TRAINING_FOCUS, WILDCARDS } from '../../config';
 import { activePack } from '../../content';
+import { AU_CAREER_PROFILE } from '../../content/career/au';
+import { INITIAL_CALENDAR, INITIAL_TRIAL_SLOTS } from '../../content/career/calendar';
 import { inlineIqStat } from '../../content/pack';
 import { ATTACK_COACHES, ATTACK_SPECIALITIES, STAFF } from '../../systems/staff';
 import { playsOfFamily } from '../../data/plays';
@@ -105,6 +107,9 @@ export interface GuidePage {
   sections: GuideSection[];
 }
 
+/** The league every new career starts in (Local: eight clubs, four-team finals). */
+const LOCAL = AU_CAREER_PROFILE.divisions.find((d) => d.id === AU_CAREER_PROFILE.startingDivisionId)!;
+
 export const CLUB_PAGES: readonly GuidePage[] = [
   {
     id: 'week',
@@ -112,7 +117,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
     title: 'Your week',
     sections: [
       {
-        text: `New careers begin each season with two pre-season trials: try a lineup, earn a small home gate, with no ladder points or contract weeks used. Then come ${WEEKS_PER_SEASON} competitive weeks: ${SEASON_ROUNDS} rounds and ${FINALS_WEEKS} finals weeks if you make the eight. Older careers keep their existing season shape. Play Week runs one week: training and injuries, wages and income, your match and the rivals’, the ladder, the free-agent pool (it refreshes every 4 weeks), then an autosave.`,
+        text: `A League career’s year is ${INITIAL_CALENDAR.length} calendar weeks: ${INITIAL_TRIAL_SLOTS.length} pre-season trials (try a lineup, earn a small home gate, no ladder points), ${LOCAL.regularRounds} league rounds, then finals for the top ${LOCAL.finalsSize}, with quiet weeks between. Play Week runs one week: training and injuries, income, any scheduled match and the rivals’, the ladder, the free-agent pool (it refreshes every 4 weeks), then an autosave.`,
       },
       {
         heading: 'Advancing further',
@@ -295,13 +300,17 @@ export const CLUB_PAGES: readonly GuidePage[] = [
     screen: 'ladder',
     sections: [
       {
-        text: `${activePack().clubs.length + 1} clubs play ${SEASON_ROUNDS} rounds: 2 points for a win, 1 for a draw, points difference splits ties. The Ladder tab shows every club’s form (the last five), and a club’s name opens its squad. The Fixtures tab previews your next match.`,
+        heading: 'League career',
+        text: 'League career is the only mode. A new club starts in Local, in Australia or the UK: eight clubs, and a finals title unlocks the next league. Classic mode has been retired: an old Classic save is no longer loadable, and its slot shows as empty. It is overwritten when you start a League career in that slot.',
+      },
+      {
+        text: `${LOCAL.name}: ${LOCAL.entrants.length} clubs play ${LOCAL.regularRounds} rounds, home and away: 2 points for a win, 1 for a draw, points difference splits ties. The Ladder tab shows every club’s form (the last five), and a club’s name opens its squad. The Fixtures tab previews your next match.`,
       },
       {
         heading: 'Finals',
         bullets: [
-          `The top eight play quarter finals (1 v 8, 2 v 7, 3 v 6, 4 v 5), the winners are re-seeded for the semis, and the grand final is week ${WEEKS_PER_SEASON}. A final level at full time goes to golden point: ${NINES.goldenPointMinutes} more minutes, and the next score wins (a try needs no conversion). Still level after that, the higher seed goes through. Finals are night games.`,
-          'Prize money is paid at the rollover; the premiership is worth 15 reputation on top.',
+          `The top ${LOCAL.finalsSize} play the finals: two semi finals, then a grand final at a neutral ground. A final level at full time goes to golden point: ${NINES.goldenPointMinutes} more minutes, and the next score wins (a try needs no conversion). Still level after that, the saved tie draw decides who goes through.`,
+          'The finals title unlocks the next league and is worth 15 reputation; a title in a league below your highest unlocked one is worth half. There is no extra title cash.',
         ],
       },
       {

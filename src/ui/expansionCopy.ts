@@ -1,6 +1,7 @@
 // Expansion wording is kept together for future content packs. No simulation rules.
 import type { GameState, Objective } from '../core/state';
 import { fmtMoney } from '../utils/money';
+import { coachAddress } from './coachName';
 
 export const EXPANSION_COPY = {
   title: 'Welcome to the league',
@@ -13,5 +14,5 @@ export const EXPANSION_COPY = {
 } as const;
 
 export function expansionIntroLines(state: GameState, objectives: readonly Objective[]): string[] {
-  return [EXPANSION_COPY.admitted(state.clubName), EXPANSION_COPY.bank(state.money), EXPANSION_COPY.objectives(objectives)];
+  return [EXPANSION_COPY.admitted(state.clubName), EXPANSION_COPY.bank(state.money), EXPANSION_COPY.objectives(objectives, coachAddress(state))];
 }

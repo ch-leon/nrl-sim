@@ -373,11 +373,12 @@ async function playTrialWeeks(rec) {
  * answers its cards first (answerCards), so a card here is one drawn since: go ahead.
  */
 async function passAdvanceAsks() {
-  for (let i = 0; i < 2; i++) {
+  for (let i = 0; i < 3; i++) {
+    // A League career also asks about event entries closing (#752): carry on without entering.
     const which = await page.waitForFunction(() => (document.querySelector('[data-advance-confirm]') ? 'confirm'
-      : document.querySelector('[data-advance-ask]') ? 'ask' : null), null, { timeout: 600 }).then((h) => h.jsonValue()).catch(() => null);
+      : document.querySelector('[data-advance-ask]') ? 'ask' : document.querySelector('[data-skip-events]') ? 'events' : null), null, { timeout: 600 }).then((h) => h.jsonValue()).catch(() => null);
     if (!which) return;
-    await press(page.locator(which === 'confirm' ? '[data-confirm-advance]' : '[data-ask-proceed]'));
+    await press(page.locator(which === 'confirm' ? '[data-confirm-advance]' : which === 'events' ? '[data-skip-events]' : '[data-ask-proceed]').first());
     await wait(150);
   }
 }
@@ -396,6 +397,49 @@ async function advanceMenu(i) {
   // N10.2: the advance yields between weeks; wait for the run to end.
   await page.waitForFunction(() => !document.querySelector('.nrl-dock[data-advancing]'), null, { timeout: 240000 });
   await wait(400);
+}
+
+/**
+ * A League career's league fixtures at calendar week `week` (#819): every club's
+ * regular-round games on this season's league instances, not the empty Classic
+ * `league.fixtures`. Trials, cups and finals are left out.
+ */
+function leagueRoundAt(s, week = s.week) {
+  return (s.competitions?.instances ?? [])
+    .filter((i) => i.season === s.season && i.definition?.format?.kind === 'league')
+    .flatMap((i) => (i.fixtures ?? []).filter((f) => f.slot === week
+      && i.definition.stages?.find((st) => st.id === f.stageId)?.kind === 'league'));
+}
+
+/** The season review seen when the League year closed, before the league choice. */
+let reviewAtClose = null;
+
+/**
+ * A League career's year ends at an explicit league choice (#819): time stays paused
+ * until it is confirmed, and only then does season 2 start. Confirm it as a player
+ * would: from the season review's Choose next league, or PLAY WEEK, which opens it.
+ * Returns false when no choice is waiting.
+ */
+async function confirmNextLeague(rec) {
+  const live = await page.evaluate(() => window.__nrlState?.() ?? null);
+  if (live?.competitions?.leagueCareer?.phase !== 'next-season-choice') return false;
+  const choose = page.locator('[data-review-choose-league]');
+  if (await choose.count()) {
+    reviewAtClose = (await page.locator('[data-season-review] .nrl-review-finish').first().textContent().catch(() => null))?.trim() ?? '';
+    await press(choose.first());
+  } else {
+    await closeAny();
+    await goHome();
+    await tap('.nrl-dock [data-hud="advance"]');
+  }
+  await page.locator('[data-nrl-league-selection]').waitFor({ timeout: 60000 });
+  await tap('[data-nrl-league-confirm]');
+  await page.locator('[data-nrl-league-selection]').waitFor({ state: 'detached', timeout: 60000 });
+  await page.waitForFunction(() => window.__nrlState?.().season > 1, null, { timeout: 60000 });
+  await page.waitForFunction((k) => (JSON.parse(localStorage.getItem(k) ?? 'null')?.season ?? 0) > 1, SLOT, { timeout: 60000 });
+  await wait(800);
+  rec?.notes.push(`confirmed next season's league${reviewAtClose !== null ? ` from the season review (${reviewAtClose})` : ''}`);
+  return true;
 }
 
 /** Answer every waiting event card (first choice, or the second for odd cards so both get exercised). */
@@ -478,6 +522,9 @@ async function play() {
     await page.fill('[data-nrl-clubname]', 'Phone Test FC');
     await setupStep(page, 3);
     await tap('[data-nrl-start]');
+    await page.locator('[data-nrl-league-selection]').waitFor({ timeout: 60000 });
+    await tap('[data-nrl-league-confirm]');
+    await page.locator('[data-nrl-league-selection]').waitFor({ state: 'detached', timeout: 60000 });
     await tap('[data-expansion-work]');
     await page.waitForSelector('.nrl-dock');
     await wait(1000);
@@ -1031,7 +1078,11 @@ async function play() {
     const shown = (await page.locator('.nrl-mo-score').textContent())?.trim();
     // A live match holds the week until full time (#73), so read the live state, not the slot.
     const s = (await page.evaluate(() => window.__nrlState?.() ?? null)) ?? (await save());
-    const f = [...s.league.fixtures].reverse().find((x) => x.result && (x.homeId === 'player' || x.awayId === 'player'));
+    // A League career (#819) keeps its results on its competition instances; the latest is the highest slot.
+    const club = s.clubId ?? 'player';
+    const f = (s.competitions?.instances ?? []).flatMap((i) => i.fixtures ?? [])
+      .filter((x) => x.result && (x.homeId === club || x.awayId === club))
+      .reduce((a, b) => (!a || (b.slot ?? 0) >= (a.slot ?? 0) ? b : a), null);
     const saved = f?.result ? `${f.result.homeScore} – ${f.result.awayScore}` : '(no result saved)';
     rec.notes.push(`overlay ${shown}, saved ${saved}`);
     if (shown !== saved) throw new Error(`the overlay shows ${shown} but the saved result is ${saved}`);
@@ -1229,6 +1280,11 @@ async function play() {
   for (let i = 0; i < 24; i++) {
     const s = await save();
     if (s.season > 1) break;
+    const choosing = await page.evaluate(() => window.__nrlState?.().competitions?.leagueCareer?.phase === 'next-season-choice');
+    if (choosing) {
+      await step('league-choice', async (rec) => { await confirmNextLeague(rec); }, { quietToasts: true });
+      break;
+    }
     const target = s.week < 25 ? 1 : 2;
     const r = await step(`to-${target === 1 ? 'finals' : 'season-end'}-${i + 1}`, async (rec) => {
       await answerCards(rec);
@@ -1260,6 +1316,11 @@ async function play() {
   // N7 (#193): the season review opens at the rollover; close it, then reopen it from History.
   await step('season-review', async (rec) => {
     const review = page.locator('[data-season-review="1"]');
+    // A League career shows the review when the year closes, and Choose next league closed it.
+    if (reviewAtClose !== null && !(await review.count())) {
+      rec.notes.push(`seen at the year's close: ${reviewAtClose}`);
+      return;
+    }
     if (!(await review.count())) {
       if (await page.evaluate(() => (window.__nrlState?.().history ?? []).some((h) => h.review))) throw new Error('season 1 has a review but none opened at the rollover');
       return 'no season review on this build';
@@ -1280,16 +1341,26 @@ async function play() {
     rec.notes.push('season 1 review reopened from History, and back to History from its header');
   });
   await step('season-2-week-2', async (rec) => {
-    // Rollover starts two trials at W1. The following held-week probe needs a
-    // league round with rival fixtures, so complete those trials through the UI.
+    // League timing: season 2 opens with trials and rest weeks, and league rounds sit on
+    // their own calendar weeks. The held-week probe needs a week with a league round the
+    // club plays and rival fixtures beside it, so play on (as a player would) until one is next.
     await playTrialWeeks(rec);
-    await closeAny();
-    await goHome();
-    await answerCards(rec);
-    await weekAsTapped(rec);
-    const s = await save();
-    if (s.season !== 2 || s.week !== 2 || s.preseason) throw new Error(`expected S2 round 2 after trials, got S${s.season} W${s.week} trial ${s.preseason}`);
-    rec.notes.push(`S${s.season} W${s.week}`);
+    let s = await page.evaluate(() => window.__nrlState());
+    for (let i = 0; i < 8; i++) {
+      const round = leagueRoundAt(s);
+      const mine = round.some((f) => f.homeId === s.clubId || f.awayId === s.clubId);
+      if (s.season === 2 && !s.preseason && mine && round.length > 1 && !round.some((f) => f.result)) break;
+      await closeAny();
+      await goHome();
+      await answerCards(rec);
+      await weekAsTapped(rec);
+      s = await page.evaluate(() => window.__nrlState());
+    }
+    const round = leagueRoundAt(s);
+    if (s.season !== 2 || s.preseason) throw new Error(`expected season 2 past its trials, got S${s.season} W${s.week} trial ${s.preseason}`);
+    if (!round.length) throw new Error(`no league fixtures at S2 W${s.week}`);
+    if (!round.some((f) => f.homeId === s.clubId || f.awayId === s.clubId)) throw new Error(`the club has no league game at S2 W${s.week}`);
+    rec.notes.push(`S${s.season} W${s.week}: league round with ${round.length} fixtures`);
     await facilitiesDrawn(rec);
     await dumpSave('season-2', rec);
   }, { quietToasts: true });
@@ -1335,7 +1406,7 @@ async function play() {
     if (!(await held())) throw new Error('the hold ended before the focus change: the slowed Worker was not slow enough');
     const slot = await save();
     if (JSON.stringify(slot) !== slotBefore) {
-      throw new Error(`a change during the held week wrote it half-ticked: slot 1 at W${slot.week}, ${slot.league.fixtures.filter((f) => f.round === week && f.result).length} of round ${week}'s results in, $${slot.money}`);
+      throw new Error(`a change during the held week wrote it half-ticked: slot 1 at W${slot.week}, ${leagueRoundAt(slot, week).filter((f) => f.result).length} of W${week}'s league results in, $${slot.money}`);
     }
     // Each tap leaves its own message. A toast lasts a few seconds and a busy page can take longer than
     // that between taps, so keep a log of every toast as it is queued and count in that.
@@ -1357,8 +1428,9 @@ async function play() {
     if (!(await held())) throw new Error('the week moved on during the hold');
     await page.waitForFunction((w) => window.__nrlState().week !== w, week, { timeout: 60000 });
     const s = await page.evaluate(() => window.__nrlState());
-    const round = s.league.fixtures.filter((f) => f.round === week);
-    rec.notes.push(`held at W${week}${match === 'match' ? ' after Back to Club' : ''}; both taps said so; W${s.week}, round ${week} ${round.filter((f) => f.result).length}/${round.length} results`);
+    const round = leagueRoundAt(s, week);
+    rec.notes.push(`held at W${week}${match === 'match' ? ' after Back to Club' : ''}; both taps said so; W${s.week}, W${week}'s league round ${round.filter((f) => f.result).length}/${round.length} results`);
+    if (!round.length) throw new Error(`no league fixtures at W${week}: the held-week probe checked nothing`);
     if (round.some((f) => !f.result)) throw new Error('the held round finished with fixtures unplayed');
     // A save with rival matches on the match engine, for the corpus (v13's field).
     await dumpSave('live-rivals', rec);

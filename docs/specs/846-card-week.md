@@ -12,7 +12,7 @@ collections and branching careers", section 24, as cut down on 26 Nov 2026.
 
 The Labs switch only decides whether the option is offered. The career itself
 remembers that it is a card-week career (`GameState.cardWeek`), so turning the switch
-off later does not break it. Classic careers never get one. Careers without it play
+off later does not break it. Careers without it play
 exactly as before, and their saves are unchanged apart from the save version.
 
 ## Rules

@@ -1,7 +1,7 @@
 // #484: real fresh-game and reload paths, with screenshots kept in CI artifacts.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { BASE, IPHONE_UA, OUT_ROOT, reachProblems, setupStep } from '../common.mjs';
+import { BASE, confirmStartingLeague, IPHONE_UA, OUT_ROOT, reachProblems, setupStep } from '../common.mjs';
 
 export async function runExpansionIntro(browser) {
   const out = join(OUT_ROOT, 'webkit', 'expansion-intro');
@@ -19,13 +19,14 @@ export async function runExpansionIntro(browser) {
       await page.locator('[data-nrl-clubname]').fill('Test Club');
       await setupStep(page, 3);
       await page.locator('[data-nrl-start]').tap();
+      await confirmStartingLeague(page);
       await page.locator('[data-expansion-intro]').waitFor();
       await page.evaluate(() => document.fonts.ready);
       rec.problems.push(...await reachProblems(page, '.nrl-expansion-card', ['[data-expansion-work]', '[data-expansion-skip]']));
       const lines = await page.locator('[data-expansion-intro] .nrl-coach-text').allTextContents();
       rec.lines = lines;
       if (lines.length !== 3 || !lines[0].includes('Test Club') || !lines[2].includes('our first season in the league')) rec.problems.push('intro copy missing');
-      if (await page.locator('canvas').count()) rec.problems.push('grounds started before intro finished');
+      // The grounds canvas is already up: the league chooser runs after Phaser starts.
       await page.screenshot({ path: join(out, `${tag}-intro.png`) });
       await page.locator(width === 844 ? '[data-expansion-skip]' : '[data-expansion-work]').tap();
       await page.locator('[data-step="build"]').waitFor();
@@ -36,7 +37,7 @@ export async function runExpansionIntro(browser) {
       await page.locator('[data-nrl-continue-1]').tap();
       await page.waitForFunction(() => !!window.__nrlGame);
       if (await page.locator('[data-expansion-intro]').count()) rec.problems.push('Continue repeated intro');
-      // Exercise old-save fallback too: the new-game path, not a flag alone, gates it.
+      // A career that has not recorded the hint sees the intro on Continue, then it stays seen.
       await ctx.addInitScript(() => {
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
@@ -51,8 +52,8 @@ export async function runExpansionIntro(browser) {
       });
       await page.reload();
       await page.locator('[data-nrl-continue-1]').tap();
-      await page.waitForFunction(() => !!window.__nrlGame);
-      if (await page.locator('[data-expansion-intro]').count()) rec.problems.push('old save showed intro');
+      await page.locator('[data-expansion-intro]').waitFor();
+      await page.locator('[data-expansion-work]').tap();
       rec.week = state.week;
     } catch (e) {
       rec.problems.push(e.message);

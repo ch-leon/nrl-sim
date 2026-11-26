@@ -51,6 +51,21 @@ describe('GUIDE_PAGES', () => {
     expect(text).toContain(`golden point: ${NINES.goldenPointMinutes} more minutes`);
   });
 
+  it('teaches the League season, not the retired Classic one (#819)', () => {
+    const page = (id: string): string => GUIDE_PAGES.find((p) => p.id === id)!.sections
+      .flatMap((s) => [s.text ?? '', ...(s.bullets ?? [])]).join(' ');
+    const ladder = page('ladder');
+    expect(ladder).toContain('Local League: 8 clubs play 14 rounds');
+    expect(ladder).toContain('The top 4 play the finals');
+    expect(ladder).not.toMatch(/top eight|quarter final|1 v 8/);
+    expect(ladder).toContain('an old Classic save is no longer loadable');
+    expect(ladder).not.toMatch(/deleted/);
+    expect(ladder).not.toMatch(/exported/);
+    const week = page('week');
+    expect(week).toContain('14 league rounds, then finals for the top 4');
+    expect(week).not.toMatch(/make the eight|Older careers keep/);
+  });
+
   it('falls back to the first page for an unknown id', () => {
     expect(guidePage('nines').id).toBe('nines');
     expect(guidePage('nope').id).toBe('week');

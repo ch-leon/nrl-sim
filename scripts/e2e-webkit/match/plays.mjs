@@ -1,7 +1,7 @@
 import { pollMatchPlay } from '../../e2e-match-play.mjs';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, setMatchSpeed, setupStep } from '../common.mjs';
+import { confirmStartingLeague, closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, setMatchSpeed, setupStep } from '../common.mjs';
 
 /** The plays the club takes in: wide launch rules (second-man: any but your 20, tackles 1–4), so one is on most sets. */
 const PLAYS = ['second-man', 'block-play', 'cut-out-winger'];
@@ -143,6 +143,7 @@ export async function runMatchPlays(browser, sizes = [[844, 390], [667, 375], [5
         await page.evaluate(() => window.__restoreMatchPlaysClock());
         await setupStep(page);
         await page.locator('[data-nrl-start]').tap();
+        await confirmStartingLeague(page);
         await page.locator('[data-expansion-work]').tap();
         const skip = page.locator('.nrl-tutorial-skip');
         if (await skip.count()) await skip.tap();

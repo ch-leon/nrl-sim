@@ -1,6 +1,7 @@
 // Developer settings' playtest career (#519). A career of its own, set up with a
 // Direct attack coach hired and Block play bought and taken into the match, so a
 // merged feature can be watched straight away without advancing Leon's career.
+// A fresh one is a League career (#819). Classic is not started here.
 //
 // Isolation: the playtest career lives under DEV_TEST_PREFIX (core/storage/local.ts
 // inCareerNamespace), so it never writes a normal slot. Setting one up saves the
@@ -249,6 +250,26 @@ export const PLAYTEST_CLUB = 'Playtest XIII';
 export const PLAYTEST_COACH = 'Dev Tester';
 /** One seed, so every playtest career starts from the same club. */
 export const PLAYTEST_SEED = 519;
+
+/**
+ * A fresh playtest career is a League career in slot 1. Classic is not started (#819).
+ * `expectedOriginal` is what slot 1 holds now: null, or a Classic career it replaces.
+ */
+export function freshPlaytestLeagueStart(expectedOriginal: string | null = null): {
+  clubName: string;
+  coachName: string;
+  seed: number;
+  difficulty: 'normal';
+  destination: { slot: 1; expectedOriginal: string | null };
+} {
+  return {
+    clubName: PLAYTEST_CLUB,
+    coachName: PLAYTEST_COACH,
+    seed: PLAYTEST_SEED,
+    difficulty: 'normal',
+    destination: { slot: 1, expectedOriginal },
+  };
+}
 
 /**
  * The preset, through the game's own routes on a new career already loaded: the
