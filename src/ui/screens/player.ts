@@ -818,7 +818,8 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
   render();
   // A full sheet in the band above the dock (#203); ◂ back is the one close (#349 A5).
   // A drill-in from a list: it cuts in, with no dialog's entrance (#606).
-  const backdrop = openModal(content, { class: 'nrl-player-modal', region: true, cut: true, onRemove: () => stopWait?.() });
+  // nrl-player-free: a free agent's page (Sign on its Deal tab), the one the tutorial's signing step rings (#838).
+  const backdrop = openModal(content, { class: `nrl-player-modal${ctx.kind === 'freeAgent' ? ' nrl-player-free' : ''}`, region: true, cut: true, onRemove: () => stopWait?.() });
   // The backdrop's own listener has closed the dialog; tell whoever opened it.
   backdrop.addEventListener('click', () => { if (!closed) { closed = true; off(); opts.onClose?.(); } });
   return backdrop;

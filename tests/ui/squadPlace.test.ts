@@ -129,6 +129,14 @@ describe('player sale and history routes', () => {
     q('[data-player-tab="record"]').click();
     expect(q('[data-club-history]').words()).toContain('No recorded club spells.');
   });
+  it('marks only a free agent’s page as one you can sign: the tutorial rings that one (#838)', () => {
+    openPlayerPage(getState().squad[0]!, { kind: 'squad' });
+    expect(body().querySelector('[data-player-page]')).not.toBeNull();
+    expect(body().querySelector('.nrl-player-free')).toBeNull();
+    closeModal();
+    openPlayerPage(getState().freeAgents[0]!, { kind: 'freeAgent' });
+    expect(q('.nrl-player-free').classList.contains('nrl-player-modal')).toBe(true);
+  });
 });
 
 describe('a row’s trait chips (#614)', () => {

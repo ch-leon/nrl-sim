@@ -96,9 +96,10 @@ export const STEPS: readonly TutorialStep[] = [
   {
     id: 'recruit',
     // Who to sign is the coach's choice, so the ring takes the whole list, not one row; a
-    // player's page opened over it is rung whole in its place (Sign is on its Deal tab).
+    // free agent's page opened over it is rung whole in its place (Sign is on its Deal tab).
+    // A squad man's page has no Sign (Renew, Sell, Release), so it gets no ring.
     text: 'Sign a player you can afford, and leave enough for the bills.',
-    anchor: `[data-screen-key="recruit"] .nrl-screen-body, .nrl-player-modal, ${inSquad('recruit')}`,
+    anchor: `[data-screen-key="recruit"] .nrl-screen-body, .nrl-player-modal.nrl-player-free, ${inSquad('recruit')}`,
     advanceOn: 'player:signed',
     opens: 'recruit',
     tap: 2,

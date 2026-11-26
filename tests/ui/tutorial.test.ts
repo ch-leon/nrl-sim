@@ -85,7 +85,7 @@ describe('STEPS: three guided taps (#370)', () => {
     expect(byId.get('build')!.anchor!.split(',')[0]).toContain('[data-screen-key="build"] [data-facility="trainingPaddock"]');
     // Who to sign is a choice: the whole list is rung, not one row; a player's page over it, whole, in its place.
     const choices = byId.get('recruit')!.anchor!.split(',').map((c) => c.trim());
-    expect(choices.slice(0, 2)).toEqual(['[data-screen-key="recruit"] .nrl-screen-body', '.nrl-player-modal']);
+    expect(choices.slice(0, 2)).toEqual(['[data-screen-key="recruit"] .nrl-screen-body', '.nrl-player-modal.nrl-player-free']);
     expect(byId.get('advance')!.anchor).toBe('.nrl-hud-actions .nrl-btn');
     // The placement step frames the bar on the grass and moves on once the bar is up.
     expect(byId.get('build')!.until).toBe('.nrl-placebar:not([hidden])');
