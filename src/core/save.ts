@@ -1,5 +1,6 @@
 import { awaitingCampReplay, CHALLENGE_REPLAY_PROBLEM, inconsistentChallengeReplay } from '../systems/parkedLeagueFixture';
 import { leagueCareerStateProblem } from '../systems/leagueEntryValidation';
+import { repairClosedSeasonTrip } from '../systems/leagueTripRepair';
 import { migrateObservedProtection } from '../systems/cap';
 import { initialPlayerPopulation, installPlayerHistory } from '../systems/playerCareer';
 import { createOpenCupOffer } from '../systems/openCupEntry';
@@ -25,7 +26,7 @@ import { currentCalendarFixtures, fixtureBridge, hasStructuralCalendar, recoverU
 // comes from src/core/storageKeys.ts, frozen whatever the game is called.
 
 import type { Fixture, GameState } from './state';
-import { hasV33Fields, validateInput, validateCurrent, REPAIR_NOTICE, type SaveRepair } from './saveValidation';
+import { hasV33Fields, validateInput, validateCurrent, type SaveRepair } from './saveValidation';
 import { emptyFinance, getState, SAVE_VERSION, setState, stateInstallation } from './state';
 import { fromLegacy, isTraitId, type TraitInstance } from '../data/traits';
 import { withRivalSquads } from '../systems/rivals';
@@ -403,6 +404,9 @@ function migrateChecked(raw: unknown): MigrateResult {
     if (version === 32) state = createOpenCupOffer({...structuredClone(state),version:SAVE_VERSION,competitionRewards:[]});
     if (version === 33 || version === 34) state = {...state,version:SAVE_VERSION};
     const problem = leagueCareerStateProblem(state);
+    // #837: a trip answered at the league choice. Kept only if the repaired career passes every check.
+    const trip = problem ? repairClosedSeasonTrip(state) : null;
+    if (trip && !leagueCareerStateProblem(trip.state)) return { ok: true, outcome: 'repaired', state: trip.state, repairs: [trip.repair] };
     return problem ? { ok: false, outcome: problem.reason === 'unsupported' ? 'unsupported' : 'unrecoverable',
       reason: 'corrupt', message: problem.message }
       : { ok: true, outcome: 'valid', state, repairs: [] };
@@ -492,7 +496,7 @@ export function getSlotSummaries(place?: (state: GameState) => number): SlotSumm
       slot, status: 'ok',
       clubName: String(result.state.clubName), season: result.state.season, week: result.state.week,
       ...slotPlace(result.state, place),
-      ...(result.repairs.length ? { message: REPAIR_NOTICE } : {}),
+      ...(result.repairs.length ? { message: result.repairs[0]!.notification } : {}),
     });
   }
   return out;
@@ -764,7 +768,7 @@ function classifySlot(store: LocalSaveStore, slot: number, raw: string | null): 
 export function load(): GameState | null {
   const result = loadSlot();
   if (result.status === 'ok') {
-    if (result.repairs.length) bus.emit('ui:notify', { text: REPAIR_NOTICE, kind: 'info' });
+    if (result.repairs.length) bus.emit('ui:notify', { text: result.repairs[0]!.notification, kind: 'info' });
     return result.state;
   }
   if (result.status !== 'empty') {
@@ -1168,7 +1172,7 @@ export function importIntoSlot(text: string, slot: number): GameState | null {
   // The import now owns the active slot: this page's game must not save over it on
   // the way to the title screen (Settings → Import save reloads; #295's checker).
   if (slot === activeSlot) slotImported = true;
-  bus.emit('ui:notify', { text: res.repairs.length ? REPAIR_NOTICE : `Save imported into slot ${slot}`, kind: 'success' });
+  bus.emit('ui:notify', { text: res.repairs.length ? res.repairs[0]!.notification : `Save imported into slot ${slot}`, kind: 'success' });
   return res.state;
 }
 

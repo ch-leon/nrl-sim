@@ -516,7 +516,9 @@ export function recordPremiership(state: GameState): GameState {
 }
 
 /** Shared explicit-year sporting bookkeeping; no payouts, rollover or RNG. */
-export function recordSeasonHonours(state: GameState, facts: {season: number; clubId: string; ladderPosition: number; championId?: string | undefined}): GameState {
+export function recordSeasonHonours(state: GameState, facts: {season: number; clubId: string; ladderPosition: number; championId?: string | undefined;
+  /** Reputation a title is worth; PREMIERSHIP_REP_BONUS unless the caller says otherwise. */
+  titleReputation?: number}): GameState {
   if (state.history.some(h => h.season === facts.season)) return state;
   const playerPremiership = facts.championId === facts.clubId;
   const row = state.league.ladder.find((r) => r.clubId === facts.clubId);
@@ -533,7 +535,7 @@ export function recordSeasonHonours(state: GameState, facts: {season: number; cl
     },
   ];
   const reputation = playerPremiership
-    ? Math.min(100, state.reputation + PREMIERSHIP_REP_BONUS)
+    ? Math.min(100, state.reputation + (facts.titleReputation ?? PREMIERSHIP_REP_BONUS))
     : state.reputation;
 
   return { ...state, history, reputation };

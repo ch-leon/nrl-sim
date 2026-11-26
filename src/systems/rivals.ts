@@ -1,4 +1,5 @@
 import type { CareerActionClock } from '../core/season';
+import { bigThreeOf } from '../content/career/bigThree';
 // src/systems/rivals.ts — rival clubs with real squads (GitHub #74). Each rival
 // keeps a persistent squad of Player objects on its RivalClub entry; its
 // `strength` is derived from that squad, so everything that reads strength (the
@@ -164,10 +165,10 @@ export function rivalPlayer(rng: Rng, clubId: string, position: Position, target
 
 /**
  * A squad for `club` matching its current strength: two players per position
- * (the first of each pair a first-grader), plus two spare first-graders. The top
- * ON_FIELD come out close to `club.strength`.
+ * (the first of each pair a first-grader), plus spare first-graders up to
+ * `size` (two by default). The top ON_FIELD come out close to `club.strength`.
  */
-export function generateRivalSquad(club: Pick<RivalClub, 'id' | 'strength'>, seed: number): Player[] {
+export function generateRivalSquad(club: Pick<RivalClub, 'id' | 'strength'>, seed: number, size = RIVAL_SQUAD_SIZE): Player[] {
   const rng = makeRng(seed);
   const first = club.strength - 1; // picking the best 9 of 11 lifts the mean back up
   const squad: Player[] = [];
@@ -175,7 +176,7 @@ export function generateRivalSquad(club: Pick<RivalClub, 'id' | 'strength'>, see
     squad.push(rivalPlayer(rng, club.id, pos, first));
     squad.push(rivalPlayer(rng, club.id, pos, club.strength - RIVAL_DEPTH_GAP));
   }
-  while (squad.length < RIVAL_SQUAD_SIZE) squad.push(rivalPlayer(rng, club.id, rng.pick(POSITIONS), first));
+  while (squad.length < size) squad.push(rivalPlayer(rng, club.id, rng.pick(POSITIONS), first));
   return squad;
 }
 
@@ -496,15 +497,27 @@ export function developRivalsWeek(clubs: readonly RivalClub[], rng: Rng, playerI
   });
 }
 
-/** Each saved division keeps its own anchor; club/ceiling identity never changes. */
+/** Each saved division keeps its own anchor; club/ceiling identity never changes.
+ * A Big Three club (#840) develops toward its own level with the same anchor
+ * applied to it alone, and stays out of its league's average, so it neither
+ * drags the ordinary clubs nor is dragged back to them. A division without one
+ * draws exactly as before. */
 export function developDivisionRivals(state: GameState, clubs: readonly RivalClub[], rng: Rng): RivalClub[] {
   const competitions = state.competitions;
   if (!competitions?.world || !competitions.calendar) return developRivalsWeek(clubs, rng);
+  const bigThree = bigThreeOf(competitions.world);
+  const intervals = competitions.calendar.slots.length;
   const updated = new Map<string, RivalClub>();
   for (const division of competitions.world.divisions) {
     const instance = competitions.instances.find(i => i.id === division.instanceId)!;
     const ids = new Set(instance.entrantIds);
-    for (const club of developRivalsWeek(clubs.filter(c => ids.has(c.id)), rng, state.clubId, division.ratingMean, competitions.calendar.slots.length)) updated.set(club.id, club);
+    const field = clubs.filter(c => ids.has(c.id));
+    for (const club of developRivalsWeek(field.filter(c => !bigThree.has(c.id)), rng, state.clubId, division.ratingMean, intervals)) updated.set(club.id, club);
+    for (const club of field) {
+      const level = bigThree.get(club.id);
+      if (level === undefined || club.id === state.clubId) continue;
+      for (const developed of developRivalsWeek([club], rng, state.clubId, level, intervals)) updated.set(developed.id, developed);
+    }
   }
   return clubs.map(c => updated.get(c.id) ?? c);
 }

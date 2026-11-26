@@ -225,7 +225,8 @@ describe('tier anchors and dormant legacy market', () => {
     const s = setup();
     const clubs = s.league.clubs.map(c => {
       if (!c.squad) return c;
-      const target = currentDivision(s, c.id)!.division.ratingMean;
+      // A Big Three club (#840) is held at its own level, every other rival at its league's.
+      const target = s.competitions!.world!.bigThree?.[c.id] ?? currentDivision(s, c.id)!.division.ratingMean;
       return { ...c, strength: target, squad: c.squad.map(p => ({ ...p, age: 28,
         stats: { ...p.stats, ...Object.fromEntries(shownStats(p.position).map(k => [k, target])) },
         ceilings: { ...p.ceilings, ...Object.fromEntries(shownStats(p.position).map(k => [k, 90])) } })) };

@@ -45,7 +45,7 @@ export async function prepareLeagueCareer(options: LeagueCareerOptions): Promise
       rngSeed: (seed ^ hashString(profile.id + ':calendar')) >>> 0,
       competitions: {
         schemaVersion: 1, instances: [...leagues, ...buildDivisionTrials(world, profile, 1, seed)],
-        world: { profile: world.profile, divisions: world.divisions },
+        world: { profile: world.profile, divisions: world.divisions, ...(world.bigThree ? { bigThree: { ...world.bigThree } } : {}) },
         calendar: { mode: 'structural', status: 'active', season: 1, elapsedIntervals: 0,
           slots: profile.calendarSlots.map(s => ({...s})) },
         leagueCareer: { version: 1, scheduleSeed: seed, clubId: base.clubId, phase: 'initial-choice',

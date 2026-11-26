@@ -15,6 +15,8 @@ import { TRAINING_FOCUS } from '../../src/config';
 import { STAFF, STAFF_ROLES } from '../../src/systems/staff';
 import { BOARD, DIFFICULTY, ECON, ON_FIELD, PRIZE, SET_TACKLES, SQUAD_MIN } from '../../src/config';
 import { createNewGame, setState } from '../../src/core/state';
+import { FACILITY_CATALOG } from '../../src/data/facility';
+import { fmtMoney } from '../../src/utils/money';
 import { IN_GOAL } from '../../src/match/core/field';
 import { bonusZoneSvg, zonePictureGeometry } from '../../src/ui/guide/zonePicture';
 
@@ -144,7 +146,16 @@ describe('the Money page says the real numbers (N12)', () => {
   it('quotes the signing fee and the pool\'s level', () => {
     expect(bullets('money')).toContain('difficulty does not scale');
     expect(bullets('squad')).toContain('about 52 overall');
-    expect(bullets('grounds')).toContain('Sponsor Board ($10,000, one only): $150 a week plus $10 a reputation point (up to $1,000)');
+    expect(bullets('grounds')).toContain('Sponsor Board ($10,000, one only): 3% / 9% / 18% of the match base on played matches');
+  });
+
+  it('quotes every facility price from the catalog (#836)', () => {
+    const text = bullets('grounds');
+    for (const def of Object.values(FACILITY_CATALOG)) {
+      expect(text).toContain(`${def.name.replace("'", '’')} (${fmtMoney(def.cost)}`);
+    }
+    expect(text).toContain('Grandstand ($30,000, one only): seats 3,500, 5,000 or 6,500');
+    expect(text).not.toContain('a reputation point');
   });
 });
 
@@ -209,5 +220,18 @@ describe('the bonus zone picture', () => {
     expect(svg).toContain(`width="${g.zone.w}" height="${g.zone.h}"`);
     expect(svg).toContain('stroke-dasharray');
     expect(svg).toContain(`>${NINES_FACTS.bonusTryPoints}</text>`);
+  });
+});
+
+describe('League career guide pages (#836)', () => {
+  it('says story cards run in a League career', async () => {
+    const { prepareLeagueCareer } = await import('../../src/systems/leagueCareerSetup');
+    const { guidePageForCareer } = await import('../../src/ui/guide/pages');
+    const state = await prepareLeagueCareer({ clubName: 'Guide FC', seed: 575 });
+    const events = guidePageForCareer(CLUB_PAGES.find(p => p.id === 'events')!, state);
+    const text = events.sections.map(x => [x.heading, x.text, ...(x.bullets ?? [])].join(' ')).join(' ');
+    expect(text).not.toContain('not enabled');
+    expect(text).toContain('In a League career');
+    expect(text).toContain('Skills Camp');
   });
 });

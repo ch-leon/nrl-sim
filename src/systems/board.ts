@@ -3,6 +3,7 @@
 // objectives come from a private RNG seeded by season + club count, so the same
 // state always yields the same goals and the main rngSeed stream is untouched.
 import { EXPANSION_COPY } from '../ui/expansionCopy';
+import { bigThreeOf } from '../content/career/bigThree';
 import { derbyRival } from './derby';
 import { coachAddress } from '../ui/coachName';
 import { getState, setState, type GameState, type Objective } from '../core/state';
@@ -59,6 +60,12 @@ export function finalsObjectiveText(top: number): string {
  * catalog build, capped at `BUILD_TARGET_EXTRA`. Zero when the cash cannot
  * buy one: that goal is left off, because a club cannot go into the red to meet it.
  */
+/** Every catalog facility built and at level 3: anything more would only be a duplicate. */
+export function everyFacilityMaxed(facilities: GameState['facilities']): boolean {
+  return (Object.keys(FACILITY_CATALOG) as (keyof typeof FACILITY_CATALOG)[])
+    .every(id => facilities.some(f => f.defId === id && f.level === 3));
+}
+
 export function buildsTheCashCovers(money: number): number {
   const cheapest = Math.min(...Object.values(FACILITY_CATALOG).map((f) => f.cost));
   if (cheapest <= 0) return BOARD.BUILD_TARGET_EXTRA;
@@ -80,7 +87,11 @@ export function generateObjectives(state: GameState): Objective[] {
 export function generateLeagueObjectives(state: GameState, fieldIds: readonly string[]): Objective[] {
   const clubs = state.league.clubs.filter(c => fieldIds.includes(c.id));
   if (clubs.length !== new Set(fieldIds).size || clubs.length < 2 || !clubs.some(c => c.id === state.clubId)) throw new Error('Invalid League objective field');
-  const top = Math.max(1, Math.min(clubs.length - 1, Math.round(finalsTarget(state) * clubs.length / 16)));
+  // The board never asks a club to finish above every Big Three club in its field (#840).
+  const bigThree = bigThreeOf(state.competitions?.world);
+  const giants = clubs.filter(c => c.id !== state.clubId && bigThree.has(c.id)).length;
+  const scaled = Math.round(finalsTarget(state) * clubs.length / 16);
+  const top = Math.max(1, Math.min(clubs.length - 1, Math.max(scaled, giants + 1)));
   return objectivesForField({...state, league: {...state.league, clubs}}, top);
 }
 
@@ -93,7 +104,9 @@ function objectivesForField(state: GameState, top: number): Objective[] {
   const derby = derbyRival(state);
   if (state.reputation < 25 && !derby) return out;
 
-  const rivals = state.league.clubs.filter((c) => c.id !== state.clubId)
+  // A Big Three club (#840) is never the club to finish above, unless it is the derby.
+  const bigThree = bigThreeOf(state.competitions?.world);
+  const rivals = state.league.clubs.filter((c) => c.id !== state.clubId && (!bigThree.has(c.id) || c.id === derby))
     .sort((a, b) => b.strength - a.strength || a.id.localeCompare(b.id));
   // Consume precisely the old draw, even when geography chooses the objective.
   const rivalDraw = state.reputation >= 25 && rivals.length > 0 && rng.next() < 0.5;
@@ -106,9 +119,10 @@ function objectivesForField(state: GameState, top: number): Objective[] {
       text: `Finish above ${rival.name}${derby ? ", our derby rival" : ""}`,
     });
   } else {
-    // The draw is already consumed. A goal the cash cannot pay for is not set.
+    // The draw is already consumed. A goal the cash cannot pay for is not set,
+    // and neither is one for a club with every facility already at its top level (#836).
     const extra = buildsTheCashCovers(state.money);
-    if (extra > 0) {
+    if (extra > 0 && !everyFacilityMaxed(state.facilities)) {
       const target = state.facilities.length + extra;
       out.push({ id: `s${season}-build`, kind: 'build', target, status: 'pending', text: `Have ${target} facilities built` });
     }
