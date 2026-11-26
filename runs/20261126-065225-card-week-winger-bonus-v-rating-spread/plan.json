@@ -1,0 +1,88 @@
+{
+  "name": "card week winger bonus v rating spread",
+  "description": "Does the rating spread explain why a bonus on the wingers lowered the holder's win rate? Flat 60 v 60, home carries the bonus, played with the spread as shipped (0.2) and with sheets as written (1). 500 whole matches per row (250 seeds both ways).",
+  "report": "matrix",
+  "seeds": 250,
+  "variants": [
+    {
+      "name": "sheets as written",
+      "tuning": {
+        "rating.spread": 1
+      }
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "even 60 v 60",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "wingers +25 all stats",
+      "home": {
+        "rating": 60,
+        "positionStats": {
+          "winger": {
+            "speed": 85,
+            "strength": 85,
+            "stamina": 85,
+            "handling": 85,
+            "kicking": 85,
+            "footyIQ": 85
+          }
+        }
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "wingers +25, expansive attack",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "slide"
+        },
+        "positionStats": {
+          "winger": {
+            "speed": 85,
+            "strength": 85,
+            "stamina": 85,
+            "handling": 85,
+            "kicking": 85,
+            "footyIQ": 85
+          }
+        }
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "even, expansive attack",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true
+    }
+  ]
+}

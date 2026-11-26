@@ -1,0 +1,252 @@
+{
+  "name": "card week link sizing",
+  "description": "How big must a card-week team-sheet bonus be before the side holding it wins more? Flat 60 v 60; the home side carries the bonus on the linked positions; 1000 whole matches per row (500 seeds both ways).",
+  "report": "matrix",
+  "seeds": 500,
+  "scenarios": [
+    {
+      "name": "even 60 v 60",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "halves +3 footyIQ (as proposed)",
+      "home": {
+        "rating": 60,
+        "positionStats": {
+          "halves": {
+            "footyIQ": 63
+          }
+        }
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "halves +8 all stats",
+      "home": {
+        "rating": 60,
+        "positionStats": {
+          "halves": {
+            "speed": 68,
+            "strength": 68,
+            "stamina": 68,
+            "handling": 68,
+            "kicking": 68,
+            "footyIQ": 68
+          }
+        }
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "halves +15 all stats",
+      "home": {
+        "rating": 60,
+        "positionStats": {
+          "halves": {
+            "speed": 75,
+            "strength": 75,
+            "stamina": 75,
+            "handling": 75,
+            "kicking": 75,
+            "footyIQ": 75
+          }
+        }
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "halves +25 all stats",
+      "home": {
+        "rating": 60,
+        "positionStats": {
+          "halves": {
+            "speed": 85,
+            "strength": 85,
+            "stamina": 85,
+            "handling": 85,
+            "kicking": 85,
+            "footyIQ": 85
+          }
+        }
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "middle +8 all stats (hooker, prop)",
+      "home": {
+        "rating": 60,
+        "positionStats": {
+          "hooker": {
+            "speed": 68,
+            "strength": 68,
+            "stamina": 68,
+            "handling": 68,
+            "kicking": 68,
+            "footyIQ": 68
+          },
+          "prop": {
+            "speed": 68,
+            "strength": 68,
+            "stamina": 68,
+            "handling": 68,
+            "kicking": 68,
+            "footyIQ": 68
+          }
+        }
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "edge +8 all stats (centre, both wingers)",
+      "home": {
+        "rating": 60,
+        "positionStats": {
+          "centre": {
+            "speed": 68,
+            "strength": 68,
+            "stamina": 68,
+            "handling": 68,
+            "kicking": 68,
+            "footyIQ": 68
+          },
+          "winger": {
+            "speed": 68,
+            "strength": 68,
+            "stamina": 68,
+            "handling": 68,
+            "kicking": 68,
+            "footyIQ": 68
+          }
+        }
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "wingers +25 all stats (gold winger size)",
+      "home": {
+        "rating": 60,
+        "positionStats": {
+          "winger": {
+            "speed": 85,
+            "strength": 85,
+            "stamina": 85,
+            "handling": 85,
+            "kicking": 85,
+            "footyIQ": 85
+          }
+        }
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "three links +8 all stats (7 of 9)",
+      "home": {
+        "rating": 60,
+        "positionStats": {
+          "halves": {
+            "speed": 68,
+            "strength": 68,
+            "stamina": 68,
+            "handling": 68,
+            "kicking": 68,
+            "footyIQ": 68
+          },
+          "hooker": {
+            "speed": 68,
+            "strength": 68,
+            "stamina": 68,
+            "handling": 68,
+            "kicking": 68,
+            "footyIQ": 68
+          },
+          "prop": {
+            "speed": 68,
+            "strength": 68,
+            "stamina": 68,
+            "handling": 68,
+            "kicking": 68,
+            "footyIQ": 68
+          },
+          "centre": {
+            "speed": 68,
+            "strength": 68,
+            "stamina": 68,
+            "handling": 68,
+            "kicking": 68,
+            "footyIQ": 68
+          },
+          "winger": {
+            "speed": 68,
+            "strength": 68,
+            "stamina": 68,
+            "handling": 68,
+            "kicking": 68,
+            "footyIQ": 68
+          }
+        }
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "yardstick 63 v 60",
+      "home": {
+        "rating": 63
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "yardstick 68 v 60",
+      "home": {
+        "rating": 68
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true
+    }
+  ]
+}
