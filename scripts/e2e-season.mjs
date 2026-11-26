@@ -373,11 +373,12 @@ async function playTrialWeeks(rec) {
  * answers its cards first (answerCards), so a card here is one drawn since: go ahead.
  */
 async function passAdvanceAsks() {
-  for (let i = 0; i < 2; i++) {
+  for (let i = 0; i < 3; i++) {
+    // A League career also asks about event entries closing (#752): carry on without entering.
     const which = await page.waitForFunction(() => (document.querySelector('[data-advance-confirm]') ? 'confirm'
-      : document.querySelector('[data-advance-ask]') ? 'ask' : null), null, { timeout: 600 }).then((h) => h.jsonValue()).catch(() => null);
+      : document.querySelector('[data-advance-ask]') ? 'ask' : document.querySelector('[data-skip-events]') ? 'events' : null), null, { timeout: 600 }).then((h) => h.jsonValue()).catch(() => null);
     if (!which) return;
-    await press(page.locator(which === 'confirm' ? '[data-confirm-advance]' : '[data-ask-proceed]'));
+    await press(page.locator(which === 'confirm' ? '[data-confirm-advance]' : which === 'events' ? '[data-skip-events]' : '[data-ask-proceed]').first());
     await wait(150);
   }
 }
@@ -396,6 +397,18 @@ async function advanceMenu(i) {
   // N10.2: the advance yields between weeks; wait for the run to end.
   await page.waitForFunction(() => !document.querySelector('.nrl-dock[data-advancing]'), null, { timeout: 240000 });
   await wait(400);
+}
+
+/**
+ * A League career's league fixtures at calendar week `week` (#819): every club's
+ * regular-round games on this season's league instances, not the empty Classic
+ * `league.fixtures`. Trials, cups and finals are left out.
+ */
+function leagueRoundAt(s, week = s.week) {
+  return (s.competitions?.instances ?? [])
+    .filter((i) => i.season === s.season && i.definition?.format?.kind === 'league')
+    .flatMap((i) => (i.fixtures ?? []).filter((f) => f.slot === week
+      && i.definition.stages?.find((st) => st.id === f.stageId)?.kind === 'league'));
 }
 
 /** The season review seen when the League year closed, before the league choice. */
@@ -1328,16 +1341,26 @@ async function play() {
     rec.notes.push('season 1 review reopened from History, and back to History from its header');
   });
   await step('season-2-week-2', async (rec) => {
-    // Rollover starts two trials at W1. The following held-week probe needs a
-    // league round with rival fixtures, so complete those trials through the UI.
+    // League timing: season 2 opens with trials and rest weeks, and league rounds sit on
+    // their own calendar weeks. The held-week probe needs a week with a league round the
+    // club plays and rival fixtures beside it, so play on (as a player would) until one is next.
     await playTrialWeeks(rec);
-    await closeAny();
-    await goHome();
-    await answerCards(rec);
-    await weekAsTapped(rec);
-    const s = await save();
-    if (s.season !== 2 || s.week !== 2 || s.preseason) throw new Error(`expected S2 round 2 after trials, got S${s.season} W${s.week} trial ${s.preseason}`);
-    rec.notes.push(`S${s.season} W${s.week}`);
+    let s = await page.evaluate(() => window.__nrlState());
+    for (let i = 0; i < 8; i++) {
+      const round = leagueRoundAt(s);
+      const mine = round.some((f) => f.homeId === s.clubId || f.awayId === s.clubId);
+      if (s.season === 2 && !s.preseason && mine && round.length > 1 && !round.some((f) => f.result)) break;
+      await closeAny();
+      await goHome();
+      await answerCards(rec);
+      await weekAsTapped(rec);
+      s = await page.evaluate(() => window.__nrlState());
+    }
+    const round = leagueRoundAt(s);
+    if (s.season !== 2 || s.preseason) throw new Error(`expected season 2 past its trials, got S${s.season} W${s.week} trial ${s.preseason}`);
+    if (!round.length) throw new Error(`no league fixtures at S2 W${s.week}`);
+    if (!round.some((f) => f.homeId === s.clubId || f.awayId === s.clubId)) throw new Error(`the club has no league game at S2 W${s.week}`);
+    rec.notes.push(`S${s.season} W${s.week}: league round with ${round.length} fixtures`);
     await facilitiesDrawn(rec);
     await dumpSave('season-2', rec);
   }, { quietToasts: true });
@@ -1383,7 +1406,7 @@ async function play() {
     if (!(await held())) throw new Error('the hold ended before the focus change: the slowed Worker was not slow enough');
     const slot = await save();
     if (JSON.stringify(slot) !== slotBefore) {
-      throw new Error(`a change during the held week wrote it half-ticked: slot 1 at W${slot.week}, ${slot.league.fixtures.filter((f) => f.round === week && f.result).length} of round ${week}'s results in, $${slot.money}`);
+      throw new Error(`a change during the held week wrote it half-ticked: slot 1 at W${slot.week}, ${leagueRoundAt(slot, week).filter((f) => f.result).length} of W${week}'s league results in, $${slot.money}`);
     }
     // Each tap leaves its own message. A toast lasts a few seconds and a busy page can take longer than
     // that between taps, so keep a log of every toast as it is queued and count in that.
@@ -1405,8 +1428,9 @@ async function play() {
     if (!(await held())) throw new Error('the week moved on during the hold');
     await page.waitForFunction((w) => window.__nrlState().week !== w, week, { timeout: 60000 });
     const s = await page.evaluate(() => window.__nrlState());
-    const round = s.league.fixtures.filter((f) => f.round === week);
-    rec.notes.push(`held at W${week}${match === 'match' ? ' after Back to Club' : ''}; both taps said so; W${s.week}, round ${week} ${round.filter((f) => f.result).length}/${round.length} results`);
+    const round = leagueRoundAt(s, week);
+    rec.notes.push(`held at W${week}${match === 'match' ? ' after Back to Club' : ''}; both taps said so; W${s.week}, W${week}'s league round ${round.filter((f) => f.result).length}/${round.length} results`);
+    if (!round.length) throw new Error(`no league fixtures at W${week}: the held-week probe checked nothing`);
     if (round.some((f) => !f.result)) throw new Error('the held round finished with fixtures unplayed');
     // A save with rival matches on the match engine, for the corpus (v13's field).
     await dumpSave('live-rivals', rec);
