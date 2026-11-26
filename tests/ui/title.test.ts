@@ -472,6 +472,27 @@ describe('League setup destination', () => {
     expect(localStorage.getItem(slotKey(1))).toBe(JSON.stringify(original));
   });
 
+  it('aborts Start over when the slot changed after the prompt was shown', async () => {
+    const original = await leagueSlotState('Existing club');
+    writeSlot(1, original);
+    const root = new StubNode('div');
+    let settled = false;
+    void showTitleFlow(root as unknown as HTMLElement).then(() => { settled = true; });
+    root.querySelector('[data-nrl-new-1]')!.click();
+    await vi.dynamicImportSettled();
+    root.querySelector('[data-nrl-start]')!.click();
+    expect(root.querySelector('[data-nrl-confirm]')!.textContent).toContain('Existing club');
+    // Another tab writes a different career into the slot while the prompt is up.
+    const other = await leagueSlotState('Other tab club');
+    writeSlot(1, other);
+    const replaced = localStorage.getItem(slotKey(1));
+    root.querySelector('[data-nrl-start-confirm]')!.click();
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    expect(root.querySelector('[data-nrl-start-confirm]')).toBeNull();
+    expect(localStorage.getItem(slotKey(1))).toBe(replaced);
+  });
+
   it('archives a Classic save once, leaves the slot empty, and can export it', () => {
     const original = classicCareer('Classic Club', 54);
     writeSlot(1, original);

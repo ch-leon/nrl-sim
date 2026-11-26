@@ -91,6 +91,9 @@ const OUTLINE = 'rgba(255, 255, 255, 0.3)';
 // side (#347): with the phone turned either way the notch takes one of them. The
 // insets come through the frame's --nrl-safe-* (dom.ts) where they are set, env()
 // before the frame's stylesheet is in.
+/** Start over was confirmed for a save that has since changed in that slot (another tab, an import). */
+export const SLOT_CHANGED_TEXT = 'That save slot changed. Check it, then start again.';
+
 export const TITLE_CSS = `
 ${MOTION_CSS}
 .nrl-title { position: absolute; inset: 0; pointer-events: auto; overflow-y: auto; overscroll-behavior: contain;
@@ -1093,13 +1096,16 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
       townInput.addEventListener('change', applyTown);
       goTo(1);
 
-      const begin = (): void => {
+      // `shown` is the slot's bytes when Start (or its Start over prompt) was shown. The
+      // career is written over exactly that, and only if the slot still holds it.
+      const begin = (shown: string | null): void => {
         if (!namesOk()) return;
         const { raw, result } = captureSlot(s.slot);
+        if (raw !== shown) return showSlots(SLOT_CHANGED_TEXT);
         if (result.status !== 'ok' && result.status !== 'empty') return showSlots(result.message);
         // A Classic career stays put until it is archived. Never overwrite the only copy.
         if (raw !== null && isClassicSave(raw)) return showSlots();
-        const destination: LeagueCareerDestination = { slot: s.slot, expectedOriginal: raw };
+        const destination: LeagueCareerDestination = { slot: s.slot, expectedOriginal: shown };
         const club = cleanName(input.value);
         const name = club.ok ? club.name : DEFAULT_CLUB_NAME;
         const coach = cleanName(coachInput.value);
@@ -1123,7 +1129,7 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
         const occupant = result.status === 'empty' ? { slot: s.slot, status: 'empty' as const } : {
           slot: s.slot, status: 'ok' as const, clubName: result.state.clubName, season: result.state.season, week: result.state.week,
         };
-        if (occupant.status === 'empty') return begin();
+        if (occupant.status === 'empty') return begin(raw);
         // A season (or an unreadable save) is in this slot: say what Start replaces first.
         go.replaceChildren();
         const what = occupant.status === 'ok' ? `${occupant.clubName} (S${occupant.season} W${occupant.week})` : 'the unreadable save';
@@ -1132,7 +1138,7 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
         ask.setAttribute('role', 'alert');
         go.appendChild(ask);
         const yes = mkButton('Start over', 'data-nrl-start-confirm');
-        yes.addEventListener('click', () => begin());
+        yes.addEventListener('click', () => begin(raw));
         go.appendChild(yes);
         const no = mkButton('Cancel', 'data-nrl-start-cancel');
         no.addEventListener('click', () => { go.replaceChildren(); go.appendChild(start); });
