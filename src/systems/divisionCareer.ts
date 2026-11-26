@@ -68,7 +68,7 @@ export function setupStructuralDivisionCareer(profile: RegionalCareerProfile, se
     squad: world.squad, freeAgents: [], playerPopulation: initialPlayerPopulation({ ...state, squad: world.squad, freeAgents: [], league: { ...state.league, clubs: world.clubs } }), lineup: autoPick(world.squad), objectives: [],
     capAccount: freshCapAccount(tierForRank(start.rank)),
     league: { clubs: world.clubs, fixtures: [], ladder: competitionLadder(local) },
-    competitions: { schemaVersion: 1, instances, world: { profile: world.profile, divisions: world.divisions } } }, profile.calendarSlots);
+    competitions: { schemaVersion: 1, instances, world: { profile: world.profile, divisions: world.divisions, ...(world.bigThree ? { bigThree: { ...world.bigThree } } : {}) } } }, profile.calendarSlots);
   setState(next);
   return getState();
 }

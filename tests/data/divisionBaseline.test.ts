@@ -9,12 +9,13 @@ import { DEV_TEST_PREFIX } from '../../src/core/storageKeys';
 import { setupStructuralDivisionCareer } from '../../src/systems/divisionCareer';
 beforeAll(async () => { await preparePack('uk'); });
 afterEach(() => { setCareerNamespace(null); selectPack('au'); });
-// Captured from immutable main 03812a1618b80fbc1348bd6b0966b3df704e9b7a.
+// Captured from immutable main 03812a1618b80fbc1348bd6b0966b3df704e9b7a, then
+// re-captured once when the Premier Big Three changed the authored world (#840).
 // Includes people, fixture IDs/pairings, frozen tie orders, trials, cup and RNG.
 // The save format version and the new, empty reward ledger are checked separately.
 const baseline = {
-  au: '11b4c9a7d126ea0ac30ff446a831556e205cd017f5ad2a2ae6e65c46f5516811',
-  uk: 'd4c50df6106c38d34f9d0b4f27efb8772b7a8bfdfeaf53cc2ead18eed9b5b7b9',
+  au: '54aa6992461b37b97d2df6f1185b504a8cb73b0e92196187602130d1e9d7071f',
+  uk: '7ee60842d46827c978eeca8c2085f037888a7e327e4901c6a32a43f90a6c8a70',
 };
 it.each(['au', 'uk'] as const)('preserves the complete %s developer world during schedule extraction', pack => {
   selectPack(pack); setCareerNamespace(DEV_TEST_PREFIX);

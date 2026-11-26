@@ -13,6 +13,9 @@ export interface DivisionMetadata {
 export interface CompetitionWorldMetadata {
   profile: { id: string; version: number; pack: string; startingDivisionId: string };
   divisions: DivisionMetadata[];
+  /** The Big Three (#840): club id → the level it develops toward. Written when
+   * a career is built; careers built before it have none and are unchanged. */
+  bigThree?: Record<string, number>;
 }
 
 const object = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -20,7 +23,7 @@ const text = (v: unknown): v is string => typeof v === 'string' && v.trim().leng
 const keys = (v: Record<string, unknown>, allowed: readonly string[]): boolean => Object.keys(v).every(k => allowed.includes(k));
 
 export function validateCompetitionWorld(v: unknown, instances: readonly CompetitionInstance[], context: { pack: string; season: number; clubIds: readonly string[]; slots: readonly CompetitionCalendarSlot[] }): string | null {
-  if (!object(v) || !keys(v, ['profile', 'divisions']) || !object(v.profile)
+  if (!object(v) || !keys(v, ['profile', 'divisions', 'bigThree']) || !object(v.profile)
     || !keys(v.profile, ['id', 'version', 'pack', 'startingDivisionId']) || !text(v.profile.id)
     || !Number.isSafeInteger(v.profile.version) || (v.profile.version as number) < 1 || v.profile.pack !== context.pack
     || !text(v.profile.startingDivisionId) || !Array.isArray(v.divisions) || v.divisions.length === 0) return 'division world profile';
@@ -39,6 +42,8 @@ export function validateCompetitionWorld(v: unknown, instances: readonly Competi
       assigned.add(id);
     }
   }
+  if (v.bigThree !== undefined && (!object(v.bigThree) || Object.entries(v.bigThree).some(([id, level]) => !context.clubIds.includes(id)
+    || typeof level !== 'number' || !Number.isInteger(level) || level < 1 || level > 100))) return 'division world big three';
   if (v.profile.startingDivisionId !== (v.divisions[0] as DivisionMetadata).id
     || assigned.size !== context.clubIds.length || context.clubIds.some(id => !assigned.has(id))) return 'division world coverage';
   return null;

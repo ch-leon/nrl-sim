@@ -2,6 +2,12 @@
 import { UK_PACK } from '../uk';
 import type { RegionalCareerProfile } from '../../data/divisions';
 import { INITIAL_CALENDAR, INITIAL_FINALS_SLOTS, INITIAL_REGULAR_SLOTS, INITIAL_TRIAL_SLOTS } from './calendar';
+import { BIG_THREE } from './bigThree';
+
+// The Premier League's Big Three (#840) read their levels from one list. The
+// Premier ratingMean (61) is the five ordinary clubs' average, which is what
+// the league anchor holds; each Big Three club is anchored to its own level.
+const big = BIG_THREE['uk-career-3x8']!;
 
 // The same provisional generation bands as AU, with independently authored
 // clubs and membership. These values are not measured balance or annual caps.
@@ -45,15 +51,15 @@ export const UK_CAREER_PROFILE: RegionalCareerProfile = {
       { clubId: 'rival-uk-rattles', strength: 59 },
       { clubId: 'rival-uk-4', strength: 61 },
     ] },
-    { id: 'uk-premier', name: 'Premier League', rank: 2, regularRounds: 14, regularSlots: INITIAL_REGULAR_SLOTS, finalsSlots: INITIAL_FINALS_SLOTS, finalsSize: 4, ratingMean: 64, entrants: [
+    { id: 'uk-premier', name: 'Premier League', rank: 2, regularRounds: 14, regularSlots: INITIAL_REGULAR_SLOTS, finalsSlots: INITIAL_FINALS_SLOTS, finalsSize: 4, ratingMean: 61, entrants: [
       { clubId: 'rival-uk-kilns', strength: 57 },
       { clubId: 'rival-uk-3', strength: 59 },
       { clubId: 'rival-uk-bells', strength: 61 },
       { clubId: 'rival-uk-2', strength: 63 },
       { clubId: 'rival-uk-sails', strength: 65 },
-      { clubId: 'rival-uk-1', strength: 67 },
-      { clubId: 'rival-uk-runners', strength: 69 },
-      { clubId: 'rival-uk-0', strength: 71 },
+      { clubId: 'rival-uk-1', strength: big['rival-uk-1']! },
+      { clubId: 'rival-uk-runners', strength: big['rival-uk-runners']! },
+      { clubId: 'rival-uk-0', strength: big['rival-uk-0']! },
     ] },
   ],
 };

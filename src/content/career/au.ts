@@ -3,8 +3,15 @@
 import { AU_PACK } from '../au';
 import type { RegionalCareerProfile } from '../../data/divisions';
 import { INITIAL_CALENDAR, INITIAL_FINALS_SLOTS, INITIAL_REGULAR_SLOTS, INITIAL_TRIAL_SLOTS } from './calendar';
+import { BIG_THREE } from './bigThree';
 
-// Version-one hypotheses: 44/54/64 tier centres overlap at their edges; the
+// The Premier League's Big Three (#840) read their levels from one list. The
+// Premier ratingMean (61) is the five ordinary clubs' average, which is what
+// the league anchor holds; each Big Three club is anchored to its own level.
+const big = BIG_THREE['au-career-3x8']!;
+
+// Version-one hypotheses: 44/54/61 tier centres overlap at their edges, with
+// the Premier Big Three (74/76/78) above them; the
 // player's 41 target leaves room for original young recruits to reach the top.
 // Stars/XP still belong to the progression tuning pass, annual caps to finance.
 export const AU_CAREER_PROFILE: RegionalCareerProfile = {
@@ -43,15 +50,15 @@ export const AU_CAREER_PROFILE: RegionalCareerProfile = {
       { clubId: 'rival-brumbies', strength: 59 },
       { clubId: 'rival-drovers', strength: 61 },
     ] },
-    { id: 'au-premier', name: 'Premier League', rank: 2, regularRounds: 14, regularSlots: INITIAL_REGULAR_SLOTS, finalsSlots: INITIAL_FINALS_SLOTS, finalsSize: 4, ratingMean: 64, entrants: [
+    { id: 'au-premier', name: 'Premier League', rank: 2, regularRounds: 14, regularSlots: INITIAL_REGULAR_SLOTS, finalsSlots: INITIAL_FINALS_SLOTS, finalsSize: 4, ratingMean: 61, entrants: [
       { clubId: 'rival-au-sandpipers', strength: 57 },
       { clubId: 'rival-crocs', strength: 59 },
       { clubId: 'rival-cyclones', strength: 61 },
       { clubId: 'rival-au-miners', strength: 63 },
       { clubId: 'rival-thunder', strength: 65 },
-      { clubId: 'rival-stingrays', strength: 67 },
-      { clubId: 'rival-wolves', strength: 69 },
-      { clubId: 'rival-reapers', strength: 71 },
+      { clubId: 'rival-stingrays', strength: big['rival-stingrays']! },
+      { clubId: 'rival-wolves', strength: big['rival-wolves']! },
+      { clubId: 'rival-reapers', strength: big['rival-reapers']! },
     ] },
   ],
 };
