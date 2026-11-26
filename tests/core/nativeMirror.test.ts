@@ -1,27 +1,18 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { __setStorage, deleteSlot, listSlotMeta, loadSlot, save, setActiveSlot, type StorageLike } from '../../src/core/save';
+import { createNewGame, getState } from '../../src/core/state';
 import {
-  __setStorage, decodeRetiredSaves, deleteSlot, listSlotMeta, loadSlot, markClassicRetirementShown, retireClassicSlotDurable, save, setActiveSlot, type StorageLike,
-} from '../../src/core/save';
-import { createNewGame, getState, type GameState } from '../../src/core/state';
-import { initLeague } from '../../src/systems/fixtures';
-
-function classicCareer(name: string, seed: number): GameState {
-  const state = createNewGame(name, seed);
-  state.league = initLeague(state);
-  return state;
-}
-import {
-  classicRetiredNoticeKey, COMMERCIAL_FIRST_RUN_KEY, CORRUPT_SAVE_KEY, DEV_TEST_BACKUP_KEY, DEV_TEST_DISPLACED_KEY, DEV_TEST_PREFIX, DEVICE_ID_KEY,
+  COMMERCIAL_FIRST_RUN_KEY, CORRUPT_SAVE_KEY, DEV_TEST_BACKUP_KEY, DEV_TEST_DISPLACED_KEY, DEV_TEST_PREFIX, DEVICE_ID_KEY,
   ENTITLEMENTS_CACHE_KEY, ENTITLEMENTS_STUB_KEY, IOS_INSTALL_HINT_KEY, LABS_KEY, LEGACY_SAVE_KEY, LOG_MODE_KEY,
-  liveMatchKey, recoveryKey, retiredSaveKey, saveMetaKey, slotKey,
+  liveMatchKey, recoveryKey, saveMetaKey, slotKey,
 } from '../../src/core/storageKeys';
-import { browserStorage, LocalSaveStore, setCareerNamespace, setMirroredStorage } from '../../src/core/storage/local';
+import { browserStorage, LocalSaveStore, setMirroredStorage } from '../../src/core/storage/local';
 import {
   fileForKey, isMirroredKey, keyForFile, mirroredStorage, NativeMirror, startNativeMirror, type NativeFiles,
 } from '../../src/core/storage/nativeMirror';
 import { metaFor } from '../../src/core/storage/meta';
-import { acknowledgeNativeCheckpoint as ack, acknowledgeRetiredClassicSave, beginNativeCheckpointBoot as begin } from '../../src/core/storage/nativeCheckpoint';
+import { acknowledgeNativeCheckpoint as ack, beginNativeCheckpointBoot as begin } from '../../src/core/storage/nativeCheckpoint';
 import { bootNativeMirror, deliverFile, exportPath } from '../../src/core/storage/native';
 import { IOS_CODE, isIosNative } from '../../src/core/storage/platform';
 import { APP_PLATFORM, IS_IOS_APP } from '../../src/platform';
@@ -108,7 +99,6 @@ async function afterWipe(native: ReturnType<typeof fakeFiles>): Promise<Map<stri
 
 afterEach(() => {
   begin(false);
-  setCareerNamespace(null);
   setMirroredStorage(null);
   __setStorage(null);
   vi.unstubAllGlobals();
@@ -117,7 +107,7 @@ afterEach(() => {
 describe('which keys are mirrored', () => {
   it('the career and the player\'s choices, named from storageKeys.ts', () => {
     const mirrored = [
-      ...[1, 2, 3].flatMap((s) => [slotKey(s), saveMetaKey(s), liveMatchKey(s), recoveryKey(s), retiredSaveKey(s), classicRetiredNoticeKey(s)]),
+      ...[1, 2, 3].flatMap((s) => [slotKey(s), saveMetaKey(s), liveMatchKey(s), recoveryKey(s)]),
       LEGACY_SAVE_KEY, DEVICE_ID_KEY, LABS_KEY, IOS_INSTALL_HINT_KEY, LOG_MODE_KEY,
       ENTITLEMENTS_CACHE_KEY, ENTITLEMENTS_STUB_KEY, COMMERCIAL_FIRST_RUN_KEY,
     ];
@@ -466,163 +456,6 @@ describe('native outcome acknowledgement', () => {
     begin(true)(storage, mirror);
     return {native, mirror, storage};
   }
-
-  it('a retired Classic save is archived natively and does not return after the web view is wiped', async () => {
-    const { native, storage, mirror } = start();
-    __setStorage(storage);
-    const classic = JSON.stringify(classicCareer('Old Town', 4));
-    storage.setItem(slotKey(1), classic);
-    storage.setItem(saveMetaKey(1), '{"saveVersion":35}');
-    storage.setItem(liveMatchKey(1), 'live');
-    storage.setItem(LEGACY_SAVE_KEY, classic);
-    await mirror.idle();
-    const retired = await retireClassicSlotDurable(1);
-    expect(retired).toMatchObject({ slot: 1, raw: classic, emptied: true, notify: true });
-    // The live-match record is archived inside the career, the way Export keeps it.
-    const archive = storage.getItem(retiredSaveKey(1))!;
-    expect(retired!.stored).toBe(archive);
-    expect(JSON.parse(archive)).toMatchObject({ clubName: 'Old Town', nrlLiveMatch: 'live' });
-    markClassicRetirementShown(1);
-    expect(await acknowledgeRetiredClassicSave(1, archive, retired!.removed)).toBe('confirmed');
-    const restored = await afterWipe(native);
-    expect(restored.has(slotKey(1))).toBe(false);
-    expect(restored.has(saveMetaKey(1))).toBe(false);
-    expect(restored.has(liveMatchKey(1))).toBe(false);
-    expect(restored.has(LEGACY_SAVE_KEY)).toBe(false);
-    expect(restored.get(retiredSaveKey(1))).toBe(archive);
-    expect(restored.get(classicRetiredNoticeKey(1))).toBe('1');
-  });
-
-  it('confirms the native archive before the live slot can be marked deleted', async () => {
-    const {native, storage, mirror} = start();
-    __setStorage(storage);
-    const classic = JSON.stringify(classicCareer('Old Town', 4));
-    storage.setItem(slotKey(1), classic);
-    await mirror.idle();
-    native.calls.length = 0;
-    const release = native.hold();
-    const retiring = retireClassicSlotDurable(1);
-    const goneWrite = (name: string): boolean => name.endsWith('.txt.gone');
-    try {
-      await vi.waitFor(() => {
-        expect(native.calls.some((c) => c.op === 'write' && c.name === F(retiredSaveKey(1)) + '.tmp')).toBe(true);
-      });
-      // The archive write checks for an old delete marker. It must not write one, and the live slot stays.
-      expect(native.calls.some((c) => c.op === 'write' && goneWrite(c.name))).toBe(false);
-      expect(storage.getItem(slotKey(1))).toBe(classic);
-    } finally {
-      release();
-    }
-    const retired = await retiring;
-    expect(retired).toMatchObject({ slot: 1, raw: classic, emptied: true });
-    expect(storage.getItem(slotKey(1))).toBeNull();
-    expect(storage.getItem(retiredSaveKey(1))).toBe(classic);
-    const archiveWrite = native.calls.findIndex((c) => c.op === 'write' && c.name === F(retiredSaveKey(1)) + '.tmp');
-    const slotGone = native.calls.findIndex((c) => c.op === 'write' && c.name === F(slotKey(1)) + '.gone');
-    expect(archiveWrite).toBeGreaterThanOrEqual(0);
-    expect(slotGone).toBeGreaterThan(archiveWrite);
-  });
-
-  it('leaves a career written into the slot while the native archive was being confirmed', async () => {
-    const {native, storage, mirror} = start();
-    __setStorage(storage);
-    const classic = JSON.stringify(classicCareer('Old Town', 4));
-    storage.setItem(slotKey(1), classic);
-    await mirror.idle();
-    const release = native.hold();
-    const retiring = retireClassicSlotDurable(1);
-    const league = JSON.stringify({ version: 35, clubName: 'New League', competitions: { leagueCareer: { phase: 'active' } } });
-    try {
-      await vi.waitFor(() => {
-        expect(native.calls.some((c) => c.op === 'write' && c.name === F(retiredSaveKey(1)) + '.tmp')).toBe(true);
-      });
-      // Another tab (or the player) puts a League career in the slot before the ack.
-      storage.setItem(slotKey(1), league);
-    } finally {
-      release();
-    }
-    expect(await retiring).toMatchObject({ slot: 1, raw: classic, emptied: false, notify: false });
-    expect(storage.getItem(slotKey(1))).toBe(league);
-    expect(storage.getItem(retiredSaveKey(1))).toBe(classic);
-  });
-
-  /** Retire slot 1 on iPhone, running `during` while the native archive confirmation is held. */
-  async function retireWhileHeld(during: (storage: ReturnType<typeof start>['storage']) => void) {
-    const {native, storage, mirror} = start();
-    __setStorage(storage);
-    const classic = JSON.stringify(classicCareer('Old Town', 4));
-    storage.setItem(slotKey(1), classic);
-    storage.setItem(liveMatchKey(1), '"live-1"');
-    await mirror.idle();
-    const release = native.hold();
-    const retiring = retireClassicSlotDurable(1);
-    try {
-      await vi.waitFor(() => {
-        expect(native.calls.some((c) => c.op === 'write' && c.name === F(retiredSaveKey(1)) + '.tmp')).toBe(true);
-      });
-      during(storage);
-    } finally { release(); }
-    return { storage, classic, retired: await retiring };
-  }
-  const archivedMatches = (storage: { getItem(k: string): string | null }): unknown[] =>
-    decodeRetiredSaves(storage.getItem(retiredSaveKey(1))).map((raw) => (JSON.parse(raw) as { nrlLiveMatch?: unknown }).nrlLiveMatch);
-
-  it('never deletes the checkpoint of a career that stays live: identical legacy bytes moved in during confirmation', async () => {
-    const { storage, classic, retired } = await retireWhileHeld((s) => s.setItem(LEGACY_SAVE_KEY, s.getItem(slotKey(1))!));
-    // The career, its legacy copy and its checkpoint went together, after the newest unit was confirmed.
-    expect(retired).toMatchObject({ slot: 1, raw: classic, emptied: true });
-    expect(storage.getItem(slotKey(1))).toBeNull();
-    expect(storage.getItem(LEGACY_SAVE_KEY)).toBeNull();
-    expect(storage.getItem(liveMatchKey(1))).toBeNull();
-    expect(archivedMatches(storage)).toEqual(['live-1']);
-  });
-
-  it('archives the newest pair when the checkpoint is updated during confirmation', async () => {
-    const { storage, retired } = await retireWhileHeld((s) => s.setItem(liveMatchKey(1), '"live-2"'));
-    expect(retired?.emptied).toBe(true);
-    expect(storage.getItem(slotKey(1))).toBeNull();
-    expect(storage.getItem(liveMatchKey(1))).toBeNull();
-    // The checkpoint deleted is the one archived; the earlier pair is kept beside it.
-    expect(archivedMatches(storage)).toEqual(['live-1', 'live-2']);
-  });
-
-  it('leaves the career and its checkpoint together when a new checkpoint lands during confirmation of a swapped career', async () => {
-    const league = JSON.stringify({ version: 35, clubName: 'New League', competitions: { leagueCareer: { phase: 'active' } } });
-    const { storage, retired } = await retireWhileHeld((s) => { s.setItem(slotKey(1), league); s.setItem(liveMatchKey(1), '"league-live"'); });
-    expect(retired).toMatchObject({ emptied: false, notify: false });
-    expect(storage.getItem(slotKey(1))).toBe(league);
-    expect(storage.getItem(liveMatchKey(1))).toBe('"league-live"');
-  });
-
-  it('a wiped web view restores a native-only Classic save into the archive, not the live slot', async () => {
-    const native = fakeFiles();
-    const classic = JSON.stringify(classicCareer('Old Town', 8));
-    native.files.set(fileForKey(slotKey(1)), classic);
-    const storage = fakeStorage();
-    const mirror = new NativeMirror(native.api, quiet());
-    await mirror.sync(storage, []);
-    expect(storage.getItem(slotKey(1))).toBe(classic);
-    __setStorage(storage);
-    begin(true)(storage, mirror);
-    const retired = await retireClassicSlotDurable(1);
-    expect(retired).toMatchObject({ slot: 1, raw: classic, emptied: true });
-    expect(storage.getItem(slotKey(1))).toBeNull();
-    expect(storage.getItem(retiredSaveKey(1))).toBe(classic);
-    const wiped = await afterWipe(native);
-    expect(wiped.has(slotKey(1))).toBe(false);
-    expect(wiped.get(retiredSaveKey(1))).toBe(classic);
-  });
-
-  it('a playtest retirement is not written onto the normal career mirror', async () => {
-    const { storage } = start();
-    setCareerNamespace(DEV_TEST_PREFIX);
-    try {
-      expect(await acknowledgeRetiredClassicSave(1, '{"version":35}')).toBe('inactive');
-      expect(storage.getItem(retiredSaveKey(1))).toBeNull();
-    } finally {
-      setCareerNamespace(null);
-    }
-  });
 
   it('reads matching recoverable bytes and supports a fresh boot with no pending writes', async () => {
     const {native, mirror, storage} = start();

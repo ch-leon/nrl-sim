@@ -185,28 +185,6 @@ export class LocalSaveStore implements SyncSaveStore {
     try { this.storage.removeItem(saveMetaKey(slot)); } catch { /* best effort */ }
   }
 
-  /**
-   * Compare-and-delete for a Classic retirement (#819). The slot key, and for slot 1
-   * the legacy key, are removed only while each still holds exactly the bytes given,
-   * so a different career under the shadowed legacy key, or one written while an
-   * archive was being confirmed, stays. The meta goes with the slot key. Returns the
-   * keys removed. Throws if storage does.
-   */
-  removeExact(slot: number, own: string | null, legacy: string | null = null): string[] {
-    const removed: string[] = [];
-    if (own !== null && this.storage.getItem(slotKey(slot)) === own) {
-      this.pending.delete(slot);
-      this.storage.removeItem(slotKey(slot));
-      removed.push(slotKey(slot));
-      try { this.storage.removeItem(saveMetaKey(slot)); removed.push(saveMetaKey(slot)); } catch { /* best effort */ }
-    }
-    if (slot === 1 && legacy !== null && this.storage.getItem(LEGACY_SAVE_KEY) === legacy) {
-      this.storage.removeItem(LEGACY_SAVE_KEY);
-      removed.push(LEGACY_SAVE_KEY);
-    }
-    return removed;
-  }
-
   list(): SlotListing[] {
     const out: SlotListing[] = [];
     for (let slot = 1; slot <= this.slots; slot++) {

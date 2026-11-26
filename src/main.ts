@@ -8,10 +8,8 @@ import { MatchScene } from './scenes/MatchScene';
 import { IndividualChallengeScene, bindIndividualChallengeGame } from './scenes/IndividualChallengeScene';
 import { bus, type Events } from './core/events';
 import { getState, loadState, stateInstallation, type GameState } from './core/state';
-import { isClassicSave } from './core/classicSave';
 import {
-  enableAutosave, getActiveSlot, getSlotSummaries, hasSave, loadSlot, markClassicRetirementShown,
-  retireClassicSlot, retireClassicSlotDurable, save, setActiveSlot, writeSlot,
+  deleteClassicSlots, enableAutosave, getActiveSlot, getSlotSummaries, hasSave, loadSlot, save, setActiveSlot, writeSlot,
 } from './core/save';
 import { showLeagueLoading, showTitleFlow, type TitleChoice } from './ui/title';
 import { EXPANSION_INTRO_HINT, showExpansionIntro } from './ui/expansionIntro';
@@ -78,7 +76,6 @@ import { commercialEnabled } from './commercial/flags';
 import { initCommercial, recordFirstRun } from './commercial/demo';
 import { openPaywall } from './ui/screens/paywall';
 import { announcePlaytest, applyPlaytestPreset, bootCareerNamespace, freshPlaytestLeagueStart, markPlaytestBuilt, setMatchSceneProbe } from './labs/devCareer';
-import { nativeCheckpointRequired } from './core/storage/nativeCheckpoint';
 import { syncDevMarker } from './labs/marker';
 import { startAnalytics, track } from './analytics';
 import { dockTab } from './analytics/events';
@@ -159,11 +156,9 @@ async function boot(): Promise<void> {
   if (commercialEnabled() && !playtest) recordFirstRun(getSlotSummaries());
   if (playtest) {
     setActiveSlot(1);
-    // A Classic playtest career is archived, not resumed. The native mirror does not
-    // keep this namespace, so there is nothing to confirm on the phone.
-    const retired = nativeCheckpointRequired() ? await retireClassicSlotDurable(1) : retireClassicSlot(1);
-    if (retired?.emptied) markClassicRetirementShown(1);
-    // Its save gone (site data cleared, or a Classic career just archived): build a League career.
+    // A Classic playtest career is deleted (#819); the title does this for normal slots.
+    deleteClassicSlots();
+    // Its save gone (site data cleared, or a Classic career just deleted): build a League career.
     if (!hasSave(1)) playtest.fresh = true;
   }
   let choice: TitleChoice = playtest
@@ -175,13 +170,6 @@ async function boot(): Promise<void> {
   for (;;) {
     if ((choice.mode === 'continue' || playtest?.fresh) && loaded.status !== 'ok' && loaded.status !== 'empty') {
       choice = await showTitleFlow(uiRoot, loaded.message);
-      loaded = loadSlot();
-      continue;
-    }
-    if (choice.mode === 'continue' && loaded.status === 'ok' && isClassicSave(loaded.state)) {
-      // The title retires Classic careers before Continue is offered. This is the
-      // backstop: never install one if a slot still holds it.
-      choice = await showTitleFlow(uiRoot);
       loaded = loadSlot();
       continue;
     }

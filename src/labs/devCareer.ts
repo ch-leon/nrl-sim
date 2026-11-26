@@ -20,8 +20,8 @@ import { flushSaveMeta, getActiveSlot, lockSaves, saveIfChanged, SLOT_COUNT } fr
 import { getState, setState } from '../core/state';
 import { careerNamespace, setCareerNamespace, browserStorage, type StorageLike } from '../core/storage/local';
 import {
-  classicRetiredNoticeKey, CORRUPT_SAVE_KEY, DEV_TEST_BACKUP_KEY, DEV_TEST_DISPLACED_KEY, DEV_TEST_PREFIX, DEVICE_ID_KEY, LEGACY_SAVE_KEY,
-  liveMatchKey, recoveryKey, retiredSaveKey, saveMetaKey, slotKey,
+  CORRUPT_SAVE_KEY, DEV_TEST_BACKUP_KEY, DEV_TEST_DISPLACED_KEY, DEV_TEST_PREFIX, DEVICE_ID_KEY, LEGACY_SAVE_KEY,
+  liveMatchKey, recoveryKey, saveMetaKey, slotKey,
 } from '../core/storageKeys';
 import { weekHeld } from '../core/time';
 import { advanceInProgress } from '../core/advance';
@@ -34,9 +34,7 @@ import { setTestCareer, testCareer, turnAllOff, type TestCareerMarker } from './
 /** Every key a career keeps: what the backup holds and what the playtest namespace may hold. */
 export function careerKeys(slots = SLOT_COUNT): string[] {
   const keys = [LEGACY_SAVE_KEY, CORRUPT_SAVE_KEY, DEVICE_ID_KEY];
-  for (let slot = 1; slot <= slots; slot++) {
-    keys.push(slotKey(slot), saveMetaKey(slot), liveMatchKey(slot), recoveryKey(slot), retiredSaveKey(slot), classicRetiredNoticeKey(slot));
-  }
+  for (let slot = 1; slot <= slots; slot++) keys.push(slotKey(slot), saveMetaKey(slot), liveMatchKey(slot), recoveryKey(slot));
   return keys;
 }
 

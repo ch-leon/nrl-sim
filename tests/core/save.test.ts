@@ -16,8 +16,6 @@ function classicCareer(name: string, seed: number): GameState {
 }
 import { bus } from '../../src/core/events';
 import { DEFAULT_PLAYER_COLORS, isValidColorPair } from '../../src/config';
-import { retiredSaveKey } from '../../src/core/storageKeys';
-import { CLASSIC_RETIRED_TEXT } from '../../src/core/classicSave';
 import { leagueSlotState } from '../helpers/leagueSlot';
 
 // Setup data loads asynchronously; save-slot tests use a synthetic catalogue.
@@ -358,18 +356,14 @@ describe('showTitleFlow', () => {
     expect(root.children.length).toBe(0);
   });
 
-  it('archives a Classic save that needs a lineup repair instead of loading it', () => {
+  it('deletes a Classic save that needs a lineup repair instead of loading it', () => {
     const s = classicCareer('Missing selection', 525);
     delete (s.lineup as unknown as Record<string, unknown>).captain;
-    const original = JSON.stringify(s, null, 2);
-    storage.map.set(slotKey(1), original);
+    storage.map.set(slotKey(1), JSON.stringify(s, null, 2));
     const root = makeStubEl('div');
     void showTitleFlow(root as unknown as HTMLElement);
-    const retired = root.querySelector('[data-nrl-classic-retired]')!;
-    expect(retired.children.some((c) => c.textContent.includes(CLASSIC_RETIRED_TEXT))).toBe(true);
     expect(root.querySelector('[data-nrl-continue-1]')).toBeNull();
     expect(storage.map.get(slotKey(1))).toBeUndefined();
-    expect(storage.map.get(retiredSaveKey(1))).toBe(original);
   });
 
   it('with a save: New game opens the setup step, and Start asks before replacing the season (#350 T2)', async () => {
