@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   save, load, clearSave, hasSave, enableAutosave, writeSlot,
@@ -437,6 +438,29 @@ describe('migrateState', () => {
   });
   it('has no migration from 23 to 24', () => {
     expect(MIGRATIONS.some(m => m.from === 23)).toBe(false);
+  });
+  it('migrates a v35 Classic save to v36 untouched, with no card week', () => {
+    const raw = { ...createNewGame('Old', 7), version: 35 };
+    const before = JSON.stringify(raw);
+    const result = migrateState(raw);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.state).toEqual({ ...raw, version: SAVE_VERSION });
+    expect(result.state.cardWeek).toBeUndefined();
+    expect(JSON.stringify(raw)).toBe(before);
+    expect(MIGRATIONS.find(m => m.from === 35)).toMatchObject({ to: 36 });
+  });
+  it('migrates a v35 League career to v36 with no card week', () => {
+    const raw = JSON.parse(readFileSync(new URL('../fixtures/saves/v34-challenges/v34-au-week-5.json', import.meta.url), 'utf8'));
+    const result = migrateState({ ...raw, version: 35 });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.state.version).toBe(SAVE_VERSION);
+    expect(result.state.cardWeek).toBeUndefined();
+  });
+  it('refuses a v35 save that carries a card week', () => {
+    const raw = { ...createNewGame('Old', 7), version: 35, cardWeek: { rng: 1, owed: 3, offer: null, history: [], cardPlayers: [] } };
+    expect(migrateState(raw)).toMatchObject({ ok: false, message: expect.stringMatching(/card week/i) });
   });
   it('refuses a future version with a clear message', () => {
     expect(migrateState({ version: SAVE_VERSION + 1 })).toMatchObject({ ok: false, reason: 'future', message: expect.stringMatching(/newer version/i) });

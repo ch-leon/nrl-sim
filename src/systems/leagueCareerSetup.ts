@@ -1,7 +1,8 @@
 import { DEFAULT_PLAYER_COLORS } from '../config';
 import { activePack, packForCountry, preparePack, selectPack } from '../content';
 import { captureSlot, getActiveSlot, writeSlot } from '../core/save';
-import { buildNewGameState, getState, loadState, stateInstallation, type GameState, type NewGameOptions } from '../core/state';
+import { buildNewGameState, getState, loadState, newCardWeek, stateInstallation, type GameState, type NewGameOptions } from '../core/state';
+import { startCardWeek } from './cardWeek';
 import { careerNamespace } from '../core/storage/local';
 import { createDivisionWorld } from '../data/divisions';
 import { freshCapAccount, tierForRank } from './cap';
@@ -57,9 +58,11 @@ export async function prepareLeagueCareer(options: LeagueCareerOptions): Promise
     if (!admitted) throw new Error('Could not register the opening free agents.');
     candidate.freeAgents = admitted.players;
     candidate.playerPopulation = { ...admitted.playerPopulation, shortlistIds: admitted.players.map(p => p.id) };
-    const problem = leagueCareerStateProblem(candidate);
+    // Card week (#846, Labs): the career remembers it, with three picks owed and the first on show.
+    const career = options.cardWeek ? startCardWeek(candidate, newCardWeek(seed)) : candidate;
+    const problem = leagueCareerStateProblem(career);
     if (problem) throw new Error(problem.message);
-    return candidate;
+    return career;
   } finally { selectPack(previous); }
 }
 

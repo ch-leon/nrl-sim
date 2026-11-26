@@ -195,12 +195,34 @@ export function releasePlayer(state: GameState, playerId: string): SignResult {
   if (state.squad !== s.squad || state.season !== s.season || state.week !== s.week)
     return {ok:false,reason:'stale',message:'The squad changed. Review this release again.'};
   const clock = careerActionClock(s);
-  const player = s.squad.find((p) => p.id === playerId);
-  if (!player) return { ok: false, reason: 'not-found', message: 'Player not found.' };
+  if (!s.squad.some((p) => p.id === playerId)) return { ok: false, reason: 'not-found', message: 'Player not found.' };
   if (s.squad.length <= SQUAD_MIN) {
     return { ok: false, reason: 'squad-min', message: `The squad cannot drop below ${SQUAD_MIN}.` };
   }
+  const out = releasedState(s, playerId);
+  if (!('state' in out)) return out;
+  const { state: next, released, expired, terms } = out;
+  const squad = next.squad;
+  setState({ squad, freeAgents: next.freeAgents, money: next.money, finance: next.finance, capAccount: next.capAccount });
+  if (terms.payout) bus.emit('money:changed', { delta: -terms.payout, reason: `release:${playerId}`, balance: next.money, booked: true, stamp: { season: clock.season, week: clock.week } });
+  const freed = terms.nextCapFreed > 0
+    ? `, freeing ${fmtMoney(terms.capFreed)} of this season's cap and ${fmtMoney(terms.nextCapFreed)} next season`
+    : `, freeing ${fmtMoney(terms.capFreed)} of this season's cap`;
+  bus.emit('ui:notify', { text: expired ? `${released.name}'s contract expired. No payout.` : `Released ${released.name} for ${fmtMoney(terms.payout)}${freed}`, kind: 'info' });
+  return { ok: true };
+}
 
+/**
+ * The release itself (pure): he leaves the squad for the pool with his payout
+ * booked, and his salary leaves this season's cap. The squad minimum, a camp
+ * booking and a held week are the caller's checks. Refuses (changing nothing)
+ * when he isn't in the squad, holds an unfinished emergency scholarship, or the
+ * cash is short. The card week's swaps (#846) use it as well.
+ */
+export function releasedState(s: GameState, playerId: string): { state: GameState; released: Player; expired: boolean; terms: ReturnType<typeof releaseTerms> } | SignResult {
+  const clock = careerActionClock(s);
+  const player = s.squad.find((p) => p.id === playerId);
+  if (!player) return { ok: false, reason: 'not-found', message: 'Player not found.' };
   if (player.emergencyDealEndSeason !== undefined && player.emergencyDealEndSeason >= clock.season) return { ok: false, reason: 'scholarship', message: 'This emergency scholarship must finish before he can be released.' };
   const terms = releaseTerms(player, clock.season, clock.week, clock.duration);
   if (s.money < terms.payout) {
@@ -210,20 +232,14 @@ export function releasePlayer(state: GameState, playerId: string): SignResult {
       message: `Not enough cash. Releasing him costs ${fmtMoney(terms.payout)}.`,
     };
   }
-  const expired = clock.structural && player.deal && player.deal.endSeason < clock.season
-    && (!player.deal.renewal || player.deal.renewal.endSeason < clock.season);
+  const expired = !!(clock.structural && player.deal && player.deal.endSeason < clock.season
+    && (!player.deal.renewal || player.deal.renewal.endSeason < clock.season));
   const { deal: _deal, junior: _junior, ...withoutDeal } = closeClubSpell(installPlayerHistory(player, s.clubId, clock), clock, expired ? 'expiry' : 'release');
   const { emergencyDealEndSeason: _emergencyEnd, emergencyForPlayerId: _emergencySource, ...ordinary } = withoutDeal;
   const released: Player = { ...(clock.structural ? ordinary : withoutDeal), contractWeeks: 0, departed: true };
   const squad = s.squad.filter(p => p.id !== playerId);
-  const next = bookPlayerMovement({ ...s, squad, freeAgents: [...s.freeAgents, released], capAccount: reconcileProtection(squad, s.capAccount, clock.season) }, -terms.payout, 'contracts', clock);
-  setState({ squad, freeAgents: next.freeAgents, money: next.money, finance: next.finance, capAccount: next.capAccount });
-  if (terms.payout) bus.emit('money:changed', { delta: -terms.payout, reason: `release:${playerId}`, balance: next.money, booked: true, stamp: { season: clock.season, week: clock.week } });
-  const freed = terms.nextCapFreed > 0
-    ? `, freeing ${fmtMoney(terms.capFreed)} of this season's cap and ${fmtMoney(terms.nextCapFreed)} next season`
-    : `, freeing ${fmtMoney(terms.capFreed)} of this season's cap`;
-  bus.emit('ui:notify', { text: expired ? `${released.name}'s contract expired. No payout.` : `Released ${released.name} for ${fmtMoney(terms.payout)}${freed}`, kind: 'info' });
-  return { ok: true };
+  const state = bookPlayerMovement({ ...s, squad, freeAgents: [...s.freeAgents, released], capAccount: reconcileProtection(squad, s.capAccount, clock.season) }, -terms.payout, 'contracts', clock);
+  return { state, released, expired, terms };
 }
 
 // ── Week-tick hook ──────────────────────────────────────────────────────────

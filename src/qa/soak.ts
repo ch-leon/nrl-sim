@@ -29,6 +29,7 @@ import { registerYouthSystem } from '../systems/youth';
 import { registerStatsSystem } from '../systems/stats';
 import { registerBoardSystem } from '../systems/board';
 import { chooseEvent, registerEventsSystem, signRivalPlayer } from '../systems/events';
+import { registerCardWeekSystem } from '../systems/cardWeek';
 import { registerRivalsSystem, RIVAL_SQUAD_MIN } from '../systems/rivals';
 import { STRENGTH_MAX, STRENGTH_MIN } from '../systems/league';
 import { BENCH } from '../match/league/bench';
@@ -287,6 +288,7 @@ export function registerAllSystems(): void {
   registerStatsSystem();
   registerBoardSystem();
   registerEventsSystem();
+  registerCardWeekSystem();
   registerRivalsSystem();
   registerUnlockSystem();
 }

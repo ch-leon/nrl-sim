@@ -39,6 +39,10 @@ export interface HudOpts {
   onDecisions?: () => void;
   /** The decisions waiting, soonest due first: the chip names the first. */
   decisions?: (s: GameState) => readonly { title: string; note: string }[];
+  /** The card week's chip (#846): reopens the pick. Absent => no chip. */
+  onCards?: () => void;
+  /** Card-week picks waiting with one on show; 0 hides the chip. */
+  cards?: (s: GameState) => number;
   /** Weeks the balance lasts at this week's burn, null when the club is not losing money (#351 H2). */
   runwayWeeks?: (s: GameState) => number | null;
 }
@@ -219,6 +223,11 @@ export function playWeekSub(s: Pick<GameState, 'league' | 'week'> & Partial<Pick
 
 /** The PLAY WEEK button's label: the week, a parked match to resume, or the run's progress. */
 export const PLAY_WEEK_LABEL = 'Play week ▸';
+
+/** The card chip's count line (#846): "2 PICKS". */
+export function cardChipLabel(n: number): string {
+  return `${n} ${n === 1 ? 'pick' : 'picks'}`.toUpperCase();
+}
 
 /** The decisions chip's count line: "2 DECISIONS". */
 export function decisionsChipCount(n: number): string {
@@ -404,6 +413,14 @@ export function createHud(opts: HudOpts = {}): Hud {
     chipN, el('span', { class: 'nrl-decisions-chip-text' }, chipCount, chipTop), button('Review', () => opts.onDecisions?.(), { class: 'nrl-decisions-review' }));
   chip.hidden = true;
 
+  // #846: the card week's picks waiting, in the decisions card's style; Pick reopens the pick.
+  const cardN = el('span', { class: 'nrl-decisions-chip-n', attrs: { 'aria-hidden': 'true' } });
+  const cardCount = el('span', { class: 'nrl-decisions-chip-count' });
+  const cardChip = el('div', { class: 'nrl-decisions-chip nrl-decisions-card', attrs: { role: 'status', 'data-card-chip': '' } },
+    cardN, el('span', { class: 'nrl-decisions-chip-text' }, cardCount, el('span', { class: 'nrl-decisions-chip-top', text: 'Card week' })),
+    button('Pick', () => opts.onCards?.(), { class: 'nrl-card-chip-pick' }));
+  cardChip.hidden = true;
+
   // #368: the board objective most at risk, in the decisions chip's style under it; a tap opens Staff & Board.
   const boardTitle = el('span', { class: 'nrl-decisions-chip-count' });
   const boardDetail = el('span', { class: 'nrl-decisions-chip-top' });
@@ -418,8 +435,8 @@ export function createHud(opts: HudOpts = {}): Hud {
   events.setAttribute('aria-haspopup', 'dialog');
   events.append(el('span', {class:'nrl-home-events-title', text:'Events · View all'}),
     eventsNames, eventsDetail);
-  const chips = el('div', { class: 'nrl-hub-chips', attrs: {tabindex:'0', role:'region', 'aria-label':'Club updates'} }, chip, events, boardEl);
-  if (opts.onDecisions || opts.onBoard || opts.onEvents) mount(chips);
+  const chips = el('div', { class: 'nrl-hub-chips', attrs: {tabindex:'0', role:'region', 'aria-label':'Club updates'} }, chip, cardChip, events, boardEl);
+  if (opts.onDecisions || opts.onBoard || opts.onEvents || opts.onCards) mount(chips);
 
   let lastMoney: number | null = null;
   let flashTimer: ReturnType<typeof setTimeout> | undefined;
@@ -495,10 +512,16 @@ export function createHud(opts: HudOpts = {}): Hud {
       boardEl.setAttribute('aria-label', label);
       boardEl.title = label;
     }
+    const picks = opts.onCards && !advanceInProgress() && !activeScreen() ? opts.cards?.(s) ?? 0 : 0;
+    cardChip.hidden = picks === 0;
+    if (picks > 0) {
+      cardN.textContent = String(picks);
+      cardCount.textContent = cardChipLabel(picks);
+    }
     const list = opts.decisions?.(s) ?? [];
     const on = !advanceInProgress() && list.length > 0 && !activeScreen();
     chip.hidden = !on;
-    chips.hidden = !on && !board && opportunities.length === 0;
+    chips.hidden = !on && !board && opportunities.length === 0 && picks === 0;
     if (!on) return;
     chipN.textContent = String(list.length);
     chipCount.textContent = decisionsChipCount(list.length);

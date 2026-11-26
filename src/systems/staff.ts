@@ -103,12 +103,38 @@ export function staffWages(state: Pick<GameState, 'staff'>): number {
   return state.staff.reduce((t, m) => t + m.wage, 0);
 }
 
+/** A role as a hire is made: one of the plain roles, or an attack coach of a speciality. */
+export type StaffHire = HireRole | { attackCoach: AttackCoachSpeciality };
+
+/** The member a hire appoints, at today's wage (pure). The name is the caller's roll. */
+export function newStaffMember(state: Pick<GameState, 'settings' | 'season'>, hire: StaffHire, name: string): StaffMember {
+  return typeof hire === 'string'
+    ? { role: hire, name, wage: staffWage(state, hire), hiredSeason: state.season }
+    : { role: 'attackCoach', name, wage: attackCoachWage(state, hire.attackCoach), hiredSeason: state.season, speciality: hire.attackCoach };
+}
+
+/** Why this hire can't be made now, money aside, or null: the role is filled, or the attack coach is refused. */
+export function hireRefusal(state: Pick<GameState, 'staff' | 'reputation'>, hire: StaffHire): string | null {
+  if (typeof hire !== 'string') return attackCoachRefusal(state, hire.attackCoach);
+  return hasStaff(state, hire) ? `You already have ${/^[AEIOU]/.test(STAFF[hire].title) ? 'an' : 'a'} ${STAFF[hire].title}` : null;
+}
+
+/**
+ * Appoint with the appointment fee waived (card week, #846; pure): the same
+ * member a hire makes, and his wage still runs. The new state, or why not.
+ */
+export function appointFeeWaived(state: GameState, hire: StaffHire, name: string): GameState | string {
+  const refusal = hireRefusal(state, hire);
+  if (refusal) return refusal;
+  return { ...state, staff: [...state.staff, newStaffMember(state, hire, name)] };
+}
+
 /** Hire `role` for its upfront fee. Refuses duplicate or unaffordable appointments. */
 export function hireStaff(role: HireRole): StaffMember | null {
   const s = getState();
   if (awaitingCampReplay(s) || weekHeld() || hasStaff(s, role) || !(role in STAFF) || s.money < STAFF_APPOINTMENT_PRICES[role]) return null;
   const rng = makeRng(s.rngSeed);
-  const member: StaffMember = { role, name: randomName(rng), wage: staffWage(s, role), hiredSeason: s.season };
+  const member = newStaffMember(s, role, randomName(rng));
   const fee = STAFF_APPOINTMENT_PRICES[role];
   const balance = s.money - fee;
   setState({ staff: [...s.staff, member], rngSeed: rng.state(), money: balance });
@@ -125,7 +151,7 @@ export function hireAttackCoach(speciality: AttackCoachSpeciality): StaffMember 
   const s = getState();
   if (awaitingCampReplay(s) || weekHeld() || !(speciality in ATTACK_COACHES) || attackCoachRefusal(s, speciality) !== null || s.money < STAFF_APPOINTMENT_PRICES[speciality]) return null;
   const rng = makeRng(s.rngSeed);
-  const member: StaffMember = { role: 'attackCoach', name: randomName(rng), wage: attackCoachWage(s, speciality), hiredSeason: s.season, speciality };
+  const member = newStaffMember(s, { attackCoach: speciality }, randomName(rng));
   const fee = STAFF_APPOINTMENT_PRICES[speciality];
   const balance = s.money - fee;
   setState({ staff: [...s.staff, member], rngSeed: rng.state(), money: balance });

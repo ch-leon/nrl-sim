@@ -1380,8 +1380,8 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
 .nrl-decisions-chip-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .nrl-decisions-card .nrl-decisions-chip-count { color: var(--nrl-text); font-size: 0.875rem; letter-spacing: 0.08em; }
 .nrl-decisions-card .nrl-decisions-chip-top { max-width: 18rem; }
-.nrl-decisions-card .nrl-btn.nrl-decisions-review { min-height: 36px; height: 36px; padding: 0 14px; border-radius: 10px; }
-.nrl-decisions-card .nrl-btn.nrl-decisions-review::after { inset: -8px 0; }
+.nrl-decisions-card .nrl-btn.nrl-decisions-review, .nrl-decisions-card .nrl-btn.nrl-card-chip-pick { min-height: 36px; height: 36px; padding: 0 14px; border-radius: 10px; }
+.nrl-decisions-card .nrl-btn.nrl-decisions-review::after, .nrl-decisions-card .nrl-btn.nrl-card-chip-pick::after { inset: -8px 0; }
 .nrl-dock-money-line { display: flex; align-items: baseline; gap: 5px; }
 .nrl-dock-cash { font-family: var(--nrl-f-num); font-size: 0.5625rem; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--nrl-muted); }
 /* 620 and under (568×320): no room for the word beside the money, which the dock's tabs need (webkit portrait, dock text sizes). */

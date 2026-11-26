@@ -131,11 +131,12 @@ src/
     events.ts              # the typed EventBus (§5)
     time.ts                # week/season tick pipeline (§5)
     advance.ts, advanceRules.ts  # the multi-week advance and its stop rules
-  data/                    # player, facility, club, league, names, events (cards), traits
+  data/                    # player, facility, club, league, names, events (cards), traits,
+                           #   cards (the card week's deck, #846)
   systems/                 # headless game systems: economy, training, fixtures, league,
                            #   matchday, lineup, rivals, rivalRound, matchJobs/matchWorker,
                            #   freeagency, contracts, aging, youth, morale, board, staff,
-                           #   events, suspension, undo, liveMatchRecord, …
+                           #   events, cardWeek (#846), suspension, undo, liveMatchRecord, …
   match/                   # the match sim (BAK-207), §6
     core/                  # sport-neutral: fixed-step engine, bodies, ball, field, snapshots
     league/                # rugby league (Nines): rules, roles, tactics, traits, fatigue,
@@ -161,6 +162,7 @@ src/
   world/                   # iso math, camera, A* paths, placement, build feedback, readability
   art/                     # pixel generators: grounds/, match/, portraits, app icon
   ui/                      # DOM UI: dom, tokens, hud, nav, title, toasts, tutorial, guide/,
+                           #   decisions, weekSummary, cardWeek (the card week's pick, #846),
                            #   screens/ (squad, lineup, recruit, contracts, finance, …)
   fx/                      # audio, particles, atmosphere, PWA
   qa/soak.ts               # headless multi-season soak (npm run soak)
@@ -239,7 +241,7 @@ Store API: `getState()`, `setState(patch)` (publishes `state:changed`),
 League parity (N5, #140): a new game on Normal starts the player's best nine level
 with the rival mean (`LEAGUE.MEAN`, 55 in the AU pack), not above it.
 
-**Save versions.** `SAVE_VERSION` is **23**. This documentation does not change it.
+**Save versions.** `SAVE_VERSION` is **36** (v36 adds the optional card week, #846).
 Any change to `GameState`'s shape:
 
 1. Bump `SAVE_VERSION` in `state.ts` and update `GameState` and `createNewGame`.
