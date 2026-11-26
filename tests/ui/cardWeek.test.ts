@@ -188,7 +188,7 @@ describe('Cards and new grants', () => {
     openCardsScreen();
     const screen = body().querySelector('[data-cards-screen]')!;
     expect(screen.words()).toContain('Hand (1/5)');
-    expect(screen.querySelector('[data-hand-card="playmaker"]')!.words()).toContain('Grey · I');
+    expect(screen.querySelector('[data-hand-card="playmaker"]')!.words()).toContain('Grey · Level I');
     expect(screen.words()).toContain('Good if');
     screen.querySelector('[data-hand-play="0"]')!.click();
     screen.querySelectorAll('[data-card-target]')[0]!.click();
@@ -201,8 +201,8 @@ describe('Cards and new grants', () => {
 
   it('allows Play now with a full hand and requires a discard before taking a sixth card', async () => {
     loadState(await fresh());
-    for (let i = 0; i < 5; i++) {
-      loadState(plant(getState(), 'cashInjection'));
+    for (const id of ['analyst', 'assistantCoach', 'lastLine', 'playmaker', 'finisher']) {
+      loadState(plant(getState(), id));
       expect(chooseCard(0).ok).toBe(true);
     }
     loadState(plant(getState(), 'cashInjection'));
@@ -222,6 +222,7 @@ describe('Cards and new grants', () => {
     expect(getState().cardWeek!.hand).toHaveLength(4);
     pick().querySelector('[data-card-choice="0"]')!.click();
     expect(getState().cardWeek!.hand).toHaveLength(5);
+    expect(getState().cardWeek!.hand[4]).toMatchObject({ cardId: 'cashInjection', level: 2 });
   });
 
   it('opens actual new League picks through every entry point, even with three starters and a full match queue', async () => {

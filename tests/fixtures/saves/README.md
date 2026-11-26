@@ -121,3 +121,13 @@ with its original seed.
 | --- | ---: |
 | `v32-au-week-6.json` | 282 |
 | `v32-uk-week-6.json` | 278 |
+
+
+### v37 Card week saves
+
+`v37-card-week-starters.json.gz` and `v37-card-week-after-starters.json.gz` were
+serialized by main at `3de4f8e4` using the Australian League career with Card week
+enabled, seed 37. The first records the three original starter offers. The second
+records taking Cash injection into hand and playing Analyst and Prop off the
+market directly from the starter picks. The gzip files contain the original v37
+save JSON.

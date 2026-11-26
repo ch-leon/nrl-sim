@@ -1,10 +1,12 @@
 import { BOARD } from '../../config';
 import { bus } from '../../core/events';
-import { getState, type CardHistoryEntry, type GameState } from '../../core/state';
-import { CARD_WEEK, cardDefById } from '../../data/cards';
+import { getState, type CardHistoryEntry, type CardOffer, type GameState } from '../../core/state';
+import { CARD_WEEK, SIGNATURE_TRAIT, cardDefById } from '../../data/cards';
+import { PLAYS_BY_ID } from '../../data/plays';
+import { fmtMoney } from '../../utils/money';
 import { overallRating } from '../../data/player';
 import { ROMAN, TRAITS, traitLevel } from '../../data/traits';
-import { activeCardStaff, cardHandView, discardHeldCard, pickBlocked, playChosenCard, preferredCardOffer, type CardFaceView } from '../../systems/cardWeek';
+import { activeCard, cardHandView, discardHeldCard, pickBlocked, playChosenCard, preferredCardOffer, rerollCost, type CardFaceView } from '../../systems/cardWeek';
 import { POSITION_SHORT } from '../../systems/lineup';
 import { staffTitle } from '../../systems/staff';
 import { cardAction, cardFacts, cardProblem, cardTargets, ensureCardStyles, openCardPick, picksWaitingText } from '../cardWeek';
@@ -16,15 +18,37 @@ function activeLines(state: GameState): string[] {
   return [
     ...cw.cardPlayers.flatMap(id => {
       const player = players.get(id);
-      return player ? [`${player.name} · Joined from a card · ${POSITION_SHORT[player.position]} · ${Math.round(overallRating(player))}`] : [];
+      if (!player) return [];
+      const recruit = cw.active.find(c => (c.kind === 'player' || c.kind === 'dilemma') && c.playerId === id);
+      const signature = SIGNATURE_TRAIT[player.position];
+      const trait = recruit?.kind === 'player' && traitLevel(player.traits, signature) ? ` · ${TRAITS[signature].name}` : '';
+      const level = recruit ? ` · Level ${ROMAN[recruit.level]}${trait}` : '';
+      const spells = player.clubHistory?.spells ?? [];
+      const origin = spells[spells.length - 2];
+      const source = recruit?.cardId.startsWith('steal-player:') && origin
+        ? state.league.clubs.find(c => c.id === origin.clubId)?.name : undefined;
+      return [`${player.name} · ${source ? `From ${source}` : 'Joined from a card'} · ${POSITION_SHORT[player.position]} · ${Math.round(overallRating(player))}${level}`];
     }),
     ...cw.cardTraits.flatMap(({ playerId, trait }) => {
       const player = players.get(playerId);
       const level = player && traitLevel(player.traits, trait);
       return player && level ? [`${TRAITS[trait].name} ${ROMAN[level]} on ${player.name}`] : [];
     }),
-    ...activeCardStaff(state).map(member => `${member.name} · ${staffTitle(member)} · Hired from a card`),
+    ...cw.active.flatMap(card => {
+      if (activeCard(state, card.cardId) !== card) return [];
+      if (card.kind === 'staff') {
+        const discount = (1 - CARD_WEEK.STAFF_WAGE_FACTOR[card.level]) * 100;
+        return [`${card.member.name} · ${staffTitle(card.member)} · Level ${ROMAN[card.level]}${discount ? ` · Wage −${discount}%` : ''}`];
+      }
+      if (card.kind === 'setPlay') return [`${PLAYS_BY_ID[card.playId].name} · Level ${ROMAN[card.level]}`];
+      return [];
+    }),
   ];
+}
+
+function offerSource(state: GameState, offer: CardOffer): string | undefined {
+  const clubId = offer.cards.find(card => card.fromClubId)?.fromClubId;
+  return state.league.clubs.find(c => c.id === clubId)?.name;
 }
 
 const HISTORY_ACTION: Record<NonNullable<CardHistoryEntry['action']>, string> = {
@@ -83,8 +107,9 @@ export function openCardsScreen(): HTMLElement | null {
       const preferred = preferredCardOffer(state);
       const list = el('div', { class: 'nrl-cards-offers' });
       for (const [index, offer] of cw.offers.entries()) {
+        const source = offerSource(state, offer);
         const label = offer.kind === 'starter' ? `Starter pick ${index + 1}`
-          : `Match pick · Season ${offer.season}, Week ${offer.week}`;
+          : `Match pick · Season ${offer.season}, Week ${offer.week}${source ? ` · From ${source}` : ''}`;
         const open = cardAction(label, () => openCardPick(offer.grant), blocked);
         open.setAttribute('data-cards-offer', String(offer.grant));
         if (offer === preferred && offer.kind !== 'starter') open.append(el('span', { class: 'nrl-cards-latest', text: 'Latest' }));
@@ -94,18 +119,24 @@ export function openCardsScreen(): HTMLElement | null {
     } else if (count === 1) {
       pick.setAttribute('data-cards-offer', String(cw.offers[0]!.grant));
     }
+    if (count) {
+      const source = count === 1 ? offerSource(state, cw.offers[0]!) : undefined;
+      if (source) waiting.append(el('p', { class: 'nrl-card-source', text: `From ${source}` }));
+      const reroll = cw.offers.some(o => o.kind !== 'decree') ? `Next reroll ${fmtMoney(rerollCost(state))}` : 'Decree picks cannot be rerolled.';
+      waiting.append(el('p', { class: 'nrl-card-hint', text: reroll }));
+    }
     content.append(waiting);
     if (count && blocked) content.append(cardProblem(blocked));
 
     const hand = cardHandView(state);
     const grid = el('div', { class: 'nrl-cards-hand' });
     for (const face of hand) {
-      const box = cardFacts(face, ROMAN[face.level]);
+      const box = cardFacts(face);
       box.setAttribute('data-hand-card', face.cardId);
       box.append(el('span', { class: 'nrl-card-hint', text: face.hint }));
       if (face.refusal) box.append(cardProblem(face.refusal));
       const use = cardAction('Play', () => {
-        if (face.kind === 'trait') { target = face; render(); }
+        if (face.targets) { target = face; render(); }
         else play(face);
       }, face.refusal, true);
       use.setAttribute('data-hand-play', String(face.index));

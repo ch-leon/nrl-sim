@@ -1,9 +1,12 @@
 // Card week (#846): pick one card from three before round 1 and after each
 // League match. Rules, state and save; the pick screen comes later.
+import { readFileSync } from 'node:fs';
+import { gunzipSync } from 'node:zlib';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { preparePack, selectPack } from '../../src/content';
 import { advanceUntil } from '../../src/core/advance';
 import { runMatch } from '../../src/match/league/match';
+import * as matchEngine from '../../src/match/league/match';
 import { eventOpportunities } from '../../src/systems/eventOpportunities';
 import { registerEventsSystem } from '../../src/systems/events';
 import { registerEconomySystem, registerFinanceSystem } from '../../src/systems/economy';
@@ -16,18 +19,23 @@ import { isCardWeek } from '../../src/core/saveValidation';
 import { careerActionClock } from '../../src/core/season';
 import { setCareerNamespace } from '../../src/core/storage/local';
 import { DEV_TEST_PREFIX } from '../../src/core/storageKeys';
-import { createNewGame, getState, loadState, newCardWeek, setState, type GameState, type OfferedCard, type Player, type Position } from '../../src/core/state';
+import { createNewGame, getState, loadState, newCardWeek, SAVE_VERSION, setState, type GameState, type OfferedCard, type Player, type Position } from '../../src/core/state';
 import { advanceWeek, advanceWeeks, clearHeldWeek, clearSeasonHooks, clearTickHooks, withFastForward, weekHeld } from '../../src/core/time';
 import { BOARD, SQUAD_CAP } from '../../src/config';
-import { CARD_WEEK, CARDS, cardDefById, PLAYER_CARD_MARGIN } from '../../src/data/cards';
-import { AROUND_SPREAD, overallRating } from '../../src/data/player';
+import { CARD_WEEK, CARDS, SIGNATURE_TRAIT, cardDefById, PLAYER_CARD_MARGIN } from '../../src/data/cards';
+import { AROUND_SPREAD, overallRating, shownStats } from '../../src/data/player';
 import { effectiveRating, FIT, positionFit } from '../../src/systems/lineup';
+import { PLAYS_BY_ID, CARD_PLAY_CONTACT_STEP, CARD_PLAY_IQ_STEP } from '../../src/data/plays';
+import { playBonus, stylePlays } from '../../src/match/league/plays';
+import { rivalStyle } from '../../src/systems/rivalRound';
+import { RIVAL_POSITION_MIN } from '../../src/systems/rivals';
+import { validatePlayerPopulation } from '../../src/systems/playerCareer';
 import { traitLevel } from '../../src/data/traits';
 import { leagueEntryReceiptId } from '../../src/data/leagueCareer';
 import { AU_CAREER_PROFILE } from '../../src/content/career/au';
 import {
-  activeCardStaff, cardFloor, cardOfferView, cardWeekTick, passCard, passPick, discardCard, playCard, playChosenCard, playPickCard, drawOffer, freePlayCandidates, lastMatchImpact, plantCard,
-  playedLeagueMatch, registerCardWeekSystem, startCardWeek, takeCard, traitTargets, type CardTake,
+  activeCard, activeCardStaff, cardFloor, cardMatchPlays, cardOfferView, cardWeekTick, passCard, passPick, discardCard, playCard, playChosenCard, playPickCard, drawOffer, freePlayCandidates, lastMatchImpact, plantCard,
+  playedLeagueMatch, registerCardWeekSystem, rerollCard, rerollCost, rerollPick, startCardWeek, takeCard, traitTargets, type CardTake,
 } from '../../src/systems/cardWeek';
 import { capRoomFor, commitment, publishedCap } from '../../src/systems/cap';
 import { setupStructuralDivisionCareer } from '../../src/systems/divisionCareer';
@@ -208,9 +216,10 @@ describe('each card does what its face says', () => {
     expect(migrateState(JSON.parse(JSON.stringify(r)))).toMatchObject({ ok: true, state: { cardWeek: cw } });
   });
 
-  it('holds five cards, refuses a sixth atomically, then allows explicit discard and take', async () => {
+  it('holds five distinct cards and refuses a sixth until there is room', async () => {
     let s = await career(31);
-    for (let i = 0; i < CARD_WEEK.HAND_CAP; i++) s = changed(takeCard(planted(s, 'cashInjection'), 0));
+    for (const id of ['analyst', 'assistantCoach', 'lastLine', 'playmaker', 'finisher']) s = changed(takeCard(planted(s, id), 0));
+    expect(s.cardWeek!.hand).toHaveLength(CARD_WEEK.HAND_CAP);
     const waiting = planted(s, 'cashInjection');
     expect(takeCard(waiting, 0)).toMatch(/hand is full/i);
     const immediate = taken(playPickCard(waiting, 0));
@@ -221,7 +230,7 @@ describe('each card does what its face says', () => {
     expect(waiting.cardWeek!.offers).toHaveLength(1);
     expect(waiting.cardWeek!.hand).toHaveLength(5);
     const discarded = changed(discardCard(waiting, 2));
-    expect(discarded.cardWeek!.history.slice(-1)[0]).toMatchObject({ cardId: 'cashInjection', action: 'discard' });
+    expect(discarded.cardWeek!.history.slice(-1)[0]).toMatchObject({ cardId: 'lastLine', action: 'discard' });
     expect(discarded.cardWeek!.offers).toEqual(waiting.cardWeek!.offers);
     const afterDiscard = changed(takeCard(discarded, 0));
     expect(afterDiscard.cardWeek!.hand).toHaveLength(5);
@@ -240,7 +249,7 @@ describe('each card does what its face says', () => {
     expect(out.cardWeek!.cardTraits).toEqual([{ playerId: target.player.id, trait: 'lastLine', level: target.level }]);
   });
 
-  it('a staff card hires the role with the fee waived, and is not offered once the role is filled', async () => {
+  it('a staff card waives the fee and only upgrades the card hire', async () => {
     const s = await career(37);
     const p = planted(s, 'analyst');
     const r = taken(playPickCard(p, 0));
@@ -249,7 +258,9 @@ describe('each card does what its face says', () => {
     expect(hire.wage).toBe(staffWage(s, 'analyst'));
     expect(r.state.money).toBe(p.money);
     expect(r.money).toEqual([]);
-    expect(plantCard(r.state, 'analyst')).toBe('That card cannot be offered now.');
+    expect(typeof plantCard(r.state, 'analyst')).toBe('object');
+    const paid = { ...s, staff: [newStaffMember(s, 'analyst', 'Paid hire')] };
+    expect(plantCard(paid, 'analyst')).toBe('That card cannot be offered now.');
   });
 
   it('a set play card adds a play the club could buy, free, and needs an attack coach to be offered', async () => {
@@ -266,23 +277,18 @@ describe('each card does what its face says', () => {
     expect(r.state.money).toBe(0);
   });
 
-  it('a trait card goes to the man chosen: I, then II, then III, and then he is not a target', async () => {
+  it('a trait upgrade stays with the man chosen at Level I and stops at III', async () => {
     const s = await career(43);
-    const target = s.squad.find((p) => traitLevel(p.traits, 'lastLine') === 0)!;
+    const target = s.squad.find(p => traitLevel(p.traits, 'lastLine') === 0)!;
     let state = s;
     for (const level of [1, 2, 3]) {
       state = planted(state, 'lastLine');
-      expect(cardOfferView(state).cards[0]!.targets!.find((t) => t.playerId === target.id)!.level).toBe(level);
-      state = taken(playPickCard(state, 0, target.id)).state;
-      expect(traitLevel(state.squad.find((p) => p.id === target.id)!.traits, 'lastLine')).toBe(level);
+      expect(cardOfferView(state).cards[0]!.level).toBe(level);
+      state = taken(playPickCard(state, 0, level === 1 ? target.id : undefined)).state;
+      expect(traitLevel(state.squad.find(p => p.id === target.id)!.traits, 'lastLine')).toBe(level);
     }
-    expect(traitTargets(state, 'lastLine').some((t) => t.player.id === target.id)).toBe(false);
-    const again = planted(state, 'lastLine');
-    expect(playPickCard(again, 0, target.id)).toMatch(/already has Last Line III/);
-    expect(playPickCard(again, 0)).toBe('Choose a player for the trait.');
-    // Nobody left to take it: the card is not offered.
-    const maxed = { ...again, squad: again.squad.map((p) => ({ ...p, traits: [{ id: 'lastLine' as const, level: 3 as const }] })) };
-    expect(plantCard(maxed, 'lastLine')).toBe('That card cannot be offered now.');
+    expect(traitTargets(state, 'lastLine').some(t => t.player.id === target.id)).toBe(false);
+    expect(plantCard(state, 'lastLine')).toBe('That card cannot be offered now.');
   });
 
   it('a cash card pays into the bank through the books', async () => {
@@ -652,6 +658,7 @@ describe('a League week with the card week on', () => {
     });
     advanceWeek();
     expect(weekHeld()).toBe(true);
+    expect(rerollPick()).toEqual({ ok: false, reason: 'Finish the current week first.' });
     expect(getState().cardWeek!.grants).toBe(3);
     expect(match).toBeDefined();
     bus.emit('match:finished', match!);
@@ -659,6 +666,33 @@ describe('a League week with the card week on', () => {
     expect(getState().cardWeek).toMatchObject({ starterLeft: 3, owed: 1, grants: 4 });
     bus.emit('match:finished', match!);
     expect(getState().cardWeek!.grants).toBe(4);
+  });
+
+  it('bakes the levelled set play into the live match sheet and reproduces the result from that sheet', () => {
+    activeLeague(573);
+    const s = getState();
+    setState({
+      cardWeek: { ...startCardWeek(s, newCardWeek(573)).cardWeek!,
+        active: [{ kind: 'setPlay', cardId: 'setPlay', playId: 'block-play', level: 3 }] },
+      playbook: { owned: ['block-play'] },
+      lineup: { ...s.lineup, plays: ['block-play'] },
+    });
+    registerFixturesSystem(); registerPlayerMatchSystem();
+    advanceWeeks(leagueSlot(getState()) - 1);
+    let recorded: Parameters<typeof bus.emit<'match:started'>>[1] | undefined;
+    bus.on('match:started', match => { recorded = match; });
+    advanceWeek();
+    expect(weekHeld()).toBe(true);
+    expect(recorded).toBeDefined();
+    const { fixture, home, away, live } = recorded!;
+    const ours = home.clubId === s.clubId ? home : away;
+    expect(ours.plays).toEqual(['block-play:III']);
+    const settings = { seed: live.seed, weather: live.weather, injuryRate: live.injuryRate! };
+    const result = runMatch(home, away, settings);
+    const saved = JSON.parse(JSON.stringify({ home, away, settings }));
+    expect(runMatch(saved.home, saved.away, saved.settings)).toEqual(result);
+    bus.emit('match:finished', { fixture, result });
+    expect(weekHeld()).toBe(false);
   });
 
   it('keeps granting picks in the finals and saves the queue at season end', async () => {
@@ -704,18 +738,27 @@ describe('a League week with the card week on', () => {
       registerFixturesSystem(); registerPlayerMatchSystem(); registerEventsSystem(); registerMoraleSystem();
       if (hook) registerCardWeekSystem();
       const weeks: string[] = [];
+      const matches: string[] = [];
+      const original = matchEngine.runMatch;
+      const spy = vi.spyOn(matchEngine, 'runMatch').mockImplementation((home, away, options) => {
+        const result = original(home, away, options);
+        if (home.clubId === 'player' || away.clubId === 'player') matches.push(JSON.stringify({ home, away, options, result }));
+        return result;
+      });
       bus.on('week:advanced', () => weeks.push(JSON.stringify(getState())));
-      advanceWeeks(getState().competitions!.calendar!.slots.length);
+      try { advanceWeeks(getState().competitions!.calendar!.slots.length); }
+      finally { spy.mockRestore(); }
       expect(getState().competitions!.leagueCareer!.phase).toBe('next-season-choice');
       expect(weeks).toHaveLength(getState().competitions!.calendar!.slots.length);
       expect(getState().cardWeek).toBeUndefined();
-      return weeks;
+      expect(matches.length).toBeGreaterThan(0);
+      return [...weeks, ...matches];
     };
     expect(run(true)).toEqual(run(false));
   }, 60000);
 });
 
-describe('save v37 migration', () => {
+describe('card-week save migrations', () => {
   function legacy(s: GameState, owed: number) {
     const cw = s.cardWeek!;
     const current = cw.offers[0]!;
@@ -736,7 +779,7 @@ describe('save v37 migration', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(JSON.stringify(raw)).toBe(bytes);
-    expect(result.state.version).toBe(37);
+    expect(result.state.version).toBe(SAVE_VERSION);
     const cw = result.state.cardWeek!;
     expect(cw).toMatchObject({ starterLeft: 2, owed: 0, grants: 3, hand: [] });
     expect(cw.offers[0]).toEqual({ ...raw.cardWeek.offer, kind: 'starter', grant: 2 });
@@ -773,7 +816,7 @@ describe('save v37 migration', () => {
     const s = await career();
     const offers = s.cardWeek!.offers.map(({ grant: _grant, ...offer }) => offer);
     const match = { ...offers[0]!, kind: 'match', week: leagueSlot(s) };
-    const old = { ...s, cardWeek: { ...s.cardWeek!, offers: [...offers, match], grants: 4, seenGrant: 4, owed: 1 } };
+    const old = { ...s, version: 37, cardWeek: { ...s.cardWeek!, offers: [...offers, match], grants: 4, seenGrant: 4, owed: 1 } };
     const loaded = migrateState(old);
     expect(loaded.ok).toBe(true);
     if (!loaded.ok) return;
@@ -829,7 +872,7 @@ describe('save v37 migration', () => {
 
   it('refuses a newer save and invalid v36 card data', async () => {
     const s = await career();
-    expect(migrateState({ ...s, version: 38 })).toMatchObject({ ok: false, reason: 'future' });
+    expect(migrateState({ ...s, version: SAVE_VERSION + 1 })).toMatchObject({ ok: false, reason: 'future' });
     const raw = legacy(s, 3);
     expect(migrateState({ ...raw, cardWeek: { ...raw.cardWeek, owed: 99 } })).toMatchObject({ ok: false });
   });
@@ -852,5 +895,264 @@ describe('a card-week career after Classic was retired (#819)', () => {
     expect(loaded.status).toBe('ok');
     if (loaded.status === 'ok') expect(loaded.state.cardWeek).toEqual(s.cardWeek);
     expect(firstRunSlotSummaries().find((x) => x.slot === 1)?.status).not.toBe('empty');
+  });
+});
+
+describe('Phase 2 rerolls', () => {
+  it('charges $1,500, $3,000 and $4,500 for the shown grant only, then resets each week or season', async () => {
+    let s = await career();
+    const original = s;
+    const grant = s.cardWeek!.offers[1]!.grant!;
+    for (const cost of [1500, 3000, 4500]) {
+      expect(rerollCost(s)).toBe(cost);
+      const next = changed(rerollCard(s, grant));
+      expect(rerollCard(s, grant)).toEqual(next);
+      expect(next.money).toBe(s.money - cost);
+      expect(next.finance[0]!.events).toBe(s.finance[0]!.events - cost);
+      expect(next.cardWeek!.offers[0]).toEqual(s.cardWeek!.offers[0]);
+      expect(next.cardWeek!.offers[2]).toEqual(s.cardWeek!.offers[2]);
+      expect(next.cardWeek!.offers[1]).toMatchObject({ kind: 'starter', grant, season: 1, week: 1 });
+      expect(next.cardWeek!.offers[1]!.cards).not.toEqual(s.cardWeek!.offers[1]!.cards);
+      expect(next.cardWeek!.grants).toBe(original.cardWeek!.grants);
+      expect(next.rngSeed).toBe(original.rngSeed);
+      expect(next.eventDeck).toEqual(original.eventDeck);
+      s = next;
+    }
+    expect(s.cardWeek!.history.map(h => h.action)).toEqual(['reroll', 'reroll', 'reroll']);
+    expect(rerollCost({ ...s, week: s.week + 1 })).toBe(1500);
+    expect(rerollCost({ ...s, season: s.season + 1 })).toBe(1500);
+  });
+
+  it('refuses a Decree or an unaffordable reroll without moving the pick or either stream', async () => {
+    const s = await career();
+    const cardWeek = s.cardWeek!;
+    const decree = { ...s, cardWeek: { ...cardWeek, starterLeft: 0, owed: 1,
+      offers: [{ ...cardWeek.offers[0]!, kind: 'decree' as const }] } };
+    expect(rerollCard(decree)).toBe('Decree picks cannot be rerolled.');
+    expect(rerollCard({ ...s, money: 1499 })).toBe('The club cannot afford a reroll.');
+    expect(rerollCard(s, 100)).toBe('No pick is waiting.');
+    expect(s.money).toBe((await career()).money);
+    expect(s.cardWeek).toEqual((await career()).cardWeek);
+  });
+
+  it('saves the charged draw and restores it without a new charge or RNG roll', async () => {
+    const bytes = new Map<string, string>();
+    const storage = { getItem: (k: string) => bytes.get(k) ?? null, setItem: (k: string, v: string) => { bytes.set(k, v); }, removeItem: (k: string) => { bytes.delete(k); } };
+    __setStorage(storage); __unlockSaves(); setActiveSlot(1);
+    loadState(await career());
+    registerFinanceSystem();
+    const before = getState();
+    const moves: string[] = [];
+    bus.on('money:changed', ({ reason }) => moves.push(reason));
+    expect(rerollPick()).toEqual({ ok: true, outcome: 'Pick rerolled for $1,500.' });
+    const after = getState();
+    const loaded = loadCareer();
+    expect(loaded).toMatchObject({ status: 'ok', state: { cardWeek: after.cardWeek, money: before.money - 1500 } });
+    expect(after.finance[0]!.events).toBe(before.finance[0]!.events - 1500);
+    loadState(planted(getState(), 'cashInjection'));
+    expect(playChosenCard('pick', 0)).toMatchObject({ ok: true, outcome: 'Cash injection: +$15,000.' });
+    const paid = loadCareer();
+    expect(paid).toMatchObject({ status: 'ok', state: { money: before.money + 13_500 } });
+    expect(moves).toEqual(['card: reroll', 'card: Cash injection']);
+  });
+});
+
+describe('Phase 2 win reward', () => {
+  function result(s: GameState, outcome: 'win' | 'loss' | 'draw' | 'seeded-draw'): { state: GameState; opponent: string } {
+    const state = played(s, leagueSlot(s), format => format === 'league');
+    let opponent = '';
+    for (const instance of state.competitions!.instances) {
+      const fixture = instance.fixtures.find(f => f.slot === state.week && f.status === 'completed' && (f.homeId === s.clubId || f.awayId === s.clubId));
+      if (!fixture) continue;
+      const home = fixture.homeId === s.clubId;
+      opponent = home ? fixture.awayId : fixture.homeId;
+      fixture.result = outcome === 'draw' ? { homeScore: 10, awayScore: 10, decider: 'draw' }
+        : outcome === 'seeded-draw' ? { homeScore: 10, awayScore: 10, winnerId: s.clubId, decider: 'seeded-draw' }
+        : { homeScore: home === (outcome === 'win') ? 12 : 0, awayScore: home === (outcome === 'win') ? 0 : 12,
+          winnerId: outcome === 'win' ? s.clubId : opponent, decider: 'score' };
+    }
+    expect(opponent).not.toBe('');
+    return { state, opponent };
+  }
+
+  it('deals one stolen player on a win and rerolls deterministically with the slot intact', async () => {
+    const base = { ...(await career(573)), money: 1_000_000 };
+    for (const outcome of ['win', 'loss', 'draw', 'seeded-draw'] as const) {
+      const { state, opponent } = result(base, outcome);
+      const dealt = cardWeekTick(state);
+      expect(cardWeekTick(state)).toEqual(dealt);
+      const offer = dealt.cardWeek!.offers[3]!;
+      const stolen = offer.cards.filter(c => c.fromClubId);
+      expect(stolen).toHaveLength(outcome === 'win' ? 1 : 0);
+      const rerolled = changed(rerollCard(dealt, offer.grant));
+      expect(rerollCard(dealt, offer.grant)).toEqual(rerolled);
+      expect(rerolled.cardWeek!.offers[3]!.cards.filter(c => c.fromClubId)).toHaveLength(stolen.length);
+      expect(rerolled.rngSeed).toBe(state.rngSeed);
+      if (outcome !== 'win') continue;
+      const card = stolen[0]!;
+      expect(card.kind).toBe('player');
+      if (card.kind !== 'player') throw new Error('Expected a stolen player');
+      expect(card.fromClubId).toBe(opponent);
+      const before = dealt.league.clubs.find(c => c.id === opponent)!;
+      const index = offer.cards.indexOf(card);
+      const held = changed(takeCard(dealt, index, offer.grant));
+      expect(held.league).toEqual(dealt.league);
+      const transfer = taken(playCard(held, 0));
+      const updated = transfer.state.league.clubs.find(c => c.id === opponent)!;
+      expect(transfer.joined!.id).toBe(card.player.id);
+      expect(transfer.joined!.clubHistory!.spells.slice(-2).map(spell => spell.clubId)).toEqual([opponent, base.clubId]);
+      expect(updated.squad).toHaveLength(before.squad!.length);
+      expect(updated.squad!.some(p => p.id === card.player.id)).toBe(false);
+      expect(updated.squad!.filter(p => !before.squad!.some(old => old.id === p.id))).toMatchObject([{ position: card.player.position }]);
+      expect(updated.squad!.filter(p => p.position === card.player.position && p.injuredWeeks === 0 && !p.suspendedWeeks).length).toBeGreaterThanOrEqual(RIVAL_POSITION_MIN);
+      expect(commitment(updated.squad!, state.season)).toBeLessThanOrEqual(publishedCap(updated.capAccount!));
+      expect(validatePlayerPopulation(transfer.state)).toBeNull();
+      expect(transfer.state.rngSeed).toBe(state.rngSeed);
+      expect(transfer.state.eventDeck).toEqual(state.eventDeck);
+      expect(playCard(transfer.state, 0)).toBe('There is no card there.');
+    }
+  });
+
+  it('offers a play from the beaten club style when nobody qualifies, then a regular third card when its plays are owned', async () => {
+    const s = await career(573);
+    const { state, opponent } = result({ ...s, squad: s.squad.map(p => ({
+      ...p, stats: { speed: 99, strength: 99, stamina: 99, handling: 99, kicking: 99, footyIQ: 99 },
+    })) }, 'win');
+    const style = rivalStyle(state.league.clubs.find(c => c.id === opponent)!).attack;
+    const plays = stylePlays(style);
+    const dealt = cardWeekTick(state);
+    const offer = dealt.cardWeek!.offers[3]!;
+    const card = offer.cards[2]!;
+    expect(card).toMatchObject({ kind: 'setPlay', fromClubId: opponent });
+    if (card.kind !== 'setPlay') throw new Error('Expected a stolen play');
+    expect(plays).toContain(card.playId);
+    expect(taken(playPickCard(dealt, 2, undefined, offer.grant)).state.playbook.owned).toContain(card.playId);
+    const fallback = cardWeekTick({ ...state, playbook: { owned: plays } }).cardWeek!.offers[3]!;
+    expect(fallback.cards).toHaveLength(3);
+    expect(fallback.cards.every(c => !c.fromClubId)).toBe(true);
+  });
+});
+
+describe('Phase 2 card levels', () => {
+  it('merges in a full hand, stops offering Level III, and pays the upgraded cash amount only when played', async () => {
+    let s = await career(31);
+    for (const id of ['cashInjection', 'assistantCoach', 'lastLine', 'playmaker', 'finisher']) s = changed(takeCard(planted(s, id), 0));
+    for (const level of [2, 3]) {
+      s = changed(takeCard(planted(s, 'cashInjection'), 0));
+      expect(s.cardWeek!.hand).toHaveLength(5);
+      expect(s.cardWeek!.hand[0]).toMatchObject({ cardId: 'cashInjection', level });
+    }
+    expect(plantCard(s, 'cashInjection')).toBe('That card cannot be offered now.');
+    expect(taken(playCard(s, 0)).money).toMatchObject([{ amount: 30_000 }]);
+  });
+
+  it('cash pays $15,000, $22,500 and $30,000 with no payments past III', async () => {
+    let s = await career();
+    for (const [i, amount] of [15_000, 22_500, 30_000].entries()) {
+      const out = taken(playPickCard(planted(s, 'cashInjection'), 0));
+      expect(out.money).toMatchObject([{ amount }]);
+      expect(activeCard(out.state, 'cashInjection')).toMatchObject({ level: i + 1 });
+      s = out.state;
+    }
+    expect(plantCard(s, 'cashInjection')).toBe('That card cannot be offered now.');
+  });
+
+  it.each(CARDS.filter(card => card.kind === 'player'))('levels $id’s signature trait on the same player', async ({ id }) => {
+    let s = { ...(await career(37)), money: 1_000_000 };
+    const def = cardDefById(id);
+    if (def?.kind !== 'player') throw new Error('Expected player definition');
+    // Keep the best natural player at a different position, so the card can be drawn.
+    s = { ...s, squad: s.squad.map(p => p.position !== def.position ? p : {
+      ...p, stats: { speed: 35, strength: 35, stamina: 35, handling: 35, kicking: 35, footyIQ: 35 },
+    }) };
+    const joined = taken(playPickCard(planted(s, id), 0));
+    const player = joined.joined!;
+    const count = joined.state.squad.length;
+    for (const level of [1, 2, 3]) {
+      const result = level === 1 ? joined.state : changed(takeCard(planted(s, id), 0));
+      expect(activeCard(result, id)).toMatchObject({ kind: 'player', playerId: player.id, level });
+      expect(result.squad).toHaveLength(count);
+      expect(traitLevel(result.squad.find(p => p.id === player.id)!.traits, SIGNATURE_TRAIT[player.position])).toBeGreaterThanOrEqual(level);
+      s = result;
+    }
+    expect(plantCard(s, id)).toBe('That card cannot be offered now.');
+  });
+
+  it.each(CARDS.filter(card => card.kind === 'staff'))('takes 25% and 50% off $id’s original wage', async ({ id }) => {
+    const base = await career(37);
+    const hired = taken(playPickCard(planted({ ...base, reputation: 100 }, id), 0)).state;
+    const member = hired.staff[0]!;
+    expect(hired.money).toBe(base.money);
+    let s = hired;
+    for (const [level, factor] of [[2, 0.75], [3, 0.5]]) {
+      s = changed(takeCard(planted(s, id), 0));
+      expect(s.staff).toEqual([{ ...member, wage: Math.round(member.wage * factor!) }]);
+      expect(activeCard(s, id)).toMatchObject({ level });
+      expect(s.money).toBe(base.money);
+    }
+    expect(plantCard(s, id)).toBe('That card cannot be offered now.');
+  });
+
+  it('increases the same dilemma player’s margin by two per level and costs patience each time', async () => {
+    let s = { ...(await career(37)), boardPatience: 5 };
+    const id = 'marqueeGamble';
+    const hired = taken(playPickCard(planted(s, id), 0));
+    const player = hired.joined!;
+    s = hired.state;
+    for (const level of [2, 3]) {
+      s = changed(takeCard(planted(s, id), 0));
+      expect(s.boardPatience).toBe(5 - level);
+      expect(activeCard(s, id)).toMatchObject({ playerId: player.id, level });
+      const upgraded = s.squad.find(p => p.id === player.id)!;
+      for (const stat of shownStats(player.position)) expect(upgraded.stats[stat]).toBe(player.stats[stat] + 2 * (level - 1));
+    }
+    expect(plantCard(s, id)).toBe('That card cannot be offered now.');
+  });
+
+  it('improves the selected set play at II and III through the existing match play data', async () => {
+    const base = await career();
+    const coached = { ...base, staff: [newStaffMember(base, { attackCoach: 'direct' }, 'Coach')] };
+    let s = taken(playPickCard(planted(coached, 'setPlay'), 0)).state;
+    const id = s.playbook.owned[0]!;
+    for (const level of [1, 2, 3]) {
+      if (level > 1) s = changed(takeCard(planted(s, 'setPlay'), 0));
+      expect(s.playbook.owned).toEqual([id]);
+      expect(activeCard(s, 'setPlay')).toMatchObject({ level });
+      const selected = cardMatchPlays(s, [id]);
+      const play = PLAYS_BY_ID[selected[0]!];
+      const original = PLAYS_BY_ID[id];
+      expect(play.roles.map(r => r.iq)).toEqual(original.roles.map(r => r.iq - (level - 1) * CARD_PLAY_IQ_STEP));
+      expect(playBonus(play, original.style, 1).broken ?? 0).toBeCloseTo((original.mods.broken ?? 0) + (level - 1) * CARD_PLAY_CONTACT_STEP);
+      expect(cardMatchPlays(s, [])).toEqual([]);
+    }
+    expect(plantCard(s, 'setPlay')).toBe('That card cannot be offered now.');
+  });
+});
+
+describe('actual v37 save bytes', () => {
+  it.each(['starters', 'after-starters'])('migrates the %s save and preserves the resolved queue, hand and applied effects', name => {
+    const raw = JSON.parse(gunzipSync(readFileSync(new URL(`../fixtures/saves/v37-card-week-${name}.json.gz`, import.meta.url))).toString()) as GameState;
+    expect(raw.version).toBe(37);
+    const migrated = migrateState(raw as unknown as Record<string, unknown>);
+    expect(migrated).toMatchObject({ ok: true, state: { version: 38 } });
+    if (!migrated.ok) throw new Error(migrated.message);
+    const { version, cardWeek, ...rest } = migrated.state;
+    const { version: oldVersion, cardWeek: original, ...originalRest } = raw;
+    expect(version).toBe(oldVersion + 1);
+    expect(rest).toEqual(originalRest);
+    const { active: oldActive, ...kept } = original!;
+    expect(cardWeek).toMatchObject(kept);
+    expect(cardWeek!.active).toEqual(expect.arrayContaining(oldActive));
+    expect(Object.keys(cardWeek!)).toEqual(expect.arrayContaining(Object.keys(original!)));
+    expect(cardWeek!.offers).toEqual(original!.offers);
+    expect(cardWeek!.history).toEqual(original!.history);
+    if (name === 'after-starters') {
+      expect(cardWeek!.hand).toMatchObject([{ cardId: 'cashInjection', level: 1 }]);
+      expect(cardWeek!.active).toMatchObject([
+        { kind: 'staff', cardId: 'analyst', level: 1 },
+        { kind: 'player', cardId: 'propSigning', playerId: original!.cardPlayers[0], level: 1 },
+      ]);
+    }
+    expect(migrateState(JSON.parse(JSON.stringify(migrated.state)))).toEqual(migrated);
   });
 });

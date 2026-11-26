@@ -100,3 +100,39 @@ rerolls, the opening pack, the album across careers, and any scoring.
 - Save v36: `GameState.cardWeek` is optional and validated when present
   (`saveValidation.ts` `isCardWeek`). It is refused on a save before v36 and on a
   career that is not a League career.
+
+
+## Rerolls, win rewards and levels
+
+Rerolls use the card stream, redraw the displayed pick and retain a win reward
+slot. The first reroll costs $1,500. Each adds $1,500 to the next price until
+the week changes. The debit appears under Events. Starter picks can be rerolled
+and Decree picks cannot.
+
+After a League win, the third slot can offer a real player from the beaten
+club. On play, the player moves with his career history and the rival receives
+a fit replacement at the same position, generated around his rating. If no
+recruit fits, the slot can offer a set play from the beaten club’s attack
+style. Passes, discards and rerolls never move a player.
+
+| Card type | Level I | Level II | Level III |
+| --- | --- | --- | --- |
+| Recruit | Signature trait I | Signature trait II | Signature trait III |
+| Trait | First upgrade on the chosen player | Same player to II | Same player to III |
+| Staff | Hiring fee waived | Weekly wage −25% | Weekly wage −50% |
+| Set play | Added free | Role IQ needs −1 and break modifier +0.02 | Role IQ needs −2 and break modifier +0.04 |
+| Cash injection | $15,000 | $22,500 | $30,000 |
+| Marquee gamble | Base recruit margin | Margin +2 | Margin +4 |
+
+Marquee gamble costs one patience point each time it is played or applied to
+an active card. A duplicate merges in the hand or upgrades its active effect.
+Cash pays the level shown when played. Set-play bonuses are encoded by the
+match sheet’s play ID and apply through the existing set-play logic.
+
+Save v38 keeps v37 offers, hands, history and current roster effects. It
+recovers already applied recruit and trait cards where the saved history
+identifies the recipient. The squad and playbook stay as saved so an in-progress
+match can resume from the same inputs. Existing card recruits gain their signature
+trait on their next upgrade. A v37 playbook can mix bought and card-earned plays
+with no receipt tying a card to a play. Where attribution is ambiguous, every
+owned play is kept and no individual one receives a card upgrade on migration.

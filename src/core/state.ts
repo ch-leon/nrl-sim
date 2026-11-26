@@ -132,7 +132,7 @@ export type WeatherKind = 'clear' | 'rain' | 'wind';
 
 /** v30 adds player histories, v31 optional league progression, and v32 exact
  * protected agreements. v33 adds Open Cup entry and v34 optional Skills Camp records. v35 adds individual challenge checkpoints. v36 adds the optional card week (#846). Finance state migrates from v28; v27 requires a new career. */
-export const SAVE_VERSION = 37;
+export const SAVE_VERSION = 38;
 
 /** The hires the facilities don't cover (N14.5), and the attack coach who opens set plays to buy (#326). */
 export type StaffRole = 'assistantCoach' | 'analyst' | 'welfare' | 'attackCoach';
@@ -287,16 +287,15 @@ export interface EventDeckState {
 /**
  * One card on show in a card-week pick (#846), resolved when it was drawn so a
  * save and reload shows the same offer. `cardId` keys into data/cards.ts.
- * A player card (and the dilemma) carries the generated man (no durable id
- * yet: he gets one when he joins), his salary, and who he replaces when the
- * squad or the cap has no room. A staff card carries the hire's name, a set
- * play card the play.
+ * A recruit card carries the quoted player, salary and any required release.
+ * Generated recruits get a durable ID on signing. A steal refers to the real
+ * rival player. Staff and set-play card payloads name the hire and the play.
  */
-export type OfferedCard =
+export type OfferedCard = { fromClubId?: string } & (
   | { cardId: string; kind: 'player' | 'dilemma'; player: Player; salary: number; replacesId?: string; replacesName?: string }
   | { cardId: string; kind: 'staff'; name: string }
   | { cardId: string; kind: 'setPlay'; playId: import('../data/plays').PlayId }
-  | { cardId: string; kind: 'trait' | 'cash' };
+  | { cardId: string; kind: 'trait' | 'cash' });
 
 /** The three cards on show (fewer only when fewer could be offered), and when they were drawn. */
 export interface CardOffer {
@@ -322,6 +321,8 @@ export interface HandCard {
 export type ActiveCard =
   | { cardId: string; kind: 'staff'; level: CardLevel; member: StaffMember }
   | { cardId: string; kind: 'setPlay'; level: CardLevel; playId: import('../data/plays').PlayId }
+  | { cardId: string; kind: 'player' | 'dilemma' | 'trait'; level: CardLevel; playerId: string }
+  | { cardId: string; kind: 'cash'; level: CardLevel }
   | { cardId: string; kind: 'buff' | 'decree'; level: CardLevel; season: number; week: number; playerId?: string };
 
 export interface CardHistoryEntry {

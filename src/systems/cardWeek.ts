@@ -12,29 +12,31 @@ import { awaitingCampReplay } from './parkedLeagueFixture';
 // brings, who he would replace, the play, the hire's name) and saved, so a
 // reload shows the same offer. Randomness comes from the card week's own
 // stream (state.cardWeek.rng): drawing never moves rngSeed or the events deck.
-// Money, board patience and traits go through the events deck's applyEffects,
-// so they read and book the way an event card's do.
-import { getState, setState, type CardHistoryEntry, type CardOffer, type CardWeekState, type StaffMember, type Fixture, type GameState, type HandCard, type LastMatchImpact, type OfferedCard, type Player, type Position } from '../core/state';
+// Cash and board patience use the existing event effects. Card payments and
+// rerolls book to the Events line.
+import { getState, setState, type ActiveCard, type CardHistoryEntry, type CardOffer, type CardWeekState, type StaffMember, type Fixture, type GameState, type LastMatchImpact, type OfferedCard, type Player, type Position, type RivalClub } from '../core/state';
 import { bus } from '../core/events';
 import { registerTickHook, TICK_ORDER, weekHeld } from '../core/time';
 import { saveIfChanged } from '../core/save';
 import { careerActionClock, elapsedInterval } from '../core/season';
-import { earnMoney } from '../data/club';
-import { CARD_PASS, CARD_WEEK, CARDS, cardDefById, type CardDef, type CardKind, type CardTier } from '../data/cards';
-import { generatePlayerAround, overallRating } from '../data/player';
-import { PLAYS_BY_ID, PLAY_IDS, type PlayId } from '../data/plays';
-import { ROMAN, TRAITS, traitLevel, type TraitLevel } from '../data/traits';
+import { CARD_PASS, CARD_WEEK, CARDS, SIGNATURE_TRAIT, cardDefById, type CardDef, type CardKind, type CardTier } from '../data/cards';
+import { generatePlayerAround, overallRating, POSITIONS, shownStats } from '../data/player';
+import { PLAYS_BY_ID, PLAY_IDS, isBasePlayId, type PlayId } from '../data/plays';
+import { ROMAN, TRAITS, traitLevel, withTrait, type TraitLevel } from '../data/traits';
 import { randomName } from '../data/names';
-import { SQUAD_CAP } from '../config';
+import { SQUAD_CAP, STAT_MAX } from '../config';
 import { makeRng, type Rng } from '../utils/rng';
+import { rivalStyle } from './rivalRound';
+import { rivalPlayer, RIVAL_POSITION_MIN, withDerivedStrength } from './rivals';
+import { stylePlays } from '../match/league/plays';
 import { fmtMoney } from '../utils/money';
 import { applyEffects, deckWaitsForLeagueChoice, type Applied } from './events';
-import { capRoomFor, releaseTerms, salaryDemand, signForRestOfSeason } from './cap';
+import { capRoomFor, commitment, publishedCap, reconcileProtection, releaseTerms, salaryDemand, signForRestOfSeason } from './cap';
 import { releasedState } from './freeagency';
 import { effectiveRating, FIT, placeSigning, positionFit } from './lineup';
 import { awayPlayerIds, campDisposalProblem } from './playerAssignments';
 import { rosterIntervalProblem } from './playerAssignmentCommit';
-import { admitGeneratedPeople, openClubSpell } from './playerCareer';
+import { admitGeneratedPeople, bookPlayerMovement, closeClubSpell, openClubSpell } from './playerCareer';
 import { buyRefusal, ownsPlay } from './playbook';
 import { appointFeeWaived, hireRefusal, type StaffHire } from './staff';
 import { emptyTally, foldEvents } from './stats';
@@ -89,8 +91,39 @@ export function traitTargets(state: GameState, trait: Extract<CardDef, { kind: '
     .map((p) => ({ player: p, level: (traitLevel(p.traits, trait) + 1) as TraitLevel }));
 }
 
+/** A recruit or hire stops being active when they leave. Cash records its last payout. */
+export function activeCard(state: GameState, cardId: string): ActiveCard | undefined {
+  return state.cardWeek?.active.find(card => {
+    if (card.cardId !== cardId) return false;
+    switch (card.kind) {
+      case 'player': case 'dilemma': case 'trait': return state.squad.some(p => p.id === card.playerId);
+      case 'staff': return state.staff.some(member => sameHire(card.member, member));
+      case 'setPlay': return ownsPlay(state, card.playId);
+      case 'cash': return true;
+      default: return false;
+    }
+  });
+}
+
+function nextCardLevel(state: GameState, cardId: string): TraitLevel | null {
+  const held = state.cardWeek?.hand.find(h => h.cardId === cardId);
+  const active = activeCard(state, cardId);
+  const def = cardDefById(cardId);
+  const player = active?.kind === 'trait' ? state.squad.find(p => p.id === active.playerId) : undefined;
+  const trait = player && def?.kind === 'trait' ? traitLevel(player.traits, def.trait) : 0;
+  const level = Math.max(held?.level ?? 0, active?.level ?? 0, trait);
+  return level === 3 ? null : (level + 1) as TraitLevel;
+}
+
 /** Can `def` go in a pick now, before any dice? A player card may still sit out once it is rolled (resolveCard). */
 function eligibleBeforeDice(state: GameState, def: CardDef): boolean {
+  if (!nextCardLevel(state, def.id)) return false;
+  if (gambleRefusal(state, def)) return false;
+  const held = state.cardWeek?.hand.some(h => h.cardId === def.id);
+  const active = activeCard(state, def.id);
+  if (held || active) {
+    return active?.kind !== 'trait' || !awayPlayerIds(state).has(active.playerId);
+  }
   switch (def.kind) {
     case 'player': return true;
     // The dilemma never takes the board's last point of patience: at zero the board sacks the coach.
@@ -160,14 +193,74 @@ function resolvePlayer(state: GameState, def: Extract<CardDef, { kind: 'player' 
   return null;
 }
 
+function existingCardFace(state: GameState, def: CardDef): OfferedCard | undefined {
+  const held = state.cardWeek?.hand.find(h => h.cardId === def.id);
+  if (held) return held.offered;
+  const active = activeCard(state, def.id);
+  switch (active?.kind) {
+    case 'player': case 'dilemma': {
+      const player = state.squad.find(p => p.id === active.playerId)!;
+      return { cardId: def.id, kind: active.kind, player, salary: player.deal?.salary ?? salaryDemand(player) };
+    }
+    case 'staff': return { cardId: def.id, kind: 'staff', name: active.member.name };
+    case 'setPlay': return { cardId: def.id, kind: 'setPlay', playId: active.playId };
+  }
+  return undefined;
+}
+
 /** Settle what a drawn card brings (pure, rolls `rng`), or null when it can't be offered after all. */
 function resolveCard(state: GameState, def: CardDef, rng: Rng): OfferedCard | null {
+  const existing = existingCardFace(state, def);
+  if (existing) return existing;
   switch (def.kind) {
     case 'player': case 'dilemma': return resolvePlayer(state, def, rng);
     case 'staff': return { cardId: def.id, kind: 'staff', name: randomName(rng, state.pack === 'uk' ? UK_NAMES : AU_PACK.names) };
     case 'setPlay': return { cardId: def.id, kind: 'setPlay', playId: rng.pick(freePlayCandidates(state)) };
     case 'trait': case 'cash': return { cardId: def.id, kind: def.kind };
   }
+}
+
+type RecruitCard = Extract<OfferedCard, { kind: 'player' | 'dilemma' }>;
+
+function rivalHasDepth(squad: readonly Player[]): boolean {
+  return POSITIONS.every(position => squad.filter(p => p.position === position).length >= RIVAL_POSITION_MIN);
+}
+
+function stealPlayerCard(state: GameState, rival: RivalClub, player: Player): RecruitCard | null {
+  if (!rival.squad || !rival.capAccount || player.emergencyDealEndSeason !== undefined
+    || overallRating(player) <= cardFloor(state.squad, player.position)) return null;
+  const samePosition = rival.squad.filter(p => p.position === player.position && p.id !== player.id);
+  // The replacement is fit and plays the same position.
+  if (samePosition.filter(p => p.injuredWeeks === 0 && !p.suspendedWeeks).length + 1 < RIVAL_POSITION_MIN) return null;
+  const season = careerActionClock(state).season;
+  const remaining = rival.squad.filter(p => p.id !== player.id);
+  if (!capRoomFor(remaining, rival.capAccount, season, 1)) return null;
+  const salary = salaryDemand(player);
+  const replaces = replacementFor(state, player.position, salary);
+  if (replaces === null) return null;
+  const cardId = `steal-player:${player.position}:${player.id}`;
+  return {
+    kind: 'player', cardId, player, salary, fromClubId: rival.id,
+    ...(replaces ? { replacesId: replaces.id, replacesName: replaces.name } : {}),
+  };
+}
+
+function drawSteal(state: GameState, clubId: string, rng: Rng): OfferedCard | undefined {
+  const club = state.league.clubs.find(c => c.id === clubId && c.id !== state.clubId);
+  if (!club) return undefined;
+  const squad = club.squad ?? [];
+  const recruits = rivalHasDepth(squad) ? squad.flatMap(player => {
+    const card = stealPlayerCard(state, club, player);
+    return card && nextCardLevel(state, card.cardId) ? [card] : [];
+  }) : [];
+  if (recruits.length) return rng.pick(recruits);
+  const plays = stylePlays(rivalStyle(club).attack).filter(playId => {
+    const id = `steal-play:${playId}`;
+    return nextCardLevel(state, id) && (!ownsPlay(state, playId) || activeCard(state, id));
+  });
+  if (!plays.length) return undefined;
+  const playId = rng.pick(plays);
+  return { kind: 'setPlay', cardId: `steal-play:${playId}`, playId, fromClubId: clubId };
 }
 
 /** Weighted pick; null when nothing is left. */
@@ -187,13 +280,19 @@ function pickWeighted(cards: readonly CardDef[], rng: Rng): CardDef | null {
  * weighted, each resolved. Fewer only when fewer can be offered. Rolls the card
  * week's own stream and returns its new state with the offer.
  */
-export function drawOffer(state: GameState, kind: CardOffer['kind'] = 'match', waiting: readonly CardOffer[] = []): { offer: CardOffer | null; rng: number } {
+export function drawOffer(
+  state: GameState, kind: CardOffer['kind'] = 'match', waiting: readonly CardOffer[] = [],
+  fromClubId?: string, previousSteal?: OfferedCard,
+): { offer: CardOffer | null; rng: number } {
   const cw = state.cardWeek;
   if (!cw) return { offer: null, rng: 0 };
   const rng = makeRng(cw.rng);
   let left = CARDS.filter((c) => eligibleBeforeDice(state, c));
   const signature = (cards: readonly OfferedCard[]): string => cards.map(c => c.cardId).sort().join(',');
   const repeats = new Set(waiting.map(o => signature(o.cards)));
+  const stolen = fromClubId ? drawSteal(state, fromClubId, rng) ?? previousSteal : undefined;
+  const size = CARD_WEEK.OFFER_SIZE - Number(!!stolen);
+  const signatureWithSteal = (cards: readonly OfferedCard[]) => signature(stolen ? [...cards, stolen] : cards);
   const cards: OfferedCard[] = [];
   const drawNext = (): void => {
     const def = pickWeighted(left, rng)!;
@@ -201,15 +300,15 @@ export function drawOffer(state: GameState, kind: CardOffer['kind'] = 'match', w
     const card = resolveCard(state, def, rng);
     if (card) cards.push(card);
   };
-  while (cards.length < CARD_WEEK.OFFER_SIZE && left.length > 0) drawNext();
+  while (cards.length < size && left.length > 0) drawNext();
 
   let chosen = cards.slice();
   // Keep the normal weighted draw unless it repeats a waiting pick. In that
   // case consider the remaining eligible cards in weighted order as well.
-  if (chosen.length > 0 && repeats.has(signature(chosen))) {
+  if (chosen.length > 0 && repeats.has(signatureWithSteal(chosen))) {
     while (left.length > 0) drawNext();
     const findFresh = (prefix: OfferedCard[], start: number): OfferedCard[] | undefined => {
-      if (prefix.length === chosen.length) return repeats.has(signature(prefix)) ? undefined : prefix;
+      if (prefix.length === chosen.length) return repeats.has(signatureWithSteal(prefix)) ? undefined : prefix;
       for (let i = start; i <= cards.length - (chosen.length - prefix.length); i++) {
         const found = findFresh([...prefix, cards[i]!], i + 1);
         if (found) return found;
@@ -218,7 +317,10 @@ export function drawOffer(state: GameState, kind: CardOffer['kind'] = 'match', w
     };
     chosen = findFresh([], 0) ?? chosen;
   }
-  return { offer: chosen.length ? { season: state.season, week: state.week, kind, cards: chosen } : null, rng: rng.state() };
+  if (stolen) chosen.push(stolen);
+  return { offer: chosen.length ? {
+    season: state.season, week: state.week, kind, cards: chosen, ...(fromClubId ? { fromClubId } : {}),
+  } : null, rng: rng.state() };
 }
 
 /** Give old v37 queues stable IDs. Their watermark could have been set by a different offer. */
@@ -273,7 +375,7 @@ export function fillCardOffers(state: GameState): GameState {
 export function plantCard(state: GameState, cardId: string): GameState | string {
   const cw = state.cardWeek;
   if (!cw) return 'This career has no card week.';
-  const def = cardDefById(cardId);
+  const def = CARDS.find(c => c.id === cardId);
   if (!def) return 'No such card.';
   if (!eligibleBeforeDice(state, def)) return 'That card cannot be offered now.';
   const rng = makeRng(cw.rng);
@@ -301,8 +403,52 @@ export function startCardWeek(state: GameState, cardWeek: CardWeekState): GameSt
 /** What taking a card did, for the store wrapper to commit. Money not yet booked goes through earnMoney. */
 export type CardTake = Applied & { joined?: Player };
 
+/** Move the actual person, adding a fit same-position replacement at his former club. */
+function moveStolenPlayer(state: GameState, card: RecruitCard): { state: GameState; player: Player } | string {
+  const club = state.league.clubs.find(c => c.id === card.fromClubId);
+  const player = club?.squad?.find(p => p.id === card.player.id);
+  if (!player || !club?.squad || !club.capAccount) return 'That player is no longer at the beaten club.';
+  if (!rivalHasDepth(club.squad)) return 'The beaten club is too short to release him.';
+  const clock = careerActionClock(state);
+  const depth = club.squad.filter(p => p.position === player.position && p.id !== player.id
+    && p.injuredWeeks === 0 && !p.suspendedWeeks).length;
+  if (depth + 1 < RIVAL_POSITION_MIN) return 'The beaten club is too short at his position.';
+  const remaining = club.squad.filter(p => p.id !== player.id);
+  const capAccount = reconcileProtection(remaining, club.capAccount, clock.season);
+  const room = publishedCap(capAccount) - commitment(remaining, clock.season);
+  if (room < 1) return 'The beaten club has no cap room for his replacement.';
+
+  const cw = state.cardWeek!;
+  const rng = makeRng(cw.rng);
+  const generated = rivalPlayer(rng, club.id, player.position, Math.round(overallRating(player)));
+  const admitted = admitGeneratedPeople(state, [generated], club.id, 'signing');
+  if (!admitted) return 'The player register is full.';
+  const replacement = signForRestOfSeason(admitted.players[0]!, clock.season, clock.week, clock.duration);
+  const squad = [...remaining, { ...replacement, deal: { ...replacement.deal!, salary: Math.min(replacement.deal!.salary, room) } }];
+  const updated = withDerivedStrength({ ...club, squad, capAccount });
+  return { player: closeClubSpell(player, clock, 'transfer'), state: {
+    ...state, playerPopulation: admitted.playerPopulation, cardWeek: { ...cw, rng: rng.state() },
+    league: { ...state.league, clubs: state.league.clubs.map(c => c === club ? updated : c) },
+  } };
+}
+
+function withDilemmaMargin(player: Player, levels: number): Player {
+  if (!levels) return player;
+  const stats = { ...player.stats };
+  const ceilings = { ...player.ceilings };
+  for (const stat of shownStats(player.position)) {
+    stats[stat] = Math.min(STAT_MAX, stats[stat] + levels * CARD_WEEK.DILEMMA_MARGIN_STEP);
+    ceilings[stat] = Math.max(ceilings[stat] ?? 0, stats[stat]);
+  }
+  return { ...player, stats, ceilings };
+}
+
+function withSignature(player: Player, level: TraitLevel): Player {
+  return { ...player, traits: withTrait(player.traits, SIGNATURE_TRAIT[player.position], level) };
+}
+
 /** The card man joins (pure): any named replacement released first, then signed on for the rest of the season with no fee. */
-function joinPlayer(state: GameState, card: Extract<OfferedCard, { kind: 'player' | 'dilemma' }>): { state: GameState; money: Applied['money']; joined: Player; released?: string } | string {
+function joinPlayer(state: GameState, card: RecruitCard, level: TraitLevel): { state: GameState; money: Applied['money']; joined: Player; released?: string } | string {
   let s = state;
   const money: Applied['money'] = [];
   let released: string | undefined;
@@ -319,13 +465,29 @@ function joinPlayer(state: GameState, card: Extract<OfferedCard, { kind: 'player
   const clock = careerActionClock(s);
   if (s.squad.length >= SQUAD_CAP) return 'The squad is full. A player has to go first.';
   if (!capRoomFor(s.squad, s.capAccount, clock.season, card.salary)) return `Not enough salary-cap room for his ${fmtMoney(card.salary)}.`;
-  const admitted = admitGeneratedPeople(s, [{ ...card.player, career: emptyTally(), joinedSeason: clock.season }]);
-  if (!admitted) return 'The player register is full.';
-  const fresh = admitted.players[0]!;
-  const joined = openClubSpell(signForRestOfSeason(fresh, clock.season, clock.week, clock.duration), s.clubId, clock, 'signing', 0);
+  let fresh: Player;
+  if (card.fromClubId) {
+    const out = moveStolenPlayer(s, card);
+    if (typeof out === 'string') return out;
+    if (overallRating(out.player) <= cardFloor(state.squad, out.player.position)) {
+      return 'He no longer improves the squad at his position.';
+    }
+    s = out.state;
+    fresh = out.player;
+  } else {
+    const admitted = admitGeneratedPeople(s, [{ ...card.player, career: emptyTally() }]);
+    if (!admitted) return 'The player register is full.';
+    s = { ...s, playerPopulation: admitted.playerPopulation };
+    fresh = admitted.players[0]!;
+  }
+  // The offer's quoted salary still applies if a player develops while the pick waits.
+  const improved = card.kind === 'dilemma' ? withDilemmaMargin(fresh, level - 1) : withSignature(fresh, level);
+  const signed = signForRestOfSeason({ ...improved, joinedSeason: clock.season }, clock.season, clock.week, clock.duration);
+  const joined = openClubSpell({ ...signed, deal: { ...signed.deal!, salary: card.salary } }, s.clubId, clock,
+    card.fromClubId ? 'transfer' : 'signing', 0);
   const squad = [...s.squad, joined];
   const placed = placeSigning(s.lineup, squad, joined, awayPlayerIds(s));
-  s = { ...s, squad, playerPopulation: admitted.playerPopulation, lineup: placed.lineup };
+  s = { ...s, squad, lineup: placed.lineup };
   return { state: s, money, joined, ...(released ? { released } : {}) };
 }
 
@@ -356,8 +518,8 @@ function pickedCard(cw: CardWeekState, index: number, grant?: number): { at: num
   return card ? { at, card } : 'There is no card there.';
 }
 
-/** Keep a resolved card for later. Only the pick and hand change. */
-export function takeCard(state: GameState, index: number, grant?: number): GameState | string {
+/** Take a pick into the hand, or apply its upgrade to a card already in play. */
+function takeCardResult(state: GameState, index: number, grant?: number): CardTake | string {
   const cw = state.cardWeek;
   if (!cw) return 'This career has no card week.';
   const picked = pickedCard(cw, index, grant);
@@ -367,11 +529,24 @@ export function takeCard(state: GameState, index: number, grant?: number): GameS
   if (!def || def.kind !== card.kind) return 'That card is no longer in the deck.';
   const refusal = gambleRefusal(state, def);
   if (refusal) return refusal;
-  if (cw.hand.length >= CARD_WEEK.HAND_CAP) return 'Your hand is full. Play or discard a card first.';
-  const held: HandCard = { cardId: card.cardId, offered: card, level: 1, gotSeason: state.season, gotWeek: state.week };
-  return { ...state, cardWeek: {
-    ...spendPick(cw, at, recordCard(cw, state, card.cardId, 'take')), hand: [...cw.hand, held],
-  } };
+  const level = nextCardLevel(state, card.cardId);
+  if (!level) return 'That card is already Level III.';
+  const held = cw.hand.find(h => h.cardId === card.cardId);
+  const existing = activeCard(state, card.cardId);
+  const spent = spendPick(cw, at, recordCard(cw, state, card.cardId, 'take'));
+  if (!held && existing && existing.kind !== 'cash') return applyCard({ ...state, cardWeek: spent }, card, level);
+  if (!held && cw.hand.length >= CARD_WEEK.HAND_CAP) return 'Your hand is full. Play or discard a card first.';
+  const hand = held ? cw.hand.map(h => h === held ? { ...h, level } : h)
+    : [...cw.hand, { cardId: card.cardId, offered: card, level, gotSeason: state.season, gotWeek: state.week }];
+  return {
+    state: { ...state, cardWeek: { ...spent, hand } }, money: [],
+    news: [{ kind: 'success', text: held ? `${def.title} upgraded to Level ${ROMAN[level]} in your hand.` : `${def.title} added to your hand.` }],
+  };
+}
+
+export function takeCard(state: GameState, index: number, grant?: number): GameState | string {
+  const result = takeCardResult(state, index, grant);
+  return typeof result === 'string' ? result : result.state;
 }
 
 /** Apply a held card using today's club, salary cap and board patience. Refusals spend nothing. */
@@ -380,10 +555,11 @@ export function playCard(state: GameState, index: number, targetId?: string): Ca
   if (!cw) return 'This career has no card week.';
   const held = cw.hand[index];
   if (!held) return 'There is no card there.';
-  const result = applyCard(state, held.offered, held.level, targetId);
-  if (typeof result === 'string') return result;
-  const next = result.state.cardWeek!;
-  return { ...result, state: { ...result.state, cardWeek: { ...next, hand: cw.hand.filter((_, i) => i !== index) } } };
+  const existing = activeCard(state, held.cardId);
+  if (existing?.level === 3) return 'That card is already Level III.';
+  const level = Math.max(held.level, (existing?.level ?? 0) + 1) as TraitLevel;
+  const withoutHeld = { ...cw, hand: cw.hand.filter((_, i) => i !== index) };
+  return applyCard({ ...state, cardWeek: withoutHeld }, held.offered, level, targetId);
 }
 
 function applyCard(state: GameState, card: OfferedCard, level: TraitLevel, targetId?: string): CardTake | string {
@@ -398,68 +574,100 @@ function applyCard(state: GameState, card: OfferedCard, level: TraitLevel, targe
   const news: Applied['news'] = [];
   let joined: Player | undefined;
   let traitGiven: CardWeekState['cardTraits'][number] | undefined;
-  let active = cw.active;
+  const previous = activeCard(state, def.id);
+  let active: ActiveCard;
 
   switch (card.kind) {
     case 'player': case 'dilemma': {
-      const out = joinPlayer(s, card);
-      if (typeof out === 'string') return out;
-      s = out.state;
-      joined = out.joined;
-      money.push(...out.money);
-      // The dilemma's price: board patience, the way an event card's boardPatience effect takes it.
-      const board = card.kind === 'dilemma' && def.kind === 'dilemma' ? applyEffects(s, [{ kind: 'boardPatience', amount: def.patience }], ctx) : null;
+      const upgraded = previous?.kind === 'player' || previous?.kind === 'dilemma'
+        ? s.squad.find(p => p.id === previous.playerId) : undefined;
+      let released: string | undefined;
+      if (upgraded) {
+        const player = card.kind === 'dilemma'
+          ? withDilemmaMargin(upgraded, level - previous!.level) : withSignature(upgraded, level);
+        s = { ...s, squad: s.squad.map(p => p === upgraded ? player : p) };
+        active = { kind: card.kind, cardId: def.id, level, playerId: player.id };
+      } else {
+        const out = joinPlayer(s, card, level);
+        if (typeof out === 'string') return out;
+        s = out.state;
+        joined = out.joined;
+        released = out.released;
+        money.push(...out.money);
+        active = { kind: card.kind, cardId: def.id, level, playerId: joined.id };
+      }
+      const board = def.kind === 'dilemma' ? applyEffects(s, [{ kind: 'boardPatience', amount: def.patience }], ctx) : null;
       if (board) s = board.state;
+      const update = joined
+        ? `${joined.name} (${Math.round(overallRating(joined))}) joins, no signing fee.`
+        : `${upgraded!.name} reaches Level ${ROMAN[level]}.`;
       news.push({
-        text: `${def.title}: ${joined.name} (${Math.round(overallRating(joined))}) joins, no signing fee.${out.released ? ` ${out.released} is released.` : ''}${board ? ' The board is less patient.' : ''}`,
+        text: `${def.title}: ${update}${released ? ` ${released} is released.` : ''}${board ? ' The board is less patient.' : ''}`,
         kind: 'success',
       });
       break;
     }
     case 'staff': {
       if (def.kind !== 'staff') return 'That card is no longer in the deck.';
-      const out = appointFeeWaived(s, hireOf(def), card.name);
-      if (typeof out === 'string') return out;
-      s = out;
-      active = [...active, { kind: 'staff', cardId: def.id, level, member: s.staff[s.staff.length - 1]! }];
-      news.push({ text: `${def.title}: ${card.name} joins, appointment fee waived.`, kind: 'success' });
+      const base = previous?.kind === 'staff' ? previous.member : undefined;
+      if (!base) {
+        const out = appointFeeWaived(s, hireOf(def), card.name);
+        if (typeof out === 'string') return out;
+        s = out;
+      }
+      const member = base ?? s.staff[s.staff.length - 1]!;
+      const wage = Math.round(member.wage * CARD_WEEK.STAFF_WAGE_FACTOR[level]);
+      s = { ...s, staff: s.staff.map(m => sameHire(m, member) ? { ...m, wage } : m) };
+      active = { kind: 'staff', cardId: def.id, level, member };
+      news.push({ text: base ? `${member.name} reaches Level ${ROMAN[level]} at ${fmtMoney(wage)}/week.`
+        : `${def.title}: ${member.name} joins, appointment fee waived.`, kind: 'success' });
       break;
     }
     case 'setPlay': {
-      if (ownsPlay(s, card.playId)) return 'That play is already yours.';
-      const refusal = buyRefusal({ ...s, money: Number.MAX_SAFE_INTEGER }, card.playId);
-      if (refusal) return refusal;
-      s = { ...s, playbook: { owned: [...s.playbook.owned, card.playId] } };
-      news.push({ text: `${PLAYS_BY_ID[card.playId].name} is in your playbook, free.`, kind: 'success' });
+      const playId = previous?.kind === 'setPlay' ? previous.playId : card.playId;
+      if (!previous) {
+        if (ownsPlay(s, playId)) return 'That play is already yours.';
+        if (!card.fromClubId) {
+          const problem = buyRefusal({ ...s, money: Number.MAX_SAFE_INTEGER }, playId);
+          if (problem) return problem;
+        }
+        s = { ...s, playbook: { owned: [...s.playbook.owned, playId] } };
+      }
+      active = { kind: 'setPlay', cardId: def.id, level, playId };
+      news.push({ text: previous ? `${PLAYS_BY_ID[playId].name} reaches Level ${ROMAN[level]}.`
+        : `${PLAYS_BY_ID[playId].name} is in your playbook, free.`, kind: 'success' });
       break;
     }
     case 'trait': {
       if (def.kind !== 'trait') return 'That card is no longer in the deck.';
-      if (!targetId) return 'Choose a player for the trait.';
-      const target = traitTargets(s, def.trait).find((t) => t.player.id === targetId);
-      if (!target) {
-        const p = s.squad.find((x) => x.id === targetId);
-        return !p ? 'That player is no longer at the club.'
-          : traitLevel(p.traits, def.trait) >= 3 ? `${p.name} already has ${TRAITS[def.trait].name} III.` : `${p.name} is away.`;
-      }
-      const out = applyEffects(s, [{ kind: 'playerTrait', trait: def.trait }], { ...ctx, subjectId: target.player.id, subjectName: target.player.name });
-      s = out.state;
-      traitGiven = { playerId: target.player.id, trait: def.trait, level: target.level };
-      news.push({ text: `${target.player.name} has ${TRAITS[def.trait].name} ${ROMAN[target.level]}.`, kind: 'success' });
+      const recipient = previous?.kind === 'trait' ? previous.playerId : targetId;
+      if (!recipient) return 'Choose a player for the trait.';
+      const player = s.squad.find(p => p.id === recipient);
+      if (!player) return 'That player is no longer at the club.';
+      const before = traitLevel(player.traits, def.trait);
+      if (before === 3) return `${player.name} already has ${TRAITS[def.trait].name} III.`;
+      if (awayPlayerIds(s).has(recipient)) return `${player.name} is away.`;
+      const applied = previous ? level : Math.min(3, before + level) as TraitLevel;
+      s = { ...s, squad: s.squad.map(p => p === player ? { ...p, traits: withTrait(p.traits, def.trait, applied) } : p) };
+      traitGiven = { playerId: recipient, trait: def.trait, level: applied };
+      active = { kind: 'trait', cardId: def.id, level: applied, playerId: recipient };
+      news.push({ text: `${player.name} has ${TRAITS[def.trait].name} ${ROMAN[applied]}.`, kind: 'success' });
       break;
     }
     case 'cash': {
       if (def.kind !== 'cash') return 'That card is no longer in the deck.';
-      const out = applyEffects(s, [{ kind: 'money', amount: def.amount }], ctx);
+      const amount = def.amount * CARD_WEEK.CASH_FACTOR[level];
+      const out = applyEffects(s, [{ kind: 'money', amount }], ctx);
       s = out.state;
       money.push(...out.money);
-      news.push({ text: `${def.title}: +${fmtMoney(def.amount)}.`, kind: 'success' });
+      active = { kind: 'cash', cardId: def.id, level };
+      news.push({ text: `${def.title}: +${fmtMoney(amount)}.`, kind: 'success' });
       break;
     }
   }
 
   const next: CardWeekState = {
-    ...cw, active,
+    ...s.cardWeek!, active: [...cw.active.filter(c => c.cardId !== def.id), active],
     history: recordCard(cw, state, def.id, 'play'),
     cardPlayers: joined ? [...cw.cardPlayers, joined.id] : cw.cardPlayers,
     cardTraits: traitGiven
@@ -476,8 +684,11 @@ export function playPickCard(state: GameState, index: number, targetId?: string,
   const picked = pickedCard(cw, index, grant);
   if (typeof picked === 'string') return picked;
   const { at, card } = picked;
+  const level = nextCardLevel(state, card.cardId);
+  if (!level) return 'That card is already Level III.';
+  const held = cw.hand.find(h => h.cardId === card.cardId);
   const spent = spendPick(cw, at, recordCard(cw, state, card.cardId, 'take'));
-  return applyCard({ ...state, cardWeek: spent }, card, 1, targetId);
+  return applyCard({ ...state, cardWeek: { ...spent, hand: cw.hand.filter(h => h !== held) } }, held?.offered ?? card, level, targetId);
 }
 
 export function discardCard(state: GameState, index: number): GameState | string {
@@ -501,20 +712,28 @@ export function passCard(state: GameState, grant?: number): GameState | string {
 
 // ── The week ─────────────────────────────────────────────────────────────────
 
-/** Did the club play a League match (a regular round or a final) this week? Cup, trial and camp fixtures don't count. */
+/** A completed League round or final for our club, excluding cup, trial and camp fixtures. */
+function completedLeagueFixture(state: GameState) {
+  return state.competitions?.instances.filter(i => i.season === state.season && i.definition.format.kind === 'league')
+    .flatMap(i => i.fixtures).find(f => f.slot === state.week && f.status === 'completed' && f.result
+      && (f.homeId === state.clubId || f.awayId === state.clubId));
+}
+
 export function playedLeagueMatch(state: GameState): boolean {
-  const club = state.clubId;
-  return (state.competitions?.instances ?? []).some((instance) => instance.season === state.season
-    && instance.definition.format.kind === 'league'
-    && instance.fixtures.some((f) => f.slot === state.week && f.status === 'completed' && !!f.result
-      && (f.homeId === club || f.awayId === club)));
+  return !!completedLeagueFixture(state);
 }
 
 /** Draw a fresh match pick on the card stream and replace the oldest match pick at the cap. */
 export function cardWeekTick(state: GameState): GameState {
   const cw = state.cardWeek;
-  if (!cw || !playedLeagueMatch(state)) return state;
-  const { offer, rng } = drawOffer(state, 'match', cw.offers);
+  if (!cw) return state;
+  const fixture = completedLeagueFixture(state);
+  if (!fixture) return state;
+  const result = fixture.result!;
+  // Advancing from a tied final on seeding does not turn the draw into a win.
+  const won = result.winnerId === state.clubId && result.homeScore !== result.awayScore;
+  const fromClubId = won ? (fixture.homeId === state.clubId ? fixture.awayId : fixture.homeId) : undefined;
+  const { offer, rng } = drawOffer(state, 'match', cw.offers, fromClubId);
   if (!offer) return state;
   const full = cw.owed === CARD_WEEK.MAX_OWED;
   const waiting = full ? cw.offers.filter((_, i) => i !== cw.starterLeft) : cw.offers;
@@ -573,20 +792,23 @@ export interface CardFaceView {
   /** A trait card's squad members who could take it, with the level each would reach. */
   targets?: { playerId: string; name: string; level: TraitLevel }[];
   detail?: string;
+  source?: string;
+  level: TraitLevel;
+  upgrade: boolean;
   hint: string;
   /** Why it can't be played now, or null. */
   refusal: string | null;
 }
 
 /** The effect line on the face; the specific hire, recruit or play is also named. */
-function effectLine(def: CardDef, card: OfferedCard): string {
+function effectLine(def: CardDef, card: OfferedCard, level: TraitLevel): string {
   switch (card.kind) {
-    case 'player': return 'No signing fee.';
-    case 'dilemma': return 'Board patience −1.';
-    case 'staff': return 'No hiring fee.';
-    case 'setPlay': return 'Free set play.';
-    case 'trait': return '+1 trait level.';
-    case 'cash': return def.kind === 'cash' ? `Bank +${fmtMoney(def.amount)}.` : def.title;
+    case 'player': return `${TRAITS[SIGNATURE_TRAIT[card.player.position]].name} ${ROMAN[level]}.`;
+    case 'dilemma': return level === 1 ? 'Board patience −1.' : `+${(level - 1) * CARD_WEEK.DILEMMA_MARGIN_STEP} recruit rating. Board patience −1.`;
+    case 'staff': return level === 1 ? 'No hiring fee.' : `Weekly wage −${(1 - CARD_WEEK.STAFF_WAGE_FACTOR[level]) * 100}%.`;
+    case 'setPlay': return level === 1 ? 'Free set play.' : 'Better execution when called.';
+    case 'trait': return `+${level} trait ${level === 1 ? 'level' : 'levels'}.`;
+    case 'cash': return def.kind === 'cash' ? `Bank +${fmtMoney(def.amount * CARD_WEEK.CASH_FACTOR[level])}.` : def.title;
   }
 }
 
@@ -599,11 +821,14 @@ const GOOD_IF: Record<CardKind, string> = {
   cash: 'you need money now.',
 };
 
-function cardFaceView(state: GameState, card: OfferedCard, index: number): CardFaceView[] {
+function cardFaceView(state: GameState, card: OfferedCard, index: number, level: TraitLevel, upgrade: boolean): CardFaceView[] {
   const def = cardDefById(card.cardId);
   if (!def) return [];
+  const current = upgrade ? existingCardFace(state, def) : undefined;
+  if (current) card = { ...current, ...(card.fromClubId ? { fromClubId: card.fromClubId } : {}) };
   const view: CardFaceView = {
-    index, cardId: def.id, kind: def.kind, title: def.title, tier: def.tier, effect: effectLine(def, card),
+    index, cardId: def.id, kind: def.kind, title: def.title, tier: def.tier, level, upgrade, effect: effectLine(def, card, level),
+    ...(card.fromClubId ? { source: state.league.clubs.find(c => c.id === card.fromClubId)?.name ?? card.fromClubId } : {}),
     hint: `Good if ${GOOD_IF[def.kind]}`, refusal: null,
   };
   if (card.kind === 'staff') view.detail = card.name;
@@ -618,7 +843,14 @@ function cardFaceView(state: GameState, card: OfferedCard, index: number): CardF
     };
   }
   if (def.kind === 'trait') {
-    view.targets = traitTargets(state, def.trait).map((t) => ({ playerId: t.player.id, name: t.player.name, level: t.level }));
+    const active = activeCard(state, def.id);
+    if (active?.kind === 'trait') {
+      view.detail = state.squad.find(p => p.id === active.playerId)?.name ?? '';
+      view.effect = `Raises the trait to ${ROMAN[level]}.`;
+    } else view.targets = traitTargets(state, def.trait).map(t => ({
+      playerId: t.player.id, name: t.player.name,
+      level: Math.min(3, traitLevel(t.player.traits, def.trait) + level) as TraitLevel,
+    }));
   }
   return [view];
 }
@@ -628,7 +860,8 @@ export function cardOfferView(state: GameState, grant?: number): { owed: number;
   const offer = cw?.offers[offerIndex(cw, grant)];
   if (!cw || !offer) return { owed: 0, starterLeft: 0, cards: [] };
   const blocked = pickBlocked(state);
-  const cards = offer.cards.flatMap((card, index) => cardFaceView(state, card, index).map((view) => {
+  const cards = offer.cards.flatMap((card, index) => cardFaceView(state, card, index, nextCardLevel(state, card.cardId) ?? 3,
+    !!activeCard(state, card.cardId) || cw.hand.some(h => h.cardId === card.cardId)).map((view) => {
     const taken = blocked ?? takeCard(state, index, grant);
     const takeRefusal = typeof taken === 'string' ? taken : null;
     const probe = blocked ?? playPickCard(state, index, view.targets?.[0]?.playerId, grant);
@@ -646,9 +879,19 @@ function playRefusal(view: CardFaceView, probe: CardTake | string): string | nul
 
 export function cardHandView(state: GameState): (CardFaceView & { level: TraitLevel })[] {
   const blocked = pickBlocked(state);
-  return (state.cardWeek?.hand ?? []).flatMap((held, index) => cardFaceView(state, held.offered, index).map((view) => ({
+  return (state.cardWeek?.hand ?? []).flatMap((held, index) => cardFaceView(state, held.offered, index, held.level, false).map((view) => ({
     ...view, level: held.level, refusal: playRefusal(view, blocked ?? playCard(state, index, view.targets?.[0]?.playerId)),
   })));
+}
+
+/** A match saves the levelled play ID alongside its other pre-kickoff selections. */
+export function cardMatchPlays(state: GameState, plays: PlayId[]): PlayId[] {
+  if (!state.cardWeek) return plays;
+  return plays.map((playId): PlayId => {
+    const active = state.cardWeek!.active.find(c => c.kind === 'setPlay' && c.playId === playId);
+    if (!active || active.level === 1 || !isBasePlayId(playId)) return playId;
+    return active.level === 2 ? `${playId}:II` : `${playId}:III`;
+  });
 }
 
 /** Staff have no person id; match the saved hire to the member still at the club. */
@@ -662,29 +905,29 @@ export function activeCardStaff(state: GameState): StaffMember[] {
 
 // ── Store glue ───────────────────────────────────────────────────────────────
 
-/** Write a take to the store: state first, then money (ledger) and news, the way the events deck commits. */
+/** Publish the pick, squad and any payment together. */
 function commit(t: CardTake): void {
-  const s = t.state;
+  const s = t.money.reduce((state, m) => m.booked ? state
+    : bookPlayerMovement(state, m.amount, 'events', careerActionClock(state)), t.state);
   setState({
-    squad: s.squad, freeAgents: s.freeAgents, playerPopulation: s.playerPopulation, lineup: s.lineup, capAccount: s.capAccount,
-    money: s.money, finance: s.finance, staff: s.staff, playbook: s.playbook, boardPatience: s.boardPatience, cardWeek: s.cardWeek!,
+    squad: s.squad, freeAgents: s.freeAgents, playerPopulation: s.playerPopulation, lineup: s.lineup,
+    league: s.league, capAccount: s.capAccount, money: s.money, finance: s.finance, staff: s.staff,
+    playbook: s.playbook, boardPatience: s.boardPatience, cardWeek: s.cardWeek!,
   });
-  for (const m of t.money) {
-    if (m.booked) bus.emit('money:changed', { delta: m.amount, reason: m.reason, balance: getState().money, booked: true, stamp: { season: s.season, week: s.week } });
-    else earnMoney(m.amount, m.reason);
-  }
-  for (const n of t.news) bus.emit('ui:notify', n);
+  for (const m of t.money) bus.emit('money:changed', {
+    delta: m.amount, reason: m.reason, balance: s.money, booked: true, stamp: careerActionClock(s),
+  });
 }
 
 type CardActionResult = { ok: true; outcome: string } | { ok: false; reason: string };
 
 export function chooseCard(index: number, grant?: number): CardActionResult {
   const s = getState();
-  const out = pickBlocked(s) ?? takeCard(s, index, grant);
+  const out = pickBlocked(s) ?? takeCardResult(s, index, grant);
   if (typeof out === 'string') return { ok: false, reason: out };
-  setState({ cardWeek: out.cardWeek! });
+  commit(out);
   saveIfChanged(getState());
-  return { ok: true, outcome: `${cardDefById(out.cardWeek!.hand[out.cardWeek!.hand.length - 1]!.cardId)!.title} added to your hand.` };
+  return { ok: true, outcome: out.news.map(n => n.text).join(' ') };
 }
 
 export function playChosenCard(source: 'pick' | 'hand', index: number, targetId?: string, grant?: number): CardActionResult {
@@ -693,6 +936,7 @@ export function playChosenCard(source: 'pick' | 'hand', index: number, targetId?
   if (typeof out === 'string') return { ok: false, reason: out };
   commit(out);
   saveIfChanged(getState());
+  for (const n of out.news) bus.emit('ui:notify', n);
   return { ok: true, outcome: out.news.map((n) => n.text).join(' ') };
 }
 
@@ -703,6 +947,53 @@ export function discardHeldCard(index: number): CardActionResult {
   setState({ cardWeek: out.cardWeek! });
   saveIfChanged(getState());
   return { ok: true, outcome: 'Card discarded.' };
+}
+
+export function rerollCost(state: GameState): number {
+  const receipt = state.cardWeek?.rerolls;
+  const count = receipt?.season === state.season && receipt.week === state.week ? receipt.count : 0;
+  return CARD_WEEK.REROLL_BASE + count * CARD_WEEK.REROLL_STEP;
+}
+
+export function rerollRefusal(state: GameState, offer: CardOffer | undefined): string | null {
+  const blocked = pickBlocked(state);
+  if (blocked) return blocked;
+  if (!offer) return 'No pick is waiting.';
+  if (offer.kind === 'decree') return 'Decree picks cannot be rerolled.';
+  return state.money < rerollCost(state) ? 'The club cannot afford a reroll.' : null;
+}
+
+const REROLL_REASON = 'card: reroll';
+
+export function rerollCard(state: GameState, grant?: number): GameState | string {
+  const cw = state.cardWeek;
+  const at = cw ? offerIndex(cw, grant) : -1;
+  const offer = cw?.offers[at];
+  const refusal = rerollRefusal(state, offer);
+  if (refusal) return refusal;
+  if (!cw || !offer) return 'No pick is waiting.';
+  const cost = rerollCost(state);
+  const paid = bookPlayerMovement(state, -cost, 'events', careerActionClock(state));
+  const previousSteal = offer.cards.find(c => c.fromClubId);
+  const draw = drawOffer(paid, offer.kind, [offer], offer.fromClubId, previousSteal);
+  if (!draw.offer) return 'There are no eligible cards to draw.';
+  const rerolls = { season: state.season, week: state.week, count: (cost - CARD_WEEK.REROLL_BASE) / CARD_WEEK.REROLL_STEP + 1 };
+  const { cards } = draw.offer;
+  return { ...paid, cardWeek: {
+    ...cw, rng: draw.rng, rerolls, history: recordCard(cw, state, 'reroll', 'reroll'),
+    offers: cw.offers.map((o, i) => i === at ? { ...o, cards } : o),
+  } };
+}
+
+export function rerollPick(grant?: number): CardActionResult {
+  const s = getState();
+  const result = rerollCard(s, grant);
+  if (typeof result === 'string') return { ok: false, reason: result };
+  setState({ cardWeek: result.cardWeek!, money: result.money, finance: result.finance });
+  saveIfChanged(getState());
+  const cost = rerollCost(s);
+  bus.emit('money:changed', { delta: -cost, reason: REROLL_REASON, balance: result.money, booked: true, stamp: careerActionClock(s) });
+  return { ok: true, outcome: `Pick rerolled for ${fmtMoney(cost)}.` };
 }
 
 /** The player passed the pick on show. Refused only where a take would be (a held week, the league choice). */
