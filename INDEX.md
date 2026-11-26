@@ -440,3 +440,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261126-023214-standard | standard | 102665b | main | [report](runs/20261126-023214-standard/report.md) |
 | 20261126-064642-card-week-link-sizing | card week link sizing | 8f4697f9 | claude/feature-idea-review-144cb5 | [report](runs/20261126-064642-card-week-link-sizing/report.md) |
 | 20261126-065225-card-week-winger-bonus-v-rating-spread | card week winger bonus v rating spread | 8f4697f9 | claude/feature-idea-review-144cb5 | [report](runs/20261126-065225-card-week-winger-bonus-v-rating-spread/report.md) |
+| 20261126-115157-standard | standard | cb8d9b8 | main | [report](runs/20261126-115157-standard/report.md) |
