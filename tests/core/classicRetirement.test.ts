@@ -14,7 +14,7 @@ function classicCareer(name: string, seed: number): GameState {
   state.league = initLeague(state);
   return state;
 }
-import { classicRetiredNoticeKey, DEV_TEST_PREFIX, retiredSaveKey } from '../../src/core/storageKeys';
+import { classicRetiredNoticeKey, DEV_TEST_PREFIX, LEGACY_SAVE_KEY, liveMatchKey, retiredSaveKey, saveMetaKey } from '../../src/core/storageKeys';
 import { setCareerNamespace } from '../../src/core/storage/local';
 import { stubLocalStorage } from '../commercial/memStorage';
 
@@ -32,7 +32,7 @@ describe('retiring a Classic save', () => {
     writeSlot(1, state);
     const raw = storage.getItem(slotKey(1))!;
     const first = retireClassicSlot(1);
-    expect(first).toEqual({ slot: 1, raw, emptied: true, notify: true });
+    expect(first).toMatchObject({ slot: 1, raw, emptied: true, notify: true });
     expect(storage.getItem(slotKey(1))).toBeNull();
     expect(storage.getItem(retiredSaveKey(1))).toBe(raw);
     expect(readRetiredSave(1)).toBe(raw);
@@ -41,7 +41,7 @@ describe('retiring a Classic save', () => {
 
     markClassicRetirementShown(1);
     storage.setItem(slotKey(1), raw);
-    expect(retireClassicSlot(1)).toEqual({ slot: 1, raw, emptied: true, notify: false });
+    expect(retireClassicSlot(1)).toMatchObject({ slot: 1, raw, emptied: true, notify: false });
     expect(storage.getItem(classicRetiredNoticeKey(1))).toBe('1');
     expect(storage.getItem(slotKey(1))).toBeNull();
   });
@@ -95,6 +95,48 @@ describe('retiring a Classic save', () => {
     expect(readRetiredSaves(1)).toEqual([first, second]);
     expect(storage.getItem(slotKey(1))).toBeNull();
     expect(loadSlot(1).status).toBe('empty');
+  });
+
+  it('keeps a different career under the shadowed legacy key when slot 1 is retired', () => {
+    const storage = stubLocalStorage();
+    writeSlot(1, classicCareer('Old Club', 9));
+    const raw = storage.getItem(slotKey(1))!;
+    const league = JSON.stringify({ version: 35, clubName: 'Shadowed', competitions: { leagueCareer: { phase: 'active' } } });
+    storage.setItem(LEGACY_SAVE_KEY, league);
+    const retired = retireClassicSlot(1);
+    expect(retired).toMatchObject({ slot: 1, raw, emptied: true });
+    expect(retired!.removed).not.toContain(LEGACY_SAVE_KEY);
+    expect(storage.getItem(slotKey(1))).toBeNull();
+    expect(storage.getItem(saveMetaKey(1))).toBeNull();
+    expect(storage.getItem(LEGACY_SAVE_KEY)).toBe(league);
+    expect(readRetiredSaves(1)).toEqual([raw]);
+  });
+
+  it('archives a different Classic career under the legacy key beside slot 1, then removes both', () => {
+    const storage = stubLocalStorage();
+    writeSlot(1, classicCareer('Slot One', 9));
+    const raw = storage.getItem(slotKey(1))!;
+    const legacy = JSON.stringify(classicCareer('Legacy', 12));
+    storage.setItem(LEGACY_SAVE_KEY, legacy);
+    expect(retireClassicSlot(1)?.emptied).toBe(true);
+    expect(readRetiredSaves(1)).toEqual([raw, legacy]);
+    expect(storage.getItem(slotKey(1))).toBeNull();
+    expect(storage.getItem(LEGACY_SAVE_KEY)).toBeNull();
+    expect(loadSlot(1).status).toBe('empty');
+  });
+
+  it('archives the live-match record inside the career, the way Export keeps it', () => {
+    const storage = stubLocalStorage();
+    writeSlot(2, classicCareer('Mid Match', 4));
+    const raw = storage.getItem(slotKey(2))!;
+    const live = { season: 1, week: 3, fixtureId: 'f-3' };
+    storage.setItem(liveMatchKey(2), JSON.stringify(live));
+    const retired = retireClassicSlot(2);
+    expect(retired).toMatchObject({ slot: 2, raw, emptied: true });
+    const [archived] = readRetiredSaves(2);
+    expect(JSON.parse(archived!)).toEqual({ ...JSON.parse(raw), nrlLiveMatch: live });
+    expect(storage.getItem(liveMatchKey(2))).toBeNull();
+    expect(storage.getItem(slotKey(2))).toBeNull();
   });
 
   it('refuses a Classic import and does not install it', () => {

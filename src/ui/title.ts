@@ -666,7 +666,7 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
           actions.appendChild(exp);
           if (r.emptied) {
             markClassicRetirementShown(r.slot);
-            void acknowledgeRetiredClassicSave(r.slot, r.raw);
+            void acknowledgeRetiredClassicSave(r.slot, r.stored ?? r.raw, r.removed);
           }
         }
         const startNew = retired.find((r) => r.emptied);

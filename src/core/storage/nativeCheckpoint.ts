@@ -64,14 +64,16 @@ export async function acknowledgeClassicArchive(slot: number, stored: string): P
  * legacy key are gone. Call this only after `acknowledgeClassicArchive` has
  * confirmed, so a wipe cannot find the slot marked deleted and the archive missing.
  */
-export async function acknowledgeClassicSlotGone(slot: number): Promise<NativeCheckpointResult> {
+export async function acknowledgeClassicSlotGone(slot: number, removed?: readonly string[]): Promise<NativeCheckpointResult> {
   const early = retirementReady();
   if (early) return early;
   const live = slotKey(slot);
   if (!isMirroredKey(live)) return 'unavailable';
   const {storage, mirror} = active!;
   const signal = boot!.signal;
-  const goneKeys = [live, saveMetaKey(slot), liveMatchKey(slot), ...(slot === 1 ? [LEGACY_SAVE_KEY] : [])];
+  // Only the keys the retirement removed: a different career kept under the legacy
+  // key (or written since) is not waited on.
+  const goneKeys = removed ?? [live, saveMetaKey(slot), liveMatchKey(slot), ...(slot === 1 ? [LEGACY_SAVE_KEY] : [])];
   for (const key of goneKeys) {
     const gone = await mirror.confirmGone(key, () => storage.getItem(key) === null, signal);
     if (gone !== 'confirmed') return gone;
@@ -87,8 +89,8 @@ export async function acknowledgeClassicSlotGone(slot: number): Promise<NativeCh
  * the archived bytes, then confirms the live slot is gone. The caller must already
  * have deleted the slot; to keep that order, use `retireClassicSlotDurable`.
  */
-export async function acknowledgeRetiredClassicSave(slot: number, raw: string): Promise<NativeCheckpointResult> {
+export async function acknowledgeRetiredClassicSave(slot: number, raw: string, removed?: readonly string[]): Promise<NativeCheckpointResult> {
   const archived = await acknowledgeClassicArchive(slot, raw);
   if (archived !== 'confirmed') return archived;
-  return acknowledgeClassicSlotGone(slot);
+  return acknowledgeClassicSlotGone(slot, removed);
 }

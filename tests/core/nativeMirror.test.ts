@@ -476,15 +476,20 @@ describe('native outcome acknowledgement', () => {
     storage.setItem(liveMatchKey(1), 'live');
     storage.setItem(LEGACY_SAVE_KEY, classic);
     await mirror.idle();
-    expect(await retireClassicSlotDurable(1)).toMatchObject({ slot: 1, raw: classic, emptied: true, notify: true });
+    const retired = await retireClassicSlotDurable(1);
+    expect(retired).toMatchObject({ slot: 1, raw: classic, emptied: true, notify: true });
+    // The live-match record is archived inside the career, the way Export keeps it.
+    const archive = storage.getItem(retiredSaveKey(1))!;
+    expect(retired!.stored).toBe(archive);
+    expect(JSON.parse(archive)).toMatchObject({ clubName: 'Old Town', nrlLiveMatch: 'live' });
     markClassicRetirementShown(1);
-    expect(await acknowledgeRetiredClassicSave(1, classic)).toBe('confirmed');
+    expect(await acknowledgeRetiredClassicSave(1, archive, retired!.removed)).toBe('confirmed');
     const restored = await afterWipe(native);
     expect(restored.has(slotKey(1))).toBe(false);
     expect(restored.has(saveMetaKey(1))).toBe(false);
     expect(restored.has(liveMatchKey(1))).toBe(false);
     expect(restored.has(LEGACY_SAVE_KEY)).toBe(false);
-    expect(restored.get(retiredSaveKey(1))).toBe(classic);
+    expect(restored.get(retiredSaveKey(1))).toBe(archive);
     expect(restored.get(classicRetiredNoticeKey(1))).toBe('1');
   });
 
