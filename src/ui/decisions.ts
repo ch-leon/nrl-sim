@@ -19,7 +19,7 @@ import { getState, type GameState, type PendingEvent } from '../core/state';
 import type { AdvanceRun } from '../core/advance';
 import { remainingTarget, targetSpan, type AdvanceTarget } from '../core/advanceRules';
 import { cardById } from '../data/events';
-import { chooseEvent, describeChoice, fillText } from '../systems/events';
+import { chooseEvent, deckWaitsForLeagueChoice, describeChoice, fillText } from '../systems/events';
 import { elapsedInterval } from '../core/season';
 import { hasStaff } from '../systems/staff';
 import { NEW_CONTRACT_WEEKS } from '../systems/freeagency';
@@ -57,6 +57,8 @@ export interface DecisionView {
   /** Advances until the default is taken: 1 means the next one takes it. */
   advancesLeft: number;
   defaultLabel: string;
+  /** A closed League season: the card waits until next season's league is confirmed (#837). */
+  waiting?: boolean;
   choices: DecisionChoiceView[];
 }
 
@@ -77,6 +79,7 @@ export function advancesLeft(
 export function decisionViews(state: GameState): DecisionView[] {
   const out: DecisionView[] = [];
   const welfare = hasStaff(state, 'welfare');
+  const waiting = deckWaitsForLeagueChoice(state);
   for (const ev of state.eventDeck.pending) {
     const card = cardById(ev.cardId);
     if (!card) continue;
@@ -88,6 +91,7 @@ export function decisionViews(state: GameState): DecisionView[] {
       stamp: `S${ev.season} · Week ${ev.week}`,
       advancesLeft: advancesLeft(ev, state),
       defaultLabel: card.choices[card.defaultChoice]?.label ?? '',
+      ...(waiting ? { waiting } : {}),
       choices: card.choices.map((c, index) => {
         const signs = ev.fee !== undefined && c.effects.some((e) => e.kind === 'signSubject');
         const split = signs
@@ -109,7 +113,7 @@ export function decisionChipItems(state: GameState): { title: string; note: stri
   return [...event, ...decisionViews(state)
     .slice()
     .sort((a, b) => a.advancesLeft - b.advancesLeft)
-    .map((v) => ({ title: v.title, note: v.advancesLeft === 1 ? 'due now' : `${v.advancesLeft} wks left` }))];
+    .map((v) => ({ title: v.title, note: v.waiting ? 'after the league choice' : v.advancesLeft === 1 ? 'due now' : `${v.advancesLeft} wks left` }))];
 }
 
 /** Number of cards waiting for a choice (the News and Advance Week badges). */
@@ -126,7 +130,8 @@ function openRequiredChallenge(): HTMLElement | null {
 }
 
 /** The card's deadline, in advances rather than calendar weeks. */
-export function deadlineText(v: Pick<DecisionView, 'advancesLeft' | 'defaultLabel'>): string {
+export function deadlineText(v: Pick<DecisionView, 'advancesLeft' | 'defaultLabel' | 'waiting'>): string {
+  if (v.waiting) return `Confirm next season's league, then answer before you advance, or it's "${v.defaultLabel}".`;
   const when = v.advancesLeft === 1 ? 'Answer before you advance' : `${v.advancesLeft} weeks to answer`;
   return `${when}, or it's "${v.defaultLabel}".`;
 }
@@ -187,8 +192,10 @@ export function decisionCard(view: DecisionView, onChoose: (id: string, index: n
   if (comment) card.append(coachLine(comment));
   const choices = el('div', { class: 'nrl-event-choices' });
   for (const c of view.choices) {
-    const b = button('', () => onChoose(view.id, c.index), { class: 'nrl-event-choice' });
+    const b = button('', () => { if (!view.waiting) onChoose(view.id, c.index); }, { class: 'nrl-event-choice' });
     b.setAttribute('data-event-choice', String(c.index));
+    // The closed season's review is frozen: the choices open in the new season (#837).
+    if (view.waiting) b.disabled = true;
     b.append(el('span', { class: 'nrl-event-choice-label', text: c.label }));
     if (c.sure) {
       // SuperCOOKED 56: a pill each; "Sure:" beside a risk is the green one.
