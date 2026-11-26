@@ -1085,19 +1085,28 @@ export function readRetiredSave(slot: number): string | null {
   return readRetiredSaves(slot)[0] ?? null;
 }
 
-/** Drop one archived career. The others stay. Never throws. */
-export function deleteRetiredSave(slot: number, index: number): void {
+/**
+ * Drop one archived career by its id (`retiredSaveId`), in the save critical section:
+ * the bundle is re-read there, so a stale Settings list can only delete the career it
+ * showed. False when that career is no longer archived or another tab is saving. Never throws.
+ */
+export function deleteRetiredSave(slot: number, id: string): boolean {
   const store = getStore();
-  if (!store) return;
+  if (!store) return false;
   try {
-    const key = retiredSaveKey(slot);
-    const saves = decodeRetiredSaves(store.storage.getItem(key));
-    if (index < 0 || index >= saves.length) return;
-    saves.splice(index, 1);
-    const next = encodeRetiredSaves(saves);
-    if (next === null) store.storage.removeItem(key);
-    else store.storage.setItem(key, next);
-  } catch { /* the list can be tried again */ }
+    return withSaveLease(store.storage, () => {
+      const key = retiredSaveKey(slot);
+      const current = store.storage.getItem(key);
+      const saves = decodeRetiredSaves(current);
+      const index = saves.findIndex((raw) => retiredSaveId(raw) === id);
+      if (index < 0) return false;
+      saves.splice(index, 1);
+      const next = encodeRetiredSaves(saves);
+      if (next === null) store.storage.removeItem(key);
+      else store.storage.setItem(key, next);
+      return !decodeRetiredSaves(store.storage.getItem(key)).some((raw) => retiredSaveId(raw) === id);
+    });
+  } catch { return false; }
 }
 
 /** Remember that this slot's retirement message has been shown. Never throws. */
@@ -1107,9 +1116,11 @@ export function markClassicRetirementShown(slot: number): void {
 }
 
 /** Hand the player one archived Classic save, the same way Export original does. */
-export function downloadRetiredSave(slot: number, index = 0): void {
+export function downloadRetiredSave(slot: number, which: number | string = 0): void {
   try {
-    const raw = readRetiredSaves(slot)[index];
+    const saves = readRetiredSaves(slot);
+    const index = typeof which === 'string' ? saves.findIndex((raw) => retiredSaveId(raw) === which) : which;
+    const raw = saves[index];
     if (raw === undefined || typeof document === 'undefined') return;
     const name = index === 0 ? `career-slot-${slot}-retired.json` : `career-slot-${slot}-retired-${index + 1}.json`;
     deliverFile(name, raw, { onShareFailed: shareFailed });

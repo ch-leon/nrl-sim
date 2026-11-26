@@ -2,7 +2,7 @@
 // A "second tab" is a fresh copy of the save modules (its own lock state), sharing storage.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  __setStorage, readRetiredSaves, retireClassicSlot, slotKey, writeSlot,
+  __setStorage, deleteRetiredSave, readRetiredSaves, retiredSaveId, retireClassicSlot, slotKey, writeSlot,
 } from '../../src/core/save';
 import { createNewGame, type GameState } from '../../src/core/state';
 import { initLeague } from '../../src/systems/fixtures';
@@ -49,12 +49,15 @@ describe('one critical section across tabs (#819)', () => {
     onFirstRead(storage, retiredSaveKey(1), () => {
       expect(storage.getItem(SAVE_LOCK_KEY)).not.toBeNull();
       // The other tab would have written its stale view of the bundle here.
-      seen.push(tabB.retireClassicSlot(1));
+      seen.push(tabB.deleteRetiredSave(1, retiredSaveId(old)), tabB.retireClassicSlot(1));
     });
     expect(retireClassicSlot(1)).toMatchObject({ slot: 1, raw, emptied: true });
-    expect(seen).toEqual([null]);
+    expect(seen).toEqual([false, null]);
     expect(readRetiredSaves(1)).toEqual([old, raw]);
     expect(storage.getItem(SAVE_LOCK_KEY)).toBeNull();
+    // Once the section is free, the other tab's delete goes through against the latest list.
+    expect(tabB.deleteRetiredSave(1, retiredSaveId(old))).toBe(true);
+    expect(readRetiredSaves(1)).toEqual([raw]);
   });
 
   it('merges a new retirement into the latest bundle by id instead of writing a stale copy back', () => {
@@ -73,5 +76,15 @@ describe('one critical section across tabs (#819)', () => {
     expect(readRetiredSaves(1)).toEqual([a, b, c]);
   });
 
+  it('Settings deletes by id: two stale views cannot delete two different careers', () => {
+    const a = JSON.stringify(classicCareer('A', 1));
+    const b = JSON.stringify(classicCareer('B', 2));
+    storage.setItem(retiredSaveKey(2), bundle([a, b]));
+    // Both views drew [A, B] and the player taps Delete on A in each.
+    const shown = readRetiredSaves(2).map(retiredSaveId);
+    expect(deleteRetiredSave(2, shown[0]!)).toBe(true);
+    expect(deleteRetiredSave(2, shown[0]!)).toBe(false);
+    expect(readRetiredSaves(2)).toEqual([b]);
+  });
 
 });
