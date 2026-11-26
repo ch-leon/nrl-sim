@@ -76,3 +76,9 @@ export function retiredSaveKey(slot: number): string {
 export function classicRetiredNoticeKey(slot: number): string {
   return `${CLASSIC_RETIRED_NOTICE_PREFIX}${slot}`;
 }
+
+/**
+ * The cross-tab save lease (#819): held for the few synchronous steps of an archive,
+ * a retirement, a Start over write or a retired-save delete. Not a career; never mirrored.
+ */
+export const SAVE_LOCK_KEY = 'nrl-sim-save-lock';
