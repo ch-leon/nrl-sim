@@ -315,10 +315,12 @@ export interface CardWeekState {
   /** Picks waiting, 0..CARD_WEEK.MAX_OWED. */
   owed: number;
   offer: CardOffer | null;
-  /** Every card taken, oldest first. */
+  /** Every card taken, oldest first. A pick passed is recorded as cardId 'pass' (data/cards.ts CARD_PASS). */
   history: { cardId: string; season: number; week: number }[];
   /** Ids of the players who joined from a card. */
   cardPlayers: string[];
+  /** The traits trait cards gave, by player: the pick screen marks them. */
+  cardTraits: { playerId: string; trait: import('../data/traits').TraitId }[];
   lastMatch?: LastMatchImpact;
 }
 
@@ -568,7 +570,7 @@ export function newEventDeck(seed: number): EventDeckState {
  *  stream is derived from the game seed like the events deck's, with its own
  *  constant, so it never shares a roll with the deck or the main RNG. */
 export function newCardWeek(seed: number): CardWeekState {
-  return { rng: (seed ^ 0x85ebca6b) >>> 0, owed: 3 /* CARD_WEEK.START_OWED, data/cards.ts */, offer: null, history: [], cardPlayers: [] };
+  return { rng: (seed ^ 0x85ebca6b) >>> 0, owed: 3 /* CARD_WEEK.START_OWED, data/cards.ts */, offer: null, history: [], cardPlayers: [], cardTraits: [] };
 }
 
 /**

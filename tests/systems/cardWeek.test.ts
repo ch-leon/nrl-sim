@@ -17,7 +17,7 @@ import { traitLevel } from '../../src/data/traits';
 import { leagueEntryReceiptId } from '../../src/data/leagueCareer';
 import { AU_CAREER_PROFILE } from '../../src/content/career/au';
 import {
-  bestAtPosition, cardOfferView, cardWeekTick, chooseCard, drawOffer, freePlayCandidates, lastMatchImpact, plantCard,
+  bestAtPosition, cardOfferView, cardWeekTick, passCard, passPick, chooseCard, drawOffer, freePlayCandidates, lastMatchImpact, plantCard,
   playedLeagueMatch, registerCardWeekSystem, startCardWeek, takeCard, traitTargets, type CardTake,
 } from '../../src/systems/cardWeek';
 import { capRoomFor, commitment, publishedCap } from '../../src/systems/cap';
@@ -215,7 +215,7 @@ describe('each card does what its face says', () => {
     const before = getState().money;
     const moves: { delta: number; reason: string }[] = [];
     bus.on('money:changed', (m) => { moves.push({ delta: m.delta, reason: m.reason }); });
-    expect(chooseCard(0)).toEqual({ ok: true });
+    expect(chooseCard(0)).toEqual({ ok: true, outcome: 'Cash injection: +$15,000.' });
     expect(getState().money).toBe(before + 15_000);
     expect(moves).toEqual([{ delta: 15_000, reason: 'card: Cash injection' }]);
     expect(classifyReason('card: Cash injection')).toBe('events');
@@ -233,6 +233,46 @@ describe('each card does what its face says', () => {
     expect(overallRating(r.joined!)).toBeGreaterThan(bestAtPosition(s.squad, card.player.position));
     expect(plantCard({ ...s, boardPatience: 1 }, 'marqueeGamble')).toBe('That card cannot be offered now.');
     expect(BOARD.MAX_PATIENCE).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe('passing a pick', () => {
+  it('spends the pick with no card, records the pass and draws the next', async () => {
+    const s = await career(83);
+    const r = passCard(s);
+    if (typeof r === 'string') throw new Error(r);
+    const cw = r.cardWeek!;
+    expect(cw.owed).toBe(2);
+    expect(cw.history).toEqual([{ cardId: 'pass', season: 1, week: 1 }]);
+    expect(cw.offer!.cards).toHaveLength(3);
+    expect(r.squad).toEqual(s.squad);
+    expect(r.money).toBe(s.money);
+    expect(isCardWeek(cw)).toBe(true);
+    const last = passCard({ ...s, cardWeek: { ...s.cardWeek!, owed: 1 } });
+    if (typeof last === 'string') throw new Error(last);
+    expect(last.cardWeek!.offer).toBeNull();
+    expect(passCard(last)).toBe('No pick is waiting.');
+  });
+
+  it('frees a pick whose three cards are all refused', async () => {
+    const s = await career(89);
+    // Every card on show is refused: the set play is owned, everyone already has Last Line III, and the
+    // squad is full with nobody the club can afford to release for the prop.
+    const prop = planted({ ...s, money: 10_000_000 }, 'propSigning').cardWeek!.offer!.cards[0]!;
+    const stuck: GameState = { ...s, money: -1,
+      squad: s.squad.map((p) => ({ ...p, traits: [{ id: 'lastLine' as const, level: 3 as const }] })),
+      cardWeek: { ...s.cardWeek!, owed: 1, offer: { season: 1, week: 1, cards: [
+        { ...prop, replacesId: s.squad[0]!.id, replacesName: s.squad[0]!.name } as OfferedCard,
+        { cardId: 'setPlay', kind: 'setPlay', playId: 'block-play' }, { cardId: 'lastLine', kind: 'trait' },
+      ] } }, playbook: { owned: ['block-play'] } };
+    const view = cardOfferView(stuck);
+    expect(view.cards).toHaveLength(3);
+    expect(view.cards.every((c) => c.refusal !== null)).toBe(true);
+    expect([0, 1, 2].every((i) => typeof takeCard(stuck, i, 'nobody') === 'string')).toBe(true);
+    loadState(stuck);
+    expect(passPick()).toEqual({ ok: true });
+    expect(getState().cardWeek!.owed).toBe(0);
+    expect(getState().cardWeek!.offer).toBeNull();
   });
 });
 

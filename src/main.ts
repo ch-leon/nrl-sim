@@ -7,7 +7,7 @@ import { GroundsScene } from './scenes/GroundsScene';
 import { MatchScene } from './scenes/MatchScene';
 import { IndividualChallengeScene, bindIndividualChallengeGame } from './scenes/IndividualChallengeScene';
 import { bus, type Events } from './core/events';
-import { createNewGame, getState, loadState, stateInstallation, type GameState } from './core/state';
+import { createNewGame, getState, loadState, setState, stateInstallation, type GameState } from './core/state';
 import { enableAutosave, getActiveSlot, getSlotSummaries, hasSave, loadSlot, save, setActiveSlot } from './core/save';
 import { showLeagueLoading, showTitleFlow, type TitleChoice } from './ui/title';
 import { EXPANSION_INTRO_HINT, showExpansionIntro } from './ui/expansionIntro';
@@ -37,7 +37,8 @@ import { registerStatsSystem } from './systems/stats';
 import { registerDerbySystem } from './systems/derby';
 import { registerBoardSystem } from './systems/board';
 import { plantPending, registerEventsSystem } from './systems/events';
-import { registerCardWeekSystem } from './systems/cardWeek';
+import { plantCard, registerCardWeekSystem } from './systems/cardWeek';
+import { cardChipCount, initCardWeekPick, openCardPick } from './ui/cardWeek';
 import { registerRivalsSystem } from './systems/rivals';
 import { contractsEndingSoon, endingSoonLabel } from './systems/contracts';
 import { initBoardUi, openStaffScreen, STAFF_SCREEN_TITLE } from './ui/screens/board';
@@ -272,10 +273,20 @@ async function boot(): Promise<void> {
     const w = window as unknown as {
       __nrlGame?: Phaser.Game; __nrlState?: () => GameState; __nrlTutorialText?: string[];
       __nrlShowCard?: (cardId: string) => boolean; __nrlNotify?: (n: Events['ui:notify']) => void;
+      __nrlShowCardWeek?: (cardId: string) => string | null;
     };
     w.__nrlGame = g;
     w.__nrlState = () => getState();
     w.__nrlShowCard = plantPending;
+    // #846: put a card-week card first in the pick on show and open it; the refusal when it can't be.
+    w.__nrlShowCardWeek = (cardId) => {
+      const next = plantCard(getState(), cardId);
+      if (typeof next === 'string') return next;
+      setState({ cardWeek: next.cardWeek! });
+      closeModal();
+      openCardPick();
+      return null;
+    };
     // scripts/e2e-webkit.mjs fires a burst of toasts at the lane (#339).
     w.__nrlNotify = (n) => bus.emit('ui:notify', n);
     // Every tutorial step's copy, for scripts/e2e-webkit.mjs's fit check (#208).
@@ -304,11 +315,15 @@ async function boot(): Promise<void> {
     onBoard: () => nav.open('staff'), // the objective at risk (#368)
     onDecisions: () => void openDecisions(),
     decisions: decisionChipItems,
+    onCards: () => void openCardPick(),
+    cards: cardChipCount,
     onEvents: () => openEvents(),
     runwayWeeks,
   });
   // #368: the weekly summary, from the club as it stands now; its Play Week is the dock's.
   initWeekSummary({ onAdvance: () => advanceFromClub(advanceOneWeek, onChooseLeague), runwayWeeks });
+  // #846: the card week's pick opens by itself behind the summary and any decision. Other careers have none.
+  initCardWeekPick();
 
   // Grounds → Match handoff: for the classic engine state/ladder are already
   // applied by the matchday tick hook before this fires and the Match scene is

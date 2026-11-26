@@ -17,7 +17,7 @@ import { bus } from '../core/events';
 import { registerTickHook, TICK_ORDER, weekHeld } from '../core/time';
 import { careerActionClock, elapsedInterval } from '../core/season';
 import { earnMoney } from '../data/club';
-import { CARD_WEEK, CARDS, cardDefById, type CardDef, type CardKind, type CardTier } from '../data/cards';
+import { CARD_PASS, CARD_WEEK, CARDS, cardDefById, type CardDef, type CardKind, type CardTier } from '../data/cards';
 import { generatePlayerAround, overallRating } from '../data/player';
 import { PLAYS_BY_ID, PLAY_IDS, type PlayId } from '../data/plays';
 import { ROMAN, TRAITS, traitLevel, type TraitLevel } from '../data/traits';
@@ -273,6 +273,7 @@ export function takeCard(state: GameState, index: number, targetId?: string): Ca
   const money: Applied['money'] = [];
   const news: Applied['news'] = [];
   let joined: Player | undefined;
+  let traitGiven: { playerId: string; trait: Extract<CardDef, { kind: 'trait' }>['trait'] } | undefined;
 
   switch (card.kind) {
     case 'player': case 'dilemma': {
@@ -315,6 +316,7 @@ export function takeCard(state: GameState, index: number, targetId?: string): Ca
       }
       const out = applyEffects(s, [{ kind: 'playerTrait', trait: def.trait }], { ...ctx, subjectId: target.player.id, subjectName: target.player.name });
       s = out.state;
+      traitGiven = { playerId: target.player.id, trait: def.trait };
       news.push({ text: `${target.player.name} has ${TRAITS[def.trait].name} ${ROMAN[target.level]}.`, kind: 'success' });
       break;
     }
@@ -335,8 +337,26 @@ export function takeCard(state: GameState, index: number, targetId?: string): Ca
     offer: null,
     history: [...after.history, { cardId: def.id, season: state.season, week: state.week }],
     cardPlayers: joined ? [...after.cardPlayers, joined.id] : after.cardPlayers,
+    cardTraits: traitGiven && !after.cardTraits.some((t) => t.playerId === traitGiven!.playerId && t.trait === traitGiven!.trait)
+      ? [...after.cardTraits, traitGiven] : after.cardTraits,
   };
   return { state: withOffer({ ...s, cardWeek: next }), money, news, ...(joined ? { joined } : {}) };
+}
+
+/**
+ * Pass the pick on show (pure): it is spent with no card taken, recorded in the
+ * history as a pass, and the next pick is drawn if another is owed. Always
+ * allowed while a pick is showing, so a pick whose cards are all refused never
+ * holds the career up.
+ */
+export function passCard(state: GameState): GameState | string {
+  const cw = state.cardWeek;
+  if (!cw) return 'This career has no card week.';
+  if (cw.owed <= 0 || !cw.offer) return 'No pick is waiting.';
+  return withOffer({ ...state, cardWeek: {
+    ...cw, owed: cw.owed - 1, offer: null,
+    history: [...cw.history, { cardId: CARD_PASS, season: state.season, week: state.week }],
+  } });
 }
 
 // ── The week ─────────────────────────────────────────────────────────────────
@@ -470,22 +490,40 @@ function commit(t: CardTake): void {
 
 /**
  * The player took card `index` (a trait card with `targetId`, the man who gets
- * it). Refused, with the reason, during a match or a held week, while a closed
+ * it); `outcome` says what happened in a line. Refused, with the reason, during a match or a held week, while a closed
  * League season waits for next season's league, or when the card can't be
  * taken; nothing changes then.
  */
-export function chooseCard(index: number, targetId?: string): { ok: true } | { ok: false; reason: string } {
+export function chooseCard(index: number, targetId?: string): { ok: true; outcome: string } | { ok: false; reason: string } {
   const s = getState();
-  if (!s.cardWeek) return { ok: false, reason: 'This career has no card week.' };
-  if (s.sacked) return { ok: false, reason: 'The board has sacked the coach.' };
-  if (awaitingCampReplay(s) || weekHeld()) return { ok: false, reason: 'Finish the current week first.' };
-  const held = rosterIntervalProblem(s);
-  if (held) return { ok: false, reason: held };
-  if (deckWaitsForLeagueChoice(s)) return { ok: false, reason: "Picks wait until next season's league is confirmed." };
+  const blocked = pickBlocked(s);
+  if (blocked) return { ok: false, reason: blocked };
   const out = takeCard(s, index, targetId);
   if (typeof out === 'string') return { ok: false, reason: out };
   commit(out);
+  return { ok: true, outcome: out.news.map((n) => n.text).join(' ') };
+}
+
+/** The player passed the pick on show. Refused only where a take would be (a held week, the league choice). */
+export function passPick(): { ok: true } | { ok: false; reason: string } {
+  const s = getState();
+  const blocked = pickBlocked(s);
+  if (blocked) return { ok: false, reason: blocked };
+  const out = passCard(s);
+  if (typeof out === 'string') return { ok: false, reason: out };
+  setState({ cardWeek: out.cardWeek! });
   return { ok: true };
+}
+
+/** Why no pick can be made in the store's state now, or null. */
+function pickBlocked(s: GameState): string | null {
+  if (!s.cardWeek) return 'This career has no card week.';
+  if (s.sacked) return 'The board has sacked the coach.';
+  if (awaitingCampReplay(s) || weekHeld()) return 'Finish the current week first.';
+  const held = rosterIntervalProblem(s);
+  if (held) return held;
+  if (deckWaitsForLeagueChoice(s)) return "Picks wait until next season's league is confirmed.";
+  return null;
 }
 
 /** Install the card-week tick: after the week's results, before the autosave. Careers without a card week are untouched. */

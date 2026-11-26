@@ -76,6 +76,9 @@ export const CARDS: readonly CardDef[] = [
   { id: 'marqueeGamble', kind: 'dilemma', title: 'Marquee gamble', tier: 'gold', weight: 3, margin: PLAYER_CARD_MARGIN.gold, patience: -1 },
 ];
 
+/** The history's id for a pick passed rather than taken. No card has it. */
+export const CARD_PASS = 'pass';
+
 const BY_ID: ReadonlyMap<string, CardDef> = new Map(CARDS.map((c) => [c.id, c]));
 
 /** The card with `id`, or undefined (a card dropped since the save was made). */

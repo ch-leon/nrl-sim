@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- **Card week (Labs test).** Off by default. With Developer settings → Experiments → Card week on, a new League career can tick "Card week (test)". The career then gets three card picks before round 1 and one more after each League match, up to three waiting. Each pick shows three cards (a player who joins with no fee, a staff hire with the fee waived, a free set play, a trait for a player you choose, cash, or a stronger player for a point of board patience); take one or pass. The pick screen also shows each player's tries, line breaks and tackles from the last match. Other careers are unchanged. [#846](https://github.com/ch-leon/nrl-sim/issues/846).
+
 - **Stepping down a league.** In a League career, a title won in a league below the club's highest unlocked league is worth half the usual title reputation (7 instead of 15). The League guide's Ladder page says so.
 
 - **Guide prices match the game.** The Grounds page reads every facility price from the facility list, so the Grandstand now shows $30,000 and the Sponsor Board its match-based income instead of an old weekly figure. The Events page no longer says story cards are off in a League career. The board stops setting a building goal once every facility is at level 3.

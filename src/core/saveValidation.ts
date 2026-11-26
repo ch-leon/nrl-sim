@@ -215,12 +215,14 @@ function settledCupProblem(state: GameState): string | null {
 /**
  * The card week (#846, v36): its stream, picks owed (0..CARD_WEEK.MAX_OWED),
  * the offer (known, different cards, each resolved for its kind), the cards
- * taken, the card players and the last match's lines.
+ * taken (or 'pass'), the card players, the card traits and the last match's lines.
  */
 export function isCardWeek(v: unknown): boolean {
   if (!record(v) || !integer(v.rng, 0, 0xffffffff) || !integer(v.owed, 0, CARD_WEEK.MAX_OWED)) return false;
   if (!Array.isArray(v.history) || !v.history.every(h => record(h) && text(h.cardId) && integer(h.season, 1) && integer(h.week, 1))) return false;
   if (!strings(v.cardPlayers) || !unique(v.cardPlayers)) return false;
+  if (!Array.isArray(v.cardTraits) || !v.cardTraits.every(t => record(t) && text(t.playerId) && knownTrait(t.trait))
+    || !unique(v.cardTraits.map(t => `${(t as Record<string, unknown>).playerId}:${(t as Record<string, unknown>).trait}`))) return false;
   if (v.offer !== null) {
     const o = v.offer;
     if (!record(o) || !integer(o.season, 1) || !integer(o.week, 1) || !Array.isArray(o.cards) || o.cards.length < 1 || o.cards.length > CARD_WEEK.OFFER_SIZE) return false;
