@@ -398,6 +398,37 @@ async function advanceMenu(i) {
   await wait(400);
 }
 
+/** The season review seen when the League year closed, before the league choice. */
+let reviewAtClose = null;
+
+/**
+ * A League career's year ends at an explicit league choice (#819): time stays paused
+ * until it is confirmed, and only then does season 2 start. Confirm it as a player
+ * would: from the season review's Choose next league, or PLAY WEEK, which opens it.
+ * Returns false when no choice is waiting.
+ */
+async function confirmNextLeague(rec) {
+  const live = await page.evaluate(() => window.__nrlState?.() ?? null);
+  if (live?.competitions?.leagueCareer?.phase !== 'next-season-choice') return false;
+  const choose = page.locator('[data-review-choose-league]');
+  if (await choose.count()) {
+    reviewAtClose = (await page.locator('[data-season-review] .nrl-review-finish').first().textContent().catch(() => null))?.trim() ?? '';
+    await press(choose.first());
+  } else {
+    await closeAny();
+    await goHome();
+    await tap('.nrl-dock [data-hud="advance"]');
+  }
+  await page.locator('[data-nrl-league-selection]').waitFor({ timeout: 60000 });
+  await tap('[data-nrl-league-confirm]');
+  await page.locator('[data-nrl-league-selection]').waitFor({ state: 'detached', timeout: 60000 });
+  await page.waitForFunction(() => window.__nrlState?.().season > 1, null, { timeout: 60000 });
+  await page.waitForFunction((k) => (JSON.parse(localStorage.getItem(k) ?? 'null')?.season ?? 0) > 1, SLOT, { timeout: 60000 });
+  await wait(800);
+  rec?.notes.push(`confirmed next season's league${reviewAtClose !== null ? ` from the season review (${reviewAtClose})` : ''}`);
+  return true;
+}
+
 /** Answer every waiting event card (first choice, or the second for odd cards so both get exercised). */
 async function answerCards(rec) {
   const s = await save();
@@ -1034,7 +1065,11 @@ async function play() {
     const shown = (await page.locator('.nrl-mo-score').textContent())?.trim();
     // A live match holds the week until full time (#73), so read the live state, not the slot.
     const s = (await page.evaluate(() => window.__nrlState?.() ?? null)) ?? (await save());
-    const f = [...s.league.fixtures].reverse().find((x) => x.result && (x.homeId === 'player' || x.awayId === 'player'));
+    // A League career (#819) keeps its results on its competition instances; the latest is the highest slot.
+    const club = s.clubId ?? 'player';
+    const f = (s.competitions?.instances ?? []).flatMap((i) => i.fixtures ?? [])
+      .filter((x) => x.result && (x.homeId === club || x.awayId === club))
+      .reduce((a, b) => (!a || (b.slot ?? 0) >= (a.slot ?? 0) ? b : a), null);
     const saved = f?.result ? `${f.result.homeScore} – ${f.result.awayScore}` : '(no result saved)';
     rec.notes.push(`overlay ${shown}, saved ${saved}`);
     if (shown !== saved) throw new Error(`the overlay shows ${shown} but the saved result is ${saved}`);
@@ -1232,6 +1267,11 @@ async function play() {
   for (let i = 0; i < 24; i++) {
     const s = await save();
     if (s.season > 1) break;
+    const choosing = await page.evaluate(() => window.__nrlState?.().competitions?.leagueCareer?.phase === 'next-season-choice');
+    if (choosing) {
+      await step('league-choice', async (rec) => { await confirmNextLeague(rec); }, { quietToasts: true });
+      break;
+    }
     const target = s.week < 25 ? 1 : 2;
     const r = await step(`to-${target === 1 ? 'finals' : 'season-end'}-${i + 1}`, async (rec) => {
       await answerCards(rec);
@@ -1263,6 +1303,11 @@ async function play() {
   // N7 (#193): the season review opens at the rollover; close it, then reopen it from History.
   await step('season-review', async (rec) => {
     const review = page.locator('[data-season-review="1"]');
+    // A League career shows the review when the year closes, and Choose next league closed it.
+    if (reviewAtClose !== null && !(await review.count())) {
+      rec.notes.push(`seen at the year's close: ${reviewAtClose}`);
+      return;
+    }
     if (!(await review.count())) {
       if (await page.evaluate(() => (window.__nrlState?.().history ?? []).some((h) => h.review))) throw new Error('season 1 has a review but none opened at the rollover');
       return 'no season review on this build';
