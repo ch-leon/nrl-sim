@@ -484,15 +484,29 @@ function migrateChecked(raw: unknown): MigrateResult {
     for (const step of MIGRATIONS.filter(m => m.from >= Math.max(36, version))) {
       state = { ...step.run(state as unknown as RawState), version: step.to } as unknown as GameState;
     }
+    const repairs: SaveRepair[] = [];
+    const cards = state.cardWeek;
+    if (version === 38 && cards && Array.isArray(cards.cardPlayers)) {
+      // Earlier v38 builds could record the same recruit twice when he returned via a steal.
+      const cardPlayers = [...new Set(cards.cardPlayers)];
+      if (cardPlayers.length < cards.cardPlayers.length) {
+        state = { ...state, cardWeek: { ...cards, cardPlayers } };
+        repairs.push({
+          field: 'cardWeek.cardPlayers', problem: 'Repeated recruit ID', repair: 'Kept one marker per recruit',
+          rationale: 'A returning recruit retains the same player ID.',
+          notification: 'Card recruits repaired. The original save has been kept in recovery.',
+        });
+      }
+    }
     const problem = leagueCareerStateProblem(state);
     // #837: a trip answered at the league choice. Kept only if the repaired career passes every check.
     const trip = problem ? repairClosedSeasonTrip(state) : null;
     const identifyOffers = (loaded: GameState): GameState => loaded.cardWeek
       ? { ...loaded, cardWeek: identifyCardOffers(loaded.cardWeek) } : loaded;
-    if (trip && !leagueCareerStateProblem(trip.state)) return { ok: true, outcome: 'repaired', state: identifyOffers(trip.state), repairs: [trip.repair] };
+    if (trip && !leagueCareerStateProblem(trip.state)) return { ok: true, outcome: 'repaired', state: identifyOffers(trip.state), repairs: [...repairs, trip.repair] };
     return problem ? { ok: false, outcome: problem.reason === 'unsupported' ? 'unsupported' : 'unrecoverable',
       reason: 'corrupt', message: problem.message }
-      : { ok: true, outcome: 'valid', state: identifyOffers(state), repairs: [] };
+      : { ok: true, outcome: repairs.length ? 'repaired' : 'valid', state: identifyOffers(state), repairs };
   }
   const inputProblem = validateInput(cur, version);
   if (inputProblem) return { ok: false, outcome: 'unrecoverable', reason: 'corrupt', message: inputProblem };

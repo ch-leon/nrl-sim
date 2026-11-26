@@ -121,6 +121,11 @@ function eligibleBeforeDice(state: GameState, def: CardDef): boolean {
   if (gambleRefusal(state, def)) return false;
   const held = state.cardWeek?.hand.some(h => h.cardId === def.id);
   const active = activeCard(state, def.id);
+  if (active?.kind === 'player' || active?.kind === 'dilemma') {
+    const player = state.squad.find(p => p.id === active.playerId)!;
+    return overallRating(player) < STAT_MAX
+      || (active.kind === 'player' && traitLevel(player.traits, SIGNATURE_TRAIT[player.position]) < 3);
+  }
   if (held || active) {
     return active?.kind !== 'trait' || !awayPlayerIds(state).has(active.playerId);
   }
@@ -282,7 +287,7 @@ function pickWeighted(cards: readonly CardDef[], rng: Rng): CardDef | null {
  */
 export function drawOffer(
   state: GameState, kind: CardOffer['kind'] = 'match', waiting: readonly CardOffer[] = [],
-  fromClubId?: string, previousSteal?: OfferedCard,
+  fromClubId?: string,
 ): { offer: CardOffer | null; rng: number } {
   const cw = state.cardWeek;
   if (!cw) return { offer: null, rng: 0 };
@@ -290,7 +295,7 @@ export function drawOffer(
   let left = CARDS.filter((c) => eligibleBeforeDice(state, c));
   const signature = (cards: readonly OfferedCard[]): string => cards.map(c => c.cardId).sort().join(',');
   const repeats = new Set(waiting.map(o => signature(o.cards)));
-  const stolen = fromClubId ? drawSteal(state, fromClubId, rng) ?? previousSteal : undefined;
+  const stolen = fromClubId ? drawSteal(state, fromClubId, rng) : undefined;
   const size = CARD_WEEK.OFFER_SIZE - Number(!!stolen);
   const signatureWithSteal = (cards: readonly OfferedCard[]) => signature(stolen ? [...cards, stolen] : cards);
   const cards: OfferedCard[] = [];
@@ -432,19 +437,33 @@ function moveStolenPlayer(state: GameState, card: RecruitCard): { state: GameSta
   } };
 }
 
-function withDilemmaMargin(player: Player, levels: number): Player {
-  if (!levels) return player;
+function withRatingBonus(player: Player, points: number): Player {
+  if (!points) return player;
   const stats = { ...player.stats };
   const ceilings = { ...player.ceilings };
   for (const stat of shownStats(player.position)) {
-    stats[stat] = Math.min(STAT_MAX, stats[stat] + levels * CARD_WEEK.DILEMMA_MARGIN_STEP);
+    stats[stat] = Math.min(STAT_MAX, stats[stat] + points);
     ceilings[stat] = Math.max(ceilings[stat] ?? 0, stats[stat]);
   }
   return { ...player, stats, ceilings };
 }
 
-function withSignature(player: Player, level: TraitLevel): Player {
-  return { ...player, traits: withTrait(player.traits, SIGNATURE_TRAIT[player.position], level) };
+function withRecruitUpgrade(player: Player, levels: number): Player {
+  const trait = SIGNATURE_TRAIT[player.position];
+  const desired = Math.max(1, traitLevel(player.traits, trait)) + levels;
+  const withSignature = { ...player, traits: withTrait(player.traits, trait, Math.min(3, desired) as TraitLevel) };
+  return withRatingBonus(withSignature, Math.max(0, desired - 3) * CARD_WEEK.RECRUIT_RATING_STEP);
+}
+
+function recruitBenefit(before: Player, after: Player): string {
+  const trait = SIGNATURE_TRAIT[after.position];
+  const original = traitLevel(before.traits, trait);
+  const improved = traitLevel(after.traits, trait);
+  const points = overallRating(after) - overallRating(before);
+  const benefits: string[] = [];
+  if (improved && improved > original) benefits.push(`${TRAITS[trait].name} ${ROMAN[improved]}`);
+  if (points > 0) benefits.push(`+${Number(points.toFixed(2))} recruit rating`);
+  return benefits.join(' and ');
 }
 
 /** The card man joins (pure): any named replacement released first, then signed on for the rest of the season with no fee. */
@@ -481,7 +500,9 @@ function joinPlayer(state: GameState, card: RecruitCard, level: TraitLevel): { s
     fresh = admitted.players[0]!;
   }
   // The offer's quoted salary still applies if a player develops while the pick waits.
-  const improved = card.kind === 'dilemma' ? withDilemmaMargin(fresh, level - 1) : withSignature(fresh, level);
+  const improved = card.kind === 'dilemma'
+    ? withRatingBonus(fresh, (level - 1) * CARD_WEEK.DILEMMA_MARGIN_STEP)
+    : withRecruitUpgrade(fresh, level - 1);
   const signed = signForRestOfSeason({ ...improved, joinedSeason: clock.season }, clock.season, clock.week, clock.duration);
   const joined = openClubSpell({ ...signed, deal: { ...signed.deal!, salary: card.salary } }, s.clubId, clock,
     card.fromClubId ? 'transfer' : 'signing', 0);
@@ -582,9 +603,16 @@ function applyCard(state: GameState, card: OfferedCard, level: TraitLevel, targe
       const upgraded = previous?.kind === 'player' || previous?.kind === 'dilemma'
         ? s.squad.find(p => p.id === previous.playerId) : undefined;
       let released: string | undefined;
+      let benefit = '';
       if (upgraded) {
+        const levels = level - previous!.level;
         const player = card.kind === 'dilemma'
-          ? withDilemmaMargin(upgraded, level - previous!.level) : withSignature(upgraded, level);
+          ? withRatingBonus(upgraded, levels * CARD_WEEK.DILEMMA_MARGIN_STEP) : withRecruitUpgrade(upgraded, levels);
+        benefit = recruitBenefit(upgraded, player);
+        if (!benefit) {
+          const limit = card.kind === 'player' ? 'signature trait and rating' : 'recruit rating';
+          return `${player.name} already has the maximum ${limit}.`;
+        }
         s = { ...s, squad: s.squad.map(p => p === upgraded ? player : p) };
         active = { kind: card.kind, cardId: def.id, level, playerId: player.id };
       } else {
@@ -600,7 +628,7 @@ function applyCard(state: GameState, card: OfferedCard, level: TraitLevel, targe
       if (board) s = board.state;
       const update = joined
         ? `${joined.name} (${Math.round(overallRating(joined))}) joins, no signing fee.`
-        : `${upgraded!.name} reaches Level ${ROMAN[level]}.`;
+        : `${upgraded!.name} reaches Level ${ROMAN[level]}${benefit ? ` with ${benefit}` : ''}.`;
       news.push({
         text: `${def.title}: ${update}${released ? ` ${released} is released.` : ''}${board ? ' The board is less patient.' : ''}`,
         kind: 'success',
@@ -669,7 +697,7 @@ function applyCard(state: GameState, card: OfferedCard, level: TraitLevel, targe
   const next: CardWeekState = {
     ...s.cardWeek!, active: [...cw.active.filter(c => c.cardId !== def.id), active],
     history: recordCard(cw, state, def.id, 'play'),
-    cardPlayers: joined ? [...cw.cardPlayers, joined.id] : cw.cardPlayers,
+    cardPlayers: joined && !cw.cardPlayers.includes(joined.id) ? [...cw.cardPlayers, joined.id] : cw.cardPlayers,
     cardTraits: traitGiven
       ? [...cw.cardTraits.filter((t) => t.playerId !== traitGiven.playerId || t.trait !== traitGiven.trait), traitGiven]
       : cw.cardTraits,
@@ -801,10 +829,26 @@ export interface CardFaceView {
 }
 
 /** The effect line on the face; the specific hire, recruit or play is also named. */
-function effectLine(def: CardDef, card: OfferedCard, level: TraitLevel): string {
+function effectLine(state: GameState, def: CardDef, card: OfferedCard, level: TraitLevel): string {
   switch (card.kind) {
-    case 'player': return `${TRAITS[SIGNATURE_TRAIT[card.player.position]].name} ${ROMAN[level]}.`;
-    case 'dilemma': return level === 1 ? 'Board patience −1.' : `+${(level - 1) * CARD_WEEK.DILEMMA_MARGIN_STEP} recruit rating. Board patience −1.`;
+    case 'player': {
+      const active = activeCard(state, card.cardId);
+      const player = active?.kind === 'player' ? state.squad.find(p => p.id === active.playerId)! : card.player;
+      const levels = Math.max(0, level - (active?.level ?? 1));
+      const improved = withRecruitUpgrade(player, levels);
+      const benefit = recruitBenefit(player, improved);
+      if (benefit) return `${benefit}.`;
+      const trait = SIGNATURE_TRAIT[player.position];
+      const current = traitLevel(player.traits, trait);
+      return levels ? 'Signature trait and rating already at maximum.' : `${TRAITS[trait].name} ${ROMAN[current || 1]}.`;
+    }
+    case 'dilemma': {
+      const active = activeCard(state, card.cardId);
+      const player = active?.kind === 'dilemma' ? state.squad.find(p => p.id === active.playerId)! : card.player;
+      const points = Math.max(0, level - (active?.level ?? 1)) * CARD_WEEK.DILEMMA_MARGIN_STEP;
+      const benefit = recruitBenefit(player, withRatingBonus(player, points));
+      return benefit ? `${benefit}. Board patience −1.` : 'Board patience −1.';
+    }
     case 'staff': return level === 1 ? 'No hiring fee.' : `Weekly wage −${(1 - CARD_WEEK.STAFF_WAGE_FACTOR[level]) * 100}%.`;
     case 'setPlay': return level === 1 ? 'Free set play.' : 'Better execution when called.';
     case 'trait': return `+${level} trait ${level === 1 ? 'level' : 'levels'}.`;
@@ -827,7 +871,7 @@ function cardFaceView(state: GameState, card: OfferedCard, index: number, level:
   const current = upgrade ? existingCardFace(state, def) : undefined;
   if (current) card = { ...current, ...(card.fromClubId ? { fromClubId: card.fromClubId } : {}) };
   const view: CardFaceView = {
-    index, cardId: def.id, kind: def.kind, title: def.title, tier: def.tier, level, upgrade, effect: effectLine(def, card, level),
+    index, cardId: def.id, kind: def.kind, title: def.title, tier: def.tier, level, upgrade, effect: effectLine(state, def, card, level),
     ...(card.fromClubId ? { source: state.league.clubs.find(c => c.id === card.fromClubId)?.name ?? card.fromClubId } : {}),
     hint: `Good if ${GOOD_IF[def.kind]}`, refusal: null,
   };
@@ -974,8 +1018,7 @@ export function rerollCard(state: GameState, grant?: number): GameState | string
   if (!cw || !offer) return 'No pick is waiting.';
   const cost = rerollCost(state);
   const paid = bookPlayerMovement(state, -cost, 'events', careerActionClock(state));
-  const previousSteal = offer.cards.find(c => c.fromClubId);
-  const draw = drawOffer(paid, offer.kind, [offer], offer.fromClubId, previousSteal);
+  const draw = drawOffer(paid, offer.kind, [offer], offer.fromClubId);
   if (!draw.offer) return 'There are no eligible cards to draw.';
   const rerolls = { season: state.season, week: state.week, count: (cost - CARD_WEEK.REROLL_BASE) / CARD_WEEK.REROLL_STEP + 1 };
   const { cards } = draw.offer;

@@ -21,7 +21,7 @@ import { setCareerNamespace } from '../../src/core/storage/local';
 import { DEV_TEST_PREFIX } from '../../src/core/storageKeys';
 import { createNewGame, getState, loadState, newCardWeek, SAVE_VERSION, setState, type GameState, type OfferedCard, type Player, type Position } from '../../src/core/state';
 import { advanceWeek, advanceWeeks, clearHeldWeek, clearSeasonHooks, clearTickHooks, withFastForward, weekHeld } from '../../src/core/time';
-import { BOARD, SQUAD_CAP } from '../../src/config';
+import { BOARD, SQUAD_CAP, STAT_MAX } from '../../src/config';
 import { CARD_WEEK, CARDS, SIGNATURE_TRAIT, cardDefById, PLAYER_CARD_MARGIN } from '../../src/data/cards';
 import { AROUND_SPREAD, overallRating, shownStats } from '../../src/data/player';
 import { effectiveRating, FIT, positionFit } from '../../src/systems/lineup';
@@ -34,7 +34,7 @@ import { traitLevel } from '../../src/data/traits';
 import { leagueEntryReceiptId } from '../../src/data/leagueCareer';
 import { AU_CAREER_PROFILE } from '../../src/content/career/au';
 import {
-  activeCard, activeCardStaff, cardFloor, cardMatchPlays, cardOfferView, cardWeekTick, passCard, passPick, discardCard, playCard, playChosenCard, playPickCard, drawOffer, freePlayCandidates, lastMatchImpact, plantCard,
+  activeCard, activeCardStaff, cardFloor, cardMatchPlays, cardOfferView, cardWeekTick, chooseCard, passCard, passPick, discardCard, playCard, playChosenCard, playPickCard, drawOffer, freePlayCandidates, lastMatchImpact, plantCard,
   playedLeagueMatch, registerCardWeekSystem, rerollCard, rerollCost, rerollPick, startCardWeek, takeCard, traitTargets, type CardTake,
 } from '../../src/systems/cardWeek';
 import { capRoomFor, commitment, publishedCap } from '../../src/systems/cap';
@@ -1013,6 +1013,28 @@ describe('Phase 2 win reward', () => {
     }
   });
 
+  it('replaces a departed player with a regular card when the beaten club has no eligible steals', async () => {
+    const { state, opponent } = result(await career(573), 'win');
+    const dealt = cardWeekTick(state);
+    const pick = dealt.cardWeek!.offers.slice(-1)[0]!;
+    const departed = pick.cards.find(c => c.fromClubId);
+    if (departed?.kind !== 'player') throw new Error('Expected a stolen player');
+    const club = dealt.league.clubs.find(c => c.id === opponent)!;
+    const plays = stylePlays(rivalStyle(club).attack);
+    const rerolled = changed(rerollCard({
+      ...dealt, playbook: { owned: plays },
+      squad: dealt.squad.map(p => ({ ...p,
+        stats: { speed: 99, strength: 99, stamina: 99, handling: 99, kicking: 99, footyIQ: 99 } })),
+      league: { ...dealt.league, clubs: dealt.league.clubs.map(c => c === club
+        ? { ...c, squad: c.squad!.filter(p => p.id !== departed.player.id) } : c) },
+    }, pick.grant));
+    const refreshed = rerolled.cardWeek!.offers.slice(-1)[0]!;
+    expect(refreshed.cards).toHaveLength(3);
+    expect(refreshed.cards.every(c => !c.fromClubId && c.cardId !== departed.cardId)).toBe(true);
+    expect(rerolled.money).toBe(dealt.money - 1500);
+    expect(isCardWeek(rerolled.cardWeek)).toBe(true);
+  });
+
   it('offers a play from the beaten club style when nobody qualifies, then a regular third card when its plays are owned', async () => {
     const s = await career(573);
     const { state, opponent } = result({ ...s, squad: s.squad.map(p => ({
@@ -1055,6 +1077,37 @@ describe('Phase 2 card levels', () => {
       s = out.state;
     }
     expect(plantCard(s, 'cashInjection')).toBe('That card cannot be offered now.');
+  });
+
+  it('gives seed 150’s Harley Kestwick Playmaker III at card Level II and extra rating at Level III', async () => {
+    const base = await career(150);
+    const pick = base.cardWeek!.offers[2]!;
+    const index = pick.cards.findIndex(c => c.kind === 'player' && c.player.name === 'Harley Kestwick');
+    expect(index).toBeGreaterThanOrEqual(0);
+    const hired = taken(playPickCard(base, index, undefined, pick.grant));
+    const harley = hired.joined!;
+    expect(traitLevel(harley.traits, 'playmaker')).toBe(2);
+    expect(activeCard(hired.state, 'hookerSigning')).toMatchObject({ level: 1, playerId: harley.id });
+    loadState(planted(hired.state, 'hookerSigning'));
+    expect(cardOfferView(getState()).cards[0]).toMatchObject({ level: 2, effect: 'Playmaker III.' });
+    expect(chooseCard(0)).toMatchObject({ ok: true, outcome: expect.stringContaining('Playmaker III') });
+    const upgraded = getState().squad.find(p => p.id === harley.id)!;
+    expect(traitLevel(upgraded.traits, 'playmaker')).toBe(3);
+    expect(activeCard(getState(), 'hookerSigning')).toMatchObject({ level: 2 });
+
+    loadState(planted(getState(), 'hookerSigning'));
+    expect(cardOfferView(getState()).cards[0]).toMatchObject({ level: 3, effect: '+2 recruit rating.' });
+    const capped = { ...getState(), squad: getState().squad.map(p => p.id === harley.id
+      ? { ...p, stats: { ...p.stats, handling: STAT_MAX, footyIQ: STAT_MAX, stamina: STAT_MAX, strength: STAT_MAX } }
+      : p) };
+    expect(takeCard(capped, 0)).toMatch(/already has the maximum signature trait and rating/);
+    expect(activeCard(capped, 'hookerSigning')).toMatchObject({ level: 2 });
+    expect(plantCard(capped, 'hookerSigning')).toBe('That card cannot be offered now.');
+    expect(chooseCard(0)).toMatchObject({ ok: true, outcome: expect.stringContaining('+2 recruit rating') });
+    const maxed = getState().squad.find(p => p.id === harley.id)!;
+    expect(overallRating(maxed)).toBe(overallRating(upgraded) + 2);
+    expect(activeCard(getState(), 'hookerSigning')).toMatchObject({ level: 3 });
+    expect(plantCard(getState(), 'hookerSigning')).toBe('That card cannot be offered now.');
   });
 
   it.each(CARDS.filter(card => card.kind === 'player'))('levels $id’s signature trait on the same player', async ({ id }) => {

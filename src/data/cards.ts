@@ -28,6 +28,7 @@ export const CARD_WEEK = {
   STAFF_WAGE_FACTOR: { 1: 1, 2: 0.75, 3: 0.5 },
   CASH_FACTOR: { 1: 1, 2: 1.5, 3: 2 },
   DILEMMA_MARGIN_STEP: 2,
+  RECRUIT_RATING_STEP: 2,
 } as const;
 
 /**
