@@ -37,7 +37,8 @@ type Save = Record<string, unknown> & {
  */
 function withoutMatchResults(save: Save): unknown {
   // Story cards are drawn on the replay (#820). The captured week-5 file predates that.
-  const { squad: _squad, potmTally: _potm, competitions, eventDeck: _deck, ...rest } = save;
+  // Unlocks follow league rounds (#831). The captured week-5 file opened round-5 rows on the calendar week.
+  const { squad: _squad, potmTally: _potm, competitions, eventDeck: _deck, unlocks: _unlocks, ...rest } = save;
   const { instances: _instances, ...otherCompetitions } = competitions;
   return { ...rest, competitions: otherCompetitions };
 }
@@ -114,11 +115,15 @@ it.each(['au', 'uk'] as const)(
     expect(withoutMatchResults(replayed)).toEqual(withoutMatchResults(w5));
     expect(squadIdentity(replayed)).toEqual(squadIdentity(w5));
     expect(fixtureCalendar(replayed)).toEqual(fixtureCalendar(w5));
+    // Before league round 1 nothing new opens; the capture opened the round-5 rows at calendar week 5.
+    expect(replayed.unlocks).toEqual(JSON.parse(w4).unlocks);
+    const capturedUnlocks = w5.unlocks as { facilities: string[]; screens: string[] };
+    expect(capturedUnlocks.facilities.filter(id => id !== 'scoutOffice' && id !== 'medicalBay')).toEqual((replayed.unlocks as { facilities: string[] }).facilities);
     // The slot holds what was played, in the current save version.
     expect(bytes.get(slotKey(1))).toBe(JSON.stringify({ ...replayed, version: SAVE_VERSION }));
     if (sameEngine) {
-      const { eventDeck: _replayedDeck, ...replayedRest } = replayed;
-      const { eventDeck: _capturedDeck, ...capturedRest } = w5;
+      const { eventDeck: _replayedDeck, unlocks: _replayedUnlocks, ...replayedRest } = replayed;
+      const { eventDeck: _capturedDeck, unlocks: _capturedUnlocks, ...capturedRest } = w5;
       expect(replayedRest).toEqual(capturedRest);
       expect(bytes.get(slotKey(1))).toBe(JSON.stringify({ ...replayed, version: SAVE_VERSION }));
     }
