@@ -7,7 +7,7 @@ live gameplay change; work still open below has not shipped.
 
 ## Now
 
-- **League career only.** New clubs start a League career in Local. Classic saves are archived, not loaded ([#819](https://github.com/ch-leon/nrl-sim/issues/819)). Removing the Classic-only season code and moving the old test harnesses across is the follow-up.
+- **League career only.** New clubs start a League career in Local. Classic saves are deleted on load, at the owner's request ([#819](https://github.com/ch-leon/nrl-sim/issues/819)). Removing the Classic-only season code and moving the old test harnesses across is the follow-up.
 
 - **A ground that grows** ([PR #827](https://github.com/ch-leon/nrl-sim/pull/827), [#824](https://github.com/ch-leon/nrl-sim/issues/824)): home matches show the Grandstand, Sponsor Board and Canteen you have built, and the crowd fills with the gate. Away grounds follow the league, small in Local and full in the Premier League.
 

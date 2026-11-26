@@ -34,7 +34,7 @@ What's in the game, with the PR that added each.
 
 ## League and season
 
-- League career is the only mode. A new club starts in Local, in Australia or the UK: eight clubs in Local, Championship and Premier League. A finals title unlocks the next league (`src/content/career/`). An old Classic save is archived and can be exported; it is not loaded.
+- League career is the only mode. A new club starts in Local, in Australia or the UK: eight clubs in Local, Championship and Premier League. A finals title unlocks the next league (`src/content/career/`). An old Classic save is deleted on load, at the owner's request.
 - Rivals sign ([PR](https://github.com/ch-leon/nrl-sim/pull/386)) and switch plans ([PR](https://github.com/ch-leon/nrl-sim/pull/319))
 - Fictional names, rename in-game ([PR](https://github.com/ch-leon/nrl-sim/pull/401))
 - Easy, Normal, Hard ([PR](https://github.com/ch-leon/nrl-sim/pull/153))
@@ -64,7 +64,7 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
-- **League career is the only mode.** A new club no longer asks Classic or League: it starts a League career in Local. An old Classic save shows “Classic mode has been retired. Start a new League career.” once, with Export save, and the slot is left empty. The save is archived, including on the iPhone app, so it does not come back at the next launch. A second Classic career in that slot is kept beside the first. Import of a Classic file is refused with the same message. Settings lists every retired save, with Export and Delete, after a new League career has started. A home game still opens Finance and the coach's office, and a derby against the neighbour is still called on the match and in the news, including a trial. On a phone the ladder column scrolls so the table stays reachable under the event cards. [#819](https://github.com/ch-leon/nrl-sim/issues/819) [#834](https://github.com/ch-leon/nrl-sim/issues/834).
+- **League career is the only mode.** A new club no longer asks Classic or League: it starts a League career in Local. An old Classic save, with its live match, is deleted when the game loads (intentional, at the owner's request) and the slot is left empty; the title says “Classic mode has been retired. Start a new League career.” once. League saves are not touched. Import of a Classic file is refused with the same message. A home game still opens Finance and the coach's office, and a derby against the neighbour is still called on the match and in the news, including a trial. On a phone the ladder column scrolls so the table stays reachable under the event cards. [#819](https://github.com/ch-leon/nrl-sim/issues/819) [#834](https://github.com/ch-leon/nrl-sim/issues/834).
 
 - **Stepping down a league.** In a League career, a title won in a league below the club's highest unlocked league is worth half the usual title reputation (7 instead of 15). The League guide's Ladder page says so.
 
