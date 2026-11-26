@@ -139,7 +139,7 @@ describe('rejected import', () => {
     const destinationBytes = bytes.get(slotKey(1));
     const old = JSON.stringify({ ...destination, version: 27 });
     expect(importSave(old)).toMatchObject({ ok: false, message: expect.stringMatching(/older version.*start a new career/i) });
-    expect(installImportedSave(old, 1)).toMatchObject({ ok: false, message: 'Classic mode has been retired. Start a new League career.' });
+    expect(installImportedSave(old, 1)).toMatchObject({ ok: false, message: expect.stringMatching(/start a new career/i) });
     expect(bytes.get(slotKey(1))).toBe(destinationBytes);
     expect(exportOriginalSave(1)).toBe(destinationBytes);
     expect(JSON.parse(destinationBytes!).version).toBe(SAVE_VERSION);

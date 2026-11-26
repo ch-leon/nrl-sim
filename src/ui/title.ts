@@ -517,7 +517,7 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
       card.setAttribute(`data-nrl-slot-${s.slot}`, '');
       if (s.status === 'empty') card.setAttribute('data-empty', '');
       // The save written last carries the screen's one orange (#613) and says so.
-      const last = isPrimary && s.status === 'ok';
+      const last = isPrimary && s.status === 'ok' && !s.classic;
       if (last) card.setAttribute('data-last', '');
       card.appendChild(mk('div', 'nrl-title-slotno', last ? `Slot ${s.slot} · Last played` : `Slot ${s.slot}`));
       const club = mk('div', 'nrl-title-club',
@@ -530,8 +530,9 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
       if (s.status === 'ok') card.appendChild(mk('div', 'nrl-title-when', `Season ${s.season} · Week ${s.week}${s.ladder ? ` · ${ordinal(s.ladder)}` : ''}`));
       if (s.message) card.appendChild(mk('div', 'nrl-title-warn', s.message));
 
-      // The card's one button: Continue on a season, New club where there is none to continue.
-      if (s.status === 'ok') {
+      // The card's one button: Continue on a season, New club where there is none to continue
+      // (a retired Classic career sharing its slot with League data is never continued, #819).
+      if (s.status === 'ok' && !s.classic) {
         const cont = mkButton(isPrimary ? 'Continue ▸' : 'Continue', `data-nrl-continue-${s.slot}`, lead);
         cont.addEventListener('click', () => finish(s.slot, { mode: 'continue' }));
         card.appendChild(cont);
@@ -556,7 +557,7 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
         }
         if (originals.length) what.push('export');
       } catch { /* unreadable storage is already described on the card */ }
-      if (s.status === 'ok') {
+      if (s.status === 'ok' && !s.classic) {
         const newBtn = mkButton('New club', `data-nrl-new-${s.slot}`, 'nrl-title-btn-small');
         newBtn.addEventListener('click', () => showSetup(s));
         menu.appendChild(newBtn);
@@ -603,7 +604,7 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
     const primarySlot = (summaries: SlotSummary[]): number | undefined => {
       const meta = listSlotMeta();
       const when = (slot: number): number => meta.find((m) => m.slot === slot)?.meta?.updatedAt ?? 0;
-      const saved = summaries.filter((s) => s.status === 'ok');
+      const saved = summaries.filter((s) => s.status === 'ok' && !s.classic);
       if (saved.length) return saved.reduce((a, b) => (when(b.slot) > when(a.slot) ? b : a)).slot;
       return summaries.find((s) => s.status === 'empty')?.slot;
     };

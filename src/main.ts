@@ -9,7 +9,7 @@ import { IndividualChallengeScene, bindIndividualChallengeGame } from './scenes/
 import { bus, type Events } from './core/events';
 import { getState, loadState, stateInstallation, type GameState } from './core/state';
 import {
-  captureSlot, classicSlots, enableAutosave, firstRunSlotSummaries, getActiveSlot, hasSave, loadCareer, save, setActiveSlot, writeSlot,
+  captureSlot, classicSlots, enableAutosave, firstRunSlotSummaries, getActiveSlot, hasSave, loadCareer, save, setActiveSlot, slotHasLeagueData, writeSlot,
 } from './core/save';
 import { showLeagueLoading, showTitleFlow, type TitleChoice } from './ui/title';
 import { EXPANSION_INTRO_HINT, showExpansionIntro } from './ui/expansionIntro';
@@ -159,7 +159,7 @@ async function boot(): Promise<void> {
     setActiveSlot(1);
     // Its save gone (site data cleared), or only a Classic career there (#819, which reads
     // as empty and is overwritten by the new League career): build a League career.
-    if (!hasSave(1) || classicSlots().includes(1)) playtest.fresh = true;
+    if (!hasSave(1) || (classicSlots().includes(1) && !slotHasLeagueData(1))) playtest.fresh = true;
   }
   let choice: TitleChoice = playtest
     ? (playtest.fresh ? { mode: 'new' as const, careerMode: 'league', ...freshPlaytestLeagueStart(captureSlot(1).raw) } : { mode: 'continue' as const })
