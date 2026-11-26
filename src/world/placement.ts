@@ -548,7 +548,7 @@ export class PlacementController {
     const def = FACILITY_CATALOG[defId];
     if (this.moving) return this.confirmMove(def);
     if (!isFacilityOpen(getState(), defId)) {
-      bus.emit('ui:notify', { text: unlockReason(defId), kind: 'info' });
+      bus.emit('ui:notify', { text: unlockReason(defId, getState()), kind: 'info' });
       return { ok: false, reason: 'locked' };
     }
 
