@@ -523,6 +523,29 @@ describe('native outcome acknowledgement', () => {
     expect(slotGone).toBeGreaterThan(archiveWrite);
   });
 
+  it('leaves a career written into the slot while the native archive was being confirmed', async () => {
+    const {native, storage, mirror} = start();
+    __setStorage(storage);
+    const classic = JSON.stringify(classicCareer('Old Town', 4));
+    storage.setItem(slotKey(1), classic);
+    await mirror.idle();
+    const release = native.hold();
+    const retiring = retireClassicSlotDurable(1);
+    const league = JSON.stringify({ version: 35, clubName: 'New League', competitions: { leagueCareer: { phase: 'active' } } });
+    try {
+      await vi.waitFor(() => {
+        expect(native.calls.some((c) => c.op === 'write' && c.name === F(retiredSaveKey(1)) + '.tmp')).toBe(true);
+      });
+      // Another tab (or the player) puts a League career in the slot before the ack.
+      storage.setItem(slotKey(1), league);
+    } finally {
+      release();
+    }
+    expect(await retiring).toMatchObject({ slot: 1, raw: classic, emptied: false, notify: false });
+    expect(storage.getItem(slotKey(1))).toBe(league);
+    expect(storage.getItem(retiredSaveKey(1))).toBe(classic);
+  });
+
   it('a wiped web view restores a native-only Classic save into the archive, not the live slot', async () => {
     const native = fakeFiles();
     const classic = JSON.stringify(classicCareer('Old Town', 8));

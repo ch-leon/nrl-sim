@@ -939,6 +939,8 @@ function commitClassicRetirement(staged: StagedClassic): ClassicRetirement {
   if (!store) return { slot, raw, emptied: false, notify: true };
   let removed: string[] = [];
   try {
+    const now = store.read(slot);
+    if (now !== raw) return { slot, raw, emptied: false, notify: false };
     removed = store.removeExact(slot, staged.own, staged.legacy);
     if (staged.match !== null && store.storage.getItem(liveMatchKey(slot)) === staged.match) {
       store.storage.removeItem(liveMatchKey(slot));
