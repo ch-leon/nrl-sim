@@ -1,6 +1,6 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, setupStep } from '../common.mjs';
+import { confirmStartingLeague, closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, setupStep } from '../common.mjs';
 
 /**
  * Set plays on the club side (#326, phase 2), at phone landscape (667×375 and
@@ -61,6 +61,7 @@ export async function runPlaybook(browser, sizes = [[667, 375], [844, 390]]) {
       await setupStep(page);
       await page.locator('[data-nrl-open-all]').check();
       await page.locator('[data-nrl-start]').tap();
+      await confirmStartingLeague(page);
       await page.locator('[data-expansion-work]').tap();
       const skip = page.locator('.nrl-tutorial-skip');
       if (await skip.count()) await skip.tap();

@@ -4,6 +4,7 @@ import { createNewGame, getState, SAVE_VERSION, type GameState } from '../../src
 import { isPlayer, isPlayerStats, isPlacedFacility, REPAIR_NOTICE } from '../../src/core/saveValidation';
 import { __setStorage, __unlockSaves, exportRecoverySaves, getSlotSummaries, importSave, installImportedSave, loadSlot, migrateState, MIGRATIONS, setActiveSlot, writeSlot } from '../../src/core/save';
 import { initLeague } from '../../src/systems/fixtures';
+import { CLASSIC_RETIRED_TEXT } from '../../src/core/classicSave';
 import { resolveLineup } from '../../src/systems/lineup';
 import { preparePack, selectPack } from '../../src/content';
 import { setCareerNamespace, type StorageLike } from '../../src/core/storage/local';
@@ -148,7 +149,9 @@ describe('preservation gates', () => {
     const raw = damaged(); bytes.set(slotKey(1), raw);
     const result = loadSlot(); expect(result).toMatchObject({ status: 'ok', outcome: 'repaired' });
     expect(exportRecoverySaves(1)).toContain(raw); expect(bytes.get(slotKey(1))).toBe(raw);
-    expect(getSlotSummaries()[0].message).toBe(REPAIR_NOTICE);
+    // A round-based career is Classic, so the player's slot list shows the slot empty (#819).
+    expect(getSlotSummaries()[0]).toEqual({ slot: 1, status: 'empty' });
+    if (result.status === 'ok') expect(result.repairs[0]?.notification).toBe(REPAIR_NOTICE);
     if (result.status === 'ok') expect(writeSlot(1, result.state)).toBe(true);
     expect(JSON.parse(bytes.get(slotKey(1))!).lineup.captain).toBe(null);
     expect(exportRecoverySaves(1)).toContain(raw);
@@ -162,10 +165,12 @@ describe('preservation gates', () => {
     expect(installImportedSave(incoming, 2).ok).toBe(false);
     expect(bytes.get(slotKey(1))).toBe(incoming); expect(bytes.get(slotKey(2))).toBe(destination); expect(bytes.get(liveMatchKey(2))).toBe('live');
   });
-  it('preserves both the repaired import original and the occupied destination', () => {
+  it('refuses a repaired Classic import before writing anything (#819)', () => {
     const incoming = damaged(); const destination = JSON.stringify(fresh()); bytes.set(slotKey(1), destination);
-    expect(installImportedSave(incoming, 1)).toMatchObject({ ok: true, outcome: 'repaired' });
-    expect(exportRecoverySaves(1)).toEqual([incoming, destination]);
+    expect(importSave(incoming)).toMatchObject({ ok: true, outcome: 'repaired' });
+    expect(installImportedSave(incoming, 1)).toEqual({ ok: false, message: CLASSIC_RETIRED_TEXT });
+    expect(exportRecoverySaves(1)).toEqual([]);
+    expect(bytes.get(slotKey(1))).toBe(destination);
   });
   it('rejects historical imports without installing or writing recovery', () => {
     const incoming = JSON.stringify({ ...fresh(), version: 22 }, null, 2);
@@ -247,8 +252,9 @@ it('does not install a repaired import when retaining its occupied destination f
     if (key === recoveryKey(1) && (JSON.parse(value) as string[]).includes(destination)) throw new Error('destination backup failed');
     set(key, value);
   };
-  expect(installImportedSave(incoming, 1)).toMatchObject({ ok: false });
-  expect(exportRecoverySaves(1)).toContain(incoming);
+  // A round-based career is Classic: refused on import before anything is written (#819).
+  expect(installImportedSave(incoming, 1)).toEqual({ ok: false, message: CLASSIC_RETIRED_TEXT });
+  expect(exportRecoverySaves(1)).toEqual([]);
   expect(bytes.get(slotKey(1))).toBe(destination); expect(bytes.get(liveMatchKey(1))).toBe('existing live');
 });
 

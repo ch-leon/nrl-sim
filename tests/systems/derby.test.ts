@@ -1,6 +1,6 @@
 import { createLegacyGame as createNewGame } from '../helpers/legacyGame';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { getState, setState, type RivalClub } from '../../src/core/state';
+import { getState, setState, type GameState, type RivalClub } from '../../src/core/state';
 import { bus, type Events } from '../../src/core/events';
 import { advanceWeek, clearSeasonHooks, clearTickHooks, registerTickHook, TICK_ORDER } from '../../src/core/time';
 import { derbyRival, isDerbyFixture, registerDerbySystem } from '../../src/systems/derby';
@@ -96,6 +96,28 @@ describe('derby News hook', () => {
   });
 });
 
+
+it('previews a League career derby from the calendar slot, and ignores a trial', () => {
+  setState({
+    week: 5,
+    competitions: {
+      schemaVersion: 1,
+      instances: [{
+        definition: { format: { kind: 'league' } },
+        fixtures: [{ slot: 5, round: 1, homeId: 'player', awayId: 'rival-cyclones', status: 'scheduled' }],
+      }, {
+        definition: { format: { kind: 'exhibition' } },
+        fixtures: [{ slot: 5, round: 1, homeId: 'player', awayId: 'rival-wolves', status: 'scheduled' }],
+      }],
+      calendar: { mode: 'structural', status: 'active', season: 1, elapsedIntervals: 4, slots: [] },
+    } as unknown as NonNullable<GameState['competitions']>,
+  });
+  const news: string[] = [];
+  bus.on('ui:notify', n => news.push(n.text));
+  registerDerbySystem();
+  expect(news).toHaveLength(1);
+  expect(news[0]).toContain('Derby week against Cairns Cyclones');
+});
 
 it('waits through both trials before previewing a competitive round-one derby', () => {
   const s = getState();

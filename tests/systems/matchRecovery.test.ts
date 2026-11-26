@@ -109,25 +109,21 @@ it.each(badIds)('Save & exit drops incompatible inputs even at tick zero (%s), e
   expect(JSON.stringify(getState())).toBe(before);
 });
 
-it.each([matchEngineIdentity(), ...badIds])('export/import carries compatible identity or accepts fallback identity %s', engineId => {
+it.each([matchEngineIdentity(), ...badIds])('refuses a Classic export, whatever the parked match identity (%s)', engineId => {
   save(getState()); advanceWeek();
   starts[0]!.live.onProgress?.([{ tick: 1, side: 'home', call: 'hit-up' }], 40, []);
   const exported = JSON.parse(exportSave(getState()));
   expect(exported.nrlLiveMatch.engineId).toBe(matchEngineIdentity());
   exported.nrlLiveMatch.engineId = engineId;
+  const before = bytes.get(liveMatchKey(1));
   const text = JSON.stringify(exported);
   expect(peelLiveMatchExport(text).bad).toBe(false);
   clearHeldWeek(); listen();
-  expect(installImportedSave(text, 1).ok).toBe(true);
-  setState(load()!); advanceWeek();
-  const live = starts[starts.length - 1]!.live;
-  if (engineId === matchEngineIdentity()) {
-    expect(live.resumeAt).toBe(40); expect(live.calls).toEqual(exported.nrlLiveMatch.calls);
-    expect(notes).not.toContain(MATCH_RESTARTED_TEXT);
-  } else {
-    expect(live.resumeAt).toBeUndefined(); expect(live.calls).toEqual([]);
-    expect(notes.filter(n => n === MATCH_RESTARTED_TEXT)).toHaveLength(1);
-  }
+  // A Classic career is not installed. The match record stays where it was.
+  const imported = installImportedSave(text, 1);
+  expect(imported.ok).toBe(false);
+  if (!imported.ok) expect(imported.message).toBe('Classic mode has been retired. Start a new League career.');
+  expect(bytes.get(liveMatchKey(1))).toBe(before);
 });
 
 it('retains stale bytes if replacement storage fails after rebuilding the fixture', () => {

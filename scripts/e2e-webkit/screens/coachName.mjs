@@ -2,7 +2,7 @@
 // WebKit CI artifact, never to git.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { OUT_ROOT, BASE, IPHONE_UA, openNav, setupStep } from '../common.mjs';
+import { confirmStartingLeague, OUT_ROOT, BASE, IPHONE_UA, openNav, setupStep } from '../common.mjs';
 
 export async function runCoachName(browser) {
   const out = join(OUT_ROOT, 'webkit', 'coach-name');
@@ -34,6 +34,7 @@ export async function runCoachName(browser) {
         if (record.layout.buildOverlap) record.problems.push('build label overlaps setup');
         await page.screenshot({ path: join(out, `${tag}-setup.png`) });
         await page.locator('[data-nrl-start]').tap();
+        await confirmStartingLeague(page);
         await page.locator('[data-expansion-work]').tap();
         await page.waitForSelector('.nrl-tutorial-text');
         const address = name || 'Coach';

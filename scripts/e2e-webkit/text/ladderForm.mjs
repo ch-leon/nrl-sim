@@ -1,4 +1,4 @@
-import { playTrials } from '../common.mjs';
+import { advanceOnce, confirmStartingLeague, playTrials } from '../common.mjs';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, setupStep } from '../common.mjs';
@@ -50,27 +50,19 @@ export async function runLadderForm(browser) {
     await page.goto(BASE);
     await setupStep(page);
     await page.locator('[data-nrl-start]').tap();
+    await confirmStartingLeague(page);
     await page.locator('[data-expansion-work]').tap();
     await page.locator('.nrl-tutorial-skip').tap();
       await playTrials(page);
   });
   await step('five-rounds', async (rec) => {
-    // A bye or a forfeit plays no match: weeks until every club has five results (eight at most).
-    for (let i = 0; i < 8; i++) {
+    // Rest weeks and trials sit among the regular rounds. Sixteen advances covers five results.
+    for (let i = 0; i < 16; i++) {
       if (await page.evaluate(() => Math.min(...window.__nrlState().league.ladder.map((r) => r.played)) >= 5)) break;
       const at = await page.evaluate(() => window.__nrlState().week);
       await home();
-      await page.locator('.nrl-dock [data-hud="advance"]').tap();
-      for (let j = 0; j < 2; j++) {
-        const ask = page.locator('[data-confirm-advance], [data-ask-proceed]');
-        await page.waitForTimeout(300);
-        if (await ask.count()) await ask.first().tap();
-      }
-      const what = await page.waitForFunction((a) => (document.querySelector('.nrl-mo-controls') ? 'match'
-        : window.__nrlState().week !== a ? 'week' : null), at, { timeout: 20000 }).then((h) => h.jsonValue());
+      const what = await advanceOnce(page);
       if (what === 'match') {
-        const go = page.locator('.nrl-mo-plan .nrl-mo-plan-go');
-        if (await go.count()) await go.first().tap();
         await page.locator('.nrl-mo-controls [data-pause]').tap();
         await page.locator('.nrl-mo-sheet [data-skip]').tap();
         await page.locator('[data-back-to-club]:visible').first().tap({ timeout: 30000 });

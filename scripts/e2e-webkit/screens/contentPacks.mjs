@@ -2,7 +2,7 @@
 // Screenshots are kept by the existing CI artifact, never committed.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { BASE, OUT_ROOT, openNav, closeWeekSummary, playTrials, log, skipFromPill, setupStep } from '../common.mjs';
+import { confirmStartingLeague, BASE, OUT_ROOT, openNav, closeWeekSummary, playTrials, log, skipFromPill, setupStep } from '../common.mjs';
 
 export async function runContentPacks(browser) {
   const out = join(OUT_ROOT, 'webkit', 'content-packs');
@@ -32,13 +32,20 @@ export async function runContentPacks(browser) {
         await page.locator('[data-nrl-town]').fill(`${town.name}, ${town.region}, ${town.country}`);
         await setupStep(page);
         await page.locator('[data-nrl-start]').tap();
+        await confirmStartingLeague(page);
         await page.locator('[data-expansion-work]').tap();
         await page.waitForFunction(() => window.__nrlState);
         await page.locator('.nrl-tutorial-skip').tap();
         const state = await page.evaluate(() => window.__nrlState());
         const expected = country === 'GB' ? 'uk' : 'au';
-        if (state.pack !== expected || state.league.clubs.length !== (expected === 'uk' ? 12 : 16)) throw new Error('Wrong pack or club count');
-        if (report.ukRequests !== (expected === 'uk' ? 1 : 0)) throw new Error(`Unexpected UK requests: ${report.ukRequests}`);
+        const marker = expected === 'uk' ? 'rival-uk-buntings' : 'rival-larrikins';
+        const local = state.competitions?.instances?.find((i) => i.definition?.format?.kind === 'league' && i.entrantIds?.includes(state.clubId));
+        // A League career keeps the whole regional world on the save (24 clubs) and plays in a division of 8.
+        if (state.pack !== expected || state.league.clubs.length !== 24 || local?.entrantIds.length !== 8 || !state.league.clubs.some((c) => c.id === marker)) {
+          throw new Error(`Wrong pack or club count (${state.pack}, world ${state.league.clubs.length}, league ${local?.entrantIds.length})`);
+        }
+        // AU never fetches a UK chunk. A UK League career fetches the pack and the career profile, each its own file.
+        if ((expected === 'uk') !== (report.ukRequests > 0)) throw new Error(`Unexpected UK requests: ${report.ukRequests}`);
         report.pack = state.pack;
         report.clubs = state.league.clubs.length;
         await playTrials(page);

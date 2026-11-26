@@ -1,6 +1,6 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, NO_INSETS, setupStep } from '../common.mjs';
+import { confirmStartingLeague, closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, NO_INSETS, setupStep } from '../common.mjs';
 
 /**
  * The play-test's large-text and tap-target fixes (Wave 4 prompt 12, #399), at 568×320
@@ -135,6 +135,7 @@ export async function runLargeTextTargets(browser) {
         await setupStep(page, 3);
         await page.locator('[data-nrl-open-all]').check();
         await page.locator('[data-nrl-start]').tap();
+        await confirmStartingLeague(page);
         await page.locator('[data-expansion-work]').tap();
         await page.waitForSelector('.nrl-tutorial-bubble[data-step="build"]');
         await page.evaluate((size) => {

@@ -242,11 +242,13 @@ export class LocalSaveStore implements SyncSaveStore {
    * Migrate the legacy single save into slot 1. The legacy key is removed only
    * after the slot write succeeded and reads back identically — a failed or
    * partial write leaves the legacy save untouched. Never overwrites slot 1.
+   * A legacy payload `skip` accepts is left exactly where it is (save.ts passes
+   * isClassicSave: a Classic save is neither migrated nor removed, #819).
    */
-  migrateLegacy(): void {
+  migrateLegacy(skip: (legacy: string) => boolean = () => false): void {
     try {
       const legacy = this.storage.getItem(LEGACY_SAVE_KEY);
-      if (legacy === null) return;
+      if (legacy === null || skip(legacy)) return;
       const slot1 = this.storage.getItem(slotKey(1));
       if (slot1 === null) {
         this.storage.setItem(slotKey(1), legacy);

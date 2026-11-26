@@ -1,14 +1,14 @@
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import { afterEach, expect, it, vi } from 'vitest';
-import { __setStorage, __unlockSaves, getSlotSummaries, loadSlot, setActiveSlot } from '../../src/core/save';
-import { createNewGame } from '../../src/core/state';
+import { __setStorage, __unlockSaves, getSlotSummaries, loadCareer, setActiveSlot } from '../../src/core/save';
+import { leagueSlotState } from '../helpers/leagueSlot';
 import { liveMatchKey, slotKey } from '../../src/core/storageKeys';
 
 afterEach(() => { __setStorage(null); vi.restoreAllMocks(); });
 
 it('the actual boot Continue loop returns to recovery when a selected save becomes rejected (#522)', async () => {
-  const bytes = new Map([[slotKey(1), JSON.stringify(createNewGame('Continue', 525))], [liveMatchKey(1), 'parked match original']]);
+  const bytes = new Map([[slotKey(1), JSON.stringify(await leagueSlotState('Continue'))], [liveMatchKey(1), 'parked match original']]);
   __setStorage({ getItem: k => bytes.get(k) ?? null, setItem: (k, v) => { bytes.set(k, v); }, removeItem: k => { bytes.delete(k); } });
   __unlockSaves(); setActiveSlot(1);
   expect(getSlotSummaries()[0].status).toBe('ok');
@@ -24,8 +24,8 @@ it('the actual boot Continue loop returns to recovery when a selected save becom
   const main = readFileSync(new URL('../../src/main.ts', import.meta.url), 'utf8');
   const section = main.slice(main.indexOf('  let choice: TitleChoice = playtest'), main.indexOf('  if (getState().league.clubs.length === 0)'));
   const js = ts.transpileModule(section, { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.ESNext } }).outputText;
-  const run = new Function('showTitleFlow', 'loadSlot', 'createNewGame', 'clearLiveMatch', 'loadState', 'preparePack', `return (async () => { const playtest = null; const uiRoot = {}; ${js} })();`);
-  await expect(run(showTitleFlow, loadSlot, defaults, clearLiveMatch, loadState, preparePack)).rejects.toBe(reachedRecovery);
+  const run = new Function('showTitleFlow', 'loadCareer', 'createNewGame', 'clearLiveMatch', 'loadState', 'preparePack', `return (async () => { const playtest = null; const uiRoot = {}; ${js} })();`);
+  await expect(run(showTitleFlow, loadCareer, defaults, clearLiveMatch, loadState, preparePack)).rejects.toBe(reachedRecovery);
   expect(showTitleFlow).toHaveBeenCalledTimes(2);
   expect(defaults).not.toHaveBeenCalled(); expect(loadState).not.toHaveBeenCalled(); expect(clearLiveMatch).not.toHaveBeenCalled(); expect(preparePack).not.toHaveBeenCalled();
   expect(bytes.get(slotKey(1))).toBe('{rejected after Continue');

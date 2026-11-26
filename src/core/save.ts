@@ -35,12 +35,13 @@ import { DEFAULT_TACTICS } from '../match/league/presets';
 import { bus } from './events';
 import { registerTickHook, TICK_ORDER, unregisterTickHook, weekHeld, activePaidCupCheckpoint, leagueIntervalSaveHeld, failedIntervalProblem, failedIntervalCheckpoint, type IntervalCheckpoint } from './time';
 import { clearLiveMatch, isLiveMatchRecord, parseLiveMatch, LIVE_MATCH_EXPORT_FIELD, peelLiveMatchExport, readLiveMatch, writeLiveMatch } from '../systems/liveMatchRecord';
-import { CORRUPT_SAVE_KEY, LEGACY_SAVE_KEY, liveMatchKey, slotKey } from './storageKeys';
+import { CLASSIC_RETIRED_TEXT, isClassicSave } from './classicSave';
+import { CORRUPT_SAVE_KEY, LEGACY_SAVE_KEY, liveMatchKey, saveMetaKey, slotKey } from './storageKeys';
 import { BRAND } from '../brand';
 import { cleanName } from '../data/names';
 import { allPlayers, renameClubsPatch, renamePlayersPatch, validClubColors, type ClubEdit } from '../systems/rename';
 import { browserStorage, inCareerNamespace, LocalSaveStore, type StorageLike } from './storage/local';
-import { nextMeta } from './storage/meta';
+import { checksumOf, nextMeta, parseMeta } from './storage/meta';
 import { deliverFile } from './storage/native';
 import type { SaveMeta, SlotListing } from './storage/types';
 
@@ -469,6 +470,8 @@ export interface SlotSummary {
   week?: number;
   /** The club's place on the ladder (1 = top), when the caller asked for it; left out before a round is in. */
   ladder?: number;
+  /** A retired Classic career that shares its slot with League data (#819): occupied, never continued. */
+  classic?: true;
   /** Human-readable reason for 'future' / 'corrupt'. */
   message?: string;
 }
@@ -479,11 +482,20 @@ export interface SlotSummary {
  * systems, which this module doesn't import): 0, a throw or no `place` leaves it off.
  */
 export function getSlotSummaries(place?: (state: GameState) => number): SlotSummary[] {
+  return summarise(place, true);
+}
+
+/**
+ * `player`: as the player sees the slots (#819). A Classic career alone in its slot is an
+ * empty slot; one sharing it with League data is shown occupied, `classic`, never continued.
+ * Otherwise exactly main's summaries (the commercial first-run record uses those).
+ */
+function summarise(place: ((state: GameState) => number) | undefined, player: boolean): SlotSummary[] {
   const store = getStore();
   const out: SlotSummary[] = [];
-  if (loadSlot(1).status === 'ok') store?.migrateLegacy();
+  if (loadSlot(1).status === 'ok') store?.migrateLegacy(isClassicSave);
   for (let slot = 1; slot <= SLOT_COUNT; slot++) {
-    const result = loadSlot(slot);
+    const { result, raw } = player ? capturePlayerSlot(slot) : captureSlot(slot);
     if (result.status === 'empty') {
       out.push({ slot, status: 'empty' });
       continue;
@@ -492,11 +504,13 @@ export function getSlotSummaries(place?: (state: GameState) => number): SlotSumm
       out.push({ slot, status: result.status, message: result.message });
       continue;
     }
+    const classic = player && raw !== null && isClassicSave(raw);
     out.push({
       slot, status: 'ok',
       clubName: String(result.state.clubName), season: result.state.season, week: result.state.week,
-      ...slotPlace(result.state, place),
-      ...(result.repairs.length ? { message: result.repairs[0]!.notification } : {}),
+      ...(classic ? {} : slotPlace(result.state, place)),
+      ...(classic ? { classic: true, message: CLASSIC_RETIRED_TEXT }
+        : result.repairs.length ? { message: result.repairs[0]!.notification } : {}),
     });
   }
   return out;
@@ -562,7 +576,7 @@ export function listSlotMeta(): SlotListing[] {
   const store = getStore();
   if (!store) return [];
   try {
-    if (loadSlot(1).status === 'ok') store.migrateLegacy();
+    if (loadSlot(1).status === 'ok') store.migrateLegacy(isClassicSave);
     return store.list();
   } catch (err) {
     console.warn('nrl-sim: could not list saves', err);
@@ -715,6 +729,76 @@ export function loadSlot(slot = activeSlot): LoadResult {
   return captureSlot(slot).result;
 }
 
+/**
+ * A live-match record's fixture is this Classic career's own: no structural fixture identity
+ * (Classic predates it), its week, its club playing, both clubs in its league.
+ */
+function classicOwnsMatch(raw: string, record: { season: number; week: number; homeId: string; awayId: string; competitionId?: string; fixtureId?: string }): boolean {
+  if (record.competitionId !== undefined || record.fixtureId !== undefined) return false;
+  try {
+    const career = JSON.parse(raw) as { season?: unknown; week?: unknown; clubId?: unknown; league?: { clubs?: unknown } };
+    const clubs = Array.isArray(career.league?.clubs) ? career.league!.clubs as unknown[] : [];
+    const ids = new Set(clubs.map((c) => (c as { id?: unknown } | null)?.id));
+    return record.season === career.season && record.week === career.week
+      && (record.homeId === career.clubId || record.awayId === career.clubId)
+      && ids.has(record.homeId) && ids.has(record.awayId);
+  } catch { return false; }
+}
+
+/**
+ * Does anything belonging to `slot` hold League (non-Classic) data (#819)? Its keys are
+ * the slot key, slot 1's legacy key, its meta and its live-match checkpoint. The slot key
+ * and legacy key count when they hold a non-Classic payload; the meta when it does not
+ * describe one of the Classic payloads (by checksum); the checkpoint when it is not a
+ * Classic career's own fixture. Anything unreadable counts as League data. Read only.
+ */
+export function slotHasLeagueData(slot: number): boolean {
+  const store = getStore();
+  if (!store) return true;
+  try {
+    const storage = store.storage;
+    const careers = [storage.getItem(slotKey(slot)), ...(slot === 1 ? [storage.getItem(LEGACY_SAVE_KEY)] : [])]
+      .filter((raw): raw is string => raw !== null);
+    if (careers.some((raw) => !isClassicSave(raw))) return true;
+    const metaRaw = storage.getItem(saveMetaKey(slot));
+    if (metaRaw !== null) {
+      const meta = parseMeta(metaRaw);
+      if (!meta || !careers.some((raw) => checksumOf(raw) === meta.checksum)) return true;
+    }
+    // The checkpoint lives where liveMatchRecord keeps it, which is the slot's storage outside tests.
+    const matchStores = new Set([storage, inCareerNamespace(browserStorage())]);
+    for (const where of matchStores) {
+      const matchRaw = where?.getItem(liveMatchKey(slot)) ?? null;
+      if (matchRaw === null) continue;
+      const record = parseLiveMatch(matchRaw);
+      if (!record || !careers.some((raw) => classicOwnsMatch(raw, record))) return true;
+    }
+    return false;
+  } catch { return true; }
+}
+
+/**
+ * A slot as the player sees it (#819): `captureSlot`, but a slot whose every key holds
+ * nothing or only Classic data reads as empty. It is never loaded and never deleted;
+ * `raw` keeps its bytes, so starting a League career there overwrites exactly them. A
+ * Classic career sharing its slot with League data stays occupied, so Start asks Start
+ * over and Import passes it by, as main does for an occupied slot. Never throws.
+ */
+export function capturePlayerSlot(slot: number): { result: LoadResult; raw: string | null } {
+  const captured = captureSlot(slot);
+  return captured.result.status === 'ok' && captured.raw !== null && isClassicSave(captured.raw) && !slotHasLeagueData(slot)
+    ? { raw: captured.raw, result: { status: 'empty' } }
+    : captured;
+}
+
+/** Continue's loader: a Classic career is never installed (#819), so its slot reads as empty. */
+export function loadCareer(slot = activeSlot): LoadResult {
+  const captured = captureSlot(slot);
+  return captured.result.status === 'ok' && captured.raw !== null && isClassicSave(captured.raw)
+    ? { status: 'empty' }
+    : captured.result;
+}
+
 /** The status shown when replacing a club and the bytes authorized by that choice
  * come from one read. The writer compares them again after asynchronous setup. */
 export function captureSlot(slot: number): { result: LoadResult; raw: string | null } {
@@ -817,6 +901,29 @@ export function downloadOriginalSave(slot: number, recoveryIndex?: number): void
   }
 }
 
+/**
+ * The slots exactly as main summarised them, for the commercial first-run record only
+ * (#362): a loadable Classic career is listed, an unreadable one (a released v26 save,
+ * say) is not, as on main. Read only.
+ */
+export function firstRunSlotSummaries(): SlotSummary[] {
+  return summarise(undefined, false);
+}
+
+/** The slots whose visible save is a Classic career, for the title's notice. Read only. Never throws. */
+export function classicSlots(): number[] {
+  const store = getStore();
+  if (!store) return [];
+  const out: number[] = [];
+  for (let slot = 1; slot <= SLOT_COUNT; slot++) {
+    try {
+      const raw = store.read(slot);
+      if (raw !== null && isClassicSave(raw)) out.push(slot);
+    } catch { /* unreadable is not Classic */ }
+  }
+  return out;
+}
+
 /** Delete a slot (leaves CORRUPT_KEY intact) and the live-match record beside it. */
 export function deleteSlot(slot: number): void {
   const store = getStore();
@@ -840,7 +947,7 @@ export function hasSave(slot: number = activeSlot): boolean {
   const store = getStore();
   if (!store) return false;
   try {
-    if (loadSlot(1).status === 'ok') store.migrateLegacy();
+    if (loadSlot(1).status === 'ok') store.migrateLegacy(isClassicSave);
     return store.read(slot) !== null;
   } catch { return true; } // unreadable is occupied, never a fresh developer career
 }
@@ -1113,6 +1220,8 @@ export function installImportedSave(text: string, slot: number): ImportResult {
   if (peeled.bad) return { ok: false, message: 'the match in this file could not be read.' };
   const res = importSave(peeled.text);
   if (!res.ok) return res;
+  // After main's own checks, so an old or broken file is still explained as on main (#819).
+  if (isClassicSave(peeled.text)) return { ok: false, message: CLASSIC_RETIRED_TEXT };
   if (inconsistentChallengeReplay(res.state,peeled.live)) return {ok:false,message:CHALLENGE_REPLAY_PROBLEM};
   if (!res.state.competitions?.leagueCareer && hasStructuralCalendar(res.state) && careerNamespace() !== DEV_TEST_PREFIX) return { ok: false, message: 'Competition prototypes can only be imported into the isolated developer career.' };
   if (hasStructuralCalendar(res.state)) {
@@ -1166,7 +1275,7 @@ export function installImportedSave(text: string, slot: number): ImportResult {
 export function importIntoSlot(text: string, slot: number): GameState | null {
   const res = installImportedSave(text, slot);
   if (!res.ok) {
-    if (res.message) bus.emit('ui:notify', { text: `Import failed: ${res.message}`, kind: 'danger' });
+    if (res.message) bus.emit('ui:notify', { text: res.message === CLASSIC_RETIRED_TEXT ? CLASSIC_RETIRED_TEXT : `Import failed: ${res.message}`, kind: 'danger' });
     return null;
   }
   // The import now owns the active slot: this page's game must not save over it on

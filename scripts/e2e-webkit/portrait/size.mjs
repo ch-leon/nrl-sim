@@ -1,6 +1,6 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { closeWeekSummary, BOOST, OUT_ROOT, BASE, IPHONE_UA, log, reachProblems, boostFonts, scrolls, fitsOrScrolls, openNav, setupStep } from '../common.mjs';
+import { confirmStartingLeague, closeWeekSummary, BOOST, OUT_ROOT, BASE, IPHONE_UA, log, reachProblems, boostFonts, scrolls, fitsOrScrolls, openNav, setupStep } from '../common.mjs';
 
 // ── One size ─────────────────────────────────────────────────────────────────
 export async function runSize(browser, W, H) {
@@ -42,6 +42,7 @@ export async function runSize(browser, W, H) {
     await page.fill('[data-nrl-clubname]', 'Safari FC');
     await setupStep(page, 3);
     await tap('[data-nrl-start]');
+    await confirmStartingLeague(page);
     await page.locator('[data-expansion-work]').tap();
     await page.waitForSelector('.nrl-tutorial-bubble[data-step="build"]');
     await page.waitForTimeout(700);

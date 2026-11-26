@@ -11,7 +11,8 @@
 // wired later from the settings popup (see REPLAY note at the bottom).
 //
 // #370: the first session is three guided taps (build a Training Paddock, sign a
-// player, Advance Week) in place of the 11-step tour; what the old steps
+// player, Advance Week) in place of the 11-step tour. There is one mode, the
+// League career (#819): these taps never offer a Classic career. What the old steps
 // explained about Lineup, News, Finance and Contracts is a one-line hint the
 // first time each screen opens (HINTS, settings.hintsSeen). DECISION (Leon).
 
@@ -267,7 +268,9 @@ export function startTutorial(force = false): void {
   if (!force && !shouldAutoStart(s.settings)) return;
   // #370: arm the first-visit hints (a replay brings them back). Before the DOM
   // guard so the node tests see it.
-  setState({ settings: { ...s.settings, hintsSeen: [] } });
+  // Arm the first-visit hints. Keep the expansion intro, which was marked as the card opened.
+  const seen = s.settings.hintsSeen?.includes('expansion-intro') ? ['expansion-intro'] : [];
+  setState({ settings: { ...s.settings, hintsSeen: seen } });
   // DOM-less environments (node unit tests): nothing to render.
   if (typeof document === 'undefined') return;
 

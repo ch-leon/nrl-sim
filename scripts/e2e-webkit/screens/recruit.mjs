@@ -2,7 +2,7 @@
 // Screenshots stay in CI's e2e-webkit-screens artifact.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { BASE, OUT_ROOT, IPHONE_UA, openNav, SHEET_EXIT, setupStep } from '../common.mjs';
+import { confirmStartingLeague, BASE, OUT_ROOT, IPHONE_UA, openNav, SHEET_EXIT, setupStep } from '../common.mjs';
 
 export async function runRecruit(browser) {
   let failures = 0;
@@ -31,6 +31,7 @@ export async function runRecruit(browser) {
         await setupStep(page, 3);
         await page.locator(`[data-nrl-difficulty-${difficulty}]`).tap();
         await page.locator('[data-nrl-start]').tap();
+        await confirmStartingLeague(page);
         await page.locator('[data-expansion-work]').tap();
         await page.locator('.nrl-tutorial-skip').tap();
         await page.waitForSelector('.nrl-tutorial', { state: 'detached' });
@@ -42,7 +43,10 @@ export async function runRecruit(browser) {
         await shot('club-home');
         await openNav(page, 'recruit');
         const rows = page.locator('.nrl-recruit [data-row-player]');
-        check(await rows.count() === 4, 'new game must show four rows');
+        await rows.first().waitFor();
+        const shown = await rows.count();
+        check(shown >= 1 && shown <= 4, `new game showed ${shown} rows`);
+        const shortlist = await rows.evaluateAll((ns) => ns.map((n) => n.getAttribute('data-row-player')));
         check(await page.locator('[data-coach-pick]').count() === 1, 'exactly one pick');
         check(!await page.locator('[data-sort-menu]').isVisible(), 'sort hidden on shortlist');
         const picked = await page.locator('[data-coach-pick]').evaluate((e) => e.closest('[data-row-player]').getAttribute('data-row-player'));
@@ -80,7 +84,10 @@ export async function runRecruit(browser) {
         }
         await page.locator(SHEET_EXIT).tap();
         await openNav(page, 'recruit');
-        check(await rows.count() === 4, 'reopening resets shortlist');
+        // A reach player, or a thin affordable pool, makes the shortlist shorter than four. Reopening returns to that same list.
+        await rows.first().waitFor();
+        const reopened = await rows.evaluateAll((ns) => ns.map((n) => n.getAttribute('data-row-player')));
+        check(reopened.join(',') === shortlist.join(','), `reopening resets shortlist to the same players (${reopened.length} of ${shown})`);
         const before = await page.evaluate(() => ({ bank: window.__nrlState().money, squad: window.__nrlState().squad.length }));
         await page.locator(`[data-row-player="${picked}"] .nrl-row-action`).tap();
         check(await page.evaluate((id) => window.__nrlState().squad.some((p) => p.id === id), picked), 'pick signed');

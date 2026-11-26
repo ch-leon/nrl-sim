@@ -3,6 +3,7 @@ import { currentRound, inTrials } from '../core/season';
 import { getState, type GameState, type Fixture } from '../core/state';
 import { bus } from '../core/events';
 import { registerTickHook, registerSeasonHook, TICK_ORDER } from '../core/time';
+import { fixtureBridge, hasStructuralCalendar } from './competitionCalendar';
 
 type DerbyState = Pick<GameState, 'home' | 'league' | 'clubId'>;
 type Coordinates = { lat?: number; lon?: number };
@@ -39,10 +40,24 @@ export function isDerbyFixture(state: DerbyState, fixture: Fixture): boolean {
     || (fixture.awayId === state.clubId && fixture.homeId === rival));
 }
 
+/** This week's club matches: the Classic round, or a League career's calendar slot, trials included. */
+function slotFixtures(state: GameState, slot: number): Fixture[] {
+  if (!hasStructuralCalendar(state)) return state.league.fixtures.filter((f) => f.round === slot);
+  const out: Fixture[] = [];
+  for (const instance of state.competitions!.instances) {
+    // A trial against the neighbour is still a derby.
+    for (const fixture of instance.fixtures) {
+      if (fixture.slot !== slot) continue;
+      out.push(fixtureBridge({ instance, fixture }));
+    }
+  }
+  return out;
+}
+
 /** Preview the coming week, including opening week when a game is started/loaded. */
 function announceDerby(week: number): void {
   const s = getState();
-  if (!s.league.fixtures.some((f) => f.round === week && !f.result && isDerbyFixture(s, f))) return;
+  if (!slotFixtures(s, week).some((f) => !f.result && isDerbyFixture(s, f))) return;
   const rival = s.league.clubs.find((c) => c.id === derbyRival(s))!;
   bus.emit('ui:notify', {
     text: `Derby week against ${rival.name}. These are the neighbours. Give our supporters something to talk about.`,
@@ -60,8 +75,8 @@ export function registerDerbySystem(): void {
       if (week === 0) announceDerby(1);
       return;
     }
-    for (const f of s.league.fixtures) {
-      if (f.round !== week || !f.result || !isDerbyFixture(s, f)) continue;
+    for (const f of slotFixtures(s, week)) {
+      if (!f.result || !isDerbyFixture(s, f)) continue;
       const rival = s.league.clubs.find((c) => c.id === derbyRival(s))!;
       const home = f.homeId === s.clubId;
       const ours = home ? f.result.homeScore : f.result.awayScore;

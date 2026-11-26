@@ -1,3 +1,4 @@
+import { leagueSlotState } from '../helpers/leagueSlot';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   __flushSaveMeta, __setStorage, getSlotMeta, getSlotSummaries, hasSave, listSlotMeta, load, save,
@@ -212,7 +213,7 @@ describe('save meta (sidecar, not inside the save)', () => {
   });
 
   it('a save from before meta loads, lists as the oldest, and gets meta on its next save', async () => {
-    const s = createNewGame('Old Save', 8);
+    const s = await leagueSlotState('Old Save');
     const raw = JSON.stringify(s);
     storage.map.set(slotKey(2), raw);
     expect(getSlotSummaries()[1]).toMatchObject({ slot: 2, status: 'ok', clubName: 'Old Save' });
@@ -250,8 +251,8 @@ describe('save meta (sidecar, not inside the save)', () => {
 
 describe('a page with today\'s keys (slots and legacy key, no meta)', () => {
   it('boots, lists its slots, loads and keeps saving, writing meta beside each slot', async () => {
-    const legacy = createNewGame('Legacy', 11);
-    const two = createNewGame('Two', 12);
+    const legacy = await leagueSlotState('Legacy');
+    const two = await leagueSlotState('Two');
     storage.map.set(LEGACY_SAVE_KEY, JSON.stringify(legacy));
     storage.map.set(slotKey(2), JSON.stringify(two));
     expect(getSlotSummaries().map((s) => s.status)).toEqual(['ok', 'ok', 'empty']);

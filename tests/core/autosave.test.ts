@@ -3,7 +3,16 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { enableAutosave, exportSave, deleteSlot, downloadSave, EXPORT_HELD_FAILED_TEXT, getActiveSlot, importIntoSlot, load, save, slotKey, __setStorage, type StorageLike } from '../../src/core/save';
 import { bus } from '../../src/core/events';
 import { readLiveMatch, writeLiveMatch } from '../../src/systems/liveMatchRecord';
-import { getState, setState } from '../../src/core/state';
+import { getState, loadState, setState } from '../../src/core/state';
+import { leagueSlotState } from '../helpers/leagueSlot';
+
+// The careers these imports install are League ones: a Classic file is refused on import (#819).
+const leagueCareer = await leagueSlotState('Autosave');
+const asLeague = (): void => {
+  // Past the preseason, as createLegacyGame leaves its round-based career.
+  const { preseason: _phase, ...state } = structuredClone(leagueCareer);
+  loadState(state);
+};
 import { advanceWeek, clearHeldWeek, clearTickHooks, registerTickHook, resumeWeek, weekHeld } from '../../src/core/time';
 
 // QA finding 21: a change made between weeks (here, money) was saved only by the next
@@ -90,6 +99,7 @@ describe('enableAutosave (QA finding 21)', () => {
   });
 
   it('does not save over a save imported into the active slot (Settings → Import save, then reload)', () => {
+    asLeague();
     const page = fakePage();
     save(getState());
     off = enableAutosave({ doc: page.doc, win: page.win });
@@ -208,7 +218,13 @@ describe('export and import during a held week', () => {
     expect(parsed.nrlLiveMatch?.tick).toBe(80);
     expect(parsed.nrlLiveMatch?.calls).toEqual(record.calls);
 
-    expect(importIntoSlot(JSON.stringify(parsed), getActiveSlot())?.money).toBe(money);
+    // This round-based career is Classic, so its file is refused on import (#819) and the
+    // slot keeps its bytes; the same export envelope around a League career installs.
+    const before = store.get(slotKey(1));
+    expect(importIntoSlot(JSON.stringify(parsed), getActiveSlot())).toBeNull();
+    expect(store.get(slotKey(1))).toBe(before);
+    const league = { ...structuredClone(leagueCareer), money, nrlLiveMatch: parsed.nrlLiveMatch };
+    expect(importIntoSlot(JSON.stringify(league), getActiveSlot())?.money).toBe(money);
     expect(load()?.money).toBe(money);
     expect(load()).not.toHaveProperty('nrlLiveMatch');
     expect(JSON.parse(store.get(slotKey(1))!)).not.toHaveProperty('nrlLiveMatch');
@@ -216,6 +232,7 @@ describe('export and import during a held week', () => {
   });
 
   it('importing a save with no match clears a stale record, and a bad record is refused', () => {
+    asLeague();
     shareLocalStorage();
     save(getState());
     expect(writeLiveMatch({
