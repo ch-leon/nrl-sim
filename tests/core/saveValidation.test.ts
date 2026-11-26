@@ -314,15 +314,29 @@ describe('card week (#846, v36)', () => {
 
   it('rejects picks owed out of bounds, unknown, repeated or too many cards, and a card that does not match its kind', async () => {
     const cw = (await league()).cardWeek!;
-    const cards = cw.offer!.cards;
+    const [first, ...remaining] = cw.offers;
+    const cards = first!.cards;
+    const withCards = (replaced: unknown[]) => ({ ...cw, offers: [{ ...first, cards: replaced }, ...remaining] });
     expect(isCardWeek({ ...cw, owed: 4 })).toBe(false);
     expect(isCardWeek({ ...cw, owed: -1 })).toBe(false);
-    expect(isCardWeek({ ...cw, offer: { ...cw.offer!, cards: [{ cardId: 'nope', kind: 'cash' }] } })).toBe(false);
-    expect(isCardWeek({ ...cw, offer: { ...cw.offer!, cards: [cards[0]!, cards[0]!] } })).toBe(false);
-    expect(isCardWeek({ ...cw, offer: { ...cw.offer!, cards: [...cards, { cardId: 'cashInjection', kind: 'cash' }] } })).toBe(false);
-    expect(isCardWeek({ ...cw, offer: { ...cw.offer!, cards: [{ cardId: 'cashInjection', kind: 'trait' }] } })).toBe(false);
-    expect(isCardWeek({ ...cw, offer: { ...cw.offer!, cards: [{ cardId: 'setPlay', kind: 'setPlay', playId: 'no-such-play' }] } })).toBe(false);
-    expect(isCardWeek({ ...cw, offer: null, owed: 0 })).toBe(true);
+    expect(isCardWeek(withCards([{ cardId: 'nope', kind: 'cash' }]))).toBe(false);
+    expect(isCardWeek(withCards([cards[0]!, cards[0]!]))).toBe(false);
+    expect(isCardWeek(withCards([...cards, { cardId: 'cashInjection', kind: 'cash' }]))).toBe(false);
+    expect(isCardWeek(withCards([{ cardId: 'cashInjection', kind: 'trait' }]))).toBe(false);
+    expect(isCardWeek(withCards([{ cardId: 'setPlay', kind: 'setPlay', playId: 'no-such-play' }]))).toBe(false);
+    expect(isCardWeek({ ...cw, offers: [], starterLeft: 0, owed: 0 })).toBe(true);
+    expect(isCardWeek({ ...cw, starterLeft: 0 })).toBe(false);
+    expect(isCardWeek({ ...cw, offers: [{ ...first, kind: 'match' }, ...remaining] })).toBe(false);
+    expect(isCardWeek({ ...cw, grants: 0 })).toBe(false);
+    expect(isCardWeek({ ...cw, seenGrant: cw.grants + 1 })).toBe(false);
+    const held = { cardId: cards[0]!.cardId, level: 1, offered: cards[0], gotSeason: 1, gotWeek: 1 };
+    expect(isCardWeek({ ...cw, hand: [held] })).toBe(true);
+    expect(isCardWeek({ ...cw, hand: Array(6).fill(held) })).toBe(false);
+    expect(isCardWeek({ ...cw, hand: [{ ...held, level: 4 }] })).toBe(false);
+    expect(isCardWeek({ ...cw, hand: [{ ...held, cardId: 'nope' }] })).toBe(false);
+    expect(isCardWeek({ ...cw, history: [{ cardId: cards[0]!.cardId, season: 1, week: 1, action: 'remove' }] })).toBe(false);
+    expect(isCardWeek({ ...cw, strikes: { ...cw.strikes, log: [{ week: 1, reason: 'unknown' }] } })).toBe(false);
+    expect(isCardWeek({ ...cw, rerolls: { season: 1, week: 1, count: -1 } })).toBe(false);
     expect(isCardWeek({ ...cw, cardPlayers: ['a', 'a'] })).toBe(false);
     expect(isCardWeek({ ...cw, lastMatch: { season: 1, week: 5, opponentName: 'Them', rows: [{ playerId: 'x', name: 'X', tries: -1, tackles: 0, lineBreaks: 0 }] } })).toBe(false);
   });

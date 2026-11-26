@@ -51,6 +51,9 @@ export interface GenPlayerOpts {
   age?: number; // else rng.int(17,36)
   position?: Position; // else rng.pick(POSITIONS)
   quality?: Quality; // default 'average'
+  /** Explicit inputs for saved offers, which can be migrated before the career's pack is selected. */
+  names?: Parameters<typeof randomName>[1];
+  seasonWeeks?: number;
 }
 
 /** Stat roll bands per quality: [lo, hi] each stat is rolled within. */
@@ -141,7 +144,7 @@ export function generatePlayer(rng: Rng, opts: GenPlayerOpts = {}): Player {
   const quality: Quality = opts.quality ?? 'average';
   const age = opts.age ?? rng.int(17, 36);
   const position = opts.position ?? rng.pick(POSITIONS);
-  const name = randomName(rng);
+  const name = randomName(rng, opts.names);
   const stats = rollStats(rng, quality, position);
   const overall = overallRating({ stats, position });
 
@@ -152,7 +155,7 @@ export function generatePlayer(rng: Rng, opts: GenPlayerOpts = {}): Player {
   const morale = rng.int(55, 85);
   const injuryRisk = rng.int(5, 40);
   const wage = marketWage({ stats, position });
-  const contractWeeks = rng.int(1, 3) * WEEKS_PER_SEASON;
+  const contractWeeks = rng.int(1, 3) * (opts.seasonWeeks ?? WEEKS_PER_SEASON);
 
   // Special skills: rare, levelled, weighted to the position (BAK-208 §3).
   let traits = rollTraits(rng, position, quality);

@@ -22,7 +22,7 @@ import { assignmentOwnerProblem } from '../systems/assignmentEvidence';
 import { competitionInstanceId, validateCompetitions } from '../data/competition';
 import { FINANCE_TIERS, tierForRank } from '../data/financeRules';
 import { canonicalLeagueJson, validateLeagueHistory } from '../data/leagueCareer';
-import { CARD_WEEK, cardDefById } from '../data/cards';
+import { CARD_PASS, CARD_WEEK, cardDefById } from '../data/cards';
 
 export interface SaveRepair { field: string; problem: string; repair: string; rationale: string; notification: string }
 export const REPAIR_NOTICE = 'Career lineup repaired. The original save has been kept in recovery.';
@@ -212,28 +212,67 @@ function settledCupProblem(state: GameState): string | null {
   return null;
 }
 
-/**
- * The card week (#846, v36): its stream, picks owed (0..CARD_WEEK.MAX_OWED),
- * the offer (known, different cards, each resolved for its kind), the cards
- * taken (or 'pass'), the card players, the card traits and the last match's lines.
- */
-export function isCardWeek(v: unknown): boolean {
+function cardDate(v: unknown): v is Record<string, unknown> {
+  return record(v) && integer(v.season, 1) && integer(v.week, 1);
+}
+
+function cardOffer(v: unknown): v is Record<string, unknown> {
+  return cardDate(v) && Array.isArray(v.cards) && v.cards.length >= 1 && v.cards.length <= CARD_WEEK.OFFER_SIZE
+    && v.cards.every(isOfferedCard) && unique(v.cards.map(c => c.cardId));
+}
+
+function cardWeekCommon(v: unknown): v is Record<string, unknown> {
   if (!record(v) || !integer(v.rng, 0, 0xffffffff) || !integer(v.owed, 0, CARD_WEEK.MAX_OWED)) return false;
-  if (!Array.isArray(v.history) || !v.history.every(h => record(h) && text(h.cardId) && integer(h.season, 1) && integer(h.week, 1))) return false;
+  if (!Array.isArray(v.history) || !v.history.every(h => cardDate(h) && text(h.cardId))) return false;
   if (!strings(v.cardPlayers) || !unique(v.cardPlayers)) return false;
   if (!Array.isArray(v.cardTraits) || !v.cardTraits.every(t => record(t) && text(t.playerId) && knownTrait(t.trait))
-    || !unique(v.cardTraits.map(t => `${(t as Record<string, unknown>).playerId}:${(t as Record<string, unknown>).trait}`))) return false;
-  if (v.offer !== null) {
-    const o = v.offer;
-    if (!record(o) || !integer(o.season, 1) || !integer(o.week, 1) || !Array.isArray(o.cards) || o.cards.length < 1 || o.cards.length > CARD_WEEK.OFFER_SIZE) return false;
-    if (!o.cards.every(isOfferedCard) || !unique(o.cards.map(c => (c as Record<string, unknown>).cardId))) return false;
-  }
+    || !unique(v.cardTraits.map(t => `${t.playerId}:${t.trait}`))) return false;
   if (v.lastMatch !== undefined) {
     const m = v.lastMatch;
-    if (!record(m) || !integer(m.season, 1) || !integer(m.week, 1) || typeof m.opponentName !== 'string' || !Array.isArray(m.rows)) return false;
+    if (!cardDate(m) || typeof m.opponentName !== 'string' || !Array.isArray(m.rows)) return false;
     if (!m.rows.every(r => record(r) && text(r.playerId) && text(r.name) && integer(r.tries) && integer(r.tackles) && integer(r.lineBreaks))) return false;
   }
   return true;
+}
+
+export function isCardWeekV36(v: unknown): boolean {
+  return cardWeekCommon(v) && (v.offer === null || cardOffer(v.offer));
+}
+
+function isActiveCard(v: unknown): boolean {
+  if (!record(v) || !text(v.cardId) || !integer(v.level, 1, 3)) return false;
+  switch (v.kind) {
+    case 'staff': {
+      const def = cardDefById(v.cardId);
+      return def?.kind === 'staff' && record(v.member) && text(v.member.name)
+        && integer(v.member.wage) && integer(v.member.hiredSeason, 1)
+        && (typeof def.role === 'string' ? v.member.role === def.role && v.member.speciality === undefined
+          : v.member.role === 'attackCoach' && v.member.speciality === def.role.attackCoach);
+    }
+    case 'setPlay': return cardDefById(v.cardId)?.kind === 'setPlay' && isPlayId(v.playId);
+    case 'buff': case 'decree': return cardDate(v) && (v.playerId === undefined || text(v.playerId));
+    default: return false;
+  }
+}
+
+export function isCardWeek(v: unknown): boolean {
+  if (!cardWeekCommon(v) || !integer(v.starterLeft, 0, CARD_WEEK.STARTER_PICKS) || !integer(v.owed, 0, CARD_WEEK.MAX_OWED)) return false;
+  const starterLeft = v.starterLeft;
+  if (!Array.isArray(v.offers) || v.offers.length !== starterLeft + v.owed
+    || !v.offers.every((o, i) => cardOffer(o) && (i < starterLeft ? o.kind === 'starter' : oneOf(o.kind, ['match', 'decree']))
+      && (o.fromClubId === undefined || text(o.fromClubId)))) return false;
+  if (!integer(v.grants, v.offers.length) || !integer(v.seenGrant, 0, v.grants)) return false;
+  if (!Array.isArray(v.hand) || v.hand.length > CARD_WEEK.HAND_CAP || !v.hand.every(h => record(h) && isOfferedCard(h.offered)
+    && record(h.offered) && h.cardId === h.offered.cardId && integer(h.level, 1, 3)
+    && integer(h.gotSeason, 1) && integer(h.gotWeek, 1))) return false;
+  if (!Array.isArray(v.history) || !v.history.every(h => h.action === undefined || (oneOf(h.action, ['take', 'pass', 'expire', 'discard', 'play', 'reroll'])
+    && (h.action !== 'pass' || h.cardId === CARD_PASS) && (h.action !== 'expire' || h.cardId === 'expired')))) return false;
+  if (!Array.isArray(v.cardTraits) || !v.cardTraits.every(t => t.level === undefined || integer(t.level, 1, 3))) return false;
+  if (!Array.isArray(v.active) || !v.active.every(isActiveCard)) return false;
+  if (!cardDate(v.rerolls) || !integer(v.rerolls.count)) return false;
+  if (!record(v.strikes) || !integer(v.strikes.season, 1) || !integer(v.strikes.count) || !integer(v.strikes.lossRun)
+    || !Array.isArray(v.strikes.log) || !v.strikes.log.every(l => record(l) && integer(l.week, 1) && oneOf(l.reason, ['margin', 'run']))) return false;
+  return v.decree === null || (record(v.decree) && integer(v.decree.season, 1) && text(v.decree.id));
 }
 
 function isOfferedCard(c: unknown): boolean {
@@ -308,7 +347,7 @@ export function validateInput(v: Record<string, unknown>, version: number, runni
   }
   if ('individualChallenges' in v || (version < 35 && record(v.competitions) && 'individualChallenges' in v.competitions)) return fail('individual challenge version');
   if (version < 30 && 'playerPopulation' in v) return fail('player population version');
-  if (v.cardWeek !== undefined && (version < 36 || !isCardWeek(v.cardWeek) || !record(v.competitions) || v.competitions.leagueCareer === undefined)) return fail('card week');
+  if (v.cardWeek !== undefined && (version < 36 || !(version === 36 ? isCardWeekV36(v.cardWeek) : isCardWeek(v.cardWeek)) || !record(v.competitions) || v.competitions.leagueCareer === undefined)) return fail('card week');
   if (clubs.size && !clubs.has('player')) return fail('player club reference');
   if (v.competitions !== undefined) {
     if (version < 25) return fail('competition metadata version');

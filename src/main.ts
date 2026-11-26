@@ -22,7 +22,7 @@ import { advanceFromClub, createHud } from './ui/hud';
 import { initWeekSummary } from './ui/weekSummary';
 import { initMatchArtAhead, warmMatchArt } from './scenes/matchArtAhead';
 import { createNav } from './ui/nav';
-import { closeModal, closeScreen } from './ui/dom';
+import { button, closeModal, closeScreen, dialogOpen } from './ui/dom';
 import { showAssignmentRecovery } from './ui/assignmentRecovery';
 import { initToasts } from './ui/toasts';
 import { getCurrentFixture, initLeague, registerFixturesSystem } from './systems/fixtures';
@@ -40,7 +40,7 @@ import { registerDerbySystem } from './systems/derby';
 import { registerBoardSystem } from './systems/board';
 import { plantPending, registerEventsSystem } from './systems/events';
 import { plantCard, registerCardWeekSystem } from './systems/cardWeek';
-import { cardChipCount, initCardWeekPick, openCardPick } from './ui/cardWeek';
+import { cardChipCount, initCardWeekPick, openCardPick, picksWaitingText } from './ui/cardWeek';
 import { registerRivalsSystem } from './systems/rivals';
 import { contractsEndingSoon, endingSoonLabel } from './systems/contracts';
 import { initBoardUi, openStaffScreen, STAFF_SCREEN_TITLE } from './ui/screens/board';
@@ -332,15 +332,15 @@ async function boot(): Promise<void> {
     onBoard: () => nav.open('staff'), // the objective at risk (#368)
     onDecisions: () => void openDecisions(),
     decisions: decisionChipItems,
-    onCards: () => void openCardPick(),
+    onCards: () => nav.open('cards'),
     cards: cardChipCount,
     onEvents: () => openEvents(),
     runwayWeeks,
   });
   // #368: the weekly summary, from the club as it stands now; its Play Week is the dock's.
-  initWeekSummary({ onAdvance: () => advanceFromClub(advanceOneWeek, onChooseLeague), runwayWeeks });
+  const weekSummary = initWeekSummary({ onAdvance: () => advanceFromClub(advanceOneWeek, onChooseLeague), runwayWeeks, onPick: () => { openCardPick(); } });
   // #846: the card week's pick opens by itself behind the summary and any decision. Other careers have none.
-  initCardWeekPick();
+  initCardWeekPick(weekSummary.pending);
 
   // Grounds → Match handoff: for the classic engine state/ladder are already
   // applied by the matchday tick hook before this fires and the Match scene is
@@ -374,6 +374,26 @@ async function boot(): Promise<void> {
   nav.registerScreen('squad', 'Squad', () => openSquadScreen(), { holds: ['lineup', 'recruit'] });
   nav.registerScreen('fixtures', 'League', () => openFixturesScreen({onChooseLeague}), { holds: ['ladder'] });
   nav.registerScreen('build', 'Build', () => openBuildScreen());
+  if (getState().cardWeek) {
+    const openCards = lazyOpener(
+      () => import('./ui/screens/cards'),
+      (m) => void m.openCardsScreen(),
+      screenDeps('Cards', { key: 'cards' }),
+      () => {
+        closeLoading('cards');
+        bus.emit('ui:notify', { text: "Couldn't load Cards. Check the connection and try again.", kind: 'danger' });
+      },
+    );
+    nav.registerScreen('cards', 'Cards', () => { closeModal(); void openCards(); }, { badgeLabel: picksWaitingText });
+    const refreshCardBadge = (): void => nav.setBadge('cards', cardChipCount(getState()));
+    bus.on('state:changed', refreshCardBadge);
+    refreshCardBadge();
+    const portraitCards = button('Cards', () => {
+      if (!dialogOpen() && !weekHeld() && !advanceInProgress() && !g.scene.isActive('Match')) nav.open('cards');
+    }, { class: 'nrl-btn-outline' });
+    portraitCards.setAttribute('data-portrait-cards', '');
+    document.querySelector('.nrl-rotate-card')?.append(portraitCards);
+  }
   nav.registerScreen('lineup', 'Lineup', () => openLineupScreen(), { hidden: true }); // the coach's nine (#69)
   nav.registerScreen('recruit', 'Recruit', () => openRecruitScreen(), { hidden: true });
   nav.registerScreen('finance', 'Finance', () => openFinanceScreen(), {

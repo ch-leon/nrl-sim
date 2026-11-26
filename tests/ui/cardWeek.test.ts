@@ -8,9 +8,11 @@ import { bus } from '../../src/core/events';
 import { getState, loadState, setState, type GameState } from '../../src/core/state';
 import { __setLabs } from '../../src/labs/flags';
 import { prepareLeagueCareer } from '../../src/systems/leagueCareerSetup';
-import { cardOfferView, plantCard } from '../../src/systems/cardWeek';
-import { closeModal, dialogOpen } from '../../src/ui/dom';
-import { cardChipCount, lastMatchView, openCardPick, picksWaitingText, replacesLine, tierLabel, traitTargetRows } from '../../src/ui/cardWeek';
+import { cardOfferView, chooseCard, plantCard } from '../../src/systems/cardWeek';
+import { closeModal, closeScreen, dialogOpen, el, openModal } from '../../src/ui/dom';
+import { cardChipCount, initCardWeekPick, lastMatchView, openCardPick, picksWaitingText, replacesLine, tierLabel, traitTargetRows } from '../../src/ui/cardWeek';
+import { openCardsScreen } from '../../src/ui/screens/cards';
+import { openWeekSummary, weekSnapshot, weekSummary } from '../../src/ui/weekSummary';
 import { createHud } from '../../src/ui/hud';
 import { showTitleFlow } from '../../src/ui/title';
 import { stubLocalStorage } from '../commercial/memStorage';
@@ -32,7 +34,7 @@ const plant = (s: GameState, id: string): GameState => {
 };
 
 beforeEach(() => { stubDocument(); bus.clear(); });
-afterEach(() => { closeModal(); vi.unstubAllGlobals(); __setLabs(null); });
+afterEach(() => { closeModal(); closeScreen(); vi.useRealTimers(); vi.unstubAllGlobals(); __setLabs(null); });
 
 describe('the view model', () => {
   it('says the tier in words and names the man a full squad would lose', () => {
@@ -59,7 +61,7 @@ describe('the view model', () => {
     expect(cardChipCount(s)).toBe(3);
     const { cardWeek: _cw, ...plain } = s;
     expect(cardChipCount(plain as GameState)).toBe(0);
-    expect(cardChipCount({ ...s, cardWeek: { ...s.cardWeek!, owed: 0, offer: null } })).toBe(0);
+    expect(cardChipCount({ ...s, cardWeek: { ...s.cardWeek!, owed: 0, starterLeft: 0, offers: [] } })).toBe(0);
   });
 });
 
@@ -67,7 +69,7 @@ describe('the pick', () => {
   it('shows three faces from the view model, with the count waiting', async () => {
     loadState(await fresh());
     openCardPick();
-    const faces = pick().querySelectorAll('[data-card-choice]');
+    const faces = pick().querySelectorAll('.nrl-card-face');
     expect(faces).toHaveLength(3);
     const view = cardOfferView(getState());
     for (const [i, f] of view.cards.entries()) {
@@ -86,36 +88,37 @@ describe('the pick', () => {
     const s = await fresh();
     const coached = { ...s, staff: [{ role: 'attackCoach' as const, name: 'Coach', wage: 1, hiredSeason: 1, speciality: 'direct' as const }] };
     const planted = plant(coached, 'setPlay');
-    const card = planted.cardWeek!.offer!.cards[0]!;
+    const card = planted.cardWeek!.offers[0]!.cards[0]!;
     if (card.kind !== 'setPlay') throw new Error('not a set play');
     loadState({ ...planted, playbook: { owned: [card.playId] } });
     openCardPick();
-    const face = pick().querySelector('[data-card-choice="0"]')!;
-    expect(face.disabled).toBe(true);
-    expect(face.words()).toContain('That play is already yours.');
+    const play = pick().querySelector('[data-card-play-now="0"]')!;
+    expect(play.disabled).toBe(true);
+    expect(play.parentNode!.parentNode!.words()).toContain('That play is already yours.');
+    expect(pick().querySelector('[data-card-choice="0"]')!.disabled).toBe(false);
   });
 
-  it('takes a trait card through its target list, with a way back, and says what happened', async () => {
+  it('plays a trait from the pick through its target list, with a way back, and says what happened', async () => {
     loadState(plant(await fresh(), 'playmaker'));
     openCardPick();
-    pick().querySelector('[data-card-choice="0"]')!.click();
+    pick().querySelector('[data-card-play-now="0"]')!.click();
     expect(pick().querySelectorAll('[data-card-target]').length).toBeGreaterThan(0);
     pick().querySelector('[data-card-back]')!.click();
     expect(pick().querySelectorAll('[data-card-choice]')).toHaveLength(3);
-    pick().querySelector('[data-card-choice="0"]')!.click();
+    pick().querySelector('[data-card-play-now="0"]')!.click();
     const target = pick().querySelectorAll('[data-card-target]')[0]!;
     const id = target.getAttribute('data-card-target')!;
     target.click();
     const name = getState().squad.find((p) => p.id === id)!.name;
     expect(pick().querySelector('[data-card-outcome]')!.words()).toContain(`${name} has Playmaker`);
-    expect(getState().cardWeek!.owed).toBe(2);
-    expect(getState().cardWeek!.cardTraits).toEqual([{ playerId: id, trait: 'playmaker' }]);
+    expect(getState().cardWeek!.starterLeft).toBe(2);
+    expect(getState().cardWeek!.cardTraits).toEqual([expect.objectContaining({ playerId: id, trait: 'playmaker' })]);
     expect(pick().words()).toContain('2 picks waiting');
   });
 
   it('passes a pick after a one-line confirm, and closes when the last pick goes', async () => {
     const s = await fresh();
-    loadState({ ...s, cardWeek: { ...s.cardWeek!, owed: 1 } });
+    loadState({ ...s, cardWeek: { ...s.cardWeek!, starterLeft: 1, offers: s.cardWeek!.offers.slice(0, 1) } });
     openCardPick();
     pick().querySelector('[data-card-pass]')!.click();
     expect(pick().words()).toContain('Pass this pick?');
@@ -153,7 +156,7 @@ describe('the pick', () => {
 });
 
 describe('the HUD chip', () => {
-  it('shows the picks waiting and reopens the pick; hidden without a card week', async () => {
+  it('shows the picks waiting with another screen open and opens Cards; hidden without a card week', async () => {
     const s = await fresh();
     loadState(s);
     const open = vi.fn();
@@ -163,12 +166,97 @@ describe('the HUD chip', () => {
     expect(chip.words()).toContain('3 PICKS');
     chip.querySelector('.nrl-card-chip-pick')!.click();
     expect(open).toHaveBeenCalledOnce();
-    setState({ cardWeek: { ...s.cardWeek!, owed: 1 } });
+    openModal(el('p', { text: 'Squad' }), { screen: true, key: 'squad' });
+    expect(chip.hidden).toBe(false);
+    setState({ cardWeek: { ...s.cardWeek!, starterLeft: 1, offers: s.cardWeek!.offers.slice(0, 1) } });
     expect(chip.words()).toContain('1 PICK');
     const { cardWeek: _cw, ...plain } = s;
     loadState(plain as GameState);
     expect(chip.hidden).toBe(true);
     hud.destroy();
+  });
+});
+
+describe('Cards and new grants', () => {
+  it('shows a held trait and its level and hint, plays it from the hand, and logs the activity', async () => {
+    loadState(plant(await fresh(), 'playmaker'));
+    const s = getState();
+    openCardPick();
+    pick().querySelector('[data-card-choice="0"]')!.click();
+    expect(getState().squad).toBe(s.squad);
+    closeModal();
+    openCardsScreen();
+    const screen = body().querySelector('[data-cards-screen]')!;
+    expect(screen.words()).toContain('Hand (1/5)');
+    expect(screen.querySelector('[data-hand-card="playmaker"]')!.words()).toContain('Grey · I');
+    expect(screen.words()).toContain('Good if');
+    screen.querySelector('[data-hand-play="0"]')!.click();
+    screen.querySelectorAll('[data-card-target]')[0]!.click();
+    expect(screen.words()).toContain('Hand (0/5)');
+    expect(screen.words()).toMatch(/Playmaker (I|II|III) on/);
+    expect(screen.words()).toContain('Took Playmaker');
+    expect(screen.words()).toContain('Played Playmaker');
+    expect(getState().cardWeek!.hand).toEqual([]);
+  });
+
+  it('disables both actions when the hand is full until the player discards a specific card', async () => {
+    const s = plant(await fresh(), 'cashInjection');
+    loadState(s);
+    for (let i = 0; i < 5; i++) {
+      loadState(plant(getState(), 'cashInjection'));
+      expect(chooseCard(0).ok).toBe(true);
+    }
+    loadState(plant(getState(), 'cashInjection'));
+    openCardPick();
+    expect(pick().querySelector('[data-card-choice="0"]')!.disabled).toBe(true);
+    expect(pick().querySelector('[data-card-play-now="0"]')!.disabled).toBe(true);
+    pick().querySelector('[data-card-make-room]')!.click();
+    pick().querySelector('[data-card-discard="2"]')!.click();
+    expect(getState().cardWeek!.hand).toHaveLength(4);
+    expect(pick().querySelector('[data-card-choice="0"]')!.disabled).toBe(false);
+    pick().querySelector('[data-card-choice="0"]')!.click();
+    expect(getState().cardWeek!.hand).toHaveLength(5);
+  });
+
+  it('opens once per grant even at the same queue length, waits behind a dialog, and stays closed on reload', async () => {
+    const s = await fresh();
+    vi.useFakeTimers();
+    loadState(s);
+    const stop = initCardWeekPick();
+    vi.advanceTimersByTime(50);
+    expect(pick()).not.toBeNull();
+    expect(getState().cardWeek!.seenGrant).toBe(3);
+    closeModal();
+    openModal(el('p', { text: 'Week summary' }));
+    setState({ cardWeek: { ...getState().cardWeek!, grants: 4 } });
+    bus.emit('week:advanced', { season: s.season, week: s.week + 1 });
+    vi.advanceTimersByTime(400);
+    expect(pick()).toBeNull();
+    closeModal();
+    vi.advanceTimersByTime(400);
+    expect(pick()).not.toBeNull();
+    closeModal();
+    vi.advanceTimersByTime(500);
+    expect(pick()).toBeNull();
+    stop();
+    loadState(JSON.parse(JSON.stringify(getState())));
+    const stopReload = initCardWeekPick();
+    vi.advanceTimersByTime(500);
+    expect(pick()).toBeNull();
+    stopReload();
+  });
+
+  it('links the weekly summary to a pick even when a full queue kept the waiting count the same', async () => {
+    const s = await fresh();
+    loadState(s);
+    const before = weekSnapshot(s);
+    const summary = weekSummary(before, weekSnapshot({ ...s, week: s.week + 1, cardWeek: { ...s.cardWeek!, grants: 4 } }));
+    expect(summary.newCardPicks).toBe(1);
+    openWeekSummary(summary, { onAdvance: () => {}, onPick: () => { openCardPick(); } });
+    const line = body().querySelector('.nrl-summary-pick')!;
+    expect(line.words()).toContain('New card pick');
+    line.querySelector('.nrl-btn-outline')!.click();
+    expect(pick()).not.toBeNull();
   });
 });
 

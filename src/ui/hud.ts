@@ -39,7 +39,7 @@ export interface HudOpts {
   onDecisions?: () => void;
   /** The decisions waiting, soonest due first: the chip names the first. */
   decisions?: (s: GameState) => readonly { title: string; note: string }[];
-  /** The card week's chip (#846): reopens the pick. Absent => no chip. */
+  /** The card week's chip (#846): opens the Cards screen. Absent => no chip. */
   onCards?: () => void;
   /** Card-week picks waiting with one on show; 0 hides the chip. */
   cards?: (s: GameState) => number;
@@ -413,12 +413,12 @@ export function createHud(opts: HudOpts = {}): Hud {
     chipN, el('span', { class: 'nrl-decisions-chip-text' }, chipCount, chipTop), button('Review', () => opts.onDecisions?.(), { class: 'nrl-decisions-review' }));
   chip.hidden = true;
 
-  // #846: the card week's picks waiting, in the decisions card's style; Pick reopens the pick.
+  // #846: the card week's picks waiting, in the decisions card's style; Cards opens the management screen.
   const cardN = el('span', { class: 'nrl-decisions-chip-n', attrs: { 'aria-hidden': 'true' } });
   const cardCount = el('span', { class: 'nrl-decisions-chip-count' });
   const cardChip = el('div', { class: 'nrl-decisions-chip nrl-decisions-card', attrs: { role: 'status', 'data-card-chip': '' } },
     cardN, el('span', { class: 'nrl-decisions-chip-text' }, cardCount, el('span', { class: 'nrl-decisions-chip-top', text: 'Card week' })),
-    button('Pick', () => opts.onCards?.(), { class: 'nrl-card-chip-pick' }));
+    button('Cards', () => opts.onCards?.(), { class: 'nrl-card-chip-pick' }));
   cardChip.hidden = true;
 
   // #368: the board objective most at risk, in the decisions chip's style under it; a tap opens Staff & Board.
@@ -512,7 +512,7 @@ export function createHud(opts: HudOpts = {}): Hud {
       boardEl.setAttribute('aria-label', label);
       boardEl.title = label;
     }
-    const picks = opts.onCards && !advanceInProgress() && !activeScreen() ? opts.cards?.(s) ?? 0 : 0;
+    const picks = opts.onCards && !advanceInProgress() && !s.sacked ? opts.cards?.(s) ?? 0 : 0;
     cardChip.hidden = picks === 0;
     if (picks > 0) {
       cardN.textContent = String(picks);
