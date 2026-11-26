@@ -1,8 +1,10 @@
+import { AU_PACK } from '../content';
+import { UK_NAMES } from '../content/ukNames';
 import { awaitingCampReplay } from './parkedLeagueFixture';
 // src/systems/cardWeek.ts — the card week (#846, Labs): a League career that
 // chose it gets a pick of one card from three before round 1 and after each
 // League match it plays (up to CARD_WEEK.MAX_OWED waiting). The cards are in
-// data/cards.ts. Pure functions plus one tick hook and chooseCard() for the UI.
+// data/cards.ts. Pure functions plus one tick hook and store actions for the UI.
 //
 // A career is a card-week career only when state.cardWeek exists; every path
 // here is guarded on it, so any other career plays exactly as before. The
@@ -12,9 +14,10 @@ import { awaitingCampReplay } from './parkedLeagueFixture';
 // stream (state.cardWeek.rng): drawing never moves rngSeed or the events deck.
 // Money, board patience and traits go through the events deck's applyEffects,
 // so they read and book the way an event card's do.
-import { getState, setState, type CardOffer, type CardWeekState, type Fixture, type GameState, type LastMatchImpact, type OfferedCard, type Player, type Position } from '../core/state';
+import { getState, setState, type CardHistoryEntry, type CardOffer, type CardWeekState, type StaffMember, type Fixture, type GameState, type HandCard, type LastMatchImpact, type OfferedCard, type Player, type Position } from '../core/state';
 import { bus } from '../core/events';
 import { registerTickHook, TICK_ORDER, weekHeld } from '../core/time';
+import { saveIfChanged } from '../core/save';
 import { careerActionClock, elapsedInterval } from '../core/season';
 import { earnMoney } from '../data/club';
 import { CARD_PASS, CARD_WEEK, CARDS, cardDefById, type CardDef, type CardKind, type CardTier } from '../data/cards';
@@ -33,13 +36,10 @@ import { awayPlayerIds, campDisposalProblem } from './playerAssignments';
 import { rosterIntervalProblem } from './playerAssignmentCommit';
 import { admitGeneratedPeople, openClubSpell } from './playerCareer';
 import { buyRefusal, ownsPlay } from './playbook';
-import { appointFeeWaived, ATTACK_COACHES, hireRefusal, STAFF, type StaffHire } from './staff';
+import { appointFeeWaived, hireRefusal, type StaffHire } from './staff';
 import { emptyTally, foldEvents } from './stats';
 import { PLAYER_ID } from './fixtures';
 import type { MatchEvent } from '../sim/events';
-
-/** Tick order: after the week's results, ladder and morale, before the unlocks (autosave − 1) and the autosave. */
-export const CARD_WEEK_TICK_ORDER = TICK_ORDER.autosave - 2;
 
 /** Is this a card-week career? */
 export function isCardWeekCareer(state: Pick<GameState, 'cardWeek'>): boolean {
@@ -94,7 +94,7 @@ function eligibleBeforeDice(state: GameState, def: CardDef): boolean {
   switch (def.kind) {
     case 'player': return true;
     // The dilemma never takes the board's last point of patience: at zero the board sacks the coach.
-    case 'dilemma': return state.boardPatience + def.patience >= 1;
+    case 'dilemma': return gambleRefusal(state, def) === null;
     case 'staff': return hireRefusal(state, hireOf(def)) === null;
     case 'setPlay': return freePlayCandidates(state).length > 0;
     case 'trait': return traitTargets(state, def.trait).length > 0;
@@ -145,7 +145,9 @@ function resolvePlayer(state: GameState, def: Extract<CardDef, { kind: 'player' 
   if (floor >= Math.max(0, ...state.squad.map(overallRating))) return null;
   const target = Math.min(99, floor + def.margin);
   for (let i = 0; i < CARD_WEEK.PLAYER_TRIES; i++) {
-    const player = generatePlayerAround(rng, target, { position });
+    const player = generatePlayerAround(rng, target, {
+      position, names: state.pack === 'uk' ? UK_NAMES : AU_PACK.names, seasonWeeks: careerActionClock(state).duration,
+    });
     if (overallRating(player) <= floor) continue;
     const salary = salaryDemand(player);
     const replaces = replacementFor(state, position, salary);
@@ -162,7 +164,7 @@ function resolvePlayer(state: GameState, def: Extract<CardDef, { kind: 'player' 
 function resolveCard(state: GameState, def: CardDef, rng: Rng): OfferedCard | null {
   switch (def.kind) {
     case 'player': case 'dilemma': return resolvePlayer(state, def, rng);
-    case 'staff': return { cardId: def.id, kind: 'staff', name: randomName(rng) };
+    case 'staff': return { cardId: def.id, kind: 'staff', name: randomName(rng, state.pack === 'uk' ? UK_NAMES : AU_PACK.names) };
     case 'setPlay': return { cardId: def.id, kind: 'setPlay', playId: rng.pick(freePlayCandidates(state)) };
     case 'trait': case 'cash': return { cardId: def.id, kind: def.kind };
   }
@@ -185,28 +187,81 @@ function pickWeighted(cards: readonly CardDef[], rng: Rng): CardDef | null {
  * weighted, each resolved. Fewer only when fewer can be offered. Rolls the card
  * week's own stream and returns its new state with the offer.
  */
-export function drawOffer(state: GameState): { offer: CardOffer | null; rng: number } {
+export function drawOffer(state: GameState, kind: CardOffer['kind'] = 'match', waiting: readonly CardOffer[] = []): { offer: CardOffer | null; rng: number } {
   const cw = state.cardWeek;
   if (!cw) return { offer: null, rng: 0 };
   const rng = makeRng(cw.rng);
   let left = CARDS.filter((c) => eligibleBeforeDice(state, c));
+  const signature = (cards: readonly OfferedCard[]): string => cards.map(c => c.cardId).sort().join(',');
+  const repeats = new Set(waiting.map(o => signature(o.cards)));
   const cards: OfferedCard[] = [];
-  while (cards.length < CARD_WEEK.OFFER_SIZE && left.length > 0) {
-    const def = pickWeighted(left, rng);
-    if (!def) break;
+  const drawNext = (): void => {
+    const def = pickWeighted(left, rng)!;
     left = left.filter((c) => c !== def);
     const card = resolveCard(state, def, rng);
     if (card) cards.push(card);
+  };
+  while (cards.length < CARD_WEEK.OFFER_SIZE && left.length > 0) drawNext();
+
+  let chosen = cards.slice();
+  // Keep the normal weighted draw unless it repeats a waiting pick. In that
+  // case consider the remaining eligible cards in weighted order as well.
+  if (chosen.length > 0 && repeats.has(signature(chosen))) {
+    while (left.length > 0) drawNext();
+    const findFresh = (prefix: OfferedCard[], start: number): OfferedCard[] | undefined => {
+      if (prefix.length === chosen.length) return repeats.has(signature(prefix)) ? undefined : prefix;
+      for (let i = start; i <= cards.length - (chosen.length - prefix.length); i++) {
+        const found = findFresh([...prefix, cards[i]!], i + 1);
+        if (found) return found;
+      }
+      return undefined;
+    };
+    chosen = findFresh([], 0) ?? chosen;
   }
-  return { offer: cards.length > 0 ? { season: state.season, week: state.week, cards } : null, rng: rng.state() };
+  return { offer: chosen.length ? { season: state.season, week: state.week, kind, cards: chosen } : null, rng: rng.state() };
 }
 
-/** Put a pick on show when one is owed and none is (pure). Any other state comes back as it was. */
-export function withOffer(state: GameState): GameState {
+/** Give old v37 queues stable IDs. Their watermark could have been set by a different offer. */
+export function identifyCardOffers(cw: CardWeekState): CardWeekState {
+  if (cw.offers.every(o => o.grant !== undefined)) return cw;
+  return { ...cw, offers: cw.offers.map((o, i) => ({
+    ...o, grant: cw.grants - cw.offers.length + i + 1,
+  })) };
+}
+
+/** The newest waiting match offer, or the first starter pick if there are no match picks. */
+export function preferredCardOffer(state: GameState): CardOffer | undefined {
   const cw = state.cardWeek;
-  if (!cw || cw.owed <= 0 || cw.offer) return state;
-  const { offer, rng } = drawOffer(state);
-  return { ...state, cardWeek: { ...cw, rng, offer } };
+  return cw && (cw.owed ? cw.offers[cw.offers.length - 1] : cw.offers[0]);
+}
+
+export function unshownCardOffer(state: GameState): CardOffer | undefined {
+  const cw = state.cardWeek;
+  if (!cw) return undefined;
+  for (let i = cw.offers.length - 1; i >= cw.starterLeft; i--) {
+    const offer = cw.offers[i]!;
+    if (!offer.seen) return offer;
+  }
+  return cw.seenGrant === 0 ? cw.offers[0] : undefined;
+}
+
+function offerIndex(cw: CardWeekState, grant?: number): number {
+  return grant === undefined ? 0 : cw.offers.findIndex(o => o.grant === grant);
+}
+
+/** Fill the opening queue. Migration can supply the already-resolved v36 pick first. */
+export function fillCardOffers(state: GameState): GameState {
+  const cw = state.cardWeek!;
+  const offers = [...cw.offers];
+  let rng = cw.rng;
+  while (offers.length < cw.starterLeft + cw.owed) {
+    const kind = offers.length < cw.starterLeft ? 'starter' : 'match';
+    const draw = drawOffer({ ...state, cardWeek: { ...cw, rng } }, kind, offers);
+    if (!draw.offer) break;
+    offers.push(draw.offer);
+    rng = draw.rng;
+  }
+  return { ...state, cardWeek: identifyCardOffers({ ...cw, offers, rng }) };
 }
 
 /**
@@ -224,14 +279,21 @@ export function plantCard(state: GameState, cardId: string): GameState | string 
   const rng = makeRng(cw.rng);
   const card = resolveCard(state, def, rng);
   if (!card) return 'That card cannot be offered now.';
-  const rest = (cw.offer?.cards ?? []).filter((c) => c.cardId !== cardId);
-  const offer: CardOffer = { season: state.season, week: state.week, cards: [card, ...rest].slice(0, CARD_WEEK.OFFER_SIZE) };
-  return { ...state, cardWeek: { ...cw, rng: rng.state(), owed: Math.max(1, cw.owed), offer } };
+  const current = cw.offers[0];
+  const rest = (current?.cards ?? []).filter((c) => c.cardId !== cardId);
+  const offer: CardOffer = {
+    ...(current ?? { season: state.season, week: state.week, kind: 'match', grant: cw.grants + 1 }),
+    cards: [card, ...rest].slice(0, CARD_WEEK.OFFER_SIZE),
+  };
+  return { ...state, cardWeek: {
+    ...cw, rng: rng.state(), owed: current ? cw.owed : 1,
+    grants: cw.grants + (current ? 0 : 1), offers: [offer, ...cw.offers.slice(1)],
+  } };
 }
 
-/** A new card-week career's opening state: three picks owed and the first on show. */
+/** A new card-week career's three opening picks, drawn on its own stream. */
 export function startCardWeek(state: GameState, cardWeek: CardWeekState): GameState {
-  return withOffer({ ...state, cardWeek });
+  return fillCardOffers({ ...state, cardWeek });
 }
 
 // ── Taking a card ────────────────────────────────────────────────────────────
@@ -267,26 +329,76 @@ function joinPlayer(state: GameState, card: Extract<OfferedCard, { kind: 'player
   return { state: s, money, joined, ...(released ? { released } : {}) };
 }
 
-/**
- * Take card `index` of the pick on show (pure). A trait card needs `targetId`,
- * the squad member who gets it. Returns what happened, or why not in plain
- * words (nothing changes then). The pick is spent, and the next one drawn if
- * another is owed.
- */
-export function takeCard(state: GameState, index: number, targetId?: string): CardTake | string {
+function gambleRefusal(state: GameState, def: CardDef): string | null {
+  return def.kind === 'dilemma' && state.boardPatience + def.patience < 1
+    ? "The board can't take another gamble right now."
+    : null;
+}
+
+function recordCard(cw: CardWeekState, when: Pick<GameState, 'season' | 'week'>, cardId: string, action: NonNullable<CardHistoryEntry['action']>): CardHistoryEntry[] {
+  return [...cw.history, { cardId, season: when.season, week: when.week, action }];
+}
+
+function spendPick(cw: CardWeekState, at: number, history: CardHistoryEntry[]): CardWeekState {
+  const starter = cw.offers[at]!.kind === 'starter';
+  return {
+    ...cw, history, offers: cw.offers.filter((_, index) => index !== at),
+    starterLeft: cw.starterLeft - Number(starter),
+    owed: cw.owed - Number(!starter),
+  };
+}
+
+function pickedCard(cw: CardWeekState, index: number, grant?: number): { at: number; card: OfferedCard } | string {
+  const at = offerIndex(cw, grant);
+  const offer = cw.offers[at];
+  if (!offer) return grant === undefined ? 'No pick is waiting.' : 'That pick is no longer waiting.';
+  const card = offer.cards[index];
+  return card ? { at, card } : 'There is no card there.';
+}
+
+/** Keep a resolved card for later. Only the pick and hand change. */
+export function takeCard(state: GameState, index: number, grant?: number): GameState | string {
   const cw = state.cardWeek;
   if (!cw) return 'This career has no card week.';
-  if (cw.owed <= 0 || !cw.offer) return 'No pick is waiting.';
-  const card = cw.offer.cards[index];
-  if (!card) return 'There is no card there.';
+  const picked = pickedCard(cw, index, grant);
+  if (typeof picked === 'string') return picked;
+  const { at, card } = picked;
   const def = cardDefById(card.cardId);
   if (!def || def.kind !== card.kind) return 'That card is no longer in the deck.';
+  const refusal = gambleRefusal(state, def);
+  if (refusal) return refusal;
+  if (cw.hand.length >= CARD_WEEK.HAND_CAP) return 'Your hand is full. Play or discard a card first.';
+  const held: HandCard = { cardId: card.cardId, offered: card, level: 1, gotSeason: state.season, gotWeek: state.week };
+  return { ...state, cardWeek: {
+    ...spendPick(cw, at, recordCard(cw, state, card.cardId, 'take')), hand: [...cw.hand, held],
+  } };
+}
+
+/** Apply a held card using today's club, salary cap and board patience. Refusals spend nothing. */
+export function playCard(state: GameState, index: number, targetId?: string): CardTake | string {
+  const cw = state.cardWeek;
+  if (!cw) return 'This career has no card week.';
+  const held = cw.hand[index];
+  if (!held) return 'There is no card there.';
+  const result = applyCard(state, held.offered, held.level, targetId);
+  if (typeof result === 'string') return result;
+  const next = result.state.cardWeek!;
+  return { ...result, state: { ...result.state, cardWeek: { ...next, hand: cw.hand.filter((_, i) => i !== index) } } };
+}
+
+function applyCard(state: GameState, card: OfferedCard, level: TraitLevel, targetId?: string): CardTake | string {
+  const cw = state.cardWeek!;
+  const def = cardDefById(card.cardId);
+  if (!def || def.kind !== card.kind) return 'That card is no longer in the deck.';
+  const refusal = gambleRefusal(state, def);
+  if (refusal) return refusal;
   const ctx = { cardId: def.id, reason: `card: ${def.title}`, now: elapsedInterval(state), clubName: state.clubName };
   let s = state;
   const money: Applied['money'] = [];
   const news: Applied['news'] = [];
   let joined: Player | undefined;
-  let traitGiven: { playerId: string; trait: Extract<CardDef, { kind: 'trait' }>['trait'] } | undefined;
+  let traitGiven: CardWeekState['cardTraits'][number] | undefined;
+  let active = cw.active;
 
   switch (card.kind) {
     case 'player': case 'dilemma': {
@@ -309,11 +421,14 @@ export function takeCard(state: GameState, index: number, targetId?: string): Ca
       const out = appointFeeWaived(s, hireOf(def), card.name);
       if (typeof out === 'string') return out;
       s = out;
+      active = [...active, { kind: 'staff', cardId: def.id, level, member: s.staff[s.staff.length - 1]! }];
       news.push({ text: `${def.title}: ${card.name} joins, appointment fee waived.`, kind: 'success' });
       break;
     }
     case 'setPlay': {
       if (ownsPlay(s, card.playId)) return 'That play is already yours.';
+      const refusal = buyRefusal({ ...s, money: Number.MAX_SAFE_INTEGER }, card.playId);
+      if (refusal) return refusal;
       s = { ...s, playbook: { owned: [...s.playbook.owned, card.playId] } };
       news.push({ text: `${PLAYS_BY_ID[card.playId].name} is in your playbook, free.`, kind: 'success' });
       break;
@@ -329,7 +444,7 @@ export function takeCard(state: GameState, index: number, targetId?: string): Ca
       }
       const out = applyEffects(s, [{ kind: 'playerTrait', trait: def.trait }], { ...ctx, subjectId: target.player.id, subjectName: target.player.name });
       s = out.state;
-      traitGiven = { playerId: target.player.id, trait: def.trait };
+      traitGiven = { playerId: target.player.id, trait: def.trait, level: target.level };
       news.push({ text: `${target.player.name} has ${TRAITS[def.trait].name} ${ROMAN[target.level]}.`, kind: 'success' });
       break;
     }
@@ -343,33 +458,45 @@ export function takeCard(state: GameState, index: number, targetId?: string): Ca
     }
   }
 
-  const after = s.cardWeek!;
   const next: CardWeekState = {
-    ...after,
-    owed: after.owed - 1,
-    offer: null,
-    history: [...after.history, { cardId: def.id, season: state.season, week: state.week }],
-    cardPlayers: joined ? [...after.cardPlayers, joined.id] : after.cardPlayers,
-    cardTraits: traitGiven && !after.cardTraits.some((t) => t.playerId === traitGiven!.playerId && t.trait === traitGiven!.trait)
-      ? [...after.cardTraits, traitGiven] : after.cardTraits,
+    ...cw, active,
+    history: recordCard(cw, state, def.id, 'play'),
+    cardPlayers: joined ? [...cw.cardPlayers, joined.id] : cw.cardPlayers,
+    cardTraits: traitGiven
+      ? [...cw.cardTraits.filter((t) => t.playerId !== traitGiven.playerId || t.trait !== traitGiven.trait), traitGiven]
+      : cw.cardTraits,
   };
-  return { state: withOffer({ ...s, cardWeek: next }), money, news, ...(joined ? { joined } : {}) };
+  return { state: { ...s, cardWeek: next }, money, news, ...(joined ? { joined } : {}) };
 }
 
-/**
- * Pass the pick on show (pure): it is spent with no card taken, recorded in the
- * history as a pass, and the next pick is drawn if another is owed. Always
- * allowed while a pick is showing, so a pick whose cards are all refused never
- * holds the career up.
- */
-export function passCard(state: GameState): GameState | string {
+/** Take and play as one operation, so a refused play leaves the pick waiting. */
+export function playPickCard(state: GameState, index: number, targetId?: string, grant?: number): CardTake | string {
   const cw = state.cardWeek;
   if (!cw) return 'This career has no card week.';
-  if (cw.owed <= 0 || !cw.offer) return 'No pick is waiting.';
-  return withOffer({ ...state, cardWeek: {
-    ...cw, owed: cw.owed - 1, offer: null,
-    history: [...cw.history, { cardId: CARD_PASS, season: state.season, week: state.week }],
-  } });
+  const picked = pickedCard(cw, index, grant);
+  if (typeof picked === 'string') return picked;
+  const { at, card } = picked;
+  const spent = spendPick(cw, at, recordCard(cw, state, card.cardId, 'take'));
+  return applyCard({ ...state, cardWeek: spent }, card, 1, targetId);
+}
+
+export function discardCard(state: GameState, index: number): GameState | string {
+  const cw = state.cardWeek;
+  if (!cw) return 'This career has no card week.';
+  const held = cw.hand[index];
+  if (!held) return 'There is no card there.';
+  return { ...state, cardWeek: {
+    ...cw, hand: cw.hand.filter((_, i) => i !== index), history: recordCard(cw, state, held.cardId, 'discard'),
+  } };
+}
+
+/** Pass even if none of the three cards can currently be played. */
+export function passCard(state: GameState, grant?: number): GameState | string {
+  const cw = state.cardWeek;
+  if (!cw) return 'This career has no card week.';
+  const at = offerIndex(cw, grant);
+  if (!cw.offers[at]) return grant === undefined ? 'No pick is waiting.' : 'That pick is no longer waiting.';
+  return { ...state, cardWeek: spendPick(cw, at, recordCard(cw, state, CARD_PASS, 'pass')) };
 }
 
 // ── The week ─────────────────────────────────────────────────────────────────
@@ -383,13 +510,19 @@ export function playedLeagueMatch(state: GameState): boolean {
       && (f.homeId === club || f.awayId === club)));
 }
 
-/** The weekly card-week tick (pure): a League match adds a pick (to MAX_OWED), and a pick owed is put on show. */
+/** Draw a fresh match pick on the card stream and replace the oldest match pick at the cap. */
 export function cardWeekTick(state: GameState): GameState {
   const cw = state.cardWeek;
-  if (!cw) return state;
-  const owed = playedLeagueMatch(state) ? Math.min(CARD_WEEK.MAX_OWED, cw.owed + 1) : cw.owed;
-  const next = owed === cw.owed ? state : { ...state, cardWeek: { ...cw, owed } };
-  return withOffer(next);
+  if (!cw || !playedLeagueMatch(state)) return state;
+  const { offer, rng } = drawOffer(state, 'match', cw.offers);
+  if (!offer) return state;
+  const full = cw.owed === CARD_WEEK.MAX_OWED;
+  const waiting = full ? cw.offers.filter((_, i) => i !== cw.starterLeft) : cw.offers;
+  return { ...state, cardWeek: {
+    ...cw, rng, owed: full ? cw.owed : cw.owed + 1, grants: cw.grants + 1,
+    offers: [...waiting, { ...offer, grant: cw.grants + 1 }],
+    history: full ? recordCard(cw, state, 'expired', 'expire') : cw.history,
+  } };
 }
 
 /**
@@ -439,50 +572,92 @@ export interface CardFaceView {
   player?: { name: string; position: Position; rating: number; salary: number; replacesName?: string; releaseCost?: number };
   /** A trait card's squad members who could take it, with the level each would reach. */
   targets?: { playerId: string; name: string; level: TraitLevel }[];
-  /** Why it can't be taken now, or null. */
+  detail?: string;
+  hint: string;
+  /** Why it can't be played now, or null. */
   refusal: string | null;
 }
 
-/** The effect line on a card's face: plain words, about a dozen at most. */
+/** The effect line on the face; the specific hire, recruit or play is also named. */
 function effectLine(def: CardDef, card: OfferedCard): string {
   switch (card.kind) {
-    case 'player': return 'Joins now with no signing fee. His salary counts on the cap.';
-    case 'dilemma': return 'A better man joins free where you are weakest. Board patience −1.';
-    case 'staff': {
-      const title = def.kind === 'staff' ? (typeof def.role === 'string' ? STAFF[def.role].title : ATTACK_COACHES[def.role.attackCoach].title) : def.title;
-      return `${card.name} joins as ${title}. Fee waived; wages still run.`;
-    }
-    case 'setPlay': return `${PLAYS_BY_ID[card.playId].name} goes in your playbook, free.`;
-    case 'trait': return def.kind === 'trait' ? `${TRAITS[def.trait].name} for a player you choose. III is the limit.` : def.title;
-    case 'cash': return def.kind === 'cash' ? `${fmtMoney(def.amount)} into the bank now.` : def.title;
+    case 'player': return 'No signing fee.';
+    case 'dilemma': return 'Board patience −1.';
+    case 'staff': return 'No hiring fee.';
+    case 'setPlay': return 'Free set play.';
+    case 'trait': return '+1 trait level.';
+    case 'cash': return def.kind === 'cash' ? `Bank +${fmtMoney(def.amount)}.` : def.title;
   }
 }
 
-/** The pick on show, for the pick screen: picks owed and each card's face. Empty when nothing is on show. */
-export function cardOfferView(state: GameState): { owed: number; cards: CardFaceView[] } {
+const GOOD_IF: Record<CardKind, string> = {
+  player: 'you need a better starter.',
+  dilemma: 'you can spare board patience.',
+  staff: 'you have a vacant role.',
+  setPlay: 'your playbook needs options.',
+  trait: 'a player needs a boost.',
+  cash: 'you need money now.',
+};
+
+function cardFaceView(state: GameState, card: OfferedCard, index: number): CardFaceView[] {
+  const def = cardDefById(card.cardId);
+  if (!def) return [];
+  const view: CardFaceView = {
+    index, cardId: def.id, kind: def.kind, title: def.title, tier: def.tier, effect: effectLine(def, card),
+    hint: `Good if ${GOOD_IF[def.kind]}`, refusal: null,
+  };
+  if (card.kind === 'staff') view.detail = card.name;
+  if (card.kind === 'setPlay') view.detail = PLAYS_BY_ID[card.playId].name;
+  if (card.kind === 'player' || card.kind === 'dilemma') {
+    const clock = careerActionClock(state);
+    const out = card.replacesId ? state.squad.find((p) => p.id === card.replacesId) : undefined;
+    view.player = {
+      name: card.player.name, position: card.player.position, rating: Math.round(overallRating(card.player)), salary: card.salary,
+      ...(card.replacesName ? { replacesName: card.replacesName } : {}),
+      ...(out ? { releaseCost: releaseTerms(out, clock.season, clock.week, clock.duration).payout } : {}),
+    };
+  }
+  if (def.kind === 'trait') {
+    view.targets = traitTargets(state, def.trait).map((t) => ({ playerId: t.player.id, name: t.player.name, level: t.level }));
+  }
+  return [view];
+}
+
+export function cardOfferView(state: GameState, grant?: number): { owed: number; starterLeft: number; cards: (CardFaceView & { takeRefusal: string | null })[] } {
   const cw = state.cardWeek;
-  if (!cw?.offer) return { owed: cw?.owed ?? 0, cards: [] };
-  const cards = cw.offer.cards.flatMap((card, index): CardFaceView[] => {
-    const def = cardDefById(card.cardId);
-    if (!def) return [];
-    const view: CardFaceView = { index, cardId: def.id, kind: def.kind, title: def.title, tier: def.tier, effect: effectLine(def, card), refusal: null };
-    if (card.kind === 'player' || card.kind === 'dilemma') {
-      const clock = careerActionClock(state);
-      const out = card.replacesId ? state.squad.find((p) => p.id === card.replacesId) : undefined;
-      view.player = {
-        name: card.player.name, position: card.player.position, rating: Math.round(overallRating(card.player)), salary: card.salary,
-        ...(card.replacesName ? { replacesName: card.replacesName } : {}),
-        ...(out ? { releaseCost: releaseTerms(out, clock.season, clock.week, clock.duration).payout } : {}),
-      };
-    }
-    if (def.kind === 'trait') {
-      view.targets = traitTargets(state, def.trait).map((t) => ({ playerId: t.player.id, name: t.player.name, level: t.level }));
-    }
-    const probe = takeCard(state, index, view.targets?.[0]?.playerId);
-    view.refusal = typeof probe === 'string' ? probe : null;
-    return [view];
-  });
-  return { owed: cw.owed, cards };
+  const offer = cw?.offers[offerIndex(cw, grant)];
+  if (!cw || !offer) return { owed: 0, starterLeft: 0, cards: [] };
+  const blocked = pickBlocked(state);
+  const cards = offer.cards.flatMap((card, index) => cardFaceView(state, card, index).map((view) => {
+    const taken = blocked ?? takeCard(state, index, grant);
+    const takeRefusal = typeof taken === 'string' ? taken : null;
+    const probe = blocked ?? playPickCard(state, index, view.targets?.[0]?.playerId, grant);
+    return { ...view, takeRefusal, refusal: playRefusal(view, probe) };
+  }));
+  return { owed: cw.offers.length, starterLeft: cw.starterLeft, cards };
+}
+
+function playRefusal(view: CardFaceView, probe: CardTake | string): string | null {
+  if (typeof probe !== 'string') return null;
+  return view.targets?.length === 0 && probe === 'Choose a player for the trait.'
+    ? 'No eligible players are available.'
+    : probe;
+}
+
+export function cardHandView(state: GameState): (CardFaceView & { level: TraitLevel })[] {
+  const blocked = pickBlocked(state);
+  return (state.cardWeek?.hand ?? []).flatMap((held, index) => cardFaceView(state, held.offered, index).map((view) => ({
+    ...view, level: held.level, refusal: playRefusal(view, blocked ?? playCard(state, index, view.targets?.[0]?.playerId)),
+  })));
+}
+
+/** Staff have no person id; match the saved hire to the member still at the club. */
+function sameHire(a: StaffMember, b: StaffMember): boolean {
+  return a.role === b.role && a.speciality === b.speciality && a.name === b.name && a.hiredSeason === b.hiredSeason;
+}
+
+export function activeCardStaff(state: GameState): StaffMember[] {
+  return state.staff.filter((member) => state.cardWeek?.active.some((card) => card.kind === 'staff' && sameHire(card.member, member)));
 }
 
 // ── Store glue ───────────────────────────────────────────────────────────────
@@ -501,35 +676,49 @@ function commit(t: CardTake): void {
   for (const n of t.news) bus.emit('ui:notify', n);
 }
 
-/**
- * The player took card `index` (a trait card with `targetId`, the man who gets
- * it); `outcome` says what happened in a line. Refused, with the reason, during a match or a held week, while a closed
- * League season waits for next season's league, or when the card can't be
- * taken; nothing changes then.
- */
-export function chooseCard(index: number, targetId?: string): { ok: true; outcome: string } | { ok: false; reason: string } {
+type CardActionResult = { ok: true; outcome: string } | { ok: false; reason: string };
+
+export function chooseCard(index: number, grant?: number): CardActionResult {
   const s = getState();
-  const blocked = pickBlocked(s);
-  if (blocked) return { ok: false, reason: blocked };
-  const out = takeCard(s, index, targetId);
+  const out = pickBlocked(s) ?? takeCard(s, index, grant);
+  if (typeof out === 'string') return { ok: false, reason: out };
+  setState({ cardWeek: out.cardWeek! });
+  saveIfChanged(getState());
+  return { ok: true, outcome: `${cardDefById(out.cardWeek!.hand[out.cardWeek!.hand.length - 1]!.cardId)!.title} added to your hand.` };
+}
+
+export function playChosenCard(source: 'pick' | 'hand', index: number, targetId?: string, grant?: number): CardActionResult {
+  const s = getState();
+  const out = pickBlocked(s) ?? (source === 'pick' ? playPickCard(s, index, targetId, grant) : playCard(s, index, targetId));
   if (typeof out === 'string') return { ok: false, reason: out };
   commit(out);
+  saveIfChanged(getState());
   return { ok: true, outcome: out.news.map((n) => n.text).join(' ') };
 }
 
+export function discardHeldCard(index: number): CardActionResult {
+  const s = getState();
+  const out = pickBlocked(s) ?? discardCard(s, index);
+  if (typeof out === 'string') return { ok: false, reason: out };
+  setState({ cardWeek: out.cardWeek! });
+  saveIfChanged(getState());
+  return { ok: true, outcome: 'Card discarded.' };
+}
+
 /** The player passed the pick on show. Refused only where a take would be (a held week, the league choice). */
-export function passPick(): { ok: true } | { ok: false; reason: string } {
+export function passPick(grant?: number): { ok: true } | { ok: false; reason: string } {
   const s = getState();
   const blocked = pickBlocked(s);
   if (blocked) return { ok: false, reason: blocked };
-  const out = passCard(s);
+  const out = passCard(s, grant);
   if (typeof out === 'string') return { ok: false, reason: out };
   setState({ cardWeek: out.cardWeek! });
+  saveIfChanged(getState());
   return { ok: true };
 }
 
 /** Why no pick can be made in the store's state now, or null. */
-function pickBlocked(s: GameState): string | null {
+export function pickBlocked(s: GameState): string | null {
   if (!s.cardWeek) return 'This career has no card week.';
   if (s.sacked) return 'The board has sacked the coach.';
   if (awaitingCampReplay(s) || weekHeld()) return 'Finish the current week first.';
@@ -541,10 +730,15 @@ function pickBlocked(s: GameState): string | null {
 
 /** Install the card-week tick: after the week's results, before the autosave. Careers without a card week are untouched. */
 export function registerCardWeekSystem(): void {
-  registerTickHook('card-week', CARD_WEEK_TICK_ORDER, () => {
+  // After results, ladder and morale, before the unlocks and autosave.
+  registerTickHook('card-week', TICK_ORDER.autosave - 2, () => {
     const s = getState();
     if (!s.cardWeek || s.sacked || deckWaitsForLeagueChoice(s)) return;
     const next = cardWeekTick(s);
-    if (next !== s) setState({ cardWeek: next.cardWeek! });
+    if (next === s) return;
+    setState({ cardWeek: next.cardWeek! });
+    if (s.cardWeek.owed === CARD_WEEK.MAX_OWED) {
+      bus.emit('ui:notify', { text: `A card pick expired. Up to ${CARD_WEEK.MAX_OWED} can wait.`, kind: 'info' });
+    }
   });
 }

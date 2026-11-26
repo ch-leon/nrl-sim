@@ -16,6 +16,7 @@ import type { FacilityDefId } from '../data/facility';
 import { BOARD, LEAGUE, DEFAULT_DIFFICULTY, difficultyMultipliers, type Difficulty } from '../config';
 import { FINANCE_STARTING_CASH } from '../data/financeRules';
 import { admitOpeningSquad, freshCapAccount, SINGLE_LEAGUE_TIER, tierCap, type CapAccount, type SignedDeal } from '../systems/cap';
+import { CARD_WEEK } from '../data/cards';
 import { autoPick } from '../systems/lineup';
 
 /** The UI's text size (#371): Normal, Large (115%) and Larger (130%); see ui/textSize.ts. */
@@ -131,7 +132,7 @@ export type WeatherKind = 'clear' | 'rain' | 'wind';
 
 /** v30 adds player histories, v31 optional league progression, and v32 exact
  * protected agreements. v33 adds Open Cup entry and v34 optional Skills Camp records. v35 adds individual challenge checkpoints. v36 adds the optional card week (#846). Finance state migrates from v28; v27 requires a new career. */
-export const SAVE_VERSION = 36;
+export const SAVE_VERSION = 37;
 
 /** The hires the facilities don't cover (N14.5), and the attack coach who opens set plays to buy (#326). */
 export type StaffRole = 'assistantCoach' | 'analyst' | 'welfare' | 'attackCoach';
@@ -298,7 +299,37 @@ export type OfferedCard =
   | { cardId: string; kind: 'trait' | 'cash' };
 
 /** The three cards on show (fewer only when fewer could be offered), and when they were drawn. */
-export interface CardOffer { season: number; week: number; cards: OfferedCard[] }
+export interface CardOffer {
+  season: number;
+  week: number;
+  cards: OfferedCard[];
+  kind: 'starter' | 'match' | 'decree';
+  fromClubId?: string;
+  /** Missing only in v37 saves written before picks could be opened individually. */
+  grant?: number;
+  seen?: true;
+}
+
+type CardLevel = import('../data/traits').TraitLevel;
+export interface HandCard {
+  cardId: string;
+  level: CardLevel;
+  offered: OfferedCard;
+  gotSeason: number;
+  gotWeek: number;
+}
+
+export type ActiveCard =
+  | { cardId: string; kind: 'staff'; level: CardLevel; member: StaffMember }
+  | { cardId: string; kind: 'setPlay'; level: CardLevel; playId: import('../data/plays').PlayId }
+  | { cardId: string; kind: 'buff' | 'decree'; level: CardLevel; season: number; week: number; playerId?: string };
+
+export interface CardHistoryEntry {
+  cardId: string;
+  season: number;
+  week: number;
+  action?: 'take' | 'pass' | 'expire' | 'discard' | 'play' | 'reroll';
+}
 
 /** One line of the last match's impact (#846): what a player who played did. */
 export interface LastMatchRow { playerId: string; name: string; tries: number; tackles: number; lineBreaks: number }
@@ -312,15 +343,23 @@ export interface LastMatchImpact { season: number; week: number; opponentName: s
 export interface CardWeekState {
   /** Its own seeded stream: drawing cards never moves rngSeed or the events deck. */
   rng: number;
-  /** Picks waiting, 0..CARD_WEEK.MAX_OWED. */
+  starterLeft: number;
+  /** Match picks waiting, 0..CARD_WEEK.MAX_OWED. The starter picks are first in the queue. */
   owed: number;
-  offer: CardOffer | null;
-  /** Every card taken, oldest first. A pick passed is recorded as cardId 'pass' (data/cards.ts CARD_PASS). */
-  history: { cardId: string; season: number; week: number }[];
+  offers: CardOffer[];
+  grants: number;
+  /** The highest grant actually shown. Waiting offers track their own acknowledgement. */
+  seenGrant: number;
+  hand: HandCard[];
+  active: ActiveCard[];
+  rerolls: { season: number; week: number; count: number };
+  strikes: { season: number; count: number; lossRun: number; log: { week: number; reason: 'margin' | 'run' }[] };
+  decree: { season: number; id: string } | null;
+  history: CardHistoryEntry[];
   /** Ids of the players who joined from a card. */
   cardPlayers: string[];
   /** The traits trait cards gave, by player: the pick screen marks them. */
-  cardTraits: { playerId: string; trait: import('../data/traits').TraitId }[];
+  cardTraits: { playerId: string; trait: import('../data/traits').TraitId; level?: CardLevel }[];
   lastMatch?: LastMatchImpact;
 }
 
@@ -570,7 +609,12 @@ export function newEventDeck(seed: number): EventDeckState {
  *  stream is derived from the game seed like the events deck's, with its own
  *  constant, so it never shares a roll with the deck or the main RNG. */
 export function newCardWeek(seed: number): CardWeekState {
-  return { rng: (seed ^ 0x85ebca6b) >>> 0, owed: 3 /* CARD_WEEK.START_OWED, data/cards.ts */, offer: null, history: [], cardPlayers: [], cardTraits: [] };
+  return {
+    rng: (seed ^ 0x85ebca6b) >>> 0, starterLeft: CARD_WEEK.STARTER_PICKS, owed: 0,
+    offers: [], grants: CARD_WEEK.STARTER_PICKS, seenGrant: 0, hand: [], active: [],
+    rerolls: { season: 1, week: 1, count: 0 }, strikes: { season: 1, count: 0, lossRun: 0, log: [] },
+    decree: null, history: [], cardPlayers: [], cardTraits: [],
+  };
 }
 
 /**

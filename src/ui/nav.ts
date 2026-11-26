@@ -38,6 +38,7 @@ export interface NavStatus {
 export interface NavPlacement {
   /** A tile in Office's sheet rather than a tab of its own. */
   more?: boolean;
+  badgeLabel?: (count: number) => string;
   /** Office only: a visible tile explains why it has not opened yet. */
   locked?: () => string | null;
   /** Other screen keys this entry stands for (League holds the ladder, Squad the lineup). */
@@ -56,6 +57,7 @@ export interface NavScreen {
   more: boolean;
   holds: string[];
   hidden: boolean;
+  badgeLabel?: NavPlacement['badgeLabel'];
   status?: () => NavStatus | null;
   locked?: () => string | null;
 }
@@ -104,6 +106,7 @@ export class ScreenRegistry {
     const existed = this.map.has(id);
     this.map.set(id, {
       id, label, open, more: placement.more === true, holds: placement.holds ?? [], hidden: placement.hidden === true,
+      ...(placement.badgeLabel ? { badgeLabel: placement.badgeLabel } : {}),
       ...(placement.status ? { status: placement.status } : {}),
       ...(placement.locked ? { locked: placement.locked } : {}),
     });
@@ -380,7 +383,9 @@ export function createNav(opts: NavOptions = {}): Nav {
     const btn = buttons.get(id);
     const sc = registry.get(id);
     if (!btn || !sc) return;
-    const v = badgeView(sc.label, counts.get(id) ?? 0, dots.get(id) ?? null);
+    const count = counts.get(id) ?? 0;
+    const v = badgeView(sc.label, count, dots.get(id) ?? null);
+    if (count && sc.badgeLabel) v.ariaLabel = `${sc.label}, ${sc.badgeLabel(count)}`;
     paint(btn, v, !sc.more);
     // A tile with nothing to add reads its name and status line as they show.
     if (sc.more && v.ariaLabel === null) btn.removeAttribute('aria-label');

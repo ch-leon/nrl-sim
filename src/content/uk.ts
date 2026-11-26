@@ -1,6 +1,7 @@
 // An invented English-style competition. Match rules deliberately match AU.
 import { AU_LEAGUE, AU_RULES } from './au';
 import type { ContentPack } from './pack';
+import { UK_NAMES } from './ukNames';
 
 export const UK_PACK: ContentPack = {
   id: 'uk',
@@ -19,10 +20,7 @@ export const UK_PACK: ContentPack = {
     { id: 'rival-uk-9', name: 'Juniper Fold Rooks', colors: ['#3f476c', '#e9c894'], strength: 46 },
     { id: 'rival-uk-10', name: 'Kestrel Dene Cogs', colors: ['#89582c', '#c8d7ec'], strength: 42 },
   ],
-  names: {
-    first: ['Alfie', 'Bertie', 'Callum', 'Declan', 'Elliot', 'Freddie', 'Gareth', 'Hugo', 'Ivor', 'Jasper', 'Kit', 'Laurence', 'Monty', 'Ned', 'Orson', 'Percy', 'Quentin', 'Rupert', 'Stanley', 'Wilfred', 'Toby', 'Archie', 'Finn', 'Ollie'],
-    last: ['Brackenwick', 'Cobblesquill', 'Dunmottle', 'Emberwick', 'Fallowden', 'Gorsewell', 'Hollowmere', 'Ivythorpe', 'Juniperby', 'Kestleden', 'Lanternby', 'Mossquill', 'Nettlecombe', 'Oatfen', 'Puddlewick', 'Quarryden', 'Rookmottle', 'Spindleby', 'Thistlewick', 'Umberfen', 'Velvetby', 'Wickerden', 'Yewmottle', 'Bramblequill'],
-  },
+  names: UK_NAMES,
   vocab: {
     iqStat: 'Rugby IQ', sport: 'rugby',
     stadiumSigns: { food: 'HOT PIES', sport: 'RUGBY', home: 'OUR CLUB', snack: 'CHIPS', score: 'TRY TIME', away: 'WELCOME', cheer: 'GET IN' },
