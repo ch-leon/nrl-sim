@@ -53,7 +53,9 @@ export async function runOfficeUnlocks(browser) {
           if (tiles.find((t) => t.id === 'finance')?.locked) record.problems.push('Finance still locked after first home game');
           homeSeen = true;
         }
-        if (progress.round >= 4 && !state.unlocks?.screens?.includes('staff')) record.problems.push(`Staff not open at league round ${progress.round}`);
+        // No screens list (or no unlocks record) means every screen is open.
+        const staffOpen = state.unlocks?.screens === undefined || state.unlocks.screens.includes('staff');
+        if (progress.round >= 4 && !staffOpen) record.problems.push(`Staff not open at league round ${progress.round}`);
       }
       if ((await leagueUnlockProgress(page)).round < 12) record.problems.push('never reached league round 12');
       const end = await shot('round-12');
