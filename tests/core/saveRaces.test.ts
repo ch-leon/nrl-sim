@@ -6,7 +6,7 @@ import {
 } from '../../src/core/save';
 import { createNewGame, type GameState } from '../../src/core/state';
 import { initLeague } from '../../src/systems/fixtures';
-import { retiredSaveKey, SAVE_LOCK_KEY } from '../../src/core/storageKeys';
+import { DEVICE_ID_KEY, retiredSaveKey, saveMetaKey, SAVE_LOCK_KEY } from '../../src/core/storageKeys';
 import { stubLocalStorage, type MemStorage } from '../commercial/memStorage';
 
 type SaveModule = typeof import('../../src/core/save');
@@ -87,4 +87,23 @@ describe('one critical section across tabs (#819)', () => {
     expect(readRetiredSaves(2)).toEqual([b]);
   });
 
+  it('Start over never overwrites a replacement that lands during the metadata lookup', async () => {
+    writeSlot(1, createNewGame('Shown in the prompt', 4));
+    const shown = storage.getItem(slotKey(1))!;
+    await new Promise((r) => setTimeout(r, 0)); // the queued meta is flushed, so the write looks it up
+    const replacement = JSON.stringify({ ...JSON.parse(shown), clubName: 'Other tab' });
+    const inject = () => storage.map.set(slotKey(1), replacement);
+    onFirstRead(storage, saveMetaKey(1), inject);
+    onFirstRead(storage, DEVICE_ID_KEY, inject);
+    expect(writeSlot(1, createNewGame('Start over', 5), shown)).toBe(false);
+    expect(storage.getItem(slotKey(1))).toBe(replacement);
+  });
+
+  it('Start over refuses while another tab is in the section', async () => {
+    writeSlot(1, createNewGame('Shown', 4));
+    const shown = storage.getItem(slotKey(1))!;
+    storage.setItem(SAVE_LOCK_KEY, JSON.stringify({ token: 'other-tab:1', expires: Date.now() + 60_000 }));
+    expect(writeSlot(1, createNewGame('Start over', 5), shown)).toBe(false);
+    expect(storage.getItem(slotKey(1))).toBe(shown);
+  });
 });
