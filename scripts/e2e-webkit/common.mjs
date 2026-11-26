@@ -252,6 +252,43 @@ export async function advanceOnce(page) {
   return next;
 }
 
+/**
+ * Season-one unlock progress as a League career reads it (#831, #844): trials do not
+ * count; `round` is the next league round (league rounds played + 1), not the
+ * calendar week; home and win come from any competitive result this season.
+ */
+export async function leagueUnlockProgress(page) {
+  return page.evaluate(() => {
+    const s = window.__nrlState();
+    let played = 0;
+    let home = false;
+    let win = false;
+    for (const i of s.competitions?.instances ?? []) {
+      if (i.season !== s.season || i.definition.format.kind === 'exhibition') continue;
+      for (const f of i.fixtures) {
+        if (f.status !== 'completed' || !f.result || (f.homeId !== s.clubId && f.awayId !== s.clubId)) continue;
+        const atHome = f.homeId === s.clubId;
+        if (atHome) home = true;
+        if (atHome ? f.result.homeScore > f.result.awayScore : f.result.awayScore > f.result.homeScore) win = true;
+        if (i.definition.format.kind === 'league' && i.definition.stages.find((st) => st.id === f.stageId)?.kind === 'league') played++;
+      }
+    }
+    return { round: played + 1, home, win, reputation: s.reputation, week: s.week };
+  });
+}
+
+/** Play one PLAY WEEK on the phone, skipping any match to full time, and wait for the week to move. */
+export async function playSkippedWeek(page) {
+  const before = await page.evaluate(() => { const s = window.__nrlState(); return `${s.season}:${s.week}`; });
+  if (await advanceOnce(page) === 'match') {
+    await page.locator('.nrl-mo-controls [data-pause]').tap();
+    await page.locator('.nrl-mo-sheet [data-skip]').tap();
+    await page.locator('[data-back-to-club]:visible').first().tap({ timeout: 60000 });
+    await page.waitForSelector('body:not(.nrl-match-active) .nrl-dock');
+  }
+  await page.waitForFunction((b) => { const s = window.__nrlState(); return `${s.season}:${s.week}` !== b; }, before, { timeout: 60000 });
+}
+
 /** Keep advancing rest weeks until a match is on screen. */
 export async function advanceToMatch(page) {
   for (let i = 0; i < 8; i++) {
