@@ -1,0 +1,77 @@
+// #819: the save critical section, with the interleavings a second tab could produce.
+// A "second tab" is a fresh copy of the save modules (its own lock state), sharing storage.
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  __setStorage, readRetiredSaves, retireClassicSlot, slotKey, writeSlot,
+} from '../../src/core/save';
+import { createNewGame, type GameState } from '../../src/core/state';
+import { initLeague } from '../../src/systems/fixtures';
+import { retiredSaveKey, SAVE_LOCK_KEY } from '../../src/core/storageKeys';
+import { stubLocalStorage, type MemStorage } from '../commercial/memStorage';
+
+type SaveModule = typeof import('../../src/core/save');
+
+function classicCareer(name: string, seed: number): GameState {
+  const state = createNewGame(name, seed);
+  state.league = initLeague(state);
+  return state;
+}
+
+const bundle = (saves: string[]): string => JSON.stringify({ kind: 'nrl-retired-saves', saves });
+
+/** Run `during` once, the first time `key` is read: a moment inside the caller's critical section. */
+function onFirstRead(storage: MemStorage, key: string, during: () => void): void {
+  const get = storage.getItem.bind(storage);
+  let fired = false;
+  storage.getItem = (k: string) => {
+    if (k === key && !fired) { fired = true; during(); }
+    return get(k);
+  };
+}
+
+async function secondTab(): Promise<SaveModule> {
+  vi.resetModules();
+  return import('../../src/core/save');
+}
+
+let storage: MemStorage;
+beforeEach(() => { storage = stubLocalStorage(); });
+afterEach(() => { __setStorage(null); vi.unstubAllGlobals(); });
+
+describe('one critical section across tabs (#819)', () => {
+  it('a second tab cannot touch the archive while the first is archiving, so no career is dropped', async () => {
+    const old = JSON.stringify(classicCareer('Archived earlier', 3));
+    storage.setItem(retiredSaveKey(1), old);
+    writeSlot(1, classicCareer('Retiring now', 9));
+    const raw = storage.getItem(slotKey(1))!;
+    const tabB = await secondTab();
+    const seen: unknown[] = [];
+    onFirstRead(storage, retiredSaveKey(1), () => {
+      expect(storage.getItem(SAVE_LOCK_KEY)).not.toBeNull();
+      // The other tab would have written its stale view of the bundle here.
+      seen.push(tabB.retireClassicSlot(1));
+    });
+    expect(retireClassicSlot(1)).toMatchObject({ slot: 1, raw, emptied: true });
+    expect(seen).toEqual([null]);
+    expect(readRetiredSaves(1)).toEqual([old, raw]);
+    expect(storage.getItem(SAVE_LOCK_KEY)).toBeNull();
+  });
+
+  it('merges a new retirement into the latest bundle by id instead of writing a stale copy back', () => {
+    const a = JSON.stringify(classicCareer('A', 1));
+    const b = JSON.stringify(classicCareer('B', 2));
+    storage.setItem(retiredSaveKey(1), bundle([a]));
+    writeSlot(1, classicCareer('C', 9));
+    const c = storage.getItem(slotKey(1))!;
+    // Another tab finished archiving B just before this one entered the section.
+    onFirstRead(storage, retiredSaveKey(1), () => storage.map.set(retiredSaveKey(1), bundle([a, b])));
+    expect(retireClassicSlot(1)?.emptied).toBe(true);
+    expect(readRetiredSaves(1)).toEqual([a, b, c]);
+    // The same career archived again (a retry) is not duplicated.
+    storage.setItem(slotKey(1), c);
+    expect(retireClassicSlot(1)?.emptied).toBe(true);
+    expect(readRetiredSaves(1)).toEqual([a, b, c]);
+  });
+
+
+});

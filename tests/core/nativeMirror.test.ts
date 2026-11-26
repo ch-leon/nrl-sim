@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  __setStorage, deleteSlot, listSlotMeta, loadSlot, markClassicRetirementShown, retireClassicSlotDurable, save, setActiveSlot, type StorageLike,
+  __setStorage, decodeRetiredSaves, deleteSlot, listSlotMeta, loadSlot, markClassicRetirementShown, retireClassicSlotDurable, save, setActiveSlot, type StorageLike,
 } from '../../src/core/save';
 import { createNewGame, getState, type GameState } from '../../src/core/state';
 import { initLeague } from '../../src/systems/fixtures';
@@ -544,6 +544,54 @@ describe('native outcome acknowledgement', () => {
     expect(await retiring).toMatchObject({ slot: 1, raw: classic, emptied: false, notify: false });
     expect(storage.getItem(slotKey(1))).toBe(league);
     expect(storage.getItem(retiredSaveKey(1))).toBe(classic);
+  });
+
+  /** Retire slot 1 on iPhone, running `during` while the native archive confirmation is held. */
+  async function retireWhileHeld(during: (storage: ReturnType<typeof start>['storage']) => void) {
+    const {native, storage, mirror} = start();
+    __setStorage(storage);
+    const classic = JSON.stringify(classicCareer('Old Town', 4));
+    storage.setItem(slotKey(1), classic);
+    storage.setItem(liveMatchKey(1), '"live-1"');
+    await mirror.idle();
+    const release = native.hold();
+    const retiring = retireClassicSlotDurable(1);
+    try {
+      await vi.waitFor(() => {
+        expect(native.calls.some((c) => c.op === 'write' && c.name === F(retiredSaveKey(1)) + '.tmp')).toBe(true);
+      });
+      during(storage);
+    } finally { release(); }
+    return { storage, classic, retired: await retiring };
+  }
+  const archivedMatches = (storage: { getItem(k: string): string | null }): unknown[] =>
+    decodeRetiredSaves(storage.getItem(retiredSaveKey(1))).map((raw) => (JSON.parse(raw) as { nrlLiveMatch?: unknown }).nrlLiveMatch);
+
+  it('never deletes the checkpoint of a career that stays live: identical legacy bytes moved in during confirmation', async () => {
+    const { storage, classic, retired } = await retireWhileHeld((s) => s.setItem(LEGACY_SAVE_KEY, s.getItem(slotKey(1))!));
+    // The career, its legacy copy and its checkpoint went together, after the newest unit was confirmed.
+    expect(retired).toMatchObject({ slot: 1, raw: classic, emptied: true });
+    expect(storage.getItem(slotKey(1))).toBeNull();
+    expect(storage.getItem(LEGACY_SAVE_KEY)).toBeNull();
+    expect(storage.getItem(liveMatchKey(1))).toBeNull();
+    expect(archivedMatches(storage)).toEqual(['live-1']);
+  });
+
+  it('archives the newest pair when the checkpoint is updated during confirmation', async () => {
+    const { storage, retired } = await retireWhileHeld((s) => s.setItem(liveMatchKey(1), '"live-2"'));
+    expect(retired?.emptied).toBe(true);
+    expect(storage.getItem(slotKey(1))).toBeNull();
+    expect(storage.getItem(liveMatchKey(1))).toBeNull();
+    // The checkpoint deleted is the one archived; the earlier pair is kept beside it.
+    expect(archivedMatches(storage)).toEqual(['live-1', 'live-2']);
+  });
+
+  it('leaves the career and its checkpoint together when a new checkpoint lands during confirmation of a swapped career', async () => {
+    const league = JSON.stringify({ version: 35, clubName: 'New League', competitions: { leagueCareer: { phase: 'active' } } });
+    const { storage, retired } = await retireWhileHeld((s) => { s.setItem(slotKey(1), league); s.setItem(liveMatchKey(1), '"league-live"'); });
+    expect(retired).toMatchObject({ emptied: false, notify: false });
+    expect(storage.getItem(slotKey(1))).toBe(league);
+    expect(storage.getItem(liveMatchKey(1))).toBe('"league-live"');
   });
 
   it('a wiped web view restores a native-only Classic save into the archive, not the live slot', async () => {

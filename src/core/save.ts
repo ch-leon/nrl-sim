@@ -42,6 +42,7 @@ import { BRAND } from '../brand';
 import { cleanName } from '../data/names';
 import { allPlayers, renameClubsPatch, renamePlayersPatch, validClubColors, type ClubEdit } from '../systems/rename';
 import { browserStorage, inCareerNamespace, LocalSaveStore, type StorageLike } from './storage/local';
+import { withSaveLease, withSaveLock } from './storage/saveLock';
 import { nextMeta } from './storage/meta';
 import { deliverFile } from './storage/native';
 import type { SaveMeta, SlotListing } from './storage/types';
@@ -862,6 +863,47 @@ function encodeRetiredSaves(saves: readonly string[]): string | null {
   return JSON.stringify({ kind: RETIRED_BUNDLE, saves });
 }
 
+/**
+ * A stable id for one archived career: a 53-bit hash of its bytes and their length.
+ * Settings deletes by this id, so a stale list can only ever delete the career it showed.
+ */
+export function retiredSaveId(raw: string): string {
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return `${(4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36)}-${raw.length.toString(36)}`;
+}
+
+/**
+ * Add `entries` to the slot's archive, merged by id. Call only inside the save critical
+ * section: the latest bundle is read here, so a stale copy is never written back and a
+ * career another tab archived stays. Returns the stored value, or null when it did not
+ * read back holding every career it should.
+ */
+function mergeIntoArchive(storage: StorageLike, slot: number, entries: readonly string[]): string | null {
+  const key = retiredSaveKey(slot);
+  const current = storage.getItem(key);
+  const kept = decodeRetiredSaves(current);
+  const ids = new Set(kept.map(retiredSaveId));
+  for (const entry of entries) {
+    const id = retiredSaveId(entry);
+    if (!ids.has(id)) { kept.push(entry); ids.add(id); }
+  }
+  const next = encodeRetiredSaves(kept);
+  if (next === null) return null;
+  if (current !== next) storage.setItem(key, next);
+  const stored = storage.getItem(key);
+  if (stored === null) return null;
+  const have = new Set(decodeRetiredSaves(stored).map(retiredSaveId));
+  return [...ids].every((id) => have.has(id)) ? stored : null;
+}
+
 /** What was archived for one slot, and the exact bytes each source key held then. */
 interface StagedClassic {
   slot: number;
@@ -869,7 +911,9 @@ interface StagedClassic {
   stored: string;
   /** The slot key's bytes (null when slot 1 read through to the legacy key). */
   own: string | null;
-  /** For slot 1: the legacy key's bytes, only when they are a Classic career archived here. */
+  /** For slot 1: the legacy key's bytes, whatever they are, as one part of the unit. */
+  legacyRaw: string | null;
+  /** The legacy bytes to delete: a Classic career archived here, or the slot's own bytes. */
   legacy: string | null;
   /** The live-match record kept beside the slot, archived inside the visible career. */
   match: string | null;
@@ -884,65 +928,55 @@ function archiveEntry(raw: string, match: string | null): string {
   catch { return raw; }
 }
 
-/**
- * Keep the raw Classic bytes under the retired-save key. Every distinct Classic
- * payload the slot holds is archived: for slot 1 that is the slot key and a
- * different Classic career under the shadowed legacy key. The live-match record is
- * archived inside the visible career, as Export keeps it. A different career already
- * archived for this slot stays; the new ones are added beside it. The live slot stays
- * until `commitClassicRetirement`, so an iPhone mirror can finish the archive before
- * the slot is marked deleted. Never throws. Null when the slot is not Classic.
- */
-function stageClassicArchive(slot: number): StagedClassic | ClassicRetirement | null {
-  const store = getStore();
-  if (!store) return null;
-  let raw: string | null;
-  let own: string | null;
-  let legacyRaw: string | null;
-  let match: string | null;
-  try {
-    raw = store.read(slot);
-    own = store.storage.getItem(slotKey(slot));
-    legacyRaw = slot === 1 ? store.storage.getItem(LEGACY_SAVE_KEY) : null;
-    match = store.storage.getItem(liveMatchKey(slot));
-  } catch { return null; }
-  if (raw === null || !isClassicSave(raw)) return null;
-  // A legacy career that is not Classic, or is the same bytes, is not archived again;
-  // only the same bytes are deleted with the slot.
-  const legacy = legacyRaw !== null && (legacyRaw === own || isClassicSave(legacyRaw)) ? legacyRaw : null;
-  const entries = [archiveEntry(raw, match)];
-  if (legacy !== null && legacy !== raw) entries.push(legacy);
-  const key = retiredSaveKey(slot);
-  let stored: string;
-  try {
-    const kept = decodeRetiredSaves(store.storage.getItem(key));
-    for (const entry of entries) if (!kept.includes(entry)) kept.push(entry);
-    const next = encodeRetiredSaves(kept);
-    if (next === null) return { slot, raw, emptied: false, notify: true };
-    if (store.storage.getItem(key) !== next) store.storage.setItem(key, next);
-    stored = store.storage.getItem(key) ?? '';
-    const archived = decodeRetiredSaves(stored);
-    if (stored !== next || !entries.every((entry) => archived.includes(entry))) return { slot, raw, emptied: false, notify: true };
-  } catch { return { slot, raw, emptied: false, notify: true }; }
-  return { slot, raw, stored, own, legacy, match };
+/** The slot's keys as one unit: the career, slot 1's legacy key and the live-match checkpoint. */
+function readUnit(store: LocalSaveStore, slot: number): { raw: string | null; own: string | null; legacyRaw: string | null; match: string | null } {
+  return {
+    raw: store.read(slot),
+    own: store.storage.getItem(slotKey(slot)),
+    legacyRaw: slot === 1 ? store.storage.getItem(LEGACY_SAVE_KEY) : null,
+    match: store.storage.getItem(liveMatchKey(slot)),
+  };
 }
 
 /**
- * Empty the slot once its archive is durable: compare-and-delete, so only the bytes
- * that were archived go. If the slot now holds something else (a career written while
- * an iPhone archive was being confirmed), it is left alone and nothing is announced.
- * Never throws.
+ * Keep the raw Classic bytes under the retired-save key. Call inside the save critical
+ * section. Every distinct Classic payload the slot holds is archived: for slot 1 that is
+ * the slot key and a different Classic career under the shadowed legacy key. The
+ * live-match record is archived inside the visible career, as Export keeps it. The archive
+ * is merged by id with whatever is already there. The live slot stays until
+ * `commitClassicRetirement`, so an iPhone mirror can finish the archive before the slot is
+ * marked deleted. Null when the slot is not Classic.
  */
-function commitClassicRetirement(staged: StagedClassic): ClassicRetirement {
+function stageClassicArchive(store: LocalSaveStore, slot: number): StagedClassic | ClassicRetirement | null {
+  let unit: ReturnType<typeof readUnit>;
+  try { unit = readUnit(store, slot); } catch { return null; }
+  const { raw, own, legacyRaw, match } = unit;
+  if (raw === null || !isClassicSave(raw)) return null;
+  // A legacy career that is not Classic is not archived, and stays; the same bytes go with the slot.
+  const legacy = legacyRaw !== null && (legacyRaw === own || isClassicSave(legacyRaw)) ? legacyRaw : null;
+  const entries = [archiveEntry(raw, match)];
+  if (legacy !== null && legacy !== raw) entries.push(legacy);
+  let stored: string | null;
+  try { stored = mergeIntoArchive(store.storage, slot, entries); }
+  catch { stored = null; }
+  if (stored === null) return { slot, raw, emptied: false, notify: true };
+  return { slot, raw, stored, own, legacyRaw, legacy, match };
+}
+
+/**
+ * Empty the slot once its archive is durable. Call inside the save critical section.
+ * The career, the legacy key and the live-match checkpoint are one unit: all three are
+ * re-read and must still hold exactly the staged bytes, or nothing is deleted
+ * (`changed`), so a checkpoint whose career stays live is never removed.
+ */
+function commitClassicRetirement(store: LocalSaveStore, staged: StagedClassic): ClassicRetirement | 'changed' {
   const { slot, raw } = staged;
-  const store = getStore();
-  if (!store) return { slot, raw, emptied: false, notify: true };
   let removed: string[] = [];
   try {
-    const now = store.read(slot);
-    if (now !== raw) return { slot, raw, emptied: false, notify: false };
+    const now = readUnit(store, slot);
+    if (now.raw !== raw || now.own !== staged.own || now.legacyRaw !== staged.legacyRaw || now.match !== staged.match) return 'changed';
     removed = store.removeExact(slot, staged.own, staged.legacy);
-    if (staged.match !== null && store.storage.getItem(liveMatchKey(slot)) === staged.match) {
+    if (staged.match !== null) {
       store.storage.removeItem(liveMatchKey(slot));
       removed.push(liveMatchKey(slot));
     }
@@ -955,43 +989,69 @@ function commitClassicRetirement(staged: StagedClassic): ClassicRetirement {
   return { slot, raw, emptied: true, notify: !retirementNoticeSeen(store, slot), removed, stored: staged.stored };
 }
 
-/**
- * Move a Classic career out of `slot`. The raw bytes are written to the retired-save
- * key first and read back; only then is the slot emptied. A failed archive leaves
- * the slot untouched. On iPhone this is not enough: the native archive and the slot
- * delete run at the same time. Use `retireClassicSlotDurable` there. A League career,
- * a structural calendar and anything that is not a Classic save are left alone.
- * Never throws.
- */
-export function retireClassicSlot(slot: number): ClassicRetirement | null {
-  const staged = stageClassicArchive(slot);
-  if (!staged) return null;
-  if ('emptied' in staged) return staged;
-  return commitClassicRetirement(staged);
+/** The unit changed under a retirement: a slot that is still Classic says so, anything else is left quietly. */
+function retirementChanged(store: LocalSaveStore, slot: number, raw: string): ClassicRetirement {
+  let now: string | null = null;
+  try { now = store.read(slot); } catch { /* unreadable: say nothing changed hands */ }
+  return { slot, raw, emptied: false, notify: now !== null && isClassicSave(now) };
 }
 
 /**
- * Archive, wait until the iPhone mirror has the archive, then delete the live slot,
- * but only while it still holds the staged Classic bytes.
- * A web-view wipe in between still has the native archive, and the slot is not
- * marked deleted until that copy exists. Off iPhone the confirm is immediate.
- * Never throws.
+ * Move a Classic career out of `slot`, in one critical section: archive (merged by id,
+ * read back), then empty the slot. A failed archive leaves the slot untouched. Another
+ * tab in the section means nothing happens now; the next launch tries again. On iPhone
+ * use `retireClassicSlotDurable`. A League career, a structural calendar and anything that
+ * is not a Classic save are left alone. Never throws.
+ */
+export function retireClassicSlot(slot: number): ClassicRetirement | null {
+  const store = getStore();
+  if (!store) return null;
+  try {
+    return withSaveLease(store.storage, () => {
+      const staged = stageClassicArchive(store, slot);
+      if (!staged || 'emptied' in staged) return staged;
+      const done = commitClassicRetirement(store, staged);
+      return done === 'changed' ? retirementChanged(store, slot, staged.raw) : done;
+    });
+  } catch { return null; }
+}
+
+/**
+ * Archive, wait until the iPhone mirror has the archive, then delete the live slot. The
+ * archive and the delete are two critical sections with the native confirmation between
+ * them, never inside one. If the career or its checkpoint changed during the wait, the
+ * newest pair is archived and confirmed again (twice at most); otherwise both are left.
+ * Off iPhone the confirm is immediate. Never throws.
  */
 export async function retireClassicSlotDurable(slot: number): Promise<ClassicRetirement | null> {
-  const staged = stageClassicArchive(slot);
-  if (!staged) return null;
-  if ('emptied' in staged) return staged;
-  let ack: 'confirmed' | 'inactive' | string = 'inactive';
-  if (nativeCheckpointRequired()) {
-    try { ack = await acknowledgeClassicArchive(staged.slot, staged.stored); }
-    catch { ack = 'failed'; }
-    if (ack !== 'confirmed' && ack !== 'inactive') return { slot: staged.slot, raw: staged.raw, emptied: false, notify: true };
+  const store = getStore();
+  if (!store) return null;
+  let raw: string | null = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    let staged: StagedClassic | ClassicRetirement | null;
+    try { staged = await withSaveLock(store.storage, () => stageClassicArchive(store, slot)); }
+    catch { return raw === null ? null : retirementChanged(store, slot, raw); }
+    // On a retry the slot no longer holds a Classic career: something else was written there.
+    if (!staged) return raw === null ? null : retirementChanged(store, slot, raw);
+    if ('emptied' in staged) return staged;
+    raw = staged.raw;
+    let ack: 'confirmed' | 'inactive' | string = 'inactive';
+    if (nativeCheckpointRequired()) {
+      try { ack = await acknowledgeClassicArchive(staged.slot, staged.stored); }
+      catch { ack = 'failed'; }
+      if (ack !== 'confirmed' && ack !== 'inactive') return { slot, raw, emptied: false, notify: true };
+    }
+    const unit = staged;
+    let done: ClassicRetirement | 'changed';
+    try { done = await withSaveLock(store.storage, () => commitClassicRetirement(store, unit)); }
+    catch { return { slot, raw, emptied: false, notify: true }; }
+    if (done === 'changed') continue;
+    if (done.emptied && ack === 'confirmed') {
+      try { await acknowledgeClassicSlotGone(staged.slot, done.removed); } catch { /* the archive is already confirmed */ }
+    }
+    return done;
   }
-  const done = commitClassicRetirement(staged);
-  if (done.emptied && ack === 'confirmed') {
-    try { await acknowledgeClassicSlotGone(staged.slot, done.removed); } catch { /* the archive is already confirmed */ }
-  }
-  return done;
+  return retirementChanged(store, slot, raw!);
 }
 
 /** Retire every Classic slot. Slots that are not Classic are absent from the list. */
