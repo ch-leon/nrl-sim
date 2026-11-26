@@ -54,7 +54,14 @@ export async function runCardWeek(browser) {
     await page.locator('.nrl-tutorial-skip').tap();
     await page.locator('[data-screen="club"]').tap();
     await page.locator(PICK).waitFor();
-    await page.evaluate(() => document.documentElement.setAttribute('data-text-size', 'larger'));
+    const larger = await page.evaluate(() => {
+      const root = document.documentElement;
+      const normal = parseFloat(getComputedStyle(root).fontSize);
+      root.setAttribute('data-text-size', 'larger');
+      root.style.setProperty('--nrl-text-scale', '1.3');
+      return parseFloat(getComputedStyle(root).fontSize) / normal;
+    });
+    assert.ok(Math.abs(larger - 1.3) < 0.01, 'The Larger text setting must scale rem units');
     await page.locator('.nrl-card-modal .nrl-screen-x').waitFor();
     await checkPick(page, false);
     await page.screenshot({ animations: 'disabled', path: join(out, '667x375-pick.png') });
