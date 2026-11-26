@@ -8,7 +8,8 @@ import { difficultyMultipliers, type Difficulty } from '../config';
 import { generatePlayer, generatePlayerAround, POSITIONS } from './player';
 import { createCompetitionInstance, competitionFixtureId, type CompetitionDefinition, type CompetitionInstance } from './competition';
 import { generateRivalSquad, hashString, rivalSquadSeed, squadStrength } from '../systems/rivals';
-import { admitOpeningSquad, AI_OPENING_CASH, freshCapAccount, tierCap, tierForRank } from '../systems/cap';
+import { admitOpeningSquad, AI_OPENING_CASH, freshCapAccount, publishedCap, tierCap, tierForRank, type CapAccount } from '../systems/cap';
+import { BIG_THREE_CAP, BIG_THREE_SQUAD_SIZE, bigThreeForProfile } from '../content/career/bigThree';
 import { makeRng } from '../utils/rng';
 import type { DivisionMetadata } from './competitionDivisions';
 import type { CompetitionCalendarSlot } from './competitionCalendar';
@@ -45,6 +46,8 @@ export interface DivisionWorld {
   squad: Player[];
   divisions: DivisionMetadata[];
   instances: CompetitionInstance[];
+  /** The Big Three this world was built with (#840). */
+  bigThree?: Record<string, number>;
 }
 export interface DivisionPairing { round: number; homeId: string; awayId: string }
 
@@ -181,19 +184,25 @@ export function createDivisionWorld(
   const targets = new Map(profile.divisions.flatMap(d => d.entrants.map(e => [e.clubId, e.strength] as const)));
   const tierOf = new Map(profile.divisions.flatMap(d => d.entrants.map(e => [e.clubId, tierForRank(d.rank)] as const)));
   const clubs: RivalClub[] = [{ id: 'player', name: player.name, colors: [...player.colors], strength: squadStrength(squad) }];
+  // The Big Three (#840) carry a smaller, stronger squad under a bigger cap.
+  const bigThree = bigThreeForProfile(profile.id);
   for (const identity of profile.clubs) {
     const target = targets.get(identity.id)!;
     const tier = tierOf.get(identity.id)!;
-    const players = admitOpeningSquad(generateRivalSquad({ id: identity.id, strength: target }, rivalSquadSeed(streamSeed(seed, profile.id, 'rivals'), identity.id)), tierCap(tier), 1);
+    const big = !!bigThree && identity.id in bigThree;
+    const capAccount: CapAccount = big ? { ...freshCapAccount(tier), ...BIG_THREE_CAP } : freshCapAccount(tier);
+    const generated = generateRivalSquad({ id: identity.id, strength: target }, rivalSquadSeed(streamSeed(seed, profile.id, 'rivals'), identity.id),
+      ...(big ? [BIG_THREE_SQUAD_SIZE] : []));
+    const players = admitOpeningSquad(generated, big ? publishedCap(capAccount) : tierCap(tier), 1);
     if (!players) throw new Error(`Opening squad for ${identity.id} does not fit the ${tier} cap`);
-    clubs.push({ id: identity.id, name: identity.name, colors: [...identity.colors], ...(identity.home ? { home: { ...identity.home } } : {}), strength: squadStrength(players), squad: players.map(p => installPlayerHistory(p, identity.id, { season: 1, week: 1 })), cash: AI_OPENING_CASH, capAccount: freshCapAccount(tier) });
+    clubs.push({ id: identity.id, name: identity.name, colors: [...identity.colors], ...(identity.home ? { home: { ...identity.home } } : {}), strength: squadStrength(players), squad: players.map(p => installPlayerHistory(p, identity.id, { season: 1, week: 1 })), cash: AI_OPENING_CASH, capAccount });
   }
   const schedule = buildDivisionSchedule(profile, pack, 1,
     Object.fromEntries(profile.divisions.map(d => [d.id, d.entrants.map(e => e.clubId)])), seed);
   // Preserve the dormant fresh-world public contract: activation owns dates.
   const instances = schedule.instances.map(i => ({ ...i, status: 'entered' as const, stageId: null,
     fixtures: i.fixtures.map(({ slot: _slot, ...f }) => ({ ...f, status: 'pending' as const })) }));
-  return { ...schedule, clubs, squad, instances };
+  return { ...schedule, clubs, squad, instances, ...(bigThree ? { bigThree } : {}) };
 }
 
 

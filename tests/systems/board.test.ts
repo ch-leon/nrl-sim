@@ -1,7 +1,8 @@
+import { FACILITY_CATALOG } from '../../src/data/facility';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   generateObjectives, generateLeagueObjectives, evaluateObjective, reviewObjectives, finalsPrize, finalsTarget,
-  buildsTheCashCovers, finalsObjectiveText,
+  buildsTheCashCovers, everyFacilityMaxed, finalsObjectiveText,
   applyBoardReview, ensureObjectives, registerBoardSystem, sackedSummary, type SeasonOutcome,
 } from '../../src/systems/board';
 import { initLeague, PLAYER_ID } from '../../src/systems/fixtures';
@@ -106,6 +107,20 @@ describe('generateObjectives', () => {
     expect(buildsTheCashCovers(15_999)).toBe(1);
     expect(buildsTheCashCovers(16_000)).toBe(2);
     expect(buildsTheCashCovers(200_000)).toBe(BOARD.BUILD_TARGET_EXTRA);
+  });
+
+  it('sets no building goal once every facility is built at level 3 (#836)', () => {
+    const s = fresh();
+    const buildSeason = Array.from({ length: 20 }, (_, i) => i + 1)
+      .find(season => generateObjectives({ ...s, season, money: 500_000 }).some(o => o.kind === 'build'))!;
+    expect(buildSeason).toBeDefined();
+    const maxed = Object.keys(FACILITY_CATALOG).map((defId, i) => ({ id: `f${i}`, defId: defId as keyof typeof FACILITY_CATALOG, level: 3 as const, x: i * 4, y: 0 }));
+    expect(everyFacilityMaxed(maxed)).toBe(true);
+    expect(everyFacilityMaxed(maxed.map((f, i) => i === 0 ? { ...f, level: 2 as const } : f))).toBe(false);
+    expect(generateObjectives({ ...s, season: buildSeason, money: 500_000, facilities: maxed }).some(o => o.kind === 'build')).toBe(false);
+  });
+
+  it('sizes the build goal to what the cash covers', () => {
     const s = fresh();
     const buildSeason = Array.from({ length: 20 }, (_, i) => i + 1)
       .find(season => generateObjectives({ ...s, season }).some(o => o.kind === 'build'))!;
