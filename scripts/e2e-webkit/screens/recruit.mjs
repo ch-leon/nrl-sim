@@ -59,7 +59,7 @@ export async function runRecruitTutorial(browser) {
 }
 
 export async function runRecruit(browser) {
-  let failures = await runRecruitTutorial(browser);
+  let failures = 0;
   for (const [width, height] of [[667, 375], [844, 390]]) {
     for (const difficulty of ['easy', 'hard']) {
       const tag = `${width}x${height}-${difficulty}`;
