@@ -26,6 +26,7 @@ import {
 } from '../../data/facility';
 import type { PlacedFacility } from '../../core/state';
 import { isFacilityOpen, unlockReason } from '../../systems/unlocks';
+import type { LeagueReadState } from '../../systems/leagueSeasonView';
 import { getState } from '../../core/state';
 import { ECON, PROGRESSION } from '../../config';
 import { fmtMoney, fmtMoneyShort } from '../../utils/money';
@@ -110,8 +111,8 @@ export function facilityCategory(def: Pick<FacilityDef, 'training'>): Exclude<Bu
  * Why a facility can't be built now, or null when it can: a unique one already
  * on the grounds, or the money short ("Need $23,390 more"). Pure.
  */
-export function buildBlocker(def: Pick<FacilityDef, 'id' | 'cost' | 'unique'>, state: { money: number; facilities: readonly { defId: string }[]; unlocks?: { facilities: FacilityDefId[] } | undefined }): string | null {
-  if (!isFacilityOpen(state, def.id)) return unlockReason(def.id);
+export function buildBlocker(def: Pick<FacilityDef, 'id' | 'cost' | 'unique'>, state: { money: number; facilities: readonly { defId: string }[]; unlocks?: { facilities: FacilityDefId[] } | undefined } & Partial<LeagueReadState>): string | null {
+  if (!isFacilityOpen(state, def.id)) return unlockReason(def.id, state.league ? { ...state, league: state.league } : undefined);
   if (def.unique && state.facilities.some((f) => f.defId === def.id)) return 'Built: upgrade it on the grounds';
   if (state.money < def.cost) return `Need ${fmtMoney(def.cost - Math.max(0, state.money))} more`;
   return null;

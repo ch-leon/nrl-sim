@@ -3,11 +3,21 @@ import { completedLeagueFinal, leagueCloseFacts, leagueHistoryFacts } from '../d
 import { competitionLadder } from './competitionCalendar';
 import { reconcileMatchIncome } from './matchIncome';
 import { leagueAccessFromClose } from './leagueSelection';
-import { recordSeasonHonours } from './fixtures';
+import { PREMIERSHIP_REP_BONUS, recordSeasonHonours } from './fixtures';
+import type { CompetitionWorldMetadata } from '../data/competitionDivisions';
+import type { LeagueAccess } from '../data/leagueCareer';
 import { applySeasonReputation } from './league';
 import { reviewObjectives, sackingReason } from './board';
 import { buildCompletedSeasonReview } from './stats';
 import { validateInput } from '../core/saveValidation';
+
+/** Reputation a League title is worth (#833): the full premiership bonus in the
+ * club's highest unlocked league, half of it (rounded down) in any league below. */
+export function leagueTitleReputation(world: CompetitionWorldMetadata, access: readonly LeagueAccess[], leagueId: string): number {
+  const rank = (id: string): number => world.divisions.find(d => d.id === id)?.rank ?? 0;
+  const highest = Math.max(0, ...access.map(a => rank(a.leagueId)));
+  return rank(leagueId) < highest ? Math.floor(PREMIERSHIP_REP_BONUS / 2) : PREMIERSHIP_REP_BONUS;
+}
 
 /** Complete the settled final interval without beginning next season. */
 export function closeLeagueSeason(state: GameState): GameState {
@@ -33,7 +43,8 @@ export function closeLeagueSeason(state: GameState): GameState {
   // Every saved source-year promise settles before books and sporting facts freeze.
   let next = reconcileMatchIncome(state);
   if (next.matchIncome.some(r => r.season === state.season && !r.receipt)) return state;
-  next = recordSeasonHonours({...next, league: {...next.league, ladder}}, {season: state.season, clubId: state.clubId, ladderPosition: position, championId: own.championId});
+  next = recordSeasonHonours({...next, league: {...next.league, ladder}}, {season: state.season, clubId: state.clubId, ladderPosition: position, championId: own.championId,
+      titleReputation: leagueTitleReputation(c.world, progress.access, own.leagueId)});
   const reputation = applySeasonReputation(next.reputation, {ladderPosition: position, clubCount: instance.entrantIds.length,
     finalsWins: played.filter(f => !(f.stageId === finalStage?.id && f.round === finalStage.rounds) && f.result!.winnerId === state.clubId).length,
     playedGrandFinal, premiership: outcome.premiership}).reputation;

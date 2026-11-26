@@ -205,6 +205,16 @@ function leagueCareerEvents(state: Pick<GameState, 'competitions'>): boolean {
 }
 
 /**
+ * A closed League season waiting for next season's league. Its review (board,
+ * reputation and books) is frozen, so the deck waits too (#837): a card offered
+ * or still open at the close is answered, or takes its default, once the new
+ * season has started, and its effects land in that season.
+ */
+export function deckWaitsForLeagueChoice(state: Pick<GameState, 'competitions'>): boolean {
+  return state.competitions?.leagueCareer?.phase === 'next-season-choice';
+}
+
+/**
  * Classic week windows, read on a League career year. A 25-week year maps onto
  * the 27-week Classic scale, so weeks 1–4 stay the pre-season block and the
  * finals sit past a [1, 24] window. Equal lengths stay as written.
@@ -675,11 +685,13 @@ function commit(a: Applied): void {
   for (const n of a.news) bus.emit('ui:notify', n);
 }
 
-/** The player picked choice `index` on a pending card. Returns false if it no longer exists. */
+/** The player picked choice `index` on a pending card. Returns false if it no longer exists,
+ *  or while a closed League season waits for next season's league. */
 export function chooseEvent(eventId: string, index: number): boolean {
   const s = getState();
   if (awaitingCampReplay(s) || weekHeld()) return false;
   if (hasStructuralCalendar(s) && !s.competitions?.leagueCareer) return false;
+  if (deckWaitsForLeagueChoice(s)) return false;
   const r = resolveEvent(s, eventId, index, elapsedInterval(s));
   if (!r) return false;
   commit(r);
@@ -781,13 +793,14 @@ export function plantPending(cardId: string): boolean {
 export function registerEventsSystem(): void {
   registerTickHook('events-rollover', TICK_ORDER.match - 5, () => {
     const s = getState();
-    if (s.sacked || (hasStructuralCalendar(s) && !s.competitions?.leagueCareer)) return;
+    if (s.sacked || (hasStructuralCalendar(s) && !s.competitions?.leagueCareer) || deckWaitsForLeagueChoice(s)) return;
     const due = resolveDueRollovers(s, elapsedInterval(s));
     if (due.state !== s) commit(due);
   });
   registerTickHook('events', EVENTS_TICK_ORDER, () => {
     const s = getState();
-    if (s.sacked) return;
+    // Time cannot pass at the league choice; if it ever did, no card or modifier would touch the closed season.
+    if (s.sacked || deckWaitsForLeagueChoice(s)) return;
     commit(eventsTick(s));
   });
   registerSeasonHook('events-season', 25, () => {
@@ -810,6 +823,10 @@ function offerSeasonCards(s: GameState): void {
   for (const ev of next.eventDeck.pending) {
     if (s.eventDeck.pending.some((p) => p.id === ev.id)) continue;
     const card = cardById(ev.cardId);
-    if (card) bus.emit('ui:notify', { text: `Decision needed: ${card.title}. Open News to choose.`, kind: 'info' });
+    if (!card) continue;
+    const text = deckWaitsForLeagueChoice(next)
+      ? `Decision waiting: ${card.title}. Answer it once next season's league is confirmed.`
+      : `Decision needed: ${card.title}. Open News to choose.`;
+    bus.emit('ui:notify', { text, kind: 'info' });
   }
 }

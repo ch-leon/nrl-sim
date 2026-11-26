@@ -4,7 +4,8 @@ import { bus } from '../core/events';
 import { registerTickHook, TICK_ORDER } from '../core/time';
 import { SEASON_ROUNDS } from '../config';
 import { FACILITY_CATALOG, type FacilityDefId } from '../data/facility';
-import { SCREEN_UNLOCK_LADDER, careerResults, isScreenOpen, registerScreenUnlockSystem } from './screenUnlocks';
+import type { LeagueReadState } from './leagueSeasonView';
+import { SCREEN_UNLOCK_LADDER, isScreenOpen, ladderReason, leagueUnlockProgress, registerScreenUnlockSystem } from './screenUnlocks';
 
 export { isScreenOpen, screenLockReason, screensDue } from './screenUnlocks';
 
@@ -32,27 +33,42 @@ export function isFacilityOpen(state: Pick<GameState, 'unlocks'>, id: FacilityDe
   return !state.unlocks || state.unlocks.facilities.includes(id);
 }
 
-export function unlockReason(id: FacilityDefId): string {
-  return UNLOCK_LADDER.find((row) => row.facilities.includes(id))!.reason;
+/** Without a state (or in Classic) the Classic wording; a League career's names its league rounds. */
+export function unlockReason(id: FacilityDefId, state?: LeagueReadState): string {
+  const row = UNLOCK_LADDER.find((r) => r.facilities.includes(id))!;
+  if (row.trigger !== 'lastRoundOrReputation' || !state?.competitions?.leagueCareer) return ladderReason(state, row.reason);
+  const rounds = leagueUnlockProgress(state)?.regularRounds;
+  return rounds ? `Opens at league round ${rounds}, or reputation 40` : 'Opens at the last league round, or reputation 40';
 }
 
-/** Pure: fixtures with results are played; scheduled home games and draws are not wins. */
+/**
+ * Pure: fixtures with results are played; scheduled home games and draws are not wins.
+ * A League career (#831) reads its own season's results and counts league rounds
+ * played, so `week` (the hook's look-ahead) does not move its ladder.
+ */
 export function unlocksDue(state: GameState): FacilityDefId[] {
   if (!state.unlocks) return [];
-  const played = careerResults(state);
-  const home = played.some((f) => f.homeId === state.clubId);
-  const win = played.some((f) => f.homeId === state.clubId
-    ? f.homeScore > f.awayScore
-    : f.awayId === state.clubId && f.awayScore > f.homeScore);
+  const league = leagueUnlockProgress(state);
+  let home: boolean, win: boolean;
+  if (league) ({ home, win } = league);
+  else {
+    const played = state.league.fixtures.filter((f) => f.round > 0 && f.result);
+    home = played.some((f) => f.homeId === state.clubId);
+    win = played.some((f) => f.homeId === state.clubId
+      ? f.result!.homeScore > f.result!.awayScore
+      : f.awayId === state.clubId && f.result!.awayScore > f.result!.homeScore);
+  }
+  const round = league ? league.round : state.week;
+  const lastRound = league ? league.regularRounds ?? Infinity : SEASON_ROUNDS;
   return UNLOCK_LADDER.filter((row) => {
     if (state.season > 1) return true;
     switch (row.trigger) {
       case 'screen': return false;
       case 'start': return true;
       case 'home': return home;
-      case 'roundOrWin': return state.week >= row.round! || win;
-      case 'round': return state.week >= row.round!;
-      case 'lastRoundOrReputation': return state.week >= SEASON_ROUNDS || state.reputation >= 40;
+      case 'roundOrWin': return round >= row.round! || win;
+      case 'round': return round >= row.round!;
+      case 'lastRoundOrReputation': return round >= lastRound || state.reputation >= 40;
     }
   }).flatMap((row) => row.facilities.filter((id) => !isFacilityOpen(state, id)));
 }
