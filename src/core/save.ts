@@ -1016,6 +1016,12 @@ function retirementChanged(store: LocalSaveStore, slot: number, raw: string): Cl
   return { slot, raw, emptied: false, notify: now !== null && isClassicSave(now) };
 }
 
+/** A quick look outside the section: only a slot that holds a Classic career takes the lock. Never throws. */
+function looksClassic(store: LocalSaveStore, slot: number): boolean {
+  try { const raw = store.read(slot); return raw !== null && isClassicSave(raw); }
+  catch { return false; }
+}
+
 /**
  * Move a Classic career out of `slot`, in one critical section: archive (merged by id,
  * read back), then empty the slot. A failed archive leaves the slot untouched. Another
@@ -1026,6 +1032,7 @@ function retirementChanged(store: LocalSaveStore, slot: number, raw: string): Cl
 export function retireClassicSlot(slot: number): ClassicRetirement | null {
   const store = getStore();
   if (!store) return null;
+  if (!looksClassic(store, slot)) return null;
   try {
     return withSaveLease(store.storage, () => {
       const staged = stageClassicArchive(store, slot);
@@ -1046,6 +1053,7 @@ export function retireClassicSlot(slot: number): ClassicRetirement | null {
 export async function retireClassicSlotDurable(slot: number): Promise<ClassicRetirement | null> {
   const store = getStore();
   if (!store) return null;
+  if (!looksClassic(store, slot)) return null;
   let raw: string | null = null;
   for (let attempt = 0; attempt < 3; attempt++) {
     let staged: StagedClassic | ClassicRetirement | null;
