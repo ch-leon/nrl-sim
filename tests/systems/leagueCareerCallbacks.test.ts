@@ -205,6 +205,31 @@ describe('async result ownership across fresh careers', () => {
     expect(attempted).not.toHaveBeenCalled();
   });
 
+  it('a settled League week is saved while another tab holds a save lock (#819: normal play takes no lock)', () => {
+    const {bytes, original} = startLeagueMatch();
+    // What an older build of this PR left behind: a held cross-tab lease and a busy Web Lock.
+    const lease = JSON.stringify({token: 'other-tab', expires: Date.now() + 60_000});
+    bytes.set('nrl-sim-save-lock', lease);
+    bytes.set(DEV_TEST_PREFIX + 'nrl-sim-save-lock', lease);
+    const request = vi.fn(() => new Promise<never>(() => {}));
+    vi.stubGlobal('navigator', {locks: {request}});
+    const matches: Events['match:started'][] = [];
+    bus.on('match:started', value => { matches.push(value); });
+    registerPlayerMatchSystem();
+    registerFixturesSystem();
+    advanceWeek();
+    expect(matches).toHaveLength(1);
+    bus.emit('match:finished', {fixture: matches[0]!.fixture, result: matchResult()});
+    expect(getState().week).toBe(2);
+    const saved = bytes.get(DEV_TEST_PREFIX + slotKey(1));
+    expect(saved).not.toBe(original);
+    expect(saved).toBe(JSON.stringify(getState()));
+    expect(pendingLeagueSaveProblem()).toBeNull();
+    expect(saveIfChanged(getState())).toBe(true);
+    expect(request).not.toHaveBeenCalled();
+    expect(bytes.get('nrl-sim-save-lock')).toBe(lease);
+  });
+
   it('holds a settled watched week for storage retry without overwriting its checkpoint or starting another match', async () => {
     const {bytes, original} = startLeagueMatch();
     const matches: Events['match:started'][] = [];

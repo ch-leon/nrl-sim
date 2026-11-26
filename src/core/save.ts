@@ -41,8 +41,8 @@ import { classicRetiredNoticeKey, CORRUPT_SAVE_KEY, LEGACY_SAVE_KEY, liveMatchKe
 import { BRAND } from '../brand';
 import { cleanName } from '../data/names';
 import { allPlayers, renameClubsPatch, renamePlayersPatch, validClubColors, type ClubEdit } from '../systems/rename';
-import { browserStorage, DestinationChanged, inCareerNamespace, LocalSaveStore, type StorageLike } from './storage/local';
-import { SaveLockBusy, withSaveLease, withSaveLock } from './storage/saveLock';
+import { browserStorage, inCareerNamespace, LocalSaveStore, type StorageLike } from './storage/local';
+import { withSaveLease, withSaveLock } from './storage/saveLock';
 import { nextMeta } from './storage/meta';
 import { deliverFile } from './storage/native';
 import type { SaveMeta, SlotListing } from './storage/types';
@@ -529,22 +529,6 @@ function persistSlot(store: LocalSaveStore | null, slot: number, state: GameStat
     bus.emit('ui:notify', { text: 'Save failed: storage unavailable', kind: 'danger' });
     return false;
   }
-  // A write over a compared original (Start over, an import) is one critical section, so
-  // no other tab's archive, retirement or Start over can land between the compare and the write.
-  if (expectedOriginal !== undefined) {
-    try { return withSaveLease(store.storage, () => persistChecked(store, slot, state, expectedOriginal, options)); }
-    catch (err) {
-      const busy = err instanceof SaveLockBusy;
-      if (!busy) console.warn('nrl-sim: save failed', err);
-      bus.emit('ui:notify', { text: busy ? 'Save refused: another tab is saving. Try again.' : 'Save failed: storage full', kind: 'danger' });
-      return false;
-    }
-  }
-  return persistChecked(store, slot, state, expectedOriginal, options);
-}
-
-function persistChecked(store: LocalSaveStore, slot: number, state: GameState, expectedOriginal: string | null | undefined,
-  options: {parkedMatch?: string | null; verifyPayload?: boolean; current?: () => boolean}): boolean {
   try {
     const original = store.read(slot);
     if (options.current && !options.current()) return false;
@@ -565,10 +549,6 @@ function persistChecked(store: LocalSaveStore, slot: number, state: GameState, e
     store.write(slot, payload, meta, options.parkedMatch, options.verifyPayload, options.current, expectedOriginal);
     approveOriginal(store, slot, payload, false);
   } catch (err) {
-    if (err instanceof DestinationChanged) {
-      bus.emit('ui:notify', { text: 'Save refused: the slot changed. Reopen the career before saving.', kind: 'danger' });
-      return false;
-    }
     console.warn('nrl-sim: save failed', err);
     bus.emit('ui:notify', { text: 'Save failed: storage full', kind: 'danger' });
     return false;

@@ -99,11 +99,6 @@ export function inCareerNamespace(base: StorageLike | null): StorageLike | null 
   return base && careerPrefix ? prefixedStorage(base, careerPrefix) : base;
 }
 
-/** The slot no longer holds what the caller compared against; nothing was written. */
-export class DestinationChanged extends Error {
-  constructor() { super('The destination changed before saving'); }
-}
-
 export class LocalSaveStore implements SyncSaveStore {
   private readonly pending = new Map<number, SaveMeta>();
   private flushQueued = false;
@@ -138,11 +133,9 @@ export class LocalSaveStore implements SyncSaveStore {
     const matchKey = liveMatchKey(slot);
     const ownsSidecar = (): boolean => parkedMatch === undefined || storage.getItem(matchKey) === parkedMatch;
     const writePayload = (): void => {
-      // The last read before the write: a replacement that arrived during the meta lookup
-      // (or anything else since the caller compared) is never overwritten.
-      if (expectedOriginal !== undefined && this.read(slot) !== expectedOriginal)
-        throw new DestinationChanged();
-      if (current && !current()) throw new DestinationChanged();
+      if (verifyPayload && expectedOriginal !== undefined && this.read(slot) !== expectedOriginal)
+        throw new Error('The destination changed before saving');
+      if (current && !current()) throw new Error('The destination changed before saving');
       storage.setItem(key, payload);
       if (!verifyPayload) return;
       try {
