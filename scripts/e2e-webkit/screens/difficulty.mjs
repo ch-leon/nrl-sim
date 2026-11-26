@@ -2,7 +2,7 @@
 // Screenshots stay in the existing CI artifact, never in git.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { OUT_ROOT, BASE, IPHONE_UA, setupStep } from '../common.mjs';
+import { confirmStartingLeague, OUT_ROOT, BASE, IPHONE_UA, setupStep } from '../common.mjs';
 
 export async function runDifficulty(browser) {
   const out = join(OUT_ROOT, 'webkit', 'difficulty');
@@ -62,6 +62,7 @@ export async function runDifficulty(browser) {
           await page.reload();
           await setupStep(page);
           await page.locator('[data-nrl-start]').tap();
+          await confirmStartingLeague(page);
           await page.locator('[data-expansion-work]').tap();
           await page.waitForSelector('.nrl-tutorial-skip');
           const difficulty = await page.evaluate(() => window.__nrlState().settings.difficulty);

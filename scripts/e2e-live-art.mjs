@@ -111,6 +111,9 @@ try {
   await career.goto(`${process.env.E2E_URL ?? 'http://localhost:5173/'}?e2e`);
   await setupStep(career);
   await career.locator('[data-nrl-start]').click();
+  await career.locator('[data-nrl-league-selection]').waitFor({ timeout: 60000 });
+  await career.locator('[data-nrl-league-confirm]').click();
+  await career.locator('[data-nrl-league-selection]').waitFor({ state: 'detached', timeout: 60000 });
   await career.locator('[data-expansion-work]').click();
   await career.locator('.nrl-tutorial-skip').click();
   await career.locator('.nrl-dock [data-hud="advance"]').click();

@@ -7,6 +7,9 @@ import { DEV_TEST_PREFIX } from '../../src/core/storageKeys';
 import { advanceWeek, clearHeldWeek, clearSeasonHooks, clearTickHooks, registerTickHook, resumeWeek, weekHeld } from '../../src/core/time';
 import { changeKit } from '../../src/systems/rename';
 import { defaultKitDesign } from '../../src/art/match/kit';
+import { leagueSlotState } from '../helpers/leagueSlot';
+
+const leagueCareer = await leagueSlotState('Imported FC');
 import { FACILITY_CATALOG, upgradeCost } from '../../src/data/facility';
 import { autoPick, autoPickKeepingPlan, commitLineup, placeAt, setCaptain, setKicker, setRotation, setTactics, swapSpots } from '../../src/systems/lineup';
 import { takePlay } from '../../src/systems/playbook';
@@ -228,7 +231,8 @@ describe.each(['lineup', 'play', 'settings'] as const)('%s edits retain the exis
 
   it('cannot overwrite an import into the active slot', () => {
     saves.save(getState());
-    expect(saves.importIntoSlot(saves.exportSave({ ...getState(), clubName: 'Imported FC' }), 1)).not.toBeNull();
+    // A League file: a Classic one is refused on import (#819).
+    expect(saves.importIntoSlot(JSON.stringify({ ...structuredClone(leagueCareer), clubName: 'Imported FC' }), 1)).not.toBeNull();
     const imported = store.get(saves.slotKey(1));
     edit();
     expect(store.get(saves.slotKey(1))).toBe(imported);

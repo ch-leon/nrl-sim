@@ -2,7 +2,7 @@
 // Evidence goes to the existing screens CI artifact, never into git.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { OUT_ROOT, BASE, IPHONE_UA, reachProblems, skipFromPill, setupStep } from '../common.mjs';
+import { advanceOnce, confirmStartingLeague, OUT_ROOT, BASE, IPHONE_UA, reachProblems, skipFromPill, setupStep } from '../common.mjs';
 
 export async function runCoachSays(browser) {
   const out = join(OUT_ROOT, 'webkit', 'coach-says');
@@ -22,15 +22,16 @@ export async function runCoachSays(browser) {
       await page.goto(BASE);
       await setupStep(page);
       await page.locator('[data-nrl-start]').tap();
+      await confirmStartingLeague(page);
       await page.locator('[data-expansion-work]').tap();
       await page.locator('.nrl-tutorial-skip').tap();
       // Set up complete, fit starters and enough natural cover. All changes are
       // to this test game's in-memory state, exposed by the existing ?e2e hook.
       await page.evaluate(() => {
         const s = window.__nrlState();
-        const positions = ['fullback', 'winger', 'winger', 'centre', 'five-eighth', 'halfback', 'hooker', 'prop', 'second-row'];
-        s.squad.forEach((p, i) => { p.position = positions[i % 9]; p.injuredWeeks = 0; p.suspendedWeeks = 0; });
-        s.lineup.starters = s.squad.slice(0, 9).map((p) => p.id);
+        // Keep the generated nines lineup. Rewriting every player onto the nine
+        // positions makes the career fail its own checks, and Play Week does nothing.
+        s.squad.forEach((p) => { p.injuredWeeks = 0; p.suspendedWeeks = 0; });
         s.objectives = [];
         s.eventDeck.pending = [];
         s.settings.weekSummary = true;
@@ -46,8 +47,7 @@ export async function runCoachSays(browser) {
         });
         await page.locator('.nrl-nav [data-nav-home]').tap();
         if (await page.locator('.nrl-club-home-coach').count()) throw new Error('Coach row leaked into landscape HUD');
-        await page.locator('.nrl-hud-actions > [data-hud="advance"]').tap();
-        await page.waitForSelector('.nrl-mo-controls', { timeout: 60000 });
+        if (await advanceOnce(page) !== 'match') throw new Error('the first week did not start a match');
         await skipFromPill(page);
         await page.waitForSelector('.nrl-mo-ft [data-back-to-club]', { timeout: 120000 });
         // Clear generated cards so the summary has one known line. Salaries no

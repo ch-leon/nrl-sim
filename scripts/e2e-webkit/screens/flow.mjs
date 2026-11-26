@@ -1,4 +1,4 @@
-import { playTrials } from '../common.mjs';
+import { confirmStartingLeague, playTrials } from '../common.mjs';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, setupStep, slotMenu } from '../common.mjs';
@@ -132,6 +132,7 @@ export async function runFlow(browser, { w: W, h: H, text }) {
     }));
     await shot('t1-at-check');
     await tap('[data-nrl-start]');
+    await confirmStartingLeague(page);
     await page.locator('[data-expansion-work]').tap();
     await page.waitForSelector('.nrl-tutorial-skip');
     await tap('.nrl-tutorial-skip');
@@ -192,6 +193,8 @@ export async function runFlow(browser, { w: W, h: H, text }) {
     await club();
     const w0 = await week();
     await menuPick('To season end');
+    const skipEvents = page.locator('[data-skip-events]');
+    if (await skipEvents.waitFor({ timeout: 3000 }).then(() => true).catch(() => false)) await skipEvents.tap();
     await page.waitForSelector('[data-advance-ask]');
     await page.waitForTimeout(250); // the dialog's entrance (#606): its buttons are measured at full size
     const q = (await page.locator('[data-ask-question]').textContent().catch(() => '')) ?? '';
@@ -251,6 +254,7 @@ export async function runFlow(browser, { w: W, h: H, text }) {
       if (from > 23) break;
       await menuPick('×4 weeks');
       await page.waitForTimeout(200);
+      if (await page.locator('[data-skip-events]').count()) await tap('[data-skip-events]');
       if (await page.locator('[data-advance-confirm]').count()) {
         out.push('×4 weeks asked to confirm');
         await tap('[data-confirm-advance]');

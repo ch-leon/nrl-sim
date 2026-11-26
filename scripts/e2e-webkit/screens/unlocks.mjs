@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { playTrials, BASE, OUT_ROOT, openNav, SHEET_EXIT, closeWeekSummary, log, skipFromPill, setupStep } from '../common.mjs';
+import { confirmStartingLeague, leagueUnlockProgress, playSkippedWeek, playTrials, BASE, OUT_ROOT, openNav, SHEET_EXIT, closeWeekSummary, log, setupStep } from '../common.mjs';
 
 /** Facility ladder + both veteran exits, played through round 8 on the required phones. */
 export async function runUnlocks(browser) {
@@ -29,6 +29,7 @@ export async function runUnlocks(browser) {
       check(start && start.y + start.height <= height, 'Start is visible');
       await shot('setup');
       await page.locator('[data-nrl-start]').tap();
+      await confirmStartingLeague(page);
       await page.locator('[data-expansion-work]').tap();
       await page.waitForFunction(() => window.__nrlState);
       await page.locator('.nrl-tutorial-skip').tap();
@@ -54,28 +55,34 @@ export async function runUnlocks(browser) {
         await page.locator(SHEET_EXIT).tap();
       };
       await build('build-start', 4);
-      for (let round = 1; round < 8; round++) {
-        await page.locator('[data-hud="advance"]').tap();
-        const ask = page.locator('[data-ask-proceed]');
-        await page.waitForFunction(() => document.querySelector('[data-ask-proceed]') || document.querySelector('.nrl-mo-controls'));
-        if (await ask.isVisible()) await ask.tap();
-        await page.waitForSelector('.nrl-mo-controls', { timeout: 60000 });
-        await skipFromPill(page);
-        await page.waitForSelector('.nrl-mo-ft [data-back-to-club]', { timeout: 120000 });
-        await page.locator('.nrl-mo-ft [data-back-to-club]').evaluate((n) => n.click());
-        // The week settles before the scene switch; nav must see the visible dock.
-        await page.waitForSelector('body:not(.nrl-match-active) .nrl-dock');
-        await page.waitForFunction((week) => window.__nrlState().week === week, round + 1);
-        report.rounds.push(await page.evaluate(() => ({ week: window.__nrlState().week, facilities: window.__nrlState().unlocks?.facilities })));
-        if (round === 1) {
+      // The ladder counts league rounds played (#844), not calendar weeks: rest weeks and
+      // trials move the calendar but not the ladder. Expected opens, from the UNLOCK_LADDER rows.
+      const expectedOpen = (p) => 4 + (p.round >= 2 || p.win ? 2 : 0) + (p.home ? 1 : 0)
+        + (p.round >= 5 ? 2 : 0) + (p.round >= 8 ? 2 : 0) + (p.round >= 14 || p.reputation >= 40 ? 1 : 0);
+      let newsChecked = false;
+      let round5Checked = false;
+      for (let i = 0; i < 20 && (await leagueUnlockProgress(page)).round < 8; i++) {
+        await playSkippedWeek(page);
+        const progress = await leagueUnlockProgress(page);
+        const facilities = await page.evaluate(() => window.__nrlState().unlocks?.facilities);
+        report.rounds.push({ week: progress.week, leagueRound: progress.round, facilities });
+        if (!newsChecked && facilities?.includes('videoRoom')) {
           await openNav(page, 'news');
           check((await page.locator('.nrl-news').textContent()).includes('Video Room, Physio Centre'), 'unlock News line is present');
           await shot('news');
           await page.keyboard.press('Escape');
+          newsChecked = true;
         }
-        if (round === 4) await build('build-round5', 9);
+        if (!round5Checked && progress.round >= 5) {
+          await build('build-round5', expectedOpen(progress));
+          round5Checked = true;
+        }
       }
-      await build('build-round8', 11);
+      const end = await leagueUnlockProgress(page);
+      check(newsChecked, 'Video Room and Physio Centre opened');
+      check(round5Checked, 'reached league round 5');
+      check(end.round >= 8, `reached league round 8 (at ${end.round}, week ${end.week})`);
+      await build('build-round8', expectedOpen(end));
       await openNav(page, 'settings');
       await page.locator('.nrl-unlocks-open').tap();
       check(await page.evaluate(() => !!window.__nrlState().unlocks), 'Settings waits for confirmation');
@@ -93,6 +100,7 @@ export async function runUnlocks(browser) {
       await setupStep(veteran);
       await veteran.locator('[data-nrl-open-all]').check();
       await veteran.locator('[data-nrl-start]').tap();
+      await confirmStartingLeague(veteran);
       await veteran.locator('[data-expansion-work]').tap();
       await veteran.waitForFunction(() => window.__nrlState);
       await veteran.locator('.nrl-tutorial-skip').tap();

@@ -1,6 +1,6 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, setupStep } from '../common.mjs';
+import { confirmStartingLeague, closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, setupStep } from '../common.mjs';
 
 /**
  * The Coach calls page (Office ▸ Coach calls): a new club opens it from the
@@ -24,6 +24,7 @@ export async function runCoachCalls(browser, sizes) {
       await page.goto(BASE);
       await setupStep(page);
       await page.locator('[data-nrl-start]').tap();
+      await confirmStartingLeague(page);
       await page.locator('[data-expansion-work]').tap();
       await page.locator('.nrl-tutorial-skip').tap();
       await openNav(page, 'calls');

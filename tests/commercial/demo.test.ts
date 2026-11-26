@@ -9,7 +9,7 @@ import { __setCommercial } from '../../src/commercial/flags';
 import { advanceUntil } from '../../src/core/advance';
 import { bus, type Events } from '../../src/core/events';
 import { getState, setState } from '../../src/core/state';
-import { getSlotSummaries, slotKey, SAVE_KEY, CORRUPT_KEY } from '../../src/core/save';
+import { firstRunSlotSummaries, slotKey, SAVE_KEY, CORRUPT_KEY } from '../../src/core/save';
 import {
   advanceWeek, advanceWeeks, clearHeldWeek, clearSeasonHooks, clearTickHooks, registerTickHook, resumeWeek, weekHeld, TICK_ORDER,
 } from '../../src/core/time';
@@ -179,7 +179,8 @@ describe('grandfathered saves (#362)', () => {
 
   it('reads the slots from the saves themselves', () => {
     storage.map.set(slotKey(2), JSON.stringify(getState()));
-    recordFirstRun(getSlotSummaries());
+    // A Classic career reads as an empty slot (#819) but is still recorded, as main records it.
+    recordFirstRun(firstRunSlotSummaries());
     __resetDemo(); // a later page load reads the key back
     expect(isGrandfathered(2, getState())).toBe(true);
     expect(isGrandfathered(1, getState())).toBe(false);

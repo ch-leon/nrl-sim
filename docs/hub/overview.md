@@ -1,6 +1,6 @@
 # Overview
 
-Last updated: 2026-11-13
+Last updated: 2026-11-25
 
 ## The pitch
 
@@ -33,7 +33,11 @@ premium game with a free demo and a one-off unlock
   ([PR](https://github.com/ch-leon/nrl-sim/pull/394)). Saves stay on the phone; no
   login or payments.
 
-## Where things stand (as of 7 Nov 2026)
+## Where things stand (as of 25 Nov 2026)
+
+- **One mode.** League career is the only way to start a club. It begins in Local. A Classic save is no longer loadable: its slot shows as empty, with a one-time message, and it is overwritten when you start a League career in that slot. Nothing is deleted automatically. Classic-only code is a later removal ([#819](https://github.com/ch-leon/nrl-sim/issues/819)).
+
+## Where things stood (7 Nov 2026)
 
 - **UI cleanup:** done, in five chunks
   ([PR](https://github.com/ch-leon/nrl-sim/pull/353) to

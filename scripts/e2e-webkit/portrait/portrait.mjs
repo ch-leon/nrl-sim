@@ -1,6 +1,6 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, reachProblems, setupStep } from '../common.mjs';
+import { advanceToMatch, confirmStartingLeague, closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, reachProblems, setupStep } from '../common.mjs';
 
 // A phone that opens already upright (390×844, the portrait pair of 844×390).
 // The rotate card covers the title, the menus, the grounds and the match, and
@@ -99,6 +99,7 @@ export async function runPortrait(browser) {
     // The new club's three steps (SuperCOOKED 12–14), by DOM clicks under the card like Start.
     await setupStep(page, 3, { dom: true });
     await press('[data-nrl-start]');
+    await confirmStartingLeague(page, press);
     await press('[data-expansion-work]');
     await page.waitForSelector('.nrl-dock');
     await asleep('opened upright');
@@ -188,7 +189,6 @@ export async function runPortrait(browser) {
         await page.waitForTimeout(150);
         if (await page.locator('.nrl-event-card').count()) problems.push(`${w}×${h}: choice ${choice} did not resolve`);
         if (await page.evaluate(() => window.__nrlState().eventDeck.pending.length)) problems.push(`${w}×${h}: choice ${choice} left the card pending`);
-        // The decisions dialog's ✕ if it is still up.
         if (await page.locator('.nrl-decisions-modal .nrl-screen-x').count()) await page.locator('.nrl-decisions-modal .nrl-screen-x').tap();
       }
       rec.notes.push(`${w}×${h}: both choices tapped`);
@@ -197,8 +197,7 @@ export async function runPortrait(browser) {
     return problems;
   });
   await step('match-running', async (rec) => {
-    await page.locator('.nrl-dock [data-hud="advance"]').tap();
-    await page.waitForSelector('.nrl-mo-controls');
+    await advanceToMatch(page);
     await page.waitForFunction(() => {
       const t = document.querySelector('.nrl-mo-clock')?.textContent?.trim();
       return !!t && t !== '00:00';

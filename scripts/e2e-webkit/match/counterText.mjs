@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { BASE, OUT_ROOT, IPHONE_UA, closeWeekSummary, openNav, log, skipFromPill, setMatchSpeed, setupStep } from '../common.mjs';
+import { confirmStartingLeague, BASE, OUT_ROOT, IPHONE_UA, closeWeekSummary, openNav, log, skipFromPill, setMatchSpeed, setupStep } from '../common.mjs';
 
 /**
  * The seeds this check may play, in order. It needs a match that shows a real Compressed
@@ -55,6 +55,7 @@ async function playCounterText(browser, out, width, height, textSize, seed) {
       await page.goto(BASE);
       await setupStep(page);
       await page.locator('[data-nrl-start]').tap();
+      await confirmStartingLeague(page);
       await page.locator('[data-expansion-work]').tap();
       await page.locator('.nrl-tutorial-skip').tap();
       await page.evaluate(([size, seed]) => {

@@ -52,7 +52,6 @@ async function startCareer(page, town, pack) {
   await page.goto(BASE);
   await page.locator('[data-nrl-town]').fill(`${town.name}, ${town.region}, ${town.country}`);
   await setupStep(page);
-  await page.locator('[data-nrl-career-mode-league]').tap();
   await page.locator('[data-nrl-start]').tap();
   await page.locator(CHOOSER).waitFor({ timeout: 60000 });
   const initial = await state(page);
