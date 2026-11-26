@@ -338,6 +338,8 @@ export const MIGRATIONS: readonly MigrationStep[] = [
   // Absence of assignment records means the club has never booked a place.
   { from: 33, to: 34, run: old => old },
   { from: 34, to: 35, run: old => old },
+  // v36 adds the optional card week (#846): absent keeps a career as it was.
+  { from: 35, to: 36, run: old => old },
   // v32 snapshots the agreement observed under v31 ID-only protection.
   // Already recorded exact terms keep their provenance, including queued terms.
   { from: 31, to: 32, run: old => {
@@ -390,6 +392,8 @@ function migrateChecked(raw: unknown): MigrateResult {
   // Pre-finance careers are kept and are not converted. v28 and later migrate.
   if ('individualChallenges' in cur || (version < 35 && cur.competitions && typeof cur.competitions === 'object' && 'individualChallenges' in cur.competitions))
     return {ok:false,outcome:'unrecoverable',reason:'corrupt',message:'Invalid individual challenge data for this save format.'};
+  if (version < 36 && 'cardWeek' in cur)
+    return {ok:false,outcome:'unrecoverable',reason:'corrupt',message:'Invalid card week data for this save format.'};
   if (version <= LAST_PRE_FINANCE_VERSION) {
     return { ok: false, outcome: 'unrecoverable', reason: 'corrupt',
       message: `This save is from an older version of ${BRAND.name} (save v${version}). Please start a new career. Your original save has been kept.` };
@@ -402,7 +406,7 @@ function migrateChecked(raw: unknown): MigrateResult {
   if (competitions && typeof competitions === 'object' && 'leagueCareer' in competitions) {
     let state = cur as unknown as GameState;
     if (version === 32) state = createOpenCupOffer({...structuredClone(state),version:SAVE_VERSION,competitionRewards:[]});
-    if (version === 33 || version === 34) state = {...state,version:SAVE_VERSION};
+    if (version === 33 || version === 34 || version === 35) state = {...state,version:SAVE_VERSION};
     const problem = leagueCareerStateProblem(state);
     // #837: a trip answered at the league choice. Kept only if the repaired career passes every check.
     const trip = problem ? repairClosedSeasonTrip(state) : null;

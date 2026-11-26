@@ -301,7 +301,7 @@ const MODIFIER_LABELS = new Set(EVENT_CARDS.flatMap((c) => c.choices.flatMap((ch
 /**
  * The line of the books a ledger reason belongs to. Reasons are the strings each
  * system passes to earnMoney / spendMoney: this file's fixed words, the board's,
- * `event: <title>` and modifier labels from the deck, and `<verb>:<id>` for
+ * `event: <title>` and modifier labels from the deck, `card: <title>` from the card week, and `<verb>:<id>` for
  * signings, sales, renewals, releases and the grounds. Anything else is `other`.
  */
 export function classifyReason(reason: string): FinanceLine {
@@ -315,7 +315,8 @@ export function classifyReason(reason: string): FinanceLine {
   if (reason === 'gate') return 'gate';
   if (reason === 'finals prize money') return 'prize';
   if (reason === 'board grant' || reason === BOARD_LOAN || reason === BOARD_LOAN_REPAID) return 'boardGrant';
-  if (reason.startsWith('event: ') || MODIFIER_LABELS.has(reason)) return 'events';
+  // A card week's cash card (#846) books like an event card's money.
+  if (reason.startsWith('event: ') || reason.startsWith('card: ') || MODIFIER_LABELS.has(reason)) return 'events';
   if (/^(sign|sell):/.test(reason)) return 'transfers';
   if (/^(renew|release):/.test(reason)) return 'contracts';
   // A set play bought from the Playbook (#326) is spent on the club like a build.

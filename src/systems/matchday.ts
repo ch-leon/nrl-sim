@@ -1,3 +1,4 @@
+import { withLastMatch } from './cardWeek';
 import { leagueFixtureView } from './leagueSeasonView';
 import { freezeMatchEffects, matchIncomePatch, commitMatchState, reconcileMatchEffects } from './matchIncome';
 // Orchestrator-owned: the PLAYER's match of the round (rival-vs-rival matches
@@ -253,6 +254,10 @@ function applyPlayerResult(fixture: Fixture, home: TeamSheet, away: TeamSheet, s
     squad: applyMatchXp(applyMatchStats(getState().squad, sim.events, PLAYER_ID, playedIds, getState().season, participantIds),
       ownSheet, sim, fixture.homeId, fixture.awayId, getState().facilities, getState().training.focus, getState().settings.spendPointsMyself === true),
   });
+  // Card week (#846): the last match's lines for the pick screen. A career without one is untouched.
+  if (getState().cardWeek) {
+    setState({ cardWeek: withLastMatch(getState(), fixture, sim.events, playedIds, participantIds, { season: before.season, week: before.week }).cardWeek! });
+  }
 
   // GitHub #7: engine emits injuries; matchday owns squad mutation + notify.
   const injuryToasts = applyMatchInjuries(sim.injuries, participantIds);

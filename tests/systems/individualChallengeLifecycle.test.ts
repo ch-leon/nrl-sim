@@ -5,7 +5,7 @@ import { advanceUntil } from '../../src/core/advance';
 import { bus, type Events } from '../../src/core/events';
 import { __setStorage, installImportedSave, loadSlot, migrateState, pendingLeagueSaveProblem,
   retryPendingLeagueSave, saveIfChanged, setActiveSlot } from '../../src/core/save';
-import { getState, loadState, setState, type GameState } from '../../src/core/state';
+import { getState, loadState, SAVE_VERSION, setState, type GameState } from '../../src/core/state';
 import { setCareerNamespace } from '../../src/core/storage/local';
 import { bootNativeMirror } from '../../src/core/storage/native';
 import * as native from '../../src/core/storage/nativeCheckpoint';
@@ -44,12 +44,12 @@ describe('individual challenge career format', () => {
   for (const pack of ['au','uk']) for (const week of [5,6,13,14]) it(`upgrades the genuine ${pack} week ${week} without invented contests`, () => {
     const raw = fixture(week, pack);
     const loaded = migrateState(raw);
-    expect(loaded.ok && loaded.state).toEqual({ ...raw, version: 35 });
+    expect(loaded.ok && loaded.state).toEqual({ ...raw, version:SAVE_VERSION });
   });
   it('retains the original v34 award on the camp-completed Week 6 save', () => {
     const raw = fixture(6,'au','-camp-completed');
     const loaded = migrateState(raw);
-    expect(loaded.ok && loaded.state).toEqual({...raw,version:35});
+    expect(loaded.ok && loaded.state).toEqual({...raw,version:SAVE_VERSION});
   });
   it('rejects legacy format claims carrying challenge fields before League migration', () => {
     const raw = fixture(5);
@@ -61,12 +61,12 @@ describe('individual challenge career format', () => {
 });
 
 it('books, starts, freezes the participant and completes the same six or seven clashes without advancing club time', async () => {
-  const initial = {...fixture(5),version:35 as const};
+  const initial = {...fixture(5),version:SAVE_VERSION as typeof SAVE_VERSION};
   const participantId = initial.squad.find(p=>p.injuredWeeks===0 && !p.suspendedWeeks)!.id;
   const book = changeChallenge(initial, 'showground', {kind:'book',participantId});
   expect(book.ok).toBe(true);
   if (!book.ok) throw Error(book.message);
-  const week6 = {...fixture(6), version:35 as const};
+  const week6 = {...fixture(6), version:SAVE_VERSION as typeof SAVE_VERSION};
   const due = {...week6, competitions:{...week6.competitions!,individualChallenges:book.state.competitions!.individualChallenges!}};
   const start = changeChallenge(due, 'showground',{kind:'start'});
   if (!start.ok) throw Error(start.message);
@@ -89,8 +89,8 @@ function checked(r:ReturnType<typeof changeChallenge>) {
   return r.state;
 }
 function dueBooking() {
-  const week5 = {...fixture(5),version:35 as const};
-  const week6 = {...fixture(6),version:35 as const};
+  const week5 = {...fixture(5),version:SAVE_VERSION as typeof SAVE_VERSION};
+  const week6 = {...fixture(6),version:SAVE_VERSION as typeof SAVE_VERSION};
   const p = week5.squad.find(p=>!p.injuredWeeks && !p.suspendedWeeks && week6.squad.some(q=>q.id===p.id && !q.injuredWeeks && !q.suspendedWeeks))!;
   const booked = checked(changeChallenge(week5,'showground',{kind:'book',participantId:p.id}));
   return {...week6,competitions:{...week6.competitions!,individualChallenges:booked.competitions!.individualChallenges!}};
@@ -137,7 +137,7 @@ afterEach(()=>{
 it('refuses both imported and on-device parked due decisions, preserving the exact bytes', () => {
   const {bytes}=storage();
   const booked = dueBooking();
-  const initial = {...fixture(5),version:35};
+  const initial = {...fixture(5),version:SAVE_VERSION};
   expect(installImportedSave(JSON.stringify(initial),1).ok).toBe(true);
   const raw = bytes.get(slotKey(1));
   expect(installImportedSave(JSON.stringify({...booked,nrlLiveMatch:sidecar()}),1).ok).toBe(false);
@@ -311,7 +311,7 @@ it('explicitly cancels failed departure eligibility and lets a coach cancel and 
   const cancelled=checked(changeChallenge(injured,'showground',{kind:'start'}));
   expect(currentIndividualChallenge(cancelled,'showground')).toMatchObject({status:'cancelled',award:null,contest:null,reason:expect.stringMatching(/injured/i)});
   expect(challengeAdvanceProblem(cancelled)).toBeNull();
-  const original={...fixture(5),version:35 as const};
+  const original={...fixture(5),version:SAVE_VERSION as typeof SAVE_VERSION};
   const first=checked(changeChallenge(original,'showground',{kind:'book',participantId:r.participantId}));
   const removed=checked(changeChallenge(first,'showground',{kind:'cancel'}));
   const retry=checked(changeChallenge(removed,'showground',{kind:'book',participantId:r.participantId}));
@@ -382,7 +382,7 @@ it.each([['au',6],['au',14],['uk',6],['uk',14]] as const)(
     const imported = installImportedSave(JSON.stringify({...raw,nrlLiveMatch:live}),1);
     if (!imported.ok) throw Error(imported.message);
     expect(imported.repairs).toEqual([]);
-    expect(imported.state).toEqual({...raw,version:35});
+    expect(imported.state).toEqual({...raw,version:SAVE_VERSION});
     loadState(imported.state);
     registerAllSystems();
     const kickoffs: Events['match:started'][] = [];
@@ -410,7 +410,7 @@ it('preserves an installed career and its match when an import claims a future s
   for (const kind of ['save','engine','policy']) {
     const unsupported = structuredClone(state);
     const record = currentIndividualChallenge(unsupported,'showground')!;
-    if (kind === 'save') Object.assign(unsupported,{version:36});
+    if (kind === 'save') Object.assign(unsupported,{version:SAVE_VERSION + 1});
     if (kind === 'engine') record.contest!.engineVersion++;
     if (kind === 'policy') record.contest!.policyVersion++;
     expect(installImportedSave(JSON.stringify(unsupported),1).ok,kind).toBe(false);
@@ -512,7 +512,7 @@ it('rejects invalid completed actor snapshots even when every roll, policy choic
 
 it('pays repeat annual titles once and accepts a different Invitational entrant after the original champion leaves',async()=>{
   storage();
-  install({...fixture(5),version:35});
+  install({...fixture(5),version:SAVE_VERSION});
   registerFixturesSystem();
   // This is a controlled career to exercise repeat rewards and history, not a balance sample.
   async function playTitle(edition:ChallengeEditionId,exclude?:string) {

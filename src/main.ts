@@ -37,6 +37,7 @@ import { registerStatsSystem } from './systems/stats';
 import { registerDerbySystem } from './systems/derby';
 import { registerBoardSystem } from './systems/board';
 import { plantPending, registerEventsSystem } from './systems/events';
+import { registerCardWeekSystem } from './systems/cardWeek';
 import { registerRivalsSystem } from './systems/rivals';
 import { contractsEndingSoon, endingSoonLabel } from './systems/contracts';
 import { initBoardUi, openStaffScreen, STAFF_SCREEN_TITLE } from './ui/screens/board';
@@ -243,6 +244,7 @@ async function boot(): Promise<void> {
   registerBoardSystem();
   registerDerbySystem();
   registerEventsSystem();
+  registerCardWeekSystem();
   registerRivalsSystem();
   registerUnlockSystem();
   initMatchReport({ onReason: (screen) => nav.open(screen) }); // "Why did I lose?" (#368)

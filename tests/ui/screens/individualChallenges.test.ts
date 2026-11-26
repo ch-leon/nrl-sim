@@ -5,7 +5,7 @@ import { __setStorage, __unlockSaves, setActiveSlot } from '../../../src/core/sa
 import { beginNativeCheckpointBoot } from '../../../src/core/storage/nativeCheckpoint';
 import { NativeMirror, fileForKey } from '../../../src/core/storage/nativeMirror';
 import { changeChallenge, currentIndividualChallenge } from '../../../src/systems/individualChallenges';
-import { type GameState, getState, loadState } from '../../../src/core/state';
+import { SAVE_VERSION, type GameState, getState, loadState } from '../../../src/core/state';
 import { CHALLENGE_EDITIONS, type ChallengeCall } from '../../../src/data/individualChallengeRules';
 import { challengeCheckpoint, initialChallengeProgress, resolveChallengeAction } from '../../../src/systems/individualChallengeEngine';
 import { clashFrame, LANE_MARKER, CLASH_DURATION } from '../../../src/scenes/individualChallengePresentation';
@@ -68,7 +68,7 @@ function installCoaching() {
   const local = {getItem:(key:string) => bytes.get(key) ?? null, setItem:(key:string,value:string) => {bytes.set(key,value);}, removeItem:(key:string) => {bytes.delete(key);}};
   __setStorage(local); __unlockSaves(); setActiveSlot(1);
   function week(n: number): GameState {
-    return {...JSON.parse(readFileSync(new URL(`../../fixtures/saves/v34-challenges/v34-au-week-${n}.json`, import.meta.url),'utf8')), version:35};
+    return {...JSON.parse(readFileSync(new URL(`../../fixtures/saves/v34-challenges/v34-au-week-${n}.json`, import.meta.url),'utf8')), version:SAVE_VERSION};
   }
   const original = week(5);
   const booked = changeChallenge(original,'showground',{kind:'book',participantId:original.squad.find(p=>!p.injuredWeeks && !p.suspendedWeeks)!.id});
