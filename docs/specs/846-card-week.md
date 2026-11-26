@@ -29,12 +29,21 @@ exactly as before, and their saves are unchanged apart from the save version.
 
 | Kind | What it does | Offered when |
 | --- | --- | --- |
-| Player | A generated player joins now with no signing fee. He is rated above the club's current best man at that position (the card floor). His salary counts on the cap. | His salary fits the squad limit and this season's cap, or a named player can be released to make it fit. |
+| Player | A generated player joins now with no signing fee. He is rated above the card floor at his position (below). His salary counts on the cap. | His salary fits the squad limit and this season's cap, or a named player can be released to make it fit. |
 | Staff | Hires the role with the appointment fee waived. Wages still run. | The role is empty and nothing else refuses it (the attack coach: one at a time; Razzle needs reputation). |
 | Set play | Adds one play the club could buy today, free. Which play is settled when the card is drawn. | The club's attack coach teaches a play it does not own. |
 | Trait | The player chooses a squad member. The first copy gives the trait at I, a second raises it to II, a third to III. III is the limit. | Someone in the squad, not away, is below III in that trait. |
 | Cash | Money now, booked to the Events line of the books as `card: <title>`. | Always. |
-| Dilemma | A gold-tier player joins (as a player card) where the club's best man is weakest, and board patience drops by one. | As a player card, and only while board patience is at least 2, so it never takes the last point. |
+| Dilemma | A gold-tier player joins (as a player card) at the position with the lowest card floor, and board patience drops by one. | As a player card, and only while board patience is at least 2, so it never takes the last point. |
+
+**The card floor.** The club's best natural player at the card's position (his own
+position is the card's), by overall rating. With nobody there, the best man from a
+related position by his rating there (×0.92: centre and winger, the halves, the pack);
+with none of those either, the best man anywhere by his rating there. A star from an
+unrelated position does not set it: at 0.8 fit a 85-rated halfback would read 68 at
+fullback, and a grey fullback card would land near 70 in a league whose clubs average
+in the 40s. The card's man is generated around floor + margin (each stat within ±6 of
+that) and must rate strictly above the floor.
 
 **Full squad or no cap room.** The card names the man the newcomer replaces: the weakest
 at his position first, then the weakest player outside the starting nine, whose release
@@ -65,8 +74,8 @@ card.
 
 | Value | Where | Now | What moving it does |
 | --- | --- | --- | --- |
-| `PLAYER_CARD_MARGIN.grey` | `src/data/cards.ts` | 3 | How far above the club's best at the position a grey player card's man is generated (overall points). |
-| `PLAYER_CARD_MARGIN.gold` | `src/data/cards.ts` | 8 | The same for the gold player card and the dilemma. |
+| `PLAYER_CARD_MARGIN.grey` | `src/data/cards.ts` | 4 | How far above the card floor a grey player card's man is generated (overall points). He lands within ±6 of floor + 4 and above the floor. |
+| `PLAYER_CARD_MARGIN.gold` | `src/data/cards.ts` | 18 | The same for the gold player card and the dilemma: meant to read about five stars in Local (five stars start at 60, `STAR_BANDS` in `src/config.ts`). Capped at 99. |
 | `CARD_WEEK.START_OWED` | `src/data/cards.ts` | 3 | Picks waiting when a card-week career starts (`newCardWeek` in `state.ts` matches it). |
 | `CARD_WEEK.MAX_OWED` | `src/data/cards.ts` | 3 | The most picks that can wait; a League match beyond it adds nothing. |
 | `CARD_WEEK.OFFER_SIZE` | `src/data/cards.ts` | 3 | Cards on show in a pick. |

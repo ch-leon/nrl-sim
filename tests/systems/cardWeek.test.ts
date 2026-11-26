@@ -8,16 +8,17 @@ import { isCardWeek } from '../../src/core/saveValidation';
 import { careerActionClock } from '../../src/core/season';
 import { setCareerNamespace } from '../../src/core/storage/local';
 import { DEV_TEST_PREFIX } from '../../src/core/storageKeys';
-import { createNewGame, getState, loadState, newCardWeek, setState, type GameState, type OfferedCard, type Player } from '../../src/core/state';
+import { createNewGame, getState, loadState, newCardWeek, setState, type GameState, type OfferedCard, type Player, type Position } from '../../src/core/state';
 import { advanceWeek, clearHeldWeek, clearSeasonHooks, clearTickHooks, withFastForward } from '../../src/core/time';
 import { BOARD, SQUAD_CAP } from '../../src/config';
-import { CARD_WEEK, CARDS, cardDefById } from '../../src/data/cards';
-import { overallRating } from '../../src/data/player';
+import { CARD_WEEK, CARDS, cardDefById, PLAYER_CARD_MARGIN } from '../../src/data/cards';
+import { AROUND_SPREAD, overallRating } from '../../src/data/player';
+import { effectiveRating, FIT, positionFit } from '../../src/systems/lineup';
 import { traitLevel } from '../../src/data/traits';
 import { leagueEntryReceiptId } from '../../src/data/leagueCareer';
 import { AU_CAREER_PROFILE } from '../../src/content/career/au';
 import {
-  bestAtPosition, cardOfferView, cardWeekTick, passCard, passPick, chooseCard, drawOffer, freePlayCandidates, lastMatchImpact, plantCard,
+  cardFloor, cardOfferView, cardWeekTick, passCard, passPick, chooseCard, drawOffer, freePlayCandidates, lastMatchImpact, plantCard,
   playedLeagueMatch, registerCardWeekSystem, startCardWeek, takeCard, traitTargets, type CardTake,
 } from '../../src/systems/cardWeek';
 import { capRoomFor, commitment, publishedCap } from '../../src/systems/cap';
@@ -130,14 +131,16 @@ describe('each card does what its face says', () => {
       const card = first(p);
       if (card.kind !== 'player') throw new Error('not a player card');
       const position = card.player.position;
-      const best = bestAtPosition(s.squad, position);
+      const best = cardFloor(s.squad, position);
       expect(position).toBe(def.kind === 'player' ? def.position : position);
       const r = taken(takeCard(p, 0));
       const joined = r.state.squad.find((x) => x.id === r.joined!.id)!;
       expect(overallRating(joined)).toBeGreaterThan(best);
-      expect(r.state.money).toBe(p.money);
-      expect(r.money).toEqual([]);
-      expect(r.state.squad).toHaveLength(p.squad.length + 1);
+      // No signing fee: the only money is a named replacement's release payout.
+      const payout = r.money.reduce((t, m) => t + m.amount, 0);
+      expect(r.money.every((m) => m.reason === `release:${card.replacesId}`)).toBe(true);
+      expect(r.state.money).toBe(p.money + payout);
+      expect(r.state.squad).toHaveLength(p.squad.length + (card.replacesId ? 0 : 1));
       expect(joined.id).toMatch(/^career-person:/);
       expect(joined.deal!.salary).toBe(card.salary);
       expect(r.state.cardWeek!.cardPlayers).toEqual([joined.id]);
@@ -230,9 +233,68 @@ describe('each card does what its face says', () => {
     expect(r.state.squad.some((x) => x.id === r.joined!.id)).toBe(true);
     const card = first(p);
     if (card.kind !== 'dilemma') throw new Error('not the dilemma');
-    expect(overallRating(r.joined!)).toBeGreaterThan(bestAtPosition(s.squad, card.player.position));
+    expect(overallRating(r.joined!)).toBeGreaterThan(cardFloor(s.squad, card.player.position));
     expect(plantCard({ ...s, boardPatience: 1 }, 'marqueeGamble')).toBe('That card cannot be offered now.');
     expect(BOARD.MAX_PATIENCE).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe('the card floor', () => {
+  /** The squad's star moved to `away` position with a big rating, so only fit sets him near `position`. */
+  const withStar = (s: GameState, at: Position): GameState => {
+    const star = s.squad.find((p) => p.position === at)!;
+    const boosted = { ...star, stats: Object.fromEntries(Object.entries(star.stats).map(([k]) => [k, 90])) as unknown as Player['stats'] };
+    return { ...s, money: 10_000_000, squad: s.squad.map((p) => (p === star ? boosted : p)) };
+  };
+
+  it('reads the best natural player at the position, not a star from elsewhere at his fit', async () => {
+    const s = withStar(await career(97), 'halfback');
+    const naturals = s.squad.filter((p) => p.position === 'fullback');
+    expect(naturals.length).toBeGreaterThan(0);
+    const floor = Math.max(...naturals.map(overallRating));
+    expect(cardFloor(s.squad, 'fullback')).toBe(floor);
+    // The halfback star, at his 0.8 fit there, would read far higher than the club's fullbacks.
+    expect(effectiveRating(s.squad.find((p) => overallRating(p) >= 89)!, 'fullback')).toBeGreaterThan(floor + 10);
+    for (let seed = 0; seed < 12; seed++) {
+      const p = planted({ ...s, cardWeek: { ...s.cardWeek!, rng: 500 + seed } }, 'fullbackSigning');
+      const card = first(p);
+      if (card.kind !== 'player') throw new Error('not a player card');
+      const rating = overallRating(card.player);
+      expect(rating).toBeGreaterThan(floor);
+      // The margin, then each stat within ±AROUND_SPREAD of it.
+      expect(rating).toBeLessThanOrEqual(floor + PLAYER_CARD_MARGIN.grey + AROUND_SPREAD);
+    }
+  });
+
+  it('falls back to a related position, then to anyone, when nobody plays there', async () => {
+    const s = await career(101);
+    const noHookers = s.squad.filter((p) => p.position !== 'hooker');
+    const related = noHookers.filter((p) => positionFit(p.position, 'hooker') === FIT.related);
+    expect(related.length).toBeGreaterThan(0);
+    expect(cardFloor(noHookers, 'hooker')).toBe(Math.max(...related.map((p) => effectiveRating(p, 'hooker'))));
+    const wingers = s.squad.filter((p) => p.position === 'winger');
+    expect(cardFloor(wingers, 'prop')).toBe(Math.max(...wingers.map((p) => effectiveRating(p, 'prop'))));
+    expect(cardFloor([], 'prop')).toBe(0);
+  });
+
+  it('puts a gold man well above a grey one for the same club and position', async () => {
+    const s = { ...(await career(103)), money: 10_000_000 };
+    const floor = cardFloor(s.squad, 'halfback');
+    const grey: number[] = [];
+    const gold: number[] = [];
+    for (let seed = 0; seed < 10; seed++) {
+      const base = { ...s, cardWeek: { ...s.cardWeek!, rng: 900 + seed } };
+      // A grey halfback: the prop card's rule at halfback, via the floor and the grey margin.
+      const g = first(planted(base, 'starHalfback'));
+      if (g.kind !== 'player') throw new Error('not a player card');
+      gold.push(overallRating(g.player));
+      const c = first(planted(base, 'propSigning'));
+      if (c.kind !== 'player') throw new Error('not a player card');
+      grey.push(overallRating(c.player) - cardFloor(s.squad, 'prop'));
+    }
+    const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+    expect(mean(gold) - floor).toBeGreaterThan(mean(grey) + 8);
+    for (const r of gold) expect(r).toBeLessThanOrEqual(Math.min(99, floor + PLAYER_CARD_MARGIN.gold) + AROUND_SPREAD);
   });
 });
 

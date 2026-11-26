@@ -23,11 +23,13 @@ export const CARD_WEEK = {
 } as const;
 
 /**
- * How far above the club's best man at the position a player card's man is
- * generated (overall points). He must still beat that best man (the card floor).
- * Tuning values: Leon changes these.
+ * How far above the card floor (the club's best natural player at the position,
+ * systems/cardWeek.ts cardFloor) a player card's man is generated, in overall
+ * points. Each of his stats lands within ±AROUND_SPREAD (6) of that, and he must
+ * still beat the floor. Gold is meant to read about five stars in Local
+ * (STAR_BANDS in config.ts). Tuning values: Leon changes these.
  */
-export const PLAYER_CARD_MARGIN: Readonly<Record<CardTier, number>> = { grey: 3, gold: 8 };
+export const PLAYER_CARD_MARGIN: Readonly<Record<CardTier, number>> = { grey: 4, gold: 18 };
 
 interface CardBase {
   id: string;

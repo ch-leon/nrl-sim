@@ -28,7 +28,7 @@ import { fmtMoney } from '../utils/money';
 import { applyEffects, deckWaitsForLeagueChoice, type Applied } from './events';
 import { capRoomFor, releaseTerms, salaryDemand, signForRestOfSeason } from './cap';
 import { releasedState } from './freeagency';
-import { effectiveRating, placeSigning } from './lineup';
+import { effectiveRating, FIT, placeSigning, positionFit } from './lineup';
 import { awayPlayerIds, campDisposalProblem } from './playerAssignments';
 import { rosterIntervalProblem } from './playerAssignmentCommit';
 import { admitGeneratedPeople, openClubSpell } from './playerCareer';
@@ -48,15 +48,26 @@ export function isCardWeekCareer(state: Pick<GameState, 'cardWeek'>): boolean {
 
 // ── Eligibility ──────────────────────────────────────────────────────────────
 
-/** The club's best man at `position`, by his rating as he plays there (0 with nobody). */
-export function bestAtPosition(squad: readonly Player[], position: Position): number {
-  return squad.reduce((best, p) => Math.max(best, effectiveRating(p, position)), 0);
+/**
+ * A player card's floor at `position` (the card's man must beat it): the club's
+ * best natural player there, by overall. With none, the best man from a related
+ * position by his rating there (×0.92), and with none of those either, the best
+ * man anywhere by his rating there. A star from another position does not set
+ * it: at 0.8 fit he would push a card's man far above the club's real level.
+ */
+export function cardFloor(squad: readonly Player[], position: Position): number {
+  const best = (players: readonly Player[], rate: (p: Player) => number): number | null =>
+    players.length ? Math.max(...players.map(rate)) : null;
+  return best(squad.filter((p) => p.position === position), overallRating)
+    ?? best(squad.filter((p) => positionFit(p.position, position) === FIT.related), (p) => effectiveRating(p, position))
+    ?? best(squad, (p) => effectiveRating(p, position))
+    ?? 0;
 }
 
-/** The position where the club's best man is weakest (the dilemma card's man plays there); ties go to the formation order. */
+/** The position with the lowest card floor (the dilemma card's man plays there); ties go to the formation order. */
 function weakestPosition(squad: readonly Player[]): Position {
   const order: Position[] = ['fullback', 'winger', 'centre', 'five-eighth', 'halfback', 'hooker', 'prop', 'second-row', 'lock'];
-  return order.reduce((weak, pos) => (bestAtPosition(squad, pos) < bestAtPosition(squad, weak) ? pos : weak), order[0]!);
+  return order.reduce((weak, pos) => (cardFloor(squad, pos) < cardFloor(squad, weak) ? pos : weak), order[0]!);
 }
 
 /** A staff card's hire. */
@@ -126,14 +137,14 @@ export function replacementFor(state: GameState, position: Position, salary: num
 
 // ── Drawing ──────────────────────────────────────────────────────────────────
 
-/** A player card's man: generated around the club's best at the position plus the card's margin, and better than that best man (the card floor). */
+/** A player card's man: generated around the card floor at his position plus the card's margin, and better than the floor. */
 function resolvePlayer(state: GameState, def: Extract<CardDef, { kind: 'player' | 'dilemma' }>, rng: Rng): OfferedCard | null {
   const position = def.kind === 'player' ? def.position : weakestPosition(state.squad);
-  const best = bestAtPosition(state.squad, position);
-  const target = Math.min(99, best + def.margin);
+  const floor = cardFloor(state.squad, position);
+  const target = Math.min(99, floor + def.margin);
   for (let i = 0; i < CARD_WEEK.PLAYER_TRIES; i++) {
     const player = generatePlayerAround(rng, target, { position });
-    if (effectiveRating(player, position) <= best) continue;
+    if (overallRating(player) <= floor) continue;
     const salary = salaryDemand(player);
     const replaces = replacementFor(state, position, salary);
     if (replaces === null) return null;
