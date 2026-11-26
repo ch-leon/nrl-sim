@@ -3,7 +3,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { selectPack } from '../../src/content';
 import { bus } from '../../src/core/events';
-import { __setStorage, __unlockSaves, migrateState, saveIfChanged, setActiveSlot } from '../../src/core/save';
+import { __setStorage, __unlockSaves, classicSlots, firstRunSlotSummaries, loadCareer, migrateState, saveIfChanged, setActiveSlot, slotHasLeagueData } from '../../src/core/save';
+import { isClassicSave } from '../../src/core/classicSave';
 import { isCardWeek } from '../../src/core/saveValidation';
 import { careerActionClock } from '../../src/core/season';
 import { setCareerNamespace } from '../../src/core/storage/local';
@@ -552,5 +553,25 @@ describe('a League week with the card week on', () => {
     expect(without.competitions!.calendar!.elapsedIntervals).toBeGreaterThan(0);
     expect(withHook.cardWeek).toBeUndefined();
     expect(JSON.stringify(withHook)).toBe(JSON.stringify(without));
+  });
+});
+
+describe('a card-week career after Classic was retired (#819)', () => {
+  it('is a League career: never Classic, saved, continued and listed', async () => {
+    const s = await career(11);
+    expect(s.cardWeek).toBeDefined();
+    expect(isClassicSave(s)).toBe(false);
+    expect(isClassicSave(JSON.stringify(s))).toBe(false);
+    const bytes = new Map<string, string>();
+    const storage = { getItem: (k: string) => bytes.get(k) ?? null, setItem: (k: string, v: string) => { bytes.set(k, v); }, removeItem: (k: string) => { bytes.delete(k); } };
+    vi.stubGlobal('localStorage', storage); __setStorage(storage); __unlockSaves(); setActiveSlot(1);
+    loadState(s);
+    expect(saveIfChanged(getState())).toBe(true);
+    expect(slotHasLeagueData(1)).toBe(true);
+    expect(classicSlots()).toEqual([]);
+    const loaded = loadCareer(1);
+    expect(loaded.status).toBe('ok');
+    if (loaded.status === 'ok') expect(loaded.state.cardWeek).toEqual(s.cardWeek);
+    expect(firstRunSlotSummaries().find((x) => x.slot === 1)?.status).not.toBe('empty');
   });
 });
