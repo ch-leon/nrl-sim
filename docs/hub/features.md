@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- **Guide prices match the game.** The Grounds page reads every facility price from the facility list, so the Grandstand now shows $30,000 and the Sponsor Board its match-based income instead of an old weekly figure. The Events page no longer says story cards are off in a League career. The board stops setting a building goal once every facility is at level 3.
+
 - **The Big Three.** A new League career's Premier League has three clubs well above the rest: in AU the Redcliffe Reapers (78), Woolloomooloo Wolves (76) and Southport Stingrays (74); in the UK the Ashcombe Lanterns, Yewbridge Runners and Bramblewick Foundry. They carry an 18-player squad under a $750k cap and grow toward their own level rather than the league's, so they stay ahead. The other five Premier clubs stay at 57 to 65. The board never asks a club to finish above all three, or above any one of them unless it is the derby. Careers started before this keep their old Premier League.
 
 - **The Bali trip waits for next season's league.** In a League career, a story card offered or still open when the season closes is answered once next season's league is confirmed, so a trip incident lands in the new year and no longer stops the league choice. A save already stuck this way is repaired on load. [#837](https://github.com/ch-leon/nrl-sim/issues/837).
