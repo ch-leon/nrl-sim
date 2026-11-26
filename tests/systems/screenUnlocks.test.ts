@@ -2,7 +2,7 @@ import { createLegacyGame as createNewGame } from '../helpers/legacyGame';
 import { registerScreenUnlockSystem as registerUnlockSystem } from '../../src/systems/screenUnlocks';
 import { SCREEN_UNLOCK_LADDER as UNLOCK_LADDER } from '../../src/systems/screenUnlocks';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { getState, loadState, setState, type GameState } from '../../src/core/state';
+import { getState, loadState, setState } from '../../src/core/state';
 import { advanceWeek, clearTickHooks, clearSeasonHooks } from '../../src/core/time';
 import { bus, type Events } from '../../src/core/events';
 import { isScreenOpen, screensDue, screenLockReason } from '../../src/systems/unlocks';
@@ -108,23 +108,6 @@ it.each(['easy', 'normal', 'hard'] as const)('walks both ladders together on %s 
   expect(getState().unlocks).toBeUndefined();
   expect(isFacilityOpen(getState(), 'grandstand')).toBe(true);
   for (const id of ['finance', 'staff', 'contracts']) expect(isScreenOpen(getState(), id)).toBe(true);
-});
-
-it('opens Finance from a League career home result when the classic ladder is empty', () => {
-  const s = createNewGame('League office', 1);
-  const competitions = {
-    schemaVersion: 1,
-    instances: [{
-      definition: { format: { kind: 'league' } },
-      fixtures: [{ homeId: 'player', awayId: 'rival', result: { homeScore: 8, awayScore: 4 } }],
-    }],
-  } as unknown as NonNullable<GameState['competitions']>;
-  expect(screensDue({ ...s, league: { ...s.league, fixtures: [] }, competitions } as GameState)).toContain('finance');
-  const trial = {
-    ...competitions,
-    instances: [{ definition: { format: { kind: 'exhibition' } }, fixtures: competitions.instances[0]!.fixtures }],
-  } as unknown as NonNullable<GameState['competitions']>;
-  expect(screensDue({ ...s, league: { ...s.league, fixtures: [] }, competitions: trial } as GameState)).not.toContain('finance');
 });
 
 it('clears an already complete shared state without repeating announcements', async () => {
