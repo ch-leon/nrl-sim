@@ -26,11 +26,8 @@ import { BOARD, SQUAD_CAP, STAT_MAX } from '../../src/config';
 import { CARD_WEEK, CARDS, SIGNATURE_TRAIT, cardDefById, PLAYER_CARD_MARGIN } from '../../src/data/cards';
 import { AROUND_SPREAD, overallRating, shownStats } from '../../src/data/player';
 import { effectiveRating, FIT, positionFit } from '../../src/systems/lineup';
-import { stylePlays } from '../../src/match/league/plays';
-import { rivalStyle } from '../../src/systems/rivalRound';
-import { RIVAL_POSITION_MIN } from '../../src/systems/rivals';
+import { playerRivalContext, rivalSheet } from '../../src/systems/rivalRound';
 import { releasedState } from '../../src/systems/freeagency';
-import { validatePlayerPopulation } from '../../src/systems/playerCareer';
 import { PLAY_IDS, PLAYS_BY_ID } from '../../src/data/plays';
 import { traitLevel } from '../../src/data/traits';
 import { leagueEntryReceiptId } from '../../src/data/leagueCareer';
@@ -45,7 +42,7 @@ import { createOpenCupOffer } from '../../src/systems/openCupEntry';
 import { registerFixturesSystem } from '../../src/systems/fixtures';
 import { acceptLeagueEntry, previewLeagueEntry } from '../../src/systems/leagueEntry';
 import { prepareLeagueCareer } from '../../src/systems/leagueCareerSetup';
-import { registerPlayerMatchSystem } from '../../src/systems/matchday';
+import { registerPlayerMatchSystem, rivalMatchSheet } from '../../src/systems/matchday';
 import { STAFF_ROLES, hireStaff, newStaffMember, releaseStaff, staffWage } from '../../src/systems/staff';
 import { classifyReason, weeklyWages } from '../../src/systems/economy';
 import type { MatchEvent } from '../../src/sim/events';
@@ -992,101 +989,55 @@ describe('Phase 2 rerolls', () => {
   });
 });
 
-describe('Phase 2 win reward', () => {
-  function result(s: GameState, outcome: 'win' | 'loss' | 'draw' | 'seeded-draw'): { state: GameState; opponent: string } {
-    const state = played(s, leagueSlot(s), format => format === 'league');
-    let opponent = '';
-    for (const instance of state.competitions!.instances) {
-      const fixture = instance.fixtures.find(f => f.slot === state.week && f.status === 'completed' && (f.homeId === s.clubId || f.awayId === s.clubId));
-      if (!fixture) continue;
-      const home = fixture.homeId === s.clubId;
-      opponent = home ? fixture.awayId : fixture.homeId;
-      fixture.result = outcome === 'draw' ? { homeScore: 10, awayScore: 10, decider: 'draw' }
-        : outcome === 'seeded-draw' ? { homeScore: 10, awayScore: 10, winnerId: s.clubId, decider: 'seeded-draw' }
-        : { homeScore: home === (outcome === 'win') ? 12 : 0, awayScore: home === (outcome === 'win') ? 0 : 12,
-          winnerId: outcome === 'win' ? s.clubId : opponent, decider: 'score' };
-    }
-    expect(opponent).not.toBe('');
-    return { state, opponent };
+describe('League match offers', () => {
+  async function afterWin(): Promise<GameState> {
+    const base = { ...(await career(573)), money: 1_000_000 };
+    const state = played(base, leagueSlot(base), format => format === 'league');
+    const fixture = state.competitions!.instances.flatMap(instance => instance.fixtures).find(f =>
+      f.slot === state.week && f.status === 'completed' && (f.homeId === state.clubId || f.awayId === state.clubId))!;
+    const home = fixture.homeId === state.clubId;
+    fixture.result = { homeScore: home ? 12 : 0, awayScore: home ? 0 : 12, winnerId: state.clubId, decider: 'score' };
+    return state;
   }
 
-  it('deals one stolen player on a win and rerolls deterministically with the slot intact', async () => {
-    const base = { ...(await career(573)), money: 1_000_000 };
-    for (const outcome of ['win', 'loss', 'draw', 'seeded-draw'] as const) {
-      const { state, opponent } = result(base, outcome);
-      const dealt = cardWeekTick(state);
-      expect(cardWeekTick(state)).toEqual(dealt);
-      const offer = dealt.cardWeek!.offers[3]!;
-      const stolen = offer.cards.filter(c => c.fromClubId);
-      expect(stolen).toHaveLength(outcome === 'win' ? 1 : 0);
+  it('draws and rerolls only normal cards after League wins across 128 card-stream seeds', async () => {
+    const state = await afterWin();
+    const strongSquad = state.squad.map(p => ({
+      ...p, stats: { speed: STAT_MAX, strength: STAT_MAX, stamina: STAT_MAX, handling: STAT_MAX, kicking: STAT_MAX, footyIQ: STAT_MAX },
+    }));
+    const normalIds = new Set(CARDS.map(card => card.id));
+    // A strong squad used to trigger the fallback to a rival set play.
+    for (let rng = 0; rng < 128; rng++) {
+      const squad = rng % 2 === 0 ? state.squad : strongSquad;
+      const before = { ...state, squad, cardWeek: { ...state.cardWeek!, rng } };
+      const dealt = cardWeekTick(before);
+      expect(cardWeekTick(before)).toEqual(dealt);
+      const offer = dealt.cardWeek!.offers.slice(-1)[0]!;
       const rerolled = changed(rerollCard(dealt, offer.grant));
       expect(rerollCard(dealt, offer.grant)).toEqual(rerolled);
-      expect(rerolled.cardWeek!.offers[3]!.cards.filter(c => c.fromClubId)).toHaveLength(stolen.length);
+      for (const match of [offer, rerolled.cardWeek!.offers.slice(-1)[0]!]) {
+        expect(match).toMatchObject({ kind: 'match', week: state.week });
+        expect(match.fromClubId).toBeUndefined();
+        expect(match.cards).toHaveLength(CARD_WEEK.OFFER_SIZE);
+        expect(match.cards.every(card => !card.fromClubId && normalIds.has(card.cardId))).toBe(true);
+      }
       expect(rerolled.rngSeed).toBe(state.rngSeed);
-      if (outcome !== 'win') continue;
-      const card = stolen[0]!;
-      expect(card.kind).toBe('player');
-      if (card.kind !== 'player') throw new Error('Expected a stolen player');
-      expect(card.fromClubId).toBe(opponent);
-      const before = dealt.league.clubs.find(c => c.id === opponent)!;
-      const index = offer.cards.indexOf(card);
-      const held = changed(takeCard(dealt, index, offer.grant));
-      expect(held.league).toEqual(dealt.league);
-      const transfer = taken(playCard(held, 0));
-      const updated = transfer.state.league.clubs.find(c => c.id === opponent)!;
-      expect(transfer.joined!.id).toBe(card.player.id);
-      expect(transfer.joined!.clubHistory!.spells.slice(-2).map(spell => spell.clubId)).toEqual([opponent, base.clubId]);
-      expect(updated.squad).toHaveLength(before.squad!.length);
-      expect(updated.squad!.some(p => p.id === card.player.id)).toBe(false);
-      expect(updated.squad!.filter(p => !before.squad!.some(old => old.id === p.id))).toMatchObject([{ position: card.player.position }]);
-      expect(updated.squad!.filter(p => p.position === card.player.position && p.injuredWeeks === 0 && !p.suspendedWeeks).length).toBeGreaterThanOrEqual(RIVAL_POSITION_MIN);
-      expect(commitment(updated.squad!, state.season)).toBeLessThanOrEqual(publishedCap(updated.capAccount!));
-      expect(validatePlayerPopulation(transfer.state)).toBeNull();
-      expect(transfer.state.rngSeed).toBe(state.rngSeed);
-      expect(transfer.state.eventDeck).toEqual(state.eventDeck);
-      expect(playCard(transfer.state, 0)).toBe('There is no card there.');
+      expect(rerolled.eventDeck).toEqual(state.eventDeck);
     }
   });
 
-  it('replaces a departed player with a regular card when the beaten club has no eligible steals', async () => {
-    const { state, opponent } = result(await career(573), 'win');
+  it('keeps rival team sheets identical through a League win offer and reroll', async () => {
+    const state = await afterWin();
     const dealt = cardWeekTick(state);
-    const pick = dealt.cardWeek!.offers.slice(-1)[0]!;
-    const departed = pick.cards.find(c => c.fromClubId);
-    if (departed?.kind !== 'player') throw new Error('Expected a stolen player');
-    const club = dealt.league.clubs.find(c => c.id === opponent)!;
-    const plays = stylePlays(rivalStyle(club).attack);
-    const rerolled = changed(rerollCard({
-      ...dealt, playbook: { owned: plays },
-      squad: dealt.squad.map(p => ({ ...p,
-        stats: { speed: 99, strength: 99, stamina: 99, handling: 99, kicking: 99, footyIQ: 99 } })),
-      league: { ...dealt.league, clubs: dealt.league.clubs.map(c => c === club
-        ? { ...c, squad: c.squad!.filter(p => p.id !== departed.player.id) } : c) },
-    }, pick.grant));
-    const refreshed = rerolled.cardWeek!.offers.slice(-1)[0]!;
-    expect(refreshed.cards).toHaveLength(3);
-    expect(refreshed.cards.every(c => !c.fromClubId && c.cardId !== departed.cardId)).toBe(true);
-    expect(rerolled.money).toBe(dealt.money - 1500);
-    expect(isCardWeek(rerolled.cardWeek)).toBe(true);
-  });
-
-  it('offers a play from the beaten club style when nobody qualifies, then a regular third card when its plays are owned', async () => {
-    const s = await career(573);
-    const { state, opponent } = result({ ...s, squad: s.squad.map(p => ({
-      ...p, stats: { speed: 99, strength: 99, stamina: 99, handling: 99, kicking: 99, footyIQ: 99 },
-    })) }, 'win');
-    const style = rivalStyle(state.league.clubs.find(c => c.id === opponent)!).attack;
-    const plays = stylePlays(style);
-    const dealt = cardWeekTick(state);
-    const offer = dealt.cardWeek!.offers[3]!;
-    const card = offer.cards[2]!;
-    expect(card).toMatchObject({ kind: 'setPlay', fromClubId: opponent });
-    if (card.kind !== 'setPlay') throw new Error('Expected a stolen play');
-    expect(plays).toContain(card.playId);
-    expect(taken(playPickCard(dealt, 2, undefined, offer.grant)).state.playbook.owned).toContain(card.playId);
-    const fallback = cardWeekTick({ ...state, playbook: { owned: plays } }).cardWeek!.offers[3]!;
-    expect(fallback.cards).toHaveLength(3);
-    expect(fallback.cards.every(c => !c.fromClubId)).toBe(true);
+    const rerolled = changed(rerollCard(dealt, dealt.cardWeek!.offers.slice(-1)[0]!.grant));
+    const sheets = (s: GameState) => s.league.clubs.filter(club => club.id !== s.clubId).map(club => ({
+      vsPlayer: rivalMatchSheet(club, playerRivalContext(s)),
+      vsRival: rivalSheet(club),
+    }));
+    const before = sheets(state);
+    expect(before.length).toBeGreaterThan(0);
+    expect(sheets(dealt)).toEqual(before);
+    expect(sheets(rerolled)).toEqual(before);
   });
 });
 

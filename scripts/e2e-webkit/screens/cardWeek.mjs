@@ -112,8 +112,7 @@ export async function runCardWeek(browser) {
     assert.ok(await page.locator('.nrl-rotate').isHidden());
     await page.screenshot({ animations: 'disabled', path: join(out, '375x667-cards.png') });
 
-    // Give the remaining pick a repeat and an identified win reward so both
-    // presentation paths are exercised on every run, regardless of the seed.
+    // Give the remaining pick a duplicate and a saved steal to check both card faces.
     const source = await page.evaluate(() => {
       const state = window.__nrlState();
       const club = state.league.clubs.find(c => c.id !== state.clubId);
@@ -132,7 +131,7 @@ export async function runCardWeek(browser) {
     // Reopen so the Cards screen reads the latest queued pick.
     await page.locator('.nrl-cards-screen .nrl-screen-x').tap();
     await page.locator('[data-portrait-cards]').tap();
-    assert.equal(await page.locator(`${CARDS} .nrl-card-source`).textContent(), `From ${source}`);
+    assert.equal(await page.locator(`${CARDS} .nrl-card-source`).count(), 0);
     assert.match(await page.locator(CARDS).textContent(), /Next reroll \$3,000/);
     await page.locator(`${CARDS} [data-cards-pick]`).tap();
     await checkPick(page, true);
@@ -142,7 +141,7 @@ export async function runCardWeek(browser) {
     assert.match(await reroll.textContent(), /Reroll \(\$3,000\)/);
     await reroll.tap();
     assert.match(await reroll.textContent(), /Reroll \(\$4,500\)/);
-    assert.equal(await page.locator(`${PICK} .nrl-card-source`).textContent(), `From ${source}`);
+    assert.equal(await page.locator(`${PICK} .nrl-card-source`).count(), 0);
     await page.locator('.nrl-card-modal .nrl-screen-x').tap();
     await page.locator('.nrl-cards-screen .nrl-screen-x').tap();
     await page.locator('[data-portrait-cards]').tap();

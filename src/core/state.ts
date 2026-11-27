@@ -290,8 +290,8 @@ export interface EventDeckState {
  * One card on show in a card-week pick (#846), resolved when it was drawn so a
  * save and reload shows the same offer. `cardId` keys into data/cards.ts.
  * A recruit card carries the quoted player, salary and any required release.
- * Generated recruits get a durable ID on signing. A steal refers to the real
- * rival player. Staff and set-play card payloads name the hire and the play.
+ * Generated recruits get a durable ID on signing. A saved steal refers to the
+ * real rival player. Staff and set-play card payloads name the hire and the play.
  */
 export type OfferedCard = { fromClubId?: string } & (
   | { cardId: string; kind: 'player' | 'dilemma'; player: Player; salary: number; replacesId?: string; replacesName?: string }
@@ -305,6 +305,7 @@ export interface CardOffer {
   week: number;
   cards: OfferedCard[];
   kind: 'starter' | 'match' | 'decree';
+  /** Source of a steal in an older saved match pick. */
   fromClubId?: string;
   /** Missing only in v37 saves written before picks could be opened individually. */
   grant?: number;
