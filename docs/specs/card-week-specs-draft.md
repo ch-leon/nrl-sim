@@ -4,7 +4,7 @@ Nov 27, 2026 · @Le
 
 ## Status and how to use this
 
-Draft for Le's review. Nothing here is approved, Ready or built. These six specs turn the 26–27 Nov chat decisions into buildable pieces for the Card week Labs test. Do not build from this file until Le approves a slice and its issues exist.
+**Slice 1a is approved** (Le, 27 Nov) and filed as issues #852 to #858. Everything else is still a draft for Le's review: not approved, Ready or built. These six specs turn the 26–27 Nov chat decisions into buildable pieces for the Card week Labs test. Build only from the issues; do not build Slice 1b, 2 or 3 from this file until Le approves them and their issues exist.
 
 Parent: Notion page *NRL Sim — Cards, collections and branching careers*, section 24. Where this draft and section 24 disagree, this draft holds the newer decision (no steal, the money rule, stadium plots). Section 23 (opening pack and album) is unchanged and out of scope here. What is in the game today is described in `docs/specs/846-card-week.md`.
 
@@ -285,13 +285,15 @@ Build in four slices, each playable on its own. Slice 1a answers the one questio
 
 **Slice 1a: offer and fatigue** (Specs 1 and 5)
 
-1. Remove the steal from Card week offers.
-2. Match picks show 5 and keep 2; starter picks show 5 and keep 1.
-3. Weekly fatigue: rules, team-sheet fields and save field (save version bump from 39, with a migration and load test).
-4. Fatigue bars on Squad and Lineup, plus the cost preview at event entry.
-5. Three recovery cards (Fatigue wipe, Ice baths, Injury repair) and the hold limit.
-6. Persona bots keep cards from each offer and rest tired players. Without this the balance run measures a bot that ignores the feature.
-7. Balance run with Card week on and off, using the persona bots. Reports League wins, strikes a season, injuries, and how many cards reach level III.
+Approved and filed. Build in this order, one PR each, because they share files and save-version bumps.
+
+1. #852: Remove the steal from Card week offers.
+2. #853: Match picks show 5 and keep 2; starter picks show 5 and keep 1.
+3. #854: Weekly fatigue: rules, team-sheet fields and save field (save version bump from 39, with a migration and load test).
+4. #855: Fatigue bars on Squad and Lineup, plus the cost preview at event entry.
+5. #856: Three recovery cards (Fatigue wipe, Ice baths, Injury repair) and the hold limit.
+6. #857: Persona bots keep cards from each offer and rest tired players. Without this the balance run measures a bot that ignores the feature.
+7. #858: Balance run with Card week on and off, using the persona bots. Reports League wins, strikes a season, injuries, and how many cards reach level III.
 
 **Slice 1b: the money rule** (Specs 2 and 3), after Le has played 1a
 
@@ -329,12 +331,17 @@ The biggest risk in Slice 1a is that fatigue only ever hurts the player, so a ca
 
 **Open questions for Le**
 
-- [ ] Split Slice 1 into 1a (fatigue, free player cards) and 1b (money)? Recommended.
-- [ ] Offer size and keep count: 5 and 2, with starter picks keeping 1?
-- [ ] Should bonus events also earn a pick? Recommended: no.
-- [ ] Fatigue numbers: +30 League, +20 event, 30 back each week?
-- [ ] Recovery cards: hold at most 2?
-- [ ] Does training add fatigue?
+Settled by approving Slice 1a (27 Nov), as starting values to playtest:
+
+- [x] Split Slice 1 into 1a (fatigue, free player cards) and 1b (money).
+- [x] Offer size and keep count: 5 and 2, with starter picks keeping 1.
+- [x] Bonus events do not earn a pick in 1a.
+- [x] Fatigue numbers: +30 League, +20 event, 30 back each week.
+- [x] Recovery cards: hold at most 2.
+
+Still open:
+
+- [ ] Does training add fatigue? (Left out of 1a.)
 - [ ] Card-player fee: half the free-agent fee (about $8,500 for a grey card)?
 - [ ] Matchday cards free (recommended)?
 - [ ] Staff deliver a card every 3 rounds?
