@@ -143,3 +143,12 @@ was started with Card week disabled.
 
 `v38-card-week-level-one-hire.json.gz` was exported from the same build after
 playing a Level I Assistant Coach directly from a starter pick.
+
+
+### v39 Card week save with legacy steals
+
+`v39-card-week-legacy-steals.json.gz` comes from main at `329fd4fc`, after twelve
+weeks of an Australian League career with seed 1. The waiting Week 12 pick
+contains Reece Fenuamea from the Bendigo Bellbirds, to whom the club previously
+sold him. The fixture places a Second Man card drawn from the same club in the
+hand, so one save exercises both paths.

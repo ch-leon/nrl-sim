@@ -14,7 +14,7 @@ import { awaitingCampReplay } from './parkedLeagueFixture';
 // stream (state.cardWeek.rng): drawing never moves rngSeed or the events deck.
 // Cash and board patience use the existing event effects. Card payments and
 // rerolls book to the Events line.
-import { getState, setState, type ActiveCard, type CardHistoryEntry, type CardOffer, type CardStrike, type CardWeekState, type StaffMember, type Fixture, type GameState, type LastMatchImpact, type OfferedCard, type Player, type Position, type RivalClub } from '../core/state';
+import { getState, setState, type ActiveCard, type CardHistoryEntry, type CardOffer, type CardStrike, type CardWeekState, type StaffMember, type Fixture, type GameState, type LastMatchImpact, type OfferedCard, type Player, type Position } from '../core/state';
 import { bus } from '../core/events';
 import { registerLeagueRolloverHook, registerTickHook, TICK_ORDER, weekHeld } from '../core/time';
 import { saveIfChanged } from '../core/save';
@@ -26,9 +26,7 @@ import { ROMAN, TRAITS, traitLevel, withTrait, type TraitLevel } from '../data/t
 import { randomName } from '../data/names';
 import { SQUAD_CAP, STAT_MAX } from '../config';
 import { makeRng, type Rng } from '../utils/rng';
-import { rivalStyle } from './rivalRound';
 import { rivalPlayer, RIVAL_POSITION_MIN, withDerivedStrength } from './rivals';
-import { stylePlays } from '../match/league/plays';
 import { fmtMoney } from '../utils/money';
 import { applyEffects, deckWaitsForLeagueChoice, type Applied } from './events';
 import { capRoomFor, commitment, publishedCap, reconcileProtection, releaseTerms, salaryDemand, signForRestOfSeason } from './cap';
@@ -232,7 +230,7 @@ function resolveCard(state: GameState, def: CardDef, rng: Rng): OfferedCard | nu
 
 type RecruitCard = Extract<OfferedCard, { kind: 'player' | 'dilemma' }>;
 
-/** An upgrade carries the signed player's old snapshot. A steal uses the rival's live roster instead. */
+/** An upgrade carries the signed player's old snapshot. A saved steal uses the rival's live roster instead. */
 function recruitUpgradeRefusal(state: GameState, card: OfferedCard): string | null {
   if ((card.kind !== 'player' && card.kind !== 'dilemma') || card.fromClubId
     || !card.player.clubHistory?.spells.some(spell => !spell.end)) return null;
@@ -246,43 +244,6 @@ function recruitUpgradeRefusal(state: GameState, card: OfferedCard): string | nu
 
 function rivalHasDepth(squad: readonly Player[]): boolean {
   return POSITIONS.every(position => squad.filter(p => p.position === position).length >= RIVAL_POSITION_MIN);
-}
-
-function stealPlayerCard(state: GameState, rival: RivalClub, player: Player): RecruitCard | null {
-  if (!rival.squad || !rival.capAccount || player.emergencyDealEndSeason !== undefined
-    || overallRating(player) <= cardFloor(state.squad, player.position)) return null;
-  const samePosition = rival.squad.filter(p => p.position === player.position && p.id !== player.id);
-  // The replacement is fit and plays the same position.
-  if (samePosition.filter(p => p.injuredWeeks === 0 && !p.suspendedWeeks).length + 1 < RIVAL_POSITION_MIN) return null;
-  const season = careerActionClock(state).season;
-  const remaining = rival.squad.filter(p => p.id !== player.id);
-  if (!capRoomFor(remaining, rival.capAccount, season, 1)) return null;
-  const salary = salaryDemand(player);
-  const replaces = replacementFor(state, player.position, salary);
-  if (replaces === null) return null;
-  const cardId = `steal-player:${player.position}:${player.id}`;
-  return {
-    kind: 'player', cardId, player, salary, fromClubId: rival.id,
-    ...(replaces ? { replacesId: replaces.id, replacesName: replaces.name } : {}),
-  };
-}
-
-function drawSteal(state: GameState, clubId: string, rng: Rng): OfferedCard | undefined {
-  const club = state.league.clubs.find(c => c.id === clubId && c.id !== state.clubId);
-  if (!club) return undefined;
-  const squad = club.squad ?? [];
-  const recruits = rivalHasDepth(squad) ? squad.flatMap(player => {
-    const card = stealPlayerCard(state, club, player);
-    return card && nextCardLevel(state, card.cardId) ? [card] : [];
-  }) : [];
-  if (recruits.length) return rng.pick(recruits);
-  const plays = stylePlays(rivalStyle(club).attack).filter(playId => {
-    const id = `steal-play:${playId}`;
-    return nextCardLevel(state, id) && (!ownsPlay(state, playId) || activeCard(state, id));
-  });
-  if (!plays.length) return undefined;
-  const playId = rng.pick(plays);
-  return { kind: 'setPlay', cardId: `steal-play:${playId}`, playId, fromClubId: clubId };
 }
 
 /** Weighted pick; null when nothing is left. */
@@ -304,7 +265,6 @@ function pickWeighted(cards: readonly CardDef[], rng: Rng): CardDef | null {
  */
 export function drawOffer(
   state: GameState, kind: CardOffer['kind'] = 'match', waiting: readonly CardOffer[] = [],
-  fromClubId?: string,
 ): { offer: CardOffer | null; rng: number } {
   const cw = state.cardWeek;
   if (!cw) return { offer: null, rng: 0 };
@@ -321,9 +281,6 @@ export function drawOffer(
   let left = CARDS.filter((c) => c.weight > 0 && eligibleBeforeDice(state, c));
   const signature = (cards: readonly OfferedCard[]): string => cards.map(c => c.cardId).sort().join(',');
   const repeats = new Set(waiting.map(o => signature(o.cards)));
-  const stolen = fromClubId ? drawSteal(state, fromClubId, rng) : undefined;
-  const size = CARD_WEEK.OFFER_SIZE - Number(!!stolen);
-  const signatureWithSteal = (cards: readonly OfferedCard[]) => signature(stolen ? [...cards, stolen] : cards);
   const cards: OfferedCard[] = [];
   const drawNext = (): void => {
     const def = pickWeighted(left, rng)!;
@@ -331,15 +288,15 @@ export function drawOffer(
     const card = resolveCard(state, def, rng);
     if (card) cards.push(card);
   };
-  while (cards.length < size && left.length > 0) drawNext();
+  while (cards.length < CARD_WEEK.OFFER_SIZE && left.length > 0) drawNext();
 
   let chosen = cards.slice();
   // Keep the normal weighted draw unless it repeats a waiting pick. In that
   // case consider the remaining eligible cards in weighted order as well.
-  if (chosen.length > 0 && repeats.has(signatureWithSteal(chosen))) {
+  if (chosen.length > 0 && repeats.has(signature(chosen))) {
     while (left.length > 0) drawNext();
     const findFresh = (prefix: OfferedCard[], start: number): OfferedCard[] | undefined => {
-      if (prefix.length === chosen.length) return repeats.has(signatureWithSteal(prefix)) ? undefined : prefix;
+      if (prefix.length === chosen.length) return repeats.has(signature(prefix)) ? undefined : prefix;
       for (let i = start; i <= cards.length - (chosen.length - prefix.length); i++) {
         const found = findFresh([...prefix, cards[i]!], i + 1);
         if (found) return found;
@@ -348,9 +305,8 @@ export function drawOffer(
     };
     chosen = findFresh([], 0) ?? chosen;
   }
-  if (stolen) chosen.push(stolen);
   return { offer: chosen.length ? {
-    season: state.season, week: state.week, kind, cards: chosen, ...(fromClubId ? { fromClubId } : {}),
+    season: state.season, week: state.week, kind, cards: chosen,
   } : null, rng: rng.state() };
 }
 
@@ -827,8 +783,7 @@ export function cardWeekTick(state: GameState): GameState {
 
   const played = fixtures.filter(f => f.slot! <= state.week);
   const decree = played.length === CARD_WEEK.DECREE_MATCH;
-  const fromClubId = !decree && margin < 0 ? (fixture.homeId === state.clubId ? fixture.awayId : fixture.homeId) : undefined;
-  const { offer, rng } = drawOffer(next, decree ? 'decree' : 'match', cw.offers, fromClubId);
+  const { offer, rng } = drawOffer(next, decree ? 'decree' : 'match', cw.offers);
   if (!offer) return { ...next, cardWeek: settled };
   const expireAt = cw.owed >= CARD_WEEK.MAX_OWED ? cw.offers.findIndex(o => o.kind === 'match') : -1;
   const waiting = cw.offers.filter((_, i) => i !== expireAt);
@@ -1089,13 +1044,14 @@ export function rerollCard(state: GameState, grant?: number): GameState | string
   if (!cw || !offer) return 'No pick is waiting.';
   const cost = rerollCost(state);
   const paid = bookPlayerMovement(state, -cost, 'events', careerActionClock(state));
-  const draw = drawOffer(paid, offer.kind, [offer], offer.fromClubId);
+  const draw = drawOffer(paid, offer.kind, [offer]);
   if (!draw.offer) return 'There are no eligible cards to draw.';
   const rerolls = { season: state.season, week: state.week, count: (cost - CARD_WEEK.REROLL_BASE) / CARD_WEEK.REROLL_STEP + 1 };
-  const { cards } = draw.offer;
+  const { fromClubId: _legacySource, ...waiting } = offer;
+  const rerolled = { ...waiting, cards: draw.offer.cards };
   return { ...paid, cardWeek: {
     ...cw, rng: draw.rng, rerolls, history: recordCard(cw, state, 'reroll', 'reroll'),
-    offers: cw.offers.map((o, i) => i === at ? { ...o, cards } : o),
+    offers: cw.offers.map((o, i) => i === at ? rerolled : o),
   } };
 }
 

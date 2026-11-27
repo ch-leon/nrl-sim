@@ -1,6 +1,6 @@
 import { BOARD } from '../../config';
 import { bus } from '../../core/events';
-import { getState, type CardHistoryEntry, type CardOffer, type GameState } from '../../core/state';
+import { getState, type CardHistoryEntry, type GameState } from '../../core/state';
 import { CARD_WEEK, SIGNATURE_TRAIT, cardDefById } from '../../data/cards';
 import { PLAYS_BY_ID } from '../../data/plays';
 import { fmtMoney } from '../../utils/money';
@@ -50,11 +50,6 @@ export function activeLines(state: GameState): string[] {
       return [];
     }),
   ];
-}
-
-function offerSource(state: GameState, offer: CardOffer): string | undefined {
-  const clubId = offer.cards.find(card => card.fromClubId)?.fromClubId;
-  return state.league.clubs.find(c => c.id === clubId)?.name;
 }
 
 const HISTORY_ACTION: Record<NonNullable<CardHistoryEntry['action']>, string> = {
@@ -113,9 +108,8 @@ export function openCardsScreen(): HTMLElement | null {
       const preferred = preferredCardOffer(state);
       const list = el('div', { class: 'nrl-cards-offers' });
       for (const [index, offer] of cw.offers.entries()) {
-        const source = offerSource(state, offer);
         const label = offer.kind === 'starter' ? `Starter pick ${index + 1}`
-          : `${offer.kind === 'decree' ? 'Decree pick' : 'Match pick'} · Season ${offer.season}, Week ${offer.week}${source ? ` · From ${source}` : ''}`;
+          : `${offer.kind === 'decree' ? 'Decree pick' : 'Match pick'} · Season ${offer.season}, Week ${offer.week}`;
         const open = cardAction(label, () => openCardPick(offer.grant), blocked);
         open.setAttribute('data-cards-offer', String(offer.grant));
         if (offer === preferred && offer.kind !== 'starter') open.append(el('span', { class: 'nrl-cards-latest', text: 'Latest' }));
@@ -126,8 +120,6 @@ export function openCardsScreen(): HTMLElement | null {
       pick.setAttribute('data-cards-offer', String(cw.offers[0]!.grant));
     }
     if (count) {
-      const source = count === 1 ? offerSource(state, cw.offers[0]!) : undefined;
-      if (source) waiting.append(el('p', { class: 'nrl-card-source', text: `From ${source}` }));
       const reroll = cw.offers.some(o => o.kind !== 'decree') ? `Next reroll ${fmtMoney(rerollCost(state))}` : 'Decree picks cannot be rerolled.';
       waiting.append(el('p', { class: 'nrl-card-hint', text: reroll }));
     }
