@@ -76,6 +76,7 @@ const inSquad = (id: string): string => `[data-seg="${id}"], ${tab('squad')}`;
 /** The paddock's name as the catalog has it, so a rename follows (#361 owns the names). */
 const PADDOCK = FACILITY_CATALOG.trainingPaddock.name;
 const RECRUIT_LIST = '[data-screen-key="recruit"] .nrl-screen-body';
+const FREE_AGENT_PAGE = '.nrl-player-modal.nrl-player-free';
 
 export const STEPS: readonly TutorialStep[] = [
   {
@@ -101,7 +102,7 @@ export const STEPS: readonly TutorialStep[] = [
     // free agent's page opened over it is rung whole in its place (Sign is on its Deal tab).
     // A squad man's page has no Sign (Renew, Sell, Release), so it gets no ring.
     text: 'Sign a player you can afford, and leave enough for the bills.',
-    anchor: `${RECRUIT_LIST}, .nrl-player-modal.nrl-player-free, ${inSquad('recruit')}`,
+    anchor: `${RECRUIT_LIST}, ${FREE_AGENT_PAGE}, ${inSquad('recruit')}`,
     advanceOn: 'player:signed',
     opens: 'recruit',
     tap: 2,
@@ -960,6 +961,9 @@ body.nrl-match-active .nrl-tutorial, .nrl-tutorial[hidden] { display: none; }
 .nrl-tutorial-bubble.nrl-tutorial-right { left: auto; right: calc(0.75rem + var(--nrl-safe-r, 0px)); transform: none; }
 /* #412: no dock clear of the Undo toast: the bubble stands aside (and takes no taps) until the toast goes. */
 .nrl-tutorial-bubble[data-aside] { visibility: hidden; }
+/* The free agent's page fills the space between HUD and dock. Stand the bubble
+   aside as soon as the page opens so every page control stays tappable. */
+#ui-root:has(> .nrl-dialog-region > ${FREE_AGENT_PAGE}) .nrl-tutorial-bubble[data-step="recruit"] { visibility: hidden; }
 `;
 
 // REPLAY (orchestrator wiring): the Guide's footer (ui/guide/guide.ts, under

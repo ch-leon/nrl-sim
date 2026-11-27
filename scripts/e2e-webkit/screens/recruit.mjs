@@ -46,6 +46,45 @@ export async function runRecruitTutorial(browser) {
           problems.push('Recruit bubble did not return to its bottom dock after Undo expired');
         }
         if (problems.length) throw new Error(problems.join('; '));
+
+        const freeAgentPage = '.nrl-player-modal.nrl-player-free';
+        const player = page.locator(freeAgentPage);
+        const recruit = page.locator(`${list} [data-row-player]`).filter({ has: page.locator('.nrl-row-action:enabled') }).first();
+        await recruit.locator('.nrl-row-name').click();
+        await player.waitFor();
+        const deal = player.locator('[data-player-tab="deal"]');
+        const sign = '[data-player-action="sign"]';
+        const pressDeal = async (part) => {
+          const { x, y, blockedBy } = await deal.evaluate((el, part) => {
+            const r = el.getBoundingClientRect();
+            const x = r.left + r.width / 2;
+            const y = r.top + (part === 'upper part' ? 4 : r.height / 2);
+            const hit = document.elementFromPoint(x, y);
+            return { x, y, blockedBy: el.contains(hit) ? null : hit?.className || hit?.tagName || 'outside the viewport' };
+          }, part);
+          if (blockedBy) throw new Error(`Deal ${part} press hits ${blockedBy}`);
+          if (phone) await page.touchscreen.tap(x, y);
+          else await page.mouse.click(x, y);
+          await player.locator('[data-player-panel="deal"]').waitFor();
+          await player.locator(`${sign}:enabled`).waitFor();
+          const signProblems = await reachProblems(page, freeAgentPage, [`${freeAgentPage} ${sign}`]);
+          if (signProblems.length) throw new Error(signProblems.join('; '));
+          if (await page.evaluate(() => window.__nrlState().settings.tutorialDone)) {
+            throw new Error(`Deal ${part} press skipped the tutorial`);
+          }
+        };
+        await pressDeal('centre');
+        // Check the upper tap after the ring has moved from the list to the player page.
+        await page.waitForFunction((selector) => {
+          const modal = document.querySelector(selector)?.getBoundingClientRect();
+          const ring = document.querySelector('.nrl-tutorial-cutout')?.getBoundingClientRect();
+          return modal && ring && ring.top <= modal.top && modal.top - ring.top <= 6;
+        }, freeAgentPage);
+        await player.locator('[data-player-tab="stats"]').click();
+        await pressDeal('upper part');
+        await player.locator('.nrl-back').click();
+        await player.waitFor({ state: 'detached' });
+        await page.locator(`${bubble} .nrl-tutorial-skip`).waitFor();
         console.log(`ok recruit tutorial ${tag}`);
       } catch (err) {
         failures++;
