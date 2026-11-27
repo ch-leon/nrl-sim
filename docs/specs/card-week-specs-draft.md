@@ -55,8 +55,9 @@ Le has set the direction: cards run most of the career week, tested first behind
 | D16 | No limit on cards played per week during testing | Le | 27 Nov |
 | D17 | Three tiers: Common, Rare and Gold (#851), replacing grey and gold | Le | 27 Nov |
 | D18 | Everything carries into the next season: hand, card levels, waiting picks and fatigue. Only the Decree expires and strikes reset, as today | Le | 27 Nov |
+| D19 | For the first testing round, the cards in a pick are drawn by chance as today, with no guaranteed mix of families. Revisit after the playtest | Le | 27 Nov |
 
-**Still open:** what goes in each offer (pure chance or a guaranteed spread of families); whether matchday cards are free; gear's exact job. D10 to D14 settle Slice 1b's design, but 1b is not filed as issues until #858 has reported.
+**Still open:** whether matchday cards are free; gear's exact job. D10 to D14 settle Slice 1b's design, but 1b is not filed as issues until #858 has reported.
 
 ## Spec 1: Weekly offer and hand
 
