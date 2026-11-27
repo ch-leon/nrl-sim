@@ -7,7 +7,7 @@ import { makeRng } from '../../utils/rng';
 import { randomName } from '../../data/names';
 import { overallRating } from '../../data/player';
 import { ON_FIELD, STAT_MAX } from '../../config';
-import type { Player, Position, RivalClub } from '../../core/state';
+import type { Player, PlayerStats, Position, RivalClub } from '../../core/state';
 import type { RosterEntry, TeamSheet } from '../../sim/events';
 import { rollTraits, type TraitQuality } from '../../data/traits';
 import { usesHabitCounters, type RivalPlanContext } from './ai';
@@ -105,6 +105,7 @@ export function teamSheetFromSquad(
   colors: [string, string],
   selection?: Selection,
   away?: LineupAvailability,
+  adjustStats?: (player: Player) => PlayerStats,
 ): TeamSheet {
   const fit = players.filter((p) => isSelectable(p, away));
   if (fit.length === 0) throw new Error('no fit players');
@@ -122,11 +123,12 @@ export function teamSheetFromSquad(
     const p = take(selection.starters[slot]?.id);
     return p ? [{ ...p, position, stats: statsAt(p, position) }] : [];
   }) : [];
-  const best = picked.length > 0 ? picked : ranked.slice(0, ON_FIELD);
+  const boost = (player: Player): Player => adjustStats ? { ...player, stats: adjustStats(player) } : player;
+  const best = (picked.length > 0 ? picked : ranked.slice(0, ON_FIELD)).map(boost);
   // The next best fit players make the interchange bench (the live sim rotates them on).
-  const bench = selection && picked.length > 0
+  const bench = (selection && picked.length > 0
     ? selection.bench.flatMap((p) => take(p.id) ?? []).slice(0, BENCH.size)
-    : ranked.slice(ON_FIELD, ON_FIELD + BENCH.size);
+    : ranked.slice(ON_FIELD, ON_FIELD + BENCH.size)).map(boost);
 
   const attackRaw = mean(best.map((p) => (p.stats.speed + p.stats.handling + p.stats.footyIQ) / 3));
   const defenseRaw = mean(best.map((p) => (p.stats.strength + p.stats.stamina) / 2));

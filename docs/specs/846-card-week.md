@@ -126,7 +126,8 @@ style. Passes, discards and rerolls never move a player.
 
 Recruit upgrades raise the signature trait from its current level, including
 traits the player already had. Once that trait reaches III, a further card
-upgrade adds up to two rating points per level.
+upgrade adds up to two rating points per level. A waiting upgrade can only
+apply to the recruit it names while he is still at the club.
 
 Marquee gamble costs one patience point each time it is played or applied to
 an active card. A duplicate merges in the hand or upgrades its active effect.
@@ -144,3 +145,28 @@ owned play is kept and no individual one receives a card upgrade on migration.
 When a former card recruit rejoins through a win reward, he keeps one card
 marker. Affected v38 saves recover the single marker and preserve the original
 save in recovery.
+
+
+## Strikes and Decrees
+
+A League loss by 24 or more, or every third consecutive League loss, earns
+one strike. A strike costs one board patience point down to a minimum of one.
+A win or recorded draw breaks the run. A tied final counts by its tiebreak
+winner. A heavy third loss counts once. Cards and the board chip show this
+season's strike count. The week summary gives the
+reason or says the strike was absorbed.
+
+After the club's fifth completed League match, including forfeits, the next
+pick offers three of six Decrees. Adopting one applies it immediately for the rest of the season.
+Passing gives up the Decree for that season. A waiting Decree survives match
+pick expiry and expires at season close.
+
+Match-sheet bonuses share an eight-point budget per player. Level II and III
+plays reserve one and two points respectively. Width uses three points of
+that budget when the lineup takes a width play. Tight ship credits five per
+cent of the quoted weekly squad and staff wages to the wages line.
+
+Save v39 identifies fee-waived appointments so a paid replacement cannot
+inherit a card level or discount. It links a Level I v38 hire when exactly one
+serving staff member matches the recorded name, role, speciality and hire
+season. Level II and III hires also need the matching discounted wage.

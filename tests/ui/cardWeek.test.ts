@@ -13,6 +13,7 @@ import { getState, loadState, setState, type GameState } from '../../src/core/st
 import { __setLabs } from '../../src/labs/flags';
 import { prepareLeagueCareer } from '../../src/systems/leagueCareerSetup';
 import { acceptLeagueEntry, previewLeagueEntry } from '../../src/systems/leagueEntry';
+import { releasedState } from '../../src/systems/freeagency';
 import { registerFixturesSystem } from '../../src/systems/fixtures';
 import { registerPlayerMatchSystem } from '../../src/systems/matchday';
 import { confirmPlayerSale, quotePlayerSale } from '../../src/systems/playerTransfers';
@@ -20,7 +21,7 @@ import { makeRng } from '../../src/utils/rng';
 import { cardOfferView, cardWeekTick, chooseCard, plantCard, playChosenCard, registerCardWeekSystem, rerollPick } from '../../src/systems/cardWeek';
 import { closeModal, closeScreen, dialogOpen, el, openModal } from '../../src/ui/dom';
 import { cardChipCount, initCardWeekPick, lastMatchView, openCardPick, picksWaitingText, replacesLine, tierLabel, traitTargetRows } from '../../src/ui/cardWeek';
-import { openCardsScreen } from '../../src/ui/screens/cards';
+import { activeLines, openCardsScreen } from '../../src/ui/screens/cards';
 import { openWeekSummary, weekSnapshot, weekSummary } from '../../src/ui/weekSummary';
 import { createHud } from '../../src/ui/hud';
 import { showTitleFlow } from '../../src/ui/title';
@@ -234,6 +235,38 @@ describe('Cards and new grants', () => {
     expect(getState().cardWeek!.hand[4]).toMatchObject({ cardId: 'cashInjection', level: 2 });
   });
 
+  it('shows a departed recruit’s refusal with a full hand and lets the player pass', async () => {
+    const base = await prepareLeagueCareer({ clubName: 'Card FC', seed: 37, cardWeek: true });
+    loadState(plant({ ...base, money: 1_000_000 }, 'propSigning'));
+    expect(playChosenCard('pick', 0).ok).toBe(true);
+    const recruitId = getState().cardWeek!.cardPlayers[0]!;
+    for (const id of ['analyst', 'assistantCoach', 'lastLine', 'playmaker', 'finisher']) {
+      loadState(plant(getState(), id));
+      expect(chooseCard(0).ok).toBe(true);
+    }
+    const waiting = plant(getState(), 'propSigning');
+    const released = releasedState(waiting, recruitId);
+    if (!('state' in released)) throw new Error(released.message);
+    loadState(released.state);
+    const hand = getState().cardWeek!.hand;
+    openCardPick();
+    const take = pick().querySelector('[data-card-choice="0"]')!;
+    const play = pick().querySelector('[data-card-play-now="0"]')!;
+    expect(take.disabled).toBe(true);
+    expect(play.disabled).toBe(true);
+    expect(play.parentNode!.parentNode!.words()).toContain(`${released.released.name} is no longer at the club`);
+    expect(pick().words()).toContain('Hand full. Play or discard a card first.');
+    expect(pick().querySelector('[data-card-make-room]')!.disabled).toBe(false);
+
+    const pass = pick().querySelector('[data-card-pass]')!;
+    expect(pass.disabled).toBe(false);
+    pass.click();
+    pick().querySelector('[data-card-pass-confirm]')!.click();
+    expect(getState().cardWeek!.offers).toEqual([]);
+    expect(getState().cardWeek!.hand).toEqual(hand);
+    expect(dialogOpen()).toBe(false);
+  });
+
   it('opens actual new League picks through every entry point, even with three starters and a full match queue', async () => {
     const s = await fresh();
     const league = s.competitions!.instances.find(i => i.definition.format.kind === 'league' && i.entrantIds.includes(s.clubId))!;
@@ -265,12 +298,17 @@ describe('Cards and new grants', () => {
       const cw = getState().cardWeek!;
       const newest = cw.offers[cw.offers.length - 1]!;
       expect(cw).toMatchObject({ starterLeft: 3, owed: Math.min(3, i + 1), grants: i + 4 });
-      expect(newest).toMatchObject({ kind: 'match', grant: i + 4, week: fixture.slot });
+      expect(newest).toMatchObject({ kind: i === 4 ? 'decree' : 'match', grant: i + 4, week: fixture.slot });
       const assertShown = () => {
         expect(pick().getAttribute('data-card-grant')).toBe(String(newest.grant));
         const choices = pick().querySelectorAll('[data-card-choice]');
         expect(choices.map(c => c.getAttribute('data-card-id'))).toEqual(newest.cards.map(c => c.cardId));
         expect(choices.some(c => !c.disabled)).toBe(true);
+        if (i === 4) {
+          expect(pick().words()).toContain('Decree pick');
+          expect(pick().querySelector('[data-card-reroll]')).toBeNull();
+          expect(pick().querySelector('[data-card-play-now]')).toBeNull();
+        }
       };
 
       vi.advanceTimersByTime(400);
@@ -405,7 +443,7 @@ describe('continuing after a former recruit returns', () => {
     expect(await continueFromSlot()).toMatchObject({ outcome: 'valid', repairs: [] });
 
     // Recreate the metadata written by the earlier v38 build and keep its bytes in recovery.
-    const duplicate = JSON.stringify({ ...saved, cardWeek: { ...saved.cardWeek!, cardPlayers: [id, id] } });
+    const duplicate = JSON.stringify({ ...saved, version: 38, cardWeek: { ...saved.cardWeek!, cardPlayers: [id, id] } });
     storage.setItem(slotKey(1), duplicate);
     expect(await continueFromSlot()).toMatchObject({ outcome: 'repaired', repairs: [{ field: 'cardWeek.cardPlayers' }] });
     expect(storage.getItem(slotKey(1))).toBe(duplicate);
@@ -413,6 +451,68 @@ describe('continuing after a former recruit returns', () => {
     expect(saveIfChanged(getState())).toBe(true);
     expect(await continueFromSlot()).toMatchObject({ outcome: 'valid', repairs: [] });
   }, 30000);
+});
+
+describe('active card and strike displays', () => {
+  it('shows the newest recruit record and source for the same player', async () => {
+    const s = await fresh();
+    const player = s.squad.find(p => p.position === 'hooker')!;
+    const rival = s.league.clubs.find(c => c.id !== s.clubId)!;
+    s.cardWeek!.cardPlayers = [player.id];
+    s.cardWeek!.active = [{ kind: 'player', cardId: 'hookerSigning', level: 1, playerId: player.id }];
+    expect(activeLines(s)[0]).toMatch(/Joined from a card.*Level I/);
+    s.cardWeek!.active.push({ kind: 'player', cardId: `steal-player:hooker:${player.id}`, level: 2,
+      playerId: player.id, fromClubId: rival.id });
+    const [line] = activeLines(s);
+    expect(line).toContain(`From ${rival.name}`);
+    expect(line).toContain('Level II');
+    expect(line).not.toContain('Joined from a card');
+  });
+
+  it('keeps the board objective detail and only appends a positive strike count', async () => {
+    const base = await fresh();
+    loadState({ ...base, money: 12_000, objectives: [
+      { id: 'cash', kind: 'solvent', target: 20_000, status: 'pending', text: 'Finish with $20,000' },
+    ] });
+    const hud = createHud({ onBoard: () => {}, runwayWeeks: () => 2 });
+    const board = body().querySelector('[data-hud="board"]')!;
+    const detail = board.querySelector('.nrl-decisions-chip-top')!;
+    expect(board.hidden).toBe(false);
+    expect(detail.textContent).toBe('You have $12k');
+    expect(board.getAttribute('aria-label')).not.toContain('strikes');
+
+    setState({ cardWeek: { ...base.cardWeek!, strikes: { season: base.season, count: 1, lossRun: 0,
+      log: [{ week: 1, reason: 'margin', margin: 24 }],
+    } } });
+    expect(detail.textContent).toBe('You have $12k · 1 strike');
+    expect(board.getAttribute('aria-label')).toContain('You have $12k. 1 strike');
+    hud.destroy();
+  });
+
+  it('shows strikes in words on Cards, the HUD board chip and the week summary', async () => {
+    const before = await fresh();
+    const after: GameState = { ...before, week: 4, boardPatience: 1, cardWeek: {
+      ...before.cardWeek!, strikes: { season: 1, count: 3, lossRun: 0, log: [
+        { week: 1, reason: 'margin', margin: 26 }, { week: 2, reason: 'run' }, { week: 3, reason: 'margin', margin: 30, absorbed: true },
+      ] },
+    } };
+    loadState(after);
+    const hud = createHud({ onBoard: () => {} });
+    expect(body().querySelector('[data-hud="board"]')!.words()).toContain('3 strikes');
+    expect(body().querySelector('[data-hud="board"]')!.getAttribute('aria-label')).toContain('patience 1/');
+    hud.destroy();
+    openCardsScreen();
+    const section = body().querySelector('[data-card-strikes]')!;
+    expect(section.words()).toContain('Strikes this season');
+    expect(section.words()).toContain('3 strikes');
+    expect(section.words()).toContain('Strike: lost by 30');
+    expect(section.words()).toContain('Strike absorbed');
+    closeScreen();
+    const summary = weekSummary(weekSnapshot(before), weekSnapshot(after));
+    expect(summary.strikes).toEqual(['Strike: lost by 26', 'Strike: third loss in a row', 'Strike absorbed']);
+    openWeekSummary(summary, { onAdvance: () => {} });
+    expect(body().querySelector('[data-week-summary]')!.words()).toContain('Strike absorbed');
+  });
 });
 
 describe('the title option', () => {

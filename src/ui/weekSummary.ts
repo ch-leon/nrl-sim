@@ -1,3 +1,4 @@
+import { strikeText } from '../systems/cardWeek';
 // src/ui/weekSummary.ts — the weekly summary card (#368): what changed since the
 // last card (the training gains, who got hurt or banned and who is back, the
 // money in and out by line, and the board's mood), shown once the club is back
@@ -15,7 +16,7 @@ import { coachLine, summaryRemark } from './coachVoice';
 import { coachSays, type CoachSuggestion } from './coachSays';
 import { pendingDecisionCount } from './decisions';
 import { bus } from '../core/events';
-import { getState, FINANCE_LINES, type FinanceLine, type GameState, type PlayerStats } from '../core/state';
+import { getState, FINANCE_LINES, type CardWeekState, type FinanceLine, type GameState, type PlayerStats } from '../core/state';
 import { advanceInProgress } from '../core/advance';
 import { weekHeld } from '../core/time';
 import { BOARD, WEEKS_PER_SEASON } from '../config';
@@ -40,6 +41,7 @@ const STAT_WORD: Readonly<Record<keyof PlayerStats, string>> = {
 /** What the card compares: the club as it stood at one moment. Plain data, kept in memory only. */
 export interface WeekSnapshot {
   cardGrants?: number;
+  strikes?: CardWeekState['strikes'];
   season: number;
   week: number;
   preseason?: GameState['preseason'];
@@ -56,7 +58,7 @@ export interface WeekSnapshot {
 export function weekSnapshot(s: GameState, runwayWeeks: number | null = null): WeekSnapshot {
   const chip = boardChip(s, runwayWeeks);
   return {
-    ...(s.cardWeek ? { cardGrants: s.cardWeek.grants } : {}),
+    ...(s.cardWeek ? { cardGrants: s.cardWeek.grants, strikes: s.cardWeek.strikes } : {}),
     season: s.season,
     week: s.week,
     ...(s.competitions?.leagueCareer ? { elapsedIntervals: s.competitions.calendar!.elapsedIntervals } : {}),
@@ -78,6 +80,7 @@ export type BoardMood = 'happy' | 'watching' | 'worried';
 
 export interface WeekSummary {
   newCardPicks?: number;
+  strikes?: string[];
   /** Advances the card covers: 1 for a week, more for a ▾ run. */
   weeks: number;
   title: string;
@@ -152,7 +155,8 @@ export function weekSummary(before: WeekSnapshot, after: WeekSnapshot): WeekSumm
     for (const l of FINANCE_LINES) totals[l] += f.lines[l] - (old?.[l] ?? 0);
   }
   const money = FINANCE_LINES
-    .map((line) => ({ line, label: FINANCE_LINE_LABELS[line], amount: Math.round(totals[line]) }))
+    .map((line) => ({ line, label: line === 'wages' && after.cardGrants !== undefined && totals.wages > 0 ? 'Wage saving' : FINANCE_LINE_LABELS[line],
+      amount: Math.round(totals[line]) }))
     .filter((m) => m.amount !== 0)
     .sort((a, b) => Number(b.amount > 0) - Number(a.amount > 0) || Math.abs(b.amount) - Math.abs(a.amount));
   const moneyIn = money.reduce((n, m) => n + Math.max(0, m.amount), 0);
@@ -164,7 +168,9 @@ export function weekSummary(before: WeekSnapshot, after: WeekSnapshot): WeekSumm
     : `patience ${before.boardPatience} → ${after.boardPatience}/${BOARD.MAX_PATIENCE}`;
   const why = after.board ? `${after.board.text} (${RISK_WORD[after.board.risk].toLowerCase()})` : 'every objective on track';
   const newCardPicks = (after.cardGrants ?? 0) - (before.cardGrants ?? 0);
+  const strikes = after.strikes?.log.slice(before.strikes?.season === after.strikes.season ? before.strikes.count : 0).map(strike => strikeText(strike)) ?? [];
   return {
+    ...(strikes.length ? { strikes } : {}),
     ...(newCardPicks > 0 ? { newCardPicks } : {}),
     weeks,
     title,
@@ -262,6 +268,7 @@ export function openWeekSummary(v: WeekSummary, opts: { onAdvance: () => void; c
   const board = el('div', { class: `nrl-summary-sec nrl-summary-board nrl-summary-${v.board.mood}`, attrs: { 'data-mood': v.board.mood } },
     el('h3', {}, 'Board', infoPill(MOOD_TONE[v.board.mood], el('span', { class: 'nrl-summary-mood', text: MOOD_WORD[v.board.mood] }))),
     el('p', { text: why }),
+    ...(v.strikes ?? []).map(text => el('p', { text })),
     ...(patience ? [el('p', { class: 'nrl-summary-patience', text: patience })] : []));
 
   const advance = button('Play week ▸', () => { closeModal(); opts.onAdvance(); }, { class: 'nrl-summary-advance nrl-btn-primary' });

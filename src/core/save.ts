@@ -192,6 +192,30 @@ function migrateCardLevels(old: RawState): RawState {
   return { ...old, cardWeek: { ...cw, active: [...cw.active, ...added] } };
 }
 
+function migrateCardHires(old: RawState): RawState {
+  if (!Array.isArray(old.staff) || !old.cardWeek || typeof old.cardWeek !== 'object') return old;
+  const state = old as unknown as GameState;
+  const cw = state.cardWeek!;
+  if (!Array.isArray(cw.cardPlayers) || !isCardWeek({ ...cw, cardPlayers: [...new Set(cw.cardPlayers)] })) return old;
+  const staff = [...state.staff];
+  const active = cw.active.map((card): ActiveCard => {
+    if (card.kind !== 'staff') return card;
+    const { member } = card;
+    const wage = Math.round(member.wage * CARD_WEEK.STAFF_WAGE_FACTOR[card.level]);
+    // Level I waived the fee only. For higher levels the saved discount
+    // distinguishes the card hire from a full-wage paid replacement.
+    const matches = staff.flatMap((m, index) => m.role === member.role && m.speciality === member.speciality
+      && m.name === member.name && m.hiredSeason === member.hiredSeason
+      && (card.level === 1 || (wage < member.wage && m.wage === wage)) ? [index] : []);
+    if (matches.length !== 1) return card;
+    const index = matches[0]!;
+    const cardHireId = `legacy-card-hire:${card.cardId}`;
+    staff[index] = { ...staff[index]!, cardHireId };
+    return { ...card, member: { ...member, cardHireId } };
+  });
+  return { ...old, staff, cardWeek: { ...cw, active } };
+}
+
 export const MIGRATIONS: readonly MigrationStep[] = [
   // v1 → v2: storage moved to save slots; the state shape itself is unchanged.
   { from: 1, to: 2, run: (old) => ({ ...old }) },
@@ -414,6 +438,7 @@ export const MIGRATIONS: readonly MigrationStep[] = [
   { from: 35, to: 36, run: old => old },
   { from: 36, to: 37, run: migrateCardWeek },
   { from: 37, to: 38, run: migrateCardLevels },
+  { from: 38, to: 39, run: migrateCardHires },
   // v32 snapshots the agreement observed under v31 ID-only protection.
   // Already recorded exact terms keep their provenance, including queued terms.
   { from: 31, to: 32, run: old => {
