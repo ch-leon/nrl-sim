@@ -1973,6 +1973,8 @@ export function injectOverlayStyles(): void {
 // pitch, inset 16 from the edges; Barlow for labels, Plex Mono for every number.
 export const OVERLAY_CSS = `
 .nrl-match-overlay { font-family: var(--nrl-f-body); color: var(--nrl-text); }
+/* Nothing over the field is text to copy: a long press (to hold Skip, say) must not raise iOS's selection handles or callout. */
+.nrl-match-overlay { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 /* Match mode (live AND full time, until Back to Club): the dock steps aside. */
 body.nrl-match-active .nrl-dock-wrap { display: none; }
 .nrl-mo-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

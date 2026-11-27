@@ -78,7 +78,7 @@ import { argv, SIZES, log, startServer, stopServer } from './e2e-webkit/common.m
 import { runSize } from './e2e-webkit/portrait/size.mjs';
 import { runPortrait } from './e2e-webkit/portrait/portrait.mjs';
 import { runPauseSettings } from './e2e-webkit/match/pauseSettings.mjs';
-import { runRecruit } from './e2e-webkit/screens/recruit.mjs';
+import { runRecruit, runRecruitTutorial } from './e2e-webkit/screens/recruit.mjs';
 import { SCREEN_RUNS, runScreens } from './e2e-webkit/screens/screens.mjs';
 import { WALK_RUNS, runTutorialWalk } from './e2e-webkit/match/tutorialWalk.mjs';
 import { runDockTextSize } from './e2e-webkit/portrait/dockTextSize.mjs';
@@ -123,6 +123,7 @@ const SECTIONS = [
   ['runPauseSettings', (b) => runPauseSettings(b)],
   ['runTutorialWalk', async (b) => { let f = 0; for (const run of WALK_RUNS) f += await runTutorialWalk(b, run); return f; }],
   ['runRecruit', (b) => runRecruit(b)],
+  ['runRecruitTutorial', (b) => runRecruitTutorial(b)],
   ['runScreens', async (b) => { let f = 0; for (const run of SCREEN_RUNS) f += await runScreens(b, run); return f; }],
   ['runDockTextSize', (b) => runDockTextSize(b)],
   ['runContentPacks', (b) => runContentPacks(b)],
@@ -148,7 +149,7 @@ const SECTIONS = [
 const GROUPS = {
   match: ['runPlaytest', 'runPauseSettings', 'runTutorialWalk', 'runCoachCalls', 'runLabsControls', 'runMatchPlays'],
   text: ['runCounterText', 'runLargeTextTargets', 'runLadderForm'],
-  screens: ['runCardWeek', 'runLeagueSelection', 'runOpenCupEntry', 'runPlayerAssignments', 'runIndividualChallenges', 'runEventOpportunities', 'runPlayerSales', 'runContentPacks', 'runTrials', 'runExpansionIntro', 'runDerby', 'runOfficeUnlocks', 'runUnlocks', 'runRecruit', 'runScreens', 'runTownSetup', 'runFlow', 'runCoachName', 'runDifficulty', 'runCoachVoice', 'runCoachSays', 'runPlaybook'],
+  screens: ['runCardWeek', 'runLeagueSelection', 'runOpenCupEntry', 'runPlayerAssignments', 'runIndividualChallenges', 'runEventOpportunities', 'runPlayerSales', 'runContentPacks', 'runTrials', 'runExpansionIntro', 'runDerby', 'runOfficeUnlocks', 'runUnlocks', 'runRecruit', 'runRecruitTutorial', 'runScreens', 'runTownSetup', 'runFlow', 'runCoachName', 'runDifficulty', 'runCoachVoice', 'runCoachSays', 'runPlaybook'],
   portrait: ['runSize', 'runPortrait', 'runDockTextSize', 'runDevSettings'],
 };
 

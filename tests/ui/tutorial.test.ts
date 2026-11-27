@@ -21,6 +21,8 @@ import {
   TUTORIAL_END_TEXT,
   overlapArea,
   pickDock,
+  visiblePart,
+  RING_PAD,
   onSheetIn,
   type Box,
   type TutorialStep,
@@ -73,7 +75,7 @@ describe('STEPS: three guided taps (#370)', () => {
   it('names the paddock as the catalog does, and says what each tap does', () => {
     expect(byId.get('build')!.text).toBe(`Coach, tap ${FACILITY_CATALOG.trainingPaddock.name} to build one.`);
     expect(byId.get('place')!.text).toBe('Pick a green spot, then Build here.');
-    expect(byId.get('recruit')!.text).toMatch(/Sign on the best player you can afford/);
+    expect(byId.get('recruit')!.text).toBe('Sign a player you can afford, and leave enough for the bills.');
     expect(byId.get('advance')!.text).toMatch(/Play Week/);
   });
 
@@ -81,8 +83,9 @@ describe('STEPS: three guided taps (#370)', () => {
     expect(byId.get('build')!.opens).toBe('build');
     expect(byId.get('recruit')!.opens).toBe('recruit');
     expect(byId.get('build')!.anchor!.split(',')[0]).toContain('[data-screen-key="build"] [data-facility="trainingPaddock"]');
-    // The first enabled SIGN under the default rating sort: the best player the club can afford.
-    expect(byId.get('recruit')!.anchor!.split(',')[0]).toContain('[data-screen-key="recruit"] .nrl-row:has(.nrl-row-action:not(:disabled))');
+    // Who to sign is a choice: the whole list is rung, not one row; a player's page over it, whole, in its place.
+    const choices = byId.get('recruit')!.anchor!.split(',').map((c) => c.trim());
+    expect(choices.slice(0, 2)).toEqual(['[data-screen-key="recruit"] .nrl-screen-body', '.nrl-player-modal.nrl-player-free']);
     expect(byId.get('advance')!.anchor).toBe('.nrl-hud-actions .nrl-btn');
     // The placement step frames the bar on the grass and moves on once the bar is up.
     expect(byId.get('build')!.until).toBe('.nrl-placebar:not([hidden])');
@@ -299,6 +302,32 @@ describe('pickDock: clear of the anchor and the Undo toast (#337 U2, #412)', () 
   });
 });
 
+// The run's end is saved at once (the week's autosave ran before its last tap ended it).
+const saved = vi.hoisted(() => ({ states: [] as { settings: { tutorialDone: boolean } }[] }));
+vi.mock('../../src/core/save', async (original) => ({
+  ...await original<typeof import('../../src/core/save')>(),
+  save: (state: { settings: { tutorialDone: boolean } }) => { saved.states.push(state); },
+}));
+
+describe('visiblePart: the ring keeps to what is in sight', () => {
+  const box = (left: number, top: number, right: number, bottom: number): Box => ({ left, top, right, bottom });
+  const list = box(20, 70, 850, 330); // a scrolling list on an 874×402 screen
+  const screen = box(0, 0, 874, 402);
+  it('a row wholly in the list is wholly ringed', () => {
+    expect(visiblePart(box(26, 120, 840, 160), [list, screen])).toEqual(box(26, 120, 840, 160));
+  });
+  it('a row half scrolled under the list top is ringed from the top edge down', () => {
+    expect(visiblePart(box(26, 50, 840, 90), [list, screen])).toEqual(box(26, 70, 840, 90));
+  });
+  it('a row scrolled out of the list has no ring', () => {
+    expect(visiblePart(box(26, 20, 840, 60), [list, screen])).toBeNull();
+    expect(visiblePart(box(26, 330, 840, 370), [list, screen])).toBeNull();
+  });
+  it('the ring sits inside the 6px gap between build cards', () => {
+    expect(RING_PAD * 2).toBeLessThanOrEqual(6);
+  });
+});
+
 const screenListener = vi.hoisted(() => ({ fn: null as null | ((key: string | null) => void) }));
 vi.mock('../../src/ui/dom', async (original) => ({
   ...await original<typeof import('../../src/ui/dom')>(),
@@ -330,6 +359,23 @@ it('bubbles and first-visit hints contain the shared coach block (#476)', async 
     expect(root.textContent).toContain(HINTS.lineup);
     expect(root.textContent).toContain(COACH_NAME);
   } finally { endTutorial(); off(); vi.unstubAllGlobals(); }
+});
+
+it('a run that ends saves tutorialDone straight away, so a killed app does not replay it', async () => {
+  const { coachDocument } = await import('./coachDom');
+  createNewGame('Test Club', 1);
+  coachDocument();
+  saved.states.length = 0;
+  try {
+    startTutorial();
+    expect(isTutorialActive()).toBe(true);
+    endTutorial(true);
+    expect(saved.states[saved.states.length - 1]?.settings.tutorialDone).toBe(true);
+    // Ending again (nothing active) writes nothing more.
+    const n = saved.states.length;
+    endTutorial();
+    expect(saved.states).toHaveLength(n);
+  } finally { endTutorial(); vi.unstubAllGlobals(); }
 });
 
 // #611: the ring is measured as the step's sheet mounts, 12px low while the sheet rises;

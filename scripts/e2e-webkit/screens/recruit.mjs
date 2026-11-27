@@ -2,7 +2,100 @@
 // Screenshots stay in CI's e2e-webkit-screens artifact.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { confirmStartingLeague, BASE, OUT_ROOT, IPHONE_UA, openNav, SHEET_EXIT, setupStep } from '../common.mjs';
+import { confirmStartingLeague, BASE, OUT_ROOT, IPHONE_UA, openNav, reachProblems, SHEET_EXIT, setupStep } from '../common.mjs';
+
+export async function runRecruitTutorial(browser) {
+  let failures = 0;
+  for (const [width, height] of [[844, 390], [667, 375], [390, 844]]) {
+    for (const cardWeek of [false, true]) {
+      const tag = `${width}x${height}, card week ${cardWeek ? 'on' : 'off'}`;
+      // The game shows a rotate card on coarse-pointer portrait devices. Check the playable portrait layout.
+      const phone = width > height;
+      const ctx = await browser.newContext({ viewport: { width, height }, hasTouch: phone, isMobile: phone, deviceScaleFactor: 2, userAgent: IPHONE_UA });
+      await ctx.addInitScript((enabled) => {
+        localStorage.setItem('nrlsim.iosInstallHintShown', '1');
+        if (enabled) localStorage.setItem('nrl-sim-labs', JSON.stringify({ visible: true, on: { 'card-week': true }, hintsSeen: [] }));
+      }, cardWeek);
+      const page = await ctx.newPage();
+      page.setDefaultTimeout(10000);
+      const press = (selector) => page.locator(selector).click();
+      try {
+        await page.goto(BASE);
+        await setupStep(page);
+        if (cardWeek) await page.locator('[data-nrl-card-week]').check();
+        await press('[data-nrl-start]');
+        await confirmStartingLeague(page, press);
+        await press('[data-expansion-work]');
+        await press('[data-screen-key="build"] [data-facility="trainingPaddock"]');
+        await press('.nrl-placebar [data-place-go]');
+
+        const bubble = '.nrl-tutorial-bubble[data-step="recruit"]';
+        const list = '[data-screen-key="recruit"] .nrl-screen-body';
+        const toast = page.locator('.nrl-toast-action');
+        await toast.waitFor({ state: 'visible' });
+        await page.locator(bubble).waitFor({ state: 'attached' });
+        await page.locator(list).waitFor();
+        if (cardWeek) await page.locator('[data-card-chip] .nrl-card-chip-pick').waitFor();
+        await toast.waitFor({ state: 'detached' }); // Let the build Undo expire naturally.
+
+        const problems = await reachProblems(page, bubble, [
+          '[data-screen-key="recruit"] [data-seg="squad"]',
+          `${bubble} .nrl-tutorial-skip`,
+        ]);
+        if (await page.locator(`${bubble}:is(.nrl-tutorial-top, .nrl-tutorial-right, [data-aside])`).count()) {
+          problems.push('Recruit bubble did not return to its bottom dock after Undo expired');
+        }
+        if (problems.length) throw new Error(problems.join('; '));
+
+        const freeAgentPage = '.nrl-player-modal.nrl-player-free';
+        const player = page.locator(freeAgentPage);
+        const recruit = page.locator(`${list} [data-row-player]`).filter({ has: page.locator('.nrl-row-action:enabled') }).first();
+        await recruit.locator('.nrl-row-name').click();
+        await player.waitFor();
+        const deal = player.locator('[data-player-tab="deal"]');
+        const sign = '[data-player-action="sign"]';
+        const pressDeal = async (part) => {
+          const { x, y, blockedBy } = await deal.evaluate((el, part) => {
+            const r = el.getBoundingClientRect();
+            const x = r.left + r.width / 2;
+            const y = r.top + (part === 'upper part' ? 4 : r.height / 2);
+            const hit = document.elementFromPoint(x, y);
+            return { x, y, blockedBy: el.contains(hit) ? null : hit?.className || hit?.tagName || 'outside the viewport' };
+          }, part);
+          if (blockedBy) throw new Error(`Deal ${part} press hits ${blockedBy}`);
+          if (phone) await page.touchscreen.tap(x, y);
+          else await page.mouse.click(x, y);
+          await player.locator('[data-player-panel="deal"]').waitFor();
+          await player.locator(`${sign}:enabled`).waitFor();
+          const signProblems = await reachProblems(page, freeAgentPage, [`${freeAgentPage} ${sign}`]);
+          if (signProblems.length) throw new Error(signProblems.join('; '));
+          if (await page.evaluate(() => window.__nrlState().settings.tutorialDone)) {
+            throw new Error(`Deal ${part} press skipped the tutorial`);
+          }
+        };
+        await pressDeal('centre');
+        // Check the upper tap after the ring has moved from the list to the player page.
+        await page.waitForFunction((selector) => {
+          const modal = document.querySelector(selector)?.getBoundingClientRect();
+          const ring = document.querySelector('.nrl-tutorial-cutout')?.getBoundingClientRect();
+          return modal && ring && ring.top <= modal.top && modal.top - ring.top <= 6;
+        }, freeAgentPage);
+        await player.locator('[data-player-tab="stats"]').click();
+        await pressDeal('upper part');
+        await player.locator('.nrl-back').click();
+        await player.waitFor({ state: 'detached' });
+        await page.locator(`${bubble} .nrl-tutorial-skip`).waitFor();
+        console.log(`ok recruit tutorial ${tag}`);
+      } catch (err) {
+        failures++;
+        console.log(`FAIL recruit tutorial ${tag} — ${err.message}`);
+      } finally {
+        await ctx.close();
+      }
+    }
+  }
+  return failures;
+}
 
 export async function runRecruit(browser) {
   let failures = 0;
