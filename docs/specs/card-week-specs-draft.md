@@ -56,6 +56,11 @@ Le has set the direction: cards run most of the career week, tested first behind
 | D17 | Three tiers: Common, Rare and Gold (#851), replacing grey and gold | Le | 27 Nov |
 | D18 | Everything carries into the next season: hand, card levels, waiting picks and fatigue. Only the Decree expires and strikes reset, as today | Le | 27 Nov |
 | D19 | For the first testing round, the cards in a pick are drawn by chance as today, with no guaranteed mix of families. Revisit after the playtest | Le | 27 Nov |
+| D20 | The facilities rework (one plain benefit per facility) is done first, as its own piece, before the stadium | Le | 27 Nov |
+| D21 | Plots sit in a ring around the stadium; each touches the plot on either side | Le | 27 Nov |
+| D22 | A new card-week career starts holding two blueprints; the rest come by chance | Le | 27 Nov |
+| D23 | Stadium upgrades cost 5×, 10× and 20× the league's match base ($40,000, $80,000 and $160,000 in Local) | Le | 27 Nov |
+| D24 | Staff handing you cards ships straight after Slice 1a as its own piece (#862), welfare manager and attack coach first | Le | 27 Nov |
 
 **Still open:** whether matchday cards are free; gear's exact job. D10 to D14 settle Slice 1b's design, but 1b is not filed as issues until #858 has reported.
 
@@ -186,14 +191,14 @@ The club ground becomes a stadium ringed by a fixed number of plots. A blueprint
 
 **Changes (card-week careers only)**
 
-1. **Plots replace free build (D4).** Proposal: stadium level 1 has 4 plots, level 2 has 6, level 3 has 9. With 11 facilities left to place, a club can never build everything; that is the intent.
-2. **The Grandstand becomes the stadium.** It sits in the middle and takes no plot. Upgrading it opens plots as well as growing the crowd. Upgrades cost cash and get noticeably dearer each level.
-3. **Blueprints replace the season-one unlock ladder.** A facility can't be built until you have played its blueprint card. Then you pay today's build cost.
+1. **Plots replace free build (D4).** Plots sit in a ring around the stadium, and each touches the plot on either side (D21). Proposal: stadium level 1 has 4 plots, level 2 has 6, level 3 has 9. With 11 facilities left to place, a club can never build everything; that is the intent.
+2. **The Grandstand becomes the stadium.** It sits in the middle and takes no plot. Upgrading it opens plots as well as growing the crowd. Upgrades cost 5×, 10× and 20× the league's match base (D23): $40,000, $80,000 and $160,000 in Local. The cap upgrade already uses the same multiples.
+3. **Blueprints replace the season-one unlock ladder.** A facility can't be built until you have played its blueprint card. Then you pay today's build cost. A new career starts holding two blueprints (D22), so round 1 has something to build; which two is open.
 4. **Duplicate blueprints** make that facility's next level cheaper. Proposal: 25% off.
 5. **Neighbour bonuses (new).** Start with three named pairs, shown as a line between plots: Physio Centre beside Medical Bay (faster recovery), Canteen beside Sponsor Board (more match-day income), Weights Room beside Team Gym (bigger strength gains).
 6. **Upkeep stays** as today.
 
-**Fits with the facilities rework.** Le's current focus is making facility benefits clear. Every facility needs one visible, plain benefit before it goes on a plot, so do that rework first or alongside this spec, not after.
+**After the facilities rework (D20).** Le's current focus is making facility benefits clear. Every facility gets one visible, plain benefit first, as its own piece of work with its own spec. The stadium is built after that, not alongside it.
 
 **Done when**
 
@@ -203,7 +208,7 @@ The club ground becomes a stadium ringed by a fixed number of plots. A blueprint
 - [ ] Each neighbour pair shows its link and its bonus in numbers when both are built side by side.
 - [ ] Existing non-card careers keep free build exactly as today.
 
-**Open:** plot counts per stadium level; whether a facility can be moved or demolished; which other facility pairs make good neighbours.
+**Open:** plot counts per stadium level; which two blueprints a career starts with (fixed, or the player's choice); whether a facility can be moved or demolished; which other facility pairs make good neighbours.
 
 ## Spec 5: Weekly fatigue and the event dilemma
 
@@ -268,7 +273,7 @@ Keep staff, but give each one a job you can see: every few weeks they add a card
 **Changes (card-week careers only)**
 
 1. **Each role feeds one family.** Proposal: assistant coach adds a Training card, welfare manager a Recovery card, analyst a one-match Booster, attack coach a Set play from his speciality.
-2. **Built in two steps (changed in revision 2).** Recovery cards and set plays exist by Slice 2, so the welfare manager and attack coach start then. Training and Booster cards arrive in Slice 3, and the assistant coach and analyst start with them.
+2. **Built in two steps.** The welfare manager and attack coach ship straight after Slice 1a as their own piece (D24, #862), because recovery cards and set plays exist by then. Training and Booster cards arrive in Slice 3, and the assistant coach and analyst start with them.
 3. **How often.** Proposal: one extra card in the offer every 3 League rounds per staff member, marked "From your Welfare Manager". It still counts as one of the cards on show, not an extra keep.
 4. **Existing staff benefits stay** as they are today, so nothing a career relies on disappears.
 5. **Staff cards still hire** with the appointment fee waived, as today.
@@ -310,20 +315,22 @@ Approved and filed. Build in this order, one PR each, because they share files a
 6. #857: Persona bots keep cards from each offer and rest tired players. Without this the balance run measures a bot that ignores the feature.
 7. #858: Balance run with Card week on and off, using the persona bots. Reports League wins, strikes a season, injuries, and how many cards reach level III.
 
+**Staff hand you cards** (Spec 6, D24): #862, built after #856. It does not wait for #857 or #858. With picks drawn by chance (D19), this is the player's one way to steer what he is dealt, so it should be in Le's playtest.
+
 **Slice 1b: the money rule** (Specs 2 and 3), after Le has played 1a
 
 1. Card faces show family and price badge.
 2. Player cards cost a flat fee by tier (D10) and stay out of free agency until played.
 3. Balance run again with prices on.
 
-**Slice 2: stadium and staff** (Specs 4 and 6), after the facilities rework
+**Slice 2: the stadium** (Spec 4), after the facilities rework (D20), which needs its own spec first
 
 1. Stadium with plots replaces free build in card-week careers.
 2. Grandstand becomes the upgradable stadium.
 3. Blueprint cards gate facilities; duplicates discount the next level.
 4. Three neighbour bonuses.
 5. Saving shelf: two slots for priced cards (D11).
-6. Welfare manager and attack coach add a card from their family every 3 rounds.
+6. Every new career starts holding two blueprints (D22).
 
 **Slice 3: more card types** (Later section): training, boosters, gear, sponsors, cap booster. Assistant coach and analyst start supplying Training and Booster cards here.
 
@@ -365,5 +372,5 @@ Still open:
 - [ ] Does training add fatigue? (Left out of 1a.)
 - [x] Card-player fee: flat by tier, grey 1× and gold 3× match base (D10). Final multiples after #858.
 - [ ] Matchday cards free (recommended)?
-- [ ] Staff deliver a card every 3 rounds?
+- [x] Staff deliver a card every 3 rounds, as a starting value (#862).
 - [ ] Stadium plot counts: 4, 6, 9?
