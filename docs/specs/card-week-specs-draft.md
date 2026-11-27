@@ -65,7 +65,7 @@ Le has set the direction: cards run most of the career week, tested first behind
 | D26 | Training cards add on top of the automatic weekly training; nothing is removed | Le | 27 Nov |
 | D27 | Gear is a trait you can move between players, one slot each. Built last in Slice 3 | Le | 27 Nov |
 | D28 | Sponsors are deal cards with a condition and a payout, one deal active at a time | Le | 27 Nov |
-| D29 | The cap booster card gives one free level of the cap upgrade the game already sells. Gold tier | Le | 27 Nov |
+| D29 | The cap booster card gives one level of the three-level cap upgrade. Gold tier. Correction, 27 Nov: the game does not sell that upgrade. Its rules exist (a level field and a price) but nothing grants a level, so this card is the first way to get one (#872) | Le | 27 Nov |
 | D30 | Weekly recovery is 20, not 30, and Physio Centre and Medical Bay add 2 each, not 5. Resolves Codex's finding on #854 that every bonus event falls in a week with no League match for that player | Claude, on Le's instruction to resolve #854 | 27 Nov |
 | D31 | Facilities by card starts small: in a card-week career a facility needs its blueprint card before it can be built (#866). The four facilities open today from the start stay open, which replaces D22. The stadium, plots, neighbour bonuses and shelf (D11, D21, D23) are parked until after it. The facilities rework (D20) no longer blocks blueprints, only the stadium | Le | 27 Nov |
 
@@ -173,7 +173,7 @@ For scale: a Normal career starts with $60,000, Local's match base is $8,000 (be
 
 **Changes**
 
-1. **Card players pay a flat fee by tier (D6, D10).** Grey costs 1× the league's match base and gold 3×: $8,000 and $24,000 in Local, $12,000 and $36,000 in Championship, $18,000 and $54,000 in Premier. The cap upgrade is already priced in match-base multiples. The Scout Office discount does not apply. Both multiples are tuning values, set finally from the #858 run.
+1. **Card players pay a flat fee by tier (D6, D10).** Common costs 1× the league's match base, Rare 2× and Gold 3×: $8,000, $16,000 and $24,000 in Local, $12,000, $24,000 and $36,000 in Championship, $18,000, $36,000 and $54,000 in Premier (#869). The Scout Office discount does not apply. Both multiples are tuning values, set finally from the #858 run.
 2. **Card players are exclusive until signed.** They never appear in the free-agent pool before the card is played. Once released, a card player joins the pool like anyone else (D12).
 3. **The quality floor stays.** A card player always beats your best natural player at his position.
 4. **Free agency is unchanged (D7):** full fee, your choice of player, available any week the Recruit screen is open. Card players sign for the rest of the season, the same as free agents (D13).
@@ -201,7 +201,7 @@ The club ground becomes a stadium ringed by a fixed number of plots. A blueprint
 **Changes (card-week careers only), parked**
 
 1. **Plots replace free build (D4).** Plots sit in a ring around the stadium, and each touches the plot on either side (D21). Proposal: stadium level 1 has 4 plots, level 2 has 6, level 3 has 9. With 11 facilities left to place, a club can never build everything; that is the intent.
-2. **The Grandstand becomes the stadium.** It sits in the middle and takes no plot. Upgrading it opens plots as well as growing the crowd. Upgrades cost 5×, 10× and 20× the league's match base (D23): $40,000, $80,000 and $160,000 in Local. The cap upgrade already uses the same multiples.
+2. **The Grandstand becomes the stadium.** It sits in the middle and takes no plot. Upgrading it opens plots as well as growing the crowd. Upgrades cost 5×, 10× and 20× the league's match base (D23): $40,000, $80,000 and $160,000 in Local. The unused cap-upgrade price in the finance rules uses the same multiples.
 3. **Blueprints replace the season-one unlock ladder.** A facility can't be built until you have played its blueprint card. Then you pay today's build cost. A new career starts holding two blueprints (D22), so round 1 has something to build; which two is open.
 4. **Duplicate blueprints** make that facility's next level cheaper. Proposal: 25% off.
 5. **Neighbour bonuses (new).** Start with three named pairs, shown as a line between plots: Physio Centre beside Medical Bay (faster recovery), Canteen beside Sponsor Board (more match-day income), Weights Room beside Team Gym (bigger strength gains).
@@ -312,7 +312,7 @@ These card types are wanted but are not needed to prove the loop. Each gets one 
 - **One-match boosters (D25):** a bigger gain that lasts for the next match only, for example +8 speed, played before kick-off. Never called "Fresh legs", which is already a coach call. **Revisit later:** #851's in-match booster, tapped during the match for about a minute of match time. It puts a new control on the match screen beside coach calls and live calling, so it is its own experiment after Slice 3.
 - **Gear (D27):** a trait you can move between players, so when a star rests his gear can go to whoever replaces him. Built last. One gear slot per player, priced in cash (a ticket card). Swapping it is free between matches.
 - **Sponsors (D28):** a deal with a condition and a cash payout, for example "Stay under the cap for 8 rounds: $25k". One deal active at a time. Builds on the timed sponsor effects already in the events deck. The main cash source for the stadium.
-- **Cap booster (Special, D29):** gives one free level of the cap upgrade the game already sells (three levels, each adding 5% to the cap, priced at 5×, 10× and 20× match base). Gold tier. Not offered once all three levels are owned. It is permanent, so a legal squad can't turn illegal.
+- **Cap booster (Special, D29, #872):** raises the club's cap by one level, for good. The rules for a three-level upgrade exist in the finance code (5% of the league's cap per level: $17,500 a year in Local) but nothing in the game grants a level today, so this card is the first way to get one. Gold tier. Not offered at level 3. It is permanent, so a legal squad can't turn illegal.
 
 ## Build order and issues
 
@@ -336,9 +336,11 @@ Approved and filed. Build in this order, one PR each, because they share files a
 
 **Slice 1b: the money rule** (Specs 2 and 3), after Le has played 1a
 
-1. Card faces show family and price badge.
-2. Player cards cost a flat fee by tier (D10) and stay out of free agency until played.
-3. Balance run again with prices on.
+Filed, each built after the one before:
+
+1. #868: Card faces show family, type, tier (Common, Rare, Gold) and a price badge. Built after #858 and #866.
+2. #869: Player cards cost a flat fee by tier (D10) and stay out of free agency until played.
+3. #870: Balance run with prices on.
 
 **Slice 2: the stadium** (Spec 4), parked (D31). It follows blueprints (#866) and the facilities rework (D20), which needs its own spec first
 
@@ -349,7 +351,7 @@ Approved and filed. Build in this order, one PR each, because they share files a
 5. Saving shelf: two slots for priced cards (D11).
 6. Every new career starts holding two blueprints (D22).
 
-**Slice 3: more card types** (Later section, D25 to D29): training, pre-match boosters, sponsors, cap booster, then gear last. Assistant coach and analyst start supplying Training and Booster cards here.
+**Slice 3: more card types** (Later section, D25 to D29). Filed: #871 training cards (with the assistant coach supplying them) and #872 the Cap boost card, built after #870. Not filed, each needs a decision first: pre-match boosters (how they count against the 8-point team-sheet bonus limit), sponsors (the list of deals) and gear (its rules), with gear last.
 
 Each numbered item is one GitHub issue with a plain "done when" taken from its spec. Every agent prompt starts: read AGENTS.md, CLAUDE.md and docs/hub first, and check open PRs touching cardWeek.ts, matchday.ts, lineup.ts or sheets.ts before starting.
 
