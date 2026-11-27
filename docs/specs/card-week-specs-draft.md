@@ -68,6 +68,9 @@ Le has set the direction: cards run most of the career week, tested first behind
 | D29 | The cap booster card gives one level of the three-level cap upgrade. Gold tier. Correction, 27 Nov: the game does not sell that upgrade. Its rules exist (a level field and a price) but nothing grants a level, so this card is the first way to get one (#872) | Le | 27 Nov |
 | D30 | Weekly recovery is 20, not 30, and Physio Centre and Medical Bay add 2 each, not 5. Resolves Codex's finding on #854 that every bonus event falls in a week with no League match for that player | Claude, on Le's instruction to resolve #854 | 27 Nov |
 | D31 | Facilities by card starts small: in a card-week career a facility needs its blueprint card before it can be built (#866). The four facilities open today from the start stay open, which replaces D22. The stadium, plots, neighbour bonuses and shelf (D11, D21, D23) are parked until after it. The facilities rework (D20) no longer blocks blueprints, only the stadium | Le | 27 Nov |
+| D32 | A booster is a big lift to one stat for one player for one match (+10, +15, +20 at Levels I to III), for example a winger's speed. It sits outside the 8-point team-sheet bonus limit (#874). The in-match, minute-long version (D25) stays on the list to revisit, and is the likely fix if a whole match proves too strong | Le | 27 Nov |
+| D33 | Sponsors start with three deals, one running at a time, no penalty for failing: Winning run, Cup night and Young guns (#875) | Le | 27 Nov |
+| D34 | Gear is pinned until Le has played Slice 1a | Le | 27 Nov |
 
 **Still open:** whether matchday cards are free. D10 to D14 settle Slice 1b's design, but 1b is not filed as issues until #858 has reported.
 
@@ -309,9 +312,9 @@ Keep staff, but give each one a job you can see: every few weeks they add a card
 These card types are wanted but are not needed to prove the loop. Each gets one clear job so it never becomes its own system.
 
 - **Training (D26):** a small permanent gain to one stat for one player, for example +2 speed. Respects the 100 cap and the player's potential ceiling. It adds to today's training, which is automatic: players earn XP each week and from matches, and levels spend it by each player's focus. There is no Training screen to replace.
-- **One-match boosters (D25):** a bigger gain that lasts for the next match only, for example +8 speed, played before kick-off. Never called "Fresh legs", which is already a coach call. **Revisit later:** #851's in-match booster, tapped during the match for about a minute of match time. It puts a new control on the match screen beside coach calls and live calling, so it is its own experiment after Slice 3.
-- **Gear (D27):** a trait you can move between players, so when a star rests his gear can go to whoever replaces him. Built last. One gear slot per player, priced in cash (a ticket card). Swapping it is free between matches.
-- **Sponsors (D28):** a deal with a condition and a cash payout, for example "Stay under the cap for 8 rounds: $25k". One deal active at a time. Builds on the timed sponsor effects already in the events deck. The main cash source for the stadium.
+- **One-match boosters (D25, D32, #874):** a big lift to one stat for one player for the club's next match: +10 at Level I, +15 at II, +20 at III, played before kick-off. Four cards, one per shown stat. One booster per player per match, and it sits outside the 8-point team-sheet bonus limit. Never called "Fresh legs", which is already a coach call. **Revisit later:** #851's in-match booster, tapped during the match for about a minute of match time. It puts a new control on the match screen beside coach calls and live calling, so it is its own experiment, and the likely fix if a whole match at +20 proves too strong.
+- **Gear (D27, pinned by D34):** a trait you can move between players, so when a star rests his gear can go to whoever replaces him. Its rules wait until Le has played Slice 1a, because how often players get rested should shape it.
+- **Sponsors (D28, D33, #875):** a deal with a condition and a cash payout, one running at a time, no penalty for failing. Three to start, paid in multiples of the league's match base: Winning run (win 3 of your next 5 League matches, 2.5×), Cup night (win your next Open Cup tie, 1.5×) and Young guns (start two players aged 21 or under in each of your next 4 League matches, 2×). Cup night pulls against fatigue on purpose. Builds on nothing in the events deck; the Sponsor Board is unchanged.
 - **Cap booster (Special, D29, #872):** raises the club's cap by one level, for good. The rules for a three-level upgrade exist in the finance code (5% of the league's cap per level: $17,500 a year in Local) but nothing in the game grants a level today, so this card is the first way to get one. Gold tier. Not offered at level 3. It is permanent, so a legal squad can't turn illegal.
 
 ## Build order and issues
@@ -351,7 +354,7 @@ Filed, each built after the one before:
 5. Saving shelf: two slots for priced cards (D11).
 6. Every new career starts holding two blueprints (D22).
 
-**Slice 3: more card types** (Later section, D25 to D29). Filed: #871 training cards (with the assistant coach supplying them) and #872 the Cap boost card, built after #870. Not filed, each needs a decision first: pre-match boosters (how they count against the 8-point team-sheet bonus limit), sponsors (the list of deals) and gear (its rules), with gear last.
+**Slice 3: more card types** (Later section, D25 to D29). Filed: #871 training cards (with the assistant coach supplying them) and #872 the Cap boost card, built after #870. Then #874 one-match boosters (with the analyst supplying them) and #875 sponsor deals. Gear is not filed (D34).
 
 Each numbered item is one GitHub issue with a plain "done when" taken from its spec. Every agent prompt starts: read AGENTS.md, CLAUDE.md and docs/hub first, and check open PRs touching cardWeek.ts, matchday.ts, lineup.ts or sheets.ts before starting.
 
