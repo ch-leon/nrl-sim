@@ -46,8 +46,23 @@ Le has set the direction: cards run most of the career week, tested first behind
 | D7 | Free agency stays, and still costs a cash signing fee | Le | 27 Nov |
 | D8 | Salary cap still pays wages, including card players | Le | 27 Nov (option C) |
 | D9 | First test proves the weekly offer plus the fatigue-versus-event choice. Stadium, gear and sponsors follow if it is fun | Le agreed direction | 27 Nov |
+| D10 | A player card costs a flat fee by tier, in multiples of the league's match base: grey 1×, gold 3× ($8,000 and $24,000 in Local). Final multiples are set from the #858 run | Le | 27 Nov |
+| D11 | The saving shelf waits for Slice 2, when facilities make cards dear enough to need it | Le | 27 Nov |
+| D12 | A released card player joins the free-agent pool like any other released player | Le | 27 Nov |
+| D13 | Card players sign for the rest of the season, the same as free agents | Le | 27 Nov |
+| D14 | A card's colour is its family and its word is its type (#851's types: Player, Staff, Trait, Facility, Specialty, Fatigue relief, Booster) | Le | 27 Nov |
+| D15 | Slice 1a is judged in two steps: the bot report (#858), then Le plays a season to round 10. The friend playtests only after Le has | Le | 27 Nov |
+| D16 | No limit on cards played per week during testing | Le | 27 Nov |
+| D17 | Three tiers: Common, Rare and Gold (#851), replacing grey and gold | Le | 27 Nov |
+| D18 | Everything carries into the next season: hand, card levels, waiting picks and fatigue. Only the Decree expires and strikes reset, as today | Le | 27 Nov |
+| D19 | For the first testing round, the cards in a pick are drawn by chance as today, with no guaranteed mix of families. Revisit after the playtest | Le | 27 Nov |
+| D20 | The facilities rework (one plain benefit per facility) is done first, as its own piece, before the stadium | Le | 27 Nov |
+| D21 | Plots sit in a ring around the stadium; each touches the plot on either side | Le | 27 Nov |
+| D22 | A new card-week career starts holding two blueprints; the rest come by chance | Le | 27 Nov |
+| D23 | Stadium upgrades cost 5×, 10× and 20× the league's match base ($40,000, $80,000 and $160,000 in Local) | Le | 27 Nov |
+| D24 | Staff handing you cards ships straight after Slice 1a as its own piece (#862), welfare manager and attack coach first | Le | 27 Nov |
 
-**Still open:** whether there is a limit on cards played per week; whether staff stay or become cards; whether matchday cards are free; gear's exact job; how a player card beats free agency.
+**Still open:** whether matchday cards are free; gear's exact job. D10 to D14 settle Slice 1b's design, but 1b is not filed as issues until #858 has reported.
 
 ## Spec 1: Weekly offer and hand
 
@@ -71,8 +86,8 @@ After each League match you see a row of cards and keep two. Cards wait in your 
 3. **Starter picks keep 1 each (new in revision 2).** The three picks before round 1 show 5 and keep 1, so a new career starts with 3 cards and two free hand slots.
 4. **A full hand still refuses a take.** With one free slot, you keep one card and play or pass the other.
 5. **The Decree pick is unchanged:** 3 of 6, adopt one.
-6. **No limit on plays per week** in the test. The offer is the limit. Revisit only if players hoard and dump.
-7. **Saving shelf (new, Slice 1b).** Two slots, separate from the 5-card hand, for priced cards you can't afford yet (Spec 2). A shelved card shows how much more cash you need.
+6. **No limit on plays per week** in the test (D16). The offer is the limit. Revisit only if players hoard and dump.
+7. **Saving shelf (new, Slice 2, D11).** Two slots, separate from the 5-card hand, for priced cards you can't afford yet (Spec 2). A shelved card shows how much more cash you need.
 8. **Cards never expire** in the hand or on the shelf. Unused picks still expire as today.
 9. **Rerolls stay** as a cash sink, same prices.
 
@@ -96,6 +111,8 @@ Every card belongs to one of four colour-coded families, and every card face sho
 
 **Today:** seven card kinds (player, staff, set play, trait, cash, the "Marquee gamble" dilemma, and Decree) in two tiers, grey and gold. Player cards join with no signing fee; staff cards waive the appointment fee; set plays are free. The cash card pays $15,000.
 
+**Tiers (D17).** Three tiers replace today's two: Common (today's grey), Rare (new) and Gold. Proposal for the new middle tier: a Rare player is generated +10 above the club's best at his position (Common +4, Gold +18) and costs 2× match base (Common 1×, Gold 3×, D10). This lands with the card-face work in Slice 1b, not in 1a.
+
 **Families (D3)**
 
 | Family | Cards | Plays for | Status |
@@ -114,14 +131,14 @@ Every card belongs to one of four colour-coded families, and every card face sho
 
 **Card face (new)**
 
-- Family colour and tier.
+- Family colour, the card's type as a word (D14), and tier. Types follow #851: Player, Staff, Trait, Facility, Specialty, Fatigue relief, Booster. Cards #851 does not name keep their own word: Set play, Cash, Decree, Injury repair.
 - One-line effect, about 12 words at most, with both the % and the flat number where relevant.
 - Price badge: "Free" or "$X to play". Player cards also show wage and whether it fits under the cap now.
 - A "Good if…" hint, for example "Good if your halfback has Playmaker". Today's cards already carry a hint per kind.
 
 **Done when**
 
-- [ ] Every card in the catalogue has a family, and the offer screen shows it by colour plus a word (not colour alone).
+- [ ] Every card in the catalogue has a family and a type, and the offer screen shows the family by colour and the type as a word (never colour alone).
 - [ ] A player card costs its cash fee when played and is refused with "Need $X more" when cash is short.
 - [ ] A matchday card can be played with $0 in the bank.
 - [ ] Every card face shows its price before the player keeps it.
@@ -137,7 +154,7 @@ A player card is the cheaper, better route to a signing; free agency is the rout
 
 **What the fee comes to.** From the wage curve in `src/data/financeRules.ts`, for a 25-year-old with no Scout Office:
 
-| Overall | Wage a year | Free-agent fee | Card fee (half) |
+| Overall | Wage a year | Free-agent fee | Half that (revision 2's proposal, replaced by D10) |
 | --- | --- | --- | --- |
 | 45 | $15,500 | $15,500 | $7,750 |
 | 50 | $17,000 | $17,000 | $8,500 |
@@ -145,25 +162,26 @@ A player card is the cheaper, better route to a signing; free agency is the rout
 | 65 | $25,500 | $25,500 | $12,750 |
 | 75 | $40,500 | $40,500 | $20,250 |
 
-For scale: a Normal career starts with $60,000, Local's match base is $8,000 (before home, result and sponsor money) and the Local cap is $350,000 a year. So a grey card player costs about one match's base pay and a gold one about a match and a half. Saving up for a player is a one or two week wait, not a long one.
+For scale: a Normal career starts with $60,000, Local's match base is $8,000 (before home, result and sponsor money) and the Local cap is $350,000 a year. Half-fee made a gold player (+18 over your best) only half as dear again as a grey one (+4), so D10 replaces it with a flat fee by tier. Even at 3× match base, saving up for a player is a wait of a few weeks at most.
 
 **Changes**
 
-1. **Card players pay a fee (D6).** Proposal: half the fee the same player would cost in free agency, after any Scout Office discount.
-2. **Card players are exclusive.** They never appear in the free-agent pool before the card is played, so the card is the only way to sign them.
+1. **Card players pay a flat fee by tier (D6, D10).** Grey costs 1× the league's match base and gold 3×: $8,000 and $24,000 in Local, $12,000 and $36,000 in Championship, $18,000 and $54,000 in Premier. The cap upgrade is already priced in match-base multiples. The Scout Office discount does not apply. Both multiples are tuning values, set finally from the #858 run.
+2. **Card players are exclusive until signed.** They never appear in the free-agent pool before the card is played. Once released, a card player joins the pool like anyone else (D12).
 3. **The quality floor stays.** A card player always beats your best natural player at his position.
-4. **Free agency is unchanged (D7):** full fee, your choice of player, available any week the Recruit screen is open.
+4. **Free agency is unchanged (D7):** full fee, your choice of player, available any week the Recruit screen is open. Card players sign for the rest of the season, the same as free agents (D13).
 5. **Print the deal on the card:** position, overall, age, wage, contract length, fee, and whether he fits under the cap today. When he replaces someone, the card shows the fee and the release payout as one total.
 
 **Done when**
 
-- [ ] Playing a player card deducts half the matching free-agent fee and shows the sum on the card first.
+- [ ] Playing a grey player card deducts 1× the league's match base and a gold one 3×, and the card shows the sum first.
+- [ ] A released card player appears in the free-agent pool.
 - [ ] No card-generated player appears in the free-agent list before his card is played.
 - [ ] Every card player still beats the club's best natural player at his position.
 - [ ] A card player who would break the cap is refused with the wage gap shown, never silently signed.
 - [ ] Free-agent fees and the Scout Office discount behave exactly as today.
 
-**Open:** is half the right discount? Should card players sign for longer than the rest of the season? When a card player is released or his deal ends, does he join the free-agent pool like anyone else (recommended) or leave the game?
+**Open:** the final fee multiples, after #858. Revisit a longer deal for card players only if cards don't feel better than free agency in the playtest.
 
 ## Spec 4: Stadium and facility plots
 
@@ -173,14 +191,14 @@ The club ground becomes a stadium ringed by a fixed number of plots. A blueprint
 
 **Changes (card-week careers only)**
 
-1. **Plots replace free build (D4).** Proposal: stadium level 1 has 4 plots, level 2 has 6, level 3 has 9. With 11 facilities left to place, a club can never build everything; that is the intent.
-2. **The Grandstand becomes the stadium.** It sits in the middle and takes no plot. Upgrading it opens plots as well as growing the crowd. Upgrades cost cash and get noticeably dearer each level.
-3. **Blueprints replace the season-one unlock ladder.** A facility can't be built until you have played its blueprint card. Then you pay today's build cost.
+1. **Plots replace free build (D4).** Plots sit in a ring around the stadium, and each touches the plot on either side (D21). Proposal: stadium level 1 has 4 plots, level 2 has 6, level 3 has 9. With 11 facilities left to place, a club can never build everything; that is the intent.
+2. **The Grandstand becomes the stadium.** It sits in the middle and takes no plot. Upgrading it opens plots as well as growing the crowd. Upgrades cost 5×, 10× and 20× the league's match base (D23): $40,000, $80,000 and $160,000 in Local. The cap upgrade already uses the same multiples.
+3. **Blueprints replace the season-one unlock ladder.** A facility can't be built until you have played its blueprint card. Then you pay today's build cost. A new career starts holding two blueprints (D22), so round 1 has something to build; which two is open.
 4. **Duplicate blueprints** make that facility's next level cheaper. Proposal: 25% off.
 5. **Neighbour bonuses (new).** Start with three named pairs, shown as a line between plots: Physio Centre beside Medical Bay (faster recovery), Canteen beside Sponsor Board (more match-day income), Weights Room beside Team Gym (bigger strength gains).
 6. **Upkeep stays** as today.
 
-**Fits with the facilities rework.** Le's current focus is making facility benefits clear. Every facility needs one visible, plain benefit before it goes on a plot, so do that rework first or alongside this spec, not after.
+**After the facilities rework (D20).** Le's current focus is making facility benefits clear. Every facility gets one visible, plain benefit first, as its own piece of work with its own spec. The stadium is built after that, not alongside it.
 
 **Done when**
 
@@ -190,7 +208,7 @@ The club ground becomes a stadium ringed by a fixed number of plots. A blueprint
 - [ ] Each neighbour pair shows its link and its bonus in numbers when both are built side by side.
 - [ ] Existing non-card careers keep free build exactly as today.
 
-**Open:** plot counts per stadium level; whether a facility can be moved or demolished; which other facility pairs make good neighbours.
+**Open:** plot counts per stadium level; which two blueprints a career starts with (fixed, or the player's choice); whether a facility can be moved or demolished; which other facility pairs make good neighbours.
 
 ## Spec 5: Weekly fatigue and the event dilemma
 
@@ -229,6 +247,8 @@ Players carry tiredness from week to week. A League match alone leaves a player 
 
 So the choice each event is: take on 20 that will not clear by itself, or keep him fresh. The Open Cup weeks become the natural place to pay it back, by leaving him out of the tie.
 
+**Across seasons (D18).** Fatigue carries into the next season like everything else. The weekly recovery keeps running in the weeks with no League round, so a player who sits out the off-season starts round 1 at 0 without a special reset. Pre-season trials count as bonus events.
+
 **Strikes.** Strikes exist today. A tired side that loses by 24 or more, or three in a row, costs board patience. That is the real price of overplaying, so it must be visible: the event preview names the next League opponent.
 
 **Done when**
@@ -253,7 +273,7 @@ Keep staff, but give each one a job you can see: every few weeks they add a card
 **Changes (card-week careers only)**
 
 1. **Each role feeds one family.** Proposal: assistant coach adds a Training card, welfare manager a Recovery card, analyst a one-match Booster, attack coach a Set play from his speciality.
-2. **Built in two steps (changed in revision 2).** Recovery cards and set plays exist by Slice 2, so the welfare manager and attack coach start then. Training and Booster cards arrive in Slice 3, and the assistant coach and analyst start with them.
+2. **Built in two steps.** The welfare manager and attack coach ship straight after Slice 1a as their own piece (D24, #862), because recovery cards and set plays exist by then. Training and Booster cards arrive in Slice 3, and the assistant coach and analyst start with them.
 3. **How often.** Proposal: one extra card in the offer every 3 League rounds per staff member, marked "From your Welfare Manager". It still counts as one of the cards on show, not an extra keep.
 4. **Existing staff benefits stay** as they are today, so nothing a career relies on disappears.
 5. **Staff cards still hire** with the appointment fee waived, as today.
@@ -295,24 +315,32 @@ Approved and filed. Build in this order, one PR each, because they share files a
 6. #857: Persona bots keep cards from each offer and rest tired players. Without this the balance run measures a bot that ignores the feature.
 7. #858: Balance run with Card week on and off, using the persona bots. Reports League wins, strikes a season, injuries, and how many cards reach level III.
 
+**Staff hand you cards** (Spec 6, D24): #862, built after #856. It does not wait for #857 or #858. With picks drawn by chance (D19), this is the player's one way to steer what he is dealt, so it should be in Le's playtest.
+
 **Slice 1b: the money rule** (Specs 2 and 3), after Le has played 1a
 
 1. Card faces show family and price badge.
-2. Player cards cost half the matching free-agent fee and stay out of free agency until played.
-3. Saving shelf: two slots for priced cards.
-4. Balance run again with prices on.
+2. Player cards cost a flat fee by tier (D10) and stay out of free agency until played.
+3. Balance run again with prices on.
 
-**Slice 2: stadium and staff** (Specs 4 and 6), after the facilities rework
+**Slice 2: the stadium** (Spec 4), after the facilities rework (D20), which needs its own spec first
 
 1. Stadium with plots replaces free build in card-week careers.
 2. Grandstand becomes the upgradable stadium.
 3. Blueprint cards gate facilities; duplicates discount the next level.
 4. Three neighbour bonuses.
-5. Welfare manager and attack coach add a card from their family every 3 rounds.
+5. Saving shelf: two slots for priced cards (D11).
+6. Every new career starts holding two blueprints (D22).
 
 **Slice 3: more card types** (Later section): training, boosters, gear, sponsors, cap booster. Assistant coach and analyst start supplying Training and Booster cards here.
 
 Each numbered item is one GitHub issue with a plain "done when" taken from its spec. Every agent prompt starts: read AGENTS.md, CLAUDE.md and docs/hub first, and check open PRs touching cardWeek.ts, matchday.ts, lineup.ts or sheets.ts before starting.
+
+## How Slice 1a is judged (D15)
+
+1. **The bot report (#858)** says whether Card week makes a career easier, harder or the same, and whether fatigue is a tax.
+2. **Le plays one season to round 10.** Proposal for the bar: in those 10 rounds Le hesitated over rest-or-play at least three times, and no pick felt like a chore.
+3. **The friend playtests** only after Le has, with the same checklist.
 
 ## Risks and open questions
 
@@ -342,7 +370,7 @@ Settled by approving Slice 1a (27 Nov), as starting values to playtest:
 Still open:
 
 - [ ] Does training add fatigue? (Left out of 1a.)
-- [ ] Card-player fee: half the free-agent fee (about $8,500 for a grey card)?
+- [x] Card-player fee: flat by tier, grey 1× and gold 3× match base (D10). Final multiples after #858.
 - [ ] Matchday cards free (recommended)?
-- [ ] Staff deliver a card every 3 rounds?
+- [x] Staff deliver a card every 3 rounds, as a starting value (#862).
 - [ ] Stadium plot counts: 4, 6, 9?
