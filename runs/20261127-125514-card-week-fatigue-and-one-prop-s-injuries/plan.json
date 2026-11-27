@@ -1,0 +1,41 @@
+{
+  "name": "Card week fatigue and one prop's injuries",
+  "description": "Compare the same starting home prop at 0 and 100 weekly fatigue over identical seeds on even 60 vs 60 squads. The prop has base injury risk 100 in both cases. Both sides play without a bench so selecting interchange cannot change his exposure. No match tuning is overridden.",
+  "seeds": 1000,
+  "seedStart": 85401,
+  "scenarios": [
+    {
+      "name": "Even 60 vs 60, fresh prop",
+      "home": {
+        "rating": 60,
+        "bench": 0,
+        "weeklyFatigue": {
+          "position": "prop",
+          "points": 0,
+          "injuryRisk": 100
+        }
+      },
+      "away": {
+        "rating": 60,
+        "bench": 0
+      }
+    },
+    {
+      "name": "Even 60 vs 60, tired prop",
+      "home": {
+        "rating": 60,
+        "bench": 0,
+        "weeklyFatigue": {
+          "position": "prop",
+          "points": 100,
+          "injuryRisk": 100,
+          "compareWith": "Even 60 vs 60, fresh prop"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "bench": 0
+      }
+    }
+  ]
+}
