@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- **Card week deals five cards.** Keep up to two from each League match pick and one from each starter pick. A half-used match pick saves its remaining cards and keep. [Card week rules](../specs/846-card-week.md#rules).
+
 - **Card week offers drop the steal.** League wins now draw every slot from the normal pool. Rival recruits and set plays already in a saved hand or pick are still playable. [Card week rules](../specs/846-card-week.md#rerolls-saved-steals-and-levels).
 
 - **Card week in Labs:** heavy League losses and three-loss runs cost board patience down to one point. Finals tiebreaks count by the recorded winner. After their fifth completed League match, including forfeits, clubs can adopt a Decree for the rest of the season. Match-sheet card bonuses share an eight-point cap per player. [Card week rules](../specs/846-card-week.md#strikes-and-decrees).

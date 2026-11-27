@@ -132,7 +132,7 @@ export type WeatherKind = 'clear' | 'rain' | 'wind';
 
 /** v30 adds player histories, v31 optional league progression, and v32 exact
  * protected agreements. v33 adds Open Cup entry and v34 optional Skills Camp records. v35 adds individual challenge checkpoints. v36 adds the optional card week (#846). Finance state migrates from v28; v27 requires a new career. */
-export const SAVE_VERSION = 39;
+export const SAVE_VERSION = 40;
 
 /** The hires the facilities don't cover (N14.5), and the attack coach who opens set plays to buy (#326). */
 export type StaffRole = 'assistantCoach' | 'analyst' | 'welfare' | 'attackCoach';
@@ -299,11 +299,13 @@ export type OfferedCard = { fromClubId?: string } & (
   | { cardId: string; kind: 'setPlay'; playId: import('../data/plays').PlayId }
   | { cardId: string; kind: 'trait' | 'cash' | 'decree' });
 
-/** The three cards on show (fewer only when fewer could be offered), and when they were drawn. */
+/** The remaining cards in a pick and when they were drawn. */
 export interface CardOffer {
   season: number;
   week: number;
   cards: OfferedCard[];
+  /** Cards already kept from this grant, including cards played straight away. */
+  keptCardIds: string[];
   kind: 'starter' | 'match' | 'decree';
   /** Source of a steal in an older saved match pick. */
   fromClubId?: string;

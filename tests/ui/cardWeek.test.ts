@@ -7,7 +7,7 @@ import { gunzipSync } from 'node:zlib';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { selectPack } from '../../src/content';
 import { bus } from '../../src/core/events';
-import { __unlockSaves, loadCareer, saveIfChanged, setActiveSlot } from '../../src/core/save';
+import { __unlockSaves, loadCareer, migrateState, saveIfChanged, setActiveSlot } from '../../src/core/save';
 import { CORRUPT_SAVE_KEY, slotKey } from '../../src/core/storageKeys';
 import { isCardWeek } from '../../src/core/saveValidation';
 import { getState, loadState, setState, type GameState } from '../../src/core/state';
@@ -76,11 +76,11 @@ describe('the view model', () => {
 });
 
 describe('the pick', () => {
-  it('shows three faces from the view model, with the count waiting', async () => {
+  it('shows five faces from the view model, with the count waiting', async () => {
     loadState(await fresh());
     openCardPick();
     const faces = pick().querySelectorAll('.nrl-card-face');
-    expect(faces).toHaveLength(3);
+    expect(faces).toHaveLength(5);
     const view = cardOfferView(getState());
     for (const [i, f] of view.cards.entries()) {
       const words = faces[i]!.words();
@@ -91,6 +91,23 @@ describe('the pick', () => {
     }
     expect(pick().words()).toContain('Pick a card');
     expect(pick().words()).toContain('3 picks waiting');
+  });
+
+  it('stays on the same match pick after one keep and closes after two with starters still waiting', async () => {
+    const s = await fresh();
+    const [starter] = s.cardWeek!.offers;
+    const grant = s.cardWeek!.grants + 1;
+    const match = { ...starter!, kind: 'match' as const, grant };
+    loadState({ ...s, cardWeek: { ...s.cardWeek!, owed: 1, grants: grant, offers: [...s.cardWeek!.offers, match] } });
+    openCardPick(grant);
+    expect(pick().words()).toContain('Keep 2 cards');
+    pick().querySelector('[data-card-choice="0"]')!.click();
+    expect(pick().getAttribute('data-card-grant')).toBe(String(grant));
+    expect(pick().words()).toContain('1 keep left');
+    expect(pick().querySelectorAll('[data-card-choice]')).toHaveLength(4);
+    pick().querySelector('[data-card-choice="0"]')!.click();
+    expect(dialogOpen()).toBe(false);
+    expect(getState().cardWeek).toMatchObject({ starterLeft: 3, owed: 0 });
   });
 
   it('shows a refused card disabled, with its reason', async () => {
@@ -114,7 +131,7 @@ describe('the pick', () => {
     pick().querySelector('[data-card-play-now="0"]')!.click();
     expect(pick().querySelectorAll('[data-card-target]').length).toBeGreaterThan(0);
     pick().querySelector('[data-card-back]')!.click();
-    expect(pick().querySelectorAll('[data-card-choice]')).toHaveLength(3);
+    expect(pick().querySelectorAll('[data-card-choice]')).toHaveLength(5);
     pick().querySelector('[data-card-play-now="0"]')!.click();
     const target = pick().querySelectorAll('[data-card-target]')[0]!;
     const id = target.getAttribute('data-card-target')!;
@@ -357,6 +374,8 @@ describe('Cards and new grants', () => {
     body().querySelector('[data-cards-offer="6"]')!.click();
     expect(pick().getAttribute('data-card-grant')).toBe('6');
     pick().querySelectorAll('[data-card-choice]').find(c => !c.disabled)!.click();
+    expect(pick().getAttribute('data-card-grant')).toBe('6');
+    pick().querySelectorAll('[data-card-choice]').find(c => !c.disabled)!.click();
     expect(getState().cardWeek!.offers.map(o => o.grant)).toEqual([1, 2, 3, 7, 8]);
     expect(getState().cardWeek!.starterLeft).toBe(3);
     expect(getState().cardWeek!.owed).toBe(2);
@@ -405,7 +424,9 @@ describe('legacy Cards saves', () => {
 
     expect(await continueFromSlot()).toMatchObject({ outcome: 'valid', repairs: [] });
     expect(storage.getItem(slotKey(1))).toBe(original);
-    expect(getState().cardWeek).toEqual(base.cardWeek);
+    expect(getState().cardWeek).toEqual({
+      ...base.cardWeek, offers: base.cardWeek!.offers.map(offer => ({ ...offer, keptCardIds: [] })),
+    });
 
     const winPick = base.cardWeek!.offers.slice(-1)[0]!;
     const index = winPick.cards.findIndex(card => card.fromClubId);
@@ -478,7 +499,9 @@ describe('legacy Cards saves', () => {
   });
 
   it('rerolls a saved steal into a normal match pick and keeps the hand', () => {
-    const base = JSON.parse(fixture()) as GameState;
+    const loaded = migrateState(JSON.parse(fixture()));
+    if (!loaded.ok) throw new Error(loaded.message);
+    const base = loaded.state;
     const winPick = base.cardWeek!.offers.slice(-1)[0]!;
     const rerolled = rerollCard(base, winPick.grant);
     if (typeof rerolled === 'string') throw new Error(rerolled);

@@ -28,7 +28,7 @@ import { currentCalendarFixtures, fixtureBridge, hasStructuralCalendar, recoverU
 import { fillCardOffers, identifyCardOffers } from '../systems/cardWeek';
 import { CARD_PASS, CARD_WEEK, cardDefById } from '../data/cards';
 import type { ActiveCard, CardHistoryEntry, CardOffer, CardWeekState, Fixture, GameState } from './state';
-import { hasV33Fields, isCardWeek, isCardWeekV36, validateInput, validateCurrent, type SaveRepair } from './saveValidation';
+import { hasV33Fields, isCardWeek, isCardWeekV36, LEGACY_CARD_OFFER_SIZE, validateInput, validateCurrent, type SaveRepair } from './saveValidation';
 import { emptyFinance, getState, SAVE_VERSION, setState, stateInstallation } from './state';
 import { fromLegacy, isTraitId, traitLevel, type TraitInstance } from '../data/traits';
 import { withRivalSquads } from '../systems/rivals';
@@ -124,7 +124,7 @@ interface MigrationStep {
 }
 
 type CardWeekV36 = Pick<CardWeekState, 'rng' | 'owed' | 'history' | 'cardPlayers' | 'cardTraits' | 'lastMatch'>
-  & { offer: Omit<CardOffer, 'kind' | 'grant' | 'seen'> | null };
+  & { offer: Omit<CardOffer, 'kind' | 'grant' | 'seen' | 'keptCardIds'> | null };
 
 function migrateCardWeek(old: RawState): RawState {
   if (old.cardWeek === undefined) return old;
@@ -146,15 +146,15 @@ function migrateCardWeek(old: RawState): RawState {
   const grants = history.length + waiting;
   return { ...old, cardWeek: fillCardOffers({ ...state, cardWeek: {
     ...kept, starterLeft, owed: waiting - starterLeft,
-    offers: offer ? [{ ...offer, kind: starterLeft > 0 ? 'starter' : 'match' }] : [],
+    offers: offer ? [{ ...offer, kind: starterLeft > 0 ? 'starter' : 'match', keptCardIds: [] }] : [],
     grants, seenGrant: 0, history, cardTraits, hand: [], active: [], decree: null,
     rerolls: { season: state.season, week: state.week, count: 0 },
     strikes: { season: state.season, count: 0, lossRun: 0, log: [] },
-  } }).cardWeek };
+  } }, LEGACY_CARD_OFFER_SIZE).cardWeek };
 }
 
 function migrateCardLevels(old: RawState): RawState {
-  if (!isCardWeek(old.cardWeek)) return old;
+  if (!isCardWeek(old.cardWeek, 37)) return old;
   const state = old as unknown as GameState;
   const cw = state.cardWeek!;
   const levels = new Map<string, ActiveCard>();
@@ -196,7 +196,7 @@ function migrateCardHires(old: RawState): RawState {
   if (!Array.isArray(old.staff) || !old.cardWeek || typeof old.cardWeek !== 'object') return old;
   const state = old as unknown as GameState;
   const cw = state.cardWeek!;
-  if (!Array.isArray(cw.cardPlayers) || !isCardWeek({ ...cw, cardPlayers: [...new Set(cw.cardPlayers)] })) return old;
+  if (!Array.isArray(cw.cardPlayers) || !isCardWeek({ ...cw, cardPlayers: [...new Set(cw.cardPlayers)] }, 38)) return old;
   const staff = [...state.staff];
   const active = cw.active.map((card): ActiveCard => {
     if (card.kind !== 'staff') return card;
@@ -214,6 +214,16 @@ function migrateCardHires(old: RawState): RawState {
     return { ...card, member: { ...member, cardHireId } };
   });
   return { ...old, staff, cardWeek: { ...cw, active } };
+}
+
+function migrateCardPicks(old: RawState): RawState {
+  if (old.cardWeek === undefined) return old;
+  const cw = old.cardWeek as CardWeekState;
+  if (!Array.isArray(cw?.offers) || cw.offers.some(o => !Array.isArray(o?.cards) || o.cards.length > LEGACY_CARD_OFFER_SIZE)) {
+    throw new Error('Invalid saved card offers.');
+  }
+  // Older picks were spent in one action, so no waiting pick has used a keep.
+  return { ...old, cardWeek: { ...cw, offers: cw.offers.map(offer => ({ ...offer, keptCardIds: [] })) } };
 }
 
 export const MIGRATIONS: readonly MigrationStep[] = [
@@ -439,6 +449,7 @@ export const MIGRATIONS: readonly MigrationStep[] = [
   { from: 36, to: 37, run: migrateCardWeek },
   { from: 37, to: 38, run: migrateCardLevels },
   { from: 38, to: 39, run: migrateCardHires },
+  { from: 39, to: 40, run: migrateCardPicks },
   // v32 snapshots the agreement observed under v31 ID-only protection.
   // Already recorded exact terms keep their provenance, including queued terms.
   { from: 31, to: 32, run: old => {

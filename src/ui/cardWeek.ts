@@ -162,17 +162,21 @@ export function openCardPick(grant?: number): HTMLElement | null {
   let problem = '';
 
   const choose = (index: number, play = false, targetId?: string): void => {
+    const kind = getState().cardWeek?.offers.find(o => o.grant === showing)?.kind;
     const r = play ? playChosenCard('pick', index, targetId, showing) : chooseCard(index, showing);
     problem = r.ok ? '' : r.reason;
+    step = { kind: 'cards' };
     if (r.ok) {
       outcome = r.outcome;
-      showing = preferredCardOffer(getState())?.grant;
-    }
-    step = { kind: 'cards' };
-    if (r.ok && cardChipCount(getState()) === 0) {
-      closeModal();
-      if (!play) bus.emit('ui:notify', { text: outcome, kind: 'success' });
-      return;
+      const state = getState();
+      if (!state.cardWeek?.offers.some(o => o.grant === showing)) {
+        if (kind === 'match' || cardChipCount(state) === 0) {
+          closeModal();
+          if (!play) bus.emit('ui:notify', { text: outcome, kind: 'success' });
+          return;
+        }
+        showing = preferredCardOffer(state)?.grant;
+      }
     }
     render();
   };
@@ -185,9 +189,13 @@ export function openCardPick(grant?: number): HTMLElement | null {
     if (!view.cards.length) { closeModal(); return; }
     const displayed = state.cardWeek!.offers.find(o => o.grant === showing);
     content.setAttribute('data-card-grant', String(showing));
+    const keeps = displayed?.keptCardIds.length
+      ? `${view.keepsLeft} ${view.keepsLeft === 1 ? 'keep' : 'keeps'} left`
+      : `Keep ${view.keepsLeft} ${view.keepsLeft === 1 ? 'card' : 'cards'}`;
     content.append(el('div', { class: 'nrl-card-head' },
       el('h2', { text: displayed?.kind === 'decree' ? 'Decree pick' : displayed?.kind === 'match' ? 'Match pick' : 'Pick a card' }),
-      el('p', { class: 'nrl-decisions-count', text: picksWaitingText(view.owed, view.starterLeft), attrs: { 'data-card-owed': String(view.owed) } })));
+      el('p', { class: 'nrl-decisions-count', text: picksWaitingText(view.owed, view.starterLeft), attrs: { 'data-card-owed': String(view.owed) } }),
+      ...(displayed?.kind === 'decree' ? [] : [el('p', { class: 'nrl-decisions-count', text: keeps, attrs: { 'data-card-keeps': String(view.keepsLeft), role: 'status' } })])));
     if (outcome) content.append(el('p', { class: 'nrl-card-outcome', text: outcome, attrs: { 'data-card-outcome': '', role: 'status' } }));
     if (problem) content.append(el('p', { class: 'nrl-card-problem', text: problem, attrs: { role: 'alert' } }));
 
@@ -254,7 +262,9 @@ export function openCardPick(grant?: number): HTMLElement | null {
         render();
       }, blocked, true);
       yes.setAttribute('data-card-pass-confirm', '');
-      actions.append(el('p', { class: 'nrl-card-pass-ask', text: decree ? 'Pass and go without a Decree this season?' : 'Pass this pick? It will be gone.' }), cardAction('Keep picking', back), yes);
+      const question = decree ? 'Pass and go without a Decree this season?'
+        : displayed?.keptCardIds.length ? 'Pass the rest of this pick?' : 'Pass this pick? It will be gone.';
+      actions.append(el('p', { class: 'nrl-card-pass-ask', text: question }), cardAction('Keep picking', back), yes);
     } else {
       if (!decree) {
         const rerollProblem = rerollRefusal(state, displayed);
@@ -341,7 +351,7 @@ export function ensureCardStyles(): void {
   document.head.appendChild(style);
 }
 
-/** Three cards side by side when there is width, stacked in portrait; rem throughout, so Larger text scales it. */
+/** Cards in rows when there is width, stacked in portrait; rem throughout, so Larger text scales it. */
 export const CARD_CSS = `
 .nrl-dialog-region .nrl-card-modal { width: min(100%, 760px); }
 .nrl-card-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 12px; padding-right: 44px; }
@@ -368,7 +378,7 @@ export const CARD_CSS = `
 .nrl-card-effect { font-size: 0.875rem; line-height: 1.35; color: var(--nrl-text-2); overflow-wrap: anywhere; }
 .nrl-card-player { font-weight: 700; font-size: 0.9375rem; color: var(--nrl-text); overflow-wrap: anywhere; }
 .nrl-card-source { font-size: 0.75rem; color: var(--nrl-accent); overflow-wrap: anywhere; }
-.nrl-card-facts { font-family: var(--nrl-f-num); font-size: 0.8125rem; color: var(--nrl-text); }
+.nrl-card-facts { font-family: var(--nrl-f-num); font-size: 0.8125rem; color: var(--nrl-text); overflow-wrap: anywhere; }
 .nrl-card-replaces { font-size: 0.8125rem; color: var(--nrl-neg); overflow-wrap: anywhere; }
 .nrl-card-refusal { font-size: 0.8125rem; color: var(--nrl-neg); overflow-wrap: anywhere; }
 .nrl-card-actions { align-items: center; }
@@ -409,7 +419,7 @@ export const CARD_CSS = `
   .nrl-cards-hand { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   body:has(.nrl-cards-screen, .nrl-card-modal) .nrl-rotate { display: none; }
 }
-/* Short landscape phones: tighter, so three cards and the Pass row fit above the fold. */
+/* Short landscape phones: keep each card compact in the scrolling pick. */
 @media (max-height: 500px) and (orientation: landscape) {
   .nrl-card-face { padding: 6px 10px; gap: 2px; }
   .nrl-card-title { font-size: 0.9375rem; }
