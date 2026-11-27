@@ -192,6 +192,28 @@ function migrateCardLevels(old: RawState): RawState {
   return { ...old, cardWeek: { ...cw, active: [...cw.active, ...added] } };
 }
 
+function migrateCardHires(old: RawState): RawState {
+  if (!Array.isArray(old.staff) || !old.cardWeek || typeof old.cardWeek !== 'object') return old;
+  const state = old as unknown as GameState;
+  const cw = state.cardWeek!;
+  if (!Array.isArray(cw.cardPlayers) || !isCardWeek({ ...cw, cardPlayers: [...new Set(cw.cardPlayers)] })) return old;
+  const staff = [...state.staff];
+  const active = cw.active.map((card): ActiveCard => {
+    if (card.kind !== 'staff') return card;
+    const { member } = card;
+    const wage = Math.round(member.wage * CARD_WEEK.STAFF_WAGE_FACTOR[card.level]);
+    // A full-wage v38 card hire and a same-name paid replacement leave the
+    // same record. Only a saved card discount can establish the old identity.
+    const index = wage < member.wage ? staff.findIndex(m => m.role === member.role && m.speciality === member.speciality
+      && m.name === member.name && m.hiredSeason === member.hiredSeason && m.wage === wage) : -1;
+    if (index < 0) return card;
+    const cardHireId = `legacy-card-hire:${card.cardId}`;
+    staff[index] = { ...staff[index]!, cardHireId };
+    return { ...card, member: { ...member, cardHireId } };
+  });
+  return { ...old, staff, cardWeek: { ...cw, active } };
+}
+
 export const MIGRATIONS: readonly MigrationStep[] = [
   // v1 → v2: storage moved to save slots; the state shape itself is unchanged.
   { from: 1, to: 2, run: (old) => ({ ...old }) },
@@ -414,6 +436,7 @@ export const MIGRATIONS: readonly MigrationStep[] = [
   { from: 35, to: 36, run: old => old },
   { from: 36, to: 37, run: migrateCardWeek },
   { from: 37, to: 38, run: migrateCardLevels },
+  { from: 38, to: 39, run: migrateCardHires },
   // v32 snapshots the agreement observed under v31 ID-only protection.
   // Already recorded exact terms keep their provenance, including queued terms.
   { from: 31, to: 32, run: old => {

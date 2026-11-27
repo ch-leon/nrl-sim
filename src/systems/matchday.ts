@@ -1,4 +1,5 @@
-import { cardMatchPlays, withLastMatch } from './cardWeek';
+import { withLastMatch } from './cardWeek';
+import { cardSheetBonuses } from './cardBonuses';
 import { leagueFixtureView } from './leagueSeasonView';
 import { freezeMatchEffects, matchIncomePatch, commitMatchState, reconcileMatchEffects } from './matchIncome';
 // Orchestrator-owned: the PLAYER's match of the round (rival-vs-rival matches
@@ -10,12 +11,12 @@ import { applyMatchXp } from './training';
 import { DEFAULT_TACTICS } from '../match/league/presets';
 import type { RivalPlanContext } from '../match/league/ai';
 import { bus, type LiveMatchData } from '../core/events';
-import { getState, setState, stateInstallation, type Fixture, type GameState, type RivalClub } from '../core/state';
+import { getState, setState, stateInstallation, type Fixture, type GameState, type Player, type RivalClub } from '../core/state';
 import { registerTickHook, weekHeld, TICK_ORDER, type WeekRelease } from '../core/time';
 import { belongsToFixture, clearLiveMatch, liveMatchSameRules, readLiveMatch, writeLiveMatch, type LiveMatchRecord } from './liveMatchRecord';
 import { matchEngineIdentity } from './matchEngineIdentity';
 import { NINES } from '../match/league/rules';
-import { DEFAULT_PLAYER_COLORS, FORFEIT_SCORE, SQUAD_MIN, SEASON_ROUNDS, difficultyMultipliers } from '../config';
+import { DEFAULT_PLAYER_COLORS, FORFEIT_SCORE, SQUAD_MIN, SEASON_ROUNDS, STAT_MAX, difficultyMultipliers } from '../config';
 import { applyResult, getCurrentFixture, isFinalsRound, PLAYER_ID } from './fixtures';
 import { teamSheetFromSquad } from '../match/league/sheets';
 import { validPlays } from './playbook';
@@ -148,7 +149,7 @@ function applyMatchInjuries(injuries: readonly MatchInjury[], participantIds: Re
   return toasts;
 }
 
-function sheetFor(clubId: string): TeamSheet {
+function sheetFor(clubId: string, fixture: Fixture): TeamSheet {
   const state = getState();
   if (clubId === PLAYER_ID) {
     const entry = state.league.clubs.find((c) => c.id === PLAYER_ID);
@@ -160,15 +161,36 @@ function sheetFor(clubId: string): TeamSheet {
     if (picked.changed) setState({ lineup: picked.lineup });
     if (picked.fills.length > 0) bus.emit('ui:notify', { text: describeFills(picked.fills), kind: 'info', match: true });
     // The set plays he takes in (#326): only ones the club owns, at most three, in his order.
-    const selected = validPlays(picked.lineup.plays, state.playbook?.owned);
-    const plays = state.cardWeek ? cardMatchPlays(state, selected) : selected;
-    return teamSheetFromSquad(
+    const plays = validPlays(picked.lineup.plays, state.playbook?.owned);
+    const bonus = state.cardWeek ? cardSheetBonuses(state, fixture, { ...picked, plays }) : undefined;
+    const selection = plays.length > 0 ? { ...picked, plays: bonus?.plays ?? plays } : picked;
+    const adjustStats = bonus && (bonus.ratingByPlayer.size || bonus.strengthByPlayer.size) ? (p: Player) => {
+      const rating = bonus.ratingByPlayer.get(p.id) ?? 0;
+      const strength = bonus.strengthByPlayer.get(p.id) ?? 0;
+      const stats = { ...p.stats };
+      for (const key of Object.keys(stats) as (keyof Player['stats'])[]) stats[key] = Math.min(STAT_MAX, stats[key] + rating);
+      stats.strength = Math.min(STAT_MAX, stats.strength + strength);
+      return stats;
+    } : undefined;
+    const sheet = teamSheetFromSquad(
       state.squad,
       PLAYER_ID,
       state.clubName,
       entry?.colors ?? DEFAULT_PLAYER_COLORS,
-      plays.length > 0 ? { ...picked, plays } : picked, away,
+      selection, away, adjustStats,
     );
+    if (bonus?.attack) {
+      sheet.attack = Math.min(STAT_MAX, sheet.attack + bonus.attack);
+      // The live sim reads roster stats. Bake the attack bonus into the three
+      // stats that make up the attack aggregate for starters and interchange.
+      for (const entry of [...(sheet.roster ?? []), ...(sheet.bench ?? [])]) {
+        if (!entry.stats) continue;
+        for (const stat of ['speed', 'handling', 'footyIQ'] as const) {
+          entry.stats[stat] = Math.min(STAT_MAX, entry.stats[stat] + bonus.attack);
+        }
+      }
+    }
+    return sheet;
   }
   const rival = state.league.clubs.find((c) => c.id === clubId);
   if (!rival) throw new Error(`unknown club ${clubId}`);
@@ -340,7 +362,7 @@ export function registerPlayerMatchSystem(): void {
     const seed = rng.int(1, 2 ** 31);
     setState({ rngSeed: rng.state() });
 
-    const player = sheetFor(PLAYER_ID);
+    const player = sheetFor(PLAYER_ID, fixture);
     const rivalId = fixture.homeId === PLAYER_ID ? fixture.awayId : fixture.homeId;
     const rival = state.league.clubs.find(c => c.id === rivalId)!;
     const opponent = rivalMatchSheet(rival, playerRivalContext(state, player.roster ?? []));

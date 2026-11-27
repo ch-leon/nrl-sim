@@ -6,27 +6,29 @@ import { PLAYS_BY_ID } from '../../data/plays';
 import { fmtMoney } from '../../utils/money';
 import { overallRating } from '../../data/player';
 import { ROMAN, TRAITS, traitLevel } from '../../data/traits';
-import { activeCard, cardHandView, discardHeldCard, pickBlocked, playChosenCard, preferredCardOffer, rerollCost, type CardFaceView } from '../../systems/cardWeek';
+import { activeCard, cardHandView, discardHeldCard, pickBlocked, playChosenCard, preferredCardOffer, rerollCost, strikeText, type CardFaceView } from '../../systems/cardWeek';
 import { POSITION_SHORT } from '../../systems/lineup';
 import { staffTitle } from '../../systems/staff';
 import { cardAction, cardFacts, cardProblem, cardTargets, ensureCardStyles, openCardPick, picksWaitingText } from '../cardWeek';
 import { el, openModal } from '../dom';
 
-function activeLines(state: GameState): string[] {
+export function activeLines(state: GameState): string[] {
   const cw = state.cardWeek!;
   const players = new Map(state.squad.map(p => [p.id, p]));
+  const newestFirst = [...cw.active].reverse();
   return [
     ...cw.cardPlayers.flatMap(id => {
       const player = players.get(id);
       if (!player) return [];
-      const recruit = cw.active.find(c => (c.kind === 'player' || c.kind === 'dilemma') && c.playerId === id);
+      const recruit = newestFirst.find(c => (c.kind === 'player' || c.kind === 'dilemma') && c.playerId === id);
       const signature = SIGNATURE_TRAIT[player.position];
       const trait = recruit?.kind === 'player' && traitLevel(player.traits, signature) ? ` · ${TRAITS[signature].name}` : '';
       const level = recruit ? ` · Level ${ROMAN[recruit.level]}${trait}` : '';
       const spells = player.clubHistory?.spells ?? [];
       const origin = spells[spells.length - 2];
-      const source = recruit?.cardId.startsWith('steal-player:') && origin
-        ? state.league.clubs.find(c => c.id === origin.clubId)?.name : undefined;
+      const fromClubId = recruit && 'playerId' in recruit && 'fromClubId' in recruit ? recruit.fromClubId : undefined;
+      const sourceId = fromClubId ?? (recruit?.cardId.startsWith('steal-player:') ? origin?.clubId : undefined);
+      const source = sourceId && (state.league.clubs.find(c => c.id === sourceId)?.name ?? sourceId);
       return [`${player.name} · ${source ? `From ${source}` : 'Joined from a card'} · ${POSITION_SHORT[player.position]} · ${Math.round(overallRating(player))}${level}`];
     }),
     ...cw.cardTraits.flatMap(({ playerId, trait }) => {
@@ -39,6 +41,10 @@ function activeLines(state: GameState): string[] {
       if (card.kind === 'staff') {
         const discount = (1 - CARD_WEEK.STAFF_WAGE_FACTOR[card.level]) * 100;
         return [`${card.member.name} · ${staffTitle(card.member)} · Level ${ROMAN[card.level]}${discount ? ` · Wage −${discount}%` : ''}`];
+      }
+      if (card.kind === 'decree') {
+        const def = cardDefById(card.cardId);
+        if (def?.kind === 'decree') return [`${def.title} · Rest of season · ${def.effect}`];
       }
       if (card.kind === 'setPlay') return [`${PLAYS_BY_ID[card.playId].name} · Level ${ROMAN[card.level]}`];
       return [];
@@ -65,7 +71,7 @@ function historyLine(state: GameState, entry: CardHistoryEntry): string {
     : `Week ${entry.week}`;
   const action = entry.action ?? (entry.cardId === 'pass' ? 'pass' : 'take');
   const card = ['take', 'play', 'discard'].includes(action) ? ` ${cardDefById(entry.cardId)?.title ?? entry.cardId}` : '';
-  return `Season ${entry.season} · ${date} · ${HISTORY_ACTION[action]}${card}`;
+  return `Season ${entry.season} · ${date} · ${entry.cardId === 'decree-pick' ? 'Decree pick expired' : HISTORY_ACTION[action]}${card}`;
 }
 
 export function openCardsScreen(): HTMLElement | null {
@@ -109,7 +115,7 @@ export function openCardsScreen(): HTMLElement | null {
       for (const [index, offer] of cw.offers.entries()) {
         const source = offerSource(state, offer);
         const label = offer.kind === 'starter' ? `Starter pick ${index + 1}`
-          : `Match pick · Season ${offer.season}, Week ${offer.week}${source ? ` · From ${source}` : ''}`;
+          : `${offer.kind === 'decree' ? 'Decree pick' : 'Match pick'} · Season ${offer.season}, Week ${offer.week}${source ? ` · From ${source}` : ''}`;
         const open = cardAction(label, () => openCardPick(offer.grant), blocked);
         open.setAttribute('data-cards-offer', String(offer.grant));
         if (offer === preferred && offer.kind !== 'starter') open.append(el('span', { class: 'nrl-cards-latest', text: 'Latest' }));
@@ -150,6 +156,9 @@ export function openCardsScreen(): HTMLElement | null {
       grid.append(box);
     }
     const active = activeLines(state);
+    const { count: strikes, log } = cw.strikes;
+    const lastStrike = log[log.length - 1];
+    const dots = '●'.repeat(Math.min(strikes, 3)) + '○'.repeat(Math.max(0, 3 - strikes));
     const list = (lines: readonly string[]) => el('ul', {}, ...lines.map(text => el('li', { text })));
     const history = el('details', {}, el('summary', { text: 'History' }),
       cw.history.length ? list([...cw.history].reverse().map(h => historyLine(state, h))) : el('p', { text: 'No card activity yet.' }));
@@ -157,7 +166,11 @@ export function openCardsScreen(): HTMLElement | null {
     history.addEventListener('toggle', () => { historyOpen = history.open; });
     content.append(
       el('section', {}, el('h3', { text: `Hand (${hand.length}/${CARD_WEEK.HAND_CAP})` }), hand.length ? grid : el('p', { text: 'Take cards to keep them here.' })),
-      el('section', {}, el('h3', { text: 'Active' }), active.length ? list(active) : el('p', { text: 'No active cards.' }),
+      el('section', {}, el('h3', { text: 'Active' }), active.length ? list(active) : el('p', { text: 'No active cards.' })),
+      el('section', { attrs: { 'data-card-strikes': '' } }, el('h3', { text: 'Strikes this season' }),
+        el('p', {}, el('span', { text: dots, attrs: { 'aria-hidden': 'true' } }), ` ${strikes} ${strikes === 1 ? 'strike' : 'strikes'}`),
+        ...(lastStrike ? [el('p', { text: strikeText(lastStrike, false)
+          + (lastStrike.absorbed ? ' · Strike absorbed' : '') })] : []),
         el('p', { text: `Board patience ${state.boardPatience}/${BOARD.MAX_PATIENCE}` })),
       history,
     );

@@ -20,7 +20,7 @@ import { makeRng } from '../../src/utils/rng';
 import { cardOfferView, cardWeekTick, chooseCard, plantCard, playChosenCard, registerCardWeekSystem, rerollPick } from '../../src/systems/cardWeek';
 import { closeModal, closeScreen, dialogOpen, el, openModal } from '../../src/ui/dom';
 import { cardChipCount, initCardWeekPick, lastMatchView, openCardPick, picksWaitingText, replacesLine, tierLabel, traitTargetRows } from '../../src/ui/cardWeek';
-import { openCardsScreen } from '../../src/ui/screens/cards';
+import { activeLines, openCardsScreen } from '../../src/ui/screens/cards';
 import { openWeekSummary, weekSnapshot, weekSummary } from '../../src/ui/weekSummary';
 import { createHud } from '../../src/ui/hud';
 import { showTitleFlow } from '../../src/ui/title';
@@ -265,12 +265,17 @@ describe('Cards and new grants', () => {
       const cw = getState().cardWeek!;
       const newest = cw.offers[cw.offers.length - 1]!;
       expect(cw).toMatchObject({ starterLeft: 3, owed: Math.min(3, i + 1), grants: i + 4 });
-      expect(newest).toMatchObject({ kind: 'match', grant: i + 4, week: fixture.slot });
+      expect(newest).toMatchObject({ kind: i === 4 ? 'decree' : 'match', grant: i + 4, week: fixture.slot });
       const assertShown = () => {
         expect(pick().getAttribute('data-card-grant')).toBe(String(newest.grant));
         const choices = pick().querySelectorAll('[data-card-choice]');
         expect(choices.map(c => c.getAttribute('data-card-id'))).toEqual(newest.cards.map(c => c.cardId));
         expect(choices.some(c => !c.disabled)).toBe(true);
+        if (i === 4) {
+          expect(pick().words()).toContain('Decree pick');
+          expect(pick().querySelector('[data-card-reroll]')).toBeNull();
+          expect(pick().querySelector('[data-card-play-now]')).toBeNull();
+        }
       };
 
       vi.advanceTimersByTime(400);
@@ -405,7 +410,7 @@ describe('continuing after a former recruit returns', () => {
     expect(await continueFromSlot()).toMatchObject({ outcome: 'valid', repairs: [] });
 
     // Recreate the metadata written by the earlier v38 build and keep its bytes in recovery.
-    const duplicate = JSON.stringify({ ...saved, cardWeek: { ...saved.cardWeek!, cardPlayers: [id, id] } });
+    const duplicate = JSON.stringify({ ...saved, version: 38, cardWeek: { ...saved.cardWeek!, cardPlayers: [id, id] } });
     storage.setItem(slotKey(1), duplicate);
     expect(await continueFromSlot()).toMatchObject({ outcome: 'repaired', repairs: [{ field: 'cardWeek.cardPlayers' }] });
     expect(storage.getItem(slotKey(1))).toBe(duplicate);
@@ -413,6 +418,48 @@ describe('continuing after a former recruit returns', () => {
     expect(saveIfChanged(getState())).toBe(true);
     expect(await continueFromSlot()).toMatchObject({ outcome: 'valid', repairs: [] });
   }, 30000);
+});
+
+describe('active card and strike displays', () => {
+  it('shows the newest recruit record and source for the same player', async () => {
+    const s = await fresh();
+    const player = s.squad.find(p => p.position === 'hooker')!;
+    const rival = s.league.clubs.find(c => c.id !== s.clubId)!;
+    s.cardWeek!.cardPlayers = [player.id];
+    s.cardWeek!.active = [{ kind: 'player', cardId: 'hookerSigning', level: 1, playerId: player.id }];
+    expect(activeLines(s)[0]).toMatch(/Joined from a card.*Level I/);
+    s.cardWeek!.active.push({ kind: 'player', cardId: `steal-player:hooker:${player.id}`, level: 2,
+      playerId: player.id, fromClubId: rival.id });
+    const [line] = activeLines(s);
+    expect(line).toContain(`From ${rival.name}`);
+    expect(line).toContain('Level II');
+    expect(line).not.toContain('Joined from a card');
+  });
+
+  it('shows strikes in words on Cards, the HUD board chip and the week summary', async () => {
+    const before = await fresh();
+    const after: GameState = { ...before, week: 4, boardPatience: 1, cardWeek: {
+      ...before.cardWeek!, strikes: { season: 1, count: 3, lossRun: 0, log: [
+        { week: 1, reason: 'margin', margin: 26 }, { week: 2, reason: 'run' }, { week: 3, reason: 'margin', margin: 30, absorbed: true },
+      ] },
+    } };
+    loadState(after);
+    const hud = createHud({ onBoard: () => {} });
+    expect(body().querySelector('[data-hud="board"]')!.words()).toContain('3 strikes');
+    expect(body().querySelector('[data-hud="board"]')!.getAttribute('aria-label')).toContain('patience 1/');
+    hud.destroy();
+    openCardsScreen();
+    const section = body().querySelector('[data-card-strikes]')!;
+    expect(section.words()).toContain('Strikes this season');
+    expect(section.words()).toContain('3 strikes');
+    expect(section.words()).toContain('Strike: lost by 30');
+    expect(section.words()).toContain('Strike absorbed');
+    closeScreen();
+    const summary = weekSummary(weekSnapshot(before), weekSnapshot(after));
+    expect(summary.strikes).toEqual(['Strike: lost by 26', 'Strike: third loss in a row', 'Strike absorbed']);
+    openWeekSummary(summary, { onAdvance: () => {} });
+    expect(body().querySelector('[data-week-summary]')!.words()).toContain('Strike absorbed');
+  });
 });
 
 describe('the title option', () => {

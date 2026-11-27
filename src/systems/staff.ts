@@ -123,10 +123,10 @@ export function hireRefusal(state: Pick<GameState, 'staff' | 'reputation'>, hire
  * Appoint with the appointment fee waived (card week, #846; pure): the same
  * member a hire makes, and his wage still runs. The new state, or why not.
  */
-export function appointFeeWaived(state: GameState, hire: StaffHire, name: string): GameState | string {
+export function appointFeeWaived(state: GameState, hire: StaffHire, name: string, cardHireId: string): GameState | string {
   const refusal = hireRefusal(state, hire);
   if (refusal) return refusal;
-  return { ...state, staff: [...state.staff, newStaffMember(state, hire, name)] };
+  return { ...state, staff: [...state.staff, { ...newStaffMember(state, hire, name), cardHireId }] };
 }
 
 /** Hire `role` for its upfront fee. Refuses duplicate or unaffordable appointments. */

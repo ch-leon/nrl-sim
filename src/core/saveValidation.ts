@@ -246,13 +246,16 @@ function isActiveCard(v: unknown): boolean {
       const def = cardDefById(v.cardId);
       return def?.kind === 'staff' && record(v.member) && text(v.member.name)
         && integer(v.member.wage) && integer(v.member.hiredSeason, 1)
+        && (v.member.cardHireId === undefined || text(v.member.cardHireId))
         && (typeof def.role === 'string' ? v.member.role === def.role && v.member.speciality === undefined
           : v.member.role === 'attackCoach' && v.member.speciality === def.role.attackCoach);
     }
     case 'setPlay': return cardDefById(v.cardId)?.kind === 'setPlay' && isBasePlayId(v.playId);
-    case 'player': case 'dilemma': case 'trait': return cardDefById(v.cardId)?.kind === v.kind && text(v.playerId);
+    case 'player': case 'dilemma': case 'trait': return cardDefById(v.cardId)?.kind === v.kind && text(v.playerId)
+      && (v.fromClubId === undefined || v.kind === 'player' && v.cardId.startsWith('steal-player:') && text(v.fromClubId));
     case 'cash': return cardDefById(v.cardId)?.kind === 'cash';
-    case 'buff': case 'decree': return cardDate(v) && (v.playerId === undefined || text(v.playerId));
+    case 'buff': return cardDate(v) && (v.playerId === undefined || text(v.playerId));
+    case 'decree': return cardDate(v) && cardDefById(v.cardId)?.kind === 'decree' && v.level === 1 && v.playerId === undefined;
     default: return false;
   }
 }
@@ -266,9 +269,14 @@ export function isCardWeek(v: unknown): boolean {
   if (!integer(grants, v.offers.length) || !integer(seenGrant, 0, grants)) return false;
   const identified = v.offers.some(o => record(o) && o.grant !== undefined);
   let previous = 0;
+  let decreeOffer = false;
   for (const [i, o] of v.offers.entries()) {
     if (!cardOffer(o) || (i < starterLeft ? o.kind !== 'starter' : !oneOf(o.kind, ['match', 'decree']))
       || (o.fromClubId !== undefined && !text(o.fromClubId))) return false;
+    const isDecree = o.kind === 'decree';
+    if (isDecree && (decreeOffer || o.fromClubId !== undefined || (o.cards as unknown[]).length !== CARD_WEEK.OFFER_SIZE)) return false;
+    decreeOffer ||= isDecree;
+    if ((o.cards as unknown[]).some(c => record(c) && (c.kind === 'decree') !== isDecree)) return false;
     if (identified) {
       if (!integer(o.grant, previous + 1, grants)) return false;
       previous = o.grant;
@@ -278,16 +286,25 @@ export function isCardWeek(v: unknown): boolean {
     if (o.seen !== undefined && (o.seen !== true || !integer(o.grant, 1, seenGrant))) return false;
   }
   if (!Array.isArray(v.hand) || v.hand.length > CARD_WEEK.HAND_CAP || !v.hand.every(h => record(h) && isOfferedCard(h.offered)
-    && record(h.offered) && h.cardId === h.offered.cardId && integer(h.level, 1, 3)
+    && record(h.offered) && h.offered.kind !== 'decree' && h.cardId === h.offered.cardId && integer(h.level, 1, 3)
     && integer(h.gotSeason, 1) && integer(h.gotWeek, 1))) return false;
   if (!Array.isArray(v.history) || !v.history.every(h => h.action === undefined || (oneOf(h.action, ['take', 'pass', 'expire', 'discard', 'play', 'reroll'])
-    && (h.action !== 'pass' || h.cardId === CARD_PASS) && (h.action !== 'expire' || h.cardId === 'expired')))) return false;
+    && (h.action !== 'pass' || h.cardId === CARD_PASS) && (h.action !== 'expire' || oneOf(h.cardId, ['expired', 'decree-pick']))))) return false;
   if (!Array.isArray(v.cardTraits) || !v.cardTraits.every(t => t.level === undefined || integer(t.level, 1, 3))) return false;
   if (!Array.isArray(v.active) || !v.active.every(isActiveCard)) return false;
   if (!cardDate(v.rerolls) || !integer(v.rerolls.count)) return false;
-  if (!record(v.strikes) || !integer(v.strikes.season, 1) || !integer(v.strikes.count) || !integer(v.strikes.lossRun)
-    || !Array.isArray(v.strikes.log) || !v.strikes.log.every(l => record(l) && integer(l.week, 1) && oneOf(l.reason, ['margin', 'run']))) return false;
-  return v.decree === null || (record(v.decree) && integer(v.decree.season, 1) && text(v.decree.id));
+  if (v.lastSettled !== undefined && !cardDate(v.lastSettled)) return false;
+  if (!record(v.strikes) || !integer(v.strikes.season, 1) || !integer(v.strikes.lossRun, 0, CARD_WEEK.STRIKE_LOSS_RUN - 1)
+    || !Array.isArray(v.strikes.log) || v.strikes.count !== v.strikes.log.length
+    || !v.strikes.log.every(l => record(l) && integer(l.week, 1) && oneOf(l.reason, ['margin', 'run'])
+      && (l.margin === undefined || l.reason === 'margin' && integer(l.margin, CARD_WEEK.STRIKE_MARGIN))
+      && (l.absorbed === undefined || l.absorbed === true))
+    || !unique(v.strikes.log.map(l => l.week))) return false;
+  const activeDecrees = v.active.filter(c => c.kind === 'decree');
+  const decree = activeDecrees[0];
+  if (v.decree === null) return !decree;
+  return !decreeOffer && activeDecrees.length === 1 && record(v.decree) && cardDate(decree)
+    && v.decree.season === decree.season && v.decree.id === decree.cardId;
 }
 
 function isOfferedCard(c: unknown): boolean {
@@ -303,7 +320,7 @@ function isOfferedCard(c: unknown): boolean {
         && (c.replacesId === undefined ? c.replacesName === undefined : text(c.replacesId) && text(c.replacesName));
     case 'staff': return text(c.name);
     case 'setPlay': return isBasePlayId(c.playId) && (!steal || c.cardId === `steal-play:${c.playId}`);
-    case 'trait': case 'cash': return true;
+    case 'trait': case 'cash': case 'decree': return true;
   }
 }
 
@@ -409,7 +426,7 @@ export function validateInput(v: Record<string, unknown>, version: number, runni
   if (v.lineup !== undefined && !record(v.lineup)) return fail('lineup');
   if (version >= 16 && (!record(v.training) || !oneOf(v.training.focus, ['balanced', ...stats]))) return fail('training');
   if (version >= 18 && (!record(v.boardLoan) || !range(v.boardLoan.owed, 0))) return fail('boardLoan');
-  if (version >= 19 && (!Array.isArray(v.staff) || !v.staff.every(s => record(s) && oneOf(s.role, ['assistantCoach', 'analyst', 'welfare', 'attackCoach']) && text(s.name) && range(s.wage, 0) && integer(s.hiredSeason, 1) && (s.speciality === undefined || oneOf(s.speciality, ['direct', 'width', 'kicking', 'razzle']))) || !unique(v.staff.map(s => s.role)))) return fail('staff');
+  if (version >= 19 && (!Array.isArray(v.staff) || !v.staff.every(s => record(s) && oneOf(s.role, ['assistantCoach', 'analyst', 'welfare', 'attackCoach']) && text(s.name) && range(s.wage, 0) && integer(s.hiredSeason, 1) && (s.cardHireId === undefined || text(s.cardHireId)) && (s.speciality === undefined || oneOf(s.speciality, ['direct', 'width', 'kicking', 'razzle']))) || !unique(v.staff.map(s => s.role)))) return fail('staff');
   if (version >= 29 && !validMatchIncome(v.matchIncome, { season: v.season as number, league: v.league as unknown as GameState['league'], competitions: v.competitions as GameState['competitions'] })) return fail('match income');
   if (version >= 33) {
     const state = v as unknown as GameState;

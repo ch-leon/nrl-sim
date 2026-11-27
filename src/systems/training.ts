@@ -1,3 +1,5 @@
+import { CARD_WEEK } from '../data/cards';
+import { currentDecree } from './cardBonuses';
 // src/systems/training.ts — XP, level points, focus spending and injury recovery.
 // See BAK-180 (WU-10). Pure TypeScript, no Phaser. All maths deterministic and
 // unit-tested; stats stay fractional in state (UI rounds for display).
@@ -199,10 +201,10 @@ export function trainPlayer(player: Player, _facilities: PlacedFacility[] = [], 
 
 /** Weekly XP and decline. An away assignment can substitute for the XP and point spending. */
 export function trainWeek(player: Player, facilities: PlacedFacility[], focus: TrainingFocus = 'balanced',
-  byHand = false, options: { skipXp?: boolean } = {}): Player {
+  byHand = false, options: { skipXp?: boolean; xpFactor?: number } = {}): Player {
   const declined = { ...player, stats: trainPlayer(player) };
   if (options.skipXp) return declined;
-  return spendIfAuto(awardXp(declined, PROGRESSION.WEEKLY_XP * injuryMult(player), facilities), focus, byHand);
+  return spendIfAuto(awardXp(declined, PROGRESSION.WEEKLY_XP * injuryMult(player) * (options.xpFactor ?? 1), facilities), focus, byHand);
 }
 
 /** Match XP uses the sheets and recorded moments, never the simulation RNG. */
@@ -225,7 +227,11 @@ export function applyMatchXp(squad: readonly Player[], own: TeamSheet, result: M
 /** Weekly hook (10), before injury recovery (20). */
 export function applyTraining(state: GameState): GameState {
   const away = awayPlayerIds(state);
-  const squad = state.squad.map(p => trainWeek(p, state.facilities, state.training?.focus ?? 'balanced', state.settings.spendPointsMyself === true, {skipXp:away.has(p.id)}));
+  const youthFirst = currentDecree(state) === 'youthFirst';
+  const squad = state.squad.map(p => trainWeek(p, state.facilities, state.training?.focus ?? 'balanced', state.settings.spendPointsMyself === true, {
+    skipXp: away.has(p.id),
+    xpFactor: youthFirst && p.age <= CARD_WEEK.YOUTH_MAX_AGE ? CARD_WEEK.YOUTH_XP_FACTOR : 1,
+  }));
   setState({ squad });
   return getState();
 }

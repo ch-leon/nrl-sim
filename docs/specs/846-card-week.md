@@ -144,3 +144,27 @@ owned play is kept and no individual one receives a card upgrade on migration.
 When a former card recruit rejoins through a win reward, he keeps one card
 marker. Affected v38 saves recover the single marker and preserve the original
 save in recovery.
+
+
+## Strikes and Decrees
+
+A League loss by 24 or more, or every third consecutive League loss, earns
+one strike. A strike costs one board patience point down to a minimum of one.
+A win or draw breaks the run, and a heavy third loss counts once. Cards and
+the board chip show this season's strike count. The week summary gives the
+reason or says the strike was absorbed.
+
+After the club plays its fifth League match, the next pick offers three of
+six Decrees. Adopting one applies it immediately for the rest of the season.
+Passing gives up the Decree for that season. A waiting Decree survives match
+pick expiry and expires at season close.
+
+Match-sheet bonuses share an eight-point budget per player. Level II and III
+plays reserve one and two points respectively. Width uses three points of
+that budget when the lineup takes a width play. Tight ship credits five per
+cent of the quoted weekly squad and staff wages to the wages line.
+
+Save v39 identifies fee-waived appointments so a paid replacement cannot
+inherit a card level or discount. It links discounted v38 appointments using
+the saved wage. Full-wage v38 appointments lack enough information to link them
+to a card reliably.

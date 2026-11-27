@@ -1,3 +1,4 @@
+import { expireSeasonDecree } from './cardWeek';
 import { emptyFinance, type GameState } from '../core/state';
 import { careerActionClock } from '../core/season';
 import type { LeagueEntryReceipt } from '../data/leagueCareer';
@@ -26,9 +27,11 @@ export function annualLeagueEntry(source: GameState, fields: LeagueFields, recei
     { ...club, capAccount: leagueEntryAccount(club.capAccount!, ranks.get(club.id)!) });
   const instance = draw.instances.find(i => i.id === receipt.quote.definitionInstanceId)!;
   const before = snapshotBeforeRollover(source);
+  const rolled = expireSeasonDecree(source);
   let next: GameState = {
-    ...source, season, week: 1, preseason: 0, capAccount: leagueEntryAccount(source.capAccount, ranks.get(source.clubId)!),
+    ...rolled, season, week: 1, preseason: 0, capAccount: leagueEntryAccount(source.capAccount, ranks.get(source.clubId)!),
     league: { ...source.league, clubs, fixtures: [], ladder: competitionLadder(instance) },
+    ...(rolled.cardWeek ? { cardWeek: { ...rolled.cardWeek, strikes: { season, count: 0, lossRun: 0, log: [] } } } : {}),
     finance: source.finance.some(f => f.season === season) ? source.finance : [...source.finance, emptyFinance(season)],
     matchIncome: source.matchIncome.filter(r => r.season >= source.season),
     competitions: {

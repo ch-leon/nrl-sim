@@ -83,7 +83,7 @@ export function picksWaitingText(owed: number, starter = 0): string {
 
 export function cardFacts(face: CardFaceView): HTMLElement {
   const box = el('div', { class: `nrl-card-face nrl-card-${face.tier}` },
-    el('span', { class: 'nrl-card-tier', text: `${tierLabel(face.tier)} · Level ${ROMAN[face.level]}` }),
+    el('span', { class: 'nrl-card-tier', text: face.kind === 'decree' ? 'Rest of season' : `${tierLabel(face.tier)} · Level ${ROMAN[face.level]}` }),
     el('strong', { class: 'nrl-card-title', text: face.title }),
     el('span', { class: 'nrl-card-effect', text: face.effect }));
   if (face.source) box.append(el('span', { class: 'nrl-card-source', text: `From ${face.source}` }));
@@ -186,7 +186,7 @@ export function openCardPick(grant?: number): HTMLElement | null {
     const displayed = state.cardWeek!.offers.find(o => o.grant === showing);
     content.setAttribute('data-card-grant', String(showing));
     content.append(el('div', { class: 'nrl-card-head' },
-      el('h2', { text: displayed?.kind === 'match' ? 'Match pick' : 'Pick a card' }),
+      el('h2', { text: displayed?.kind === 'decree' ? 'Decree pick' : displayed?.kind === 'match' ? 'Match pick' : 'Pick a card' }),
       el('p', { class: 'nrl-decisions-count', text: picksWaitingText(view.owed, view.starterLeft), attrs: { 'data-card-owed': String(view.owed) } })));
     if (outcome) content.append(el('p', { class: 'nrl-card-outcome', text: outcome, attrs: { 'data-card-outcome': '', role: 'status' } }));
     if (problem) content.append(el('p', { class: 'nrl-card-problem', text: problem, attrs: { role: 'alert' } }));
@@ -214,13 +214,14 @@ export function openCardPick(grant?: number): HTMLElement | null {
     }
 
     const row = el('div', { class: 'nrl-card-row' });
-    const full = state.cardWeek!.hand.length >= CARD_WEEK.HAND_CAP;
+    const decree = displayed?.kind === 'decree';
+    const full = !decree && state.cardWeek!.hand.length >= CARD_WEEK.HAND_CAP;
     for (const face of view.cards) {
       const box = cardFacts(face);
-      const take = cardAction(face.upgrade ? 'Upgrade' : 'Take', () => choose(face.index), face.takeRefusal);
+      const take = cardAction(decree ? 'Adopt' : face.upgrade ? 'Upgrade' : 'Take', () => choose(face.index), face.takeRefusal);
       take.setAttribute('data-card-choice', String(face.index));
       take.setAttribute('data-card-id', face.cardId);
-      take.setAttribute('aria-label', `${face.upgrade ? 'Upgrade' : 'Take'} ${face.title}`);
+      take.setAttribute('aria-label', `${decree ? 'Adopt' : face.upgrade ? 'Upgrade' : 'Take'} ${face.title}`);
       const play = cardAction('Play now', () => {
         if (face.targets) { step = { kind: 'targets', index: face.index }; problem = ''; render(); }
         else choose(face.index, true);
@@ -230,7 +231,7 @@ export function openCardPick(grant?: number): HTMLElement | null {
       if (face.refusal && face.refusal !== blocked && (!full || face.refusal !== face.takeRefusal || face.kind === 'dilemma')) {
         box.append(cardProblem(face.refusal));
       }
-      box.append(el('div', { class: 'nrl-card-buttons' }, take, play));
+      box.append(el('div', { class: 'nrl-card-buttons' }, take, ...(!decree ? [play] : [])));
       row.append(box);
     }
     content.append(row);
@@ -253,22 +254,24 @@ export function openCardPick(grant?: number): HTMLElement | null {
         render();
       }, blocked, true);
       yes.setAttribute('data-card-pass-confirm', '');
-      actions.append(el('p', { class: 'nrl-card-pass-ask', text: 'Pass this pick? It will be gone.' }), cardAction('Keep picking', back), yes);
+      actions.append(el('p', { class: 'nrl-card-pass-ask', text: decree ? 'Pass and go without a Decree this season?' : 'Pass this pick? It will be gone.' }), cardAction('Keep picking', back), yes);
     } else {
-      const rerollProblem = rerollRefusal(state, displayed);
-      const reroll = cardAction(`Reroll (${fmtMoney(rerollCost(state))})`, () => {
-        const result = rerollPick(showing);
-        if (result.ok) {
-          outcome = result.outcome;
-          problem = '';
-        } else problem = result.reason;
-        render();
-        if (result.ok) content.closest('.nrl-modal-scroll')?.scrollTo({ top: 0 });
-      }, rerollProblem);
-      reroll.setAttribute('data-card-reroll', '');
-      actions.append(reroll);
-      if (rerollProblem && rerollProblem !== blocked) {
-        actions.append(el('span', { class: 'nrl-card-refusal', text: rerollProblem }));
+      if (!decree) {
+        const rerollProblem = rerollRefusal(state, displayed);
+        const reroll = cardAction(`Reroll (${fmtMoney(rerollCost(state))})`, () => {
+          const result = rerollPick(showing);
+          if (result.ok) {
+            outcome = result.outcome;
+            problem = '';
+          } else problem = result.reason;
+          render();
+          if (result.ok) content.closest('.nrl-modal-scroll')?.scrollTo({ top: 0 });
+        }, rerollProblem);
+        reroll.setAttribute('data-card-reroll', '');
+        actions.append(reroll);
+        if (rerollProblem && rerollProblem !== blocked) {
+          actions.append(el('span', { class: 'nrl-card-refusal', text: rerollProblem }));
+        }
       }
       const pass = cardAction('Pass', () => { step = { kind: 'pass' }; render(); }, blocked);
       pass.setAttribute('data-card-pass', '');

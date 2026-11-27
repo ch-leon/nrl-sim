@@ -131,3 +131,12 @@ enabled, seed 37. The first records the three original starter offers. The secon
 records taking Cash injection into hand and playing Analyst and Prop off the
 market directly from the starter picks. The gzip files contain the original v37
 save JSON.
+
+
+### v38 Card week saves
+
+The three v38 gzip files contain original save exports from main at `1d2b76b`
+after seven intervals of an Australian League career with seed 577.
+The Card week exports include a Level II Assistant Coach. One was exported with
+picks waiting and the other after passing each waiting pick. The third career
+was started with Card week disabled.

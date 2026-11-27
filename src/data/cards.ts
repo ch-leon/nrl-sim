@@ -29,6 +29,21 @@ export const CARD_WEEK = {
   CASH_FACTOR: { 1: 1, 2: 1.5, 3: 2 },
   DILEMMA_MARGIN_STEP: 2,
   RECRUIT_RATING_STEP: 2,
+  STRIKE_MARGIN: 24,
+  STRIKE_LOSS_RUN: 3,
+  STRIKE_PATIENCE_COST: 1,
+  PATIENCE_FLOOR: 1,
+  DECREE_MATCH: 5,
+  WIDTH_ATTACK: 3,
+  MIDDLE_STRENGTH: 2,
+  YOUTH_MAX_AGE: 21,
+  YOUTH_XP_FACTOR: 1.25,
+  WAGE_SAVING_RATE: 0.05,
+  FORTRESS_RATING: 2,
+  BENCH_RATING: 3,
+  SHEET_BONUS_CAP: 8,
+  SET_PLAY_RATING_STEP: 1,
+  BUFF_RATING: { 1: 2, 2: 3, 3: 4 },
 } as const;
 
 /**
@@ -66,10 +81,23 @@ export interface TraitCardDef extends CardBase { kind: 'trait'; trait: TraitId }
 /** Money now. */
 export interface CashCardDef extends CardBase { kind: 'cash'; amount: number }
 
-export type CardDef = PlayerCardDef | DilemmaCardDef | StaffCardDef | SetPlayCardDef | TraitCardDef | CashCardDef;
+export type DecreeId = 'width' | 'throughTheMiddle' | 'youthFirst' | 'tightShip' | 'fortress' | 'nextManUp';
+export interface DecreeCardDef extends CardBase { kind: 'decree'; id: DecreeId; effect: string }
+
+export const DECREES: readonly DecreeCardDef[] = [
+  { id: 'width', kind: 'decree', title: 'Width', tier: 'gold', weight: 0, effect: '+3 attack when you bring a width set play.' },
+  { id: 'throughTheMiddle', kind: 'decree', title: 'Through the middle', tier: 'gold', weight: 0, effect: '+2 strength for props, second-rowers, locks and hookers.' },
+  { id: 'youthFirst', kind: 'decree', title: 'Youth first', tier: 'gold', weight: 0, effect: 'Players aged 21 and under earn 25% more training XP.' },
+  { id: 'tightShip', kind: 'decree', title: 'Tight ship', tier: 'gold', weight: 0, effect: 'Save 5% of weekly wages this season.' },
+  { id: 'fortress', kind: 'decree', title: 'Fortress', tier: 'gold', weight: 0, effect: '+2 rating for every starter at home.' },
+  { id: 'nextManUp', kind: 'decree', title: 'Next man up', tier: 'gold', weight: 0, effect: '+3 rating for interchange players when they come on.' },
+];
+
+export type CardDef = PlayerCardDef | DilemmaCardDef | StaffCardDef | SetPlayCardDef | TraitCardDef | CashCardDef | DecreeCardDef;
 export type CardKind = CardDef['kind'];
 
 export const CARDS: readonly CardDef[] = [
+  ...DECREES,
   // Players: one per position line, the halfback the gold one.
   { id: 'fullbackSigning', kind: 'player', title: 'Fullback off the market', tier: 'grey', weight: 10, position: 'fullback', margin: PLAYER_CARD_MARGIN.grey },
   { id: 'centreSigning', kind: 'player', title: 'Centre off the market', tier: 'grey', weight: 10, position: 'centre', margin: PLAYER_CARD_MARGIN.grey },

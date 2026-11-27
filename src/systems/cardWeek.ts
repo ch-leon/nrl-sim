@@ -14,14 +14,14 @@ import { awaitingCampReplay } from './parkedLeagueFixture';
 // stream (state.cardWeek.rng): drawing never moves rngSeed or the events deck.
 // Cash and board patience use the existing event effects. Card payments and
 // rerolls book to the Events line.
-import { getState, setState, type ActiveCard, type CardHistoryEntry, type CardOffer, type CardWeekState, type StaffMember, type Fixture, type GameState, type LastMatchImpact, type OfferedCard, type Player, type Position, type RivalClub } from '../core/state';
+import { getState, setState, type ActiveCard, type CardHistoryEntry, type CardOffer, type CardStrike, type CardWeekState, type StaffMember, type Fixture, type GameState, type LastMatchImpact, type OfferedCard, type Player, type Position, type RivalClub } from '../core/state';
 import { bus } from '../core/events';
-import { registerTickHook, TICK_ORDER, weekHeld } from '../core/time';
+import { registerLeagueRolloverHook, registerTickHook, TICK_ORDER, weekHeld } from '../core/time';
 import { saveIfChanged } from '../core/save';
 import { careerActionClock, elapsedInterval } from '../core/season';
-import { CARD_PASS, CARD_WEEK, CARDS, SIGNATURE_TRAIT, cardDefById, type CardDef, type CardKind, type CardTier } from '../data/cards';
+import { CARD_PASS, CARD_WEEK, CARDS, DECREES, SIGNATURE_TRAIT, cardDefById, type CardDef, type CardKind, type CardTier } from '../data/cards';
 import { generatePlayerAround, overallRating, POSITIONS, shownStats } from '../data/player';
-import { PLAYS_BY_ID, PLAY_IDS, isBasePlayId, type PlayId } from '../data/plays';
+import { PLAYS_BY_ID, PLAY_IDS, type PlayId } from '../data/plays';
 import { ROMAN, TRAITS, traitLevel, withTrait, type TraitLevel } from '../data/traits';
 import { randomName } from '../data/names';
 import { SQUAD_CAP, STAT_MAX } from '../config';
@@ -38,9 +38,11 @@ import { awayPlayerIds, campDisposalProblem } from './playerAssignments';
 import { rosterIntervalProblem } from './playerAssignmentCommit';
 import { admitGeneratedPeople, bookPlayerMovement, closeClubSpell, openClubSpell } from './playerCareer';
 import { buyRefusal, ownsPlay } from './playbook';
-import { appointFeeWaived, hireRefusal, type StaffHire } from './staff';
+import { appointFeeWaived, hireRefusal, staffWages, type StaffHire } from './staff';
 import { emptyTally, foldEvents } from './stats';
 import { PLAYER_ID } from './fixtures';
+import { currentDecree } from './cardBonuses';
+import { weeklyWages } from './economy';
 import type { MatchEvent } from '../sim/events';
 
 /** Is this a card-week career? */
@@ -100,6 +102,7 @@ export function activeCard(state: GameState, cardId: string): ActiveCard | undef
       case 'staff': return state.staff.some(member => sameHire(card.member, member));
       case 'setPlay': return ownsPlay(state, card.playId);
       case 'cash': return true;
+      case 'decree': return currentDecree(state) === card.cardId;
       default: return false;
     }
   });
@@ -137,6 +140,7 @@ function eligibleBeforeDice(state: GameState, def: CardDef): boolean {
     case 'setPlay': return freePlayCandidates(state).length > 0;
     case 'trait': return traitTargets(state, def.trait).length > 0;
     case 'cash': return true;
+    case 'decree': return false;
   }
 }
 
@@ -221,7 +225,7 @@ function resolveCard(state: GameState, def: CardDef, rng: Rng): OfferedCard | nu
     case 'player': case 'dilemma': return resolvePlayer(state, def, rng);
     case 'staff': return { cardId: def.id, kind: 'staff', name: randomName(rng, state.pack === 'uk' ? UK_NAMES : AU_PACK.names) };
     case 'setPlay': return { cardId: def.id, kind: 'setPlay', playId: rng.pick(freePlayCandidates(state)) };
-    case 'trait': case 'cash': return { cardId: def.id, kind: def.kind };
+    case 'trait': case 'cash': case 'decree': return { cardId: def.id, kind: def.kind };
   }
 }
 
@@ -292,7 +296,16 @@ export function drawOffer(
   const cw = state.cardWeek;
   if (!cw) return { offer: null, rng: 0 };
   const rng = makeRng(cw.rng);
-  let left = CARDS.filter((c) => eligibleBeforeDice(state, c));
+  if (kind === 'decree') {
+    const pool = [...DECREES];
+    const cards: OfferedCard[] = [];
+    while (cards.length < CARD_WEEK.OFFER_SIZE) {
+      const [decree] = pool.splice(rng.int(0, pool.length - 1), 1);
+      cards.push({ cardId: decree!.id, kind: 'decree' });
+    }
+    return { offer: { season: state.season, week: state.week, kind, cards }, rng: rng.state() };
+  }
+  let left = CARDS.filter((c) => c.weight > 0 && eligibleBeforeDice(state, c));
   const signature = (cards: readonly OfferedCard[]): string => cards.map(c => c.cardId).sort().join(',');
   const repeats = new Set(waiting.map(o => signature(o.cards)));
   const stolen = fromClubId ? drawSteal(state, fromClubId, rng) : undefined;
@@ -513,7 +526,7 @@ function joinPlayer(state: GameState, card: RecruitCard, level: TraitLevel): { s
 }
 
 function gambleRefusal(state: GameState, def: CardDef): string | null {
-  return def.kind === 'dilemma' && state.boardPatience + def.patience < 1
+  return def.kind === 'dilemma' && state.boardPatience + def.patience < CARD_WEEK.PATIENCE_FLOOR
     ? "The board can't take another gamble right now."
     : null;
 }
@@ -555,7 +568,7 @@ function takeCardResult(state: GameState, index: number, grant?: number): CardTa
   const held = cw.hand.find(h => h.cardId === card.cardId);
   const existing = activeCard(state, card.cardId);
   const spent = spendPick(cw, at, recordCard(cw, state, card.cardId, 'take'));
-  if (!held && existing && existing.kind !== 'cash') return applyCard({ ...state, cardWeek: spent }, card, level);
+  if (card.kind === 'decree' || (!held && existing && existing.kind !== 'cash')) return applyCard({ ...state, cardWeek: spent }, card, level);
   if (!held && cw.hand.length >= CARD_WEEK.HAND_CAP) return 'Your hand is full. Play or discard a card first.';
   const hand = held ? cw.hand.map(h => h === held ? { ...h, level } : h)
     : [...cw.hand, { cardId: card.cardId, offered: card, level, gotSeason: state.season, gotWeek: state.week }];
@@ -599,6 +612,13 @@ function applyCard(state: GameState, card: OfferedCard, level: TraitLevel, targe
   let active: ActiveCard;
 
   switch (card.kind) {
+    case 'decree': {
+      if (currentDecree(s)) return 'A Decree is already active this season.';
+      active = { kind: 'decree', cardId: def.id, level: 1, season: s.season, week: s.week };
+      s = { ...s, cardWeek: { ...cw, decree: { id: def.id, season: s.season } } };
+      news.push({ text: `${def.title} is your Decree for the rest of the season.`, kind: 'success' });
+      break;
+    }
     case 'player': case 'dilemma': {
       const upgraded = previous?.kind === 'player' || previous?.kind === 'dilemma'
         ? s.squad.find(p => p.id === previous.playerId) : undefined;
@@ -614,7 +634,7 @@ function applyCard(state: GameState, card: OfferedCard, level: TraitLevel, targe
           return `${player.name} already has the maximum ${limit}.`;
         }
         s = { ...s, squad: s.squad.map(p => p === upgraded ? player : p) };
-        active = { kind: card.kind, cardId: def.id, level, playerId: player.id };
+        active = { ...previous!, kind: card.kind, cardId: def.id, level, playerId: player.id };
       } else {
         const out = joinPlayer(s, card, level);
         if (typeof out === 'string') return out;
@@ -622,12 +642,13 @@ function applyCard(state: GameState, card: OfferedCard, level: TraitLevel, targe
         joined = out.joined;
         released = out.released;
         money.push(...out.money);
-        active = { kind: card.kind, cardId: def.id, level, playerId: joined.id };
+        active = { kind: card.kind, cardId: def.id, level, playerId: joined.id,
+          ...(card.fromClubId ? { fromClubId: card.fromClubId } : {}) };
       }
       const board = def.kind === 'dilemma' ? applyEffects(s, [{ kind: 'boardPatience', amount: def.patience }], ctx) : null;
       if (board) s = board.state;
       const update = joined
-        ? `${joined.name} (${Math.round(overallRating(joined))}) joins, no signing fee.`
+        ? `${joined.name} (${Math.round(overallRating(joined))}) joins${level > 1 ? ` at Level ${ROMAN[level]}` : ''}, no signing fee.`
         : `${upgraded!.name} reaches Level ${ROMAN[level]}${benefit ? ` with ${benefit}` : ''}.`;
       news.push({
         text: `${def.title}: ${update}${released ? ` ${released} is released.` : ''}${board ? ' The board is less patient.' : ''}`,
@@ -639,7 +660,7 @@ function applyCard(state: GameState, card: OfferedCard, level: TraitLevel, targe
       if (def.kind !== 'staff') return 'That card is no longer in the deck.';
       const base = previous?.kind === 'staff' ? previous.member : undefined;
       if (!base) {
-        const out = appointFeeWaived(s, hireOf(def), card.name);
+        const out = appointFeeWaived(s, hireOf(def), card.name, `card-hire:${def.id}:${cw.history.length}`);
         if (typeof out === 'string') return out;
         s = out;
       }
@@ -695,7 +716,7 @@ function applyCard(state: GameState, card: OfferedCard, level: TraitLevel, targe
   }
 
   const next: CardWeekState = {
-    ...s.cardWeek!, active: [...cw.active.filter(c => c.cardId !== def.id), active],
+    ...s.cardWeek!, active: [...cw.active.filter(c => c.cardId !== def.id && (card.kind !== 'decree' || c.kind !== 'decree')), active],
     history: recordCard(cw, state, def.id, 'play'),
     cardPlayers: joined && !cw.cardPlayers.includes(joined.id) ? [...cw.cardPlayers, joined.id] : cw.cardPlayers,
     cardTraits: traitGiven
@@ -740,35 +761,79 @@ export function passCard(state: GameState, grant?: number): GameState | string {
 
 // ── The week ─────────────────────────────────────────────────────────────────
 
-/** A completed League round or final for our club, excluding cup, trial and camp fixtures. */
-function completedLeagueFixture(state: GameState) {
+/** Our completed League rounds and finals, excluding cup, trial and camp. */
+function completedLeagueFixtures(state: GameState) {
   return state.competitions?.instances.filter(i => i.season === state.season && i.definition.format.kind === 'league')
-    .flatMap(i => i.fixtures).find(f => f.slot === state.week && f.status === 'completed' && f.result
-      && (f.homeId === state.clubId || f.awayId === state.clubId));
+    .flatMap(i => i.fixtures).filter(f => f.slot !== null && f.status === 'completed' && f.result
+      && (f.homeId === state.clubId || f.awayId === state.clubId)) ?? [];
 }
 
 export function playedLeagueMatch(state: GameState): boolean {
-  return !!completedLeagueFixture(state);
+  return completedLeagueFixtures(state).some(f => f.slot === state.week);
 }
 
-/** Draw a fresh match pick on the card stream and replace the oldest match pick at the cap. */
+export function strikeText(strike: CardStrike, showAbsorbed = true): string {
+  if (showAbsorbed && strike.absorbed) return 'Strike absorbed';
+  return strike.reason === 'run' ? 'Strike: third loss in a row'
+    : strike.margin === undefined ? 'Strike: heavy loss' : `Strike: lost by ${strike.margin}`;
+}
+
+/** Settle the current League result and the week's Decree saving once. */
 export function cardWeekTick(state: GameState): GameState {
   const cw = state.cardWeek;
-  if (!cw) return state;
-  const fixture = completedLeagueFixture(state);
-  if (!fixture) return state;
-  const result = fixture.result!;
-  // Advancing from a tied final on seeding does not turn the draw into a win.
-  const won = result.winnerId === state.clubId && result.homeScore !== result.awayScore;
-  const fromClubId = won ? (fixture.homeId === state.clubId ? fixture.awayId : fixture.homeId) : undefined;
-  const { offer, rng } = drawOffer(state, 'match', cw.offers, fromClubId);
-  if (!offer) return state;
-  const full = cw.owed === CARD_WEEK.MAX_OWED;
-  const waiting = full ? cw.offers.filter((_, i) => i !== cw.starterLeft) : cw.offers;
-  return { ...state, cardWeek: {
-    ...cw, rng, owed: full ? cw.owed : cw.owed + 1, grants: cw.grants + 1,
+  if (!cw || (cw.lastSettled?.season === state.season && cw.lastSettled.week >= state.week)) return state;
+  const fixtures = completedLeagueFixtures(state);
+  const fixture = fixtures.find(f => f.slot === state.week);
+  const tightShip = currentDecree(state) === 'tightShip';
+  if (!fixture && !tightShip) return state;
+  // Regular wage bills were retired. Book the Decree's saving on the wages line.
+  let next = tightShip ? bookPlayerMovement(state,
+    Math.round((weeklyWages(state) + staffWages(state)) * CARD_WEEK.WAGE_SAVING_RATE), 'wages') : state;
+  const settled: CardWeekState = { ...cw, lastSettled: { season: state.season, week: state.week } };
+  if (!fixture) return { ...next, cardWeek: settled };
+
+  const { homeScore, awayScore } = fixture.result!;
+  const margin = fixture.homeId === state.clubId ? awayScore - homeScore : homeScore - awayScore;
+  const strikes = cw.strikes.season === state.season ? cw.strikes : { season: state.season, count: 0, lossRun: 0, log: [] };
+  const run = margin > 0 ? strikes.lossRun + 1 : 0;
+  const thirdLoss = run >= CARD_WEEK.STRIKE_LOSS_RUN;
+  const reason = margin >= CARD_WEEK.STRIKE_MARGIN ? 'margin' : thirdLoss ? 'run' : undefined;
+  let log = strikes.log;
+  if (reason) {
+    const amount = -CARD_WEEK.STRIKE_PATIENCE_COST;
+    const absorbed = state.boardPatience + amount < CARD_WEEK.PATIENCE_FLOOR;
+    log = [...log, { week: state.week, reason, ...(reason === 'margin' ? { margin } : {}), ...(absorbed ? { absorbed: true } : {}) }];
+    if (!absorbed) next = applyEffects(next, [{ kind: 'boardPatience', amount }], {
+      cardId: 'strike', reason: 'League strike', now: elapsedInterval(state), clubName: state.clubName,
+    }).state;
+  }
+  settled.strikes = { ...strikes, count: log.length, lossRun: thirdLoss ? 0 : run, log };
+  settled.active = cw.active.filter(c => c.kind !== 'buff');
+
+  const played = fixtures.filter(f => f.slot! <= state.week && f.result?.decider !== 'forfeit');
+  const decree = fixture.result!.decider !== 'forfeit' && played.length === CARD_WEEK.DECREE_MATCH;
+  const fromClubId = !decree && margin < 0 ? (fixture.homeId === state.clubId ? fixture.awayId : fixture.homeId) : undefined;
+  const { offer, rng } = drawOffer(next, decree ? 'decree' : 'match', cw.offers, fromClubId);
+  if (!offer) return { ...next, cardWeek: settled };
+  const expireAt = cw.owed >= CARD_WEEK.MAX_OWED ? cw.offers.findIndex(o => o.kind === 'match') : -1;
+  const waiting = cw.offers.filter((_, i) => i !== expireAt);
+  return { ...next, cardWeek: {
+    ...settled, rng, owed: cw.owed + Number(expireAt < 0), grants: cw.grants + 1,
     offers: [...waiting, { ...offer, grant: cw.grants + 1 }],
-    history: full ? recordCard(cw, state, 'expired', 'expire') : cw.history,
+    history: expireAt >= 0 ? recordCard(cw, state, 'expired', 'expire') : cw.history,
+  } };
+}
+
+/** Expire the season's Decree as soon as its League campaign closes. */
+export function expireSeasonDecree(state: GameState): GameState {
+  const cw = state.cardWeek;
+  if (!cw) return state;
+  const waiting = cw.offers.filter(o => o.kind === 'decree');
+  if (!waiting.length && !cw.decree) return state;
+  return { ...state, cardWeek: {
+    ...cw, decree: null, active: cw.active.filter(c => c.kind !== 'decree'),
+    offers: cw.offers.filter(o => o.kind !== 'decree'), owed: cw.owed - waiting.length,
+    history: waiting.length ? recordCard(cw, state, 'decree-pick', 'expire') : cw.history,
   } };
 }
 
@@ -852,11 +917,12 @@ function effectLine(state: GameState, def: CardDef, card: OfferedCard, level: Tr
     case 'staff': return level === 1 ? 'No hiring fee.' : `Weekly wage −${(1 - CARD_WEEK.STAFF_WAGE_FACTOR[level]) * 100}%.`;
     case 'setPlay': return level === 1 ? 'Free set play.' : 'Better execution when called.';
     case 'trait': return `+${level} trait ${level === 1 ? 'level' : 'levels'}.`;
+    case 'decree': return def.kind === 'decree' ? def.effect : def.title;
     case 'cash': return def.kind === 'cash' ? `Bank +${fmtMoney(def.amount * CARD_WEEK.CASH_FACTOR[level])}.` : def.title;
   }
 }
 
-const GOOD_IF: Record<CardKind, string> = {
+const GOOD_IF: Record<Exclude<CardKind, 'decree'>, string> = {
   player: 'you need a better starter.',
   dilemma: 'you can spare board patience.',
   staff: 'you have a vacant role.',
@@ -873,7 +939,7 @@ function cardFaceView(state: GameState, card: OfferedCard, index: number, level:
   const view: CardFaceView = {
     index, cardId: def.id, kind: def.kind, title: def.title, tier: def.tier, level, upgrade, effect: effectLine(state, def, card, level),
     ...(card.fromClubId ? { source: state.league.clubs.find(c => c.id === card.fromClubId)?.name ?? card.fromClubId } : {}),
-    hint: `Good if ${GOOD_IF[def.kind]}`, refusal: null,
+    hint: def.kind === 'decree' ? '' : `Good if ${GOOD_IF[def.kind]}`, refusal: null,
   };
   if (card.kind === 'staff') view.detail = card.name;
   if (card.kind === 'setPlay') view.detail = PLAYS_BY_ID[card.playId].name;
@@ -928,19 +994,8 @@ export function cardHandView(state: GameState): (CardFaceView & { level: TraitLe
   })));
 }
 
-/** A match saves the levelled play ID alongside its other pre-kickoff selections. */
-export function cardMatchPlays(state: GameState, plays: PlayId[]): PlayId[] {
-  if (!state.cardWeek) return plays;
-  return plays.map((playId): PlayId => {
-    const active = state.cardWeek!.active.find(c => c.kind === 'setPlay' && c.playId === playId);
-    if (!active || active.level === 1 || !isBasePlayId(playId)) return playId;
-    return active.level === 2 ? `${playId}:II` : `${playId}:III`;
-  });
-}
-
-/** Staff have no person id; match the saved hire to the member still at the club. */
 function sameHire(a: StaffMember, b: StaffMember): boolean {
-  return a.role === b.role && a.speciality === b.speciality && a.name === b.name && a.hiredSeason === b.hiredSeason;
+  return a.cardHireId !== undefined && a.cardHireId === b.cardHireId;
 }
 
 export function activeCardStaff(state: GameState): StaffMember[] {
@@ -958,6 +1013,7 @@ function commit(t: CardTake): void {
     league: s.league, capAccount: s.capAccount, money: s.money, finance: s.finance, staff: s.staff,
     playbook: s.playbook, boardPatience: s.boardPatience, cardWeek: s.cardWeek!,
   });
+  if (t.joined) bus.emit('player:signed', t.joined);
   for (const m of t.money) bus.emit('money:changed', {
     delta: m.amount, reason: m.reason, balance: s.money, booked: true, stamp: careerActionClock(s),
   });
@@ -1070,9 +1126,18 @@ export function registerCardWeekSystem(): void {
     if (!s.cardWeek || s.sacked || deckWaitsForLeagueChoice(s)) return;
     const next = cardWeekTick(s);
     if (next === s) return;
-    setState({ cardWeek: next.cardWeek! });
-    if (s.cardWeek.owed === CARD_WEEK.MAX_OWED) {
+    setState({ cardWeek: next.cardWeek!, boardPatience: next.boardPatience, money: next.money, finance: next.finance });
+    if (next.money !== s.money) bus.emit('money:changed', {
+      delta: next.money - s.money, reason: 'Tight ship wage saving', balance: next.money, booked: true,
+      stamp: { season: s.season, week: s.week },
+    });
+    if (next.cardWeek!.history.length > s.cardWeek.history.length) {
       bus.emit('ui:notify', { text: `A card pick expired. Up to ${CARD_WEEK.MAX_OWED} can wait.`, kind: 'info' });
     }
+  });
+  registerLeagueRolloverHook('card-week-season', 26, () => {
+    const state = getState();
+    const next = expireSeasonDecree(state);
+    if (next !== state) setState({ cardWeek: next.cardWeek! });
   });
 }

@@ -6,7 +6,7 @@ import { BASE, IPHONE_UA, OUT_ROOT, confirmStartingLeague, log, setupStep } from
 const PICK = '[data-card-pick]';
 const CARDS = '[data-cards-screen]';
 
-async function checkPick(page, portrait) {
+async function checkPick(page, portrait, decree = false) {
   const cards = page.locator(`${PICK} .nrl-card-face`);
   await cards.first().waitFor();
   assert.equal(await cards.count(), 3);
@@ -22,9 +22,10 @@ async function checkPick(page, portrait) {
     assert.ok(boxes.every(box => box.y === boxes[0].y && box.visible), JSON.stringify(boxes));
     assert.ok(boxes[2].x > boxes[1].x && boxes[1].x > boxes[0].x);
   }
-  const actions = await page.locator(`${PICK} .nrl-card-face button, ${PICK} [data-card-reroll]`).evaluateAll(buttons =>
+  const actions = await page.locator(`${PICK} .nrl-card-face button, ${PICK} [data-card-reroll], ${PICK} [data-card-pass]`).evaluateAll(buttons =>
     buttons.map(button => [button.offsetWidth, button.offsetHeight]));
-  assert.ok((await cards.locator('.nrl-card-tier').allTextContents()).every(text => /Level I/.test(text)));
+  const tier = decree ? 'Rest of season' : 'Level I';
+  assert.ok((await cards.locator('.nrl-card-tier').allTextContents()).every(text => text.includes(tier)));
   assert.ok(actions.every(([width, height]) => width >= 44 && height >= 44), JSON.stringify(actions));
 }
 
@@ -155,6 +156,35 @@ export async function runCardWeek(browser) {
     await page.locator(CARDS).waitFor();
     assert.equal(await page.locator(`${CARDS} [data-hand-card]`).count(), 2);
     assert.equal(await page.locator(PICK).count(), 0);
+
+    await page.evaluate(() => {
+      const root = document.documentElement;
+      root.setAttribute('data-text-size', 'larger');
+      root.style.setProperty('--nrl-text-scale', '1.3');
+      const state = window.__nrlState();
+      const offer = state.cardWeek.offers[0];
+      offer.kind = 'decree';
+      delete offer.fromClubId;
+      offer.cards = ['width', 'fortress', 'throughTheMiddle'].map(cardId => ({ cardId, kind: 'decree' }));
+      state.cardWeek.strikes = { season: state.season, count: 1, lossRun: 0, log: [
+        { week: state.week, reason: 'margin', margin: 26, absorbed: true },
+      ] };
+    });
+    await page.locator('.nrl-cards-screen .nrl-screen-x').tap();
+    await page.locator('[data-screen="cards"]').tap();
+    assert.match(await page.locator(`${CARDS} [data-card-strikes]`).textContent(), /1 strike.*lost by 26.*Strike absorbed.*Board patience/);
+    await page.locator(`${CARDS} [data-cards-pick]`).tap();
+    const decree = page.locator(PICK);
+    assert.match(await decree.locator('h2').textContent(), /Decree pick/);
+    assert.equal(await decree.locator('[data-card-reroll]').count(), 0);
+    await checkPick(page, false, true);
+    await page.screenshot({ animations: 'disabled', path: join(out, '667x375-decree.png') });
+    await page.setViewportSize({ width: 375, height: 667 });
+    await checkPick(page, true, true);
+    await page.screenshot({ animations: 'disabled', path: join(out, '375x667-decree.png') });
+    await decree.getByRole('button', { name: 'Adopt Fortress' }).tap();
+    await page.locator(CARDS).waitFor();
+    assert.match(await page.locator(CARDS).textContent(), /Fortress · Rest of season/);
     assert.deepEqual(errors, []);
     log('ok card week 667×375 and 375×667 at Larger text');
     return 0;

@@ -132,13 +132,15 @@ export type WeatherKind = 'clear' | 'rain' | 'wind';
 
 /** v30 adds player histories, v31 optional league progression, and v32 exact
  * protected agreements. v33 adds Open Cup entry and v34 optional Skills Camp records. v35 adds individual challenge checkpoints. v36 adds the optional card week (#846). Finance state migrates from v28; v27 requires a new career. */
-export const SAVE_VERSION = 38;
+export const SAVE_VERSION = 39;
 
 /** The hires the facilities don't cover (N14.5), and the attack coach who opens set plays to buy (#326). */
 export type StaffRole = 'assistantCoach' | 'analyst' | 'welfare' | 'attackCoach';
 /** The attack coach's speciality: the family of set plays he opens to buy (#326, plan §2.2). */
 export type AttackCoachSpeciality = import('../data/plays').PlayFamily;
 export interface StaffMember {
+  /** Identifies a specific fee-waived appointment. */
+  cardHireId?: string;
   role: StaffRole;
   name: string;
   wage: number;
@@ -295,7 +297,7 @@ export type OfferedCard = { fromClubId?: string } & (
   | { cardId: string; kind: 'player' | 'dilemma'; player: Player; salary: number; replacesId?: string; replacesName?: string }
   | { cardId: string; kind: 'staff'; name: string }
   | { cardId: string; kind: 'setPlay'; playId: import('../data/plays').PlayId }
-  | { cardId: string; kind: 'trait' | 'cash' });
+  | { cardId: string; kind: 'trait' | 'cash' | 'decree' });
 
 /** The three cards on show (fewer only when fewer could be offered), and when they were drawn. */
 export interface CardOffer {
@@ -321,9 +323,10 @@ export interface HandCard {
 export type ActiveCard =
   | { cardId: string; kind: 'staff'; level: CardLevel; member: StaffMember }
   | { cardId: string; kind: 'setPlay'; level: CardLevel; playId: import('../data/plays').PlayId }
-  | { cardId: string; kind: 'player' | 'dilemma' | 'trait'; level: CardLevel; playerId: string }
+  | { cardId: string; kind: 'player' | 'dilemma' | 'trait'; level: CardLevel; playerId: string; fromClubId?: string }
   | { cardId: string; kind: 'cash'; level: CardLevel }
-  | { cardId: string; kind: 'buff' | 'decree'; level: CardLevel; season: number; week: number; playerId?: string };
+  | { cardId: string; kind: 'buff'; level: CardLevel; season: number; week: number; playerId?: string }
+  | { cardId: string; kind: 'decree'; level: 1; season: number; week: number };
 
 export interface CardHistoryEntry {
   cardId: string;
@@ -335,6 +338,8 @@ export interface CardHistoryEntry {
 /** One line of the last match's impact (#846): what a player who played did. */
 export interface LastMatchRow { playerId: string; name: string; tries: number; tackles: number; lineBreaks: number }
 export interface LastMatchImpact { season: number; week: number; opponentName: string; rows: LastMatchRow[] }
+
+export interface CardStrike { week: number; reason: 'margin' | 'run'; margin?: number; absorbed?: true }
 
 /**
  * A card-week career (#846, Labs): a pick of one card from three, owed before
@@ -354,7 +359,9 @@ export interface CardWeekState {
   hand: HandCard[];
   active: ActiveCard[];
   rerolls: { season: number; week: number; count: number };
-  strikes: { season: number; count: number; lossRun: number; log: { week: number; reason: 'margin' | 'run' }[] };
+  strikes: { season: number; count: number; lossRun: number; log: CardStrike[] };
+  /** Last interval whose card effects were settled. */
+  lastSettled?: { season: number; week: number };
   decree: { season: number; id: string } | null;
   history: CardHistoryEntry[];
   /** Ids of the players who joined from a card. */
