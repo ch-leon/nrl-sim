@@ -132,7 +132,7 @@ export type WeatherKind = 'clear' | 'rain' | 'wind';
 
 /** v30 adds player histories, v31 optional league progression, and v32 exact
  * protected agreements. v33 adds Open Cup entry and v34 optional Skills Camp records. v35 adds individual challenge checkpoints. v36 adds the optional card week (#846). Finance state migrates from v28; v27 requires a new career. */
-export const SAVE_VERSION = 40;
+export const SAVE_VERSION = 41;
 
 /** The hires the facilities don't cover (N14.5), and the attack coach who opens set plays to buy (#326). */
 export type StaffRole = 'assistantCoach' | 'analyst' | 'welfare' | 'attackCoach';
@@ -350,6 +350,8 @@ export interface CardStrike { week: number; reason: 'margin' | 'run'; margin?: n
  * chose it; absent, the career plays exactly as before.
  */
 export interface CardWeekState {
+  /** Fatigue carried to the next week. Squad players absent from this map start at zero. */
+  weeklyFatigue: Record<string, number>;
   /** Its own seeded stream: drawing cards never moves rngSeed or the events deck. */
   rng: number;
   starterLeft: number;
@@ -624,7 +626,7 @@ export function newCardWeek(seed: number): CardWeekState {
     rng: (seed ^ 0x85ebca6b) >>> 0, starterLeft: CARD_WEEK.STARTER_PICKS, owed: 0,
     offers: [], grants: CARD_WEEK.STARTER_PICKS, seenGrant: 0, hand: [], active: [],
     rerolls: { season: 1, week: 1, count: 0 }, strikes: { season: 1, count: 0, lossRun: 0, log: [] },
-    decree: null, history: [], cardPlayers: [], cardTraits: [],
+    decree: null, history: [], cardPlayers: [], cardTraits: [], weeklyFatigue: {},
   };
 }
 

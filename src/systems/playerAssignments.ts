@@ -1,3 +1,4 @@
+import { addBonusEventFatigue } from './weeklyFatigue';
 import { clubReservations } from './playerAvailability';
 export { awayPlayerIds } from './playerAvailability';
 import type { GameState, Player, TrainingFocus } from '../core/state';
@@ -215,7 +216,7 @@ export function completeCamp(state: GameState): GameState {
     stats: Object.fromEntries(shownStats(participant.position).map((k) => [k, participant.stats[k]]))
   };
   return replaceCamp(
-    { ...state, squad: state.squad.map((p) => (p.id === player.id ? player : p)) },
+    addBonusEventFatigue({ ...state, squad: state.squad.map((p) => (p.id === player.id ? player : p)) }, [player.id]),
     {
       ...r,
       awardBasis,

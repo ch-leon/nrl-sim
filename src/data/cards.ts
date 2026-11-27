@@ -50,6 +50,19 @@ export const CARD_WEEK = {
   BUFF_RATING: { 1: 2, 2: 3, 3: 4 },
 } as const;
 
+/** Weekly fatigue in Labs careers (#854). Recovery is per calendar week. */
+export const WEEKLY_FATIGUE = {
+  MIN: 0,
+  MAX: 100,
+  LEAGUE_STARTER: 30,
+  LEAGUE_BENCH: 15,
+  BONUS_EVENT: 20,
+  RECOVERY: 20,
+  FACILITY_RECOVERY: 2,
+  ENERGY_LOSS_PER_POINT: 0.004,
+  INJURY_TIERS: [{ above: 80, factor: 2 }, { above: 60, factor: 1.5 }],
+} as const;
+
 /**
  * How far above the card floor (the club's best natural player at the position,
  * systems/cardWeek.ts cardFloor) a player card's man is generated, in overall

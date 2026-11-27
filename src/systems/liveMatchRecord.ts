@@ -5,10 +5,11 @@
 // rebuilds the same match (the seed comes from the saved rng). This record — the
 // fixture, seed, the calls and plan changes made and the tick — lets
 // that match carry on where it was, with the calls already made, instead of
-// starting over (no reloading for a better result). It is written on each call
+// starting over (no reloading for a better result). Card week also saves both
+// kick-off sheets. The record is written on each call
 // and plan change, when the page hides, every LIVE_MATCH_SAVE_SECONDS of match
 // time, and on Save & exit, so a compatible kill that never fires pagehide loses at most
-// that much. A few hundred bytes, kept next to the save slot; cleared at full time.
+// that much. Kept next to the save slot and cleared at full time.
 import type { Fixture, GameState } from '../core/state';
 import { type ControlInput, isControlInput } from '../match/league/controls';
 import { getActiveSlot } from '../core/save';
@@ -16,7 +17,12 @@ import { browserStorage, inCareerNamespace, type StorageLike } from '../core/sto
 import { liveMatchKey } from '../core/storageKeys';
 import { TICK_S } from '../match/core/engine';
 import { isCoachCall } from '../match/league/calls';
-import { PLAYS_BY_ID } from '../data/plays';
+import { POSITIONS } from '../data/player';
+import { TRAIT_IDS } from '../data/traits';
+import type { TeamSheet } from '../sim/events';
+import { BENCH, isRotation } from '../match/league/bench';
+import { ON_FIELD } from '../config';
+import { isPlayId, PLAYS_BY_ID } from '../data/plays';
 import { isAttackPreset, isDefencePreset } from '../match/league/presets';
 import { isMatchEngineIdentity, matchEngineIdentity } from './matchEngineIdentity';
 import type { CallInput } from '../match/league/calls';
@@ -57,13 +63,15 @@ export interface LiveMatchRecord {
    * starts it again from the kick-off.
    */
   halfMinutes?: number;
+  /** Card week kick-off sheets, including each squad player's weekly fatigue effects. */
+  sheets?: { home: TeamSheet; away: TeamSheet };
   /** Missing in historical records: never replay those inputs. */
   engineId?: string;
 }
 
 /** Both explicit engine compatibility and the actual half length must match. */
-export function liveMatchSameRules(r: Pick<LiveMatchRecord, 'halfMinutes' | 'engineId'>): boolean {
-  return r.halfMinutes === NINES.halfMinutes && r.engineId === matchEngineIdentity();
+export function liveMatchSameRules(r: Pick<LiveMatchRecord, 'halfMinutes' | 'engineId' | 'sheets'>): boolean {
+  return r.halfMinutes === NINES.halfMinutes && r.engineId === matchEngineIdentity(r.sheets !== undefined);
 }
 
 /** Key for one slot's record. Export files carry the same object under this field. */
@@ -92,6 +100,33 @@ function isPlan(x: unknown): boolean {
     && typeof x.tactics.defence === 'string' && isDefencePreset(x.tactics.defence);
 }
 
+const numberIn = (x: unknown, min: number, max = Infinity): x is number =>
+  typeof x === 'number' && Number.isFinite(x) && x >= min && x <= max;
+const text = (x: unknown): x is string => typeof x === 'string' && x.length > 0;
+
+function isRosterEntry(x: unknown): boolean {
+  return object(x) && text(x.name) && POSITIONS.some(p => p === x.position)
+    && (x.id === undefined || text(x.id))
+    && (x.injuryRisk === undefined || numberIn(x.injuryRisk, 0))
+    && (x.startingEnergy === undefined || numberIn(x.startingEnergy, 0, 1))
+    && (x.stats === undefined || object(x.stats)
+      && ['speed', 'strength', 'stamina', 'handling', 'kicking', 'footyIQ'].every(k => numberIn((x.stats as Record<string, unknown>)[k], 1, 100)))
+    && (x.traits === undefined || Array.isArray(x.traits) && x.traits.every(t =>
+      object(t) && TRAIT_IDS.some(id => id === t.id) && numberIn(t.level, 1, 3) && Number.isInteger(t.level)));
+}
+
+function isSavedSheet(x: unknown, clubId: string): boolean {
+  return object(x) && x.clubId === clubId && text(x.name)
+    && ['attack', 'defense', 'kicking', 'fitness'].every(k => numberIn(x[k], 1, 100))
+    && Array.isArray(x.colors) && x.colors.length === 2 && x.colors.every(text)
+    && Array.isArray(x.roster) && x.roster.length > 0 && x.roster.length <= ON_FIELD && x.roster.every(isRosterEntry)
+    && (x.bench === undefined || Array.isArray(x.bench) && x.bench.length <= BENCH.size && x.bench.every(isRosterEntry))
+    && (x.tactics === undefined || object(x.tactics) && isAttackPreset(x.tactics.attack as string) && isDefencePreset(x.tactics.defence as string))
+    && (x.rotation === undefined || isRotation(x.rotation))
+    && (x.kicker === undefined || text(x.kicker)) && (x.captain === undefined || text(x.captain))
+    && (x.plays === undefined || Array.isArray(x.plays) && x.plays.every(isPlayId));
+}
+
 /** Boundary shape, not a promise of compatibility; historical identities may be absent. */
 export function isLiveMatchRecord(x: unknown): x is LiveMatchRecord {
   if (!object(x)) return false;
@@ -107,7 +142,9 @@ export function isLiveMatchRecord(x: unknown): x is LiveMatchRecord {
     && (r.halfMinutes === undefined || Number.isFinite(r.halfMinutes) && r.halfMinutes > 0)
     && Array.isArray(r.calls) && r.calls.every(isCall)
     && (r.plans === undefined || Array.isArray(r.plans) && r.plans.every(isPlan))
-    && (r.controls === undefined || Array.isArray(r.controls) && r.controls.every(isControlInput));
+    && (r.controls === undefined || Array.isArray(r.controls) && r.controls.every(isControlInput))
+    && (r.sheets === undefined || object(r.sheets)
+      && isSavedSheet(r.sheets.home, r.homeId) && isSavedSheet(r.sheets.away, r.awayId));
 }
 
 /**

@@ -208,8 +208,10 @@ export abstract class LiveClock extends LiveSetPlays {
     p.name = b.name;
     p.key = b.key;
     p.visualStep = null;
-    if (b.id) p.id = b.id;
-    else delete p.id;
+    if (b.id) {
+      p.id = b.id;
+      this.benchPlayed[p.side]?.add(b.id);
+    } else delete p.id;
     p.injuryRisk = b.injuryRisk;
     p.hurt = false;
     p.stats = b.stats;

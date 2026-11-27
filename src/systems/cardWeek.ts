@@ -1,3 +1,4 @@
+import { recoverWeeklyFatigue } from './weeklyFatigue';
 import { AU_PACK } from '../content';
 import { UK_NAMES } from '../content/ukNames';
 import { awaitingCampReplay } from './parkedLeagueFixture';
@@ -1106,6 +1107,11 @@ export function pickBlocked(s: GameState): string | null {
 
 /** Install the card-week tick: after the week's results, before the autosave. Careers without a card week are untouched. */
 export function registerCardWeekSystem(): void {
+  registerTickHook('card-week-recovery', TICK_ORDER.weekStart + 1, () => {
+    const state = getState();
+    const recovered = recoverWeeklyFatigue(state);
+    if (recovered !== state) setState({ cardWeek: recovered.cardWeek! });
+  }, { trials: true });
   // After results, ladder and morale, before the unlocks and autosave.
   registerTickHook('card-week', TICK_ORDER.autosave - 2, () => {
     const s = getState();

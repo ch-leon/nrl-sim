@@ -21,7 +21,7 @@ import type { TapOrigin } from '../touch';
 import { edgeSheets, spreadSheets } from '../spread';
 import { CallJudge, callDefence, withAttackCall, withDefenceCall, type CallInput, type CallVerdict, type CoachCall } from '../calls';
 import type { KickoffCall } from '../kickoff';
-import { weatherEffect, windDirection, type WeatherEffect, type WindDirection } from '../weather';
+import { DEFAULT_INJURY_RISK, weatherEffect, windDirection, type WeatherEffect, type WindDirection } from '../weather';
 import type { MatchInjury, WeatherKind } from '../../../sim/events';
 import { styleFit, type StyleFit } from '../fit';
 import { compressedCounter, fitEdge, rushCounter, slideCounter } from '../counters';
@@ -45,6 +45,8 @@ export abstract class LiveBase {
   /** How each side plays (BAK-208 §5), changed at the breaks (N11). */
   readonly tactics: Record<Side, TeamTactics>;
   /** Tight fit of the selected starters, fixed before kick-off; bench and fatigue never rescore it. */
+  /** Card week bench appearances, keyed by side. Ordinary matches omit them. */
+  readonly benchPlayed: Partial<Record<Side, Set<string>>> = {};
   protected readonly tightFit: Record<Side, number>;
   protected readonly squadFit: Record<Side, StyleFit>;
   protected readonly planFit: Record<Side, { attack: number; defence: number }>;
@@ -357,19 +359,16 @@ export abstract class LiveBase {
     this.goalKickerKey = { home: home.kicker, away: away.kicker };
     this.captain = { home: captainOf(home), away: captainOf(away) };
     this.captainKey = { home: home.captain, away: away.captain };
-    this.players = [...this.buildSide(home, 'home'), ...this.buildSide(away, 'away')];
+    const energy = Math.max(0, Math.min(1, opts.energy ?? 1));
+    this.players = [...this.buildSide(home, 'home', energy), ...this.buildSide(away, 'away', energy)];
     this.homeOn = this.players.slice(0, PLAYERS);
     this.awayOn = this.players.slice(PLAYERS);
-    this.bench = { home: benchOf(home), away: benchOf(away) };
+    // A tired start in the lab finds the bench rested unless the sheet sets his legs.
+    const benchEnergy = energy < 1 ? Math.max(energy, BENCH.recoverCap) : 1;
+    this.bench = { home: benchOf(home, benchEnergy), away: benchOf(away, benchEnergy) };
     this.rotation = { home: home.rotation ?? DEFAULT_ROTATION, away: away.rotation ?? DEFAULT_ROTATION };
-    const energy = Math.max(0, Math.min(1, opts.energy ?? 1));
-    for (const p of this.players) {
-      p.energy = energy;
-      p.gassed = energy < FATIGUE.spentAt;
-      p.gas.gas = energy;
-    }
-    // A tired start (the lab's late legs, a closing stretch) finds the bench rested, as it would have been.
-    for (const b of [...this.bench.home, ...this.bench.away]) b.energy = energy < 1 ? Math.max(energy, BENCH.recoverCap) : 1;
+    if (home.roster?.some(p => p.startingEnergy !== undefined)) this.benchPlayed.home = new Set();
+    if (away.roster?.some(p => p.startingEnergy !== undefined)) this.benchPlayed.away = new Set();
     this.setForKickoff(other(this.firstReceiver));
   }
 
@@ -406,7 +405,7 @@ export abstract class LiveBase {
     return s === 'home' ? this.ends : this.ends === 1 ? -1 : 1;
   }
 
-  private buildSide(sheet: TeamSheet, side: Side): Player[] {
+  private buildSide(sheet: TeamSheet, side: Side, defaultEnergy: number): Player[] {
     const roster = sheet.roster ?? [];
     const used = new Set<number>();
     return ROLES.map((role, slot) => {
@@ -414,6 +413,7 @@ export abstract class LiveBase {
       if (i < 0) i = roster.findIndex((_, k) => !used.has(k));
       if (i >= 0) used.add(i);
       const entry = roster[i];
+      const energy = entry?.startingEnergy ?? defaultEnergy;
       const stats = statsOf(entry);
       const traits = entry?.traits ? [...entry.traits] : [];
       const stamina = entry?.stats?.stamina ?? 50;
@@ -424,14 +424,14 @@ export abstract class LiveBase {
         name,
         key: entry?.id ?? name,
         ...(entry?.id ? { id: entry.id } : {}),
-        injuryRisk: entry?.injuryRisk ?? 20,
+        injuryRisk: entry?.injuryRisk ?? DEFAULT_INJURY_RISK,
         hurt: false,
         stats,
         traits,
         stamina,
-        energy: 1,
+        energy,
         drain: drainRate(stamina, traits),
-        gassed: false,
+        gassed: energy < FATIGUE.spentAt,
         body: makeBody({ x: MID_X, y: MID_Y }, maxSpeedFor(stats.speed), { x: this.dirOf(side), y: 0 }),
         odometer: 0,
         react: null, // set at build so every player has one shape: added later it slowed the whole sim by a third
@@ -444,7 +444,7 @@ export abstract class LiveBase {
         immuneUntil: 0,
         burstUntil: 0,
         brokeAt: -1000,
-        gas: { gas: 1, blown: false },
+        gas: { gas: energy, blown: false },
         tankS: tankSeconds(stamina, traits),
         refillS: refillSeconds(stamina),
         wantsSprint: false,

@@ -1,3 +1,4 @@
+import { DEFAULT_INJURY_RISK } from '../weather';
 import type { TapOrigin } from '../touch';
 import type { ControlInput } from '../controls';
 import type { RosterEntry, TeamSheet } from '../../../sim/events';
@@ -267,10 +268,10 @@ export function captainOf(sheet: TeamSheet): CaptainRead {
 }
 
 /** A sheet's bench, as many as the bench holds. */
-export function benchOf(sheet: TeamSheet): BenchMan[] {
+export function benchOf(sheet: TeamSheet, energy = 1): BenchMan[] {
   return (sheet.bench ?? []).slice(0, BENCH.size).map((e) => {
     const traits = e.traits ? [...e.traits] : [];
-    return { name: e.name, key: e.id ?? e.name, ...(e.id ? { id: e.id } : {}), injuryRisk: e.injuryRisk ?? 20, injured: false, stats: statsOf(e), traits, stamina: e.stats?.stamina ?? 50, energy: 1, ...(e.position ? { position: e.position } : {}) };
+    return { name: e.name, key: e.id ?? e.name, ...(e.id ? { id: e.id } : {}), injuryRisk: e.injuryRisk ?? DEFAULT_INJURY_RISK, injured: false, stats: statsOf(e), traits, stamina: e.stats?.stamina ?? 50, energy: e.startingEnergy ?? energy, ...(e.position ? { position: e.position } : {}) };
   });
 }
 
