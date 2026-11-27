@@ -2,6 +2,15 @@
 // a saved calendar slot, not necessarily a round: it can be a trial, a bye or a rest.
 export const ADVANCE_PROMPTS = '[data-confirm-advance], [data-ask-proceed], [data-skip-events]';
 
+/** The chosen League's first finals slot (not the last calendar week). */
+export function clubFinalsWeek(state) {
+  const leagueId = state.competitions?.leagueCareer?.accepted?.quote.definitionInstanceId;
+  const league = state.competitions?.instances.find((i) => i.id === leagueId);
+  const week = league?.definition.stages.find((stage) => stage.kind === 'knockout')?.slotIds[0];
+  if (!week) throw new Error('the saved League has no finals slot');
+  return week;
+}
+
 export function nextClubFixture(page) {
   return page.evaluate(() => {
     const s = window.__nrlState();

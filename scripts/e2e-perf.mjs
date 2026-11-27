@@ -46,9 +46,9 @@ import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
 import { bundleSize, reportBundle } from './bundle-size.mjs';
-import { ADVANCE_PROMPTS, passAdvancePrompts, reachClubFixture } from './e2e-calendar.mjs';
+import { ADVANCE_PROMPTS, clubFinalsWeek, passAdvancePrompts, reachClubFixture } from './e2e-calendar.mjs';
 import { weeksAdvanced } from './e2e-week-count.mjs';
-import { setupStep } from './e2e-webkit/newClub.mjs';
+import { confirmStartingLeague, setupStep } from './e2e-webkit/newClub.mjs';
 
 const argv = process.argv.slice(2);
 const flag = (name, dflt) => (argv.includes(`--${name}`) ? argv[argv.indexOf(`--${name}`) + 1] : dflt);
@@ -484,10 +484,13 @@ async function run() {
   result.timings['tick per week (×4 advances)'] = { ms: perWeek, notes: `${weekSum} weeks in ${msSum} ms` };
   log(`${String(perWeek).padStart(6)} ms  tick per week (×4 advances)`);
 
-  // To the finals, then to the season end: the last call carries the rollover.
+  // A League season's finals and rollover follow its saved calendar. Closing
+  // the final interval holds on the same week number until a league is chosen.
+  const firstFinalsWeek = clubFinalsWeek(await state());
+  const choosingLeague = (s) => s.competitions?.leagueCareer?.phase === 'next-season-choice';
   let guard = 0;
   let probed = false;
-  while ((await state()).week < 25 && guard++ < 30) {
+  while ((await state()).week < firstFinalsWeek && guard++ < 30) {
     await answerCards();
     await timed(`to finals (call ${guard})`, async () => {
       // The first call that runs more than a week also checks the page answers a tap mid-run.
@@ -500,18 +503,18 @@ async function run() {
     });
     await toastsGone();
   }
+  if ((await state()).week < firstFinalsWeek) throw new Error('did not reach the saved League finals');
   guard = 0;
   let rolloverCall = null;
-  while ((await state()).season === 1 && guard++ < 10) {
+  for (let before = await state(); before.season === 1 && !choosingLeague(before) && guard++ < 10; before = await state()) {
     await answerCards();
     const name = `to season end (call ${guard})`;
-    const before = await state();
     const ms = await timed(name, async () => {
       const a = await advance(2);
       return { ms: a.ms, notes: `${a.weeks} weeks` };
     });
     const after = await state();
-    if (after.season > before.season) rolloverCall = { ms, weeks: 27 - before.week + 1 };
+    if (choosingLeague(after)) rolloverCall = { ms, weeks: weeksAdvanced(before, after) };
     await toastsGone();
   }
   if (rolloverCall && perWeek) {
@@ -519,7 +522,20 @@ async function run() {
     result.timings['rollover (season end call minus its weeks)'] = { ms: est, notes: `${rolloverCall.ms} ms call, ${rolloverCall.weeks - 1} plain weeks before it` };
     log(`${String(est).padStart(6)} ms  rollover (season end call minus its weeks)`);
   }
+  if (choosingLeague(await state())) {
+    await timed('Choose league → season 2', async () => {
+      const review = page.locator('[data-review-choose-league]');
+      if (await review.count()) await review.tap();
+      else {
+        await clearDialogs();
+        await page.locator('.nrl-dock [data-hud="advance"]').tap();
+      }
+      await confirmStartingLeague(page);
+      await page.waitForFunction(() => window.__nrlState()?.season === 2);
+    });
+  }
   const s = await state();
+  if (s.season !== 2) throw new Error(`performance playthrough did not start season 2 (S${s.season} W${s.week})`);
   result.end = { season: s.season, week: s.week, money: s.money };
   await page.screenshot({ path: join(OUT, 'season-2.png') });
   await browser.close();

@@ -2,6 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { weeksAdvanced } from '../../scripts/e2e-week-count.mjs';
 
 describe('browser performance weekly tick count', () => {
+  it('counts the saved calendar interval at season close but not league selection', () => {
+    const position = (season: number, week: number, elapsedIntervals: number) =>
+      ({ season, week, preseason: 0 as const, competitions: { calendar: { elapsedIntervals } } });
+    expect(weeksAdvanced(position(1, 23, 22), position(1, 25, 24))).toBe(2);
+    expect(weeksAdvanced(position(1, 25, 24), position(1, 25, 25))).toBe(1);
+    expect(weeksAdvanced(position(1, 25, 25), position(2, 1, 25))).toBe(0);
+  });
   it('counts both trial weeks while the league round stays at one', () => {
     expect(weeksAdvanced({ season: 1, week: 1, preseason: 1 }, { season: 1, week: 1, preseason: 2 })).toBe(1);
     expect(weeksAdvanced({ season: 1, week: 1, preseason: 2 }, { season: 1, week: 1, preseason: 0 })).toBe(1);

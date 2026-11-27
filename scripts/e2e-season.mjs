@@ -33,7 +33,8 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium } from 'playwright-core';
 import { pollCoachCall } from './e2e-coach-call.mjs';
-import { passAdvancePrompts, reachClubFixture } from './e2e-calendar.mjs';
+import { clubFinalsWeek, passAdvancePrompts, reachClubFixture } from './e2e-calendar.mjs';
+import { weeksAdvanced } from './e2e-week-count.mjs';
 import { setupStep } from './e2e-webkit/newClub.mjs';
 
 // --size WxH (or E2E_SIZE): 844×390 is a landscape phone with touch (the default);
@@ -336,14 +337,14 @@ async function leaveMatch() {
  * (a squad short of 13), or nothing at all (a bye or a week out of the finals).
  */
 async function weekAsTapped(rec) {
-  const at = await page.evaluate(() => { const s = window.__nrlState(); return `${s.season}:${s.week}:${s.preseason ?? 0}`; });
+  const at = await page.evaluate(() => { const s = window.__nrlState(); return `${s.season}:${s.week}:${s.preseason ?? 0}:${s.competitions?.calendar?.elapsedIntervals ?? 0}`; });
   await tapAdvanceWeek();
   // The round's own toast ("… Round 9 forfeited (0–24)."), not the stop's "… would be forfeited."
   const what = await page.waitForFunction((a) => {
     if (document.querySelector('.nrl-mo-controls')) return 'match';
     if ([...document.querySelectorAll('.nrl-toast')].some((t) => /forfeited \(\d+/.test(t.textContent ?? ''))) return 'forfeit';
     const s = window.__nrlState();
-    return `${s.season}:${s.week}:${s.preseason ?? 0}` !== a ? 'week' : null;
+    return `${s.season}:${s.week}:${s.preseason ?? 0}:${s.competitions?.calendar?.elapsedIntervals ?? 0}` !== a ? 'week' : null;
   }, at, { timeout: 15000 }).then((h) => h.jsonValue())
     .catch(() => { throw new Error(`Advance Week did nothing within 15 s at ${at.replace(/(\d+):(\d+)/, 'S$1 W$2')}`); });
   if (what === 'match') {
@@ -352,7 +353,7 @@ async function weekAsTapped(rec) {
     await leaveMatch();
   }
   // The week ends once the rival round is in (as long as held-week allows); wait for it.
-  await page.waitForFunction((a) => { const s = window.__nrlState(); return `${s.season}:${s.week}:${s.preseason ?? 0}` !== a; }, at, { timeout: 60000 });
+  await page.waitForFunction((a) => { const s = window.__nrlState(); return `${s.season}:${s.week}:${s.preseason ?? 0}:${s.competitions?.calendar?.elapsedIntervals ?? 0}` !== a; }, at, { timeout: 60000 });
   rec.notes.push(what === 'forfeit' ? 'the round forfeited' : what === 'match' ? 'a match, skipped' : 'no match that week');
 }
 
@@ -1291,14 +1292,14 @@ async function play() {
       await step('league-choice', async (rec) => { await confirmNextLeague(rec); }, { quietToasts: true });
       break;
     }
-    const target = s.week < 25 ? 1 : 2;
+    const target = s.week < clubFinalsWeek(s) ? 1 : 2;
     const r = await step(`to-${target === 1 ? 'finals' : 'season-end'}-${i + 1}`, async (rec) => {
       await answerCards(rec);
       await advanceMenu(target);
       let now = await save();
       const stop = await page.locator('.nrl-toast').last().textContent().catch(() => '');
       rec.notes.push(`S${now.season} W${now.week} $${now.money}${stop ? ` · "${stop.trim()}"` : ''}`);
-      if (now.season === s.season && now.week === s.week && /Only \d+ fit/.test(stop ?? '')) {
+      if (weeksAdvanced(s, now) === 0 && /Only \d+ fit/.test(stop ?? '')) {
         // Not a failure, but worth seeing (finding 19): since #278 a forced sale keeps 13 fit, and
         // since #285 the Academy calls up juniors to make the side, so Advance Week plays a match.
         // A forfeit here means the squad is at SQUAD_CAP with too many hurt, or one of those regressed.
@@ -1309,7 +1310,7 @@ async function play() {
         now = await save();
         rec.notes.push(`played the short week with Advance Week: S${now.season} W${now.week}`);
       }
-      if (now.season === s.season && now.week === s.week) throw new Error(`no progress from S${s.season} W${s.week}`);
+      if (weeksAdvanced(s, now) <= 0) throw new Error(`no progress from S${s.season} W${s.week}`);
     }, { quietToasts: true });
     if (!r.ok && !r.errors) break;
   }
