@@ -61,8 +61,13 @@ Le has set the direction: cards run most of the career week, tested first behind
 | D22 | A new card-week career starts holding two blueprints; the rest come by chance | Le | 27 Nov |
 | D23 | Stadium upgrades cost 5×, 10× and 20× the league's match base ($40,000, $80,000 and $160,000 in Local) | Le | 27 Nov |
 | D24 | Staff handing you cards ships straight after Slice 1a as its own piece (#862), welfare manager and attack coach first | Le | 27 Nov |
+| D25 | Boosters are played before kick-off and last the next match. In-match boosters (#851) are a later experiment of their own: revisit after Slice 3 | Le | 27 Nov |
+| D26 | Training cards add on top of the automatic weekly training; nothing is removed | Le | 27 Nov |
+| D27 | Gear is a trait you can move between players, one slot each. Built last in Slice 3 | Le | 27 Nov |
+| D28 | Sponsors are deal cards with a condition and a payout, one deal active at a time | Le | 27 Nov |
+| D29 | The cap booster card gives one free level of the cap upgrade the game already sells. Gold tier | Le | 27 Nov |
 
-**Still open:** whether matchday cards are free; gear's exact job. D10 to D14 settle Slice 1b's design, but 1b is not filed as issues until #858 has reported.
+**Still open:** whether matchday cards are free. D10 to D14 settle Slice 1b's design, but 1b is not filed as issues until #858 has reported.
 
 ## Spec 1: Weekly offer and hand
 
@@ -293,11 +298,11 @@ Keep staff, but give each one a job you can see: every few weeks they add a card
 
 These card types are wanted but are not needed to prove the loop. Each gets one clear job so it never becomes its own system.
 
-- **Training:** a small permanent gain to one stat for one player, for example +2 speed. Respects the 100 cap and the player's potential ceiling.
-- **One-match boosters:** a bigger gain that lasts for the next match only, for example +8 speed. Never called "Fresh legs", which is already a coach call.
-- **Gear:** a trait you can move between players. One gear slot per player, priced in cash (a ticket card). Swapping it is free between matches.
-- **Sponsors:** a deal with a condition and a cash payout, for example "Stay under the cap for 8 rounds: $25k". Builds on the timed sponsor effects already in the events deck. The main cash source for the stadium.
-- **Cap booster (Special):** raises this career's cap by a printed amount. One active at a time, never stacking, and it never expires mid-season, so a legal squad can't turn illegal. The game already sells a cap upgrade in three levels for cash, so this card must say how the two combine.
+- **Training (D26):** a small permanent gain to one stat for one player, for example +2 speed. Respects the 100 cap and the player's potential ceiling. It adds to today's training, which is automatic: players earn XP each week and from matches, and levels spend it by each player's focus. There is no Training screen to replace.
+- **One-match boosters (D25):** a bigger gain that lasts for the next match only, for example +8 speed, played before kick-off. Never called "Fresh legs", which is already a coach call. **Revisit later:** #851's in-match booster, tapped during the match for about a minute of match time. It puts a new control on the match screen beside coach calls and live calling, so it is its own experiment after Slice 3.
+- **Gear (D27):** a trait you can move between players, so when a star rests his gear can go to whoever replaces him. Built last. One gear slot per player, priced in cash (a ticket card). Swapping it is free between matches.
+- **Sponsors (D28):** a deal with a condition and a cash payout, for example "Stay under the cap for 8 rounds: $25k". One deal active at a time. Builds on the timed sponsor effects already in the events deck. The main cash source for the stadium.
+- **Cap booster (Special, D29):** gives one free level of the cap upgrade the game already sells (three levels, each adding 5% to the cap, priced at 5×, 10× and 20× match base). Gold tier. Not offered once all three levels are owned. It is permanent, so a legal squad can't turn illegal.
 
 ## Build order and issues
 
@@ -332,7 +337,7 @@ Approved and filed. Build in this order, one PR each, because they share files a
 5. Saving shelf: two slots for priced cards (D11).
 6. Every new career starts holding two blueprints (D22).
 
-**Slice 3: more card types** (Later section): training, boosters, gear, sponsors, cap booster. Assistant coach and analyst start supplying Training and Booster cards here.
+**Slice 3: more card types** (Later section, D25 to D29): training, pre-match boosters, sponsors, cap booster, then gear last. Assistant coach and analyst start supplying Training and Booster cards here.
 
 Each numbered item is one GitHub issue with a plain "done when" taken from its spec. Every agent prompt starts: read AGENTS.md, CLAUDE.md and docs/hub first, and check open PRs touching cardWeek.ts, matchday.ts, lineup.ts or sheets.ts before starting.
 
