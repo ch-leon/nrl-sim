@@ -1,12 +1,19 @@
-# NRL Sim: Card week specs (draft, revision 2)
+# NRL Sim: Card week specs
 
-Nov 27, 2026 · @Le
+27–28 Nov 2026 · @Le · decisions D1 to D34
 
 ## Status and how to use this
 
-**Slice 1a is approved** (Le, 27 Nov) and filed as issues #852 to #858. Everything else is still a draft for Le's review: not approved, Ready or built. These six specs turn the 26–27 Nov chat decisions into buildable pieces for the Card week Labs test. Build only from the issues; do not build Slice 1b, 2 or 3 from this file until Le approves them and their issues exist.
+**Most of this is approved and filed as GitHub issues.** Build only from the issues; this file is the background they link to and the record of Le's decisions (D1 to D34, below). The file keeps its `-draft` name because the issues link to it.
 
-Parent: Notion page *NRL Sim — Cards, collections and branching careers*, section 24. Where this draft and section 24 disagree, this draft holds the newer decision (no steal, the money rule, stadium plots). Section 23 (opening pack and album) is unchanged and out of scope here. What is in the game today is described in `docs/specs/846-card-week.md`.
+- **Filed, batch 1** (the pick and fatigue; stop here for Le's playtest): #852, #853, #854, #855, #856, #862, #857, #858, in that order.
+- **Filed, batch 2** (after the playtest): #866, #868, #869, #870, #871, #872, #874, #875, in that order.
+- **Parked, not filed:** the stadium, plots, neighbour bonuses and the saving shelf (Spec 4 below the blueprint step).
+- **Pinned, not filed:** gear (D34).
+
+Where an issue and this file disagree, the issue wins. Every number is a starting value to playtest.
+
+Parent: Notion page *NRL Sim — Cards, collections and branching careers*. Section 24 is the design background; section 25 mirrors the decisions and issue list in this file. Where this file and section 24 disagree, this file holds the newer decision. Section 23 (opening pack and album) is unchanged and out of scope here. What is in the game today is described in `docs/specs/846-card-week.md`.
 
 Each spec has the same parts: what the player experiences, the rules, what exists in the game today, done when, and open questions. Labels used throughout:
 
@@ -14,11 +21,11 @@ Each spec has the same parts: what the player experiences, the rules, what exist
 - **New**: does not exist yet.
 - **Proposal**: a starting number to playtest, not a balanced value.
 
-Once Le approves a spec, it becomes one or more GitHub issues. Every agent prompt starts with: read AGENTS.md, CLAUDE.md and docs/hub before touching code.
+Every agent prompt starts with: read AGENTS.md, CLAUDE.md and docs/hub before touching code.
 
 ## What changed in revision 2
 
-Revision 1 was checked against the repo on 27 Nov. Le's decisions D1–D9 are untouched. These proposals and gaps changed:
+Revision 1 was checked against the repo on 27 Nov. Le's decisions D1–D9 are untouched. These proposals and gaps changed. Two were changed again later: weekly recovery is 20, not 30 (D30), and the player-card fee is flat by tier, not half the free-agent fee (D10).
 
 1. **Based on #850, not #849.** Strikes, the Decree and team-sheet bonuses are in the game, and the save version is 39.
 2. **Fatigue recovers every week.** Revision 1 only recovered in a week without playing, so a starter hit 90 by round 3 with no event entered. Now League alone nets zero and each event adds a debt (Spec 5).
@@ -46,7 +53,7 @@ Le has set the direction: cards run most of the career week, tested first behind
 | D7 | Free agency stays, and still costs a cash signing fee | Le | 27 Nov |
 | D8 | Salary cap still pays wages, including card players | Le | 27 Nov (option C) |
 | D9 | First test proves the weekly offer plus the fatigue-versus-event choice. Stadium, gear and sponsors follow if it is fun | Le agreed direction | 27 Nov |
-| D10 | A player card costs a flat fee by tier, in multiples of the league's match base: grey 1×, gold 3× ($8,000 and $24,000 in Local). Final multiples are set from the #858 run | Le | 27 Nov |
+| D10 | A player card costs a flat fee by tier, in multiples of the league's match base: Common 1×, Rare 2×, Gold 3× ($8,000, $16,000 and $24,000 in Local). Final multiples are set from the balance runs (#858, #870) | Le | 27 Nov |
 | D11 | The saving shelf waits for Slice 2, when facilities make cards dear enough to need it | Le | 27 Nov |
 | D12 | A released card player joins the free-agent pool like any other released player | Le | 27 Nov |
 | D13 | Card players sign for the rest of the season, the same as free agents | Le | 27 Nov |
@@ -72,7 +79,7 @@ Le has set the direction: cards run most of the career week, tested first behind
 | D33 | Sponsors start with three deals, one running at a time, no penalty for failing: Winning run, Cup night and Young guns (#875) | Le | 27 Nov |
 | D34 | Gear is pinned until Le has played Slice 1a | Le | 27 Nov |
 
-**Still open:** whether matchday cards are free. D10 to D14 settle Slice 1b's design, but 1b is not filed as issues until #858 has reported.
+**Still open:** whether training adds fatigue; whether an away event should tire a player as much as a match; a guaranteed mix of families in each pick (revisit D19 after the playtest); gear's rules (D34); the in-match booster (D25, D32); and everything about the stadium (plot counts, moving or demolishing, neighbour bonuses, the shelf).
 
 ## Spec 1: Weekly offer and hand
 
@@ -393,6 +400,8 @@ Still open:
 
 - [ ] Does training add fatigue? (Left out of 1a.)
 - [x] Card-player fee: flat by tier, grey 1× and gold 3× match base (D10). Final multiples after #858.
-- [ ] Matchday cards free (recommended)?
+- [x] Matchday cards are free: recovery, training and booster cards are filed as free to play (#856, #871, #874).
 - [x] Staff deliver a card every 3 rounds, as a starting value (#862).
-- [ ] Stadium plot counts: 4, 6, 9?
+- [ ] Stadium plot counts: 4, 6, 9? (Parked with the stadium, D31.)
+- [ ] Should an away event (Skills Camp, a challenge) tire a player as much as a match?
+- [ ] Gear's rules (pinned, D34).
