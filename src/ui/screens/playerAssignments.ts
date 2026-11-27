@@ -1,3 +1,4 @@
+import { weekHeld } from '../../core/time';
 import { getState, type GameState, type Player, type PlayerStats, type TrainingFocus } from '../../core/state';
 import { CAMP_RULES, openingCampFixture, supportedCampCalendar, type CampRecord } from '../../data/playerAssignments';
 import { PROGRESSION } from '../../config';
@@ -258,7 +259,7 @@ export function openSkillsCamp(findOpener: () => HTMLElement | null): HTMLElemen
         : today.bench.some(p => p.id === participant.id) ? 'bench' : 'reserve';
       const roleNote = role === 'bench' ? 'Currently on the bench.' : `Currently a ${role}.`;
       const fatigue = review?.action.kind === 'cancel' ? undefined : fatigueBookingNote(
-        previewWeeklyFatigue(state, { week: rules.departureWeek, playerId: participant.id }), participant.id);
+        previewWeeklyFatigue(state, { week: rules.departureWeek, playerId: participant.id }, weekHeld()), participant.id);
       detail.append(el('div', { class: 'nrl-camp-panel', attrs: { 'data-camp-preview': '' } },
         el('h3', { text: participant.name }),
         ...(role === projected.role ? [] : [el('p', { text: roleNote })]),

@@ -1,3 +1,4 @@
+import { weekHeld } from '../../core/time';
 import { leagueSeasonView, nextSeasonFixture } from '../../systems/leagueSeasonView';
 import { roundLabel } from '../../systems/matchday';
 // src/ui/screens/lineup.ts — the Lineup screen (GitHub #69; 3e Broadcast Quiet):
@@ -406,7 +407,7 @@ export function openLineupScreen(): void {
       return; // state:changed renders again
     }
     const lineup = s.lineup;
-    fatigue = previewWeeklyFatigue(s);
+    fatigue = previewWeeklyFatigue(s, undefined, weekHeld());
     if (fatigueHead) {
       const note = fatigueBonusMatchNote(fatigue, s.squad);
       const open = fatigueHead.querySelector<HTMLDetailsElement>('[data-fatigue-match-preview]')?.open;

@@ -740,7 +740,7 @@ function nextMatchCard(state: GameState, card: HTMLElement = el('div', { class: 
   line('Head to head', fmtHeadToHead(p.headToHead));
   if (p.weather) line('Conditions', fmtWeather(p.weather));
   card.append(lines);
-  const fatigue = fatigueBonusMatchNote(previewWeeklyFatigue(state), state.squad);
+  const fatigue = fatigueBonusMatchNote(previewWeeklyFatigue(state, undefined, weekHeld()), state.squad);
   if (fatigue) card.append(fatigue);
   return card;
 }

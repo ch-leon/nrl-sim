@@ -135,3 +135,13 @@ it('previews the chosen trial and drawn Cup starters before the match, with inte
     closeModal();
   }
 });
+
+
+it('uses the kick-off fatigue already applied in a parked League week', () => {
+  const state = career();
+  const playerId = state.squad[0]!.id;
+  const normal: GameState = { ...state, week: CAMP_RULES.departureWeek, cardWeek: { ...state.cardWeek, weeklyFatigue: { [playerId]: 60 } } };
+  const parked = recoverWeeklyFatigue(normal);
+  expect(previewWeeklyFatigue(normal)?.kickoff?.[playerId]).toBe(40);
+  expect(previewWeeklyFatigue(parked, undefined, true)?.kickoff?.[playerId]).toBe(40);
+});

@@ -1,3 +1,4 @@
+import { weekHeld } from '../../core/time';
 import { portraitDataUrl } from '../../art/portrait';
 import { kitFromColors } from '../../art/match/kit';
 import { DEFAULT_PLAYER_COLORS } from '../../config';
@@ -209,7 +210,7 @@ export function openIndividualChallenge(editionId: ChallengeEditionId, findOpene
     actions.append(control('Back','back',()=>{review=null;render();body.focus();}), confirm);
   }
   function bookingFatigue(s: GameState, id: string): HTMLElement | undefined {
-    return fatigueBookingNote(previewWeeklyFatigue(s, { week: edition.eventWeek, playerId: id }), id);
+    return fatigueBookingNote(previewWeeklyFatigue(s, { week: edition.eventWeek, playerId: id }, weekHeld()), id);
   }
   function renderOffer(s: GameState): void {
     const locked=edition.requiresFirstTitle && !challengeQualified(s);

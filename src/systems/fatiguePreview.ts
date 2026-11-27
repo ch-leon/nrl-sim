@@ -33,7 +33,7 @@ function fixtureText(state: GameState, match: DatedFixture): FatigueFixture {
 }
 
 export function previewWeeklyFatigue(
-  state: GameState, booking?: { week: number; playerId: string },
+  state: GameState, booking?: { week: number; playerId: string }, currentWeekRecovered = false,
 ): WeeklyFatiguePreview | undefined {
   if (!state.cardWeek) return;
   const season = leagueSeasonView(state);
@@ -52,7 +52,8 @@ export function previewWeeklyFatigue(
   const injuryRecovery = injuryRecoveryPerWeek(state.facilities);
   let projected = state;
   for (let week = state.week; week <= (league?.slot ?? eventWeek ?? 0); week++) {
-    projected = recoverWeeklyFatigue(projected);
+    // Save & exit can return to the club with this week's recovery already applied.
+    if (week !== state.week || !currentWeekRecovered) projected = recoverWeeklyFatigue(projected);
     const away = new Set(reservations.filter(r => r.week === week).map(r => r.playerId));
     if (league?.slot === week) {
       result.kickoff = projected.cardWeek!.weeklyFatigue;
@@ -64,9 +65,10 @@ export function previewWeeklyFatigue(
     if (entrant !== undefined) away.add(entrant);
     const match = fixtures.find(f => f.slot === week);
     const intervals = week - state.week;
+    const recoveries = intervals + Number(!currentWeekRecovered);
     const squad = match ? state.squad.map(player => ({
       ...player,
-      injuredWeeks: Math.max(0, player.injuredWeeks - (intervals + 1) * injuryRecovery),
+      injuredWeeks: Math.max(0, player.injuredWeeks - recoveries * injuryRecovery),
       suspendedWeeks: Math.max(0, (player.suspendedWeeks ?? 0) - intervals),
     })) : [];
     const side = match ? resolveLineup(state.lineup, squad, away) : undefined;
