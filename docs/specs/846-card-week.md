@@ -151,8 +151,9 @@ save in recovery.
 
 A League loss by 24 or more, or every third consecutive League loss, earns
 one strike. A strike costs one board patience point down to a minimum of one.
-A win or draw breaks the run, and a heavy third loss counts once. Cards and
-the board chip show this season's strike count. The week summary gives the
+A win or recorded draw breaks the run. A tied final counts by its tiebreak
+winner. A heavy third loss counts once. Cards and the board chip show this
+season's strike count. The week summary gives the
 reason or says the strike was absorbed.
 
 After the club's fifth completed League match, including forfeits, the next

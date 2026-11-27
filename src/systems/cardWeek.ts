@@ -806,12 +806,13 @@ export function cardWeekTick(state: GameState): GameState {
   const settled: CardWeekState = { ...cw, lastSettled: { season: state.season, week: state.week } };
   if (!fixture) return { ...next, cardWeek: settled };
 
-  const { homeScore, awayScore } = fixture.result!;
+  const { homeScore, awayScore, winnerId } = fixture.result!;
+  const lost = winnerId !== undefined && winnerId !== state.clubId;
   const margin = fixture.homeId === state.clubId ? awayScore - homeScore : homeScore - awayScore;
   const strikes = cw.strikes.season === state.season ? cw.strikes : { season: state.season, count: 0, lossRun: 0, log: [] };
-  const run = margin > 0 ? strikes.lossRun + 1 : 0;
+  const run = lost ? strikes.lossRun + 1 : 0;
   const thirdLoss = run >= CARD_WEEK.STRIKE_LOSS_RUN;
-  const reason = margin >= CARD_WEEK.STRIKE_MARGIN ? 'margin' : thirdLoss ? 'run' : undefined;
+  const reason = lost && margin >= CARD_WEEK.STRIKE_MARGIN ? 'margin' : thirdLoss ? 'run' : undefined;
   let log = strikes.log;
   if (reason) {
     const amount = -CARD_WEEK.STRIKE_PATIENCE_COST;

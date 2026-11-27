@@ -13,6 +13,7 @@ import { getState, loadState, setState, type GameState } from '../../src/core/st
 import { __setLabs } from '../../src/labs/flags';
 import { prepareLeagueCareer } from '../../src/systems/leagueCareerSetup';
 import { acceptLeagueEntry, previewLeagueEntry } from '../../src/systems/leagueEntry';
+import { releasedState } from '../../src/systems/freeagency';
 import { registerFixturesSystem } from '../../src/systems/fixtures';
 import { registerPlayerMatchSystem } from '../../src/systems/matchday';
 import { confirmPlayerSale, quotePlayerSale } from '../../src/systems/playerTransfers';
@@ -232,6 +233,38 @@ describe('Cards and new grants', () => {
     pick().querySelector('[data-card-choice="0"]')!.click();
     expect(getState().cardWeek!.hand).toHaveLength(5);
     expect(getState().cardWeek!.hand[4]).toMatchObject({ cardId: 'cashInjection', level: 2 });
+  });
+
+  it('shows a departed recruit’s refusal with a full hand and lets the player pass', async () => {
+    const base = await prepareLeagueCareer({ clubName: 'Card FC', seed: 37, cardWeek: true });
+    loadState(plant({ ...base, money: 1_000_000 }, 'propSigning'));
+    expect(playChosenCard('pick', 0).ok).toBe(true);
+    const recruitId = getState().cardWeek!.cardPlayers[0]!;
+    for (const id of ['analyst', 'assistantCoach', 'lastLine', 'playmaker', 'finisher']) {
+      loadState(plant(getState(), id));
+      expect(chooseCard(0).ok).toBe(true);
+    }
+    const waiting = plant(getState(), 'propSigning');
+    const released = releasedState(waiting, recruitId);
+    if (!('state' in released)) throw new Error(released.message);
+    loadState(released.state);
+    const hand = getState().cardWeek!.hand;
+    openCardPick();
+    const take = pick().querySelector('[data-card-choice="0"]')!;
+    const play = pick().querySelector('[data-card-play-now="0"]')!;
+    expect(take.disabled).toBe(true);
+    expect(play.disabled).toBe(true);
+    expect(play.parentNode!.parentNode!.words()).toContain(`${released.released.name} is no longer at the club`);
+    expect(pick().words()).toContain('Hand full. Play or discard a card first.');
+    expect(pick().querySelector('[data-card-make-room]')!.disabled).toBe(false);
+
+    const pass = pick().querySelector('[data-card-pass]')!;
+    expect(pass.disabled).toBe(false);
+    pass.click();
+    pick().querySelector('[data-card-pass-confirm]')!.click();
+    expect(getState().cardWeek!.offers).toEqual([]);
+    expect(getState().cardWeek!.hand).toEqual(hand);
+    expect(dialogOpen()).toBe(false);
   });
 
   it('opens actual new League picks through every entry point, even with three starters and a full match queue', async () => {

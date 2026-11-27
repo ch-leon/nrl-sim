@@ -1276,7 +1276,8 @@ describe('actual v37 save bytes', () => {
 });
 
 describe('League strikes and Decree picks', () => {
-  function leagueMatch(state: GameState, slot: number, margin: number, format = 'league', decider: 'score' | 'forfeit' = 'score'): GameState {
+  function leagueMatch(state: GameState, slot: number, margin: number, format = 'league',
+    outcome: 'score' | 'forfeit' | 'tiebreak-win' | 'tiebreak-loss' = 'score'): GameState {
     const instances = state.competitions!.instances;
     const instance = instances.find(i => i.definition.format.kind === format && i.fixtures.some(f => f.homeId === state.clubId || f.awayId === state.clubId))
       ?? instances.find(i => i.definition.format.kind === 'league' && i.fixtures.some(f => f.homeId === state.clubId || f.awayId === state.clubId))!;
@@ -1285,9 +1286,14 @@ describe('League strikes and Decree picks', () => {
     const them = margin > 0 ? margin : 0;
     const home = fixture.homeId === state.clubId;
     const score = { homeScore: home ? us : them, awayScore: home ? them : us };
-    const winnerId = margin > 0 ? (home ? fixture.awayId : fixture.homeId) : state.clubId;
+    const rivalId = home ? fixture.awayId : fixture.homeId;
+    const winnerId = margin > 0 || outcome === 'tiebreak-loss' ? rivalId : state.clubId;
+    const knockout = instance.definition.stages.find(stage => stage.kind === 'knockout');
+    const tiebreak = outcome === 'tiebreak-win' || outcome === 'tiebreak-loss';
     const settled = { ...fixture, id: `result-${slot}`, slot, status: 'completed' as const,
-      result: margin === 0 ? { ...score, decider: 'draw' as const } : { ...score, winnerId, decider } };
+      ...(tiebreak && knockout ? { stageId: knockout.id } : {}),
+      result: tiebreak ? { homeScore: 12, awayScore: 12, winnerId, decider: 'higher-seed' as const }
+        : margin === 0 ? { ...score, decider: 'draw' as const } : { ...score, winnerId, decider: outcome } };
     const updated = format === instance.definition.format.kind
       ? instances.map(i => i === instance ? { ...i, fixtures: [...i.fixtures, settled] } : i)
       : [...instances, { ...instance, id: `other-${slot}`, definition: {
@@ -1322,12 +1328,32 @@ describe('League strikes and Decree picks', () => {
     expect(state.boardPatience).toBe(3);
   });
 
-  it.each([-1, 0])('resets the loss run after a margin of %d', async result => {
-    let state = await career();
-    state = leagueMatch(leagueMatch(state, 1, 1), 2, 1);
-    state = leagueMatch(state, 3, result);
-    expect(state.cardWeek!.strikes.lossRun).toBe(0);
-    expect(leagueMatch(state, 4, 1).cardWeek!.strikes.count).toBe(0);
+  it('counts a tied semifinal lost on seeding as the third consecutive League loss', async () => {
+    let s = { ...await career(44), boardPatience: 5 };
+    s = leagueMatch(leagueMatch(s, 20, 1), 21, 1);
+    s = leagueMatch(s, 22, 0, 'league', 'tiebreak-loss');
+    expect(s.cardWeek!.strikes).toMatchObject({ count: 1, lossRun: 0, log: [{ week: 22, reason: 'run' }] });
+    expect(s.boardPatience).toBe(4);
+  });
+
+  it.each([
+    { label: 'a score win', margin: -1, outcome: 'score' },
+    { label: 'a recorded draw', margin: 0, outcome: 'score' },
+    { label: 'a tied semifinal won on seeding', margin: 0, outcome: 'tiebreak-win' },
+  ] as const)('resets the loss run after $label', async ({ margin, outcome }) => {
+    let s = { ...await career(44), boardPatience: 5 };
+    s = leagueMatch(leagueMatch(s, 20, 1), 21, 1);
+    s = leagueMatch(s, 22, margin, 'league', outcome);
+    expect(s.cardWeek!.strikes).toMatchObject({ count: 0, lossRun: 0, log: [] });
+    expect(s.boardPatience).toBe(5);
+  });
+
+  it('counts a third straight loss by forfeit as one margin strike', async () => {
+    let s = { ...await career(44), boardPatience: 5 };
+    s = leagueMatch(leagueMatch(s, 1, 1), 2, 1);
+    s = leagueMatch(s, 3, 24, 'league', 'forfeit');
+    expect(s.cardWeek!.strikes).toMatchObject({ count: 1, lossRun: 0, log: [{ week: 3, reason: 'margin', margin: 24 }] });
+    expect(s.boardPatience).toBe(4);
   });
 
   it.each([[1, true], [2, false]])('counts a heavy third loss once at patience %d', async (patience, absorbed) => {

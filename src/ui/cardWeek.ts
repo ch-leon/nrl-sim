@@ -228,7 +228,7 @@ export function openCardPick(grant?: number): HTMLElement | null {
       }, face.refusal, true);
       play.setAttribute('data-card-play-now', String(face.index));
       play.setAttribute('aria-label', `Play ${face.title} now`);
-      if (face.refusal && face.refusal !== blocked && (!full || face.refusal !== face.takeRefusal || face.kind === 'dilemma')) {
+      if (face.refusal && face.refusal !== blocked) {
         box.append(cardProblem(face.refusal));
       }
       box.append(el('div', { class: 'nrl-card-buttons' }, take, ...(!decree ? [play] : [])));
