@@ -5,10 +5,19 @@ vi.mock('../../src/art/coachFace', () => ({ coachFaceDataUrl: () => 'data:image/
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { selectPack } from '../../src/content';
 import { bus } from '../../src/core/events';
+import { __unlockSaves, loadCareer, saveIfChanged, setActiveSlot } from '../../src/core/save';
+import { CORRUPT_SAVE_KEY, slotKey } from '../../src/core/storageKeys';
+import { advanceWeeks, clearHeldWeek, clearSeasonHooks, clearTickHooks } from '../../src/core/time';
+import { isCardWeek } from '../../src/core/saveValidation';
 import { getState, loadState, setState, type GameState } from '../../src/core/state';
 import { __setLabs } from '../../src/labs/flags';
 import { prepareLeagueCareer } from '../../src/systems/leagueCareerSetup';
-import { cardOfferView, cardWeekTick, chooseCard, plantCard } from '../../src/systems/cardWeek';
+import { acceptLeagueEntry, previewLeagueEntry } from '../../src/systems/leagueEntry';
+import { registerFixturesSystem } from '../../src/systems/fixtures';
+import { registerPlayerMatchSystem } from '../../src/systems/matchday';
+import { confirmPlayerSale, quotePlayerSale } from '../../src/systems/playerTransfers';
+import { makeRng } from '../../src/utils/rng';
+import { cardOfferView, cardWeekTick, chooseCard, plantCard, playChosenCard, registerCardWeekSystem, rerollPick } from '../../src/systems/cardWeek';
 import { closeModal, closeScreen, dialogOpen, el, openModal } from '../../src/ui/dom';
 import { cardChipCount, initCardWeekPick, lastMatchView, openCardPick, picksWaitingText, replacesLine, tierLabel, traitTargetRows } from '../../src/ui/cardWeek';
 import { openCardsScreen } from '../../src/ui/screens/cards';
@@ -188,7 +197,7 @@ describe('Cards and new grants', () => {
     openCardsScreen();
     const screen = body().querySelector('[data-cards-screen]')!;
     expect(screen.words()).toContain('Hand (1/5)');
-    expect(screen.querySelector('[data-hand-card="playmaker"]')!.words()).toContain('Grey · I');
+    expect(screen.querySelector('[data-hand-card="playmaker"]')!.words()).toContain('Grey · Level I');
     expect(screen.words()).toContain('Good if');
     screen.querySelector('[data-hand-play="0"]')!.click();
     screen.querySelectorAll('[data-card-target]')[0]!.click();
@@ -201,8 +210,8 @@ describe('Cards and new grants', () => {
 
   it('allows Play now with a full hand and requires a discard before taking a sixth card', async () => {
     loadState(await fresh());
-    for (let i = 0; i < 5; i++) {
-      loadState(plant(getState(), 'cashInjection'));
+    for (const id of ['analyst', 'assistantCoach', 'lastLine', 'playmaker', 'finisher']) {
+      loadState(plant(getState(), id));
       expect(chooseCard(0).ok).toBe(true);
     }
     loadState(plant(getState(), 'cashInjection'));
@@ -222,6 +231,7 @@ describe('Cards and new grants', () => {
     expect(getState().cardWeek!.hand).toHaveLength(4);
     pick().querySelector('[data-card-choice="0"]')!.click();
     expect(getState().cardWeek!.hand).toHaveLength(5);
+    expect(getState().cardWeek!.hand[4]).toMatchObject({ cardId: 'cashInjection', level: 2 });
   });
 
   it('opens actual new League picks through every entry point, even with three starters and a full match queue', async () => {
@@ -329,6 +339,80 @@ describe('Cards and new grants', () => {
     stop();
   });
 
+});
+
+describe('continuing after a former recruit returns', () => {
+  afterEach(() => { clearHeldWeek(); clearTickHooks(); clearSeasonHooks(); });
+
+  it.each(['pick', 'hand'] as const)('saves and continues Reece Fenuamea’s return from the Bellbirds via the %s', async source => {
+    const storage = stubLocalStorage();
+    __unlockSaves();
+    setActiveSlot(1);
+
+    const base = await prepareLeagueCareer({ clubName: 'Card FC', seed: 1, cardWeek: true });
+    const preview = previewLeagueEntry(base, base.competitions!.world!.profile.startingDivisionId);
+    if (!preview.ok) throw new Error(preview.message);
+    const entry = acceptLeagueEntry(base, preview.preview);
+    if (!entry.ok) throw new Error(entry.message);
+    const state = entry.state;
+    // Start the week-one hooker draw at Reece’s point in seed 1’s card stream.
+    const rng = makeRng(state.cardWeek!.rng);
+    for (let i = 0; i < 19; i++) rng.next();
+    loadState(plant({ ...state, cardWeek: { ...state.cardWeek!, rng: rng.state() } }, 'hookerSigning'));
+    expect(playChosenCard('pick', 0)).toMatchObject({ ok: true, outcome: expect.stringContaining('Reece Fenuamea') });
+    const id = getState().cardWeek!.cardPlayers[0]!;
+    const offer = quotePlayerSale(getState(), id);
+    if (!offer.ok) throw new Error(offer.message);
+    expect(offer.offer).toMatchObject({ season: 1, week: 1, buyerId: 'rival-au-bellbirds' });
+    expect(confirmPlayerSale(offer.offer)).toEqual({ ok: true });
+    expect(saveIfChanged(getState())).toBe(true);
+
+    registerFixturesSystem(); registerPlayerMatchSystem(); registerCardWeekSystem();
+    advanceWeeks(12);
+    expect(getState().week).toBe(13);
+    const winPick = getState().cardWeek!.offers.slice(-1)[0]!;
+    expect(winPick).toMatchObject({ week: 12, fromClubId: 'rival-au-bellbirds' });
+    expect(rerollPick(winPick.grant)).toMatchObject({ ok: true });
+    expect(rerollPick(winPick.grant)).toMatchObject({ ok: true });
+    const cards = getState().cardWeek!.offers.slice(-1)[0]!.cards;
+    const index = cards.findIndex(card => card.kind === 'player' && card.player.id === id);
+    expect(index).toBeGreaterThanOrEqual(0);
+    if (source === 'hand') expect(chooseCard(index, winPick.grant)).toMatchObject({ ok: true });
+    expect(playChosenCard(source, source === 'hand' ? 0 : index, undefined, winPick.grant))
+      .toMatchObject({ ok: true, outcome: expect.stringContaining('Reece Fenuamea') });
+
+    const raw = storage.getItem(slotKey(1))!;
+    const saved = JSON.parse(raw) as GameState;
+    expect(saved.cardWeek!.cardPlayers).toEqual([id]);
+    expect(isCardWeek(saved.cardWeek)).toBe(true);
+    expect(saved.squad.find(player => player.id === id)?.clubHistory?.spells.map(spell => spell.clubId))
+      .toEqual([saved.clubId, 'rival-au-bellbirds', saved.clubId]);
+
+    const continueFromSlot = async () => {
+      loadState(base);
+      const root = new StubNode('div');
+      const title = showTitleFlow(root as unknown as HTMLElement);
+      root.querySelector('[data-nrl-continue-1]')!.click();
+      expect(await title).toEqual({ mode: 'continue' });
+      const loaded = loadCareer();
+      if (loaded.status !== 'ok') throw new Error(JSON.stringify(loaded));
+      loadState(loaded.state);
+      expect(getState().week).toBe(13);
+      expect(getState().cardWeek!.cardPlayers).toEqual([id]);
+      expect(getState().squad.find(player => player.id === id)?.name).toBe('Reece Fenuamea');
+      return loaded;
+    };
+    expect(await continueFromSlot()).toMatchObject({ outcome: 'valid', repairs: [] });
+
+    // Recreate the metadata written by the earlier v38 build and keep its bytes in recovery.
+    const duplicate = JSON.stringify({ ...saved, cardWeek: { ...saved.cardWeek!, cardPlayers: [id, id] } });
+    storage.setItem(slotKey(1), duplicate);
+    expect(await continueFromSlot()).toMatchObject({ outcome: 'repaired', repairs: [{ field: 'cardWeek.cardPlayers' }] });
+    expect(storage.getItem(slotKey(1))).toBe(duplicate);
+    expect(storage.getItem(CORRUPT_SAVE_KEY)).toContain(id);
+    expect(saveIfChanged(getState())).toBe(true);
+    expect(await continueFromSlot()).toMatchObject({ outcome: 'valid', repairs: [] });
+  }, 30000);
 });
 
 describe('the title option', () => {

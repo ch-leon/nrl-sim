@@ -9,7 +9,7 @@ import { FACILITY_CATALOG } from '../data/facility';
 import { TRAIT_IDS } from '../data/traits';
 import type { ActiveModifier, SeasonFinance } from './state';
 import type { ImmediateEffect } from '../data/events';
-import { isPlayId } from '../data/plays';
+import { isBasePlayId } from '../data/plays';
 import { BOARD, GRID_W, GRID_H } from '../config';
 import { BENCH, isRotation } from '../match/league/bench';
 import { isAttackPreset, isDefencePreset } from '../match/league/presets';
@@ -249,7 +249,9 @@ function isActiveCard(v: unknown): boolean {
         && (typeof def.role === 'string' ? v.member.role === def.role && v.member.speciality === undefined
           : v.member.role === 'attackCoach' && v.member.speciality === def.role.attackCoach);
     }
-    case 'setPlay': return cardDefById(v.cardId)?.kind === 'setPlay' && isPlayId(v.playId);
+    case 'setPlay': return cardDefById(v.cardId)?.kind === 'setPlay' && isBasePlayId(v.playId);
+    case 'player': case 'dilemma': case 'trait': return cardDefById(v.cardId)?.kind === v.kind && text(v.playerId);
+    case 'cash': return cardDefById(v.cardId)?.kind === 'cash';
     case 'buff': case 'decree': return cardDate(v) && (v.playerId === undefined || text(v.playerId));
     default: return false;
   }
@@ -271,6 +273,8 @@ export function isCardWeek(v: unknown): boolean {
       if (!integer(o.grant, previous + 1, grants)) return false;
       previous = o.grant;
     }
+    const stolen = (o.cards as unknown[]).filter(c => record(c) && c.fromClubId !== undefined);
+    if (stolen.length > 1 || stolen.some(c => record(c) && (o.kind !== 'match' || c.fromClubId !== o.fromClubId))) return false;
     if (o.seen !== undefined && (o.seen !== true || !integer(o.grant, 1, seenGrant))) return false;
   }
   if (!Array.isArray(v.hand) || v.hand.length > CARD_WEEK.HAND_CAP || !v.hand.every(h => record(h) && isOfferedCard(h.offered)
@@ -290,12 +294,15 @@ function isOfferedCard(c: unknown): boolean {
   if (!record(c) || !text(c.cardId)) return false;
   const def = cardDefById(c.cardId);
   if (!def || c.kind !== def.kind) return false;
+  const steal = c.cardId.startsWith('steal-');
+  if (steal ? !text(c.fromClubId) : c.fromClubId !== undefined) return false;
   switch (def.kind) {
     case 'player': case 'dilemma':
       return isPlayer(c.player) && integer(c.salary, 1)
+        && (!steal || c.cardId === `steal-player:${c.player.position}:${c.player.id}`)
         && (c.replacesId === undefined ? c.replacesName === undefined : text(c.replacesId) && text(c.replacesName));
     case 'staff': return text(c.name);
-    case 'setPlay': return isPlayId(c.playId);
+    case 'setPlay': return isBasePlayId(c.playId) && (!steal || c.cardId === `steal-play:${c.playId}`);
     case 'trait': case 'cash': return true;
   }
 }
@@ -438,7 +445,7 @@ export function validateCurrent(v: Record<string, unknown>, runningCamp?: Runnin
   const bad = (field: string): ValidationResult => ({ ok: false, message: `Invalid save data: ${field}.` });
   const tactics = (t: unknown): boolean => record(t) && isAttackPreset(t.attack as string) && isDefencePreset(t.defence as string);
   if (!Array.isArray(v.recentPlans) || !v.recentPlans.every(tactics)) return bad('recentPlans');
-  if (!record(v.playbook) || !Array.isArray(v.playbook.owned) || !v.playbook.owned.every(isPlayId) || !unique(v.playbook.owned)) return bad('playbook');
+  if (!record(v.playbook) || !Array.isArray(v.playbook.owned) || !v.playbook.owned.every(isBasePlayId) || !unique(v.playbook.owned)) return bad('playbook');
   const repairs: SaveRepair[] = [];
   const repair = (field: string, problem: string, action: string, rationale: string): void => {
     repairs.push({ field, problem, repair: action, rationale, notification: REPAIR_NOTICE });
@@ -451,7 +458,7 @@ export function validateCurrent(v: Record<string, unknown>, runningCamp?: Runnin
     l = { ...l, [field]: value };
     repair(`lineup.${field}`, 'missing selection', field === 'starters' || field === 'bench' ? 'resolveLineup' : 'clear to null', 'Existing selection rules supply the missing selection from the existing squad or use the default leader.');
   }
-  if (!record(l) || !Array.isArray(l.starters) || l.starters.length !== LINEUP_SLOTS.length || !l.starters.every(id => id === null || text(id)) || !strings(l.bench) || l.bench.length > BENCH.size || !isRotation(l.rotation as string) || !tactics(l.tactics) || ![l.kicker, l.captain].every(id => id === null || text(id)) || !Array.isArray(l.plays) || !l.plays.every(isPlayId) || !unique(l.plays) || !l.plays.every(id => (v.playbook as { owned: unknown[] }).owned.includes(id))) return bad('lineup');
+  if (!record(l) || !Array.isArray(l.starters) || l.starters.length !== LINEUP_SLOTS.length || !l.starters.every(id => id === null || text(id)) || !strings(l.bench) || l.bench.length > BENCH.size || !isRotation(l.rotation as string) || !tactics(l.tactics) || ![l.kicker, l.captain].every(id => id === null || text(id)) || !Array.isArray(l.plays) || !l.plays.every(isBasePlayId) || !unique(l.plays) || !l.plays.every(id => (v.playbook as { owned: unknown[] }).owned.includes(id))) return bad('lineup');
   const state = v as unknown as GameState;
   let lineup = l as unknown as Lineup;
   const selected = [...lineup.starters.filter(id => id !== null), ...lineup.bench];

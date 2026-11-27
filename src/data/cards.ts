@@ -6,6 +6,8 @@
 // Tiers: grey is the everyday card, gold the rarer, stronger one. Weights are
 // relative within the cards eligible for a pick. Money is in dollars.
 import type { AttackCoachSpeciality, Position, StaffRole } from '../core/state';
+import { POSITIONS } from './player';
+import { isBasePlayId } from './plays';
 import type { TraitId } from './traits';
 
 export type CardTier = 'grey' | 'gold';
@@ -21,6 +23,12 @@ export const CARD_WEEK = {
   OFFER_SIZE: 3,
   /** Tries at generating a player card's man before the card sits this pick out. */
   PLAYER_TRIES: 6,
+  REROLL_BASE: 1_500,
+  REROLL_STEP: 1_500,
+  STAFF_WAGE_FACTOR: { 1: 1, 2: 0.75, 3: 0.5 },
+  CASH_FACTOR: { 1: 1, 2: 1.5, 3: 2 },
+  DILEMMA_MARGIN_STEP: 2,
+  RECRUIT_RATING_STEP: 2,
 } as const;
 
 /**
@@ -31,6 +39,12 @@ export const CARD_WEEK = {
  * (STAR_BANDS in config.ts). Tuning values: Leon changes these.
  */
 export const PLAYER_CARD_MARGIN: Readonly<Record<CardTier, number>> = { grey: 4, gold: 18 };
+
+export const SIGNATURE_TRAIT: Record<Position, TraitId> = {
+  fullback: 'lastLine', winger: 'finisher', centre: 'finisher',
+  'five-eighth': 'playmaker', halfback: 'playmaker', hooker: 'playmaker',
+  prop: 'wreckingBall', 'second-row': 'wreckingBall', lock: 'wreckingBall',
+};
 
 interface CardBase {
   id: string;
@@ -86,5 +100,14 @@ const BY_ID: ReadonlyMap<string, CardDef> = new Map(CARDS.map((c) => [c.id, c]))
 
 /** The card with `id`, or undefined (a card dropped since the save was made). */
 export function cardDefById(id: string): CardDef | undefined {
-  return BY_ID.get(id);
+  const known = BY_ID.get(id);
+  if (known) return known;
+  const [kind, key, ...personId] = id.split(':');
+  if (kind === 'steal-player' && POSITIONS.includes(key as Position) && personId.join(':')) {
+    return { id, kind: 'player', title: 'Rival signing', tier: 'grey', weight: 0, position: key as Position, margin: 0 };
+  }
+  if (kind === 'steal-play' && !personId.length && isBasePlayId(key)) {
+    return { id, kind: 'setPlay', title: 'Rival set play', tier: 'grey', weight: 0 };
+  }
+  return undefined;
 }

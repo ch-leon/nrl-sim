@@ -11,7 +11,7 @@ import { commitLineup } from './lineup';
 import { bus } from '../core/events';
 import { getState, setState, type GameState, type Lineup } from '../core/state';
 import { spendMoney } from '../data/club';
-import { PLAYS_BY_ID, isPlayId, type PlayId } from '../data/plays';
+import { PLAYS_BY_ID, isBasePlayId, type PlayId } from '../data/plays';
 import { PLAYS } from '../match/league/plays';
 import { ATTACK_COACHES, attackCoach } from './staff';
 
@@ -22,7 +22,7 @@ export function playReason(id: PlayId): string {
 
 /** The plays the club has bought, known ids only, in the order bought. */
 export function ownedPlays(state: Partial<Pick<GameState, 'playbook'>>): PlayId[] {
-  return (state.playbook?.owned ?? []).filter(isPlayId);
+  return (state.playbook?.owned ?? []).filter(isBasePlayId);
 }
 
 export function ownsPlay(state: Partial<Pick<GameState, 'playbook'>>, id: PlayId): boolean {
@@ -36,7 +36,7 @@ export function ownsPlay(state: Partial<Pick<GameState, 'playbook'>>, id: PlayId
  */
 export function buyRefusal(state: Pick<GameState, 'staff' | 'money' | 'playbook'>, id: PlayId): string | null {
   const play = PLAYS_BY_ID[id];
-  if (!play) return 'No such play';
+  if (!isBasePlayId(id) || !play) return 'No such play';
   if (ownsPlay(state, id)) return 'Already yours';
   const coach = attackCoach(state);
   if (!coach || coach.speciality !== play.family) return `Hire the ${ATTACK_COACHES[play.family].short.toLowerCase()} coach`;
@@ -62,11 +62,11 @@ export function buyPlay(id: PlayId): boolean {
  * A play the catalogue has dropped, or one not bought, is left out.
  */
 export function validPlays(list: readonly unknown[] | undefined, owned: readonly unknown[] | undefined): PlayId[] {
-  const mine = new Set((owned ?? []).filter(isPlayId));
+  const mine = new Set<PlayId>((owned ?? []).filter(isBasePlayId));
   const out: PlayId[] = [];
   for (const id of list ?? []) {
     if (out.length >= PLAYS.takeMax) break;
-    if (isPlayId(id) && mine.has(id) && !out.includes(id)) out.push(id);
+    if (isBasePlayId(id) && mine.has(id) && !out.includes(id)) out.push(id);
   }
   return out;
 }

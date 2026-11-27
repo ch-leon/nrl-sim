@@ -1,4 +1,4 @@
-import { withLastMatch } from './cardWeek';
+import { cardMatchPlays, withLastMatch } from './cardWeek';
 import { leagueFixtureView } from './leagueSeasonView';
 import { freezeMatchEffects, matchIncomePatch, commitMatchState, reconcileMatchEffects } from './matchIncome';
 // Orchestrator-owned: the PLAYER's match of the round (rival-vs-rival matches
@@ -160,7 +160,8 @@ function sheetFor(clubId: string): TeamSheet {
     if (picked.changed) setState({ lineup: picked.lineup });
     if (picked.fills.length > 0) bus.emit('ui:notify', { text: describeFills(picked.fills), kind: 'info', match: true });
     // The set plays he takes in (#326): only ones the club owns, at most three, in his order.
-    const plays = validPlays(picked.lineup.plays, state.playbook?.owned);
+    const selected = validPlays(picked.lineup.plays, state.playbook?.owned);
+    const plays = state.cardWeek ? cardMatchPlays(state, selected) : selected;
     return teamSheetFromSquad(
       state.squad,
       PLAYER_ID,

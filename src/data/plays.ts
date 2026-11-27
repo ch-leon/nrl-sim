@@ -10,11 +10,16 @@
 // IQ need is footy IQ after the rating spread.
 import type { AttackPreset, Zone } from '../match/league/presets';
 
-export type PlayId =
+export type BasePlayId =
   | 'block-play' | 'inside-ball' | 'short-side-raid'
   | 'cut-out-winger' | 'second-man' | 'block-shift'
   | 'kick-pass' | 'chip-chase'
   | 'tap-rambo' | 'long-ball';
+
+/** Match sheets can carry a levelled version without changing the owned play. */
+export type PlayId = BasePlayId | `${BasePlayId}:II` | `${BasePlayId}:III`;
+export const CARD_PLAY_IQ_STEP = 1;
+export const CARD_PLAY_CONTACT_STEP = 0.02;
 
 /** The attack coach's speciality that opens a play to buy (plan §2.2). */
 export type PlayFamily = 'direct' | 'width' | 'kicking' | 'razzle';
@@ -96,7 +101,7 @@ export interface Play<Id extends string = PlayId> {
 
 const ANY_BUT_OWN20: readonly Zone[] = ['ownHalf', 'midfield', 'attackingHalf', 'redZone'];
 
-export const PLAY_LIST: readonly Play[] = [
+export const PLAY_LIST: readonly Play<BasePlayId>[] = [
   {
     id: 'block-play', name: 'Block play', short: 'Block play', style: 'grind', family: 'direct', from: ['ptb'],
     when: { zones: ['ownHalf', 'midfield', 'attackingHalf'], tackles: [1, 3] },
@@ -207,12 +212,24 @@ export const PLAY_LIST: readonly Play[] = [
   },
 ];
 
-export const PLAY_IDS: readonly PlayId[] = PLAY_LIST.map((p) => p.id);
+export const PLAY_IDS: readonly BasePlayId[] = PLAY_LIST.map((p) => p.id);
 
-export const PLAYS_BY_ID: Readonly<Record<PlayId, Play>> = Object.fromEntries(PLAY_LIST.map((p) => [p.id, p])) as Record<PlayId, Play>;
+const CARD_PLAY_VARIANTS = PLAY_LIST.flatMap(play => (['II', 'III'] as const).map((level, index): Play => ({
+  ...play,
+  id: `${play.id}:${level}`,
+  roles: play.roles.map(role => ({ ...role, iq: Math.max(0, role.iq - (index + 1) * CARD_PLAY_IQ_STEP) })),
+  mods: { ...play.mods, broken: (play.mods.broken ?? 0) + (index + 1) * CARD_PLAY_CONTACT_STEP },
+})));
+
+export const PLAYS_BY_ID = Object.fromEntries([...PLAY_LIST, ...CARD_PLAY_VARIANTS].map(p => [p.id, p])) as Readonly<Record<PlayId, Play>>;
+
+/** Levelled IDs are legal in saved and live match sheets. The club only owns base plays. */
+export function isBasePlayId(v: unknown): v is BasePlayId {
+  return PLAY_IDS.includes(v as BasePlayId);
+}
 
 export function isPlayId(v: unknown): v is PlayId {
-  return PLAY_IDS.includes(v as PlayId);
+  return typeof v === 'string' && Object.prototype.hasOwnProperty.call(PLAYS_BY_ID, v);
 }
 
 /** The plays a family opens, in catalogue order. */

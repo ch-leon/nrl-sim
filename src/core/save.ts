@@ -26,9 +26,9 @@ import { currentCalendarFixtures, fixtureBridge, hasStructuralCalendar, recoverU
 // comes from src/core/storageKeys.ts, frozen whatever the game is called.
 
 import { fillCardOffers, identifyCardOffers } from '../systems/cardWeek';
-import { CARD_PASS, CARD_WEEK } from '../data/cards';
-import type { CardHistoryEntry, CardOffer, CardWeekState, Fixture, GameState } from './state';
-import { hasV33Fields, isCardWeekV36, validateInput, validateCurrent, type SaveRepair } from './saveValidation';
+import { CARD_PASS, CARD_WEEK, cardDefById } from '../data/cards';
+import type { ActiveCard, CardHistoryEntry, CardOffer, CardWeekState, Fixture, GameState } from './state';
+import { hasV33Fields, isCardWeek, isCardWeekV36, validateInput, validateCurrent, type SaveRepair } from './saveValidation';
 import { emptyFinance, getState, SAVE_VERSION, setState, stateInstallation } from './state';
 import { fromLegacy, isTraitId, traitLevel, type TraitInstance } from '../data/traits';
 import { withRivalSquads } from '../systems/rivals';
@@ -151,6 +151,45 @@ function migrateCardWeek(old: RawState): RawState {
     rerolls: { season: state.season, week: state.week, count: 0 },
     strikes: { season: state.season, count: 0, lossRun: 0, log: [] },
   } }).cardWeek };
+}
+
+function migrateCardLevels(old: RawState): RawState {
+  if (!isCardWeek(old.cardWeek)) return old;
+  const state = old as unknown as GameState;
+  const cw = state.cardWeek!;
+  const levels = new Map<string, ActiveCard>();
+  const played = cw.history.filter(h => h.action === 'play');
+  let recruit = Math.max(0, cw.cardPlayers.length - played.filter(entry => {
+    const kind = cardDefById(entry.cardId)?.kind;
+    return kind === 'player' || kind === 'dilemma';
+  }).length);
+  const plays = played.filter(h => h.cardId === 'setPlay');
+  // v37 recorded recruits in application order, but recorded no set-play identity.
+  // Attribute a play only when its history accounts for every owned play.
+  for (const entry of played) {
+    const def = cardDefById(entry.cardId);
+    let card: ActiveCard | undefined;
+    if (def?.kind === 'player' || def?.kind === 'dilemma') {
+      const playerId = cw.cardPlayers[recruit++];
+      if (playerId && state.squad.some(p => p.id === playerId)) {
+        card = { kind: def.kind, cardId: def.id, playerId, level: 1 };
+      }
+    }
+    if (def?.kind === 'cash') card = { kind: 'cash', cardId: def.id, level: 1 };
+    if (card) levels.set(card.cardId, card);
+  }
+  if (plays.length && plays.length === state.playbook.owned.length) {
+    levels.set('setPlay', { kind: 'setPlay', cardId: 'setPlay', playId: state.playbook.owned[plays.length - 1]!, level: 1 });
+  }
+  for (const entry of cw.cardTraits) {
+    const player = state.squad.find(p => p.id === entry.playerId);
+    const card = cardDefById(entry.trait);
+    const level = player && traitLevel(player.traits, entry.trait);
+    if (card?.kind === 'trait' && level) levels.set(card.id, { kind: 'trait', cardId: card.id, playerId: entry.playerId, level });
+  }
+  const added = [...levels.values()].filter(c => !cw.active.some(saved => saved.cardId === c.cardId));
+  // An older save can resume a parked match from this squad and playbook.
+  return { ...old, cardWeek: { ...cw, active: [...cw.active, ...added] } };
 }
 
 export const MIGRATIONS: readonly MigrationStep[] = [
@@ -374,6 +413,7 @@ export const MIGRATIONS: readonly MigrationStep[] = [
   // v36 adds the optional card week (#846): absent keeps a career as it was.
   { from: 35, to: 36, run: old => old },
   { from: 36, to: 37, run: migrateCardWeek },
+  { from: 37, to: 38, run: migrateCardLevels },
   // v32 snapshots the agreement observed under v31 ID-only protection.
   // Already recorded exact terms keep their provenance, including queued terms.
   { from: 31, to: 32, run: old => {
@@ -441,19 +481,32 @@ function migrateChecked(raw: unknown): MigrateResult {
     let state = cur as unknown as GameState;
     if (version === 32) state = createOpenCupOffer({...structuredClone(state),version:SAVE_VERSION,competitionRewards:[]});
     if (version === 33 || version === 34 || version === 35) state = {...state,version:SAVE_VERSION};
-    if (version === 36) {
-      const step = MIGRATIONS.find((m) => m.from === version)!;
-      state = { ...step.run(cur), version: step.to } as unknown as GameState;
+    for (const step of MIGRATIONS.filter(m => m.from >= Math.max(36, version))) {
+      state = { ...step.run(state as unknown as RawState), version: step.to } as unknown as GameState;
+    }
+    const repairs: SaveRepair[] = [];
+    const cards = state.cardWeek;
+    if (version === 38 && cards && Array.isArray(cards.cardPlayers)) {
+      // Earlier v38 builds could record the same recruit twice when he returned via a steal.
+      const cardPlayers = [...new Set(cards.cardPlayers)];
+      if (cardPlayers.length < cards.cardPlayers.length) {
+        state = { ...state, cardWeek: { ...cards, cardPlayers } };
+        repairs.push({
+          field: 'cardWeek.cardPlayers', problem: 'Repeated recruit ID', repair: 'Kept one marker per recruit',
+          rationale: 'A returning recruit retains the same player ID.',
+          notification: 'Card recruits repaired. The original save has been kept in recovery.',
+        });
+      }
     }
     const problem = leagueCareerStateProblem(state);
     // #837: a trip answered at the league choice. Kept only if the repaired career passes every check.
     const trip = problem ? repairClosedSeasonTrip(state) : null;
     const identifyOffers = (loaded: GameState): GameState => loaded.cardWeek
       ? { ...loaded, cardWeek: identifyCardOffers(loaded.cardWeek) } : loaded;
-    if (trip && !leagueCareerStateProblem(trip.state)) return { ok: true, outcome: 'repaired', state: identifyOffers(trip.state), repairs: [trip.repair] };
+    if (trip && !leagueCareerStateProblem(trip.state)) return { ok: true, outcome: 'repaired', state: identifyOffers(trip.state), repairs: [...repairs, trip.repair] };
     return problem ? { ok: false, outcome: problem.reason === 'unsupported' ? 'unsupported' : 'unrecoverable',
       reason: 'corrupt', message: problem.message }
-      : { ok: true, outcome: 'valid', state: identifyOffers(state), repairs: [] };
+      : { ok: true, outcome: repairs.length ? 'repaired' : 'valid', state: identifyOffers(state), repairs };
   }
   const inputProblem = validateInput(cur, version);
   if (inputProblem) return { ok: false, outcome: 'unrecoverable', reason: 'corrupt', message: inputProblem };

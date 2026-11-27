@@ -4,7 +4,7 @@ import { advanceInProgress } from '../core/advance';
 import { saveIfChanged } from '../core/save';
 import { CARD_WEEK, cardDefById, type CardTier } from '../data/cards';
 import { ROMAN, TRAITS } from '../data/traits';
-import { cardHandView, cardOfferView, chooseCard, discardHeldCard, passPick, pickBlocked, playChosenCard, preferredCardOffer, unshownCardOffer, type CardFaceView } from '../systems/cardWeek';
+import { rerollCost, rerollPick, rerollRefusal, cardHandView, cardOfferView, chooseCard, discardHeldCard, passPick, pickBlocked, playChosenCard, preferredCardOffer, unshownCardOffer, type CardFaceView } from '../systems/cardWeek';
 import { POSITION_SHORT } from '../systems/lineup';
 import { fmtMoney } from '../utils/money';
 import { el, button, openModal, closeModal, activeScreen, dialogOpen, ensureStyles } from './dom';
@@ -81,11 +81,12 @@ export function picksWaitingText(owed: number, starter = 0): string {
 
 // ── DOM ───────────────────────────────────────────────────────────────────────
 
-export function cardFacts(face: CardFaceView, level?: string): HTMLElement {
+export function cardFacts(face: CardFaceView): HTMLElement {
   const box = el('div', { class: `nrl-card-face nrl-card-${face.tier}` },
-    el('span', { class: 'nrl-card-tier', text: `${tierLabel(face.tier)}${level ? ` · ${level}` : ''}` }),
+    el('span', { class: 'nrl-card-tier', text: `${tierLabel(face.tier)} · Level ${ROMAN[face.level]}` }),
     el('strong', { class: 'nrl-card-title', text: face.title }),
     el('span', { class: 'nrl-card-effect', text: face.effect }));
+  if (face.source) box.append(el('span', { class: 'nrl-card-source', text: `From ${face.source}` }));
   const who = playerLine(face);
   if (face.player && who) box.append(el('span', { class: 'nrl-card-player', text: face.player.name }), el('span', { class: 'nrl-card-facts', text: who }));
   if (face.detail) box.append(el('span', { class: 'nrl-card-player', text: face.detail }));
@@ -216,12 +217,12 @@ export function openCardPick(grant?: number): HTMLElement | null {
     const full = state.cardWeek!.hand.length >= CARD_WEEK.HAND_CAP;
     for (const face of view.cards) {
       const box = cardFacts(face);
-      const take = cardAction('Take', () => choose(face.index), face.takeRefusal);
+      const take = cardAction(face.upgrade ? 'Upgrade' : 'Take', () => choose(face.index), face.takeRefusal);
       take.setAttribute('data-card-choice', String(face.index));
       take.setAttribute('data-card-id', face.cardId);
-      take.setAttribute('aria-label', `Take ${face.title}`);
+      take.setAttribute('aria-label', `${face.upgrade ? 'Upgrade' : 'Take'} ${face.title}`);
       const play = cardAction('Play now', () => {
-        if (face.kind === 'trait') { step = { kind: 'targets', index: face.index }; problem = ''; render(); }
+        if (face.targets) { step = { kind: 'targets', index: face.index }; problem = ''; render(); }
         else choose(face.index, true);
       }, face.refusal, true);
       play.setAttribute('data-card-play-now', String(face.index));
@@ -254,6 +255,21 @@ export function openCardPick(grant?: number): HTMLElement | null {
       yes.setAttribute('data-card-pass-confirm', '');
       actions.append(el('p', { class: 'nrl-card-pass-ask', text: 'Pass this pick? It will be gone.' }), cardAction('Keep picking', back), yes);
     } else {
+      const rerollProblem = rerollRefusal(state, displayed);
+      const reroll = cardAction(`Reroll (${fmtMoney(rerollCost(state))})`, () => {
+        const result = rerollPick(showing);
+        if (result.ok) {
+          outcome = result.outcome;
+          problem = '';
+        } else problem = result.reason;
+        render();
+        if (result.ok) content.closest('.nrl-modal-scroll')?.scrollTo({ top: 0 });
+      }, rerollProblem);
+      reroll.setAttribute('data-card-reroll', '');
+      actions.append(reroll);
+      if (rerollProblem && rerollProblem !== blocked) {
+        actions.append(el('span', { class: 'nrl-card-refusal', text: rerollProblem }));
+      }
       const pass = cardAction('Pass', () => { step = { kind: 'pass' }; render(); }, blocked);
       pass.setAttribute('data-card-pass', '');
       actions.append(pass);
@@ -348,11 +364,12 @@ export const CARD_CSS = `
 .nrl-card-title { font-family: var(--nrl-f-label); font-size: 1.0625rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; line-height: 1.2; color: var(--nrl-text); overflow-wrap: anywhere; }
 .nrl-card-effect { font-size: 0.875rem; line-height: 1.35; color: var(--nrl-text-2); overflow-wrap: anywhere; }
 .nrl-card-player { font-weight: 700; font-size: 0.9375rem; color: var(--nrl-text); overflow-wrap: anywhere; }
+.nrl-card-source { font-size: 0.75rem; color: var(--nrl-accent); overflow-wrap: anywhere; }
 .nrl-card-facts { font-family: var(--nrl-f-num); font-size: 0.8125rem; color: var(--nrl-text); }
 .nrl-card-replaces { font-size: 0.8125rem; color: var(--nrl-neg); overflow-wrap: anywhere; }
 .nrl-card-refusal { font-size: 0.8125rem; color: var(--nrl-neg); overflow-wrap: anywhere; }
 .nrl-card-actions { align-items: center; }
-.nrl-card-actions .nrl-btn { flex: 0 1 10rem; }
+.nrl-card-actions .nrl-btn { flex: 0 1 auto; min-width: 44px; }
 .nrl-card-pass-ask { flex: 1 1 100%; margin: 0; color: var(--nrl-text-2); font-size: 0.875rem; }
 .nrl-card-targets { display: flex; flex-direction: column; gap: 6px; max-height: 50vh; overflow-y: auto; overscroll-behavior: contain; }
 .nrl-btn.nrl-card-target { height: auto; min-height: 44px; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 6px 12px; text-transform: none; letter-spacing: 0; text-align: left; white-space: normal; background: var(--nrl-panel); border: 1px solid var(--nrl-line); border-radius: 10px; }

@@ -22,8 +22,9 @@ async function checkPick(page, portrait) {
     assert.ok(boxes.every(box => box.y === boxes[0].y && box.visible), JSON.stringify(boxes));
     assert.ok(boxes[2].x > boxes[1].x && boxes[1].x > boxes[0].x);
   }
-  const actions = await cards.locator('button').evaluateAll(buttons =>
+  const actions = await page.locator(`${PICK} .nrl-card-face button, ${PICK} [data-card-reroll]`).evaluateAll(buttons =>
     buttons.map(button => [button.offsetWidth, button.offsetHeight]));
+  assert.ok((await cards.locator('.nrl-card-tier').allTextContents()).every(text => /Level I/.test(text)));
   assert.ok(actions.every(([width, height]) => width >= 44 && height >= 44), JSON.stringify(actions));
 }
 
@@ -64,6 +65,12 @@ export async function runCardWeek(browser) {
     assert.ok(Math.abs(larger - 1.3) < 0.01, 'The Larger text setting must scale rem units');
     await page.locator('.nrl-card-modal .nrl-screen-x').waitFor();
     await checkPick(page, false);
+    const reroll = page.locator(`${PICK} [data-card-reroll]`);
+    assert.match(await reroll.textContent(), /Reroll \(\$1,500\)/);
+    const money = await page.evaluate(() => window.__nrlState().money);
+    await reroll.tap();
+    assert.match(await reroll.textContent(), /Reroll \(\$3,000\)/);
+    assert.equal(await page.evaluate(() => window.__nrlState().money), money - 1500);
     await page.screenshot({ animations: 'disabled', path: join(out, '667x375-pick.png') });
 
     await page.locator('.nrl-card-modal .nrl-screen-x').tap();
@@ -75,8 +82,10 @@ export async function runCardWeek(browser) {
     await offers.nth(1).tap();
     assert.equal(await page.locator(PICK).getAttribute('data-card-grant'), grant);
 
-    await page.locator(`${PICK} [data-card-choice]`).first().tap();
-    await page.locator(`${PICK} [data-card-choice]`).first().tap();
+    for (const id of ['cashInjection', 'assistantCoach']) {
+      assert.equal(await page.evaluate(id => window.__nrlShowCardWeek(id), id), null);
+      await page.locator(`${PICK} [data-card-id="${id}"]`).tap();
+    }
     await page.locator('.nrl-card-modal .nrl-screen-x').tap();
     await page.locator('[data-screen="club"]').tap();
     const tab = page.locator('[data-screen="cards"]');
@@ -102,9 +111,37 @@ export async function runCardWeek(browser) {
     assert.ok(await page.locator('.nrl-rotate').isHidden());
     await page.screenshot({ animations: 'disabled', path: join(out, '375x667-cards.png') });
 
+    // Give the remaining pick a repeat and an identified win reward so both
+    // presentation paths are exercised on every run, regardless of the seed.
+    const source = await page.evaluate(() => {
+      const state = window.__nrlState();
+      const club = state.league.clubs.find(c => c.id !== state.clubId);
+      const offer = state.cardWeek.offers[0];
+      offer.kind = 'match';
+      offer.fromClubId = club.id;
+      offer.cards = [
+        { cardId: 'cashInjection', kind: 'cash' },
+        { cardId: 'assistantCoach', kind: 'staff', name: state.cardWeek.hand[1].offered.name },
+        { cardId: 'steal-play:block-play', kind: 'setPlay', playId: 'block-play', fromClubId: club.id },
+      ];
+      state.cardWeek.starterLeft = 0;
+      state.cardWeek.owed = 1;
+      return club.name;
+    });
+    // Reopen so the Cards screen reads the latest queued pick.
+    await page.locator('.nrl-cards-screen .nrl-screen-x').tap();
+    await page.locator('[data-portrait-cards]').tap();
+    assert.equal(await page.locator(`${CARDS} .nrl-card-source`).textContent(), `From ${source}`);
+    assert.match(await page.locator(CARDS).textContent(), /Next reroll \$3,000/);
     await page.locator(`${CARDS} [data-cards-pick]`).tap();
     await checkPick(page, true);
+    assert.equal(await page.locator(`${PICK} .nrl-card-source`).textContent(), `From ${source}`);
+    assert.match(await page.locator(`${PICK} .nrl-card-face`).first().textContent(), /Level II.*\$22,500/);
     await page.screenshot({ animations: 'disabled', path: join(out, '375x667-pick.png') });
+    assert.match(await reroll.textContent(), /Reroll \(\$3,000\)/);
+    await reroll.tap();
+    assert.match(await reroll.textContent(), /Reroll \(\$4,500\)/);
+    assert.equal(await page.locator(`${PICK} .nrl-card-source`).textContent(), `From ${source}`);
     await page.locator('.nrl-card-modal .nrl-screen-x').tap();
     await page.locator('.nrl-cards-screen .nrl-screen-x').tap();
     await page.locator('[data-portrait-cards]').tap();
