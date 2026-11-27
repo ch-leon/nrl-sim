@@ -51,8 +51,12 @@ Le has set the direction: cards run most of the career week, tested first behind
 | D12 | A released card player joins the free-agent pool like any other released player | Le | 27 Nov |
 | D13 | Card players sign for the rest of the season, the same as free agents | Le | 27 Nov |
 | D14 | A card's colour is its family and its word is its type (#851's types: Player, Staff, Trait, Facility, Specialty, Fatigue relief, Booster) | Le | 27 Nov |
+| D15 | Slice 1a is judged in two steps: the bot report (#858), then Le plays a season to round 10. The friend playtests only after Le has | Le | 27 Nov |
+| D16 | No limit on cards played per week during testing | Le | 27 Nov |
+| D17 | Three tiers: Common, Rare and Gold (#851), replacing grey and gold | Le | 27 Nov |
+| D18 | Everything carries into the next season: hand, card levels, waiting picks and fatigue. Only the Decree expires and strikes reset, as today | Le | 27 Nov |
 
-**Still open:** whether there is a limit on cards played per week; whether matchday cards are free; gear's exact job. D10 to D14 settle Slice 1b's design, but 1b is not filed as issues until #858 has reported.
+**Still open:** what goes in each offer (pure chance or a guaranteed spread of families); whether matchday cards are free; gear's exact job. D10 to D14 settle Slice 1b's design, but 1b is not filed as issues until #858 has reported.
 
 ## Spec 1: Weekly offer and hand
 
@@ -76,7 +80,7 @@ After each League match you see a row of cards and keep two. Cards wait in your 
 3. **Starter picks keep 1 each (new in revision 2).** The three picks before round 1 show 5 and keep 1, so a new career starts with 3 cards and two free hand slots.
 4. **A full hand still refuses a take.** With one free slot, you keep one card and play or pass the other.
 5. **The Decree pick is unchanged:** 3 of 6, adopt one.
-6. **No limit on plays per week** in the test. The offer is the limit. Revisit only if players hoard and dump.
+6. **No limit on plays per week** in the test (D16). The offer is the limit. Revisit only if players hoard and dump.
 7. **Saving shelf (new, Slice 2, D11).** Two slots, separate from the 5-card hand, for priced cards you can't afford yet (Spec 2). A shelved card shows how much more cash you need.
 8. **Cards never expire** in the hand or on the shelf. Unused picks still expire as today.
 9. **Rerolls stay** as a cash sink, same prices.
@@ -100,6 +104,8 @@ After each League match you see a row of cards and keep two. Cards wait in your 
 Every card belongs to one of four colour-coded families, and every card face shows its price before you keep it. Players and facilities cost cash to play; matchday cards are free, so a broke week still has decisions.
 
 **Today:** seven card kinds (player, staff, set play, trait, cash, the "Marquee gamble" dilemma, and Decree) in two tiers, grey and gold. Player cards join with no signing fee; staff cards waive the appointment fee; set plays are free. The cash card pays $15,000.
+
+**Tiers (D17).** Three tiers replace today's two: Common (today's grey), Rare (new) and Gold. Proposal for the new middle tier: a Rare player is generated +10 above the club's best at his position (Common +4, Gold +18) and costs 2× match base (Common 1×, Gold 3×, D10). This lands with the card-face work in Slice 1b, not in 1a.
 
 **Families (D3)**
 
@@ -235,6 +241,8 @@ Players carry tiredness from week to week. A League match alone leaves a player 
 
 So the choice each event is: take on 20 that will not clear by itself, or keep him fresh. The Open Cup weeks become the natural place to pay it back, by leaving him out of the tie.
 
+**Across seasons (D18).** Fatigue carries into the next season like everything else. The weekly recovery keeps running in the weeks with no League round, so a player who sits out the off-season starts round 1 at 0 without a special reset. Pre-season trials count as bonus events.
+
 **Strikes.** Strikes exist today. A tired side that loses by 24 or more, or three in a row, costs board patience. That is the real price of overplaying, so it must be visible: the event preview names the next League opponent.
 
 **Done when**
@@ -319,6 +327,12 @@ Approved and filed. Build in this order, one PR each, because they share files a
 **Slice 3: more card types** (Later section): training, boosters, gear, sponsors, cap booster. Assistant coach and analyst start supplying Training and Booster cards here.
 
 Each numbered item is one GitHub issue with a plain "done when" taken from its spec. Every agent prompt starts: read AGENTS.md, CLAUDE.md and docs/hub first, and check open PRs touching cardWeek.ts, matchday.ts, lineup.ts or sheets.ts before starting.
+
+## How Slice 1a is judged (D15)
+
+1. **The bot report (#858)** says whether Card week makes a career easier, harder or the same, and whether fatigue is a tax.
+2. **Le plays one season to round 10.** Proposal for the bar: in those 10 rounds Le hesitated over rest-or-play at least three times, and no pick felt like a chore.
+3. **The friend playtests** only after Le has, with the same checklist.
 
 ## Risks and open questions
 
