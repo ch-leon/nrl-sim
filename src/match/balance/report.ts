@@ -4,7 +4,7 @@
 // than luck would explain. Pure: results in, Markdown out.
 import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL } from '../league/presets';
 import { STAND_OUTCOMES } from '../league/goalLineStand';
-import { SIDE_COUNTS, MATCH_MINUTES, type CellResult, type CountKey, type Stat, type WatchStats } from './measure';
+import { SIDE_COUNTS, MATCH_MINUTES, stat, type CellResult, type CountKey, type Stat, type WatchStats } from './measure';
 import { LAST_TACKLES, ORIGINS, TAP_ORIGINS } from './watch';
 
 /**
@@ -89,6 +89,7 @@ export function reportMarkdown(r: ReportInput): string {
     'Penalties count whistles, including recalls. penaltiesWaived counts offsides where the referee called advantage over.',
     '',
   );
+  out.push(...weeklyFatigueTable(r.results));
   const scenarios = [...new Set(r.results.map((x) => x.scenario))];
   for (const sc of scenarios) {
     const rows = r.results.filter((x) => x.scenario === sc);
@@ -140,6 +141,29 @@ export function reportMarkdown(r: ReportInput): string {
   const secs = r.results.reduce((a, x) => a + x.ms, 0) / 1000;
   out.push(`_${r.results.length} cells in ${secs.toFixed(0)} s._`, '');
   return out.join('\n');
+}
+
+function weeklyFatigueTable(rows: readonly CellResult[]): string[] {
+  const samples = rows.flatMap(row => Object.entries(row.weeklyFatigue ?? {}).map(([side, target]) => ({ row, side, ...target })));
+  if (!samples.length) return [];
+  const out = [
+    '## Tracked starter injuries', '',
+    'Injured matches in the written orientation. A paired change compares each seed with the matching fresh scenario in this plan.',
+    '',
+    '| Scenario | Variant | Starter | Fatigue | Injured | Rate | Paired change (pp) |',
+    '|---|---|---|---:|---:|---:|---:|',
+  ];
+  for (const s of samples) {
+    const injuries = s.hurt.filter(Boolean).length;
+    const control = s.compareWith && samples.find(c => c.row.scenario === s.compareWith
+      && c.row.variant === s.row.variant && c.side === s.side && c.hurt.length === s.hurt.length);
+    const paired = control && s.points > 0
+      ? delta(stat(s.hurt.map((hurt, i) => 100 * (Number(hurt) - Number(control.hurt[i])))),
+        { mean: 0, se: 0 }, s.hurt.length >= MIN_SEEDS_TO_FLAG)
+      : '—';
+    out.push(`| ${s.row.scenario} | ${s.row.variant} | ${s.side} ${s.position} | ${s.points} | ${injuries}/${s.hurt.length} | ${pct1(injuries / s.hurt.length)} | ${paired} |`);
+  }
+  return [...out, ''];
 }
 
 /** Raw samples keep rare third sets visible even in large or shortened runs. */

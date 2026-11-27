@@ -160,3 +160,9 @@ hand, so one save exercises both paths.
 573 after the first League match. Assistant Coach is in the hand and round one's
 pick still has one keep and four resolved cards. The three starter picks remain
 in the queue.
+
+
+### v41 Card week save with weekly fatigue
+
+`v41-card-week-fatigue.json.gz` uses the v40 half-pick career with the v41
+fatigue field populated at 50 and 100 for two squad members.

@@ -14,7 +14,7 @@ import { makeRng } from '../../utils/rng';
 import { autoPick, resolveLineup } from '../../systems/lineup';
 import { generateRivalSquad, hashString, squadStrength } from '../../systems/rivals';
 import { rivalMatchSheet } from '../../systems/matchday';
-import { teamSheetFromSquad } from '../league/sheets';
+import { teamSheetFromSquad, withWeeklyFatigue } from '../league/sheets';
 import { rivalEdge, type DifficultyEdge } from '../league/spread';
 import { TICK_S } from '../core/engine';
 import type { Side, SimEvent } from '../core/snapshot';
@@ -198,6 +198,8 @@ export interface CellResult {
   nine?: { home?: number; away?: number };
   /** Raw three-set passages and qualifying starts in the written orientation (#657). Absent when off or unmeasured. */
   goalLine?: { starts: number; matches: number; outcomes: Record<StandOutcome, number>; unfinished: number };
+  /** Whether the tracked starter was injured on each seed in the written orientation. */
+  weeklyFatigue?: Partial<Record<Side, { position: string; points: number; compareWith?: string; hurt: boolean[] }>>;
   /** Wall-clock seconds this cell took. */
   ms: number;
   /** Absent in results written before #648: read as not measured, never as zero. Last in the line so the older fields keep their place. */
@@ -295,6 +297,22 @@ export function squadSide(id: string, spec: SideSpec, seed: number, level: numbe
 /** The squad seed for a scenario's n-th squad of a kind on a match seed: the same squads whichever end they play, so a swapped scenario meets the same pair. */
 const squadSeed = (kind: string, n: number, seed: number): number => (hashString(`squad:${kind}:${n}`) ^ Math.imul(seed >>> 0, 2654435761)) >>> 0;
 
+/** Injury IDs stay stable between a fatigue scenario and its zero-fatigue control. */
+const fatiguePlayerId = (sheet: TeamSheet): string => `${sheet.clubId}:weekly-fatigue`;
+
+function fatigueSheet(sheet: TeamSheet, spec: SideSpec): TeamSheet {
+  const fatigue = spec.weeklyFatigue;
+  if (!fatigue) return sheet;
+  const index = sheet.roster?.findIndex(p => p.position === fatigue.position) ?? -1;
+  if (index < 0) throw new Error(`No ${fatigue.position} in ${sheet.name}'s starting nine`);
+  const roster = [...sheet.roster!];
+  roster[index] = withWeeklyFatigue({
+    ...roster[index]!, id: roster[index]!.id ?? fatiguePlayerId(sheet),
+    ...(fatigue.injuryRisk === undefined ? {} : { injuryRisk: fatigue.injuryRisk }),
+  }, fatigue.points);
+  return { ...sheet, roster };
+}
+
 /**
  * Both sides of a scenario for one match seed. Flat and club sides are the same
  * every seed; squad-built ones are new each seed, a levelled rival (no `rating`)
@@ -315,8 +333,8 @@ export function scenarioSides(home: SideSpec, away: SideSpec, seed: number): { h
     a = build('A', away, awayN, h.nine);
   }
   return {
-    home: h.sheet,
-    away: a.sheet,
+    home: fatigueSheet(h.sheet, home),
+    away: fatigueSheet(a.sheet, away),
     nine: { ...(h.nine !== undefined ? { home: h.nine } : {}), ...(a.nine !== undefined ? { away: a.nine } : {}) },
   };
 }
@@ -580,7 +598,7 @@ export class BinSwing {
   }
 }
 
-function stat(xs: readonly number[]): Stat {
+export function stat(xs: readonly number[]): Stat {
   const n = xs.length;
   const mean = xs.reduce((a, b) => a + b, 0) / n;
   const varc = n > 1 ? xs.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1) : 0;
@@ -646,6 +664,14 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
     let trackedDraws = 0;
     let trackedN = 0;
     const legSum = new Map<number, { home: number; away: number }>();
+    const fatigue: NonNullable<CellResult['weeklyFatigue']> = {};
+    for (const side of ['home', 'away'] as const) {
+      const target = cell.scenario[side].weeklyFatigue;
+      if (target) fatigue[side] = {
+        position: target.position, points: target.points, hurt: [],
+        ...(target.compareWith ? { compareWith: target.compareWith } : {}),
+      };
+    }
     const track = cell.scenario.track;
     const bothWays = cell.scenario.bothWays === true;
     const flipSide = (side: 'home' | 'away'): 'home' | 'away' => (side === 'home' ? 'away' : 'home');
@@ -765,6 +791,12 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
         shares.push(diff > 0 ? 1 : diff === 0 ? 0.5 : 0);
       }
       if (!flip) {
+        for (const [side, sheet] of [['home', homeSheet], ['away', awaySheet]] as const) {
+          const target = fatigue[side];
+          if (!target) continue;
+          const id = sheet.roster?.find(p => p.position === target.position)?.id;
+          target.hurt.push(sim.injuries.some(injury => injury.teamId === sheet.clubId && injury.playerId === id));
+        }
         dartChoices.push(sim.darts);
         breaksByMatch.push(breakWindows);
         goalLine.starts += sim.goalLineStarts;
@@ -853,6 +885,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
         ? { nine: { ...(cell.scenario.home.squad ? { home: nineSum.home / seeds } : {}), ...(cell.scenario.away.squad ? { away: nineSum.away / seeds } : {}) } }
         : {}),
       ...(GOAL_LINE_STAND.on > 0 ? { goalLine } : {}),
+      ...(fatigue.home || fatigue.away ? { weeklyFatigue: fatigue } : {}),
       ms: Date.now() - t0,
       watch,
     };

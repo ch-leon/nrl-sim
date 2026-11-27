@@ -28,6 +28,31 @@ exactly as before, and their saves are unchanged apart from the save version.
 | Full hand | A new card cannot be taken into a full hand. With one free slot, take one card and play or pass the other. Upgrades that use no new hand slot are still available. |
 | Pass | Spends the rest of the pick and keeps any card already taken or played. Always allowed while the pick is showing. The history records a pass. |
 
+### Weekly fatigue
+
+At the start of every calendar week, all owned squad players recover 20 fatigue
+points. A built Physio Centre and a built Medical Bay add 2 recovery each.
+Fatigue runs from 0 to 100 and carries across seasons, with the same recovery
+during weeks off and pre-season.
+
+| Appearance | Fatigue after the event |
+| --- | ---: |
+| League starter, including finals | +30 |
+| League interchange who takes the field | +15 |
+| Pre-season trial or Open Cup tie, starter or used interchange | +20 |
+| Away at Skills Camp, Big Mick's Break the Line or Mick's Invitational | +20 |
+
+Leaving a player out, listing him on the bench without using him, and forfeiting
+a match add zero. Club story cards with no recorded participant have no player
+appearance to charge.
+
+Before kick-off, the club's starters and bench get 0.4 percentage points less
+starting energy per fatigue point, so a player on 50 starts at 80%. Fatigue
+strictly above 60 multiplies injury chance on a big hit by 1.5. Above 80 it
+doubles the chance. The existing injury roll reads the scaled risk on the
+team sheet. Rival sheets use their normal kick-off values. Card-week matches
+save both sheets for deterministic replay.
+
 ### Cards
 
 | Kind | What it does | Offered when |
@@ -39,6 +64,8 @@ exactly as before, and their saves are unchanged apart from the save version.
 | Cash | Money now, booked to the Events line of the books as `card: <title>`. | Always. |
 | Dilemma | A gold-tier player joins (as a player card) at the position with the lowest card floor, and board patience drops by one. | As a player card, and only while board patience is at least 2, so it never takes the last point. |
 | Saved rival recruit or set play | The recruit transfers with his career history and his former club receives a fit replacement at the same position. The set play goes into the playbook for free. | Already in the hand or a waiting pick in an older save. |
+
+The calendar and the club’s facilities determine [weekly fatigue](#weekly-fatigue) alongside these card rules.
 
 **The card floor.** The club's best natural player at the card's position (his own
 position is the card's), by overall rating. With nobody there, the best man from a
@@ -87,6 +114,12 @@ card.
 | `CARD_WEEK.PICKS.starter.show` / `.keep` | `src/data/cards.ts` | 5 / 1 | Cards dealt and keeps allowed in each new starter pick. |
 | `CARD_WEEK.PICKS.decree.show` / `.keep` | `src/data/cards.ts` | 3 / 1 | Decrees dealt and adopted in the season's Decree pick. |
 | `CARD_WEEK.PLAYER_TRIES` | `src/data/cards.ts` | 6 | Generation tries for a player card's man to beat the floor before the card sits that pick out. |
+| `WEEKLY_FATIGUE.MIN` / `.MAX` | `src/data/cards.ts` | 0 / 100 | Bounds for each squad player's weekly fatigue. |
+| `WEEKLY_FATIGUE.LEAGUE_STARTER` / `.LEAGUE_BENCH` | `src/data/cards.ts` | 30 / 15 | Fatigue gained by a League starter or a used interchange. |
+| `WEEKLY_FATIGUE.BONUS_EVENT` | `src/data/cards.ts` | 20 | Fatigue gained from playing a bonus match or completing an away event. |
+| `WEEKLY_FATIGUE.RECOVERY` / `.FACILITY_RECOVERY` | `src/data/cards.ts` | 20 / 2 | Recovery per week and extra recovery for each of the two built facilities. |
+| `WEEKLY_FATIGUE.ENERGY_LOSS_PER_POINT` | `src/data/cards.ts` | 0.004 | Fraction of full starting energy lost per fatigue point. |
+| `WEEKLY_FATIGUE.INJURY_TIERS` | `src/data/cards.ts` | >60 ×1.5, >80 ×2 | Strict thresholds for scaling the existing big-hit injury chance. The highest applicable tier wins. |
 | Card `weight` | `src/data/cards.ts` `CARDS` | grey players 10, gold halfback 4; staff 6 (attack coach 4); set play 8; grey traits 7, Finisher 4; cash 8; dilemma 3 | How often each card turns up, relative to the others that can be offered. |
 | Cash `amount` | `src/data/cards.ts` `cashInjection` | $15,000 | The cash card's money. |
 | Dilemma `patience` | `src/data/cards.ts` `marqueeGamble` | −1 | Board patience the dilemma costs. |
@@ -102,6 +135,12 @@ Position links, the opening pack, the album across careers, and any scoring.
   (`TICK_ORDER.autosave − 2`), the last match's lines and the view model.
 - `src/ui/cardWeek.ts`: the pick screen and its automatic opening; the HUD chip is in
   `src/ui/hud.ts`.
+- `src/systems/weeklyFatigue.ts` applies recovery at week start and appearance
+  loads on settlement. `src/match/league/sheets.ts` sets kick-off energy and injury
+  risk. `src/systems/liveMatchRecord.ts` stores Card-week kick-off sheets.
+- Save v41 stores weekly fatigue by squad player ID. Earlier Card-week saves
+  start everyone at zero, while careers without the experiment keep their
+  existing shape. Save validation checks each stored value.
 - Save v40 records the cards already kept from each waiting pick. Loading an
   older save preserves the waiting faces, hand, active cards, Decree and strikes.
   Those waiting picks have used no keeps. `GameState.cardWeek` stays optional

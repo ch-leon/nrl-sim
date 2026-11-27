@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
-import type { GameState } from '../../src/core/state';
+import { newCardWeek, type GameState } from '../../src/core/state';
+import { CAMP_RULES } from '../../src/data/playerAssignments';
+import { recoverWeeklyFatigue, weeklyFatigueOf } from '../../src/systems/weeklyFatigue';
 import { migrateState } from '../../src/core/save';
 import {
   currentSkillsCamp,
@@ -83,4 +85,16 @@ it('keeps ownership through departure, completes once and cancels a fresh trial 
       award: null
     });
   }
+});
+
+
+it('charges the Skills Camp player once on return and clears a fresh player by his next kickoff', () => {
+  const booked = reserve(boundary());
+  const id = currentSkillsCamp(booked)!.booking!.participantId;
+  const away = departForCamp({ ...booked, week: CAMP_RULES.departureWeek, cardWeek: newCardWeek(854), facilities: [] });
+  expect(awayPlayerIds(away).has(id)).toBe(true);
+  const returned = completeCamp({ ...recoverWeeklyFatigue(away), week: CAMP_RULES.returnWeek });
+  expect(weeklyFatigueOf(returned, id)).toBe(20);
+  expect(completeCamp(returned)).toBe(returned);
+  expect(weeklyFatigueOf(recoverWeeklyFatigue(returned), id)).toBe(0);
 });

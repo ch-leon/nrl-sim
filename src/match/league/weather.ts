@@ -75,9 +75,19 @@ export function lostInContactChance(bigHit: boolean, handling: number, weatherHa
   return Math.max(0, (base - (handling - 50) * WEATHER.lostSkill) * weatherHandling);
 }
 
+export const DEFAULT_INJURY_RISK = 20;
+const INJURY_RISK_SCALE = 100;
+
+/** Encode a chance multiplier in the existing injury-risk field, including the base chance. */
+export function scaleInjuryRisk(risk: number, factor: number): number {
+  if (WEATHER.injuryPerRisk === 0) return risk;
+  const baseRisk = WEATHER.injuryBase * INJURY_RISK_SCALE / WEATHER.injuryPerRisk;
+  return (risk + baseRisk) * factor - baseRisk;
+}
+
 /** Chance a big hit injures the carrier (the old engine's roll, scaled): his injury risk, Injury Prone, the difficulty's rate. */
 export function injuryChance(entry: Pick<RosterEntry, 'injuryRisk' | 'traits'> | undefined, rate = 1): number {
-  const risk = entry?.injuryRisk ?? 20;
+  const risk = entry?.injuryRisk ?? DEFAULT_INJURY_RISK;
   const prone = hasTrait(entry?.traits, 'injuryProne') ? WEATHER.injuryProne : 1;
-  return (WEATHER.injuryBase + (risk / 100) * WEATHER.injuryPerRisk) * rate * prone;
+  return (WEATHER.injuryBase + (risk / INJURY_RISK_SCALE) * WEATHER.injuryPerRisk) * rate * prone;
 }

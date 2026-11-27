@@ -12,6 +12,8 @@ import { cyrb53 } from '../utils/hash';
  * No historical engines: only an exact identity match may replay old inputs.
  */
 export const MATCH_ENGINE_REVISION = 24;
+// Saved Card week sheets carry extra inputs and record interchange appearances.
+const WEEKLY_FATIGUE_REVISION = 1;
 
 /** Canonical data order keeps object insertion order out of compatibility. */
 function canonical(value: unknown): string {
@@ -29,9 +31,10 @@ function canonical(value: unknown): string {
  * and art are not reconstruction rules. Other default tuning/derivation changes
  * bump revision.
  */
-export function matchEngineIdentity(): string {
+export function matchEngineIdentity(weeklyFatigue = false): string {
   return `nrl-live-${MATCH_ENGINE_REVISION}-${cyrb53(canonical({
     pack: activePack().id, rules: NINES, onField: ON_FIELD, setTackles: SET_TACKLES, fieldLength: FIELD_LENGTH,
+    ...(weeklyFatigue ? { weeklyFatigue: WEEKLY_FATIGUE_REVISION } : {}),
   }))}`;
 }
 

@@ -3,6 +3,8 @@
 // hand or as a sweep) × seeds. Pure: parse, check and expand; the runner
 // (scripts/balance.ts) plays the cells and report.ts writes them up.
 import type { Position } from '../../core/state';
+import { WEEKLY_FATIGUE } from '../../data/cards';
+import { STANDARD_POSITIONS } from '../league/sheets';
 import { POSITIONS } from '../../data/player';
 import type { RosterStats, WeatherKind } from '../../sim/events';
 import { DIFFICULTIES, type Difficulty } from '../../config';
@@ -28,6 +30,8 @@ export interface SideSpec {
   rating?: number;
   /** Per-stat overrides on the flat squad (e.g. stamina 30). */
   stats?: Partial<RosterStats>;
+  /** Apply the actual Card week sheet rules to the first starter at this position and track his injuries. */
+  weeklyFatigue?: { position: Position; points: number; injuryRisk?: number; compareWith?: string };
   /** Applied after flat stats, to starters and bench; exact positions win over groups. */
   positionStats?: Partial<Record<keyof typeof POSITION_GROUPS | Position, Partial<RosterStats>>>;
   tactics?: Partial<TeamTactics>;
@@ -184,6 +188,21 @@ export function checkPlan(p: Plan): string[] {
       if (!spec) {
         errs.push(`${s.name}: missing ${side}`);
         continue;
+      }
+      if (spec.weeklyFatigue !== undefined) {
+        const fatigue = spec.weeklyFatigue;
+        if (!fatigue || !STANDARD_POSITIONS.includes(fatigue.position) || !Number.isInteger(fatigue.points)
+          || fatigue.points < WEEKLY_FATIGUE.MIN || fatigue.points > WEEKLY_FATIGUE.MAX
+          || (fatigue.injuryRisk !== undefined && !(Number.isFinite(fatigue.injuryRisk) && fatigue.injuryRisk >= 0 && fatigue.injuryRisk <= 100))) {
+          errs.push(`${s.name} ${side}: weeklyFatigue needs a Nines position, whole fatigue in range and optional base injury risk 0–100`);
+        } else if (fatigue.compareWith !== undefined) {
+          const control = p.scenarios.find(c => c.name === fatigue.compareWith);
+          const target = control?.[side]?.weeklyFatigue;
+          if (!control || target?.points !== WEEKLY_FATIGUE.MIN || target.position !== fatigue.position
+            || target.injuryRisk !== fatigue.injuryRisk || (control.seeds ?? p.seeds) !== (s.seeds ?? p.seeds)) {
+            errs.push(`${s.name} ${side}: weeklyFatigue.compareWith needs a fresh scenario for the same starter, risk and seeds`);
+          }
+        }
       }
       if (spec.positionStats !== undefined) {
         if (!spec.positionStats || typeof spec.positionStats !== 'object' || Array.isArray(spec.positionStats)) errs.push(`${s.name} ${side}: positionStats must be an object`);

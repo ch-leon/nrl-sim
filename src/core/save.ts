@@ -145,7 +145,7 @@ function migrateCardWeek(old: RawState): RawState {
   });
   const grants = history.length + waiting;
   return { ...old, cardWeek: fillCardOffers({ ...state, cardWeek: {
-    ...kept, starterLeft, owed: waiting - starterLeft,
+    ...kept, starterLeft, owed: waiting - starterLeft, weeklyFatigue: {},
     offers: offer ? [{ ...offer, kind: starterLeft > 0 ? 'starter' : 'match', keptCardIds: [] }] : [],
     grants, seenGrant: 0, history, cardTraits, hand: [], active: [], decree: null,
     rerolls: { season: state.season, week: state.week, count: 0 },
@@ -450,6 +450,9 @@ export const MIGRATIONS: readonly MigrationStep[] = [
   { from: 37, to: 38, run: migrateCardLevels },
   { from: 38, to: 39, run: migrateCardHires },
   { from: 39, to: 40, run: migrateCardPicks },
+  { from: 40, to: 41, run: old => isCardWeek(old.cardWeek, 40)
+    ? { ...old, cardWeek: { ...old.cardWeek as CardWeekState, weeklyFatigue: {} } }
+    : old },
   // v32 snapshots the agreement observed under v31 ID-only protection.
   // Already recorded exact terms keep their provenance, including queued terms.
   { from: 31, to: 32, run: old => {

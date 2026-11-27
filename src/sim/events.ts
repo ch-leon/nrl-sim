@@ -25,8 +25,10 @@ export interface RosterEntry {
   stats?: RosterStats;
   /** Squad player id when built from a real Player (injury apply boundary). */
   id?: string;
-  /** 1–100; used for big-hit injury rolls when present (GitHub #7). */
+  /** Used for big-hit injury rolls. Weekly fatigue can scale it above the squad's range. */
   injuryRisk?: number;
+  /** Card week (#854): fraction of a full tank at kick-off. */
+  startingEnergy?: number;
   /** Levelled traits (BAK-208 §3): the live sim fires them; the event-log engine nudges on a few. */
   traits?: TraitInstance[];
 }
@@ -117,6 +119,8 @@ export interface MatchResult {
   momentumTimeline: { t: number; value: number }[]; // -100 (away)..+100 (home)
   /** Big-hit injuries; empty when none. Applied by matchday, not the engine. */
   injuries: MatchInjury[];
+  /** Squad IDs who took the field from a Card week bench. */
+  benchPlayed?: string[];
   /** Coach calls made and paid off, home then away (#73), when any were made: the match report's line (N9.5). */
   calls?: { made: [number, number]; paid: [number, number] };
   /**

@@ -5,7 +5,7 @@ import { advanceUntil } from '../../src/core/advance';
 import { bus, type Events } from '../../src/core/events';
 import { __setStorage, installImportedSave, loadSlot, migrateState, pendingLeagueSaveProblem,
   retryPendingLeagueSave, saveIfChanged, setActiveSlot } from '../../src/core/save';
-import { getState, loadState, SAVE_VERSION, setState, type GameState } from '../../src/core/state';
+import { getState, loadState, newCardWeek, SAVE_VERSION, setState, type GameState } from '../../src/core/state';
 import { setCareerNamespace } from '../../src/core/storage/local';
 import { bootNativeMirror } from '../../src/core/storage/native';
 import * as native from '../../src/core/storage/nativeCheckpoint';
@@ -30,6 +30,8 @@ import { previewLeagueEntry } from '../../src/systems/leagueEntry';
 import { confirmLeagueEntry } from '../../src/systems/leagueEntryCommit';
 import { commitLineup } from '../../src/systems/lineup';
 import { awayPlayerIds, campDisposalProblem } from '../../src/systems/playerAssignments';
+import { recoverWeeklyFatigue, weeklyFatigueOf } from '../../src/systems/weeklyFatigue';
+import { registerCardWeekSystem, startCardWeek } from '../../src/systems/cardWeek';
 import { hireStaff } from '../../src/systems/staff';
 import { registerTrainingSystem, spendSquadPoint } from '../../src/systems/training';
 import { MATCH_ENGINE_REVISION, matchEngineIdentity } from '../../src/systems/matchEngineIdentity';
@@ -292,6 +294,22 @@ it('keeps the completed atomic candidate and exact original after a final write 
   expect(saveIfChanged(settled,true)).toBe(true);
 });
 
+
+it('charges the challenge absentee once when the League interval settles', () => {
+  storage();
+  const ready = checked(changeChallenge(coaching(), 'showground', { kind: 'finish' }));
+  const { participantId } = currentIndividualChallenge(ready, 'showground')!;
+  install(startCardWeek(ready, newCardWeek(854)));
+  registerFixturesSystem();
+  registerCardWeekSystem();
+  expect(awayPlayerIds(getState()).has(participantId)).toBe(true);
+  advanceWeek();
+  const returned = getState();
+  expect(record().status).toBe('completed');
+  expect(weeklyFatigueOf(returned, participantId)).toBe(20);
+  expect(settleIndividualChallenge(returned)).toBe(returned);
+  expect(weeklyFatigueOf(recoverWeeklyFatigue(returned), participantId)).toBe(0);
+});
 
 it('keeps the participant’s existing selection preference, blocks a new role and permits a chosen cover',()=>{
   storage();

@@ -1,12 +1,14 @@
 import { cardSheetBonuses } from '../../src/systems/cardBonuses';
 // Card week (#846): pick one card from three before round 1 and after each
 // League match. Rules, state and save; the pick screen comes later.
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { preparePack, selectPack } from '../../src/content';
 import { advanceUntil } from '../../src/core/advance';
 import { runMatch } from '../../src/match/league/match';
+import { LiveSim } from '../../src/match/league/live';
 import * as matchEngine from '../../src/match/league/match';
 import { eventOpportunities } from '../../src/systems/eventOpportunities';
 import { registerEventsSystem } from '../../src/systems/events';
@@ -42,6 +44,7 @@ import { createOpenCupOffer } from '../../src/systems/openCupEntry';
 import { registerFixturesSystem } from '../../src/systems/fixtures';
 import { acceptLeagueEntry, previewLeagueEntry } from '../../src/systems/leagueEntry';
 import { prepareLeagueCareer } from '../../src/systems/leagueCareerSetup';
+import { readLiveMatch } from '../../src/systems/liveMatchRecord';
 import { registerPlayerMatchSystem, rivalMatchSheet } from '../../src/systems/matchday';
 import { STAFF_ROLES, hireStaff, newStaffMember, releaseStaff, staffWage } from '../../src/systems/staff';
 import { classifyReason, weeklyWages } from '../../src/systems/economy';
@@ -728,6 +731,58 @@ describe('a League week with the card week on', () => {
     expect(getState().cardWeek!.grants).toBe(4);
   });
 
+  it('reloads a held Card week from its saved sheets and replays the same match', () => {
+    activeLeague(573);
+    const state = getState();
+    setState({ cardWeek: startCardWeek(state, newCardWeek(573)).cardWeek! });
+    registerFixturesSystem(); registerPlayerMatchSystem(); registerCardWeekSystem();
+    advanceWeeks(leagueSlot(getState()) - 1);
+    const before = getState();
+    setState({ cardWeek: { ...before.cardWeek!, weeklyFatigue: Object.fromEntries(before.squad.map((p, i) => [p.id, i === 0 ? 70 : 100])) } });
+    expect(saveIfChanged(getState())).toBe(true);
+    let started: Parameters<typeof bus.emit<'match:started'>>[1] | undefined;
+    bus.on('match:started', match => { started = match; });
+    advanceWeek();
+    const first = started!;
+    const ours = first.home.clubId === state.clubId ? first.home : first.away;
+    const rivals = first.home.clubId === state.clubId ? first.away : first.home;
+    expect(ours.roster?.length).toBeGreaterThan(0);
+    for (const player of ours.roster ?? []) {
+      expect(player.startingEnergy).toBeCloseTo(player.id === before.squad[0]!.id ? 0.8 : 0.68);
+    }
+    const opponent = before.league.clubs.find(club => club.id === rivals.clubId)!;
+    expect(JSON.stringify(rivals)).toBe(JSON.stringify(rivalMatchSheet(opponent, playerRivalContext(before, ours.roster ?? []))));
+    expect(readLiveMatch()?.sheets).toEqual({ home: first.home, away: first.away });
+    const sim = new LiveSim(first.home, first.away, first.live.seed);
+    const side = ours === first.home ? 'home' : 'away';
+    const meanEnergy = (entries: NonNullable<typeof ours.roster>) =>
+      entries.reduce((sum, p) => sum + p.startingEnergy!, 0) / entries.length;
+    expect(sim.energyOf(side)).toBeCloseTo(meanEnergy(ours.roster!));
+    expect(sim.benchEnergyOf(side)).toBeCloseTo(meanEnergy(ours.bench!));
+    expect(sim.energyOf(side === 'home' ? 'away' : 'home')).toBe(1);
+    const result = runMatch(first.home, first.away, first.live);
+
+    clearHeldWeek();
+    const loaded = loadCareer();
+    if (loaded.status !== 'ok') throw new Error(JSON.stringify(loaded));
+    loadState({ ...loaded.state, cardWeek: { ...loaded.state.cardWeek!, weeklyFatigue: {} } });
+    started = undefined;
+    advanceWeek();
+    const replay = started as typeof first | undefined;
+    expect(replay).toBeDefined();
+    expect(replay!.home).toEqual(first.home);
+    expect(replay!.away).toEqual(first.away);
+    expect(runMatch(replay!.home, replay!.away, replay!.live)).toEqual(result);
+    bus.emit('match:finished', { fixture: replay!.fixture, result });
+    expect(weekHeld()).toBe(false);
+    const fatigue = getState().cardWeek!.weeklyFatigue;
+    for (const starter of ours.roster!) expect(fatigue[starter.id!]).toBe(30);
+    const bench = ours.bench!;
+    const used = bench.filter(p => result.benchPlayed?.includes(p.id!));
+    expect(used.length).toBeGreaterThan(0);
+    for (const player of bench) expect(fatigue[player.id!] ?? 0).toBe(used.includes(player) ? 15 : 0);
+  });
+
   it.each(['nextManUp', 'width'] as const)('replays saved match sheets with %s and a levelled play', decree => {
     activeLeague(573);
     const s = getState();
@@ -814,6 +869,7 @@ describe('a League week with the card week on', () => {
   }, 30000);
 
   it('a career without a card week plays the week exactly as it does with the hook registered', () => {
+    let fingerprint = '';
     const run = (hook: boolean): string[] => {
       clearTickHooks(); clearSeasonHooks(); bus.clear();
       activeLeague(577);
@@ -835,6 +891,7 @@ describe('a League week with the card week on', () => {
       expect(weeks).toHaveLength(getState().competitions!.calendar!.slots.length);
       expect(getState().cardWeek).toBeUndefined();
       expect(matches.length).toBeGreaterThan(0);
+      if (!hook) fingerprint = createHash('sha256').update(JSON.stringify(matches)).digest('hex');
       const closed = getState();
       if (closed.sacked) return [...weeks, ...matches];
       const leagueId = closed.competitions!.leagueCareer!.accepted!.leagueId;
@@ -847,6 +904,8 @@ describe('a League week with the card week on', () => {
       return [...weeks, ...matches, JSON.stringify(rolled.state)];
     };
     expect(run(true)).toEqual(run(false));
+    // Match sheets, options and results as generated on main before weekly fatigue.
+    expect(fingerprint).toMatchInlineSnapshot(`"bc92f66b85783f532e15779d3678a762d416afb72e38879f4c2098ddb3114ea8"`);
   }, 60000);
 });
 
@@ -1096,6 +1155,7 @@ describe('League match offers', () => {
     }));
     const before = sheets(state);
     expect(before.length).toBeGreaterThan(0);
+    expect(createHash('sha256').update(JSON.stringify(before)).digest('hex')).toMatchInlineSnapshot(`"630ff4ed5c2af324cc13528946230ddca8109c968db131ef5a60f5b003ae4263"`);
     expect(sheets(dealt)).toEqual(before);
     expect(sheets(rerolled)).toEqual(before);
   });
@@ -1451,8 +1511,26 @@ describe('League strikes and Decree picks', () => {
   });
 });
 
+describe('weekly fatigue saves', () => {
+  it('loads the v41 fatigue fixture and rejects missing, out-of-range and malformed fatigue', () => {
+    const bytes = gunzipSync(readFileSync(new URL('../fixtures/saves/v41-card-week-fatigue.json.gz', import.meta.url))).toString();
+    const raw = JSON.parse(bytes) as GameState;
+    const storage = new Map([[slotKey(1), bytes]]);
+    __setStorage({ getItem: key => storage.get(key) ?? null, setItem: (key, value) => { storage.set(key, value); },
+      removeItem: key => { storage.delete(key); } });
+    __unlockSaves(); setActiveSlot(1);
+    const loaded = loadCareer();
+    if (loaded.status !== 'ok') throw new Error(JSON.stringify(loaded));
+    expect(loaded.state).toEqual(raw);
+    expect(loaded.state.cardWeek!.weeklyFatigue).toEqual({ [raw.squad[0]!.id]: 50, [raw.squad[1]!.id]: 100 });
+    for (const weeklyFatigue of [undefined, null, [], { bad: -1 }, { bad: 101 }, { bad: 50.5 }, { bad: '50' }, { '': 20 }]) {
+      expect(migrateState({ ...raw, cardWeek: { ...raw.cardWeek, weeklyFatigue } }).ok).toBe(false);
+    }
+  });
+});
+
 describe('five-card pick saves', () => {
-  it('loads the v40 half-used match pick, honours its last keep and cannot grant it twice', () => {
+  it('migrates the v40 half-used match pick with zero fatigue and honours its last keep once', () => {
     const bytes = gunzipSync(readFileSync(new URL('../fixtures/saves/v40-card-week-half-pick.json.gz', import.meta.url))).toString();
     const storage = new Map([[slotKey(1), bytes]]);
     __setStorage({ getItem: key => storage.get(key) ?? null, setItem: (key, value) => { storage.set(key, value); },
@@ -1461,8 +1539,7 @@ describe('five-card pick saves', () => {
     const raw = JSON.parse(bytes) as GameState;
     const loaded = loadCareer();
     if (loaded.status !== 'ok') throw new Error(JSON.stringify(loaded));
-    expect(loaded).toMatchObject({ outcome: 'valid', repairs: [] });
-    expect(loaded.state).toEqual(raw);
+    expect(loaded.state).toEqual({ ...raw, version: SAVE_VERSION, cardWeek: { ...raw.cardWeek, weeklyFatigue: {} } });
     const offer = raw.cardWeek!.offers.slice(-1)[0]!;
     expect(offer).toMatchObject({ kind: 'match', keptCardIds: ['assistantCoach'] });
     expect(offer.cards).toHaveLength(4);
@@ -1486,7 +1563,7 @@ describe('five-card pick saves', () => {
     const migrate = (cardWeek: NonNullable<GameState['cardWeek']>) => {
       const result = migrateState({ ...raw, cardWeek });
       if (!result.ok) throw new Error(result.message);
-      expect(result.state.cardWeek).toEqual({ ...cardWeek, offers: cardWeek.offers.map(o => ({ ...o, keptCardIds: [] })) });
+      expect(result.state.cardWeek).toEqual({ ...cardWeek, weeklyFatigue: {}, offers: cardWeek.offers.map(o => ({ ...o, keptCardIds: [] })) });
     };
     migrate(cw);
     const decree = cw.offers.find(o => o.kind === 'decree')!.cards[0]!.cardId;

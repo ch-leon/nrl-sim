@@ -1,4 +1,5 @@
 import { withLastMatch } from './cardWeek';
+import { applyMatchWeeklyFatigue, weeklyFatigueOf } from './weeklyFatigue';
 import { cardSheetBonuses } from './cardBonuses';
 import { leagueFixtureView } from './leagueSeasonView';
 import { freezeMatchEffects, matchIncomePatch, commitMatchState, reconcileMatchEffects } from './matchIncome';
@@ -18,7 +19,7 @@ import { matchEngineIdentity } from './matchEngineIdentity';
 import { NINES } from '../match/league/rules';
 import { DEFAULT_PLAYER_COLORS, FORFEIT_SCORE, SQUAD_MIN, SEASON_ROUNDS, STAT_MAX, difficultyMultipliers } from '../config';
 import { applyResult, getCurrentFixture, isFinalsRound, PLAYER_ID } from './fixtures';
-import { teamSheetFromSquad } from '../match/league/sheets';
+import { teamSheetFromSquad, withWeeklyFatigue } from '../match/league/sheets';
 import { validPlays } from './playbook';
 import type { MatchInjury, MatchResult, TeamSheet } from '../sim/events';
 import { makeRng } from '../utils/rng';
@@ -96,12 +97,12 @@ export function resumePlayerMatch(): boolean {
     && rec.round === parked.fixture.round && rec.homeId === parked.fixture.homeId
     && rec.awayId === parked.fixture.awayId && rec.seed === live.seed
     && rec.competitionId === parked.record.competitionId && rec.fixtureId === parked.record.fixtureId && rec.slot === parked.record.slot) {
-    if (!liveMatchSameRules(rec)) {
+    if (!liveMatchSameRules(rec) || rec.engineId !== parked.record.engineId) {
       live.calls = [];
       live.plans = [];
       delete live.controls;
       delete live.resumeAt;
-      const restarted = { ...rec, calls: [], plans: [], tick: 0, halfMinutes: NINES.halfMinutes, engineId: matchEngineIdentity() };
+      const restarted = { ...parked.record, calls: [], plans: [], tick: 0 };
       delete restarted.controls;
       // The held week and its sheets/options already exist; no week hook reruns.
       Object.assign(parked.record, restarted);
@@ -188,6 +189,12 @@ function sheetFor(clubId: string, fixture: Fixture): TeamSheet {
         for (const stat of ['speed', 'handling', 'footyIQ'] as const) {
           entry.stats[stat] = Math.min(STAT_MAX, entry.stats[stat] + bonus.attack);
         }
+      }
+    }
+    if (state.cardWeek) {
+      for (const entries of [sheet.roster, sheet.bench]) {
+        if (!entries) continue;
+        for (const [i, entry] of entries.entries()) entries[i] = withWeeklyFatigue(entry, weeklyFatigueOf(state, entry.id!));
       }
     }
     return sheet;
@@ -277,9 +284,12 @@ function applyPlayerResult(fixture: Fixture, home: TeamSheet, away: TeamSheet, s
     squad: applyMatchXp(applyMatchStats(getState().squad, sim.events, PLAYER_ID, playedIds, getState().season, participantIds),
       ownSheet, sim, fixture.homeId, fixture.awayId, getState().facilities, getState().training.focus, getState().settings.spendPointsMyself === true),
   });
-  // Card week (#846): the last match's lines for the pick screen. A career without one is untouched.
   if (getState().cardWeek) {
-    setState({ cardWeek: withLastMatch(getState(), fixture, sim.events, playedIds, participantIds, { season: before.season, week: before.week }).cardWeek! });
+    const used = new Set(sim.benchPlayed);
+    const interchange = (ownSheet.bench ?? []).flatMap(p => p.id && used.has(p.id) ? [p.id] : []);
+    const fatigued = applyMatchWeeklyFatigue(getState(), context?.instance.definition.format.kind === 'league', playedIds, interchange);
+    // Card week (#846): the last match's lines for the pick screen.
+    setState({ cardWeek: withLastMatch(fatigued, fixture, sim.events, playedIds, participantIds, { season: before.season, week: before.week }).cardWeek! });
   }
 
   // GitHub #7: engine emits injuries; matchday owns squad mutation + notify.
@@ -366,8 +376,6 @@ export function registerPlayerMatchSystem(): void {
     const rivalId = fixture.homeId === PLAYER_ID ? fixture.awayId : fixture.homeId;
     const rival = state.league.clubs.find(c => c.id === rivalId)!;
     const opponent = rivalMatchSheet(rival, playerRivalContext(state, player.roster ?? []));
-    const home = fixture.homeId === PLAYER_ID ? player : opponent;
-    const away = fixture.awayId === PLAYER_ID ? player : opponent;
     const rivalSide = fixture.homeId === PLAYER_ID ? 'away' as const : 'home' as const;
     // The difficulty's edge to the rival, after the rating spread (N12.2); none on Normal.
     const edge = rivalEdge(rivalSide, state.settings.difficulty);
@@ -390,14 +398,18 @@ export function registerPlayerMatchSystem(): void {
     const prior = readLiveMatch();
     const sameFixture = prior && belongsToFixture(prior,state,fixture) ? prior : null;
     // Never replay incompatible inputs, even a call queued at tick zero.
-    const stale = !!sameFixture && (!liveMatchSameRules(sameFixture) || sameFixture.seed !== seed);
+    const stale = !!sameFixture && (!liveMatchSameRules(sameFixture) || sameFixture.seed !== seed || !!sameFixture.sheets && !state.cardWeek);
     const resumed = stale ? null : sameFixture;
+    const savedSheets = state.cardWeek ? resumed?.sheets : undefined;
+    const home = savedSheets?.home ?? (fixture.homeId === PLAYER_ID ? player : opponent);
+    const away = savedSheets?.away ?? (fixture.awayId === PLAYER_ID ? player : opponent);
     // The match on screen is the match (BAK-207; coach calls #73). The week
     // holds here; the result and the rest of the week come at full time, from
     // what the player watched (and called).
     if (!ctx.fastForward && ctx.hold) {
       const release = ctx.hold();
-      const record: LiveMatchRecord = { season: state.season, week: state.week, round: fixture.round, homeId: fixture.homeId, awayId: fixture.awayId, seed, calls: resumed ? [...resumed.calls] : [], ...(resumed?.controls?.length ? { controls: [...resumed.controls] } : {}), plans: resumed?.plans ? [...resumed.plans] : [], tick: resumed?.tick ?? 0, halfMinutes: NINES.halfMinutes, engineId: matchEngineIdentity() };
+      const record: LiveMatchRecord = { season: state.season, week: state.week, round: fixture.round, homeId: fixture.homeId, awayId: fixture.awayId, seed, calls: resumed ? [...resumed.calls] : [], ...(resumed?.controls?.length ? { controls: [...resumed.controls] } : {}), plans: resumed?.plans ? [...resumed.plans] : [], tick: resumed?.tick ?? 0, halfMinutes: NINES.halfMinutes, engineId: matchEngineIdentity(!!state.cardWeek) };
+      if (state.cardWeek) record.sheets = { home, away };
       if (fixture.id) { record.fixtureId = fixture.id; record.competitionId = fixture.competitionId!; record.slot = fixture.slot!; }
       if (release.fail) {
         const installation = stateInstallation();

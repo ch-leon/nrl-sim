@@ -22,7 +22,7 @@ import { assignmentOwnerProblem } from '../systems/assignmentEvidence';
 import { competitionInstanceId, validateCompetitions } from '../data/competition';
 import { FINANCE_TIERS, tierForRank } from '../data/financeRules';
 import { canonicalLeagueJson, validateLeagueHistory } from '../data/leagueCareer';
-import { CARD_PASS, CARD_WEEK, cardDefById } from '../data/cards';
+import { CARD_PASS, CARD_WEEK, WEEKLY_FATIGUE, cardDefById } from '../data/cards';
 
 export interface SaveRepair { field: string; problem: string; repair: string; rationale: string; notification: string }
 export const REPAIR_NOTICE = 'Career lineup repaired. The original save has been kept in recovery.';
@@ -264,6 +264,8 @@ function isActiveCard(v: unknown): boolean {
 
 export function isCardWeek(v: unknown, version: number = SAVE_VERSION): boolean {
   if (!cardWeekCommon(v) || !integer(v.starterLeft, 0, CARD_WEEK.STARTER_PICKS) || !integer(v.owed, 0, CARD_WEEK.MAX_OWED)) return false;
+  if (version >= 41 && (!record(v.weeklyFatigue) || !Object.entries(v.weeklyFatigue)
+    .every(([id, fatigue]) => text(id) && integer(fatigue, WEEKLY_FATIGUE.MIN, WEEKLY_FATIGUE.MAX)))) return false;
   const starterLeft = v.starterLeft;
   if (!Array.isArray(v.offers) || v.offers.length !== starterLeft + v.owed) return false;
   const grants = v.grants;

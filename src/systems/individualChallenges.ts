@@ -1,3 +1,4 @@
+import { addBonusEventFatigue } from './weeklyFatigue';
 import type { GameState, Player } from '../core/state';
 import { CHALLENGE_EDITIONS, CHALLENGE_RULE_VERSION, type ChallengeCall, type ChallengeEditionId } from '../data/individualChallengeRules';
 import { challengeEngines, challengeFixture, challengeId, type ChallengeContest, type IndividualChallengeRecord } from '../data/individualChallenges';
@@ -160,6 +161,6 @@ export function settleIndividualChallenge(state: GameState): GameState {
   const {player,receipt} = applyAssignmentAward(participant,edition.completionXp+(won ? edition.winnerXp : 0),
     {mode:levelPointSpendMode(state.settings.spendPointsMyself),clubFocus:awardBasis.clubFocus});
   const credited = cash ? creditPlayerPrize(state,r.season,cash) : state;
-  return replace({...credited,squad:state.squad.map(p=>p.id===player.id ? player : p)},
+  return replace(addBonusEventFatigue({...credited,squad:state.squad.map(p=>p.id===player.id ? player : p)}, [player.id]),
     {...r,status:'completed',revision:r.revision+1,awardBasis,award:{cash,honour:won ? edition.honour : null,xp:receipt}});
 }
