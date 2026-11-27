@@ -446,3 +446,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261127-051634-standard | standard | 329fd4f | main | [report](runs/20261127-051634-standard/report.md) |
 | 20261127-122315-standard | standard | deca03b | main | [report](runs/20261127-122315-standard/report.md) |
 | 20261127-125514-card-week-fatigue-and-one-prop-s-injuries | Card week fatigue and one prop's injuries | 06c7704 | codex/854-weekly-fatigue | [report](runs/20261127-125514-card-week-fatigue-and-one-prop-s-injuries/report.md) |
+| 20261127-205610-standard | standard | 762a45c | main | [report](runs/20261127-205610-standard/report.md) |
