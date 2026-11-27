@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- **Weekly fatigue in Card week.** League appearances add tiredness, bonus events can slow recovery, and tired players start with less energy and a higher injury risk. [Card week rules](../specs/846-card-week.md#weekly-fatigue).
+
 - **Card week deals five cards.** Keep up to two from each League match pick and one from each starter pick. A half-used match pick saves its remaining cards and keep. [Card week rules](../specs/846-card-week.md#rules).
 
 - **Card week offers drop the steal.** League wins now draw every slot from the normal pool. Rival recruits and set plays already in a saved hand or pick are still playable. [Card week rules](../specs/846-card-week.md#rerolls-saved-steals-and-levels).

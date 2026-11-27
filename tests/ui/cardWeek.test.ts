@@ -425,7 +425,7 @@ describe('legacy Cards saves', () => {
     expect(await continueFromSlot()).toMatchObject({ outcome: 'valid', repairs: [] });
     expect(storage.getItem(slotKey(1))).toBe(original);
     expect(getState().cardWeek).toEqual({
-      ...base.cardWeek, offers: base.cardWeek!.offers.map(offer => ({ ...offer, keptCardIds: [] })),
+      ...base.cardWeek, weeklyFatigue: {}, offers: base.cardWeek!.offers.map(offer => ({ ...offer, keptCardIds: [] })),
     });
 
     const winPick = base.cardWeek!.offers.slice(-1)[0]!;

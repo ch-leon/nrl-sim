@@ -739,6 +739,8 @@ returns the injuries (1–3 weeks, by squad id), which matchday applies as it do
 | `weather.lostHeld` / `weather.lostBigHit` | `weather.ts` | 0.006 / 0.03 | Ball lost in a made tackle / a big hit. |
 | `weather.lostSkill` | `weather.ts` | 0.0001 a point | Less for each point of the carrier's Skill over 50. |
 | `weather.injuryBase` / `weather.injuryPerRisk` | `weather.ts` | 0.005 / 0.036 | Injury on a big hit: base + risk/100 × perRisk (the old engine's 0.015 / 0.1, scaled). |
+| `WEEKLY_FATIGUE.ENERGY_LOSS_PER_POINT` | `src/data/cards.ts`, `sheets.ts` | 0.004 | Starting energy lost per weekly fatigue point on the player club's Card-week sheet. |
+| `WEEKLY_FATIGUE.INJURY_TIERS` | `src/data/cards.ts`, `sheets.ts` | >60 ×1.5, >80 ×2 | Card-week risk is scaled on the sheet so the existing big-hit injury roll applies the highest tier's chance multiplier. |
 | `weather.injuryProne` | `weather.ts` | 1.4 | × for an Injury Prone carrier. |
 | `weather.hurtSpeed` | `weather.ts` | 0.85 | A hurt man's top speed × until he comes off. |
 

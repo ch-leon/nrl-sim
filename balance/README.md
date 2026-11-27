@@ -85,6 +85,12 @@ moves (#322).
   `none` (flat squads' default), `gen` (clubs' default), `stars`. `bench` is how many
   interchange players (0–4, default 4; a flat squad's bench has its stats) and
   `rotation` how hard the coach uses them: `off`, `standard` (default), `heavy`.
+- **One starter's weekly fatigue** (#854): set a side's `weeklyFatigue` to
+  `{"position":"prop","points":100,"injuryRisk":100,"compareWith":"fresh prop"}`.
+  The game sheet rules set the first starter at that position's energy and risk.
+  The base `injuryRisk` override is optional. The report counts matches in the
+  written orientation in which he is injured. Set `compareWith` to a scenario
+  with the same sides and seeds, at zero fatigue, for a paired difference.
 - **Exact style-fit fixtures** (#465): `"fit": { "expansive": 1.5, "slide": 0.5 }`
   overrides only those cached starting-sheet fits in the headless harness. Values
   must be finite and within 0–1.5; omitted styles keep their derived fit. Playing
