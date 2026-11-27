@@ -66,6 +66,7 @@ Le has set the direction: cards run most of the career week, tested first behind
 | D27 | Gear is a trait you can move between players, one slot each. Built last in Slice 3 | Le | 27 Nov |
 | D28 | Sponsors are deal cards with a condition and a payout, one deal active at a time | Le | 27 Nov |
 | D29 | The cap booster card gives one free level of the cap upgrade the game already sells. Gold tier | Le | 27 Nov |
+| D30 | Weekly recovery is 20, not 30, and Physio Centre and Medical Bay add 2 each, not 5. Resolves Codex's finding on #854 that every bonus event falls in a week with no League match for that player | Claude, on Le's instruction to resolve #854 | 27 Nov |
 
 **Still open:** whether matchday cards are free. D10 to D14 settle Slice 1b's design, but 1b is not filed as issues until #858 has reported.
 
@@ -217,40 +218,46 @@ The club ground becomes a stadium ringed by a fixed number of plots. A blueprint
 
 ## Spec 5: Weekly fatigue and the event dilemma
 
-Players carry tiredness from week to week. A League match alone leaves a player fresh for the next one; every bonus event he enters adds a debt that stays until he rests a week or you spend a recovery card. This is the heart of the first Labs test (D5, D9) and needs a new system: weekly fatigue does not exist today.
+Players carry tiredness from week to week. League matches in back-to-back weeks build it up and a week off clears it. Play your star in the Open Cup tie that falls in that week off and it does not clear: he carries 20 until he sits a League match out or you spend a recovery card. This is the heart of the first Labs test (D5, D9) and needs a new system: weekly fatigue does not exist today.
 
 **Today:**
 
 - Fatigue only exists inside a single match. Every player starts every match at full energy.
 - Injuries carry over (weeks out). Every player has an injury-risk stat; the match rolls an injury on a big hit using the value on the team sheet.
 - A player away at an event can't play a clashing fixture.
-- League rounds sit in weeks 5–23. Weeks 7, 10, 13, 16 and 19 have no round; they are the Open Cup slots.
+- The calendar (the first pacing profile; it is saved data, so do not hard-code weeks):
+  - Trials in weeks 1 and 4.
+  - League rounds in weeks 5, 6, 8, 9, 11, 12, 14, 15, 17, 18, then 20 to 23 in a row. Finals in weeks 24 and 25.
+  - Weeks 7, 10, 13, 16 and 19 have no League round. They are the Open Cup slots, and a rest week for a club that is out of the Cup or did not enter.
+  - Skills Camp takes a player away in week 5, and the two individual challenges in weeks 6 and 14. Each costs him that week's League round.
+- So **every bonus event falls in a week when that player plays no League match.** Codex found this on #854; revision 2's numbers assumed the opposite.
 - Rival clubs' team sheets are built fresh each match and carry nothing from week to week.
 
 **Changes (card-week careers only)**
 
 1. **Weekly fatigue (new).** Every player in your squad has fatigue from 0 to 100, shown as a bar on Squad, Lineup and event entry.
 2. **What adds it.** Proposal: a full League match +30, off the bench +15, a bonus event +20.
-3. **What removes it (changed in revision 2).** Proposal: every player recovers 30 at the start of each week, whether he played or not. Physio Centre and Medical Bay each add 5 to that.
+3. **What removes it (D30).** Proposal: every player recovers 20 at the start of each week, whatever he did the week before. No special cases. Physio Centre and Medical Bay each add 2 to that. At 30 a week every bonus event was wiped before the next League kick-off; at 5 each the two facilities together cancelled a League match exactly and fatigue disappeared.
 4. **What it does.** A tired player starts the match with less energy, using the in-match energy that already exists. Proposal: 0.4% less per point, so fatigue 50 starts him at 80%. Above 60 his injury chance rises by half; above 80 it doubles.
-5. **The preview.** Entering a player in an event shows the cost before you confirm, for example "Fatigue 20 → 40. Starts Round 6 at 84% energy."
+5. **The preview.** Entering a player in an event shows the cost before you confirm, for example "Fatigue 20 → 40. Kicks off Round 6 on 20, at 92% energy." The kick-off figure is after the weekly recovery.
 6. **Recovery cards** in the Matchday family, free to play: *Fatigue wipe* (one player to 0), *Ice baths* (whole squad −30), *Injury repair* (one player −2 weeks out).
 7. **Recovery cards have a hold limit (new in revision 2).** Proposal: the hand holds at most 2 recovery cards. A third can be played at once or passed, not kept.
 8. **Rivals do not tire.** Only your squad carries fatigue. It can only cost you, never a rival, so the numbers must be gentle enough that a careful player loses nothing against today's game.
 9. **Match randomness unchanged.** Fatigue is written onto the saved team sheet before kick-off as each player's starting energy and injury risk. It adds no dice roll, so a match still replays identically from its saved sheets.
 
-**How the numbers play out (Proposal).** Fatigue at kick-off, for a star who starts every League match:
+**How the numbers play out (Proposal).** Fatigue at kick-off for a star who starts every League match, with no Physio Centre or Medical Bay:
 
 | What he does | Kick-off fatigue |
 | --- | --- |
-| League only, every week | 0 every round |
-| Enters 1 event | 20, and it stays 20 each round after |
-| Enters 2 events | 40 |
-| Enters 3 events | 60: one more puts him in the raised-injury band |
-| Rests one Open Cup week | 30 comes off |
+| League, League, week off, League, League | 0, 10, 0, 10 |
+| Plays the Open Cup tie in that week off | 20 and 30 in the next two rounds, and still 20 after the following week off |
+| Plays three Cup ties running | 60 by the third: one more League match puts him in the raised-injury band |
+| Away at Skills Camp or a challenge | 0 at his next League match. He missed a round, and that is the cost |
+| Sits out one League match | 30 lower at the next kick-off than if he had played |
+| The last four rounds and two finals, all in a row | 0, 10, 20, 30, then 40 and 50 in the finals |
 | Fatigue wipe card | Back to 0 |
 
-So the choice each event is: take on 20 that will not clear by itself, or keep him fresh. The Open Cup weeks become the natural place to pay it back, by leaving him out of the tie.
+So the real rest-or-risk choice is the Open Cup tie: play the star and carry 20 that will not clear by itself, or rest him and weaken the Cup side. The run into the finals is the second pinch, and where recovery cards are worth saving.
 
 **Across seasons (D18).** Fatigue carries into the next season like everything else. The weekly recovery keeps running in the weeks with no League round, so a player who sits out the off-season starts round 1 at 0 without a special reset. Pre-season trials count as bonus events.
 
@@ -259,7 +266,7 @@ So the choice each event is: take on 20 that will not clear by itself, or keep h
 **Done when**
 
 - [ ] Every player in a card-week career shows a fatigue bar that changes after matches, events and the weekly recovery.
-- [ ] A star who plays only League matches kicks off every round at 0 fatigue.
+- [ ] A starter whose weeks run League, League, week off, League, League kicks off at 0, 10, 0 and 10; with an Open Cup tie in the week off, the next two kick-offs are 20 and 30.
 - [ ] A player at 80+ fatigue is measurably more likely to be injured than one at 0, shown by a balance-harness plan (not an ad-hoc script).
 - [ ] Event entry shows each player's fatigue change and next-match energy before the player confirms.
 - [ ] Playing a Fatigue wipe card on a tired star resets him to 0 and his next-match preview updates.
@@ -267,7 +274,7 @@ So the choice each event is: take on 20 that will not clear by itself, or keep h
 - [ ] A saved match replays with the same result.
 - [ ] Rival sheets and non-card careers are unaffected.
 
-**Open:** the numbers above; whether training also adds fatigue; whether rested players should lose a little sharpness, so resting isn't always free. If League-only play should slowly wear a player down over a season, drop the weekly recovery from 30 to 25.
+**Open:** the numbers above; whether training also adds fatigue; whether rested players should lose a little sharpness, so resting isn't always free. Whether an away event (Skills Camp, a challenge) should cost as much as a match: at +20 a player comes back from camp fresher than if he had played.
 
 ## Spec 6: Staff as card generators
 
@@ -369,7 +376,7 @@ Settled by approving Slice 1a (27 Nov), as starting values to playtest:
 - [x] Split Slice 1 into 1a (fatigue, free player cards) and 1b (money).
 - [x] Offer size and keep count: 5 and 2, with starter picks keeping 1.
 - [x] Bonus events do not earn a pick in 1a.
-- [x] Fatigue numbers: +30 League, +20 event, 30 back each week.
+- [x] Fatigue numbers: +30 League, +20 event, 20 back each week (30 until D30).
 - [x] Recovery cards: hold at most 2.
 
 Still open:
