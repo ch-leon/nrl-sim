@@ -1,11 +1,13 @@
 # Roadmap
 
-Last updated: 2026-11-25
+Last updated: 2026-11-28
 
 Status checked against GitHub on 7 Nov 2026. Merged tooling is not the same as a
 live gameplay change; work still open below has not shipped.
 
 ## Now
+
+- **Card week (Labs test).** A League career option, off by default, where you keep cards after each League match. Leon's 34 decisions and the build order are in [the Card week specs](../specs/card-week-specs-draft.md); what has shipped is in [846-card-week.md](../specs/846-card-week.md). Shipped: picks show 5 and keep 2, and the steal is gone ([#852](https://github.com/ch-leon/nrl-sim/issues/852), [#853](https://github.com/ch-leon/nrl-sim/issues/853)). In build, in this order: weekly fatigue, fatigue bars, recovery cards, staff handing you cards, bot support and a balance run ([#854](https://github.com/ch-leon/nrl-sim/issues/854) to [#858](https://github.com/ch-leon/nrl-sim/issues/858), [#862](https://github.com/ch-leon/nrl-sim/issues/862)). Leon playtests after that. Then blueprints for facilities, new card faces, player-card fees, training cards, the Cap boost, boosters and sponsor deals ([#866](https://github.com/ch-leon/nrl-sim/issues/866), [#868](https://github.com/ch-leon/nrl-sim/issues/868) to [#872](https://github.com/ch-leon/nrl-sim/issues/872), [#874](https://github.com/ch-leon/nrl-sim/issues/874), [#875](https://github.com/ch-leon/nrl-sim/issues/875)). Parked: the stadium with plots, and gear.
 
 - **League career only.** New clubs start a League career in Local. Classic saves are no longer loadable; one is overwritten when you start a League career in that slot ([#819](https://github.com/ch-leon/nrl-sim/issues/819)). Removing the Classic-only season code and moving the old test harnesses across is the follow-up.
 
