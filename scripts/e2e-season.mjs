@@ -33,6 +33,7 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium } from 'playwright-core';
 import { pollCoachCall } from './e2e-coach-call.mjs';
+import { passAdvancePrompts, reachClubFixture } from './e2e-calendar.mjs';
 import { setupStep } from './e2e-webkit/newClub.mjs';
 
 // --size WxH (or E2E_SIZE): 844×390 is a landscape phone with touch (the default);
@@ -367,33 +368,17 @@ async function playTrialWeeks(rec) {
   if (await inTrials()) throw new Error('trial phase remained after two completed weeks');
 }
 
-/**
- * Advance Week's questions before it goes (#338, #350 H3): a long run's "Play 22
- * weeks?", and the decision cards it would take the defaults of. The playthrough
- * answers its cards first (answerCards), so a card here is one drawn since: go ahead.
- */
-async function passAdvanceAsks() {
-  for (let i = 0; i < 3; i++) {
-    // A League career also asks about event entries closing (#752): carry on without entering.
-    const which = await page.waitForFunction(() => (document.querySelector('[data-advance-confirm]') ? 'confirm'
-      : document.querySelector('[data-advance-ask]') ? 'ask' : document.querySelector('[data-skip-events]') ? 'events' : null), null, { timeout: 600 }).then((h) => h.jsonValue()).catch(() => null);
-    if (!which) return;
-    await press(page.locator(which === 'confirm' ? '[data-confirm-advance]' : which === 'events' ? '[data-skip-events]' : '[data-ask-proceed]').first());
-    await wait(150);
-  }
-}
-
 /** Tap PLAY WEEK (Advance Week) in the dock and get past its questions. */
 async function tapAdvanceWeek() {
   await tap('.nrl-dock [data-hud="advance"]');
-  await passAdvanceAsks();
+  await passAdvancePrompts(page, press);
 }
 
 /** Advance with the split-button menu: index 0 = ×4 weeks, 1 = to finals, 2 = to season end. */
 async function advanceMenu(i) {
   await tap('.nrl-hud-menu-toggle');
   await tap(`.nrl-hud-menu-item >> nth=${i}`);
-  await passAdvanceAsks();
+  await passAdvancePrompts(page, press);
   // N10.2: the advance yields between weeks; wait for the run to end.
   await page.waitForFunction(() => !document.querySelector('.nrl-dock[data-advancing]'), null, { timeout: 240000 });
   await wait(400);
@@ -701,8 +686,28 @@ async function play() {
     await tap('.nrl-kit-save');
   }, { quietToasts: true });
 
+  // The post-trial calendar can have rest weeks before the next club game.
+  // Traverse them normally without letting their summaries cover the dock;
+  // the upcoming match's own summary remains part of the test below.
+  const reachScheduledMatch = async (rec) => {
+    const closeSummary = await page.evaluate(() => sessionStorage.getItem('nrlE2eCloseSummary'));
+    await page.evaluate(() => sessionStorage.setItem('nrlE2eCloseSummary', '1'));
+    try {
+      const at = await reachClubFixture(page, async () => {
+        await closeAny();
+        await goHome();
+        await answerCards(rec);
+        await weekAsTapped(rec);
+      });
+      rec.notes.push(`S${at.season} W${at.week}: scheduled fixture ${at.fixture.id}`);
+    } finally {
+      if (closeSummary !== '1') await page.evaluate(() => sessionStorage.removeItem('nrlE2eCloseSummary'));
+    }
+  };
+
   // A match: Advance Week hands over to the match scene (the live sim since BAK-207 Phase 4).
-  await step('match-classic', async () => {
+  await step('match-classic', async (rec) => {
+    await reachScheduledMatch(rec);
     await tapAdvanceWeek();
     await page.waitForSelector('.nrl-mo-controls', { timeout: 15000 });
     await wait(3000);
@@ -847,6 +852,7 @@ async function play() {
   await step('live-match', async (rec) => {
     await goHome();
     if (!liveOn) return 'skipped: no live-match setting';
+    await reachScheduledMatch(rec);
     await tapAdvanceWeek();
     await page.waitForSelector('.nrl-mo-controls', { timeout: 15000 });
     await matchSpeed(8);
