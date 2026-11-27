@@ -78,12 +78,17 @@ function normalLeagueProblem(state: GameState, runningCamp?: RunningCamp): strin
 }
 
 export function structuralAdvanceProblem(state: GameState): string | null {
+  return advanceProblem(state, true);
+}
+
+/** `wholeSave` false skips only the whole-save pass, for a round that checks it before and after. */
+function advanceProblem(state: GameState, wholeSave: boolean): string | null {
   if (state.competitions && 'leagueCareer' in state.competitions) {
     if (!structuralRuntimeAllowed()) {
       const problem = normalLeagueProblem(state,runningCampContext(state));
       if (problem) return problem;
     }
-    if (!isPlayableLeagueCareer(state)) return 'The League career progression snapshot is invalid or unsupported.';
+    if (!leagueShape(state) || (wholeSave && !savePasses(state))) return 'The League career progression snapshot is invalid or unsupported.';
     if (state.competitions.leagueCareer!.phase !== 'active') return 'A league choice is required before time can advance.';
   }
   if (!hasStructuralCalendar(state)) return null;
@@ -97,8 +102,24 @@ export function structuralAdvanceProblem(state: GameState): string | null {
 
 /** Check the live lifecycle shape during interval settlement. */
 export function isPlayableLeagueCareer(state: GameState): boolean {
-  return !!state.competitions?.leagueCareer && state.boardLoan?.owed === 0
-    && !validateInput(state as unknown as Record<string, unknown>, state.version,runningCampContext(state),runningChallengeContext(state));
+  return leagueShape(state) && savePasses(state);
+}
+
+const leagueShape = (state: GameState): boolean => !!state.competitions?.leagueCareer && state.boardLoan?.owed === 0;
+
+// The whole-save pass reads only the state and the running interval's evidence.
+// States are replaced, never edited in place, so each state object is walked once
+// for the evidence it was checked with: a week asks about the same state from
+// several guards (the advance, the held match, its release, settlement).
+const saveChecked = new WeakMap<GameState, {camp: unknown; challenge: unknown; ok: boolean}>();
+
+function savePasses(state: GameState): boolean {
+  const camp = runningCampContext(state), challenge = runningChallengeContext(state);
+  const seen = saveChecked.get(state);
+  if (seen && seen.camp === camp && seen.challenge === challenge) return seen.ok;
+  const ok = !validateInput(state as unknown as Record<string, unknown>, state.version, camp, challenge);
+  saveChecked.set(state, {camp, challenge, ok});
+  return ok;
 }
 
 /** Activation is an explicit local developer operation, never an imported flag. */
@@ -182,7 +203,34 @@ export function __blockCalendarResults(block: boolean): void {
 /** The sole structural result commit. Duplicate/stale/cancelled deliveries are no-ops. */
 export function finaliseCalendarFixture(state: GameState, bridge: Fixture, score: { homeScore: number; awayScore: number }, forfeit = false, fulfilment?: {kind: 'open-cup-withdrawal'; offerId: string}): GameState {
   if (blockCalendarResults) throw new Error('Invalid result transition: result commit failed');
-  if (!hasStructuralCalendar(state) || structuralAdvanceProblem(state) || ![score.homeScore, score.awayScore].every(n => Number.isSafeInteger(n) && n >= 0)) return state;
+  if (!hasStructuralCalendar(state) || structuralAdvanceProblem(state)) return state;
+  return commitFixtureResult(state, bridge, score, forfeit, fulfilment);
+}
+
+export interface RoundResult { bridge: Fixture; score: { homeScore: number; awayScore: number } }
+
+/**
+ * A round of results with the whole save checked before the round and once after
+ * it, not before each result. Each result still passes every other gate of
+ * `finaliseCalendarFixture` and its own competition check; the states between
+ * results are never installed or saved. If the round ends invalid, it is played
+ * again result by result, so a refusal lands exactly where it always did.
+ */
+export function finaliseCalendarRound(state: GameState, results: readonly RoundResult[]): GameState {
+  if (!results.length) return state;
+  if (blockCalendarResults) throw new Error('Invalid result transition: result commit failed');
+  if (!hasStructuralCalendar(state) || structuralAdvanceProblem(state)) return state;
+  let next = state;
+  for (const { bridge, score } of results) {
+    if (advanceProblem(next, false)) break;
+    next = commitFixtureResult(next, bridge, score, false);
+  }
+  if (next === state || !next.competitions?.leagueCareer || savePasses(next)) return next;
+  return results.reduce((s, { bridge, score }) => finaliseCalendarFixture(s, bridge, score), state);
+}
+
+function commitFixtureResult(state: GameState, bridge: Fixture, score: { homeScore: number; awayScore: number }, forfeit: boolean, fulfilment?: {kind: 'open-cup-withdrawal'; offerId: string}): GameState {
+  if (![score.homeScore, score.awayScore].every(n => Number.isSafeInteger(n) && n >= 0)) return state;
   const context = calendarFixtureContext(state, bridge);
   if (!context) {
     const instance = state.competitions!.instances.find(i => i.id === bridge.competitionId && i.season === state.season);
