@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { BASE, IPHONE_UA, OUT_ROOT, confirmStartingLeague, log, setupStep } from '../common.mjs';
+import { BASE, IPHONE_UA, OUT_ROOT, confirmStartingLeague, log, openNav, setupStep } from '../common.mjs';
 
 const PICK = '[data-card-pick]';
 const CARDS = '[data-cards-screen]';
@@ -37,6 +37,68 @@ async function checkPick(page, portrait, count = 5, decree = false) {
     return box.top >= scroll.top - 1 && box.bottom <= scroll.bottom + 1;
   }), 'Last card action must be reachable by scrolling');
   await page.locator(`${PICK} h2`).scrollIntoViewIfNeeded();
+}
+
+async function checkFatigueScreens(page, out) {
+  const expected = await page.evaluate(() => {
+    const state = window.__nrlState();
+    const id = state.lineup.starters[0];
+    const player = state.squad.find(p => p.id === id);
+    state.cardWeek.weeklyFatigue[id] = 81;
+    const byDate = state.competitions.instances.filter(i => i.definition.format.kind === 'league')
+      .flatMap(i => i.fixtures).filter(f => f.status === 'scheduled' && [f.homeId, f.awayId].includes(state.clubId))
+      .sort((a, b) => a.slot - b.slot);
+    const afterCamp = byDate[1];
+    const opponent = state.league.clubs.find(c => c.id !== state.clubId && [afterCamp.homeId, afterCamp.awayId].includes(c.id));
+    return { id, name: player.name, size: state.squad.length, fixture: `Round ${afterCamp.round} v ${opponent.name}` };
+  });
+
+  await openNav(page, 'squad');
+  const bar = page.locator(`[data-weekly-fatigue="${expected.id}"]`);
+  assert.equal(await page.locator('[role="meter"][data-weekly-fatigue]').count(), expected.size);
+  assert.equal(await bar.getAttribute('aria-label'), `${expected.name} weekly fatigue`);
+  assert.equal(await bar.getAttribute('aria-valuenow'), '81');
+  assert.match(await bar.getAttribute('aria-valuetext'), /high injury risk/);
+  await bar.scrollIntoViewIfNeeded();
+  assert.ok(await bar.evaluate(node => {
+    const box = node.getBoundingClientRect();
+    return box.left >= 0 && box.right <= innerWidth && box.width > 10 && box.height > 0;
+  }), 'The Squad fatigue bar fits within the phone viewport');
+  await page.screenshot({ animations: 'disabled', path: join(out, '667x375-squad-fatigue.png') });
+
+  await openNav(page, 'lineup');
+  const starter = page.locator(`[data-player-open="${expected.id}"]`);
+  await starter.scrollIntoViewIfNeeded();
+  assert.match(await starter.getAttribute('aria-label'), /fatigue 81.*high injury risk.*Starts at .* energy/i);
+  assert.ok(await bar.evaluate(node => {
+    const box = node.getBoundingClientRect();
+    return box.left >= 0 && box.right <= innerWidth && box.width > 10;
+  }), 'The Lineup fatigue bar fits within the phone viewport');
+  await page.locator('[data-fatigue-match-preview] summary').tap();
+  assert.match(await page.locator('[data-fatigue-match-preview]').textContent(), /Trial.*Fatigue .* → .*Kicks off Round 1/is);
+  await page.screenshot({ animations: 'disabled', path: join(out, '667x375-lineup-fatigue.png') });
+
+  await page.evaluate(id => { delete window.__nrlState().cardWeek.weeklyFatigue[id]; }, expected.id);
+  await openNav(page, 'club');
+  await page.locator('[data-open-events]').tap();
+  await page.locator('[data-open-opportunity="skills-camp"]').tap();
+  await page.locator('[data-camp-player]').selectOption(expected.id);
+  await page.locator('[data-camp-review]').tap();
+  const preview = page.locator(`[data-fatigue-event-preview="${expected.id}"]`);
+  assert.equal(await preview.textContent(), `Fatigue 0 → 20 at the event. Kicks off ${expected.fixture} on 0, at 100% energy.`);
+  for (const [width, height] of [[667, 375], [844, 390]]) {
+    await page.setViewportSize({ width, height });
+    await preview.scrollIntoViewIfNeeded();
+    assert.ok(await preview.evaluate(node => {
+      const box = node.getBoundingClientRect();
+      return box.left >= 0 && box.right <= innerWidth && node.scrollWidth <= node.clientWidth + 1;
+    }), 'The booking preview wraps within the phone viewport');
+    await page.screenshot({ animations: 'disabled', path: join(out, `${width}x${height}-camp-fatigue.png`) });
+  }
+  await page.locator('[data-camp-dialog]').getByRole('button', { name: 'Close', exact: true }).tap();
+  await page.locator('[data-camp-dialog]').waitFor({ state: 'detached' });
+  await page.setViewportSize({ width: 667, height: 375 });
+  log('ok weekly fatigue meters, trial and camp forecast at iPhone widths');
 }
 
 export async function runCardWeek(browser) {
@@ -85,6 +147,7 @@ export async function runCardWeek(browser) {
     await page.screenshot({ animations: 'disabled', path: join(out, '667x375-pick.png') });
 
     await page.locator('.nrl-card-modal .nrl-screen-x').tap();
+    await checkFatigueScreens(page, out);
     await page.locator('[data-screen="cards"]').tap();
     const offers = page.locator(`${CARDS} [data-cards-offer]`);
     await offers.last().waitFor();

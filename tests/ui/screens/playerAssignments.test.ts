@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { bus } from '../../../src/core/events';
 import { __setStorage, __unlockSaves, installImportedSave, setActiveSlot } from '../../../src/core/save';
-import { getState, loadState } from '../../../src/core/state';
+import { getState, loadState, newCardWeek } from '../../../src/core/state';
 import { completeCamp, departForCamp } from '../../../src/systems/playerAssignments';
 import { closeModal, closeScreen } from '../../../src/ui/dom';
 import { openFixturesScreen } from '../../../src/ui/screens/fixtures';
@@ -68,12 +68,25 @@ it('reviews the named cover, fixture and development before committing a camp bo
   const id = choosePlayer(d);
   expect(d.words()).toMatch(/Week 5.*Bendigo Bellbirds/);
   expect(d.words()).toMatch(/Starter.*covers/i);
+  expect(d.querySelector('[data-fatigue-event-preview]')).toBeNull();
   expect(d.words()).toMatch(/70 base XP.*expected/i);
   expect(d.querySelector('[data-camp-confirm]')).toBeNull();
   d.querySelector('[data-camp-review]')!.click();
   expect(getState()).toEqual(original);
   d.querySelector('[data-camp-confirm]')!.click();
   expect(getState().competitions?.assignments?.[0]).toMatchObject({ status: 'booked', booking: { participantId: id } });
+});
+
+it('shows the fresh camp entrant at zero for the returning League match through booking review', () => {
+  const state = getState();
+  loadState({ ...state, cardWeek: newCardWeek(855) });
+  const d = openCamp();
+  const id = choosePlayer(d);
+  const text = d.querySelector(`[data-fatigue-event-preview="${id}"]`)!.words();
+  expect(text).toMatch(/Fatigue 0 → 20 at the event\. Kicks off Round 2 v .+ on 0, at 100% energy\./);
+  d.querySelector('[data-camp-review]')!.click();
+  expect(d.querySelector(`[data-fatigue-event-preview="${id}"]`)!.words()).toBe(text);
+  expect(d.querySelector('[data-camp-confirm]')?.getAttribute('aria-describedby')).toBe('nrl-booking-fatigue');
 });
 
 it('disarms an exact preview after a career switch and waits for another review', () => {

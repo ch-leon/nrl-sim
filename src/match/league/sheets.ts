@@ -3,7 +3,7 @@
 // its strength with a generated roster (names stable per club). Moved here from
 // the classic engine at the switch-over (BAK-207 Phase 4, #88); the numbers and
 // the rng streams are unchanged, so every sheet is exactly what it was.
-import { WEEKLY_FATIGUE } from '../../data/cards';
+import { weeklyFatigueInjuryTier, weeklyFatigueStartingEnergy } from '../../data/cards';
 import { DEFAULT_INJURY_RISK, scaleInjuryRisk } from './weather';
 import { makeRng } from '../../utils/rng';
 import { randomName } from '../../data/names';
@@ -167,10 +167,10 @@ export function teamSheetFromSquad(
 
 /** Bake the club player's kick-off condition into the sheet for play and replay. */
 export function withWeeklyFatigue(entry: RosterEntry, fatigue: number): RosterEntry {
-  const tier = WEEKLY_FATIGUE.INJURY_TIERS.find(t => fatigue > t.above);
+  const tier = weeklyFatigueInjuryTier(fatigue);
   return {
     ...entry,
-    startingEnergy: 1 - fatigue * WEEKLY_FATIGUE.ENERGY_LOSS_PER_POINT,
+    startingEnergy: weeklyFatigueStartingEnergy(fatigue),
     ...(tier ? { injuryRisk: scaleInjuryRisk(entry.injuryRisk ?? DEFAULT_INJURY_RISK, tier.factor) } : {}),
   };
 }

@@ -1,3 +1,5 @@
+import { previewWeeklyFatigue } from '../../systems/fatiguePreview';
+import { fatigueBonusMatchNote } from '../weeklyFatigue';
 import { matchupRead, counterRead, fitRead } from '../matchupRead';
 import { teamSheetFromSquad } from '../../match/league/sheets';
 import { resolveLineup, validTactics } from '../../systems/lineup';
@@ -738,6 +740,8 @@ function nextMatchCard(state: GameState, card: HTMLElement = el('div', { class: 
   line('Head to head', fmtHeadToHead(p.headToHead));
   if (p.weather) line('Conditions', fmtWeather(p.weather));
   card.append(lines);
+  const fatigue = fatigueBonusMatchNote(previewWeeklyFatigue(state), state.squad);
+  if (fatigue) card.append(fatigue);
   return card;
 }
 

@@ -45,6 +45,9 @@ import { portraitDataUrl } from '../../art/portrait';
 import { ensurePartsStyles, fitnessTone, playerCard, starsEl, statusPill } from '../parts';
 import { awayPlayerIds } from '../../systems/playerAssignments';
 import { clubReservations } from '../../systems/playerAvailability';
+import { previewWeeklyFatigue, type WeeklyFatiguePreview } from '../../systems/fatiguePreview';
+import { weeklyFatigueOf } from '../../systems/weeklyFatigue';
+import { appendFatigueBar, FATIGUE_LEGEND, fatigueBonusMatchNote, fatigueLineupText } from '../weeklyFatigue';
 import { nextReservation, reservationText, tripLabel } from '../playerReservations';
 
 const STYLE_ID = 'nrl-lineup-styles';
@@ -323,6 +326,7 @@ export function openLineupScreen(): void {
 
   // Who kicks and who captains today (N11): the coach's picks, or the defaults.
   let roles: { kicker?: string; captain?: string } = {};
+  let fatigue: WeeklyFatiguePreview | undefined;
   // The spot the swap list was last drawn for (#614).
   let swapFor: Spot | null = null;
   // A long press that just opened a swap. It re-renders the field, so on touch the press's own
@@ -357,6 +361,9 @@ export function openLineupScreen(): void {
       captain: spot?.kind === 'starter' && roles.captain === p.id,
       kicker: spot?.kind === 'starter' && roles.kicker === p.id,
     });
+    const state = getState();
+    if (state.cardWeek) appendFatigueBar(c, p, weeklyFatigueOf(state, p.id), spot ? fatigueLineupText(fatigue, p.id) : '',
+      c.querySelector<HTMLElement>('.nrl-pcard-body') ?? c);
     if (spot) c.setAttribute('data-spot', spot.kind === 'starter' ? `s${spot.slot}` : `b${spot.index}`);
     c.setAttribute('data-player-open', p.id);
     if (away || injured) c.setAttribute('data-out', '');
@@ -399,6 +406,16 @@ export function openLineupScreen(): void {
       return; // state:changed renders again
     }
     const lineup = s.lineup;
+    fatigue = previewWeeklyFatigue(s);
+    if (fatigueHead) {
+      const note = fatigueBonusMatchNote(fatigue, s.squad);
+      const open = fatigueHead.querySelector<HTMLDetailsElement>('[data-fatigue-match-preview]')?.open;
+      if (note && open) (note as HTMLDetailsElement).open = true;
+      fatigueHead.replaceChildren(el('div', { text: fatigue?.league
+        ? `Next League match · ${fatigue.league.label} · Week ${fatigue.league.week}`
+        : 'No League fixture scheduled.' }),
+        el('div', { text: FATIGUE_LEGEND }), ...(note ? [note] : []));
+    }
     const nine = today.starters.flatMap((p, slot) => (p ? [{ ...p, position: LINEUP_SLOTS[slot]!, stats: statsAt(p, LINEUP_SLOTS[slot]!) }] : []));
     roles = kickerAndCaptain(nine, lineup);
     const byId = new Map(s.squad.map((p) => [p.id, p] as const));
@@ -460,6 +477,7 @@ export function openLineupScreen(): void {
         else if (banned) row.setAttribute('data-banned', '');
         if (trip) row.setAttribute(tripLabel(trip)==='Contest' ? 'data-challenge-absence' : 'data-camp-absence', p.id);
         row.title = reservationText(trips,p.id) ?? (slotPos ? `Rating at ${positionLabel(slotPos)}: ${effectiveRating(p, slotPos)} (overall ${Math.round(overallRating(p))})` : `Overall ${Math.round(overallRating(p))}`);
+        if (s.cardWeek) appendFatigueBar(row, p, weeklyFatigueOf(s, p.id));
         return row;
       }));
       hintScroll(list);
@@ -532,7 +550,9 @@ export function openLineupScreen(): void {
 
   const head = screenHead('', { lead: [squadTabs('lineup')], sub, controls: [squadViewSeg('pitch'), swapBtn, autoBtn, squadMore()] });
   const body = el('div', { class: 'nrl-lineup-body' }, field, side);
-  const screen = el('div', { class: 'nrl-screen nrl-sq nrl-lineup' }, head, body);
+  const fatigueHead = getState().cardWeek ? el('div', { class: 'nrl-weekly-fatigue-heading', attrs: { 'data-lineup-fatigue': '' } }) : null;
+  const screen = el('div', { class: 'nrl-screen nrl-sq nrl-lineup', attrs: fatigueHead ? { 'data-fatigue': '' } : {} },
+    head, ...(fatigueHead ? [fatigueHead] : []), body);
   openScreen(screen, onLineupClosed, 'lineup');
   render();
   unsub = bus.on('state:changed', render);
