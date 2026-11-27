@@ -122,7 +122,8 @@ function nextCardLevel(state: GameState, cardId: string): TraitLevel | null {
 function eligibleBeforeDice(state: GameState, def: CardDef): boolean {
   if (!nextCardLevel(state, def.id)) return false;
   if (gambleRefusal(state, def)) return false;
-  const held = state.cardWeek?.hand.some(h => h.cardId === def.id);
+  const held = state.cardWeek?.hand.find(h => h.cardId === def.id);
+  if (held && recruitUpgradeRefusal(state, held.offered)) return false;
   const active = activeCard(state, def.id);
   if (active?.kind === 'player' || active?.kind === 'dilemma') {
     const player = state.squad.find(p => p.id === active.playerId)!;
@@ -230,6 +231,18 @@ function resolveCard(state: GameState, def: CardDef, rng: Rng): OfferedCard | nu
 }
 
 type RecruitCard = Extract<OfferedCard, { kind: 'player' | 'dilemma' }>;
+
+/** An upgrade carries the signed player's old snapshot. A steal uses the rival's live roster instead. */
+function recruitUpgradeRefusal(state: GameState, card: OfferedCard): string | null {
+  if ((card.kind !== 'player' && card.kind !== 'dilemma') || card.fromClubId
+    || !card.player.clubHistory?.spells.some(spell => !spell.end)) return null;
+  if (!state.squad.some(player => player.id === card.player.id)) {
+    return `${card.player.name} is no longer at the club. This upgrade can't be played.`;
+  }
+  const active = activeCard(state, card.cardId);
+  return active && (active.kind === 'player' || active.kind === 'dilemma') && active.playerId === card.player.id
+    ? null : `This upgrade for ${card.player.name} is no longer available.`;
+}
 
 function rivalHasDepth(squad: readonly Player[]): boolean {
   return POSITIONS.every(position => squad.filter(p => p.position === position).length >= RIVAL_POSITION_MIN);
@@ -544,28 +557,29 @@ function spendPick(cw: CardWeekState, at: number, history: CardHistoryEntry[]): 
   };
 }
 
-function pickedCard(cw: CardWeekState, index: number, grant?: number): { at: number; card: OfferedCard } | string {
+function pickedCard(state: GameState, cw: CardWeekState, index: number, grant?: number): { at: number; card: OfferedCard } | string {
   const at = offerIndex(cw, grant);
   const offer = cw.offers[at];
   if (!offer) return grant === undefined ? 'No pick is waiting.' : 'That pick is no longer waiting.';
   const card = offer.cards[index];
-  return card ? { at, card } : 'There is no card there.';
+  if (!card) return 'There is no card there.';
+  return recruitUpgradeRefusal(state, card) ?? { at, card };
 }
 
 /** Take a pick into the hand, or apply its upgrade to a card already in play. */
 function takeCardResult(state: GameState, index: number, grant?: number): CardTake | string {
   const cw = state.cardWeek;
   if (!cw) return 'This career has no card week.';
-  const picked = pickedCard(cw, index, grant);
+  const picked = pickedCard(state, cw, index, grant);
   if (typeof picked === 'string') return picked;
   const { at, card } = picked;
   const def = cardDefById(card.cardId);
   if (!def || def.kind !== card.kind) return 'That card is no longer in the deck.';
-  const refusal = gambleRefusal(state, def);
+  const held = cw.hand.find(h => h.cardId === card.cardId);
+  const refusal = (held ? recruitUpgradeRefusal(state, held.offered) : null) ?? gambleRefusal(state, def);
   if (refusal) return refusal;
   const level = nextCardLevel(state, card.cardId);
   if (!level) return 'That card is already Level III.';
-  const held = cw.hand.find(h => h.cardId === card.cardId);
   const existing = activeCard(state, card.cardId);
   const spent = spendPick(cw, at, recordCard(cw, state, card.cardId, 'take'));
   if (card.kind === 'decree' || (!held && existing && existing.kind !== 'cash')) return applyCard({ ...state, cardWeek: spent }, card, level);
@@ -600,7 +614,7 @@ function applyCard(state: GameState, card: OfferedCard, level: TraitLevel, targe
   const cw = state.cardWeek!;
   const def = cardDefById(card.cardId);
   if (!def || def.kind !== card.kind) return 'That card is no longer in the deck.';
-  const refusal = gambleRefusal(state, def);
+  const refusal = recruitUpgradeRefusal(state, card) ?? gambleRefusal(state, def);
   if (refusal) return refusal;
   const ctx = { cardId: def.id, reason: `card: ${def.title}`, now: elapsedInterval(state), clubName: state.clubName };
   let s = state;
@@ -730,7 +744,7 @@ function applyCard(state: GameState, card: OfferedCard, level: TraitLevel, targe
 export function playPickCard(state: GameState, index: number, targetId?: string, grant?: number): CardTake | string {
   const cw = state.cardWeek;
   if (!cw) return 'This career has no card week.';
-  const picked = pickedCard(cw, index, grant);
+  const picked = pickedCard(state, cw, index, grant);
   if (typeof picked === 'string') return picked;
   const { at, card } = picked;
   const level = nextCardLevel(state, card.cardId);
@@ -810,8 +824,8 @@ export function cardWeekTick(state: GameState): GameState {
   settled.strikes = { ...strikes, count: log.length, lossRun: thirdLoss ? 0 : run, log };
   settled.active = cw.active.filter(c => c.kind !== 'buff');
 
-  const played = fixtures.filter(f => f.slot! <= state.week && f.result?.decider !== 'forfeit');
-  const decree = fixture.result!.decider !== 'forfeit' && played.length === CARD_WEEK.DECREE_MATCH;
+  const played = fixtures.filter(f => f.slot! <= state.week);
+  const decree = played.length === CARD_WEEK.DECREE_MATCH;
   const fromClubId = !decree && margin < 0 ? (fixture.homeId === state.clubId ? fixture.awayId : fixture.homeId) : undefined;
   const { offer, rng } = drawOffer(next, decree ? 'decree' : 'match', cw.offers, fromClubId);
   if (!offer) return { ...next, cardWeek: settled };

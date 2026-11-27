@@ -29,6 +29,7 @@ import { effectiveRating, FIT, positionFit } from '../../src/systems/lineup';
 import { stylePlays } from '../../src/match/league/plays';
 import { rivalStyle } from '../../src/systems/rivalRound';
 import { RIVAL_POSITION_MIN } from '../../src/systems/rivals';
+import { releasedState } from '../../src/systems/freeagency';
 import { validatePlayerPopulation } from '../../src/systems/playerCareer';
 import { PLAY_IDS, PLAYS_BY_ID } from '../../src/data/plays';
 import { traitLevel } from '../../src/data/traits';
@@ -1165,6 +1166,33 @@ describe('Phase 2 card levels', () => {
     expect(plantCard(s, id)).toBe('That card cannot be offered now.');
   });
 
+  it.each(['propSigning', 'marqueeGamble'])('refuses a waiting %s upgrade after its recruit leaves', async id => {
+    const base = { ...await career(37), money: 1_000_000 };
+    const hired = taken(playPickCard(planted(base, id), 0));
+    const player = hired.joined!;
+    const waiting = planted(hired.state, id);
+    const stale = first(waiting);
+    expect(stale).toMatchObject({ player: { id: player.id, clubHistory: player.clubHistory } });
+    const departure = releasedState(waiting, player.id);
+    if (!('state' in departure)) throw new Error(departure.message);
+    loadState(departure.state);
+    const before = getState();
+    const reason = `${player.name} is no longer at the club. This upgrade can't be played.`;
+    expect(cardOfferView(before).cards[0]).toMatchObject({ takeRefusal: reason, refusal: reason });
+    expect(chooseCard(0)).toEqual({ ok: false, reason });
+    expect(playChosenCard('pick', 0)).toEqual({ ok: false, reason });
+    expect(getState()).toBe(before);
+
+    const fresh = first(planted(before, id));
+    expect(fresh).toMatchObject({ cardId: id });
+    expect(fresh).not.toMatchObject({ player: { id: player.id } });
+    const held = { ...before, cardWeek: { ...before.cardWeek!, hand: [
+      { cardId: id, level: 2 as const, offered: stale, gotSeason: before.season, gotWeek: before.week },
+    ] } };
+    expect(playCard(held, 0)).toBe(reason);
+    expect(plantCard(held, id)).toBe('That card cannot be offered now.');
+  });
+
   it.each(CARDS.filter(card => card.kind === 'staff'))('takes 25% and 50% off $id’s original wage', async ({ id }) => {
     const base = await career(37);
     const hired = taken(playPickCard(planted({ ...base, reputation: 100 }, id), 0)).state;
@@ -1223,20 +1251,23 @@ describe('actual v37 save bytes', () => {
     const migrated = migrateState(raw as unknown as Record<string, unknown>);
     expect(migrated).toMatchObject({ ok: true, state: { version: SAVE_VERSION } });
     if (!migrated.ok) throw new Error(migrated.message);
-    const { version, cardWeek, ...rest } = migrated.state;
-    const { version: _oldVersion, cardWeek: original, ...originalRest } = raw;
+    const { version, cardWeek, staff, ...rest } = migrated.state;
+    const { version: _oldVersion, cardWeek: original, staff: oldStaff, ...originalRest } = raw;
     expect(version).toBe(SAVE_VERSION);
     expect(rest).toEqual(originalRest);
+    expect(staff).toEqual(name === 'after-starters'
+      ? oldStaff.map(member => ({ ...member, cardHireId: 'legacy-card-hire:analyst' })) : oldStaff);
     const { active: oldActive, ...kept } = original!;
     expect(cardWeek).toMatchObject(kept);
-    expect(cardWeek!.active).toEqual(expect.arrayContaining(oldActive));
+    expect(cardWeek!.active).toEqual(expect.arrayContaining(oldActive.map(card => expect.objectContaining(card.kind === 'staff'
+      ? { ...card, member: expect.objectContaining(card.member) } : card))));
     expect(Object.keys(cardWeek!)).toEqual(expect.arrayContaining(Object.keys(original!)));
     expect(cardWeek!.offers).toEqual(original!.offers);
     expect(cardWeek!.history).toEqual(original!.history);
     if (name === 'after-starters') {
       expect(cardWeek!.hand).toMatchObject([{ cardId: 'cashInjection', level: 1 }]);
       expect(cardWeek!.active).toMatchObject([
-        { kind: 'staff', cardId: 'analyst', level: 1 },
+        { kind: 'staff', cardId: 'analyst', level: 1, member: { cardHireId: 'legacy-card-hire:analyst' } },
         { kind: 'player', cardId: 'propSigning', playerId: original!.cardPlayers[0], level: 1 },
       ]);
     }
@@ -1245,7 +1276,7 @@ describe('actual v37 save bytes', () => {
 });
 
 describe('League strikes and Decree picks', () => {
-  function leagueMatch(state: GameState, slot: number, margin: number, format = 'league'): GameState {
+  function leagueMatch(state: GameState, slot: number, margin: number, format = 'league', decider: 'score' | 'forfeit' = 'score'): GameState {
     const instances = state.competitions!.instances;
     const instance = instances.find(i => i.definition.format.kind === format && i.fixtures.some(f => f.homeId === state.clubId || f.awayId === state.clubId))
       ?? instances.find(i => i.definition.format.kind === 'league' && i.fixtures.some(f => f.homeId === state.clubId || f.awayId === state.clubId))!;
@@ -1256,7 +1287,7 @@ describe('League strikes and Decree picks', () => {
     const score = { homeScore: home ? us : them, awayScore: home ? them : us };
     const winnerId = margin > 0 ? (home ? fixture.awayId : fixture.homeId) : state.clubId;
     const settled = { ...fixture, id: `result-${slot}`, slot, status: 'completed' as const,
-      result: margin === 0 ? { ...score, decider: 'draw' as const } : { ...score, winnerId, decider: 'score' as const } };
+      result: margin === 0 ? { ...score, decider: 'draw' as const } : { ...score, winnerId, decider } };
     const updated = format === instance.definition.format.kind
       ? instances.map(i => i === instance ? { ...i, fixtures: [...i.fixtures, settled] } : i)
       : [...instances, { ...instance, id: `other-${slot}`, definition: {
@@ -1350,6 +1381,17 @@ describe('League strikes and Decree picks', () => {
     expect(next.cardWeek!.offers.some(o => o.kind === 'decree')).toBe(false);
   });
 
+  it.each([4, 5])('counts a forfeit in League match %d toward the fifth-match Decree', async forfeitAt => {
+    let s = { ...await career(), boardPatience: 5 };
+    for (const slot of [1, 2, 3, 4, 5]) {
+      const forfeit = slot === forfeitAt;
+      s = leagueMatch(s, slot, forfeit ? 24 : 0, 'league', forfeit ? 'forfeit' : 'score');
+      expect(s.cardWeek!.offers.filter(o => o.kind === 'decree').map(o => o.week)).toEqual(slot < 5 ? [] : [5]);
+    }
+    expect(s.cardWeek!.strikes.log).toEqual([{ week: forfeitAt, reason: 'margin', margin: 24 }]);
+    expect(s.boardPatience).toBe(4);
+  });
+
   it('clears one-week buffs at the next League result', async () => {
     const s = await career();
     const buff = { kind: 'buff' as const, cardId: 'future-buff', level: 2 as const, season: 1, week: 1 };
@@ -1393,6 +1435,28 @@ describe('v38 save exports', () => {
     const replacement = migrateState(paid);
     expect(replacement.ok && replacement.state.staff).toEqual(paid.staff);
     expect(replacement.ok && activeCardStaff(replacement.state)).toEqual([]);
+  });
+
+  it('links and upgrades a Level I staff card from an original v38 save', () => {
+    const raw = JSON.parse(gunzipSync(readFileSync(new URL('../fixtures/saves/v38-card-week-level-one-hire.json.gz', import.meta.url))).toString()) as GameState;
+    expect(raw.version).toBe(38);
+    expect(raw.cardWeek!.active).toMatchObject([{ cardId: 'assistantCoach', level: 1 }]);
+    const loaded = migrateState(raw);
+    if (!loaded.ok) throw new Error(loaded.message);
+    const s = loaded.state;
+    const [hire] = s.staff;
+    expect(s.version).toBe(SAVE_VERSION);
+    expect(hire).toMatchObject({ cardHireId: 'legacy-card-hire:assistantCoach', wage: raw.staff[0]!.wage });
+    expect(activeCardStaff(s)).toEqual([hire]);
+    expect(activeCard(s, 'assistantCoach')).toMatchObject({ level: 1 });
+    const upgraded = changed(takeCard(planted(s, 'assistantCoach'), 0));
+    expect(activeCard(upgraded, 'assistantCoach')).toMatchObject({ level: 2 });
+    expect(upgraded.staff).toEqual([{ ...hire, wage: Math.round(hire!.wage * 0.75) }]);
+
+    const differentHire = { ...raw, staff: [{ ...raw.staff[0]!, name: 'Another Coach' }] };
+    const replaced = migrateState(differentHire);
+    if (!replaced.ok) throw new Error(replaced.message);
+    expect(activeCardStaff(replaced.state)).toEqual([]);
   });
 
   it('reloads a v39 Decree offer and its active effect without granting or adopting twice', () => {

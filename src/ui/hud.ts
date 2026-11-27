@@ -501,17 +501,18 @@ export function createHud(opts: HudOpts = {}): Hud {
     eventsNames.textContent = opportunities.map(event => event.id === 'showground' ? 'Big Mick' : event.name).join(' · ');
     const first = opportunities[0];
     eventsDetail.textContent = first ? `${first.name} · ${first.detail}` : '';
-    const strikeCount = s.cardWeek?.strikes.count;
-    const strikes = strikeCount === undefined ? '' : `${strikeCount} ${strikeCount === 1 ? 'strike' : 'strikes'} · patience ${s.boardPatience}/${BOARD.MAX_PATIENCE}`;
+    const strikeCount = s.cardWeek?.strikes.count ?? 0;
+    const strikes = strikeCount > 0 ? `${strikeCount} ${strikeCount === 1 ? 'strike' : 'strikes'}` : '';
     const board = opts.onBoard && !advanceInProgress() && !activeScreen() ? boardChip(s, runway)
       ?? (strikes ? { title: 'Board', detail: '', label: 'Board', risk: 'on-track' } : null) : null;
     boardEl.hidden = !board;
     if (board) {
       boardTitle.textContent = board.title.toUpperCase();
-      boardDetail.textContent = strikes || board.detail;
+      boardDetail.textContent = [board.detail, strikes].filter(Boolean).join(' · ');
       boardEl.classList.toggle(BOARD_RISK_CLASS['at-risk'], board.risk === 'at-risk');
       boardEl.classList.toggle(BOARD_RISK_CLASS['off-track'], board.risk === 'off-track');
-      const label = `${[board.label, strikes].filter(Boolean).join('. ')}. Tap for Staff & Board`;
+      const strikeLabel = strikes ? `. ${strikes}, patience ${s.boardPatience}/${BOARD.MAX_PATIENCE}` : '';
+      const label = `${board.label}${strikeLabel}. Tap for Staff & Board`;
       boardEl.setAttribute('aria-label', label);
       boardEl.title = label;
     }

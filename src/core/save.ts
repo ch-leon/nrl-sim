@@ -202,11 +202,13 @@ function migrateCardHires(old: RawState): RawState {
     if (card.kind !== 'staff') return card;
     const { member } = card;
     const wage = Math.round(member.wage * CARD_WEEK.STAFF_WAGE_FACTOR[card.level]);
-    // A full-wage v38 card hire and a same-name paid replacement leave the
-    // same record. Only a saved card discount can establish the old identity.
-    const index = wage < member.wage ? staff.findIndex(m => m.role === member.role && m.speciality === member.speciality
-      && m.name === member.name && m.hiredSeason === member.hiredSeason && m.wage === wage) : -1;
-    if (index < 0) return card;
+    // Level I waived the fee only. For higher levels the saved discount
+    // distinguishes the card hire from a full-wage paid replacement.
+    const matches = staff.flatMap((m, index) => m.role === member.role && m.speciality === member.speciality
+      && m.name === member.name && m.hiredSeason === member.hiredSeason
+      && (card.level === 1 || (wage < member.wage && m.wage === wage)) ? [index] : []);
+    if (matches.length !== 1) return card;
+    const index = matches[0]!;
     const cardHireId = `legacy-card-hire:${card.cardId}`;
     staff[index] = { ...staff[index]!, cardHireId };
     return { ...card, member: { ...member, cardHireId } };

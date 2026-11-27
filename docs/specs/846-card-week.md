@@ -126,7 +126,8 @@ style. Passes, discards and rerolls never move a player.
 
 Recruit upgrades raise the signature trait from its current level, including
 traits the player already had. Once that trait reaches III, a further card
-upgrade adds up to two rating points per level.
+upgrade adds up to two rating points per level. A waiting upgrade can only
+apply to the recruit it names while he is still at the club.
 
 Marquee gamble costs one patience point each time it is played or applied to
 an active card. A duplicate merges in the hand or upgrades its active effect.
@@ -154,8 +155,8 @@ A win or draw breaks the run, and a heavy third loss counts once. Cards and
 the board chip show this season's strike count. The week summary gives the
 reason or says the strike was absorbed.
 
-After the club plays its fifth League match, the next pick offers three of
-six Decrees. Adopting one applies it immediately for the rest of the season.
+After the club's fifth completed League match, including forfeits, the next
+pick offers three of six Decrees. Adopting one applies it immediately for the rest of the season.
 Passing gives up the Decree for that season. A waiting Decree survives match
 pick expiry and expires at season close.
 
@@ -165,6 +166,6 @@ that budget when the lineup takes a width play. Tight ship credits five per
 cent of the quoted weekly squad and staff wages to the wages line.
 
 Save v39 identifies fee-waived appointments so a paid replacement cannot
-inherit a card level or discount. It links discounted v38 appointments using
-the saved wage. Full-wage v38 appointments lack enough information to link them
-to a card reliably.
+inherit a card level or discount. It links a Level I v38 hire when exactly one
+serving staff member matches the recorded name, role, speciality and hire
+season. Level II and III hires also need the matching discounted wage.

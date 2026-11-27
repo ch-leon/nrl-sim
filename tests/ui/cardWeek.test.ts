@@ -436,6 +436,26 @@ describe('active card and strike displays', () => {
     expect(line).not.toContain('Joined from a card');
   });
 
+  it('keeps the board objective detail and only appends a positive strike count', async () => {
+    const base = await fresh();
+    loadState({ ...base, money: 12_000, objectives: [
+      { id: 'cash', kind: 'solvent', target: 20_000, status: 'pending', text: 'Finish with $20,000' },
+    ] });
+    const hud = createHud({ onBoard: () => {}, runwayWeeks: () => 2 });
+    const board = body().querySelector('[data-hud="board"]')!;
+    const detail = board.querySelector('.nrl-decisions-chip-top')!;
+    expect(board.hidden).toBe(false);
+    expect(detail.textContent).toBe('You have $12k');
+    expect(board.getAttribute('aria-label')).not.toContain('strikes');
+
+    setState({ cardWeek: { ...base.cardWeek!, strikes: { season: base.season, count: 1, lossRun: 0,
+      log: [{ week: 1, reason: 'margin', margin: 24 }],
+    } } });
+    expect(detail.textContent).toBe('You have $12k · 1 strike');
+    expect(board.getAttribute('aria-label')).toContain('You have $12k. 1 strike');
+    hud.destroy();
+  });
+
   it('shows strikes in words on Cards, the HUD board chip and the week summary', async () => {
     const before = await fresh();
     const after: GameState = { ...before, week: 4, boardPatience: 1, cardWeek: {

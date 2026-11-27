@@ -64,7 +64,7 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
-- **Card week in Labs:** heavy League losses and three-loss runs cost board patience down to one point. After their fifth League match, clubs can adopt a Decree for the rest of the season. Match-sheet card bonuses share an eight-point cap per player. [Card week rules](../specs/846-card-week.md#strikes-and-decrees).
+- **Card week in Labs:** heavy League losses and three-loss runs cost board patience down to one point. After their fifth completed League match, including forfeits, clubs can adopt a Decree for the rest of the season. Match-sheet card bonuses share an eight-point cap per player. [Card week rules](../specs/846-card-week.md#strikes-and-decrees).
 
 - **Tutorial fixes from the iPhone Simulator.** The tutorial's orange ring fits what it points at (it reached into the next card) and moves with the list; scrolled out of view, it goes until the target is back. It only singles out one thing when the step names one (the Training Paddock, Build here, Play Week). Who to sign is your choice, so that step rings the whole player list, or a free agent's whole player page if you open one, and Mick says "Sign a player you can afford". The bubble stands aside on a free agent's page so the player controls stay tappable. On iPhone it no longer stays where it was drawn while its screen slid up. Finishing the tutorial is saved straight away, so an app closed after the first match does not start it again. A long press over the match controls no longer selects text on iPhone. [#838](https://github.com/ch-leon/nrl-sim/issues/838).
 
