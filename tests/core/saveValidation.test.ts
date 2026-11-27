@@ -344,6 +344,21 @@ describe('card week (#846, v36)', () => {
     expect(isCardWeek({ ...cw, lastMatch: { season: 1, week: 5, opponentName: 'Them', rows: [{ playerId: 'x', name: 'X', tries: -1, tackles: 0, lineBreaks: 0 }] } })).toBe(false);
   });
 
+  it('rejects impossible keep progress and cards repeated from an earlier keep of the same pick', async () => {
+    const cw = (await league()).cardWeek!;
+    const [starter] = cw.offers;
+    const [first, ...remaining] = starter!.cards;
+    const match = { ...starter, kind: 'match', cards: remaining, keptCardIds: [first!.cardId] };
+    const withPick = (offer: unknown) => ({ ...cw, owed: 1, starterLeft: 0, offers: [offer] });
+    expect(isCardWeek(withPick(match))).toBe(true);
+    expect(isCardWeek(withPick({ ...match, keptCardIds: undefined }))).toBe(false);
+    expect(isCardWeek(withPick({ ...match, keptCardIds: ['not-a-card'] }))).toBe(false);
+    expect(isCardWeek(withPick({ ...match, keptCardIds: [remaining[0]!.cardId] }))).toBe(false);
+    expect(isCardWeek(withPick({ ...match, keptCardIds: [first!.cardId, first!.cardId] }))).toBe(false);
+    expect(isCardWeek(withPick({ ...match, cards: [] }))).toBe(false);
+    expect(isCardWeek({ ...cw, offers: [{ ...starter, cards: remaining, keptCardIds: [first!.cardId] }, ...cw.offers.slice(1)] })).toBe(false);
+  });
+
   it('rejects a card week on a career that is not a League career, and on a save before v36', async () => {
     const s = await league();
     const classic = { ...fresh(), cardWeek: s.cardWeek };

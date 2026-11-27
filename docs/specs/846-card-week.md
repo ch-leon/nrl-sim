@@ -19,11 +19,14 @@ exactly as before, and their saves are unchanged apart from the save version.
 
 | Rule | Behaviour |
 | --- | --- |
-| Picks owed | Three when the career starts, so three picks before round 1. Each League match the club plays (a regular round or a final) adds one, up to three waiting. Trials, cup ties, camps and challenges add none. |
-| A pick | Three different cards, drawn by weight from the eligible cards in the normal pool. League wins use the same pool. Fewer only when fewer can be offered. The player takes one or passes. |
-| Waiting | A pick not taken waits. It is never lost and never blocks Advance Week. |
-| The same offer | The cards on show are settled when drawn (the player, his salary, who he replaces, the play, the hire's name) and saved, so a reload shows the same offer. The draw uses the card week's own seeded stream, never the match seed or the story deck's. |
-| Pass | Spends the pick with no card taken. Always allowed while a pick is showing, so a pick whose three cards are all refused never sticks. The history records it as a pass. |
+| Picks owed | Three starter picks before round 1. Each League match the club plays (a regular round or a final) adds a pick, up to three match picks waiting. Trials, cup ties, camps and challenges add none. |
+| A match pick | Shows five different cards and closes after two keeps. Take a card into the hand or play it on the spot. |
+| A starter pick | Shows five and closes after one keep, so the three starter picks can fill three hand slots. |
+| Drawing | All ordinary picks use the weighted normal pool, whatever the result. A pick can show fewer cards when the pool runs short and closes if the last card is kept. Decree picks still show three and adopt one. |
+| Waiting | A pick can wait without blocking Advance Week. A new match pick at the cap replaces the oldest waiting match pick. |
+| The same offer | The shown cards and any used keeps are saved. Reopening keeps their order and details. The draw uses the card week's own seeded stream. |
+| Full hand | A new card cannot be taken into a full hand. With one free slot, take one card and play or pass the other. Upgrades that use no new hand slot are still available. |
+| Pass | Spends the rest of the pick and keeps any card already taken or played. Always allowed while the pick is showing. The history records a pass. |
 
 ### Cards
 
@@ -64,7 +67,7 @@ a card-week career, and after a week whose League match added a pick. It waits b
 week summary, any decision, a sheet and the tutorial, and never opens during a match. The
 HUD's **Card week** chip shows how many picks are waiting and reopens it.
 
-Each card shows its tier in words (Grey or Gold), its title and a one-line effect. A
+The pick says how many cards you can keep. Each card shows its tier in words (Grey or Gold), its title and a one-line effect. A
 player card also shows his position, rating and salary a year, and "Replaces <name>
 (release costs $X)" when he needs a place. A card that can't be taken is shown disabled
 with the reason. A trait card lists who can take it (starters first) and the level each
@@ -78,9 +81,11 @@ card.
 | --- | --- | --- | --- |
 | `PLAYER_CARD_MARGIN.grey` | `src/data/cards.ts` | 4 | How far above the card floor a grey player card's man is generated (overall points). He lands within ±6 of floor + 4 and above the floor. |
 | `PLAYER_CARD_MARGIN.gold` | `src/data/cards.ts` | 18 | The same for the gold player card and the dilemma: meant to read about five stars in Local (five stars start at 60, `STAR_BANDS` in `src/config.ts`). Capped at 99. |
-| `CARD_WEEK.START_OWED` | `src/data/cards.ts` | 3 | Picks waiting when a card-week career starts (`newCardWeek` in `state.ts` matches it). |
-| `CARD_WEEK.MAX_OWED` | `src/data/cards.ts` | 3 | The most picks that can wait; a League match beyond it adds nothing. |
-| `CARD_WEEK.OFFER_SIZE` | `src/data/cards.ts` | 3 | Cards on show in a pick. An ordinary pick draws every slot from the normal pool. |
+| `CARD_WEEK.STARTER_PICKS` | `src/data/cards.ts` | 3 | Picks waiting when a card-week career starts (`newCardWeek` in `state.ts` matches it). |
+| `CARD_WEEK.MAX_OWED` | `src/data/cards.ts` | 3 | The most match picks that can wait; the next one replaces the oldest. |
+| `CARD_WEEK.PICKS.match.show` / `.keep` | `src/data/cards.ts` | 5 / 2 | Cards dealt and keeps allowed in each new match pick. |
+| `CARD_WEEK.PICKS.starter.show` / `.keep` | `src/data/cards.ts` | 5 / 1 | Cards dealt and keeps allowed in each new starter pick. |
+| `CARD_WEEK.PICKS.decree.show` / `.keep` | `src/data/cards.ts` | 3 / 1 | Decrees dealt and adopted in the season's Decree pick. |
 | `CARD_WEEK.PLAYER_TRIES` | `src/data/cards.ts` | 6 | Generation tries for a player card's man to beat the floor before the card sits that pick out. |
 | Card `weight` | `src/data/cards.ts` `CARDS` | grey players 10, gold halfback 4; staff 6 (attack coach 4); set play 8; grey traits 7, Finisher 4; cash 8; dilemma 3 | How often each card turns up, relative to the others that can be offered. |
 | Cash `amount` | `src/data/cards.ts` `cashInjection` | $15,000 | The cash card's money. |
@@ -97,22 +102,24 @@ Position links, the opening pack, the album across careers, and any scoring.
   (`TICK_ORDER.autosave − 2`), the last match's lines and the view model.
 - `src/ui/cardWeek.ts`: the pick screen and its automatic opening; the HUD chip is in
   `src/ui/hud.ts`.
-- Save v36: `GameState.cardWeek` is optional and validated when present
-  (`saveValidation.ts` `isCardWeek`). It is refused on a save before v36 and on a
-  career that is not a League career.
+- Save v40 records the cards already kept from each waiting pick. Loading an
+  older save preserves the waiting faces, hand, active cards, Decree and strikes.
+  Those waiting picks have used no keeps. `GameState.cardWeek` stays optional
+  and is validated when present (`saveValidation.ts` `isCardWeek`).
 
 
 ## Rerolls, saved steals and levels
 
-Rerolls use the card stream to redraw the displayed pick from the normal
-pool. The first reroll costs $1,500. Each adds $1,500 to the next price until
+Rerolls use the card stream to redraw the remaining slots in the displayed pick
+from the normal pool. Kept cards stay where they are and cannot come up again
+in that pick. The first reroll costs $1,500. Each adds $1,500 to the next price until
 the week changes. The debit appears under Events. Starter picks can be rerolled
 and Decree picks cannot.
 
 The steal from the beaten club has been removed. Older saves keep rival recruits
 and rival set plays in their hand and waiting picks and can still play them.
 The card face shows its original club. Rerolling a saved pick replaces the
-whole offer with a normal draw.
+cards still on show with a normal draw.
 
 | Card type | Level I | Level II | Level III |
 | --- | --- | --- | --- |

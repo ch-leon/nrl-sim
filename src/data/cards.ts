@@ -19,8 +19,12 @@ export const CARD_WEEK = {
   /** The most match picks that can wait; a new grant replaces the oldest at the cap. */
   MAX_OWED: 3,
   HAND_CAP: 5,
-  /** Cards on show in a pick. */
-  OFFER_SIZE: 3,
+  /** Cards shown and kept in each kind of pick. */
+  PICKS: {
+    starter: { show: 5, keep: 1 },
+    match: { show: 5, keep: 2 },
+    decree: { show: 3, keep: 1 },
+  },
   /** Tries at generating a player card's man before the card sits this pick out. */
   PLAYER_TRIES: 6,
   REROLL_BASE: 1_500,

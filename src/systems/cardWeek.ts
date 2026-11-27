@@ -2,13 +2,13 @@ import { AU_PACK } from '../content';
 import { UK_NAMES } from '../content/ukNames';
 import { awaitingCampReplay } from './parkedLeagueFixture';
 // src/systems/cardWeek.ts — the card week (#846, Labs): a League career that
-// chose it gets a pick of one card from three before round 1 and after each
-// League match it plays (up to CARD_WEEK.MAX_OWED waiting). The cards are in
+// chose it gets picks before round 1 and after each League match it plays
+// (up to CARD_WEEK.MAX_OWED match picks waiting). The cards are in
 // data/cards.ts. Pure functions plus one tick hook and store actions for the UI.
 //
 // A career is a card-week career only when state.cardWeek exists; every path
 // here is guarded on it, so any other career plays exactly as before. The
-// three cards on show are resolved when they are drawn (the player a card
+// cards on show are resolved when they are drawn (the player a card
 // brings, who he would replace, the play, the hire's name) and saved, so a
 // reload shows the same offer. Randomness comes from the card week's own
 // stream (state.cardWeek.rng): drawing never moves rngSeed or the events deck.
@@ -259,12 +259,13 @@ function pickWeighted(cards: readonly CardDef[], rng: Rng): CardDef | null {
 }
 
 /**
- * Draw a pick (pure): up to CARD_WEEK.OFFER_SIZE different eligible cards,
+ * Draw a pick (pure): up to the offer size for its kind in different eligible cards,
  * weighted, each resolved. Fewer only when fewer can be offered. Rolls the card
  * week's own stream and returns its new state with the offer.
  */
 export function drawOffer(
   state: GameState, kind: CardOffer['kind'] = 'match', waiting: readonly CardOffer[] = [],
+  { size = CARD_WEEK.PICKS[kind].show, exclude = [] }: { size?: number; exclude?: readonly string[] } = {},
 ): { offer: CardOffer | null; rng: number } {
   const cw = state.cardWeek;
   if (!cw) return { offer: null, rng: 0 };
@@ -272,13 +273,13 @@ export function drawOffer(
   if (kind === 'decree') {
     const pool = [...DECREES];
     const cards: OfferedCard[] = [];
-    while (cards.length < CARD_WEEK.OFFER_SIZE) {
+    while (cards.length < size) {
       const [decree] = pool.splice(rng.int(0, pool.length - 1), 1);
       cards.push({ cardId: decree!.id, kind: 'decree' });
     }
-    return { offer: { season: state.season, week: state.week, kind, cards }, rng: rng.state() };
+    return { offer: { season: state.season, week: state.week, kind, cards, keptCardIds: [] }, rng: rng.state() };
   }
-  let left = CARDS.filter((c) => c.weight > 0 && eligibleBeforeDice(state, c));
+  let left = CARDS.filter((c) => c.weight > 0 && !exclude.includes(c.id) && eligibleBeforeDice(state, c));
   const signature = (cards: readonly OfferedCard[]): string => cards.map(c => c.cardId).sort().join(',');
   const repeats = new Set(waiting.map(o => signature(o.cards)));
   const cards: OfferedCard[] = [];
@@ -288,7 +289,7 @@ export function drawOffer(
     const card = resolveCard(state, def, rng);
     if (card) cards.push(card);
   };
-  while (cards.length < CARD_WEEK.OFFER_SIZE && left.length > 0) drawNext();
+  while (cards.length < size && left.length > 0) drawNext();
 
   let chosen = cards.slice();
   // Keep the normal weighted draw unless it repeats a waiting pick. In that
@@ -306,7 +307,7 @@ export function drawOffer(
     chosen = findFresh([], 0) ?? chosen;
   }
   return { offer: chosen.length ? {
-    season: state.season, week: state.week, kind, cards: chosen,
+    season: state.season, week: state.week, kind, cards: chosen, keptCardIds: [],
   } : null, rng: rng.state() };
 }
 
@@ -339,13 +340,13 @@ function offerIndex(cw: CardWeekState, grant?: number): number {
 }
 
 /** Fill the opening queue. Migration can supply the already-resolved v36 pick first. */
-export function fillCardOffers(state: GameState): GameState {
+export function fillCardOffers(state: GameState, size?: number): GameState {
   const cw = state.cardWeek!;
   const offers = [...cw.offers];
   let rng = cw.rng;
   while (offers.length < cw.starterLeft + cw.owed) {
     const kind = offers.length < cw.starterLeft ? 'starter' : 'match';
-    const draw = drawOffer({ ...state, cardWeek: { ...cw, rng } }, kind, offers);
+    const draw = drawOffer({ ...state, cardWeek: { ...cw, rng } }, kind, offers, size === undefined ? {} : { size });
     if (!draw.offer) break;
     offers.push(draw.offer);
     rng = draw.rng;
@@ -369,10 +370,12 @@ export function plantCard(state: GameState, cardId: string): GameState | string 
   const card = resolveCard(state, def, rng);
   if (!card) return 'That card cannot be offered now.';
   const current = cw.offers[0];
+  if (current?.kind === 'decree') return 'A Decree pick is waiting.';
+  if (current?.keptCardIds.includes(cardId)) return 'That card was already kept from this pick.';
   const rest = (current?.cards ?? []).filter((c) => c.cardId !== cardId);
   const offer: CardOffer = {
-    ...(current ?? { season: state.season, week: state.week, kind: 'match', grant: cw.grants + 1 }),
-    cards: [card, ...rest].slice(0, CARD_WEEK.OFFER_SIZE),
+    ...(current ?? { season: state.season, week: state.week, kind: 'match', grant: cw.grants + 1, keptCardIds: [] }),
+    cards: [card, ...rest].slice(0, current?.cards.length ?? CARD_WEEK.PICKS.match.show),
   };
   return { ...state, cardWeek: {
     ...cw, rng: rng.state(), owed: current ? cw.owed : 1,
@@ -513,6 +516,18 @@ function spendPick(cw: CardWeekState, at: number, history: CardHistoryEntry[]): 
   };
 }
 
+function keepsRemaining(offer: CardOffer): number {
+  return Math.min(offer.cards.length, CARD_WEEK.PICKS[offer.kind].keep - offer.keptCardIds.length);
+}
+
+function keepCard(cw: CardWeekState, at: number, index: number, cardId: string, when: GameState): CardWeekState {
+  const offer = cw.offers[at]!;
+  const history = recordCard(cw, when, cardId, 'take');
+  if (keepsRemaining(offer) <= 1) return spendPick(cw, at, history);
+  const half = { ...offer, cards: offer.cards.filter((_, i) => i !== index), keptCardIds: [...offer.keptCardIds, cardId] };
+  return { ...cw, history, offers: cw.offers.map((o, i) => i === at ? half : o) };
+}
+
 function pickedCard(state: GameState, cw: CardWeekState, index: number, grant?: number): { at: number; card: OfferedCard } | string {
   const at = offerIndex(cw, grant);
   const offer = cw.offers[at];
@@ -537,7 +552,7 @@ function takeCardResult(state: GameState, index: number, grant?: number): CardTa
   const level = nextCardLevel(state, card.cardId);
   if (!level) return 'That card is already Level III.';
   const existing = activeCard(state, card.cardId);
-  const spent = spendPick(cw, at, recordCard(cw, state, card.cardId, 'take'));
+  const spent = keepCard(cw, at, index, card.cardId, state);
   if (card.kind === 'decree' || (!held && existing && existing.kind !== 'cash')) return applyCard({ ...state, cardWeek: spent }, card, level);
   if (!held && cw.hand.length >= CARD_WEEK.HAND_CAP) return 'Your hand is full. Play or discard a card first.';
   const hand = held ? cw.hand.map(h => h === held ? { ...h, level } : h)
@@ -706,7 +721,7 @@ export function playPickCard(state: GameState, index: number, targetId?: string,
   const level = nextCardLevel(state, card.cardId);
   if (!level) return 'That card is already Level III.';
   const held = cw.hand.find(h => h.cardId === card.cardId);
-  const spent = spendPick(cw, at, recordCard(cw, state, card.cardId, 'take'));
+  const spent = keepCard(cw, at, index, card.cardId, state);
   return applyCard({ ...state, cardWeek: { ...spent, hand: cw.hand.filter(h => h !== held) } }, held?.offered ?? card, level, targetId);
 }
 
@@ -720,7 +735,7 @@ export function discardCard(state: GameState, index: number): GameState | string
   } };
 }
 
-/** Pass even if none of the three cards can currently be played. */
+/** Pass the rest of a pick even if none of its cards can currently be played. */
 export function passCard(state: GameState, grant?: number): GameState | string {
   const cw = state.cardWeek;
   if (!cw) return 'This career has no card week.';
@@ -935,10 +950,10 @@ function cardFaceView(state: GameState, card: OfferedCard, index: number, level:
   return [view];
 }
 
-export function cardOfferView(state: GameState, grant?: number): { owed: number; starterLeft: number; cards: (CardFaceView & { takeRefusal: string | null })[] } {
+export function cardOfferView(state: GameState, grant?: number): { owed: number; starterLeft: number; keepsLeft: number; cards: (CardFaceView & { takeRefusal: string | null })[] } {
   const cw = state.cardWeek;
   const offer = cw?.offers[offerIndex(cw, grant)];
-  if (!cw || !offer) return { owed: 0, starterLeft: 0, cards: [] };
+  if (!cw || !offer) return { owed: 0, starterLeft: 0, keepsLeft: 0, cards: [] };
   const blocked = pickBlocked(state);
   const cards = offer.cards.flatMap((card, index) => cardFaceView(state, card, index, nextCardLevel(state, card.cardId) ?? 3,
     !!activeCard(state, card.cardId) || cw.hand.some(h => h.cardId === card.cardId)).map((view) => {
@@ -947,7 +962,7 @@ export function cardOfferView(state: GameState, grant?: number): { owed: number;
     const probe = blocked ?? playPickCard(state, index, view.targets?.[0]?.playerId, grant);
     return { ...view, takeRefusal, refusal: playRefusal(view, probe) };
   }));
-  return { owed: cw.offers.length, starterLeft: cw.starterLeft, cards };
+  return { owed: cw.offers.length, starterLeft: cw.starterLeft, keepsLeft: keepsRemaining(offer), cards };
 }
 
 function playRefusal(view: CardFaceView, probe: CardTake | string): string | null {
@@ -1044,7 +1059,7 @@ export function rerollCard(state: GameState, grant?: number): GameState | string
   if (!cw || !offer) return 'No pick is waiting.';
   const cost = rerollCost(state);
   const paid = bookPlayerMovement(state, -cost, 'events', careerActionClock(state));
-  const draw = drawOffer(paid, offer.kind, [offer]);
+  const draw = drawOffer(paid, offer.kind, [offer], { size: offer.cards.length, exclude: offer.keptCardIds });
   if (!draw.offer) return 'There are no eligible cards to draw.';
   const rerolls = { season: state.season, week: state.week, count: (cost - CARD_WEEK.REROLL_BASE) / CARD_WEEK.REROLL_STEP + 1 };
   const { fromClubId: _legacySource, ...waiting } = offer;

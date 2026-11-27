@@ -152,3 +152,11 @@ weeks of an Australian League career with seed 1. The waiting Week 12 pick
 contains Reece Fenuamea from the Bendigo Bellbirds, to whom the club previously
 sold him. The fixture places a Second Man card drawn from the same club in the
 hand, so one save exercises both paths.
+
+
+### v40 Card week save with a half-used match pick
+
+`v40-card-week-half-pick.json.gz` records an Australian League career with seed
+573 after the first League match. Assistant Coach is in the hand and round one's
+pick still has one keep and four resolved cards. The three starter picks remain
+in the queue.

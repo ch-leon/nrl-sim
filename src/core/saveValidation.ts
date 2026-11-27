@@ -216,8 +216,10 @@ function cardDate(v: unknown): v is Record<string, unknown> {
   return record(v) && integer(v.season, 1) && integer(v.week, 1);
 }
 
-function cardOffer(v: unknown): v is Record<string, unknown> {
-  return cardDate(v) && Array.isArray(v.cards) && v.cards.length >= 1 && v.cards.length <= CARD_WEEK.OFFER_SIZE
+export const LEGACY_CARD_OFFER_SIZE = 3;
+
+function cardOffer(v: unknown, max: number): v is Record<string, unknown> & { cards: { cardId: string }[] } {
+  return cardDate(v) && Array.isArray(v.cards) && v.cards.length >= 1 && v.cards.length <= max
     && v.cards.every(isOfferedCard) && unique(v.cards.map(c => c.cardId));
 }
 
@@ -236,7 +238,7 @@ function cardWeekCommon(v: unknown): v is Record<string, unknown> {
 }
 
 export function isCardWeekV36(v: unknown): boolean {
-  return cardWeekCommon(v) && (v.offer === null || cardOffer(v.offer));
+  return cardWeekCommon(v) && (v.offer === null || cardOffer(v.offer, LEGACY_CARD_OFFER_SIZE));
 }
 
 function isActiveCard(v: unknown): boolean {
@@ -260,7 +262,7 @@ function isActiveCard(v: unknown): boolean {
   }
 }
 
-export function isCardWeek(v: unknown): boolean {
+export function isCardWeek(v: unknown, version: number = SAVE_VERSION): boolean {
   if (!cardWeekCommon(v) || !integer(v.starterLeft, 0, CARD_WEEK.STARTER_PICKS) || !integer(v.owed, 0, CARD_WEEK.MAX_OWED)) return false;
   const starterLeft = v.starterLeft;
   if (!Array.isArray(v.offers) || v.offers.length !== starterLeft + v.owed) return false;
@@ -271,10 +273,21 @@ export function isCardWeek(v: unknown): boolean {
   let previous = 0;
   let decreeOffer = false;
   for (const [i, o] of v.offers.entries()) {
-    if (!cardOffer(o) || (i < starterLeft ? o.kind !== 'starter' : !oneOf(o.kind, ['match', 'decree']))
-      || (o.fromClubId !== undefined && !text(o.fromClubId))) return false;
-    const isDecree = o.kind === 'decree';
-    if (isDecree && (decreeOffer || o.fromClubId !== undefined || (o.cards as unknown[]).length !== CARD_WEEK.OFFER_SIZE)) return false;
+    if (!record(o) || (o.fromClubId !== undefined && !text(o.fromClubId))) return false;
+    const kind = o.kind;
+    if ((kind !== 'starter' && kind !== 'match' && kind !== 'decree') || (i < starterLeft) !== (kind === 'starter')) return false;
+    const { show, keep } = CARD_WEEK.PICKS[kind];
+    if (!cardOffer(o, version >= 40 ? show : LEGACY_CARD_OFFER_SIZE)) return false;
+    if (version >= 40) {
+      const kept = o.keptCardIds;
+      if (!strings(kept) || !unique(kept) || kept.length >= keep || kept.length + o.cards.length > show
+        || kept.some(id => {
+          const def = cardDefById(id);
+          return !def || def.kind === 'decree' || o.cards.some(card => card.cardId === id);
+        })) return false;
+    }
+    const isDecree = kind === 'decree';
+    if (isDecree && (decreeOffer || o.fromClubId !== undefined || o.cards.length !== show)) return false;
     decreeOffer ||= isDecree;
     if ((o.cards as unknown[]).some(c => record(c) && (c.kind === 'decree') !== isDecree)) return false;
     if (identified) {
@@ -382,7 +395,7 @@ export function validateInput(v: Record<string, unknown>, version: number, runni
   }
   if ('individualChallenges' in v || (version < 35 && record(v.competitions) && 'individualChallenges' in v.competitions)) return fail('individual challenge version');
   if (version < 30 && 'playerPopulation' in v) return fail('player population version');
-  if (v.cardWeek !== undefined && (version < 36 || !(version === 36 ? isCardWeekV36(v.cardWeek) : isCardWeek(v.cardWeek)) || !record(v.competitions) || v.competitions.leagueCareer === undefined)) return fail('card week');
+  if (v.cardWeek !== undefined && (version < 36 || !(version === 36 ? isCardWeekV36(v.cardWeek) : isCardWeek(v.cardWeek, version)) || !record(v.competitions) || v.competitions.leagueCareer === undefined)) return fail('card week');
   if (clubs.size && !clubs.has('player')) return fail('player club reference');
   if (v.competitions !== undefined) {
     if (version < 25) return fail('competition metadata version');

@@ -16,10 +16,10 @@ import { registerMoraleSystem } from '../../src/systems/morale';
 import { bus } from '../../src/core/events';
 import { __setStorage, __unlockSaves, classicSlots, firstRunSlotSummaries, loadCareer, migrateState, saveIfChanged, setActiveSlot, slotHasLeagueData } from '../../src/core/save';
 import { isClassicSave } from '../../src/core/classicSave';
-import { isCardWeek } from '../../src/core/saveValidation';
+import { isCardWeek, LEGACY_CARD_OFFER_SIZE } from '../../src/core/saveValidation';
 import { careerActionClock } from '../../src/core/season';
 import { setCareerNamespace } from '../../src/core/storage/local';
-import { DEV_TEST_PREFIX } from '../../src/core/storageKeys';
+import { DEV_TEST_PREFIX, slotKey } from '../../src/core/storageKeys';
 import { createNewGame, getState, loadState, newCardWeek, SAVE_VERSION, setState, type GameState, type OfferedCard, type Player, type Position } from '../../src/core/state';
 import { advanceWeek, advanceWeeks, clearHeldWeek, clearSeasonHooks, clearTickHooks, withFastForward, weekHeld } from '../../src/core/time';
 import { BOARD, SQUAD_CAP, STAT_MAX } from '../../src/config';
@@ -33,7 +33,7 @@ import { traitLevel } from '../../src/data/traits';
 import { leagueEntryReceiptId } from '../../src/data/leagueCareer';
 import { AU_CAREER_PROFILE } from '../../src/content/career/au';
 import {
-  activeCard, activeCardStaff, cardFloor, expireSeasonDecree, cardOfferView, cardWeekTick, chooseCard, passCard, passPick, discardCard, playCard, playChosenCard, playPickCard, drawOffer, freePlayCandidates, lastMatchImpact, plantCard,
+  activeCard, activeCardStaff, cardFloor, expireSeasonDecree, cardOfferView, cardWeekTick, chooseCard, passCard, passPick, discardCard, playCard, playChosenCard, playPickCard, drawOffer, fillCardOffers, freePlayCandidates, lastMatchImpact, plantCard,
   playedLeagueMatch, registerCardWeekSystem, rerollCard, rerollCost, rerollPick, startCardWeek, takeCard, traitTargets, type CardTake,
 } from '../../src/systems/cardWeek';
 import { capRoomFor, commitment, publishedCap } from '../../src/systems/cap';
@@ -99,13 +99,13 @@ const leagueSlot = (s: GameState): number => Math.min(...s.competitions!.instanc
   .flatMap((i) => i.fixtures.filter((f) => f.homeId === s.clubId || f.awayId === s.clubId).map((f) => f.slot!)));
 
 describe('a new card-week career', () => {
-  it('owes three picks and shows three different known cards, the same for the same seed', async () => {
+  it('owes three picks and shows five different known cards, the same for the same seed', async () => {
     const a = await career(7);
     const b = await career(7);
     expect(a.cardWeek).toMatchObject({ owed: 0, starterLeft: 3, grants: 3 });
     const ids = a.cardWeek!.offers[0]!.cards.map((c) => c.cardId);
-    expect(ids).toHaveLength(3);
-    expect(new Set(ids).size).toBe(3);
+    expect(ids).toHaveLength(CARD_WEEK.PICKS.starter.show);
+    expect(new Set(ids).size).toBe(CARD_WEEK.PICKS.starter.show);
     expect(ids.every((id) => cardDefById(id))).toBe(true);
     expect(b.cardWeek).toEqual(a.cardWeek);
     expect(isCardWeek(a.cardWeek)).toBe(true);
@@ -125,32 +125,19 @@ describe('a new card-week career', () => {
     const one = drawOffer(again);
     const two = drawOffer(again);
     expect(one).toEqual(two);
-    expect(one.offer!.cards.length).toBe(3);
+    expect(one.offer!.cards).toHaveLength(CARD_WEEK.PICKS.match.show);
     expect(one.rng).not.toBe(s.cardWeek!.rng);
   });
 
-  it('avoids repeated sets of three starter cards across waiting offers', async () => {
+  it('avoids repeating the same five starter cards when another draw is available', async () => {
     const base = await career();
-    const signature = (offer: { cards: OfferedCard[] }) => offer.cards.map(c => c.cardId).sort().join(',');
-    let reproduced = false;
-    for (let seed = 1; seed <= 256; seed++) {
-      const cw = newCardWeek(seed);
-      let rng = cw.rng;
-      const draws = [];
-      for (let i = 0; i < 3; i++) {
-        const draw = drawOffer({ ...base, cardWeek: { ...cw, rng } }, 'starter');
-        draws.push(signature(draw.offer!));
-        rng = draw.rng;
-      }
-      if (new Set(draws).size === 3) continue;
-      const fixed = startCardWeek(base, cw).cardWeek!;
-      expect(fixed.offers.map(o => o.cards.length)).toEqual([3, 3, 3]);
-      expect(new Set(fixed.offers.map(signature)).size).toBe(3);
-      expect(startCardWeek(base, cw).cardWeek).toEqual(fixed);
-      reproduced = true;
-      break;
-    }
-    expect(reproduced).toBe(true);
+    const first = drawOffer(base, 'starter').offer!;
+    const signature = (offer: { cards: OfferedCard[] }) => offer.cards.map(c => c.cardId).sort();
+    expect(drawOffer(base, 'starter').offer).toEqual(first);
+    const redrawn = drawOffer(base, 'starter', [first]).offer!;
+    expect(redrawn.cards).toHaveLength(CARD_WEEK.PICKS.starter.show);
+    expect(signature(redrawn)).not.toEqual(signature(first));
+    expect(drawOffer(base, 'starter', [first]).offer).toEqual(redrawn);
   });
 
   it('keeps the identical offer through a save and reload', async () => {
@@ -165,6 +152,79 @@ describe('a new card-week career', () => {
   it('is only a League career option: a Classic career never has one', () => {
     const s = createNewGame('Classic FC', 5, { cardWeek: true });
     expect(s.cardWeek).toBeUndefined();
+  });
+});
+
+describe('five-card picks', () => {
+  async function matchPick(): Promise<GameState> {
+    const s = await career();
+    const passStarters = s.cardWeek!.offers.reduce(state => changed(passCard(state)), s);
+    return cardWeekTick(played(passStarters, leagueSlot(s), format => format === 'league'));
+  }
+
+  it('deals five different match cards and closes after a take and a play', async () => {
+    const s = planted(await matchPick(), 'cashInjection');
+    const [offer] = s.cardWeek!.offers;
+    expect(offer!.cards).toHaveLength(5);
+    expect(new Set(offer!.cards.map(card => card.cardId)).size).toBe(5);
+    const half = changed(takeCard(s, 0, offer!.grant));
+    expect(half.cardWeek!.offers[0]).toMatchObject({ grant: offer!.grant, cards: offer!.cards.slice(1) });
+    expect(cardOfferView(half, offer!.grant)).toMatchObject({ keepsLeft: 1 });
+    expect(half.cardWeek).toMatchObject({ owed: 1, grants: s.cardWeek!.grants });
+    const playable = cardOfferView(half, offer!.grant).cards.find(c => !c.refusal)!;
+    const done = taken(playPickCard(half, playable.index, playable.targets?.[0]?.playerId, offer!.grant)).state;
+    expect(done.cardWeek).toMatchObject({ owed: 0, offers: [], grants: s.cardWeek!.grants });
+    expect(done.cardWeek!.hand.map(h => h.cardId)).toEqual(['cashInjection']);
+    expect(takeCard(done, 0, offer!.grant)).toBe('That pick is no longer waiting.');
+  });
+
+  it('shows five in each starter pick and uses one keep in each', async () => {
+    let s = await career();
+    const grants = s.cardWeek!.grants;
+    while (s.cardWeek!.starterLeft) {
+      const offer = s.cardWeek!.offers[0]!;
+      expect(offer.cards).toHaveLength(5);
+      const face = cardOfferView(s, offer.grant).cards.find(c =>
+        !c.takeRefusal && !s.cardWeek!.hand.some(held => held.cardId === c.cardId))!;
+      s = changed(takeCard(s, face.index, offer.grant));
+      expect(takeCard(s, 0, offer.grant)).toBe('That pick is no longer waiting.');
+    }
+    expect(s.cardWeek).toMatchObject({ starterLeft: 0, owed: 0, grants, offers: [] });
+    expect(s.cardWeek!.hand).toHaveLength(3);
+  });
+
+  it('rerolls the remaining slots after a keep without bringing back its card or its keep', async () => {
+    const s = planted(await matchPick(), 'cashInjection');
+    const [offer] = s.cardWeek!.offers;
+    const half = changed(takeCard(s, 0, offer!.grant));
+    const rerolled = changed(rerollCard(half, offer!.grant));
+    expect(rerollCard(half, offer!.grant)).toEqual(rerolled);
+    expect(rerolled.money).toBe(half.money - CARD_WEEK.REROLL_BASE);
+    expect(rerolled.cardWeek!.hand).toEqual(half.cardWeek!.hand);
+    expect(rerolled.cardWeek!.offers[0]!.cards).toHaveLength(4);
+    expect(rerolled.cardWeek!.offers[0]!.cards.every(c => c.cardId !== 'cashInjection')).toBe(true);
+    expect(cardOfferView(rerolled, offer!.grant)).toMatchObject({ keepsLeft: 1 });
+    const passed = changed(passCard(rerolled, offer!.grant));
+    expect(passed.cardWeek).toMatchObject({ owed: 0, offers: [], grants: half.cardWeek!.grants });
+    expect(passed.cardWeek!.hand).toEqual(half.cardWeek!.hand);
+    expect(passed.cardWeek!.history.slice(-1)[0]).toMatchObject({ action: 'pass' });
+  });
+
+  it('refuses a second take with the hand full and allows Play now', async () => {
+    let s = await matchPick();
+    const offer = s.cardWeek!.offers[0]!;
+    const hand = CARDS.filter(c => c.kind === 'trait')
+      .slice(0, CARD_WEEK.HAND_CAP - 1)
+      .map(c => ({ cardId: c.id, level: 1 as const, offered: { kind: 'trait' as const, cardId: c.id }, gotSeason: s.season, gotWeek: s.week }));
+    expect(hand).toHaveLength(CARD_WEEK.HAND_CAP - 1);
+    s = planted({ ...s, cardWeek: { ...s.cardWeek!, hand } }, 'cashInjection');
+    const half = changed(takeCard(s, 0, offer.grant));
+    const face = cardOfferView(half, offer.grant).cards.find(c => !c.refusal && !c.upgrade)!;
+    expect(half.cardWeek!.hand).toHaveLength(CARD_WEEK.HAND_CAP);
+    expect(takeCard(half, face.index, offer.grant)).toMatch(/hand is full/);
+    const done = taken(playPickCard(half, face.index, face.targets?.[0]?.playerId, offer.grant)).state;
+    expect(done.cardWeek!.offers).toEqual([]);
+    expect(done.cardWeek!.hand).toEqual(half.cardWeek!.hand);
   });
 });
 
@@ -399,7 +459,7 @@ describe('passing a pick', () => {
     expect(cw.starterLeft).toBe(2);
     expect(cw.owed).toBe(0);
     expect(cw.history).toEqual([{ cardId: 'pass', season: 1, week: 1, action: 'pass' }]);
-    expect(cw.offers[0]!.cards).toHaveLength(3);
+    expect(cw.offers[0]!.cards).toHaveLength(CARD_WEEK.PICKS.starter.show);
     expect(r.squad).toEqual(s.squad);
     expect(r.money).toBe(s.money);
     expect(isCardWeek(cw)).toBe(true);
@@ -416,7 +476,7 @@ describe('passing a pick', () => {
     const prop = planted({ ...s, money: 10_000_000 }, 'propSigning').cardWeek!.offers[0]!.cards[0]!;
     const stuck: GameState = { ...s, money: -1,
       squad: s.squad.map((p) => ({ ...p, traits: [{ id: 'lastLine' as const, level: 3 as const }] })),
-      cardWeek: { ...s.cardWeek!, starterLeft: 1, offers: [{ kind: 'starter', season: 1, week: 1, cards: [
+      cardWeek: { ...s.cardWeek!, starterLeft: 1, offers: [{ kind: 'starter', season: 1, week: 1, keptCardIds: [], cards: [
         { ...prop, replacesId: s.squad[0]!.id, replacesName: s.squad[0]!.name } as OfferedCard,
         { cardId: 'setPlay', kind: 'setPlay', playId: 'block-play' }, { cardId: 'lastLine', kind: 'trait' },
       ] }] }, playbook: { owned: ['block-play'] } };
@@ -534,7 +594,7 @@ describe('picks owed', () => {
     const offers = after.cardWeek!.offers;
     expect(offers.slice(0, 3)).toEqual(s.cardWeek!.offers);
     expect(offers[3]).toMatchObject({ kind: 'match', week: slot });
-    expect(offers[3]!.cards).toHaveLength(3);
+    expect(offers[3]!.cards).toHaveLength(CARD_WEEK.PICKS.match.show);
     const ids = (cards: OfferedCard[]) => cards.map(c => c.cardId).sort();
     for (const waiting of s.cardWeek!.offers) expect(ids(offers[3]!.cards)).not.toEqual(ids(waiting.cards));
     expect(cardWeekTick(round)).toEqual(after);
@@ -796,7 +856,7 @@ describe('card-week save migrations', () => {
     const current = cw.offers[0]!;
     return {
       ...s, version: 36, cardWeek: {
-        rng: cw.rng, owed, offer: { season: current.season, week: current.week, cards: current.cards },
+        rng: cw.rng, owed, offer: { season: current.season, week: current.week, cards: current.cards.slice(0, LEGACY_CARD_OFFER_SIZE) },
         history: cw.history.filter(h => h.action !== 'play').map(({ cardId, season, week }) => ({ cardId, season, week })),
         cardPlayers: cw.cardPlayers, cardTraits: cw.cardTraits.map(({ playerId, trait }) => ({ playerId, trait })),
       },
@@ -814,7 +874,7 @@ describe('card-week save migrations', () => {
     expect(result.state.version).toBe(SAVE_VERSION);
     const cw = result.state.cardWeek!;
     expect(cw).toMatchObject({ starterLeft: 2, owed: 0, grants: 3, hand: [] });
-    expect(cw.offers[0]).toEqual({ ...raw.cardWeek.offer, kind: 'starter', grant: 2 });
+    expect(cw.offers[0]).toEqual({ ...raw.cardWeek.offer, kind: 'starter', grant: 2, keptCardIds: [] });
     expect(cw.offers[1]!.kind).toBe('starter');
     expect(cw.history).toEqual([{ cardId: 'analyst', week: 1, season: 1, action: 'take' }]);
     expect(activeCardStaff(s)).toEqual(s.staff);
@@ -846,14 +906,14 @@ describe('card-week save migrations', () => {
 
   it('identifies older v37 offers without treating the old watermark as proof a match offer was shown', async () => {
     const s = await career();
-    const offers = s.cardWeek!.offers.map(({ grant: _grant, ...offer }) => offer);
+    const offers = s.cardWeek!.offers.map(({ grant: _grant, keptCardIds: _kept, ...offer }) => ({ ...offer, cards: offer.cards.slice(0, LEGACY_CARD_OFFER_SIZE) }));
     const match = { ...offers[0]!, kind: 'match', week: leagueSlot(s) };
     const old = { ...s, version: 37, cardWeek: { ...s.cardWeek!, offers: [...offers, match], grants: 4, seenGrant: 4, owed: 1 } };
     const loaded = migrateState(old);
     expect(loaded.ok).toBe(true);
     if (!loaded.ok) return;
     expect(loaded.state.cardWeek!.offers.map(o => o.grant)).toEqual([1, 2, 3, 4]);
-    expect(loaded.state.cardWeek!.offers[3]).toEqual({ ...match, grant: 4 });
+    expect(loaded.state.cardWeek!.offers[3]).toEqual({ ...match, grant: 4, keptCardIds: [] });
   });
 
   it('keeps a full v36 match queue, passed picks and already applied players and traits', async () => {
@@ -870,7 +930,7 @@ describe('card-week save migrations', () => {
     const cw = result.state.cardWeek!;
     expect(cw).toMatchObject({ starterLeft: 0, owed: 3, grants: 6, hand: [] });
     expect(cw.offers).toHaveLength(3);
-    expect(cw.offers[0]).toEqual({ ...raw.cardWeek.offer, kind: 'match', grant: 4 });
+    expect(cw.offers[0]).toEqual({ ...raw.cardWeek.offer, kind: 'match', grant: 4, keptCardIds: [] });
     expect(cw.history.map(h => h.action)).toEqual(['take', 'take', 'pass']);
     expect(cw.cardPlayers).toEqual(s.cardWeek!.cardPlayers);
     expect(cw.cardTraits).toEqual(s.cardWeek!.cardTraits);
@@ -1018,7 +1078,7 @@ describe('League match offers', () => {
       for (const match of [offer, rerolled.cardWeek!.offers.slice(-1)[0]!]) {
         expect(match).toMatchObject({ kind: 'match', week: state.week });
         expect(match.fromClubId).toBeUndefined();
-        expect(match.cards).toHaveLength(CARD_WEEK.OFFER_SIZE);
+        expect(match.cards).toHaveLength(CARD_WEEK.PICKS.match.show);
         expect(match.cards.every(card => !card.fromClubId && normalIds.has(card.cardId))).toBe(true);
       }
       expect(rerolled.rngSeed).toBe(state.rngSeed);
@@ -1066,7 +1126,8 @@ describe('Phase 2 card levels', () => {
   });
 
   it('gives seed 150’s Harley Kestwick Playmaker III at card Level II and extra rating at Level III', async () => {
-    const base = await career(150);
+    const state = await career(150);
+    const base = fillCardOffers({ ...state, cardWeek: newCardWeek(150) }, LEGACY_CARD_OFFER_SIZE);
     const pick = base.cardWeek!.offers[2]!;
     const index = pick.cards.findIndex(c => c.kind === 'player' && c.player.name === 'Harley Kestwick');
     expect(index).toBeGreaterThanOrEqual(0);
@@ -1208,12 +1269,12 @@ describe('actual v37 save bytes', () => {
     expect(rest).toEqual(originalRest);
     expect(staff).toEqual(name === 'after-starters'
       ? oldStaff.map(member => ({ ...member, cardHireId: 'legacy-card-hire:analyst' })) : oldStaff);
-    const { active: oldActive, ...kept } = original!;
+    const { active: oldActive, offers: _oldOffers, ...kept } = original!;
     expect(cardWeek).toMatchObject(kept);
     expect(cardWeek!.active).toEqual(expect.arrayContaining(oldActive.map(card => expect.objectContaining(card.kind === 'staff'
       ? { ...card, member: expect.objectContaining(card.member) } : card))));
     expect(Object.keys(cardWeek!)).toEqual(expect.arrayContaining(Object.keys(original!)));
-    expect(cardWeek!.offers).toEqual(original!.offers);
+    expect(cardWeek!.offers).toEqual(original!.offers.map(offer => ({ ...offer, keptCardIds: [] })));
     expect(cardWeek!.history).toEqual(original!.history);
     if (name === 'after-starters') {
       expect(cardWeek!.hand).toMatchObject([{ cardId: 'cashInjection', level: 1 }]);
@@ -1390,18 +1451,65 @@ describe('League strikes and Decree picks', () => {
   });
 });
 
+describe('five-card pick saves', () => {
+  it('loads the v40 half-used match pick, honours its last keep and cannot grant it twice', () => {
+    const bytes = gunzipSync(readFileSync(new URL('../fixtures/saves/v40-card-week-half-pick.json.gz', import.meta.url))).toString();
+    const storage = new Map([[slotKey(1), bytes]]);
+    __setStorage({ getItem: key => storage.get(key) ?? null, setItem: (key, value) => { storage.set(key, value); },
+      removeItem: key => { storage.delete(key); } });
+    __unlockSaves(); setActiveSlot(1);
+    const raw = JSON.parse(bytes) as GameState;
+    const loaded = loadCareer();
+    if (loaded.status !== 'ok') throw new Error(JSON.stringify(loaded));
+    expect(loaded).toMatchObject({ outcome: 'valid', repairs: [] });
+    expect(loaded.state).toEqual(raw);
+    const offer = raw.cardWeek!.offers.slice(-1)[0]!;
+    expect(offer).toMatchObject({ kind: 'match', keptCardIds: ['assistantCoach'] });
+    expect(offer.cards).toHaveLength(4);
+    const [first] = offer.cards;
+    expect(cardOfferView(loaded.state, offer.grant)).toMatchObject({ keepsLeft: 1 });
+
+    loadState(loaded.state);
+    expect(chooseCard(0, offer.grant)).toMatchObject({ ok: true });
+    expect(chooseCard(0, offer.grant)).toEqual({ ok: false, reason: 'That pick is no longer waiting.' });
+    const saved = loadCareer();
+    if (saved.status !== 'ok') throw new Error(JSON.stringify(saved));
+    expect(saved.state.cardWeek).toMatchObject({ grants: raw.cardWeek!.grants, starterLeft: 3, owed: 0 });
+    expect(saved.state.cardWeek!.offers).toEqual(raw.cardWeek!.offers.slice(0, -1));
+    expect(saved.state.cardWeek!.hand.map(h => h.cardId)).toEqual(['assistantCoach', first!.cardId]);
+  });
+
+  it('migrates v39 waiting picks, hand, levels, Decree and strikes without redrawing', () => {
+    const raw = JSON.parse(gunzipSync(readFileSync(new URL('../fixtures/saves/v39-card-week-legacy-steals.json.gz', import.meta.url))).toString()) as GameState;
+    expect(raw.version).toBe(39);
+    const cw = raw.cardWeek!;
+    const migrate = (cardWeek: NonNullable<GameState['cardWeek']>) => {
+      const result = migrateState({ ...raw, cardWeek });
+      if (!result.ok) throw new Error(result.message);
+      expect(result.state.cardWeek).toEqual({ ...cardWeek, offers: cardWeek.offers.map(o => ({ ...o, keptCardIds: [] })) });
+    };
+    migrate(cw);
+    const decree = cw.offers.find(o => o.kind === 'decree')!.cards[0]!.cardId;
+    const { season } = raw;
+    migrate({ ...cw, owed: cw.owed - 1, offers: cw.offers.filter(o => o.kind !== 'decree'),
+      active: [...cw.active, { kind: 'decree', cardId: decree, season, week: raw.week, level: 1 }],
+      decree: { id: decree, season }, strikes: { season, count: 1, lossRun: 0, log: [{ week: raw.week - 1, reason: 'run' }] },
+    });
+  });
+});
+
 describe('v38 save exports', () => {
   it.each(['card-week-waiting', 'card-week-empty', 'no-card-week'])('migrates %s mid-season', name => {
     const raw = JSON.parse(gunzipSync(readFileSync(new URL(`../fixtures/saves/v38-${name}.json.gz`, import.meta.url))).toString()) as GameState;
     expect(raw).toMatchObject({ version: 38, week: 8 });
     const loaded = migrateState(raw);
-    expect(loaded).toMatchObject({ ok: true, state: { version: 39 } });
+    expect(loaded).toMatchObject({ ok: true, state: { version: SAVE_VERSION } });
     if (!loaded.ok) return;
     if (!raw.cardWeek) {
       expect(loaded.state).toEqual({ ...raw, version: SAVE_VERSION });
       return;
     }
-    expect(loaded.state.cardWeek?.offers).toEqual(raw.cardWeek.offers);
+    expect(loaded.state.cardWeek?.offers).toEqual(raw.cardWeek.offers.map(offer => ({ ...offer, keptCardIds: [] })));
     expect(loaded.state.cardWeek?.history).toEqual(raw.cardWeek.history);
     const [hire] = loaded.state.staff;
     expect(hire).toMatchObject({ cardHireId: 'legacy-card-hire:assistantCoach', wage: raw.staff[0]!.wage });
@@ -1436,7 +1544,7 @@ describe('v38 save exports', () => {
     expect(activeCardStaff(replaced.state)).toEqual([]);
   });
 
-  it('reloads a v39 Decree offer and its active effect without granting or adopting twice', () => {
+  it('reloads a Decree offer and its active effect without granting or adopting twice', () => {
     const raw = JSON.parse(gunzipSync(readFileSync(new URL('../fixtures/saves/v38-card-week-empty.json.gz', import.meta.url))).toString());
     const migrated = migrateState(raw);
     if (!migrated.ok) throw new Error(migrated.message);
