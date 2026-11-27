@@ -112,6 +112,24 @@ function withoutEntry(state: GameState, edition: ChallengeEditionId): GameState 
   return { ...state, competitions: others.length ? { ...competition, individualChallenges: others } : competition };
 }
 
+/** Whether the event career's lead-in week ended as the stay career's did. The story deck keeps a booked player off
+ *  a card (systems/events.ts, subjectCandidates), so a card drawn in the lead-in can name the entrant where he stayed
+ *  and a squad-mate where he is booked. That one swap is expected; any other difference is the booking leaking. */
+function sameLeadIn(event: GameState, stay: GameState, entrantId: string): boolean {
+  const swapped = (i: number): boolean => {
+    const drawn = event.eventDeck.pending[i];
+    return stay.eventDeck.pending[i]?.subjectId === entrantId && drawn?.subjectId !== undefined
+      && drawn.subjectId !== entrantId && event.squad.some(p => p.id === drawn.subjectId && p.name === drawn.subjectName);
+  };
+  const unnamed = (state: GameState): GameState => ({ ...state, eventDeck: { ...state.eventDeck,
+    pending: state.eventDeck.pending.map((card, i) => {
+      if (!swapped(i)) return card;
+      const { subjectId: _id, subjectName: _name, ...rest } = card;
+      return rest;
+    }) } });
+  return same(unnamed(event), unnamed(stay));
+}
+
 function checkBoundary(state: GameState): void {
   const issues = checkState(state);
   const league = leagueCareerStateProblem(state);
@@ -462,7 +480,7 @@ export async function runIndividualChallengeCareerQA(options: ChallengeCareerQAC
     }
     const eventLead = playThrough(rules.eventWeek);
     requireThat(eventLead.length === stayLead.length
-      && eventLead.every((run, i) => same(withoutEntry(run.end, edition), stayLead[i]!.end)),
+      && eventLead.every((run, i) => sameLeadIn(withoutEntry(run.end, edition), stayLead[i]!.end, id)),
     'booking changed the club clock or results before contest departure');
     if (camp) {
       const campWeek = eventLead.find(run => run.start.week === 5);

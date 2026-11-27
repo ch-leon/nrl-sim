@@ -26,6 +26,8 @@ function sourceFor({ pack, camp }: ChallengeCareerQACase): ChallengeCareerQASour
 const cases = [
   { pack: 'au', edition: 'showground', difficulty: 'normal', role: 'starter', mode: 'auto', coaching: 'manual', camp: true },
   { pack: 'uk', edition: 'showground', difficulty: 'hard', role: 'reserve', mode: 'manual', coaching: 'finish' },
+  // The lead-in week draws a story card about the entrant where he stays, and about a squad-mate where he is booked.
+  { pack: 'au', edition: 'showground', difficulty: 'easy', role: 'bench', mode: 'auto', coaching: 'finish' },
   { pack: 'uk', edition: 'invitational', difficulty: 'easy', role: 'starter', mode: 'auto', coaching: 'auto' },
   { pack: 'au', edition: 'invitational', difficulty: 'hard', role: 'bench', mode: 'manual', coaching: 'finish' },
 ] satisfies ChallengeCareerQACase[];
