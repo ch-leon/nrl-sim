@@ -66,7 +66,7 @@ import { initNewsInbox, newsInbox, openInboxScreen } from './ui/inbox';
 import { advanceUntilAsked, askBeforeAdvance, decisionChipItems, openDecisions, pendingDecisionCount } from './ui/decisions';
 import { initAudio, initAudioUi, soundStatus } from './fx/audio';
 import { textSizeSync } from './ui/textSize';
-import { initPwa } from './fx/pwa';
+import { captureInstallPrompt, initPwa } from './fx/pwa';
 import { initLandscapeGuard, sleepLoopIfPortrait } from './ui/orientation';
 import { densityScaleConfig, trackDensity } from './world/density';
 import { initFirstVisitHints, setTutorialScreens, startTutorial, whenTutorialDone, STEPS as TUTORIAL_STEPS } from './ui/tutorial';
@@ -127,6 +127,7 @@ async function boot(): Promise<void> {
     bootLab();
     return;
   }
+  captureInstallPrompt();
   initLandscapeGuard({
     onBlock: () => {
       portraitBlocked = true;

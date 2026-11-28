@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   __setStorage, __unlockSaves, __flushSaveMeta, getSlotMeta, load, save, setActiveSlot, getActiveSlot,
 } from '../../src/core/save';
-import { createNewGame, getState, setState, SAVE_VERSION } from '../../src/core/state';
+import { createNewGame, getState, hasCareer, setState, SAVE_VERSION } from '../../src/core/state';
 import { careerNamespace, setCareerNamespace, type StorageLike } from '../../src/core/storage/local';
 import { DEV_TEST_BACKUP_KEY, DEV_TEST_DISPLACED_KEY, DEV_TEST_PREFIX, DEVICE_ID_KEY, LABS_KEY, liveMatchKey, saveMetaKey, slotKey } from '../../src/core/storageKeys';
 import { checksumOf, parseMeta } from '../../src/core/storage/meta';
@@ -86,6 +86,24 @@ afterEach(() => {
   __setLabs(null);
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
+});
+
+it('backs up the slot keys and reloads into playtest from the title', () => {
+  expect(hasCareer()).toBe(false);
+  storage.setItem(slotKey(2), '{"clubName":"Existing club"}');
+  storage.setItem(saveMetaKey(2), '{"updatedAt":10}');
+  const before = storage.dump(isNormal);
+  const write = vi.spyOn(storage, 'setItem');
+  const reload = vi.fn();
+  vi.stubGlobal('location', { search: '', reload });
+
+  expect(enterTestCareer()).toEqual({ ok: true });
+
+  expect(write.mock.calls.map(([key]) => key)).toEqual([DEV_TEST_BACKUP_KEY, LABS_KEY]);
+  expect(storage.dump(isNormal)).toEqual(before);
+  expect(JSON.parse(storage.getItem(DEV_TEST_BACKUP_KEY)!)).toMatchObject(before);
+  expect(testCareer()).toEqual({ preset: 'block-play', fresh: true, from: 1 });
+  expect(reload).toHaveBeenCalledOnce();
 });
 
 describe('the career namespace', () => {

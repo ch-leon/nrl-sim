@@ -1,7 +1,7 @@
 // The physical field is frozen at boot, so Apply saves progress and restarts only
 // between matches. Keep this action DOM-free, like the playtest career switches.
 import { saveIfChanged } from '../core/save';
-import { getState } from '../core/state';
+import { getState, hasCareer } from '../core/state';
 import { FIELD_LENGTH } from '../match/core/field';
 import { currentProbe, resetAll, transitionRefusal, type MatchProbe, type SwitchResult } from './devCareer';
 import { isFieldLength, type FieldLength } from './fieldLength';
@@ -15,7 +15,7 @@ export interface FieldSelectionDeps {
 }
 const pageDeps = (): FieldSelectionDeps => ({
   probe: currentProbe(),
-  save: () => saveIfChanged(getState()),
+  save: () => !hasCareer() || saveIfChanged(getState()),
   persist: setFieldLengthPreference,
   reload: () => location.reload(),
 });

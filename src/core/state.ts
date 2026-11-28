@@ -460,6 +460,10 @@ export interface GameState {
 // ── Store (module-singleton around one GameState) ──────────────────────────
 
 let state: GameState | null = null;
+
+export function hasCareer(): boolean {
+  return state !== null;
+}
 let installation = 0;
 /** In-memory installation identity; async work never crosses a career replacement. */
 export const stateInstallation = (): number => installation;

@@ -53,6 +53,15 @@ export class StubNode {
     this.childNodes.push(c);
     return c;
   }
+  insertBefore(c: StubNode, before: StubNode): StubNode {
+    if (c === before) return c;
+    c.parentNode?.removeChild(c);
+    const index = this.childNodes.indexOf(before);
+    if (index < 0) throw new Error('stub DOM: reference node is not a child');
+    c.parentNode = this;
+    this.childNodes.splice(index, 0, c);
+    return c;
+  }
   append(...nodes: (StubNode | string)[]): void {
     for (const n of nodes) this.appendChild(typeof n === 'string' ? new StubNode('#text', n) : n);
   }
