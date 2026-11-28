@@ -26,7 +26,7 @@ async function checkPick(page, portrait, count = 5, decree = false) {
   }
   const actions = await page.locator(`${PICK} .nrl-card-face button, ${PICK} [data-card-reroll], ${PICK} [data-card-pass]`).evaluateAll(buttons =>
     buttons.map(button => [button.offsetWidth, button.offsetHeight]));
-  const tier = decree ? /Rest of season/ : /Level (I|II|III)/;
+  const tier = decree ? /Rest of season/ : /Level (I|II|III)|Recovery/;
   assert.ok((await cards.locator('.nrl-card-tier').allTextContents()).every(text => tier.test(text)));
   assert.ok(actions.every(([width, height]) => width >= 44 && height >= 44), JSON.stringify(actions));
   const lastAction = cards.last().locator('button').first();
@@ -283,6 +283,48 @@ export async function runCardWeek(browser) {
     await decree.getByRole('button', { name: 'Adopt Fortress' }).tap();
     await page.locator(CARDS).waitFor();
     assert.match(await page.locator(CARDS).textContent(), /Fortress · Rest of season/);
+    await page.locator('.nrl-cards-screen .nrl-screen-x').tap();
+    await page.setViewportSize({ width: 667, height: 375 });
+    const playerId = await page.evaluate(() => {
+      const state = window.__nrlState();
+      const id = state.lineup.starters[0];
+      const cw = state.cardWeek;
+      cw.weeklyFatigue[id] = 81;
+      cw.owed = 2;
+      cw.offers = Array.from({ length: 2 }, () => ({
+        kind: 'match', season: state.season, week: state.week, grant: ++cw.grants, keptCardIds: [],
+        cards: ['iceBaths', 'fatigueWipe'].map(cardId => ({ cardId, kind: 'recovery' })),
+      }));
+      return id;
+    });
+    await openNav(page, 'cards');
+    await page.locator(`${CARDS} [data-cards-pick]`).tap();
+    for (const id of ['iceBaths', 'fatigueWipe']) await page.locator(`${PICK} [data-card-id="${id}"]`).tap();
+    await page.locator(PICK).waitFor({ state: 'detached' });
+    await page.locator(`${CARDS} [data-cards-pick]`).tap();
+    const recovery = page.locator(`${PICK} .nrl-card-face`).filter({ hasText: 'Fatigue wipe' });
+    assert.match(await recovery.textContent(), /You can hold 2 recovery cards\. Play one first\./);
+    assert.equal(await recovery.getByRole('button', { name: 'Take Fatigue wipe' }).isDisabled(), true);
+    const use = recovery.getByRole('button', { name: 'Play Fatigue wipe now' });
+    assert.equal(await use.isEnabled(), true);
+    await use.tap();
+    const receiver = page.locator(`${PICK} [data-card-target="${playerId}"]`);
+    assert.match(await receiver.textContent(), /Fatigue 81 → 0/);
+    for (const [width, height] of [[667, 375], [844, 390]]) {
+      await page.setViewportSize({ width, height });
+      await receiver.scrollIntoViewIfNeeded();
+      const box = await receiver.boundingBox();
+      assert.ok(box.width >= 44 && box.height >= 44 && box.x >= 0 && box.x + box.width <= width);
+      await page.screenshot({ animations: 'disabled', path: join(out, `${width}x${height}-recovery-target.png`) });
+    }
+    await receiver.tap();
+    assert.equal(await page.evaluate(id => window.__nrlState().cardWeek.weeklyFatigue[id] ?? 0, playerId), 0);
+    assert.equal(await page.evaluate(() => window.__nrlState().cardWeek.hand.filter(c => c.offered.kind === 'recovery').length), 2);
+    await page.locator('.nrl-card-modal .nrl-screen-x').tap();
+    await openNav(page, 'lineup');
+    const freshStarter = page.locator(`[data-player-open="${playerId}"]`);
+    assert.match(await freshStarter.getAttribute('aria-label'), /fatigue 0.*Starts at 100% energy/i);
+    log('ok recovery hand limit, targeted play and refreshed Lineup at iPhone widths');
     assert.deepEqual(errors, []);
     log('ok card week 667×375 and 375×667 at Larger text');
     return 0;
