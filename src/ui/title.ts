@@ -922,7 +922,7 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
           if (!cardWeekRow.parentNode) foot.insertBefore(cardWeekRow, build);
         } else {
           cardWeek.checked = false;
-          cardWeekRow.remove();
+          if (cardWeekRow.parentNode === foot) foot.removeChild(cardWeekRow);
         }
       };
       foot.appendChild(build);
