@@ -55,6 +55,35 @@ const CHAR_FOOT_DY = TILE_H / 2;
 // (standing just in front of a building's front row) they draw in front.
 const CHAR_LAYER = 2;
 
+/**
+ * Phaser's Canvas renderer calls every image that is visible to the camera,
+ * even if the image is offscreen. Grounds has a few hundred stationary tiles
+ * and props. Skip only those whose full rectangle is safely outside the view;
+ * don't remove them, change depths, or alter input and world objects.
+ */
+function cullStaticGroundImage(image: Phaser.GameObjects.Image): void {
+  const left = image.x - image.displayOriginX;
+  const top = image.y - image.displayOriginY;
+  const right = left + image.displayWidth;
+  const bottom = top + image.displayHeight;
+  const willRender = image.willRender;
+  image.willRender = function (camera): boolean {
+    // These images never move, scale or rotate. Fall back for a camera that
+    // hasn't been positioned yet or could show a rotated rectangle.
+    const view = camera.worldView;
+    // Phaser exposes this transform on the camera at render time, but its
+    // Camera declaration does not list it. If absent, leave rendering alone.
+    const matrix = (camera as typeof camera & {matrix?: {b: number; c: number}}).matrix;
+    if (matrix?.b === 0 && matrix.c === 0 && view.width > 0 && view.height > 0) {
+      // A tile-sized buffer covers edge rounding as the camera pans or zooms.
+      if (right + TILE_W < view.x || bottom + TILE_H < view.y
+        || left - TILE_W > view.right || top - TILE_H > view.bottom) return false;
+    }
+    return willRender.call(this, camera);
+  };
+}
+
+
 // Tile ids -> generated texture keys (BAK-158). Grass picks a lawn variant per cell.
 enum Tile {
   Grass = 0,
@@ -590,6 +619,7 @@ export class GroundsScene extends Phaser.Scene {
       // Decor textures' bottom TILE_H rows are the cell diamond (decor.ts convention).
       img.setOrigin(0.5, (img.height - TILE_H) / img.height);
       img.setDepth(depth(d.gx, d.gy, 1));
+      cullStaticGroundImage(img);
     }
   }
 
@@ -616,6 +646,7 @@ export class GroundsScene extends Phaser.Scene {
     into?.push(img);
     img.setOrigin(0.5, 0); // diamond top vertex anchors at the projected point
     img.setDepth(depth(gx, gy));
+    cullStaticGroundImage(img);
 
     const m = this.materialAt(gx, gy);
     for (const side of SIDES) {
@@ -629,6 +660,7 @@ export class GroundsScene extends Phaser.Scene {
       into?.push(e);
       e.setOrigin(0.5, 0);
       e.setDepth(depth(gx, gy) + 0.5); // above its own tile, below anything standing on it
+      cullStaticGroundImage(e);
     }
   }
 
@@ -642,7 +674,7 @@ export class GroundsScene extends Phaser.Scene {
     const size = SURROUND_SIZE;
     for (let y = b.minY - size; y < b.maxY + size; y += size) {
       for (let x = b.minX - size; x < b.maxX + size; x += size) {
-        this.add.image(x, y, SURROUND_KEY).setOrigin(0, 0).setDepth(-1e6);
+        cullStaticGroundImage(this.add.image(x, y, SURROUND_KEY).setOrigin(0, 0).setDepth(-1e6));
       }
     }
   }
