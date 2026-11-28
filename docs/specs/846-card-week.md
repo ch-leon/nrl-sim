@@ -107,11 +107,28 @@ a card-week career, and after a week whose League match added a pick. It waits b
 week summary, any decision, a sheet and the tutorial, and never opens during a match. The
 HUD's **Card week** chip shows how many picks are waiting and reopens it.
 
-The pick says how many cards you can keep. Each card shows its tier in words (Grey or Gold), its title and a one-line effect. A
-player card also shows his position, rating and salary a year, and "Replaces <name>
-(release costs $X)" when he needs a place. A card that can't be taken is shown disabled
-with the reason. A trait card lists who can take it (starters first) and the level each
-would reach. Below the cards, **Last match** lists each player who played, with tries,
+The pick says how many cards you can keep. Each card shows its tier in words (Grey or
+Gold) and level, its title and a one-line effect. A player card also shows his position,
+rating and salary a year, and "Replaces <name> (release costs $X)" when he needs a place.
+A card that can't be taken is shown disabled with the reason.
+
+Under that, each face shows the facts to choose with (the play-test said the faces did
+not give enough). The pick and a held card in Cards show the same lines, worked out from
+the club as it is now and as playing the card would settle it:
+
+| Card | What the face adds |
+| --- | --- |
+| Player | For a man who has not joined: the club's best natural player there ("Your best prop now: Jai Smith 41") and the gap ("+5 better"), with his rating as he would join at this card's level (a Level II or III dilemma adds its margin steps). "Nobody plays there now" when the card floor came from another position, with no gap, since it would be over an unnamed man; no claim either when the gap is not above zero. An upgrade of a man already here shows neither. |
+| Dilemma | As a player card, plus board patience before and after playing it ("Board patience 4 → 3 of 5"). Every play costs it, an upgrade too, so every level shows it. |
+| Trait | What the trait does (`TRAITS[id].blurb`) and, when it has a fit, "Suits: fullback, winger". Also shown once the trait is bound to its man. |
+| Staff | What the job does (the staff screen's blurb), "Wage $X a week" as he would be paid at this card's level (the hire's wage cut by `STAFF_WAGE_FACTOR`), and "Saves the $X fee" on a first hire only. An attack coach's first hire also lists the plays he opens and says each is still bought separately. |
+| Set play | The play's one-line description and "Saves $X" when the card grants the play free; its name is already the face's detail line. An upgrade saves nothing. |
+| Cash, Decree | Nothing more. |
+
+A trait card lists who can take it (starters first), each with his real step at this
+card's level ("Last Line I → II", "Last Line new → I", or "Last Line I → III" for a Level
+II card), and a "suits" mark on men whose position the trait suits; the list's heading
+repeats what the trait does. Below the cards, **Last match** lists each player who played, with tries,
 line breaks and tackles, and marks players who joined from a card or hold a trait from a
 card.
 
