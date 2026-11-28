@@ -15,7 +15,7 @@ import { getState, type GameState } from '../core/state';
 import { advanceInProgress } from '../core/advance';
 import { DEFAULT_PLAYER_COLORS } from '../config';
 import { PLAYER_ID } from '../systems/fixtures';
-import { nextFixture } from '../systems/league';
+import { nextSeasonFixture } from '../systems/leagueSeasonView';
 import { resolveKits } from '../art/match/kitClash';
 import { PixelBuffer, toTexture, type TextureHost } from '../art/pixel';
 import type { IdleSlice } from '../art/grounds';
@@ -169,8 +169,7 @@ export function takeFixtureArt(key: string): FixtureArt | null {
 }
 
 /** The player's next fixture as two kit sides, or null when there is none. */
-export function nextFixtureSides(state: GameState): [KitSide, KitSide] | null {
-  const f = nextFixture(state.league.fixtures, state.week, PLAYER_ID);
+export function nextFixtureSides(state: GameState, f = nextSeasonFixture(state)): [KitSide, KitSide] | null {
   if (!f) return null;
   const side = (id: string): KitSide | null => {
     const club = state.league.clubs.find((c) => c.id === id);
@@ -264,11 +263,12 @@ export function initMatchArtAhead(host: ArtAheadHost): () => void {
     }
     queued = false;
     const state = getState();
-    const sides = nextFixtureSides(state);
+    const fixture = nextSeasonFixture(state);
+    if (!fixture) return;
+    const sides = nextFixtureSides(state, fixture);
     if (!sides) return;
     const kits = resolveSideKits(sides[0], sides[1]);
-    const fixture = nextFixture(state.league.fixtures, state.week, PLAYER_ID);
-    void fixtureArtFor(fieldOffsetX(), { home: kits.home, away: kits.away }, fixture ? groundForMatch(state, fixture) : CLASSIC_GROUND);
+    void fixtureArtFor(fieldOffsetX(), { home: kits.home, away: kits.away }, groundForMatch(state, fixture));
     // The players' rings and, after dark, the light maps (dry or wet: the weather is
     // rolled at kick-off) too, one per idle slice; both are kept for the match.
     const lighting = lightingForFixture(fixture, state.season);
