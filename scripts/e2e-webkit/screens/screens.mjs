@@ -345,9 +345,10 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
     await page.waitForTimeout(250);
     const problems = await controlsProblems(page, ['[data-nrl-town]', '[data-nrl-next]', '[data-nrl-back]', '[data-nrl-settings]'], safe);
     await tap('[data-nrl-settings]');
-    await page.waitForSelector('.nrl-settings-modal .nrl-labs-open');
+    const developerSettings = page.locator('.nrl-settings-modal .nrl-labs-open');
+    await developerSettings.tap({ trial: true });
     problems.push(...await controlsProblems(page, ['.nrl-labs-open'], safe));
-    await tap('.nrl-labs-open');
+    await developerSettings.tap();
     await page.waitForSelector('.nrl-labs-panel');
     await tap('.nrl-dialog-region .nrl-screen-x');
     await page.waitForSelector('.nrl-dialog-region', { state: 'detached' });
