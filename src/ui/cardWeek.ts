@@ -31,9 +31,14 @@ export function playerLine(face: Pick<CardFaceView, 'player'>): string | null {
   return p ? `${POSITION_SHORT[p.position]} · ${p.rating} · ${fmtMoney(p.salary)} a year` : null;
 }
 
-export interface TraitTargetRow { playerId: string; name: string; position: Position; label: string; starter: boolean }
+export interface TraitTargetRow { playerId: string; name: string; position: Position; label: string; starter: boolean; suited: boolean }
 
-/** Who a trait card can go to, starters first (in the nine's order), then the rest by name: "Playmaker II". */
+/** The level a target holds and would reach: "Last Line I → II", or "Last Line new → I". */
+export function traitStepLabel(traitName: string, current: number, level: number): string {
+  return `${traitName} ${current ? ROMAN[current as 1 | 2 | 3] : 'new'} → ${ROMAN[level as 1 | 2 | 3]}`;
+}
+
+/** Who a trait card can go to, starters first (in the nine's order), then the rest by name, each with his step ("Playmaker I → II"). */
 export function traitTargetRows(state: GameState, face: CardFaceView): TraitTargetRow[] {
   const def = cardDefById(face.cardId);
   if (!def || def.kind !== 'trait') return [];
@@ -43,7 +48,7 @@ export function traitTargetRows(state: GameState, face: CardFaceView): TraitTarg
     const p = byId.get(t.playerId);
     if (!p) return [];
     const at = starters.indexOf(t.playerId);
-    return [{ row: { playerId: t.playerId, name: t.name, position: p.position, label: `${TRAITS[def.trait].name} ${ROMAN[t.level]}`, starter: at >= 0 }, at }];
+    return [{ row: { playerId: t.playerId, name: t.name, position: p.position, label: traitStepLabel(TRAITS[def.trait].name, t.current, t.level), starter: at >= 0, suited: t.suited }, at }];
   });
   rows.sort((a, b) => (a.at < 0 ? 99 : a.at) - (b.at < 0 ? 99 : b.at) || a.row.name.localeCompare(b.row.name));
   return rows.map((r) => r.row);
@@ -79,6 +84,40 @@ export function picksWaitingText(owed: number, starter = 0): string {
   return `${owed} ${owed === 1 ? 'pick' : 'picks'} waiting${starter ? ` (${starter} starter)` : ''}`;
 }
 
+/** One extra line on a face, with its look: plain, a number that helps, a cost, or a note. The words carry the meaning; the colour only repeats it. */
+export interface FaceLine { text: string; tone: 'plain' | 'pos' | 'neg' | 'note' }
+
+/**
+ * The facts a face shows under its effect line, in order (#846 play-test: enough to
+ * choose with). A man not yet here: the club's best there and the gap over him. The
+ * dilemma: board patience before and after. A trait: what it does and whom it suits.
+ * Staff: the job, the wage as paid at this level, any fee saved and an attack coach's
+ * plays. A set play: what it is and any price saved (its name is the detail line).
+ * Cash and decrees have none.
+ */
+export function faceLines(face: CardFaceView): FaceLine[] {
+  const out: FaceLine[] = [];
+  if (face.floor) {
+    out.push({ text: face.floor.line, tone: 'plain' });
+    if (face.floor.gap > 0) out.push({ text: `+${face.floor.gap} better`, tone: 'pos' });
+  }
+  if (face.board) out.push({ text: face.board.line, tone: 'neg' });
+  if (face.trait) {
+    out.push({ text: face.trait.blurb, tone: 'plain' });
+    if (face.trait.suits) out.push({ text: `Suits: ${face.trait.suits.join(', ')}`, tone: 'note' });
+  }
+  if (face.staff) {
+    out.push({ text: face.staff.blurb, tone: 'plain' }, { text: `Wage ${fmtMoney(face.staff.wage)} a week`, tone: 'note' });
+    if (face.staff.feeSaved > 0) out.push({ text: `Saves the ${fmtMoney(face.staff.feeSaved)} fee`, tone: 'pos' });
+    if (face.staff.plays?.length) out.push({ text: `Opens ${face.staff.plays.join(', ')}; each still bought separately`, tone: 'note' });
+  }
+  if (face.play) {
+    out.push({ text: face.play.blurb, tone: 'note' });
+    if (face.play.priceSaved > 0) out.push({ text: `Saves ${fmtMoney(face.play.priceSaved)}`, tone: 'pos' });
+  }
+  return out;
+}
+
 // ── DOM ───────────────────────────────────────────────────────────────────────
 
 export function cardFacts(face: CardFaceView): HTMLElement {
@@ -90,6 +129,7 @@ export function cardFacts(face: CardFaceView): HTMLElement {
   const who = playerLine(face);
   if (face.player && who) box.append(el('span', { class: 'nrl-card-player', text: face.player.name }), el('span', { class: 'nrl-card-facts', text: who }));
   if (face.detail) box.append(el('span', { class: 'nrl-card-player', text: face.detail }));
+  for (const line of faceLines(face)) box.append(el('span', { class: `nrl-card-fact nrl-card-fact-${line.tone}`, text: line.text }));
   const out = replacesLine(face);
   if (out) box.append(el('span', { class: 'nrl-card-replaces', text: out }));
   return box;
@@ -133,14 +173,20 @@ export function cardTargets(state: GameState, face: CardFaceView, onPlay: (targe
   for (const r of traitTargetRows(state, face)) {
     const b = button('', () => onPlay(r.playerId), { class: 'nrl-card-target' });
     b.setAttribute('data-card-target', r.playerId);
-    b.append(el('span', { class: 'nrl-card-target-name', text: r.name }),
+    // Marked only when the trait has a fit: one that suits anyone would mark every man.
+    const name = el('span', { class: 'nrl-card-target-name', text: r.name });
+    if (r.suited && face.trait?.suits) {
+      b.setAttribute('data-card-suited', '');
+      name.append(' ', el('span', { class: 'nrl-card-mark', text: 'suits', attrs: { title: 'The trait suits his position' } }));
+    }
+    b.append(name,
       el('span', { class: 'nrl-card-target-pos', text: POSITION_SHORT[r.position] }),
       el('span', { class: 'nrl-card-target-level', text: r.label }));
     list.append(b);
   }
   const back = cardAction('Back to cards', onBack);
   back.setAttribute('data-card-back', '');
-  return el('div', {}, el('p', { class: 'nrl-decisions-note', text: `Who gets ${face.title}?` }), list, back);
+  return el('div', {}, el('p', { class: 'nrl-decisions-note', text: `Who gets ${face.title}?${face.trait ? ` ${face.trait.blurb}.` : ''}` }), list, back);
 }
 
 type Step = { kind: 'cards' } | { kind: 'targets'; index: number } | { kind: 'pass' } | { kind: 'discard' };
@@ -379,6 +425,11 @@ export const CARD_CSS = `
 .nrl-card-player { font-weight: 700; font-size: 0.9375rem; color: var(--nrl-text); overflow-wrap: anywhere; }
 .nrl-card-source { font-size: 0.75rem; color: var(--nrl-accent); overflow-wrap: anywhere; }
 .nrl-card-facts { font-family: var(--nrl-f-num); font-size: 0.8125rem; color: var(--nrl-text); overflow-wrap: anywhere; }
+.nrl-card-fact { font-size: 0.8125rem; line-height: 1.3; overflow-wrap: anywhere; }
+.nrl-card-fact-plain { color: var(--nrl-text); }
+.nrl-card-fact-note { color: var(--nrl-text-2); }
+.nrl-card-fact-pos { color: var(--nrl-pos); font-family: var(--nrl-f-num); }
+.nrl-card-fact-neg { color: var(--nrl-neg); }
 .nrl-card-replaces { font-size: 0.8125rem; color: var(--nrl-neg); overflow-wrap: anywhere; }
 .nrl-card-refusal { font-size: 0.8125rem; color: var(--nrl-neg); overflow-wrap: anywhere; }
 .nrl-card-actions { align-items: center; }
@@ -423,6 +474,6 @@ export const CARD_CSS = `
 @media (max-height: 500px) and (orientation: landscape) {
   .nrl-card-face { padding: 6px 10px; gap: 2px; }
   .nrl-card-title { font-size: 0.9375rem; }
-  .nrl-card-effect, .nrl-card-replaces, .nrl-card-refusal, .nrl-card-facts { font-size: 0.75rem; line-height: 1.3; }
+  .nrl-card-effect, .nrl-card-replaces, .nrl-card-refusal, .nrl-card-facts, .nrl-card-fact { font-size: 0.75rem; line-height: 1.3; }
 }
 `;

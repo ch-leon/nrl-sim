@@ -26,16 +26,16 @@ import { createNewGame, getState, loadState, newCardWeek, SAVE_VERSION, setState
 import { advanceWeek, advanceWeeks, clearHeldWeek, clearSeasonHooks, clearTickHooks, withFastForward, weekHeld } from '../../src/core/time';
 import { BOARD, SQUAD_CAP, STAT_MAX } from '../../src/config';
 import { CARD_WEEK, CARDS, SIGNATURE_TRAIT, cardDefById, PLAYER_CARD_MARGIN } from '../../src/data/cards';
-import { AROUND_SPREAD, overallRating, shownStats } from '../../src/data/player';
+import { AROUND_SPREAD, overallRating, POSITIONS, shownStats } from '../../src/data/player';
 import { effectiveRating, FIT, positionFit } from '../../src/systems/lineup';
 import { playerRivalContext, rivalSheet } from '../../src/systems/rivalRound';
 import { releasedState } from '../../src/systems/freeagency';
-import { PLAY_IDS, PLAYS_BY_ID } from '../../src/data/plays';
-import { traitLevel } from '../../src/data/traits';
+import { PLAY_IDS, PLAYS_BY_ID, playsOfFamily } from '../../src/data/plays';
+import { TRAITS, traitLevel } from '../../src/data/traits';
 import { leagueEntryReceiptId } from '../../src/data/leagueCareer';
 import { AU_CAREER_PROFILE } from '../../src/content/career/au';
 import {
-  activeCard, activeCardStaff, cardFloor, expireSeasonDecree, cardOfferView, cardWeekTick, chooseCard, passCard, passPick, discardCard, playCard, playChosenCard, playPickCard, drawOffer, fillCardOffers, freePlayCandidates, lastMatchImpact, plantCard,
+  activeCard, activeCardStaff, cardFloor, cardFloorMan, cardHandView, floorLine, expireSeasonDecree, cardOfferView, cardWeekTick, chooseCard, passCard, passPick, discardCard, playCard, playChosenCard, playPickCard, drawOffer, fillCardOffers, freePlayCandidates, lastMatchImpact, plantCard,
   playedLeagueMatch, registerCardWeekSystem, rerollCard, rerollCost, rerollPick, startCardWeek, takeCard, traitTargets, type CardTake,
 } from '../../src/systems/cardWeek';
 import { capRoomFor, commitment, publishedCap } from '../../src/systems/cap';
@@ -46,7 +46,7 @@ import { acceptLeagueEntry, previewLeagueEntry } from '../../src/systems/leagueE
 import { prepareLeagueCareer } from '../../src/systems/leagueCareerSetup';
 import { readLiveMatch } from '../../src/systems/liveMatchRecord';
 import { registerPlayerMatchSystem, rivalMatchSheet } from '../../src/systems/matchday';
-import { STAFF_ROLES, hireStaff, newStaffMember, releaseStaff, staffWage } from '../../src/systems/staff';
+import { ATTACK_COACHES, STAFF, STAFF_APPOINTMENT_PRICES, STAFF_ROLES, attackCoachWage, hireStaff, newStaffMember, releaseStaff, staffWage } from '../../src/systems/staff';
 import { classifyReason, weeklyWages } from '../../src/systems/economy';
 import type { MatchEvent } from '../../src/sim/events';
 import { entrySnapshots } from '../data/leagueCareerFixtures';
@@ -1673,5 +1673,152 @@ describe('v38 save exports', () => {
     loadState(await career(37, false));
     expect(playChosenCard('hand', 0)).toMatchObject({ ok: false });
     expect(signed).toHaveBeenCalledOnce();
+  });
+});
+
+describe('what a card face shows (#846 play-test)', () => {
+  const face = (s: GameState, cardId: string) => {
+    const p = planted({ ...s, money: 10_000_000 }, cardId);
+    return { state: p, view: cardOfferView(p).cards[0]! };
+  };
+  const SIGNINGS = { propSigning: 'prop', hookerSigning: 'hooker', centreSigning: 'centre', fullbackSigning: 'fullback' } as const;
+  /** The first player card that can be offered to this club (none is offered at its best man's position). */
+  const signing = (s: GameState): keyof typeof SIGNINGS =>
+    (Object.keys(SIGNINGS) as (keyof typeof SIGNINGS)[]).find((id) => typeof plantCard({ ...s, money: 10_000_000 }, id) !== 'string')!;
+
+  it('keeps the card floor as it was: the best natural player, else a related position, else anyone', async () => {
+    const old = (squad: readonly Player[], position: Position): number => {
+      const best = (players: readonly Player[], rate: (p: Player) => number): number | null =>
+        players.length ? Math.max(...players.map(rate)) : null;
+      return best(squad.filter((p) => p.position === position), overallRating)
+        ?? best(squad.filter((p) => positionFit(p.position, position) === FIT.related), (p) => effectiveRating(p, position))
+        ?? best(squad, (p) => effectiveRating(p, position)) ?? 0;
+    };
+    for (const seed of [107, 109, 113]) {
+      const s = await career(seed);
+      for (const position of POSITIONS) {
+        const without = s.squad.filter((p) => p.position !== position);
+        for (const squad of [s.squad, without, []]) {
+          expect(cardFloor(squad, position)).toBe(old(squad, position));
+          expect(cardFloorMan(squad, position).natural).toBe(squad.some((p) => p.position === position));
+        }
+      }
+    }
+  });
+
+  it('a player card names the club\'s best man there and his gap over him', async () => {
+    const s = await career(107);
+    const id = signing(s);
+    const { view } = face(s, id);
+    const best = s.squad.filter((p) => p.position === SIGNINGS[id])
+      .sort((a, b) => overallRating(b) - overallRating(a) || a.id.localeCompare(b.id))[0]!;
+    expect(view.floor).toEqual({
+      line: `Your best ${SIGNINGS[id]} now: ${best.name} ${Math.round(overallRating(best))}`,
+      gap: view.player!.rating - Math.round(overallRating(best)),
+    });
+    expect(view.floor!.gap).toBeGreaterThan(0);
+  });
+
+  it('says nobody plays there when the floor came from a fallback', async () => {
+    const noProps = (await career(107)).squad.filter((p) => p.position !== 'prop');
+    expect(floorLine(noProps, 'prop', 60)).toEqual({ line: 'Nobody plays there now', gap: 60 - Math.round(cardFloor(noProps, 'prop')) });
+  });
+
+  it('an upgrade of a man already here shows no floor: it would set him against himself', async () => {
+    const s = await career(107);
+    const id = signing(s);
+    const joined = taken(playPickCard(face(s, id).state, 0));
+    const { view } = face(joined.state, id);
+    expect(view).toMatchObject({ upgrade: true, level: 2 });
+    expect(view.player!.name).toBe(joined.joined!.name);
+    expect(view.floor).toBeUndefined();
+  });
+
+  it('the dilemma shows board patience before and after, on every level, since each play costs it', async () => {
+    const s = { ...(await career(37)), boardPatience: 5 };
+    const first = face(s, 'marqueeGamble');
+    expect(first.view.board).toEqual({ from: 5, to: 4, max: BOARD.MAX_PATIENCE, line: `Board patience 5 → 4 of ${BOARD.MAX_PATIENCE}` });
+    expect(first.view.floor).toBeDefined();
+    const hired = taken(playPickCard(first.state, 0)).state;
+    expect(hired.boardPatience).toBe(4);
+    const upgrade = face(hired, 'marqueeGamble').view;
+    expect(upgrade).toMatchObject({ upgrade: true, level: 2, board: { from: 4, to: 3, line: `Board patience 4 → 3 of ${BOARD.MAX_PATIENCE}` } });
+    expect(upgrade.floor).toBeUndefined();
+  });
+
+  it('a trait card says what it does and whom it suits; each target has his real step, a Level II card too', async () => {
+    const s = await career(113);
+    const holder = s.squad[0]!;
+    const withOne = { ...s, squad: s.squad.map((p) => (p === holder ? { ...p, traits: [{ id: 'lastLine' as const, level: 1 as const }] } : p)) };
+    const one = face(withOne, 'lastLine');
+    expect(one.view.trait).toEqual({ blurb: TRAITS.lastLine.blurb, suits: ['fullback', 'winger'] });
+    expect(one.view.targets!.find((t) => t.playerId === holder.id)).toMatchObject({ current: 1, level: 2 });
+    for (const t of one.view.targets!) {
+      expect(t.suited).toBe(['fullback', 'winger'].includes(withOne.squad.find((x) => x.id === t.playerId)!.position));
+    }
+    // Taken into the hand, the next copy is Level II: two levels at once, capped at III.
+    const two = face(changed(takeCard(one.state, 0)), 'lastLine').view;
+    expect(two.level).toBe(2);
+    expect(two.targets!.find((t) => t.playerId === holder.id)).toMatchObject({ current: 1, level: 3 });
+    expect(two.targets!.find((t) => t.playerId !== holder.id)).toMatchObject({ current: 0, level: 2 });
+    expect(face(s, 'wreckingBall').view.trait!.suits).toEqual([...TRAITS.wreckingBall.fit!]);
+  });
+
+  it('a trait already bound to his man still says what the trait does', async () => {
+    const s = await career(43);
+    const target = s.squad.find((p) => traitLevel(p.traits, 'lastLine') === 0)!;
+    const bound = taken(playPickCard(face(s, 'lastLine').state, 0, target.id)).state;
+    const view = face(bound, 'lastLine').view;
+    expect(view.targets).toBeUndefined();
+    expect(view.detail).toBe(target.name);
+    expect(view.trait!.blurb).toBe(TRAITS.lastLine.blurb);
+  });
+
+  it('a staff card says what the job does, the wage as paid and the fee saved; an attack coach lists his plays', async () => {
+    const s = await career(127);
+    expect(face(s, 'analyst').view.staff).toEqual({ blurb: STAFF.analyst.blurb, wage: staffWage(s, 'analyst'), feeSaved: STAFF_APPOINTMENT_PRICES.analyst });
+    const coach = face(s, 'directAttackCoach').view.staff!;
+    expect(coach).toEqual({
+      blurb: ATTACK_COACHES.direct.blurb, wage: attackCoachWage(s, 'direct'), feeSaved: STAFF_APPOINTMENT_PRICES.direct,
+      plays: playsOfFamily('direct').map((p) => p.name),
+    });
+    expect(coach.plays!.length).toBeGreaterThan(0);
+  });
+
+  it('a staff upgrade shows the cut wage he will be paid and no fee', async () => {
+    const s = await career(37);
+    const hired = taken(playPickCard(face(s, 'analyst').state, 0)).state;
+    const { state, view } = face(hired, 'analyst');
+    expect(view).toMatchObject({ upgrade: true, level: 2 });
+    expect(view.staff).toEqual({ blurb: STAFF.analyst.blurb, wage: Math.round(staffWage(s, 'analyst') * CARD_WEEK.STAFF_WAGE_FACTOR[2]), feeSaved: 0 });
+    const upgraded = changed(takeCard(state, 0));
+    expect(upgraded.staff.find((m) => m.role === 'analyst')!.wage).toBe(view.staff!.wage);
+  });
+
+  it('a first hire held at Level II still saves the fee, at the cut wage', async () => {
+    const s = await career(37);
+    const held = changed(takeCard(face(changed(takeCard(face(s, 'analyst').state, 0)), 'analyst').state, 0));
+    const view = cardHandView(held)[0]!;
+    expect(view.level).toBe(2);
+    expect(view.staff).toMatchObject({ wage: Math.round(staffWage(s, 'analyst') * 0.75), feeSaved: STAFF_APPOINTMENT_PRICES.analyst });
+    expect(taken(playCard(held, 0)).state.staff.find((m) => m.role === 'analyst')!.wage).toBe(view.staff!.wage);
+  });
+
+  it('a set play card says what the play is and the price saved, and nothing saved on an upgrade', async () => {
+    const s = await career(131);
+    const coached = { ...s, staff: [newStaffMember(s, { attackCoach: 'direct' }, 'Coach')] };
+    const { state, view } = face(coached, 'setPlay');
+    const card = first(state);
+    if (card.kind !== 'setPlay') throw new Error('not a set play');
+    const play = PLAYS_BY_ID[card.playId];
+    expect(view.play).toEqual({ name: play.name, blurb: play.blurb, priceSaved: play.price });
+    expect(view.detail).toBe(play.name);
+    const owned = taken(playPickCard(state, 0)).state;
+    expect(face(owned, 'setPlay').view.play).toEqual({ name: play.name, blurb: play.blurb, priceSaved: 0 });
+  });
+
+  it('a cash card adds nothing', async () => {
+    const view = face(await career(137), 'cashInjection').view;
+    expect([view.floor, view.board, view.trait, view.staff, view.play]).toEqual([undefined, undefined, undefined, undefined, undefined]);
   });
 });

@@ -18,9 +18,12 @@ import { PLAYS_BY_ID } from '../../src/data/plays';
 import { commitment, publishedCap } from '../../src/systems/cap';
 import { validatePlayerPopulation } from '../../src/systems/playerCareer';
 import { RIVAL_POSITION_MIN } from '../../src/systems/rivals';
-import { cardOfferView, cardWeekTick, chooseCard, plantCard, playChosenCard, rerollCard } from '../../src/systems/cardWeek';
+import { cardOfferView, cardWeekTick, chooseCard, plantCard, playChosenCard, playPickCard, rerollCard, takeCard } from '../../src/systems/cardWeek';
 import { closeModal, closeScreen, dialogOpen, el, openModal } from '../../src/ui/dom';
-import { cardChipCount, initCardWeekPick, lastMatchView, openCardPick, picksWaitingText, replacesLine, tierLabel, traitTargetRows } from '../../src/ui/cardWeek';
+import { cardChipCount, faceLines, initCardWeekPick, lastMatchView, openCardPick, picksWaitingText, replacesLine, tierLabel, traitStepLabel, traitTargetRows } from '../../src/ui/cardWeek';
+import { TRAITS } from '../../src/data/traits';
+import { STAFF, staffWage } from '../../src/systems/staff';
+import { fmtMoney } from '../../src/utils/money';
 import { activeLines, openCardsScreen } from '../../src/ui/screens/cards';
 import { openWeekSummary, weekSnapshot, weekSummary } from '../../src/ui/weekSummary';
 import { createHud } from '../../src/ui/hud';
@@ -57,13 +60,20 @@ describe('the view model', () => {
     expect(replacesLine({ player: { name: 'A', position: 'prop', rating: 70, salary: 1 } })).toBeNull();
   });
 
-  it('lists a trait card\'s targets starters first, with the level each would reach', async () => {
+  it('lists a trait card\'s targets starters first, with the step each would take', async () => {
     const s = plant(await fresh(), 'playmaker');
     const face = cardOfferView(s).cards[0]!;
     const rows = traitTargetRows(s, face);
     const starters = s.lineup.starters.filter((id): id is string => !!id);
     expect(rows.slice(0, starters.length).map((r) => r.playerId)).toEqual(starters.filter((id) => rows.some((r) => r.playerId === id)));
-    expect(rows.every((r) => /^Playmaker (I|II|III)$/.test(r.label))).toBe(true);
+    expect(rows.every((r) => /^Playmaker (new|I|II) → (I|II|III)$/.test(r.label))).toBe(true);
+    const byId = new Map(s.squad.map((p) => [p.id, p]));
+    for (const r of rows) {
+      const p = byId.get(r.playerId)!;
+      const held = p.traits?.find((t) => t.id === 'playmaker')?.level ?? 0;
+      expect(r.label).toBe(traitStepLabel('Playmaker', held, held + 1));
+      expect(r.suited).toBe(TRAITS.playmaker.fit!.includes(p.position));
+    }
   });
 
   it('counts the chip only on a card-week career with a pick on show', async () => {
@@ -605,5 +615,101 @@ describe('the title option', () => {
   it('leaves it off unticked', async () => {
     const { choice } = await start(true, false);
     expect(choice.cardWeek).toBeUndefined();
+  });
+});
+
+describe('each kind of face (#846 play-test)', () => {
+  const rich = async (): Promise<GameState> => ({ ...(await fresh()), money: 10_000_000, boardPatience: 4 });
+  const SIGNINGS = { propSigning: 'prop', hookerSigning: 'hooker', centreSigning: 'centre', fullbackSigning: 'fullback' } as const;
+  const faceWords = (s: GameState, id: string): string => {
+    loadState(plant(s, id));
+    openCardPick();
+    const words = pick().querySelector('[data-card-choice="0"]')!.parentNode!.parentNode!.words();
+    closeModal();
+    return words;
+  };
+  const taken = <T,>(r: T | string): T => { if (typeof r === 'string') throw new Error(r); return r; };
+
+  it('shows each kind\'s facts on the face', async () => {
+    const s = await rich();
+    // A player card at a position that is not the club's best man's (none is offered there).
+    const id = (Object.keys(SIGNINGS) as (keyof typeof SIGNINGS)[]).find((c) => typeof plantCard(s, c) !== 'string')!;
+    const player = faceWords(s, id);
+    expect(player).toMatch(new RegExp(`Your best ${SIGNINGS[id]} now: .+ \\d+`));
+    expect(player).toMatch(/\+\d+ better/);
+    expect(faceWords(s, 'marqueeGamble')).toContain('Board patience 4 → 3 of 5');
+    const trait = faceWords(s, 'lastLine');
+    expect(trait).toContain(TRAITS.lastLine.blurb);
+    expect(trait).toContain('Suits: fullback, winger');
+    const analyst = faceWords(s, 'analyst');
+    expect(analyst).toContain(STAFF.analyst.blurb);
+    expect(analyst).toContain(`Wage ${fmtMoney(staffWage(s, 'analyst'))} a week`);
+    expect(analyst).toContain('Saves the $12,000 fee');
+    const coach = faceWords(s, 'directAttackCoach');
+    expect(coach).toContain('Opens Block play, Inside ball, Short-side raid');
+    expect(coach).toContain('each still bought separately');
+    const coached = { ...s, staff: [{ role: 'attackCoach' as const, name: 'Coach', wage: 1, hiredSeason: 1, speciality: 'direct' as const }] };
+    const play = faceWords(coached, 'setPlay');
+    const card = getState().cardWeek!.offers[0]!.cards[0]!;
+    if (card.kind !== 'setPlay') throw new Error('not a set play');
+    const named = PLAYS_BY_ID[card.playId];
+    expect(play).toContain(named.blurb);
+    expect(play).toContain(`Saves ${fmtMoney(named.price)}`);
+    expect(play.split(named.name)).toHaveLength(2); // named once, not twice
+    const cash = faceWords(s, 'cashInjection');
+    expect(cash).not.toMatch(/Saves|Wage|Suits|Your best|Board patience/);
+  });
+
+  it('shows no floor and no fee on an upgrade, and the cut wage', async () => {
+    const s = await rich();
+    const id = (Object.keys(SIGNINGS) as (keyof typeof SIGNINGS)[]).find((c) => typeof plantCard(s, c) !== 'string')!;
+    const joined = taken(playPickCard(plant(s, id), 0)).state;
+    const upgrade = faceWords(joined, id);
+    expect(upgrade).toContain('Level II');
+    expect(upgrade).not.toMatch(/Your best|Nobody plays there|better/);
+    const hired = taken(playPickCard(plant(s, 'analyst'), 0)).state;
+    const staff = faceWords(hired, 'analyst');
+    expect(staff).toContain(`Wage ${fmtMoney(Math.round(staffWage(s, 'analyst') * 0.75))} a week`);
+    expect(staff).not.toContain('Saves the');
+  });
+
+  it('makes no "better" claim when the gap is not above nothing', async () => {
+    const base = cardOfferView(plant(await fresh(), 'cashInjection')).cards[0]!;
+    const lines = faceLines({ ...base, floor: { line: 'Your best prop now: A 60', gap: 0 } }).map((l) => l.text);
+    expect(lines).toEqual(['Your best prop now: A 60']);
+  });
+
+  it('lists each target\'s step, a Level II card\'s too, and marks men the trait suits', async () => {
+    const s = await rich();
+    const holder = s.squad[0]!;
+    const withOne = { ...s, squad: s.squad.map((p) => (p === holder ? { ...p, traits: [{ id: 'lastLine' as const, level: 1 as const }] } : p)) };
+    loadState(plant(withOne, 'lastLine'));
+    openCardPick();
+    pick().querySelector('[data-card-play-now="0"]')!.click();
+    expect(pick().words()).toContain(TRAITS.lastLine.blurb);
+    expect(pick().querySelector(`[data-card-target="${holder.id}"]`)!.words()).toContain('Last Line I → II');
+    const other = getState().squad.find((p) => p.id !== holder.id)!;
+    expect(pick().querySelector(`[data-card-target="${other.id}"]`)!.words()).toContain('Last Line new → I');
+    const suited = pick().querySelectorAll('[data-card-suited]');
+    expect(suited.length).toBe(getState().squad.filter((p) => ['fullback', 'winger'].includes(p.position)).length);
+    expect(suited.every((n) => n.words().includes('suits'))).toBe(true);
+    closeModal();
+    // Held at I, the next copy is Level II: he would go from I to III, a new man to II.
+    loadState(plant(taken(takeCard(plant(withOne, 'lastLine'), 0)), 'lastLine'));
+    openCardPick();
+    pick().querySelector('[data-card-play-now="0"]')!.click();
+    expect(pick().querySelector(`[data-card-target="${holder.id}"]`)!.words()).toContain('Last Line I → III');
+    expect(pick().querySelector(`[data-card-target="${other.id}"]`)!.words()).toContain('Last Line new → II');
+  });
+
+  it('shows the same facts on a held card in Cards', async () => {
+    loadState(plant(await rich(), 'analyst'));
+    openCardPick();
+    pick().querySelector('[data-card-choice="0"]')!.click();
+    closeModal();
+    openCardsScreen();
+    const held = body().querySelector('[data-hand-card="analyst"]')!.words();
+    expect(held).toContain(STAFF.analyst.blurb);
+    expect(held).toContain('Saves the $12,000 fee');
   });
 });
