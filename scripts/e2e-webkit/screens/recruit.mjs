@@ -105,6 +105,14 @@ export async function runRecruit(browser) {
       const out = join(OUT_ROOT, 'webkit', `recruit-${tag}`);
       mkdirSync(out, { recursive: true });
       const ctx = await browser.newContext({ viewport: { width, height }, hasTouch: true, isMobile: true, deviceScaleFactor: 2, userAgent: IPHONE_UA });
+      // This journey needs an affordable recommended player to open, sign and undo.
+      // Some generated pools legitimately have only a reach pick. Pin the seed,
+      // not the pool or pricing, until the title has created this career.
+      await ctx.addInitScript(() => {
+        const now = Date.now;
+        Date.now = () => 552321272;
+        window.__restoreRecruitClock = () => { Date.now = now; };
+      });
       const page = await ctx.newPage();
       page.setDefaultTimeout(10000);
       const report = { tag, errors: [], screenshots: [] };
@@ -124,6 +132,7 @@ export async function runRecruit(browser) {
         await setupStep(page, 3);
         await page.locator(`[data-nrl-difficulty-${difficulty}]`).tap();
         await page.locator('[data-nrl-start]').tap();
+        await page.evaluate(() => window.__restoreRecruitClock());
         await confirmStartingLeague(page);
         await page.locator('[data-expansion-work]').tap();
         await page.locator('.nrl-tutorial-skip').tap();
