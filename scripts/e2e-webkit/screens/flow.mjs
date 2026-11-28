@@ -116,7 +116,7 @@ export async function runFlow(browser, { w: W, h: H, text }) {
     await page.goto(BASE);
     // The new club in three steps (SuperCOOKED 12–14): the town and Next, the names and Next, then Start.
     await page.waitForSelector('[data-nrl-town]');
-    const out = await flowReach(page, ['[data-nrl-town]', '[data-nrl-next]']);
+    const out = await flowReach(page, ['[data-nrl-town]', '[data-nrl-next]', '[data-nrl-settings]']);
     await setupStep(page, 2);
     out.push(...await flowReach(page, ['[data-nrl-clubname]', '[data-nrl-next]', '[data-nrl-back]']));
     await page.fill('[data-nrl-clubname]', 'Flow FC');

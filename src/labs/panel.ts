@@ -113,7 +113,7 @@ function fieldSelectionRow(): HTMLElement {
     el('small', { text: model.note, attrs: { id: 'nrl-dev-field-note' } }), smallPrint, status);
 }
 
-export function openLabsPanel(): void {
+export function openLabsPanel(onRemove?: () => void): void {
   ensurePanelStyles();
   const inTest = testCareer() !== null;
   const content = el('div', { class: 'nrl-labs-panel' },
@@ -173,5 +173,5 @@ export function openLabsPanel(): void {
       : `Turns everything here off${hides}. Your career and the hints you have seen stay.`)
       + (FIELD_LENGTH !== 100 ? ' Returns to a 100m field and reloads.' : '') }),
     off, resetWhy));
-  openModal(content, { region: true, closeButton: true });
+  openModal(content, { region: true, closeButton: true, ...(onRemove ? { onRemove } : {}) });
 }

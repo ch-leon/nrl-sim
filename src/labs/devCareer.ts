@@ -17,7 +17,7 @@
 // match's sheet and record belong to the career that kicked it off.
 import { bus } from '../core/events';
 import { flushSaveMeta, getActiveSlot, lockSaves, saveIfChanged, SLOT_COUNT } from '../core/save';
-import { getState, setState } from '../core/state';
+import { getState, hasCareer, setState } from '../core/state';
 import { careerNamespace, setCareerNamespace, browserStorage, type StorageLike } from '../core/storage/local';
 import {
   CORRUPT_SAVE_KEY, DEV_TEST_BACKUP_KEY, DEV_TEST_DISPLACED_KEY, DEV_TEST_PREFIX, DEVICE_ID_KEY, LEGACY_SAVE_KEY,
@@ -158,7 +158,7 @@ export function enterTestCareer(deps: SwitchDeps = pageDeps()): SwitchResult {
   if (testCareer()) return { ok: false, why: 'The playtest career is already on.' };
   const storage = deps.storage;
   if (!storage) return { ok: false, why: 'This browser is not keeping saves, so there is nowhere to put a playtest career.' };
-  if (!saveIfChanged(getState())) return { ok: false, why: "Your career's latest change didn't save, so nothing was switched." };
+  if (hasCareer() && !saveIfChanged(getState())) return { ok: false, why: "Your career's latest change didn't save, so nothing was switched." };
   lockSaves();
   // A save's meta (and a first device id) is written after the current task: write it
   // now, so the backup holds it and nothing queued lands on a normal key after.
