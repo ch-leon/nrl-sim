@@ -1521,7 +1521,7 @@ describe('weekly fatigue saves', () => {
     __unlockSaves(); setActiveSlot(1);
     const loaded = loadCareer();
     if (loaded.status !== 'ok') throw new Error(JSON.stringify(loaded));
-    expect(loaded.state).toEqual(raw);
+    expect(loaded.state).toEqual({ ...raw, version: SAVE_VERSION });
     expect(loaded.state.cardWeek!.weeklyFatigue).toEqual({ [raw.squad[0]!.id]: 50, [raw.squad[1]!.id]: 100 });
     for (const weeklyFatigue of [undefined, null, [], { bad: -1 }, { bad: 101 }, { bad: 50.5 }, { bad: '50' }, { '': 20 }]) {
       expect(migrateState({ ...raw, cardWeek: { ...raw.cardWeek, weeklyFatigue } }).ok).toBe(false);
@@ -1798,7 +1798,7 @@ describe('what a card face shows (#846 play-test)', () => {
     expect(one.view.trait).toEqual({ blurb: TRAITS.lastLine.blurb, suits: ['fullback', 'winger'] });
     expect(one.view.targets!.find((t) => t.playerId === holder.id)).toMatchObject({ current: 1, level: 2 });
     for (const t of one.view.targets!) {
-      expect(t.suited).toBe(['fullback', 'winger'].includes(withOne.squad.find((x) => x.id === t.playerId)!.position));
+      expect('suited' in t ? t.suited : undefined).toBe(['fullback', 'winger'].includes(withOne.squad.find((x) => x.id === t.playerId)!.position));
     }
     // Taken into the hand, the next copy is Level II: two levels at once, capped at III.
     const two = face(changed(takeCard(one.state, 0)), 'lastLine').view;

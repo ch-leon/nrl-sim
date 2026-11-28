@@ -6,7 +6,8 @@ import { openSquadScreen } from '../../src/ui/screens/squad';
 import { openNextMatch } from '../../src/ui/screens/fixtures';
 import { chooseOpenCupEntry, closeOpenCupRegistration, previewOpenCupEntry } from '../../src/systems/openCupEntry';
 import { isOpenCupInstance } from '../../src/systems/openCup';
-import { startCardWeek } from '../../src/systems/cardWeek';
+import { plantCard, startCardWeek } from '../../src/systems/cardWeek';
+import { openCardPick } from '../../src/ui/cardWeek';
 import { openLineupScreen } from '../../src/ui/screens/lineup';
 import { FATIGUE_LEGEND, fatigueEventText } from '../../src/ui/weeklyFatigue';
 import { closeModal, closeScreen } from '../../src/ui/dom';
@@ -144,4 +145,26 @@ it('uses the kick-off fatigue already applied in a parked League week', () => {
   const parked = recoverWeeklyFatigue(normal);
   expect(previewWeeklyFatigue(normal)?.kickoff?.[playerId]).toBe(40);
   expect(previewWeeklyFatigue(parked, undefined, true)?.kickoff?.[playerId]).toBe(40);
+});
+
+it('updates an open Lineup forecast immediately after playing a recovery card', () => {
+  const base = career();
+  const playerId = base.lineup.starters[0]!;
+  const state: GameState = { ...base, week: CAMP_RULES.departureWeek, cardWeek: { ...base.cardWeek, weeklyFatigue: { [playerId]: 70 } } };
+  const offered = plantCard(state, 'fatigueWipe');
+  if (typeof offered === 'string') throw new Error(offered);
+  loadState(offered);
+  openLineupScreen();
+  const player = () => document.querySelector(`[data-weekly-fatigue="${playerId}"]`) as unknown as StubNode;
+  expect(player().getAttribute('aria-valuenow')).toBe('70');
+  expect(player().parentNode!.words()).toContain('Starts at 80% energy');
+
+  openCardPick();
+  const play = document.querySelector('[data-card-play-now="0"]') as unknown as StubNode;
+  play.click();
+  const target = document.querySelector(`[data-card-target="${playerId}"]`) as unknown as StubNode;
+  expect(target.words()).toContain('Fatigue 70 → 0');
+  target.click();
+  expect(player().getAttribute('aria-valuenow')).toBe('0');
+  expect(player().parentNode!.words()).toContain('Starts at 100% energy');
 });

@@ -31,7 +31,7 @@ export function playerLine(face: Pick<CardFaceView, 'player'>): string | null {
   return p ? `${POSITION_SHORT[p.position]} · ${p.rating} · ${fmtMoney(p.salary)} a year` : null;
 }
 
-export interface TraitTargetRow { playerId: string; name: string; position: Position; label: string; starter: boolean; suited: boolean }
+export interface CardTargetRow { playerId: string; name: string; position: Position; label: string; starter: boolean; suited: boolean }
 
 /** The level a target holds and would reach: "Last Line I → II", or "Last Line new → I". */
 export function traitStepLabel(traitName: string, current: number, level: number): string {
@@ -39,16 +39,17 @@ export function traitStepLabel(traitName: string, current: number, level: number
 }
 
 /** Who a trait card can go to, starters first (in the nine's order), then the rest by name, each with his step ("Playmaker I → II"). */
-export function traitTargetRows(state: GameState, face: CardFaceView): TraitTargetRow[] {
+export function cardTargetRows(state: GameState, face: CardFaceView): CardTargetRow[] {
   const def = cardDefById(face.cardId);
-  if (!def || def.kind !== 'trait') return [];
+  if (!def || (def.kind !== 'trait' && def.kind !== 'recovery')) return [];
   const starters = state.lineup.starters;
   const byId = new Map(state.squad.map((p) => [p.id, p]));
   const rows = (face.targets ?? []).flatMap((t) => {
     const p = byId.get(t.playerId);
     if (!p) return [];
     const at = starters.indexOf(t.playerId);
-    return [{ row: { playerId: t.playerId, name: t.name, position: p.position, label: traitStepLabel(TRAITS[def.trait].name, t.current, t.level), starter: at >= 0, suited: t.suited }, at }];
+    const label = 'label' in t ? t.label : def.kind === 'trait' ? traitStepLabel(TRAITS[def.trait].name, t.current, t.level) : '';
+    return [{ row: { playerId: t.playerId, name: t.name, position: p.position, label, starter: at >= 0, suited: 'suited' in t && t.suited }, at }];
   });
   rows.sort((a, b) => (a.at < 0 ? 99 : a.at) - (b.at < 0 ? 99 : b.at) || a.row.name.localeCompare(b.row.name));
   return rows.map((r) => r.row);
@@ -122,7 +123,8 @@ export function faceLines(face: CardFaceView): FaceLine[] {
 
 export function cardFacts(face: CardFaceView): HTMLElement {
   const box = el('div', { class: `nrl-card-face nrl-card-${face.tier}` },
-    el('span', { class: 'nrl-card-tier', text: face.kind === 'decree' ? 'Rest of season' : `${tierLabel(face.tier)} · Level ${ROMAN[face.level]}` }),
+    el('span', { class: 'nrl-card-tier', text: face.kind === 'decree' ? 'Rest of season'
+      : face.kind === 'recovery' ? 'Recovery' : `${tierLabel(face.tier)} · Level ${ROMAN[face.level]}` }),
     el('strong', { class: 'nrl-card-title', text: face.title }),
     el('span', { class: 'nrl-card-effect', text: face.effect }));
   if (face.source) box.append(el('span', { class: 'nrl-card-source', text: `From ${face.source}` }));
@@ -170,7 +172,7 @@ export function lastMatchPanel(view: LastMatchView | null): HTMLElement {
 
 export function cardTargets(state: GameState, face: CardFaceView, onPlay: (targetId: string) => void, onBack: () => void): HTMLElement {
   const list = el('div', { class: 'nrl-card-targets' });
-  for (const r of traitTargetRows(state, face)) {
+  for (const r of cardTargetRows(state, face)) {
     const b = button('', () => onPlay(r.playerId), { class: 'nrl-card-target' });
     b.setAttribute('data-card-target', r.playerId);
     // Marked only when the trait has a fit: one that suits anyone would mark every man.
@@ -282,8 +284,9 @@ export function openCardPick(grant?: number): HTMLElement | null {
       }, face.refusal, true);
       play.setAttribute('data-card-play-now', String(face.index));
       play.setAttribute('aria-label', `Play ${face.title} now`);
-      if (face.refusal && face.refusal !== blocked) {
-        box.append(cardProblem(face.refusal));
+      if (face.refusal && face.refusal !== blocked) box.append(cardProblem(face.refusal));
+      if (face.kind === 'recovery' && face.takeRefusal && face.takeRefusal !== blocked && face.takeRefusal !== face.refusal) {
+        box.append(cardProblem(face.takeRefusal));
       }
       box.append(el('div', { class: 'nrl-card-buttons' }, take, ...(!decree ? [play] : [])));
       row.append(box);

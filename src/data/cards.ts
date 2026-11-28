@@ -50,6 +50,17 @@ export const CARD_WEEK = {
   BUFF_RATING: { 1: 2, 2: 3, 3: 4 },
 } as const;
 
+/** The first save format that recognises recovery cards on an offer or in hand. */
+export const RECOVERY_CARD_SAVE_VERSION = 42;
+
+export const CARD_RECOVERY = {
+  HAND_CAP: 2,
+  ICE_BATHS_FATIGUE: 30,
+  INJURY_REPAIR_WEEKS: 2,
+  INJURY_REPAIR_MIN_WEEKS: 1,
+  WEIGHT: { fatigueWipe: 3, iceBaths: 3, injuryRepair: 3 },
+} as const;
+
 /** Weekly fatigue in Labs careers (#854). Recovery is per calendar week. */
 export const WEEKLY_FATIGUE = {
   MIN: 0,
@@ -106,6 +117,10 @@ export interface TraitCardDef extends CardBase { kind: 'trait'; trait: TraitId }
 /** Money now. */
 export interface CashCardDef extends CardBase { kind: 'cash'; amount: number }
 
+export type RecoveryCardId = keyof typeof CARD_RECOVERY.WEIGHT;
+/** Free, one-shot effects: no active copy or card level after playing. */
+export interface RecoveryCardDef extends CardBase { kind: 'recovery'; id: RecoveryCardId }
+
 export type DecreeId = 'width' | 'throughTheMiddle' | 'youthFirst' | 'tightShip' | 'fortress' | 'nextManUp';
 export interface DecreeCardDef extends CardBase { kind: 'decree'; id: DecreeId; effect: string }
 
@@ -118,8 +133,14 @@ export const DECREES: readonly DecreeCardDef[] = [
   { id: 'nextManUp', kind: 'decree', title: 'Next man up', tier: 'gold', weight: 0, effect: '+3 rating for interchange players when they come on.' },
 ];
 
-export type CardDef = PlayerCardDef | DilemmaCardDef | StaffCardDef | SetPlayCardDef | TraitCardDef | CashCardDef | DecreeCardDef;
+export type CardDef = PlayerCardDef | DilemmaCardDef | StaffCardDef | SetPlayCardDef | TraitCardDef | CashCardDef | DecreeCardDef | RecoveryCardDef;
 export type CardKind = CardDef['kind'];
+
+export const RECOVERY_CARDS: readonly RecoveryCardDef[] = [
+  { id: 'fatigueWipe', kind: 'recovery', title: 'Fatigue wipe', tier: 'grey', weight: CARD_RECOVERY.WEIGHT.fatigueWipe },
+  { id: 'iceBaths', kind: 'recovery', title: 'Ice baths', tier: 'grey', weight: CARD_RECOVERY.WEIGHT.iceBaths },
+  { id: 'injuryRepair', kind: 'recovery', title: 'Injury repair', tier: 'grey', weight: CARD_RECOVERY.WEIGHT.injuryRepair },
+];
 
 export const CARDS: readonly CardDef[] = [
   ...DECREES,
@@ -144,6 +165,7 @@ export const CARDS: readonly CardDef[] = [
   // Cash and the dilemma.
   { id: 'cashInjection', kind: 'cash', title: 'Cash injection', tier: 'grey', weight: 8, amount: 15_000 },
   { id: 'marqueeGamble', kind: 'dilemma', title: 'Marquee gamble', tier: 'gold', weight: 3, margin: PLAYER_CARD_MARGIN.gold, patience: -1 },
+  ...RECOVERY_CARDS,
 ];
 
 /** The history's id for a pick passed rather than taken. No card has it. */

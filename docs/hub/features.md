@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- **Card week recovery cards.** Clear one player's fatigue, take 30 fatigue off the squad, or cut two weeks off an injury. Hold up to two recovery cards or play another straight from a pick. [Card week rules](../specs/846-card-week.md#cards).
+
 - **Fatigue at selection time.** Squad and Lineup show each player's weekly fatigue. Event booking reviews and bonus-match previews name the next League opponent and show how much energy the player is due to start with after recovery. [Card week rules](../specs/846-card-week.md#weekly-fatigue).
 
 - **Settings on the title screen.** Open Developer settings from the save slots or new-club setup to enable experiments before starting a career. [Developer settings](../specs/developer-settings.md#finding-it).

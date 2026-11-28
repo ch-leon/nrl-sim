@@ -453,6 +453,8 @@ export const MIGRATIONS: readonly MigrationStep[] = [
   { from: 40, to: 41, run: old => isCardWeek(old.cardWeek, 40)
     ? { ...old, cardWeek: { ...old.cardWeek as CardWeekState, weeklyFatigue: {} } }
     : old },
+  // v42 adds recovery faces to the existing saved offer and hand. Old cards are kept verbatim.
+  { from: 41, to: 42, run: old => old },
   // v32 snapshots the agreement observed under v31 ID-only protection.
   // Already recorded exact terms keep their provenance, including queued terms.
   { from: 31, to: 32, run: old => {

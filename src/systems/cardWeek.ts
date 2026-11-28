@@ -20,7 +20,7 @@ import { bus } from '../core/events';
 import { registerLeagueRolloverHook, registerTickHook, TICK_ORDER, weekHeld } from '../core/time';
 import { saveIfChanged } from '../core/save';
 import { careerActionClock, elapsedInterval } from '../core/season';
-import { CARD_PASS, CARD_WEEK, CARDS, DECREES, SIGNATURE_TRAIT, cardDefById, type CardDef, type CardKind, type CardTier } from '../data/cards';
+import { CARD_PASS, CARD_RECOVERY, CARD_WEEK, CARDS, DECREES, SIGNATURE_TRAIT, cardDefById, type CardDef, type CardKind, type CardTier } from '../data/cards';
 import { generatePlayerAround, overallRating, POSITIONS, shownStats } from '../data/player';
 import { PLAYS_BY_ID, PLAY_IDS, playsOfFamily, type PlayId } from '../data/plays';
 import { ROMAN, TRAITS, traitLevel, withTrait, type TraitLevel } from '../data/traits';
@@ -43,6 +43,8 @@ import { PLAYER_ID } from './fixtures';
 import { currentDecree } from './cardBonuses';
 import { weeklyWages } from './economy';
 import type { MatchEvent } from '../sim/events';
+import { applyRecoveryCard, recoveryCandidates, recoveryEffect, recoveryTargetViews } from './recoveryCards';
+export { recoveryCandidates } from './recoveryCards';
 
 /** Is this a card-week career? */
 export function isCardWeekCareer(state: Pick<GameState, 'cardWeek'>): boolean {
@@ -120,9 +122,10 @@ export function activeCard(state: GameState, cardId: string): ActiveCard | undef
 }
 
 function nextCardLevel(state: GameState, cardId: string): TraitLevel | null {
+  const def = cardDefById(cardId);
+  if (def?.kind === 'recovery') return 1;
   const held = state.cardWeek?.hand.find(h => h.cardId === cardId);
   const active = activeCard(state, cardId);
-  const def = cardDefById(cardId);
   const player = active?.kind === 'trait' ? state.squad.find(p => p.id === active.playerId) : undefined;
   const trait = player && def?.kind === 'trait' ? traitLevel(player.traits, def.trait) : 0;
   const level = Math.max(held?.level ?? 0, active?.level ?? 0, trait);
@@ -131,6 +134,7 @@ function nextCardLevel(state: GameState, cardId: string): TraitLevel | null {
 
 /** Can `def` go in a pick now, before any dice? A player card may still sit out once it is rolled (resolveCard). */
 function eligibleBeforeDice(state: GameState, def: CardDef): boolean {
+  if (def.kind === 'recovery') return recoveryCandidates(state).some(card => card.id === def.id);
   if (!nextCardLevel(state, def.id)) return false;
   if (gambleRefusal(state, def)) return false;
   const held = state.cardWeek?.hand.find(h => h.cardId === def.id);
@@ -238,6 +242,7 @@ function resolveCard(state: GameState, def: CardDef, rng: Rng): OfferedCard | nu
     case 'staff': return { cardId: def.id, kind: 'staff', name: randomName(rng, state.pack === 'uk' ? UK_NAMES : AU_PACK.names) };
     case 'setPlay': return { cardId: def.id, kind: 'setPlay', playId: rng.pick(freePlayCandidates(state)) };
     case 'trait': case 'cash': case 'decree': return { cardId: def.id, kind: def.kind };
+    case 'recovery': return { cardId: def.id, kind: 'recovery' };
   }
 }
 
@@ -564,7 +569,10 @@ function takeCardResult(state: GameState, index: number, grant?: number): CardTa
   const { at, card } = picked;
   const def = cardDefById(card.cardId);
   if (!def || def.kind !== card.kind) return 'That card is no longer in the deck.';
-  const held = cw.hand.find(h => h.cardId === card.cardId);
+  const held = card.kind === 'recovery' ? undefined : cw.hand.find(h => h.cardId === card.cardId);
+  if (card.kind === 'recovery' && cw.hand.filter(h => h.offered.kind === 'recovery').length >= CARD_RECOVERY.HAND_CAP) {
+    return `You can hold ${CARD_RECOVERY.HAND_CAP} recovery cards. Play one first.`;
+  }
   const refusal = (held ? recruitUpgradeRefusal(state, held.offered) : null) ?? gambleRefusal(state, def);
   if (refusal) return refusal;
   const level = nextCardLevel(state, card.cardId);
@@ -605,6 +613,15 @@ function applyCard(state: GameState, card: OfferedCard, level: TraitLevel, targe
   if (!def || def.kind !== card.kind) return 'That card is no longer in the deck.';
   const refusal = recruitUpgradeRefusal(state, card) ?? gambleRefusal(state, def);
   if (refusal) return refusal;
+  if (card.kind === 'recovery') {
+    if (def.kind !== 'recovery') return 'That card is no longer in the deck.';
+    const out = applyRecoveryCard(state, def, targetId);
+    if (typeof out === 'string') return out;
+    return {
+      state: { ...out.state, cardWeek: { ...out.state.cardWeek!, history: recordCard(cw, state, def.id, 'play') } },
+      money: [], news: [{ kind: 'success', text: out.outcome }],
+    };
+  }
   const ctx = { cardId: def.id, reason: `card: ${def.title}`, now: elapsedInterval(state), clubName: state.clubName };
   let s = state;
   const money: Applied['money'] = [];
@@ -738,7 +755,7 @@ export function playPickCard(state: GameState, index: number, targetId?: string,
   const { at, card } = picked;
   const level = nextCardLevel(state, card.cardId);
   if (!level) return 'That card is already Level III.';
-  const held = cw.hand.find(h => h.cardId === card.cardId);
+  const held = card.kind === 'recovery' ? undefined : cw.hand.find(h => h.cardId === card.cardId);
   const spent = keepCard(cw, at, index, card.cardId, state);
   return applyCard({ ...state, cardWeek: { ...spent, hand: cw.hand.filter(h => h !== held) } }, held?.offered ?? card, level, targetId);
 }
@@ -885,8 +902,8 @@ export interface CardFaceView {
   effect: string;
   /** A player card's man (and the dilemma's). */
   player?: { name: string; position: Position; rating: number; salary: number; replacesName?: string; releaseCost?: number };
-  /** A trait card's squad members who could take it: the level he holds now (0 = none), the level he would reach, and whether the trait suits his position. */
-  targets?: { playerId: string; name: string; level: TraitLevel; current: 0 | 1 | 2 | 3; suited: boolean }[];
+  /** Eligible squad members and the effect each would get. */
+  targets?: ({ playerId: string; name: string } & ({ level: TraitLevel; current: 0 | 1 | 2 | 3; suited: boolean } | { label: string }))[];
   /** A player card (and the dilemma) whose man has not joined: the club's best there now, and his gap over him as he would join (null when nobody plays there). */
   floor?: { line: string; gap: number | null };
   /** The dilemma: board patience now and after playing it. */
@@ -943,6 +960,7 @@ function effectLine(state: GameState, def: CardDef, card: OfferedCard, level: Tr
     case 'setPlay': return level === 1 ? 'Free set play.' : 'Better execution when called.';
     case 'trait': return `+${level} trait ${level === 1 ? 'level' : 'levels'}.`;
     case 'decree': return def.kind === 'decree' ? def.effect : def.title;
+    case 'recovery': return def.kind === 'recovery' ? recoveryEffect(def.id) : def.title;
     case 'cash': return def.kind === 'cash' ? `Bank +${fmtMoney(def.amount * CARD_WEEK.CASH_FACTOR[level])}.` : def.title;
   }
 }
@@ -954,6 +972,7 @@ const GOOD_IF: Record<Exclude<CardKind, 'decree'>, string> = {
   setPlay: 'your playbook needs options.',
   trait: 'a player needs a boost.',
   cash: 'you need money now.',
+  recovery: 'you have tired or injured players.',
 };
 
 function cardFaceView(state: GameState, card: OfferedCard, index: number, level: TraitLevel, upgrade: boolean): CardFaceView[] {
@@ -1003,6 +1022,10 @@ function cardFaceView(state: GameState, card: OfferedCard, index: number, level:
       view.board = { from: state.boardPatience, to, max: BOARD.MAX_PATIENCE, line: `Board patience ${state.boardPatience} → ${to} of ${BOARD.MAX_PATIENCE}` };
     }
   }
+  if (def.kind === 'recovery') {
+    const targets = recoveryTargetViews(state, def.id);
+    if (targets) view.targets = targets;
+  }
   if (def.kind === 'trait') {
     const fit = TRAITS[def.trait].fit;
     view.trait = { blurb: TRAITS[def.trait].blurb, suits: fit ? [...fit] : null };
@@ -1026,7 +1049,7 @@ export function cardOfferView(state: GameState, grant?: number): { owed: number;
   if (!cw || !offer) return { owed: 0, starterLeft: 0, keepsLeft: 0, cards: [] };
   const blocked = pickBlocked(state);
   const cards = offer.cards.flatMap((card, index) => cardFaceView(state, card, index, nextCardLevel(state, card.cardId) ?? 3,
-    !!activeCard(state, card.cardId) || cw.hand.some(h => h.cardId === card.cardId)).map((view) => {
+    card.kind !== 'recovery' && (!!activeCard(state, card.cardId) || cw.hand.some(h => h.cardId === card.cardId))).map((view) => {
     const taken = blocked ?? takeCard(state, index, grant);
     const takeRefusal = typeof taken === 'string' ? taken : null;
     const probe = blocked ?? playPickCard(state, index, view.targets?.[0]?.playerId, grant);

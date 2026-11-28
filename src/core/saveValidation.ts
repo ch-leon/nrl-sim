@@ -22,7 +22,7 @@ import { assignmentOwnerProblem } from '../systems/assignmentEvidence';
 import { competitionInstanceId, validateCompetitions } from '../data/competition';
 import { FINANCE_TIERS, tierForRank } from '../data/financeRules';
 import { canonicalLeagueJson, validateLeagueHistory } from '../data/leagueCareer';
-import { CARD_PASS, CARD_WEEK, WEEKLY_FATIGUE, cardDefById } from '../data/cards';
+import { CARD_PASS, CARD_RECOVERY, CARD_WEEK, RECOVERY_CARD_SAVE_VERSION, WEEKLY_FATIGUE, cardDefById } from '../data/cards';
 
 export interface SaveRepair { field: string; problem: string; repair: string; rationale: string; notification: string }
 export const REPAIR_NOTICE = 'Career lineup repaired. The original save has been kept in recovery.';
@@ -218,9 +218,9 @@ function cardDate(v: unknown): v is Record<string, unknown> {
 
 export const LEGACY_CARD_OFFER_SIZE = 3;
 
-function cardOffer(v: unknown, max: number): v is Record<string, unknown> & { cards: { cardId: string }[] } {
+function cardOffer(v: unknown, max: number, version: number): v is Record<string, unknown> & { cards: { cardId: string }[] } {
   return cardDate(v) && Array.isArray(v.cards) && v.cards.length >= 1 && v.cards.length <= max
-    && v.cards.every(isOfferedCard) && unique(v.cards.map(c => c.cardId));
+    && v.cards.every(c => isOfferedCard(c, version)) && unique(v.cards.map(c => c.cardId));
 }
 
 function cardWeekCommon(v: unknown): v is Record<string, unknown> {
@@ -238,7 +238,7 @@ function cardWeekCommon(v: unknown): v is Record<string, unknown> {
 }
 
 export function isCardWeekV36(v: unknown): boolean {
-  return cardWeekCommon(v) && (v.offer === null || cardOffer(v.offer, LEGACY_CARD_OFFER_SIZE));
+  return cardWeekCommon(v) && (v.offer === null || cardOffer(v.offer, LEGACY_CARD_OFFER_SIZE, 36));
 }
 
 function isActiveCard(v: unknown): boolean {
@@ -279,13 +279,14 @@ export function isCardWeek(v: unknown, version: number = SAVE_VERSION): boolean 
     const kind = o.kind;
     if ((kind !== 'starter' && kind !== 'match' && kind !== 'decree') || (i < starterLeft) !== (kind === 'starter')) return false;
     const { show, keep } = CARD_WEEK.PICKS[kind];
-    if (!cardOffer(o, version >= 40 ? show : LEGACY_CARD_OFFER_SIZE)) return false;
+    if (!cardOffer(o, version >= 40 ? show : LEGACY_CARD_OFFER_SIZE, version)) return false;
     if (version >= 40) {
       const kept = o.keptCardIds;
       if (!strings(kept) || !unique(kept) || kept.length >= keep || kept.length + o.cards.length > show
         || kept.some(id => {
           const def = cardDefById(id);
-          return !def || def.kind === 'decree' || o.cards.some(card => card.cardId === id);
+          return !def || def.kind === 'decree' || (def.kind === 'recovery' && version < RECOVERY_CARD_SAVE_VERSION)
+            || o.cards.some(card => card.cardId === id);
         })) return false;
     }
     const isDecree = kind === 'decree';
@@ -300,9 +301,11 @@ export function isCardWeek(v: unknown, version: number = SAVE_VERSION): boolean 
     if (stolen.length > 1 || stolen.some(c => record(c) && (o.kind !== 'match' || c.fromClubId !== o.fromClubId))) return false;
     if (o.seen !== undefined && (o.seen !== true || !integer(o.grant, 1, seenGrant))) return false;
   }
-  if (!Array.isArray(v.hand) || v.hand.length > CARD_WEEK.HAND_CAP || !v.hand.every(h => record(h) && isOfferedCard(h.offered)
+  if (!Array.isArray(v.hand) || v.hand.length > CARD_WEEK.HAND_CAP || !v.hand.every(h => record(h) && isOfferedCard(h.offered, version)
     && record(h.offered) && h.offered.kind !== 'decree' && h.cardId === h.offered.cardId && integer(h.level, 1, 3)
+    && (h.offered.kind !== 'recovery' || h.level === 1)
     && integer(h.gotSeason, 1) && integer(h.gotWeek, 1))) return false;
+  if (v.hand.filter(h => h.offered.kind === 'recovery').length > CARD_RECOVERY.HAND_CAP) return false;
   if (!Array.isArray(v.history) || !v.history.every(h => h.action === undefined || (oneOf(h.action, ['take', 'pass', 'expire', 'discard', 'play', 'reroll'])
     && (h.action !== 'pass' || h.cardId === CARD_PASS) && (h.action !== 'expire' || oneOf(h.cardId, ['expired', 'decree-pick']))))) return false;
   if (!Array.isArray(v.cardTraits) || !v.cardTraits.every(t => t.level === undefined || integer(t.level, 1, 3))) return false;
@@ -322,7 +325,7 @@ export function isCardWeek(v: unknown, version: number = SAVE_VERSION): boolean 
     && v.decree.season === decree.season && v.decree.id === decree.cardId;
 }
 
-function isOfferedCard(c: unknown): boolean {
+function isOfferedCard(c: unknown, version: number): boolean {
   if (!record(c) || !text(c.cardId)) return false;
   const def = cardDefById(c.cardId);
   if (!def || c.kind !== def.kind) return false;
@@ -336,6 +339,7 @@ function isOfferedCard(c: unknown): boolean {
     case 'staff': return text(c.name);
     case 'setPlay': return isBasePlayId(c.playId) && (!steal || c.cardId === `steal-play:${c.playId}`);
     case 'trait': case 'cash': case 'decree': return true;
+    case 'recovery': return version >= RECOVERY_CARD_SAVE_VERSION;
   }
 }
 

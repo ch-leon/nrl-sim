@@ -20,7 +20,7 @@ import { validatePlayerPopulation } from '../../src/systems/playerCareer';
 import { RIVAL_POSITION_MIN } from '../../src/systems/rivals';
 import { cardOfferView, cardWeekTick, chooseCard, plantCard, playChosenCard, playPickCard, rerollCard, takeCard } from '../../src/systems/cardWeek';
 import { closeModal, closeScreen, dialogOpen, el, openModal } from '../../src/ui/dom';
-import { cardChipCount, faceLines, initCardWeekPick, lastMatchView, openCardPick, picksWaitingText, replacesLine, tierLabel, traitStepLabel, traitTargetRows } from '../../src/ui/cardWeek';
+import { cardChipCount, faceLines, initCardWeekPick, lastMatchView, openCardPick, picksWaitingText, replacesLine, tierLabel, traitStepLabel, cardTargetRows } from '../../src/ui/cardWeek';
 import { TRAITS } from '../../src/data/traits';
 import { STAFF, staffWage } from '../../src/systems/staff';
 import { fmtMoney } from '../../src/utils/money';
@@ -63,7 +63,7 @@ describe('the view model', () => {
   it('lists a trait card\'s targets starters first, with the step each would take', async () => {
     const s = plant(await fresh(), 'playmaker');
     const face = cardOfferView(s).cards[0]!;
-    const rows = traitTargetRows(s, face);
+    const rows = cardTargetRows(s, face);
     const starters = s.lineup.starters.filter((id): id is string => !!id);
     expect(rows.slice(0, starters.length).map((r) => r.playerId)).toEqual(starters.filter((id) => rows.some((r) => r.playerId === id)));
     expect(rows.every((r) => /^Playmaker (new|I|II) → (I|II|III)$/.test(r.label))).toBe(true);
@@ -713,4 +713,25 @@ describe('each kind of face (#846 play-test)', () => {
     expect(held).toContain(STAFF.analyst.blurb);
     expect(held).toContain('Saves the $12,000 fee');
   });
+});
+
+it('prints the recovery hold limit beside Take but keeps Play now available', async () => {
+  const base = await fresh();
+  const playerId = base.squad[0]!.id;
+  loadState({ ...base, cardWeek: { ...base.cardWeek!, weeklyFatigue: { [playerId]: 55 } } });
+  for (let i = 0; i < 2; i++) {
+    loadState(plant(getState(), 'iceBaths'));
+    expect(chooseCard(0).ok).toBe(true);
+  }
+  loadState(plant(getState(), 'iceBaths'));
+  openCardPick();
+  const face = pick().querySelector('.nrl-card-face')!;
+  expect(face.words()).toContain('You can hold 2 recovery cards. Play one first.');
+  expect(face.words()).not.toContain('Level I');
+  expect(face.querySelector('[data-card-choice="0"]')!.disabled).toBe(true);
+  const play = face.querySelector('[data-card-play-now="0"]')!;
+  expect(play.disabled).toBe(false);
+  play.click();
+  expect(getState().cardWeek!.hand).toHaveLength(2);
+  expect(getState().cardWeek!.weeklyFatigue[playerId]).toBe(25);
 });
