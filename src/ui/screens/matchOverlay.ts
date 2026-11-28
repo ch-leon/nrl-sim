@@ -1180,6 +1180,8 @@ export interface MatchOverlayHandle {
    * so a score or a call is never tagged on it.
    */
   comment(line: string, weight?: CommentWeight, follow?: boolean): void;
+  /** Keep a protected read and its repeat duel in order, with time to read each line (#815). */
+  commentRun(lines: readonly string[]): void;
   /** Coach calls made and paid off, home and away (#73): the stats line, and the coach's own lines in the log. */
   setCalls?(made: Readonly<Record<'home' | 'away', number>>, paid: Readonly<Record<'home' | 'away', number>>): void;
   /** Show Replay for eight seconds after a try (N15.5). Tapping hides it and calls `onTap`. */
@@ -1585,9 +1587,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
     const at = hold.nextAt();
     if (at !== null) holdTimer = setTimeout(releaseStrip, Math.max(0, at - performance.now()));
   };
-  const offerToStrip = (text: string, weight: CommentWeight): void => {
-    const now = performance.now();
-    const shown = hold.offer(text, weight, now);
+  const applyStrip = (shown: string | null, now: number): void => {
     if (shown !== null) showOnStrip(shown);
     if (holdTimer) clearTimeout(holdTimer);
     holdTimer = null;
@@ -1602,7 +1602,10 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       const lines = [...feed.children] as HTMLElement[];
       lines[logLineToDrop(lines.map((l) => l.dataset.kind))]?.remove();
     }
-    if (strip) offerToStrip(text, strip);
+    if (strip) {
+      const now = performance.now();
+      applyStrip(hold.offer(text, strip, now), now);
+    }
     if (eventSince) {
       batch = [];
       eventSince = false;
@@ -1760,6 +1763,14 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
     comment(line: string, weight: CommentWeight = 'routine', follow = false): void {
       const added = addLine(line, '', weight);
       if (follow) added.dataset.follow = '1';
+    },
+    commentRun(lines): void {
+      lines.forEach((line, i) => {
+        const added = addLine(line, '', null);
+        if (i > 0) added.dataset.follow = '1';
+      });
+      const now = performance.now();
+      applyStrip(hold.offerRun(lines, now), now);
     },
     setCalls(made, paid): void {
       const mine = opts.mine;

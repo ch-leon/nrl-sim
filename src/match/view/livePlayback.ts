@@ -954,17 +954,21 @@ export class LivePlayback {
       // A first win keeps the commentator's own line. A repeat (the same player over the same opponent)
       // replaces an ordinary line. The pair's second win holds the strip; a later repeat is an ordinary
       // line. A tactic counter (#468), or any line the strip is already holding, stays, and the repeat is said after it.
+      let pairedDuel = false;
       if (duel && duel.wins > 1) {
         const line = { text: duel.text, important: duel.wins === 2 };
         const head = said[0];
-        if (head && (head.important || head.counter)) said.push(line);
-        else if (head) said[0] = line;
+        if (head && (head.important || head.counter)) {
+          said.push(line);
+          pairedDuel = true;
+        } else if (head) said[0] = line;
         else said.push(line);
       }
       const line = said[0]?.text ?? '';
       if (!this.skipping) {
+        if (pairedDuel) this.opts.overlay?.commentRun(said.map((s) => s.text));
         said.forEach((s, i) => {
-          this.opts.overlay?.comment(s.text, s.important ? 'important' : 'routine', i > 0);
+          if (!pairedDuel) this.opts.overlay?.comment(s.text, s.important ? 'important' : 'routine', i > 0);
           // The player's own play (#825). A skipped stretch says the line and shows none of this.
           if (e.side !== this.opts.coachSide) return;
           if (s.playHit) this.playPayoff(s.playHit);
