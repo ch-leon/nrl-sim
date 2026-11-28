@@ -1150,10 +1150,13 @@ async function play() {
   });
   await step('rival-squad', async () => { await tap('.nrl-ladder-club'); await page.waitForSelector('.nrl-rival-squad'); });
 
-  // Contracts: renew someone. Office → Finance → its contracts VIEW ▸.
+  // Contracts: use the always-available Cash shortcut to Finance, then
+  // its VIEW ▸. Office's tiles unlock on played League rounds, not week 12.
   await step('contracts', async () => {
     await press(page.locator('.nrl-rival-modal .nrl-screen-x'));
     await closeAny();
+    await tap('button.nrl-dock-statusbox');
+    await page.waitForSelector('[data-screen-key="finance"]');
     await navTo('contracts');
     await wait(300);
   });
