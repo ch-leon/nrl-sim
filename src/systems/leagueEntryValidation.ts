@@ -2,6 +2,10 @@ import type { IndividualChallengeRecord } from '../data/individualChallenges';
 import type { RunningCamp } from '../data/playerAssignments';
 import { SAVE_VERSION, type GameState } from '../core/state';
 import { careerActionClock } from '../core/season';
+import { ON_FIELD, SQUAD_CAP, SQUAD_MIN } from '../config';
+import { activePack } from '../content';
+import { BENCH } from '../match/league/bench';
+import { NINES } from '../match/league/rules';
 import { validateCurrent, validateInput } from '../core/saveValidation';
 import { canonicalLeagueJson } from '../data/leagueCareer';
 import { competitionFixtureId } from '../data/competition';
@@ -106,19 +110,21 @@ function capacityProblem(state: GameState): string | null {
 
 interface LeagueStateProblem { reason: 'invalid' | 'unsupported'; message: string; }
 
-// Admission reads only the state and the evidence passed with it. States are
-// replaced, never edited in place, so one state object is walked once for the
-// same evidence: the league chooser previews every league from one state, and
-// confirming and the first advance after it ask about the same states again.
-const admissions = new WeakMap<GameState, {runningCamp: RunningCamp | undefined; runningChallenge: IndividualChallengeRecord | undefined; problem: LeagueStateProblem | null}>();
+// Reuse the whole-save admission only while its evidence and runtime agree.
+// competitionRulesProblem compares the current match and lineup rules; validation
+// also uses the selected content pack and current bench size. The tuning API can
+// edit and restore the rule values in place, so their object identity isn't a key.
+const admissionRuntime = (): string => JSON.stringify([activePack().id, ON_FIELD, BENCH.size, SQUAD_MIN, SQUAD_CAP, NINES]);
+const admissions = new WeakMap<GameState, {runningCamp: RunningCamp | undefined; runningChallenge: IndividualChallengeRecord | undefined; runtime: string; problem: LeagueStateProblem | null}>();
 
 /** Strict admission of an already marked League save. Does not select a pack,
  * install the state, recover prototypes or grant entry to a storage namespace. */
 export function leagueCareerStateProblem(state: GameState, runningCamp?: RunningCamp, runningChallenge?: IndividualChallengeRecord): LeagueStateProblem | null {
+  const runtime = admissionRuntime();
   const seen = admissions.get(state);
-  if (seen && seen.runningCamp === runningCamp && seen.runningChallenge === runningChallenge) return seen.problem;
+  if (seen && seen.runningCamp === runningCamp && seen.runningChallenge === runningChallenge && seen.runtime === runtime) return seen.problem;
   const problem = admissionProblem(state, runningCamp, runningChallenge);
-  admissions.set(state, {runningCamp, runningChallenge, problem});
+  admissions.set(state, {runningCamp, runningChallenge, runtime, problem});
   return problem;
 }
 
