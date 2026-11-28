@@ -1,3 +1,4 @@
+import { weekHeld } from '../../core/time';
 import { getState, type GameState, type Player, type PlayerStats, type TrainingFocus } from '../../core/state';
 import { CAMP_RULES, openingCampFixture, supportedCampCalendar, type CampRecord } from '../../data/playerAssignments';
 import { PROGRESSION } from '../../config';
@@ -10,6 +11,9 @@ import { focusLabel, levelPointSpendMode } from '../../systems/training';
 import { button, closeModal, el, openModal } from '../dom';
 
 type CampAction = Parameters<typeof captureCampAction>[0];
+import { previewWeeklyFatigue } from '../../systems/fatiguePreview';
+import { fatigueBookingNote } from '../weeklyFatigue';
+
 type Selection = Parameters<typeof confirmCampAction>[0];
 type CampProjection = ReturnType<typeof projectCampDeparture>;
 type CampState = Pick<GameState, 'competitions' | 'season' | 'clubId'>;
@@ -254,10 +258,13 @@ export function openSkillsCamp(findOpener: () => HTMLElement | null): HTMLElemen
       const role = today.starters.some(p => p?.id === participant.id) ? 'starter'
         : today.bench.some(p => p.id === participant.id) ? 'bench' : 'reserve';
       const roleNote = role === 'bench' ? 'Currently on the bench.' : `Currently a ${role}.`;
+      const fatigue = review?.action.kind === 'cancel' ? undefined : fatigueBookingNote(
+        previewWeeklyFatigue(state, { week: rules.departureWeek, playerId: participant.id }, weekHeld()), participant.id);
       detail.append(el('div', { class: 'nrl-camp-panel', attrs: { 'data-camp-preview': '' } },
         el('h3', { text: participant.name }),
         ...(role === projected.role ? [] : [el('p', { text: roleNote })]),
         el('p', { text: coverText(projected) }),
+        ...(fatigue ? [fatigue] : []),
         ...(projected.reason ? [el('p', { class: 'nrl-camp-risk', text: projected.reason })] : []),
         ...(open && !manual && !review ? [choice('Camp focus', 'data-camp-focus', focus,
           targets.map(target => ({ value: target, label: focusLabel(target) })), next => {
@@ -273,11 +280,14 @@ export function openSkillsCamp(findOpener: () => HTMLElement | null): HTMLElemen
       detail.append(el('p', { class: 'nrl-camp-confirmation', text: cancelling
         ? `Cancel the booking for ${booking?.participantName}? The player stays with the club for Week ${rules.departureWeek}.`
         : `Confirm the free place for ${participant?.name}. The player remains on your squad and misses the opener.` }));
+      const confirmButton = control(cancelling ? 'Confirm cancellation' : 'Confirm booking', 'data-camp-confirm', confirm, true);
+      const previewId = detail.querySelector('[data-fatigue-event-preview]')?.getAttribute('id');
+      if (previewId) confirmButton.setAttribute('aria-describedby', previewId);
       actions.append(control('Back', 'data-camp-back', () => {
         review = null;
         render();
         focusControl(cancelling ? 'data-camp-cancel' : 'data-camp-review');
-      }), control(cancelling ? 'Confirm cancellation' : 'Confirm booking', 'data-camp-confirm', confirm, true));
+      }), confirmButton);
     } else if (open) {
       const next = control('Review booking', 'data-camp-review', () => {
         if (participant) inspect({ kind: 'book', participantId: participant.id, focus: manual ? null : focus });

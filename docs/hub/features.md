@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- **Fatigue at selection time.** Squad and Lineup show each player's weekly fatigue. Event booking reviews and bonus-match previews name the next League opponent and show how much energy the player is due to start with after recovery. [Card week rules](../specs/846-card-week.md#weekly-fatigue).
+
 - **Weekly fatigue in Card week.** League appearances add tiredness, bonus events can slow recovery, and tired players start with less energy and a higher injury risk. [Card week rules](../specs/846-card-week.md#weekly-fatigue).
 
 - **Card week deals five cards.** Keep up to two from each League match pick and one from each starter pick. A half-used match pick saves its remaining cards and keep. [Card week rules](../specs/846-card-week.md#rules).
