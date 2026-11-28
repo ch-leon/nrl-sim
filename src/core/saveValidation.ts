@@ -22,7 +22,7 @@ import { assignmentOwnerProblem } from '../systems/assignmentEvidence';
 import { competitionInstanceId, validateCompetitions } from '../data/competition';
 import { FINANCE_TIERS, tierForRank } from '../data/financeRules';
 import { canonicalLeagueJson, validateLeagueHistory } from '../data/leagueCareer';
-import { CARD_PASS, CARD_RECOVERY, CARD_WEEK, RECOVERY_CARD_SAVE_VERSION, WEEKLY_FATIGUE, cardDefById } from '../data/cards';
+import { CARD_PASS, CARD_RECOVERY, CARD_WEEK, RECOVERY_CARD_SAVE_VERSION, STAFF_CARD_SAVE_VERSION, WEEKLY_FATIGUE, cardDefById, coachedPlayCardId } from '../data/cards';
 
 export interface SaveRepair { field: string; problem: string; repair: string; rationale: string; notification: string }
 export const REPAIR_NOTICE = 'Career lineup repaired. The original save has been kept in recovery.';
@@ -241,7 +241,7 @@ export function isCardWeekV36(v: unknown): boolean {
   return cardWeekCommon(v) && (v.offer === null || cardOffer(v.offer, LEGACY_CARD_OFFER_SIZE, 36));
 }
 
-function isActiveCard(v: unknown): boolean {
+function isActiveCard(v: unknown, version: number): boolean {
   if (!record(v) || !text(v.cardId) || !integer(v.level, 1, 3)) return false;
   switch (v.kind) {
     case 'staff': {
@@ -252,7 +252,9 @@ function isActiveCard(v: unknown): boolean {
         && (typeof def.role === 'string' ? v.member.role === def.role && v.member.speciality === undefined
           : v.member.role === 'attackCoach' && v.member.speciality === def.role.attackCoach);
     }
-    case 'setPlay': return cardDefById(v.cardId)?.kind === 'setPlay' && isBasePlayId(v.playId);
+    case 'setPlay': return cardDefById(v.cardId)?.kind === 'setPlay' && isBasePlayId(v.playId)
+      && (!v.cardId.startsWith('staff-play:') || (version >= STAFF_CARD_SAVE_VERSION && v.level === 1
+        && v.cardId === coachedPlayCardId(v.playId)));
     case 'player': case 'dilemma': case 'trait': return cardDefById(v.cardId)?.kind === v.kind && text(v.playerId)
       && (v.fromClubId === undefined || v.kind === 'player' && v.cardId.startsWith('steal-player:') && text(v.fromClubId));
     case 'cash': return cardDefById(v.cardId)?.kind === 'cash';
@@ -286,6 +288,7 @@ export function isCardWeek(v: unknown, version: number = SAVE_VERSION): boolean 
         || kept.some(id => {
           const def = cardDefById(id);
           return !def || def.kind === 'decree' || (def.kind === 'recovery' && version < RECOVERY_CARD_SAVE_VERSION)
+            || (id.startsWith('staff-play:') && version < STAFF_CARD_SAVE_VERSION)
             || o.cards.some(card => card.cardId === id);
         })) return false;
     }
@@ -299,17 +302,19 @@ export function isCardWeek(v: unknown, version: number = SAVE_VERSION): boolean 
     }
     const stolen = (o.cards as unknown[]).filter(c => record(c) && c.fromClubId !== undefined);
     if (stolen.length > 1 || stolen.some(c => record(c) && (o.kind !== 'match' || c.fromClubId !== o.fromClubId))) return false;
+    const staffSources = (o.cards as unknown[]).flatMap(c => record(c) && c.staffSource !== undefined ? [c.staffSource] : []);
+    if (staffSources.length && (kind !== 'match' || !unique(staffSources))) return false;
     if (o.seen !== undefined && (o.seen !== true || !integer(o.grant, 1, seenGrant))) return false;
   }
   if (!Array.isArray(v.hand) || v.hand.length > CARD_WEEK.HAND_CAP || !v.hand.every(h => record(h) && isOfferedCard(h.offered, version)
     && record(h.offered) && h.offered.kind !== 'decree' && h.cardId === h.offered.cardId && integer(h.level, 1, 3)
-    && (h.offered.kind !== 'recovery' || h.level === 1)
+    && ((h.offered.kind !== 'recovery' && h.offered.staffSource !== 'attackCoach') || h.level === 1)
     && integer(h.gotSeason, 1) && integer(h.gotWeek, 1))) return false;
   if (v.hand.filter(h => h.offered.kind === 'recovery').length > CARD_RECOVERY.HAND_CAP) return false;
   if (!Array.isArray(v.history) || !v.history.every(h => h.action === undefined || (oneOf(h.action, ['take', 'pass', 'expire', 'discard', 'play', 'reroll'])
     && (h.action !== 'pass' || h.cardId === CARD_PASS) && (h.action !== 'expire' || oneOf(h.cardId, ['expired', 'decree-pick']))))) return false;
   if (!Array.isArray(v.cardTraits) || !v.cardTraits.every(t => t.level === undefined || integer(t.level, 1, 3))) return false;
-  if (!Array.isArray(v.active) || !v.active.every(isActiveCard)) return false;
+  if (!Array.isArray(v.active) || !v.active.every(card => isActiveCard(card, version))) return false;
   if (!cardDate(v.rerolls) || !integer(v.rerolls.count)) return false;
   if (v.lastSettled !== undefined && !cardDate(v.lastSettled)) return false;
   if (!record(v.strikes) || !integer(v.strikes.season, 1) || !integer(v.strikes.lossRun, 0, CARD_WEEK.STRIKE_LOSS_RUN - 1)
@@ -331,13 +336,19 @@ function isOfferedCard(c: unknown, version: number): boolean {
   if (!def || c.kind !== def.kind) return false;
   const steal = c.cardId.startsWith('steal-');
   if (steal ? !text(c.fromClubId) : c.fromClubId !== undefined) return false;
+  const taught = c.cardId.startsWith('staff-play:');
+  if (c.staffSource !== undefined) {
+    if (version < STAFF_CARD_SAVE_VERSION || steal
+      || !(c.staffSource === 'welfare' && c.kind === 'recovery' || c.staffSource === 'attackCoach' && taught)) return false;
+  } else if (taught) return false;
   switch (def.kind) {
     case 'player': case 'dilemma':
       return isPlayer(c.player) && integer(c.salary, 1)
         && (!steal || c.cardId === `steal-player:${c.player.position}:${c.player.id}`)
         && (c.replacesId === undefined ? c.replacesName === undefined : text(c.replacesId) && text(c.replacesName));
     case 'staff': return text(c.name);
-    case 'setPlay': return isBasePlayId(c.playId) && (!steal || c.cardId === `steal-play:${c.playId}`);
+    case 'setPlay': return isBasePlayId(c.playId) && (!steal || c.cardId === `steal-play:${c.playId}`)
+      && (!taught || c.cardId === coachedPlayCardId(c.playId));
     case 'trait': case 'cash': case 'decree': return true;
     case 'recovery': return version >= RECOVERY_CARD_SAVE_VERSION;
   }
@@ -445,7 +456,9 @@ export function validateInput(v: Record<string, unknown>, version: number, runni
   if (v.lineup !== undefined && !record(v.lineup)) return fail('lineup');
   if (version >= 16 && (!record(v.training) || !oneOf(v.training.focus, ['balanced', ...stats]))) return fail('training');
   if (version >= 18 && (!record(v.boardLoan) || !range(v.boardLoan.owed, 0))) return fail('boardLoan');
-  if (version >= 19 && (!Array.isArray(v.staff) || !v.staff.every(s => record(s) && oneOf(s.role, ['assistantCoach', 'analyst', 'welfare', 'attackCoach']) && text(s.name) && range(s.wage, 0) && integer(s.hiredSeason, 1) && (s.cardHireId === undefined || text(s.cardHireId)) && (s.speciality === undefined || oneOf(s.speciality, ['direct', 'width', 'kicking', 'razzle']))) || !unique(v.staff.map(s => s.role)))) return fail('staff');
+  if (version >= 19 && (!Array.isArray(v.staff) || !v.staff.every(s => record(s) && oneOf(s.role, ['assistantCoach', 'analyst', 'welfare', 'attackCoach']) && text(s.name) && range(s.wage, 0) && integer(s.hiredSeason, 1) && (s.cardHireId === undefined || text(s.cardHireId)) && (s.speciality === undefined || oneOf(s.speciality, ['direct', 'width', 'kicking', 'razzle'])) && (s.cardSupplyMatches === undefined
+      || (version >= STAFF_CARD_SAVE_VERSION && record(v.cardWeek) && oneOf(s.role, ['welfare', 'attackCoach'])
+        && integer(s.cardSupplyMatches, 0, CARD_WEEK.STAFF_SUPPLY_MATCHES)))) || !unique(v.staff.map(s => s.role)))) return fail('staff');
   if (version >= 29 && !validMatchIncome(v.matchIncome, { season: v.season as number, league: v.league as unknown as GameState['league'], competitions: v.competitions as GameState['competitions'] })) return fail('match income');
   if (version >= 33) {
     const state = v as unknown as GameState;

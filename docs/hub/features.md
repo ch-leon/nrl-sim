@@ -64,6 +64,7 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- **Cards from staff.** Your Welfare Manager can slip a Recovery card into the pick, and your Attack Coach can teach a set play from his speciality. They try after every third League match they watch, and rerolls keep their marked cards. [Card week rules](../specs/846-card-week.md#cards).
 - **Card week recovery cards.** Clear one player's fatigue, take 30 fatigue off the squad, or cut two weeks off an injury. Hold up to two recovery cards or play another straight from a pick. [Card week rules](../specs/846-card-week.md#cards).
 
 - **Fatigue at selection time.** Squad and Lineup show each player's weekly fatigue. Event booking reviews and bonus-match previews name the next League opponent and show how much energy the player is due to start with after recovery. [Card week rules](../specs/846-card-week.md#weekly-fatigue).
