@@ -74,11 +74,21 @@ who cross either injury line as fatigue rises or they recover.
 | Staff | Hires the role with the appointment fee waived. Wages still run. | The role is empty and nothing else refuses it (the attack coach: one at a time; Razzle needs reputation). |
 | Set play | Adds one play the club could buy today, free. Which play is settled when the card is drawn. | The club's attack coach teaches a play it does not own. |
 | Trait | The player chooses a squad member. The first copy gives the trait at I, a second raises it to II, a third to III. III is the limit. | Someone in the squad, not away, is below III in that trait. |
+| Recovery: Fatigue wipe | Choose one squad player and clear his fatigue. | At least one squad player has fatigue above zero. |
+| Recovery: Ice baths | Take 30 fatigue off every squad player, never below zero. | At least one squad player has fatigue above zero. |
+| Recovery: Injury repair | Choose one injured squad player and take two weeks off his time out, never below zero. A healed player can be selected again unless away or suspended. | At least one squad player has at least one week of injury left. |
 | Cash | Money now, booked to the Events line of the books as `card: <title>`. | Always. |
 | Dilemma | A gold-tier player joins (as a player card) at the position with the lowest card floor, and board patience drops by one. | As a player card, and only while board patience is at least 2, so it never takes the last point. |
 | Saved rival recruit or set play | The recruit transfers with his career history and his former club receives a fit replacement at the same position. The set play goes into the playbook for free. | Already in the hand or a waiting pick in an older save. |
 
 The calendar and the club’s facilities determine [weekly fatigue](#weekly-fatigue) alongside these card rules.
+
+**Recovery in the hand.** Recovery cards are free, one-shot and do not expire or
+gain levels. Two copies of the same card use both recovery slots. With two
+held, play another straight from its pick or pass it; you cannot take a third.
+A saved offer keeps its faces even if the squad has since recovered. Playing
+a card rechecks who can benefit, and a refusal does not spend it or use a keep.
+Clearing fatigue updates the Lineup kick-off preview straight away.
 
 **The card floor.** The club's best natural player at the card's position (his own
 position is the card's), by overall rating. With nobody there, the best man from a
@@ -150,6 +160,9 @@ card.
 | `WEEKLY_FATIGUE.RECOVERY` / `.FACILITY_RECOVERY` | `src/data/cards.ts` | 20 / 2 | Recovery per week and extra recovery for each of the two built facilities. |
 | `WEEKLY_FATIGUE.ENERGY_LOSS_PER_POINT` | `src/data/cards.ts` | 0.004 | Fraction of full starting energy lost per fatigue point. |
 | `WEEKLY_FATIGUE.INJURY_TIERS` | `src/data/cards.ts` | >60 ×1.5, >80 ×2 | Strict thresholds for scaling the existing big-hit injury chance. The highest applicable tier wins. |
+| `CARD_RECOVERY.HAND_CAP` | `src/data/cards.ts` | 2 | Recovery cards that can be held at once, within the normal hand limit. |
+| `CARD_RECOVERY.ICE_BATHS_FATIGUE` / `.INJURY_REPAIR_WEEKS` / `.INJURY_REPAIR_MIN_WEEKS` | `src/data/cards.ts` | 30 / 2 / 1 | Fatigue Ice baths removes, weeks Injury repair removes, and weeks out needed to offer Injury repair. |
+| `CARD_RECOVERY.WEIGHT` | `src/data/cards.ts` | 3 each | Starting weights targeting about one recovery card in every three eligible picks. The actual frequency depends on squad and deck eligibility. |
 | Card `weight` | `src/data/cards.ts` `CARDS` | grey players 10, gold halfback 4; staff 6 (attack coach 4); set play 8; grey traits 7, Finisher 4; cash 8; dilemma 3 | How often each card turns up, relative to the others that can be offered. |
 | Cash `amount` | `src/data/cards.ts` `cashInjection` | $15,000 | The cash card's money. |
 | Dilemma `patience` | `src/data/cards.ts` `marqueeGamble` | −1 | Board patience the dilemma costs. |
@@ -168,6 +181,9 @@ Position links, the opening pack, the album across careers, and any scoring.
 - `src/systems/weeklyFatigue.ts` applies recovery at week start and appearance
   loads on settlement. `src/match/league/sheets.ts` sets kick-off energy and injury
   risk. `src/systems/liveMatchRecord.ts` stores Card-week kick-off sheets.
+- `src/systems/recoveryCards.ts`: eligibility, effect, and target previews for recovery.
+- Save v42 recognises the new recovery faces in the existing saved pick and hand.
+  The v41 migration keeps all existing cards and fatigue as saved.
 - Save v41 stores weekly fatigue by squad player ID. Earlier Card-week saves
   start everyone at zero, while careers without the experiment keep their
   existing shape. Save validation checks each stored value.
