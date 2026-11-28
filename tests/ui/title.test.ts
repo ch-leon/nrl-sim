@@ -18,6 +18,8 @@ function classicCareer(name: string, seed: number): GameState {
 import { bus } from '../../src/core/events';
 import { CLASSIC_RETIRED_TEXT } from '../../src/core/classicSave';
 import { leagueSlotState } from '../helpers/leagueSlot';
+import { __setLabs, setExperiment } from '../../src/labs/flags';
+import { closeModal, getRoot } from '../../src/ui/dom';
 
 describe('the build label (#350 T1)', () => {
   it('sits in the corner, and after the setup on an iPhone SE on its side, never over the panel', () => {
@@ -671,5 +673,82 @@ describe('slot cards carry the ladder place (SuperCOOKED 11)', () => {
     const when = root.querySelector('[data-nrl-slot-1]')!.querySelector('.nrl-title-when')!.textContent;
     expect(when).toBe(`Season ${fresh.season} · Week ${fresh.week}`);
     expect(when).not.toMatch(/ · \d/);
+  });
+});
+
+describe('Settings on the title', () => {
+  beforeEach(() => {
+    stubLocalStorage();
+    stubDocument();
+    __setLabs(null);
+    vi.stubEnv('VITE_DEV_SETTINGS', '1');
+  });
+  afterEach(() => {
+    closeModal();
+    __setLabs(null);
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it.each([false, true])('opens from the slots footer with a saved career: %s', async (saved) => {
+    if (saved) writeSlot(1, await leagueSlotState('Test club'));
+    const host = getRoot();
+    const root = host as unknown as StubNode;
+    const finished = vi.fn();
+    void showTitleFlow(host).then(finished);
+    if (!saved) {
+      expect(root.querySelector('.nrl-title-head')?.querySelector('[data-nrl-settings]')?.textContent).toBe('Settings');
+      root.querySelector('[data-nrl-back]')!.click();
+    }
+    const foot = root.querySelector('.nrl-title-foot')!;
+    expect(foot.querySelector('[data-nrl-import]')).not.toBeNull();
+    const settings = foot.querySelector('[data-nrl-settings]')!;
+    expect(settings.textContent).toBe('Settings');
+    settings.click();
+    await vi.dynamicImportSettled();
+    expect(root.querySelector('.nrl-settings-modal')).not.toBeNull();
+    root.querySelector('.nrl-screen-x')!.click();
+    expect(root.querySelector('.nrl-settings-modal')).toBeNull();
+    expect(root.querySelector('[data-nrl-settings]')).toBe(settings);
+    await Promise.resolve();
+    expect(finished).not.toHaveBeenCalled();
+  });
+
+  it('refreshes Card week after closing Developer settings and keeps the setup fields', async () => {
+    const host = getRoot();
+    const root = host as unknown as StubNode;
+    const finished = vi.fn();
+    void showTitleFlow(host).then(finished);
+    await vi.dynamicImportSettled();
+    root.querySelector('[data-nrl-next]')!.click();
+    const club = root.querySelector('[data-nrl-clubname]')!;
+    club.value = 'My New Club';
+    root.querySelector('[data-nrl-next]')!.click();
+    expect(root.querySelector('[data-nrl-setup-step="3"]')).not.toBeNull();
+    const settings = root.querySelector('.nrl-title-head')!.querySelector('[data-nrl-settings]')!;
+    const changeCardWeek = async (on: boolean) => {
+      settings.click();
+      await vi.dynamicImportSettled();
+      root.querySelector('.nrl-labs-open')!.click();
+      await vi.dynamicImportSettled();
+      expect(root.querySelector('.nrl-settings-modal')).toBeNull();
+      expect(root.querySelector('.nrl-labs-panel')).not.toBeNull();
+      setExperiment('card-week', on);
+      root.querySelector('.nrl-screen-x')!.click();
+      expect(root.querySelector('.nrl-labs-panel')).toBeNull();
+      expect(root.querySelector('[data-nrl-clubname]')).toBe(club);
+      expect(club.value).toBe('My New Club');
+      await Promise.resolve();
+      expect(finished).not.toHaveBeenCalled();
+    };
+    expect(root.querySelector('[data-nrl-card-week]')).toBeNull();
+    await changeCardWeek(true);
+    const cardWeek = root.querySelector('[data-nrl-card-week]')!;
+    cardWeek.checked = true;
+    await changeCardWeek(false);
+    expect(root.querySelector('[data-nrl-card-week]')).toBeNull();
+    expect(cardWeek.checked).toBe(false);
+    await changeCardWeek(true);
+    expect(root.querySelector('[data-nrl-card-week]')?.checked).toBe(false);
   });
 });

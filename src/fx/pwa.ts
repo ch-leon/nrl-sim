@@ -105,6 +105,23 @@ export async function promptInstall(): Promise<
   return outcome;
 }
 
+let installPromptListening = false;
+
+/** Capture the browser's install offer while the title is up. */
+export function captureInstallPrompt(): void {
+  if (MATCH_PREVIEW || installPromptListening || typeof window === 'undefined') return;
+  installPromptListening = true;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault(); // suppress the mini-infobar; we drive the UI ourselves
+    deferredPrompt = e as BeforeInstallPromptEvent;
+  });
+
+  // Once installed, drop any captured prompt.
+  window.addEventListener('appinstalled', () => {
+    deferredPrompt = null;
+  });
+}
+
 /**
  * Idempotently wire install-prompt capture, SW registration and the iOS hint.
  * Safe to call in any environment; no-ops without a DOM. `holdIosHint` defers
@@ -115,15 +132,7 @@ export function initPwa(opts: { holdIosHint?: (show: () => void) => void } = {})
   if (initialised || typeof window === 'undefined') return;
   initialised = true;
 
-  window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault(); // suppress the mini-infobar; we drive the UI ourselves
-    deferredPrompt = e as BeforeInstallPromptEvent;
-  });
-
-  // Once installed, drop any captured prompt.
-  window.addEventListener('appinstalled', () => {
-    deferredPrompt = null;
-  });
+  captureInstallPrompt();
 
   // Register the service worker. The virtual module only exists in a Vite
   // build/dev graph, so guard against environments (Vitest) where it cannot be

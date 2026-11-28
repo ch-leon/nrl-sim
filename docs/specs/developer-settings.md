@@ -6,8 +6,9 @@ never part of a save.
 
 ## Finding it
 
-It is in Settings on every current build: GitHub Pages, the Android test APK and
-local dev. The build switch is `VITE_DEV_SETTINGS`, on unless it is `0` (`false`,
+Open **Settings** from the title screen's save slots or new-club setup, or from
+Office during a career. Developer settings is available on GitHub Pages, the
+Android test APK and local dev. The build switch is `VITE_DEV_SETTINGS`, on unless it is `0` (`false`,
 `off` and `no` count as off too). **Before launch, set `VITE_DEV_SETTINGS=0` or
 remove Developer settings.** The switch is not saved on the browser, so turning
 it off hides the entry again for anyone who never opened `?labs=1`.

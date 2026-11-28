@@ -343,7 +343,16 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
     await page.waitForSelector('[data-nrl-town]');
     await setInsets();
     await page.waitForTimeout(250);
-    const problems = await controlsProblems(page, ['[data-nrl-town]', '[data-nrl-next]', '[data-nrl-back]'], safe);
+    const problems = await controlsProblems(page, ['[data-nrl-town]', '[data-nrl-next]', '[data-nrl-back]', '[data-nrl-settings]'], safe);
+    await tap('[data-nrl-settings]');
+    const developerSettings = page.locator('.nrl-settings-modal .nrl-labs-open');
+    await developerSettings.tap({ trial: true });
+    problems.push(...await controlsProblems(page, ['.nrl-labs-open'], safe));
+    await developerSettings.tap();
+    await page.waitForSelector('.nrl-labs-panel');
+    await tap('.nrl-dialog-region .nrl-screen-x');
+    await page.waitForSelector('.nrl-dialog-region', { state: 'detached' });
+    await page.waitForSelector('[data-nrl-town]');
     await setupStep(page, 2);
     problems.push(...await controlsProblems(page, ['[data-nrl-next]', '[data-nrl-back]'], safe));
     for (const control of await page.locator('.nrl-title-details input, .nrl-title-swatch').all()) {
@@ -972,7 +981,7 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
     await setInsets();
     await page.waitForTimeout(250);
     rec.notes.push((await page.locator('[data-nrl-slot-label-1]').textContent()) ?? '');
-    const out = await controlsProblems(page, ['[data-nrl-continue-1]', '[data-nrl-more-1]', '[data-nrl-new-2]', '[data-nrl-import]'], safe);
+    const out = await controlsProblems(page, ['[data-nrl-continue-1]', '[data-nrl-more-1]', '[data-nrl-new-2]', '[data-nrl-import]', '[data-nrl-settings]'], safe);
     // New club over the season and Delete are in slot 1's ⋯ (SuperCOOKED 11).
     await slotMenu(page, 1);
     out.push(...await controlsProblems(page, ['[data-nrl-new-1]', '[data-nrl-delete-1]'], safe));
