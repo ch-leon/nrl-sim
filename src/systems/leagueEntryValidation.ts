@@ -106,9 +106,23 @@ function capacityProblem(state: GameState): string | null {
 
 interface LeagueStateProblem { reason: 'invalid' | 'unsupported'; message: string; }
 
+// Admission reads only the state and the evidence passed with it. States are
+// replaced, never edited in place, so one state object is walked once for the
+// same evidence: the league chooser previews every league from one state, and
+// confirming and the first advance after it ask about the same states again.
+const admissions = new WeakMap<GameState, {runningCamp: RunningCamp | undefined; runningChallenge: IndividualChallengeRecord | undefined; problem: LeagueStateProblem | null}>();
+
 /** Strict admission of an already marked League save. Does not select a pack,
  * install the state, recover prototypes or grant entry to a storage namespace. */
 export function leagueCareerStateProblem(state: GameState, runningCamp?: RunningCamp, runningChallenge?: IndividualChallengeRecord): LeagueStateProblem | null {
+  const seen = admissions.get(state);
+  if (seen && seen.runningCamp === runningCamp && seen.runningChallenge === runningChallenge) return seen.problem;
+  const problem = admissionProblem(state, runningCamp, runningChallenge);
+  admissions.set(state, {runningCamp, runningChallenge, problem});
+  return problem;
+}
+
+function admissionProblem(state: GameState, runningCamp?: RunningCamp, runningChallenge?: IndividualChallengeRecord): LeagueStateProblem | null {
   try {
     const c = state.competitions;
     const progress = c?.leagueCareer;

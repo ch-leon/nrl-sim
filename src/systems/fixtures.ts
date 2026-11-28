@@ -36,7 +36,7 @@ import { RIVAL_CLUBS } from '../data/league';
 import { bus } from '../core/events';
 import { strengthChanges, applySeasonReputation } from './league';
 import { rolloverRivalPopulation, withRivalSquads } from './rivals';
-import { currentCalendarFixtures, finaliseCalendarFixture, fixtureBridge, hasStructuralCalendar, resolveCalendarForfeits, sameFixtureIdentity } from './competitionCalendar';
+import { currentCalendarFixtures, finaliseCalendarFixture, finaliseCalendarRound, fixtureBridge, hasStructuralCalendar, resolveCalendarForfeits, sameFixtureIdentity, type RoundResult } from './competitionCalendar';
 import { closeOpenCupRegistration, resolveOpenCupWithdrawal } from './openCupEntry';
 import { prepareOpenCup } from './openCupCareer';
 import { prepareDivisionFinals } from './divisionCareer';
@@ -355,16 +355,18 @@ export function cheapSimScore(
  */
 export function simulateRivalRound(state: GameState, rng: Rng): GameState {
   if (hasStructuralCalendar(state)) {
-    let next = resolveCalendarForfeits(state);
+    const next = resolveCalendarForfeits(state);
+    const results: RoundResult[] = [];
     for (const context of currentCalendarFixtures(next)) {
       const f = fixtureBridge(context);
       if (f.homeId === PLAYER_ID || f.awayId === PLAYER_ID) continue;
       const home = state.league.clubs.find(c => c.id === f.homeId);
       const away = state.league.clubs.find(c => c.id === f.awayId);
       if (!home || !away) continue;
-      next = applyResult(next, f, cheapSimScore(home, away, rng));
+      results.push({ bridge: f, score: cheapSimScore(home, away, rng) });
     }
-    return next;
+    // One whole-save check for the round, not one per result (#739).
+    return finaliseCalendarRound(next, results);
   }
   const round = currentRound(state);
   if (round < -1 || round > WEEKS_PER_SEASON) return state;
