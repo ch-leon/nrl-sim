@@ -53,6 +53,19 @@ doubles the chance. The existing injury roll reads the scaled risk on the
 team sheet. Rival sheets use their normal kick-off values. Card-week matches
 save both sheets for deterministic replay.
 
+Squad and Lineup show each player's current fatigue and the injury bands in
+words. Lineup projects each picked player's starting energy for the next
+scheduled League fixture. Skills Camp and both Challenge booking reviews show
+fatigue immediately before and after the event, followed by the next saved
+League opponent and the player's fatigue and energy after recovery. View the
+same cost for the selected side before a trial or Cup tie in Lineup or Next
+match. Interchange load in that preview applies if the player takes the field.
+
+The preview uses the saved fixture dates, current lineup, bookings and built
+facilities. It projects intervening starters from today's picks, so a change of
+lineup or a new injury can change the result. The week summary names players
+who cross either injury line as fatigue rises or they recover.
+
 ### Cards
 
 | Kind | What it does | Offered when |

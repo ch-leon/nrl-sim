@@ -1,3 +1,5 @@
+import { crossedFatigueLines } from '../systems/fatiguePreview';
+import { weeklyFatigueOf } from '../systems/weeklyFatigue';
 import { strikeText } from '../systems/cardWeek';
 // src/ui/weekSummary.ts — the weekly summary card (#368): what changed since the
 // last card (the training gains, who got hurt or banned and who is back, the
@@ -16,7 +18,7 @@ import { coachLine, summaryRemark } from './coachVoice';
 import { coachSays, type CoachSuggestion } from './coachSays';
 import { pendingDecisionCount } from './decisions';
 import { bus } from '../core/events';
-import { getState, FINANCE_LINES, type CardWeekState, type FinanceLine, type GameState, type PlayerStats } from '../core/state';
+import { getState, stateInstallation, FINANCE_LINES, type CardWeekState, type FinanceLine, type GameState, type PlayerStats } from '../core/state';
 import { advanceInProgress } from '../core/advance';
 import { weekHeld } from '../core/time';
 import { BOARD, WEEKS_PER_SEASON } from '../config';
@@ -81,6 +83,7 @@ export type BoardMood = 'happy' | 'watching' | 'worried';
 export interface WeekSummary {
   newCardPicks?: number;
   strikes?: string[];
+  fatigueCrossings?: readonly string[];
   /** Advances the card covers: 1 for a week, more for a ▾ run. */
   weeks: number;
   title: string;
@@ -275,10 +278,13 @@ export function openWeekSummary(v: WeekSummary, opts: { onAdvance: () => void; c
   advance.setAttribute('data-summary-advance', '');
   const close = button('Close', () => closeModal(), { class: 'nrl-btn-outline' });
   close.setAttribute('data-summary-close', '');
+  const sidelines = section('Injuries & bans', squad.map(sidelineRow), 'Nobody new on the sidelines.');
+  if (v.fatigueCrossings?.length) sidelines.append(el('h3', { text: 'Weekly fatigue' }),
+    ...v.fatigueCrossings.map(text => el('p', { text, attrs: { 'data-fatigue-crossing': '' } })));
   const cols = el('div', { class: 'nrl-summary-cols' },
     section('Training', v.gains.map(gainRow), 'No gains to speak of.'),
     money,
-    section('Injuries & bans', squad.map(sidelineRow), 'Nobody new on the sidelines.'),
+    sidelines,
     board);
   // What a short phone or a larger text still cuts off fades at the foot (#610): a line was cut through its letters with no cue.
   hintScroll(cols);
@@ -294,6 +300,20 @@ export function openWeekSummary(v: WeekSummary, opts: { onAdvance: () => void; c
   return openModal(content, { class: 'nrl-summary-modal', region: true, closeButton: true });
 }
 
+export function fatigueCrossingLines(before: GameState, after: GameState): string[] {
+  if (!before.cardWeek || !after.cardWeek || before.cardWeek.weeklyFatigue === after.cardWeek.weeklyFatigue) return [];
+  const owned = new Set(before.squad.map(p => p.id));
+  return after.squad.flatMap(p => {
+    if (!owned.has(p.id)) return [];
+    const was = weeklyFatigueOf(before, p.id);
+    const now = weeklyFatigueOf(after, p.id);
+    const crossed = crossedFatigueLines(was, now);
+    if (!crossed.length) return [];
+    const action = now > was ? 'rose above' : 'recovered to or below';
+    return [`${p.name} ${action} ${crossed.join(' and ')} fatigue`];
+  });
+}
+
 /**
  * Wire the card (#368): call once the game is loaded or started, so the first
  * snapshot is the club as the player found it. Every week:advanced marks a card
@@ -305,6 +325,10 @@ export function openWeekSummary(v: WeekSummary, opts: { onAdvance: () => void; c
 export function initWeekSummary(opts: { onAdvance: () => void; runwayWeeks: (s: GameState) => number | null; onPick?: () => void }): { pending: () => boolean; destroy: () => void } {
   const snap = (): WeekSnapshot => weekSnapshot(getState(), opts.runwayWeeks(getState()));
   let before = snap();
+  let fatigueState = getState();
+  let installation = stateInstallation();
+  const pendingFatigue = new Set<string>();
+  const settledFatigue = new Set<string>();
   let due = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let poll: ReturnType<typeof setInterval> | undefined;
@@ -315,6 +339,7 @@ export function initWeekSummary(opts: { onAdvance: () => void; runwayWeeks: (s: 
     if (s.settings.weekSummary === false) {
       due = false;
       before = snap();
+      settledFatigue.clear();
       return;
     }
     const can = summaryCanShow({
@@ -334,7 +359,10 @@ export function initWeekSummary(opts: { onAdvance: () => void; runwayWeeks: (s: 
     if (poll) clearInterval(poll);
     poll = undefined;
     if (weeksBetween(before, after) <= 0) { before = after; return; }
-    openWeekSummary(weekSummary(before, after), {
+    const summary = weekSummary(before, after);
+    if (settledFatigue.size) summary.fatigueCrossings = [...settledFatigue];
+    settledFatigue.clear();
+    openWeekSummary(summary, {
       onAdvance: opts.onAdvance,
       ...(opts.onPick ? { onPick: opts.onPick } : {}),
       coach: coachSays(s, { decisions: pendingDecisionCount(s), runwayWeeks: opts.runwayWeeks(s) }),
@@ -348,17 +376,33 @@ export function initWeekSummary(opts: { onAdvance: () => void; runwayWeeks: (s: 
     timer = setTimeout(tryShow, 0);
   };
   const offWeek = bus.on('week:advanced', () => {
+    for (const line of pendingFatigue) settledFatigue.add(line);
+    pendingFatigue.clear();
     due = true;
     soon();
     // Nothing announces a dialog closing, Back to Club or the tutorial's end: look again now and then.
     if (!poll) poll = setInterval(tryShow, 400);
   });
-  const offState = bus.on('state:changed', () => { if (due) soon(); });
+  // Remember both sides of the week's recovery and appearance loads. A player
+  // can cross a line twice in one week, or during a run that ends where it began.
+  const offState = bus.on('state:changed', state => {
+    if (installation !== stateInstallation()) {
+      installation = stateInstallation();
+      pendingFatigue.clear();
+      settledFatigue.clear();
+    } else {
+      for (const line of fatigueCrossingLines(fatigueState, state)) pendingFatigue.add(line);
+    }
+    fatigueState = state;
+    if (due) soon();
+  });
+  const offBlocked = bus.on('week:blocked', () => pendingFatigue.clear());
   return {
     pending: () => due && getState().settings.weekSummary !== false,
     destroy: () => {
       offWeek();
       offState();
+      offBlocked();
       if (timer) clearTimeout(timer);
       if (poll) clearInterval(poll);
     },

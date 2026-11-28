@@ -4,9 +4,9 @@ import { bindChallengeLane, type ChallengeLane } from '../../../src/ui/challenge
 import { __setStorage, __unlockSaves, setActiveSlot } from '../../../src/core/save';
 import { beginNativeCheckpointBoot } from '../../../src/core/storage/nativeCheckpoint';
 import { NativeMirror, fileForKey } from '../../../src/core/storage/nativeMirror';
-import { changeChallenge, currentIndividualChallenge } from '../../../src/systems/individualChallenges';
-import { SAVE_VERSION, type GameState, getState, loadState } from '../../../src/core/state';
-import { CHALLENGE_EDITIONS, type ChallengeCall } from '../../../src/data/individualChallengeRules';
+import { changeChallenge, challengeQualified, currentIndividualChallenge, settleIndividualChallenge } from '../../../src/systems/individualChallenges';
+import { SAVE_VERSION, newCardWeek, type GameState, getState, loadState } from '../../../src/core/state';
+import { CHALLENGE_EDITIONS, CHALLENGE_RATINGS, type ChallengeCall } from '../../../src/data/individualChallengeRules';
 import { challengeCheckpoint, initialChallengeProgress, resolveChallengeAction } from '../../../src/systems/individualChallengeEngine';
 import { clashFrame, LANE_MARKER, CLASH_DURATION } from '../../../src/scenes/individualChallengePresentation';
 import { buildIndividualChallengeCards, openIndividualChallenge } from '../../../src/ui/screens/individualChallenges';
@@ -61,6 +61,54 @@ it('publishes both editions in League, the actual entry comparison and the tie r
   select.value = state.squad.find(p=> !p.injuredWeeks && !p.suspendedWeeks)!.id;
   select.onchange!(new Event('change'));
   for (const term of ['Strength','Speed','Stamina','Footy IQ','Auto-coach title chance']) expect(page.words()).toContain(term);
+  expect(page.querySelector('[data-fatigue-event-preview]')).toBeNull();
+});
+
+function challengeCareer(week: number): GameState {
+  const file = new URL(`../../fixtures/saves/v34-challenges/v34-au-week-${week}.json`, import.meta.url);
+  return { ...JSON.parse(readFileSync(file, 'utf8')), version: SAVE_VERSION };
+}
+
+function showgroundTitle() {
+  const edition = CHALLENGE_EDITIONS.showground;
+  const booking = challengeCareer(edition.bookingEndWeek);
+  const event = challengeCareer(edition.eventWeek);
+  const athlete = booking.squad.find(p => !p.injuredWeeks && !p.suspendedWeeks
+    && event.squad.some(q => q.id === p.id && !q.injuredWeeks && !q.suspendedWeeks))!;
+  const book = changeChallenge(booking, 'showground', { kind: 'book', participantId: athlete.id });
+  if (!book.ok) throw Error(book.message);
+  const ratings = Object.fromEntries(CHALLENGE_RATINGS.map(key => [key, 100]));
+  const start = changeChallenge({
+    ...event,
+    squad: event.squad.map(p => p.id === athlete.id ? { ...p, stats: { ...p.stats, ...ratings } } : p),
+    competitions: { ...event.competitions!, individualChallenges: book.state.competitions!.individualChallenges! },
+  }, 'showground', { kind: 'start' });
+  if (!start.ok) throw Error(start.message);
+  const finish = changeChallenge(start.state, 'showground', { kind: 'finish' });
+  if (!finish.ok) throw Error(finish.message);
+  const settled = settleIndividualChallenge({ ...finish.state, week: edition.returnWeek });
+  expect(challengeQualified(settled)).toBe(true);
+  return settled.competitions!.individualChallenges!;
+}
+
+it.each(['showground', 'invitational'] as const)('forecasts the returning League fixture on the %s booking screen', editionId => {
+  const week = CHALLENGE_EDITIONS[editionId].bookingEndWeek;
+  const state = challengeCareer(week);
+  if (editionId === 'invitational') {
+    state.competitions = { ...state.competitions!, individualChallenges: showgroundTitle() };
+  }
+  const [player] = state.squad.filter(p => !p.injuredWeeks && !p.suspendedWeeks);
+  const cardWeek = { ...newCardWeek(855), weeklyFatigue: { [player!.id]: 100 } };
+  loadState({ ...state, cardWeek });
+  const d = openIndividualChallenge(editionId) as unknown as StubNode;
+  const select = d.querySelector('[data-challenge-player]') as unknown as HTMLSelectElement;
+  expect(select).not.toBeNull();
+  select.value = player!.id;
+  select.onchange!(new Event('change'));
+  expect(d.querySelector('[data-fatigue-event-preview]')?.words()).toMatch(/Fatigue \d+ → \d+ at the event\. Kicks off Round \d+ v .+ on \d+, at [\d.]+% energy/);
+  d.querySelector('[data-challenge-review]')!.click();
+  expect(d.querySelector('[data-fatigue-event-preview]')).not.toBeNull();
+  expect(d.querySelector('[data-challenge-confirm]')?.getAttribute('aria-describedby')).toBe('nrl-booking-fatigue');
 });
 
 function installCoaching() {

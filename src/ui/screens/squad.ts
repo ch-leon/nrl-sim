@@ -29,6 +29,9 @@ import { nextReservation, reservationText, tripLabel } from '../playerReservatio
 
 // ── Squad's segments ────────────────────────────────────────────────────────
 
+import { weeklyFatigueOf } from '../../systems/weeklyFatigue';
+import { appendFatigueBar, FATIGUE_LEGEND } from '../weeklyFatigue';
+
 export type SquadTab = 'squad' | 'lineup' | 'recruit';
 /** SuperCOOKED 30: Squad and Recruit, the screen's main switch (orange). The pitch is the lineup. */
 const SQUAD_TABS: readonly { id: 'squad' | 'recruit'; label: string; title: string }[] = [
@@ -288,6 +291,7 @@ function openSquadList(): void {
           row.setAttribute('aria-label', `${p.name}, ${absence}. Open player page.`);
           row.title = absence;
         }
+        if (s.cardWeek) appendFatigueBar(row, p, weeklyFatigueOf(s, p.id));
         list.append(row);
       }
     }
@@ -299,7 +303,8 @@ function openSquadList(): void {
   const turned = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => { if (list.clientWidth !== fitted) render(); }) : null;
 
   const head = screenHead('', { lead: [squadTabs('squad')], sub, controls: [squadViewSeg('list'), sort.button, squadMore()] });
-  const screen = el('div', { class: 'nrl-screen nrl-sq nrl-squad' }, head, list);
+  const screen = el('div', { class: 'nrl-screen nrl-sq nrl-squad' }, head,
+    ...(getState().cardWeek ? [el('p', { class: 'nrl-weekly-fatigue-heading', text: FATIGUE_LEGEND })] : []), list);
   // openScreen closes any other open screen (running its teardown) first.
   openScreen(screen, onSquadClosed, 'squad');
   render();

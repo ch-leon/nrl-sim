@@ -1,3 +1,4 @@
+import { weekHeld } from '../../core/time';
 import { portraitDataUrl } from '../../art/portrait';
 import { kitFromColors } from '../../art/match/kit';
 import { DEFAULT_PLAYER_COLORS } from '../../config';
@@ -19,6 +20,9 @@ import './individualChallenges.css';
 
 const editions = Object.values(CHALLENGE_EDITIONS);
 const crewKit = kitFromColors(['#b83e36','#fff2be'],'showground-crew');
+import { previewWeeklyFatigue } from '../../systems/fatiguePreview';
+import { fatigueBookingNote } from '../weeklyFatigue';
+
 const inWindow = (week: number, edition: ChallengeEdition) => week >= edition.bookingStartWeek && week <= edition.bookingEndWeek;
 const rivalClub = (s: GameState, id: string) => s.league.clubs.find(c => c.id === id)?.name ?? id;
 function control(label: string, key: string, fn: () => void, primary = false): HTMLButtonElement {
@@ -181,6 +185,8 @@ export function openIndividualChallenge(editionId: ChallengeEditionId, findOpene
       const cover=challengeCover(s,editionId,record.participantId);
       body.append(el('h3',{text:`${record.participantName} is booked`}),paragraph(`Misses Week ${edition.eventWeek} against ${rivalClub(s,record.opponentId)}. Back before Week ${edition.returnWeek}.`),
         paragraph(cover.reason ? `Starting will cancel this entry. ${cover.reason}` : (cover.cover ? `${cover.cover.name} covers the ${cover.role} place.` : 'The starting side and bench have cover.')),guide(edition));
+      const fatigue = bookingFatigue(s, record.participantId);
+      if (fatigue) body.append(fatigue);
       if (s.week===edition.eventWeek) actions.append(control('Withdraw','withdraw',()=>inspect({kind:'withdraw'})),control('Start contest','start',()=>run({kind:'start'}),true));
       else actions.append(control('Cancel booking','cancel',()=>inspect({kind:'cancel'})));
     } else if (record && ['ready-for-interval','completed','interrupted'].includes(record.status)) {
@@ -198,8 +204,13 @@ export function openIndividualChallenge(editionId: ChallengeEditionId, findOpene
     if (previous.length) body.append(el('details',{},el('summary',{text:'Past contests'}),...previous.map(r=>report(r,r.contest?.edition ?? edition,challengeQualified(s)))));
   }
   function confirmation(): void {
-    actions.append(control('Back','back',()=>{review=null;render();body.focus();}),
-      control(review?.action.kind==='finish' ? 'Confirm finish' : review?.action.kind==='book' ? 'Confirm booking' : 'Confirm','confirm',()=>{ if(review) void submit(review); },true));
+    const confirm = control(review?.action.kind==='finish' ? 'Confirm finish' : review?.action.kind==='book' ? 'Confirm booking' : 'Confirm','confirm',()=>{ if(review) void submit(review); },true);
+    const previewId = body.querySelector('[data-fatigue-event-preview]')?.getAttribute('id');
+    if (previewId) confirm.setAttribute('aria-describedby', previewId);
+    actions.append(control('Back','back',()=>{review=null;render();body.focus();}), confirm);
+  }
+  function bookingFatigue(s: GameState, id: string): HTMLElement | undefined {
+    return fatigueBookingNote(previewWeeklyFatigue(s, { week: edition.eventWeek, playerId: id }, weekHeld()), id);
   }
   function renderOffer(s: GameState): void {
     const locked=edition.requiresFirstTitle && !challengeQualified(s);
@@ -225,6 +236,8 @@ export function openIndividualChallenge(editionId: ChallengeEditionId, findOpene
       el('details',{},el('summary',{text:'How this is estimated'}),paragraph(`Exact chance from the public ratings, rival plans and auto-coach policy: ${exactPercent(preview.titleProbability)}. Recalculated at departure.`)),
       paragraph(`Misses Week ${edition.eventWeek} against ${rivalClub(s,preview.opponentId)}. ${preview.cover ? preview.cover.name+' covers the '+preview.role+' place.' : 'Reserve · usual matchday places remain covered.'}`),
       paragraph(`Completion ${edition.completionXp} base XP · Title adds ${edition.winnerXp} base XP and ${money(edition.winnerCash)} for your club. Replaces the interval’s training.`)));
+    const fatigue = bookingFatigue(s, playerId);
+    if (fatigue) body.append(fatigue);
     if (review) confirmation();
     else actions.append(control('Review booking','review',()=>inspect({kind:'book',participantId:playerId}),true));
   }

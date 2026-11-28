@@ -3,7 +3,7 @@ import { vi, afterEach } from 'vitest';
 import { coachDocument } from './coachDom';
 import type { StubNode } from './stubDom';
 import { closeModal } from '../../src/ui/dom';
-import { openWeekSummary } from '../../src/ui/weekSummary';
+import { fatigueCrossingLines, initWeekSummary, openWeekSummary } from '../../src/ui/weekSummary';
 import { coachSays } from '../../src/ui/coachSays';
 import { summaryRemark, SUMMARY_REMARKS } from '../../src/ui/coachVoice';
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -11,7 +11,8 @@ import {
   weekSummary, weekSnapshot, boardMood, capList, sidelineLines, fmtSigned, summaryCanShow, TOP_GAINS, SIDELINE_MAX,
   type WeekSnapshot,
 } from '../../src/ui/weekSummary';
-import { createNewGame, getState, FINANCE_LINES, type FinanceLine, type PlayerStats } from '../../src/core/state';
+import { createNewGame, getState, newCardWeek, setState, FINANCE_LINES, type FinanceLine, type PlayerStats } from '../../src/core/state';
+import { applyMatchWeeklyFatigue, recoverWeeklyFatigue } from '../../src/systems/weeklyFatigue';
 import { initLeague } from '../../src/systems/fixtures';
 import { bus } from '../../src/core/events';
 import { BOARD } from '../../src/config';
@@ -258,4 +259,45 @@ describe('weekly Coach says (#477)', () => {
     expect(card.textContent).toContain(summaryRemark(v));
     expect(card.textContent).not.toContain('Opponent next.');
   });
+});
+
+
+it('names both directions of strict fatigue crossings, including recovery back to the line', () => {
+  const state = createNewGame('Crossing FC', 855);
+  const player = state.squad[0]!;
+  const withFatigue = (points: number) => ({ ...state, cardWeek: { ...newCardWeek(855), weeklyFatigue: { [player.id]: points } } });
+  expect(fatigueCrossingLines(withFatigue(59), withFatigue(60))).toEqual([]);
+  expect(fatigueCrossingLines(withFatigue(60), withFatigue(61))).toEqual([`${player.name} rose above 60 fatigue`]);
+  expect(fatigueCrossingLines(withFatigue(79), withFatigue(80))).toEqual([]);
+  expect(fatigueCrossingLines(withFatigue(80), withFatigue(81))).toEqual([`${player.name} rose above 80 fatigue`]);
+  expect(fatigueCrossingLines(withFatigue(81), withFatigue(60))).toEqual([`${player.name} recovered to or below 60 and 80 fatigue`]);
+  expect(fatigueCrossingLines(state, state)).toEqual([]);
+});
+
+
+it('shows recovery and match crossings when one committed week crosses the same line twice', () => {
+  const root = coachDocument();
+  vi.useFakeTimers();
+  const state = createNewGame('Crossing FC', 855);
+  const player = state.squad[0]!;
+  setState({ week: 5, cardWeek: { ...newCardWeek(855), weeklyFatigue: { [player.id]: 75 } } });
+  const summary = initWeekSummary({ onAdvance: () => {}, runwayWeeks: () => null });
+  try {
+    const rested = recoverWeeklyFatigue(getState());
+    setState({ cardWeek: rested.cardWeek! });
+    const played = applyMatchWeeklyFatigue(getState(), true, [player.id], []);
+    setState({ cardWeek: played.cardWeek!, week: 6 });
+    bus.emit('week:advanced', { week: 6, season: 1 });
+    vi.advanceTimersByTime(1);
+    const card = root.querySelector('[data-week-summary]')!;
+    expect(card.querySelectorAll('[data-fatigue-crossing]').map(line => line.words().trim())).toEqual([
+      `${player.name} recovered to or below 60 fatigue`,
+      `${player.name} rose above 60 and 80 fatigue`,
+    ]);
+  } finally {
+    summary.destroy();
+    closeModal();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  }
 });

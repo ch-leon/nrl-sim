@@ -203,6 +203,7 @@ export function openOpenCupEntry(findOpener?: () => HTMLElement | null): HTMLEle
     ...(cup ? [bracket(state, cup)] : []),
     ...(offer.lifecycle === 'unavailable' ? [] : [terms(offer)]));
     if (offer.canChoose) {
+      if (state.cardWeek) detail.append(el('p', { text: 'Choose your side and preview player fatigue in Lineup before each Cup tie.' }));
       actions.append(makeAction('Decline cup', 'decline', false, offer.choice === 'decline'),
         makeAction('Enter cup', 'enter', true, offer.choice === 'enter'));
     } else if (offer.canWithdraw && withdrawalArmed) {

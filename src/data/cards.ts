@@ -63,6 +63,14 @@ export const WEEKLY_FATIGUE = {
   INJURY_TIERS: [{ above: 80, factor: 2 }, { above: 60, factor: 1.5 }],
 } as const;
 
+export function weeklyFatigueStartingEnergy(fatigue: number): number {
+  return 1 - fatigue * WEEKLY_FATIGUE.ENERGY_LOSS_PER_POINT;
+}
+
+export function weeklyFatigueInjuryTier(fatigue: number) {
+  return WEEKLY_FATIGUE.INJURY_TIERS.find(t => fatigue > t.above);
+}
+
 /**
  * How far above the card floor (the club's best natural player at the position,
  * systems/cardWeek.ts cardFloor) a player card's man is generated, in overall
