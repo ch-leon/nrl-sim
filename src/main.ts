@@ -523,7 +523,14 @@ async function boot(): Promise<void> {
     if (state.season === 1 && !state.settings.hintsSeen?.includes(EXPANSION_INTRO_HINT)) {
       for (const text of expansionIntroLines(state, state.objectives))
         bus.emit('ui:notify', { text, kind: 'info', quiet: true, from: 'coach' });
-      await showExpansionIntro();
+      const intro = showExpansionIntro();
+      // The intro is fully opaque. Skip drawing the running Grounds scene
+      // underneath it, without pausing Phaser or changing its input/rotation.
+      const grounds = g.scene.getScene('Grounds');
+      const hidden = grounds?.sys.isActive() && grounds.sys.isVisible();
+      if (hidden) grounds.sys.setVisible(false);
+      try { await intro; }
+      finally { if (hidden) grounds.sys.setVisible(true); }
       if (location.search.includes('?e2e')) performance.mark('nrl-739:intro-dismissed');
     }
     if (stateInstallation() === installation && !getState().sacked && !weekHeld()) startTutorial();
