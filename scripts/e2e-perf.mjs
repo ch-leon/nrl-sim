@@ -86,7 +86,7 @@ async function startServer() {
   if (EXTERNAL) return;
   log('building…');
   await new Promise((res, rej) => {
-    const b = spawn('npx', ['vite', 'build', '--outDir', DIST, '--emptyOutDir', '--logLevel', 'warn'], { stdio: 'inherit' });
+    const b = spawn('npx', ['vite', 'build', '--sourcemap', '--outDir', DIST, '--emptyOutDir', '--logLevel', 'warn'], { stdio: 'inherit' });
     b.on('exit', (code) => (code === 0 ? res() : rej(new Error(`vite build failed (${code})`))));
   });
   server = spawn('npx', ['vite', 'preview', '--outDir', DIST, '--port', String(PORT), '--strictPort'], { stdio: 'pipe', detached: true });
@@ -103,6 +103,12 @@ function stopServer() {
 // ── Measurements ───────────────────────────────────────────────────────────────
 const result = { throttle: THROTTLE, size: `${W}x${H}`, dpr: DPR, timings: {}, errors: [], bundle: null };
 let page;
+let traceSession;
+const phaseTimes = {};
+async function notePhase(label) {
+  phaseTimes[label] = await pageNow();
+  log('STARTUP PHASE', label, JSON.stringify(phaseTimes[label]));
+}
 const state = () => page.evaluate(() => window.__nrlState?.() ?? null);
 const wait = (ms) => page.waitForTimeout(ms);
 const toastsGone = () => page.waitForFunction(() => document.querySelectorAll('.nrl-toast').length === 0, null, { timeout: 8000 }).catch(() => {});
@@ -145,6 +151,9 @@ let handlerMax = 0;
  * longest main-thread block. A number returned by `fn` replaces the wall clock.
  */
 async function timed(name, fn) {
+  // Diagnostic branch only. Sampling can change wall timings; do not use this run as a gate pass.
+  const profile = /Start → grounds|Advance Week → match scene|×4 advance #3|to finals \(call [1-3]\)/.test(name);
+  if (profile) await traceSession.send('Profiler.start');
   const t0 = Date.now();
   handlerMax = 0;
   const p0 = await pageNow();
@@ -158,6 +167,20 @@ async function timed(name, fn) {
   // A navigation inside the moment starts a new page clock: count from its start.
   const from = p0 && p1 && p0[0] === p1[0] ? p0[1] : 0;
   const blockMs = Math.max(handlerMax, p1 === null ? 0 : await longestTask(from, p1[1]).catch(() => 0));
+  if (profile) {
+    const cpu = await traceSession.send('Profiler.stop');
+    const longTasks = await page.evaluate(() => window.__nrlLongTasks);
+    const codeFiles = [...new Set(cpu.profile.nodes.map(({callFrame}) => callFrame.url)
+      .filter((url) => url.includes('/assets/') && url.endsWith('.js'))
+      .map((url) => new URL(url).pathname.split('/').pop()))];
+    // Save the exact maps beside the raw Chrome profiles for source attribution.
+    for (const file of codeFiles) {
+      try { writeFileSync(join(OUT, file + '.map'), readFileSync(join(DIST, 'assets', file + '.map'))); }
+      catch (error) { if (error.code !== 'ENOENT') throw error; }
+    }
+    writeFileSync(join(OUT, name.replace(/[^a-z0-9]/gi, '_') + '.profile.json'),
+      JSON.stringify({ cpu, longTasks, p0, p1, phaseTimes }));
+  }
   result.timings[name] = { ms, blockMs, ...(notes ? { notes } : {}) };
   log(`${String(ms).padStart(6)} ms  ${name}  [block ${blockMs} ms]${notes ? `  (${notes})` : ''}`);
   return ms;
@@ -336,6 +359,9 @@ async function run() {
   page.on('pageerror', (e) => result.errors.push(`pageerror: ${e.message}`));
   page.on('console', (m) => { if (m.type() === 'error') result.errors.push(`console: ${m.text()}`); });
   const cdp = await ctx.newCDPSession(page);
+  traceSession = cdp;
+  await cdp.send('Profiler.enable');
+  await cdp.send('Profiler.setSamplingInterval', { interval: 1000 });
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: THROTTLE });
 
   await timed('load → title', async () => {
@@ -352,12 +378,17 @@ async function run() {
   await timed('Start → grounds (textures painted, HUD up)', async () => {
     // Start is disabled ("Loading towns…") until the town list is in (#613); a DOM click before that does nothing.
     await page.waitForFunction(() => !document.querySelector('[data-nrl-start]')?.disabled);
+    await notePhase('before Start');
     await clickTimed('[data-nrl-start]');
     await page.locator('[data-nrl-league-selection]').waitFor({ timeout: 60000 });
+    await notePhase('league picker visible');
     await page.locator('[data-nrl-league-confirm]').click();
     await page.locator('[data-nrl-league-selection]').waitFor({ state: 'detached', timeout: 60000 });
+    await notePhase('league picker closed');
     await page.locator('[data-expansion-work]').tap();
+    await notePhase('intro dismissed');
     await page.waitForFunction(() => document.querySelector('.nrl-dock') && window.__nrlGame?.scene.isActive('Grounds'));
+    await notePhase('grounds active and dock mounted');
   });
   if (await page.locator('.nrl-tutorial-skip').count()) await page.locator('.nrl-tutorial-skip').tap();
   await wait(500);
