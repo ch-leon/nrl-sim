@@ -1,6 +1,7 @@
 // A repeat one-on-one is said by the playback, and a tactic counter on a tagged
-// clean bust is still heard (#468, #662). The seeds below are the first the
-// search found, stepping the live playback from kick-off.
+// clean bust is still heard (#468, #662, #815). Step live playback from kick-off
+// with rating 70 and clear weather: search seeds 1–8 for the first counter on a
+// first win, and seeds 1–12 for the first later repeat with the counter intact.
 import { describe, expect, it } from 'vitest';
 import type Phaser from 'phaser';
 import { LivePlayback, type LivePlaybackScene } from '../../../src/match/view/livePlayback';
@@ -33,6 +34,7 @@ function hear(home: Partial<TeamTactics>, away: Partial<TeamTactics>, seed: numb
   const overlay = {
     setTackle() {}, setClock() {}, offerReplay() {}, setScore() {},
     comment(text: string, weight: string = 'routine', follow = false) { heard.push({ text, weight, follow }); },
+    commentRun(lines: readonly string[]) { lines.forEach((text, i) => heard.push({ text, weight: 'held run', follow: i > 0 })); },
   } as unknown as MatchOverlayHandle;
   const pb = new LivePlayback(fakeScene(), {
     home: sideSheet('H', { rating: 70, tactics: home }),
@@ -81,14 +83,14 @@ describe('a tactic counter survives a tagged clean bust', () => {
     expect(heard.map(h => h.text)).toEqual(['Expansive breaks the Compressed line.']);
   });
 
-  it('appends a second win after the counter and holds the strip for that win only', () => {
+  it('sends the counter and a repeat as one held run on both second and later wins', () => {
     const second = hear(ALL_OUT, SLIDE, 4, 3287);
     expect(second.heard.map(h => h.text)).toEqual([
       'All-out finds a gap in Slide.',
       'H five-eighth 4 busts through A five-eighth 4 again!',
     ]);
-    expect(second.heard[0]).toMatchObject({ weight: 'routine', follow: false });
-    expect(second.heard[1]).toMatchObject({ weight: 'important', follow: true });
+    expect(second.heard[0]).toMatchObject({ weight: 'held run', follow: false });
+    expect(second.heard[1]).toMatchObject({ weight: 'held run', follow: true });
 
     // Seeds 1–12, rating 70, All-out v Slide: the first later repeat that keeps a counter
     // line is seed 12 at tick 4390. With the shift off, seed 2 at 5898 is still the
@@ -98,7 +100,7 @@ describe('a tactic counter survives a tagged clean bust', () => {
       'All-out breaks through Slide.',
       'H prop 7 busts through A five-eighth 4 for win number 3!',
     ]);
-    expect(later.heard[1]).toMatchObject({ weight: 'routine', follow: true });
+    expect(later.heard[1]).toMatchObject({ weight: 'held run', follow: true });
     const shiftOff = applyTuning({ 'shapes.openSide.on': 0 });
     try {
       const old = hear(ALL_OUT, SLIDE, 2, 5898);
@@ -106,7 +108,7 @@ describe('a tactic counter survives a tagged clean bust', () => {
         'All-out finds a gap in Slide.',
         'H halfback 5 busts through A hooker 6 for win number 4!',
       ]);
-      expect(old.heard[1]).toMatchObject({ weight: 'routine', follow: true });
+      expect(old.heard[1]).toMatchObject({ weight: 'held run', follow: true });
     } finally { shiftOff(); }
   });
 });

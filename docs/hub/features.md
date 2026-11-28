@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- **Match commentary gives the tactical read time to land.** When the same player beats his opponent again, the strip lets you read the tactic counter first, then shows the repeat. Both lines still go in the full log. [#815](https://github.com/ch-leon/nrl-sim/issues/815).
+
 - **Card week faces say what you would get.** A player card names your best man at his position and how much better the new man is at that card's level; the dilemma shows board patience before and after; a trait card says what it does and who it suits, and its player list shows each man's step (I → II); a staff card says what the job does, the weekly wage at that card's level and the fee saved; an attack coach lists the plays he opens; a set play says what the play is and what it saves. Held cards in Cards show the same. [Card week rules](../specs/846-card-week.md#the-pick-screen).
 
 - **Weekly fatigue in Card week.** League appearances add tiredness, bonus events can slow recovery, and tired players start with less energy and a higher injury risk. [Card week rules](../specs/846-card-week.md#weekly-fatigue).

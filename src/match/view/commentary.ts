@@ -270,7 +270,7 @@ export function isImportantKey(key: string, detail?: string): boolean {
 export interface Said {
   text: string;
   important: boolean;
-  /** A tactic-counter read (#468). The strip does not hold it, and a repeat duel is said after it. */
+  /** A tactic-counter read (#468). Usually routine; held when a repeat duel follows it (#815). */
   counter?: boolean;
   /** The coach's set play just came off (#825). The playback's pay-off reads this; the sim does not. */
   playHit?: PlayHit;

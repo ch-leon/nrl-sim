@@ -22,6 +22,7 @@ import {
 } from '../../../src/ui/screens/matchOverlay';
 import { NINES } from '../../../src/match/league/rules';
 import { REPLAY_OFFER_MS } from '../../../src/match/view/replay';
+import { STRIP_HOLD_MS } from '../../../src/match/view/stripHold';
 import type { MatchEvent, TeamSheet } from '../../../src/sim/events';
 
 /** Layout reads (clientHeight, scrollHeight, clientWidth) since the last reset. */
@@ -406,5 +407,67 @@ describe('the commentary line’s fitter (#433, #602)', () => {
     nextFrame();
     nextFrame();
     expect(layoutReads).toBe(0);
+  });
+});
+
+describe('the tactical counter and repeat duel on the actual strip (#815)', () => {
+  const pairs = [
+    // All-out v Slide, seeds 4 and 12; the playback tests pin both exact passages.
+    ['All-out finds a gap in Slide.', 'H five-eighth 4 busts through A five-eighth 4 again!'],
+    ['All-out breaks through Slide.', 'H prop 7 busts through A five-eighth 4 for win number 3!'],
+    // The later repeat still waits with the open-side shift off.
+    ['All-out finds a gap in Slide.', 'H halfback 5 busts through A hooker 6 for win number 4!'],
+  ] as const;
+  const tick = () => one('.nrl-mo-strip-text').textContent;
+  const log = () => all('.nrl-mo-line-text').map((n) => n.textContent);
+
+  it.each(pairs)('lets the reader see %s before %s, and logs both', (read, repeat) => {
+    const o = mountLive();
+    o.commentRun([read, repeat]);
+    expect(tick()).toBe(read);
+    expect(log()).toEqual([repeat, read]);
+    o.comment('Quick play-the-ball.');
+    vi.advanceTimersByTime(STRIP_HOLD_MS - 1);
+    expect(tick()).toBe(read);
+    vi.advanceTimersByTime(1);
+    expect(tick()).toBe(repeat);
+    o.comment('Another tackle.');
+    expect(tick()).toBe(repeat);
+    vi.advanceTimersByTime(STRIP_HOLD_MS);
+    o.comment('Ordinary commentary resumes.');
+    expect(tick()).toBe('Ordinary commentary resumes.');
+  });
+
+  it('preserves the live score and a score line already waiting, without counting the pair twice', () => {
+    const o = mountLive();
+    const [read, repeat] = pairs[0];
+    o.comment('TRY! Alex One.', 'important');
+    emit('try', H, { player: 'Alex One' });
+    expect(one('.nrl-mo-scoreboard').textContent).toContain('4');
+    o.comment('TRY! Max Two.', 'important');
+    emit('try', A, { player: 'Max Two' });
+    o.commentRun([read, repeat]);
+    expect(tick()).toBe('TRY! Alex One.');
+    expect(all('.nrl-mo-line').filter((n) => n.dataset.kind === 'score try').map((n) => n.textContent))
+      .toEqual([expect.stringContaining('Max Two'), expect.stringContaining('Alex One')]);
+    vi.advanceTimersByTime(STRIP_HOLD_MS);
+    expect(tick()).toBe('TRY! Max Two.');
+    vi.advanceTimersByTime(STRIP_HOLD_MS);
+    expect(tick()).toBe(read);
+    vi.advanceTimersByTime(STRIP_HOLD_MS);
+    expect(tick()).toBe(repeat);
+  });
+
+  it('lets a hard-priority line take over while preserving the log', () => {
+    const o = mountLive();
+    const [read, repeat] = pairs[0];
+    o.commentRun([read, repeat]);
+    o.comment('Full time.', 'now');
+    expect(tick()).toBe('Full time.');
+    vi.advanceTimersByTime(2 * STRIP_HOLD_MS);
+    expect(tick()).toBe('Full time.');
+    expect(log()).toEqual(['Full time.', repeat, read]);
+    o.comment('Ordinary line.');
+    expect(tick()).toBe('Ordinary line.');
   });
 });
