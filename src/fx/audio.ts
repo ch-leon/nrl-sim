@@ -1297,8 +1297,7 @@ export function initAudioUi(): () => void {
   };
   syncInstallVisibility();
   if (typeof window !== 'undefined') {
-    // initAudioUi runs before initPwa, so these fire before pwa.ts updates its
-    // deferred prompt — defer one task so canInstall() reads the new value.
+    // Let pwa.ts update the deferred prompt before reading canInstall().
     window.addEventListener('beforeinstallprompt', () => setTimeout(syncInstallVisibility, 0));
     window.addEventListener('appinstalled', () => setTimeout(syncInstallVisibility, 0));
   }
@@ -1398,8 +1397,7 @@ export function initAudioUi(): () => void {
   );
 
   // Developer settings (was Labs: match controls, Leon, 30 Oct; #519). Load the sheet only when opened.
-  const labs = button('Developer settings', () => { void import('../labs/panel').then((m) => m.openLabsPanel()); }, { class: 'nrl-audio-row nrl-labs-open' });
-  labs.style.minHeight = '44px';
+  const labs = developerSettingsButton();
   ensureAudioStyles();
   return () => {
     syncUnlocks();
@@ -1416,6 +1414,34 @@ export function initAudioUi(): () => void {
 }
 
 const SETTINGS_MODAL = { class: 'nrl-settings-modal', region: true, closeButton: true };
+
+function developerSettingsButton(onRemove?: () => void): HTMLButtonElement {
+  const labs = button('Developer settings', () => {
+    void import('../labs/panel').then((m) => {
+      if (labs.isConnected) m.openLabsPanel(onRemove);
+    });
+  }, { class: 'nrl-audio-row nrl-labs-open' });
+  labs.style.minHeight = '44px';
+  return labs;
+}
+
+/** Settings available before a slot has been picked. */
+export function openTitleSettings(onRemove?: () => void): void {
+  ensureAudioStyles();
+  const content = el('div', { class: 'nrl-audio-settings' },
+    el('div', { class: 'nrl-audio-title nrl-settings-head' }, el('h2', { text: 'Settings' })),
+    el('p', { class: 'nrl-settings-text', text: 'Career options are in Office Settings once a career is open.' }));
+  if (devSettingsEntryVisible()) content.append(developerSettingsButton(onRemove));
+  if (canInstall()) {
+    const install = button('Install app', () => {
+      void promptInstall();
+      installRow.remove();
+    }, { class: 'nrl-audio-install nrl-btn-outline' });
+    const installRow = el('div', { class: 'nrl-audio-row nrl-audio-btnrow nrl-audio-install-row' }, install);
+    content.append(installRow);
+  }
+  openModal(content, { ...SETTINGS_MODAL, ...(onRemove ? { onRemove } : {}) });
+}
 
 /** Office's Settings tile: "Sound on", "Muted". */
 export function soundStatus(settings: Pick<GameState['settings'], 'muted' | 'volume'>): string {

@@ -206,10 +206,10 @@ ${MOTION_CSS}
 
 /* A new club (SuperCOOKED 12–14): the head with ◂ Back and the step bar, the step, and the foot with Next or Start. */
 .nrl-title-main-setup { flex: 1 1 auto; min-height: 0; max-height: 36rem; gap: 12px; }
-.nrl-title-head { display: flex; align-items: center; gap: 12px; }
+.nrl-title-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .nrl-title-head .nrl-title-btn { flex: 0 0 auto; font-size: 0.8125rem; padding: 0 12px; }
 .nrl-title-head h2 { margin: 0; font-family: 'Archivo Black', 'Arial Black', sans-serif; font-size: 1.25rem; font-weight: 400; line-height: 1.1;
-  letter-spacing: -0.02em; text-transform: uppercase; flex: 1; min-width: 0; }
+  letter-spacing: -0.02em; text-transform: uppercase; flex: 1 0 auto; }
 .nrl-title-slottag { margin-left: 0.5em; white-space: nowrap; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.625rem; letter-spacing: 0.14em; color: ${C.muted}; }
 .nrl-title-steps { display: flex; gap: 6px; flex: 0 0 auto; }
 .nrl-title-stepchip { display: flex; align-items: center; min-height: 1.875rem; padding: 0 12px; border-radius: 999px; white-space: nowrap;
@@ -361,7 +361,6 @@ ${MOTION_CSS}
   .nrl-title-main-slots { flex-direction: column; align-items: stretch; gap: 16px; }
   .nrl-title-brand { flex: 0 0 auto; }
   .nrl-title-side { flex: 0 0 auto; }
-  .nrl-title-head { flex-wrap: wrap; }
   .nrl-title-panel-club { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
   .nrl-title-kit { flex-direction: row; }
   .nrl-title-kit img { width: 48px; height: 52px; }
@@ -493,6 +492,16 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
     const build = mk('div', 'nrl-title-build', `Build ${buildLabel()}`);
     build.setAttribute('data-nrl-build', '');
     overlay.appendChild(build);
+
+    const settingsButton = (onRemove?: () => void): HTMLButtonElement => {
+      const settings = mkButton('Settings', 'data-nrl-settings', 'nrl-title-btn-small');
+      settings.addEventListener('click', () => {
+        void import('../fx/audio').then((m) => {
+          if (settings.isConnected) m.openTitleSettings(onRemove);
+        });
+      });
+      return settings;
+    };
 
     let settled = false;
     const finish = (slot: number, choice: TitleChoice): void => {
@@ -645,6 +654,7 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
         });
       });
       foot.appendChild(importBtn);
+      foot.appendChild(settingsButton());
       // #364: the full game and "Already bought? Log in", with the commercial flag on only.
       if (commercialEnabled()) {
         const buy = mk('div', 'nrl-title-buy');
@@ -671,6 +681,7 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
       const head = mk('div', 'nrl-title-head');
       const back = mkButton('◂ Back', 'data-nrl-back');
       head.appendChild(back);
+      head.appendChild(settingsButton(() => refreshCardWeek()));
       const title = mk('h2', 'nrl-title-step');
       title.appendChild(mk('span', '', 'New club'));
       title.appendChild(mk('span', 'nrl-title-slottag', `Slot ${s.slot}`));
@@ -900,16 +911,22 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
       veteranRow.appendChild(mk('span', '', "I've played before: open every building and Office tile now"));
       foot.appendChild(veteranRow);
       // Card week (#846): a Labs test, offered on a League career only while its switch is on.
-      const cardWeek = experimentOn('card-week') ? mk('input', '') : null;
-      const cardWeekRow = cardWeek ? mk('label', 'nrl-title-veteran') : null;
-      if (cardWeek && cardWeekRow) {
-        cardWeek.type = 'checkbox';
-        cardWeek.setAttribute('data-nrl-card-week', '');
-        cardWeekRow.appendChild(cardWeek);
-        cardWeekRow.appendChild(mk('span', '', 'Card week (test): pick a card after each League match'));
-        foot.appendChild(cardWeekRow);
-      }
+      const cardWeek = mk('input', '');
+      cardWeek.type = 'checkbox';
+      cardWeek.setAttribute('data-nrl-card-week', '');
+      const cardWeekRow = mk('label', 'nrl-title-veteran');
+      cardWeekRow.appendChild(cardWeek);
+      cardWeekRow.appendChild(mk('span', '', 'Card week (test): pick a card after each League match'));
+      const refreshCardWeek = (): void => {
+        if (experimentOn('card-week')) {
+          if (!cardWeekRow.parentNode) foot.insertBefore(cardWeekRow, build);
+        } else {
+          cardWeek.checked = false;
+          cardWeekRow.remove();
+        }
+      };
       foot.appendChild(build);
+      refreshCardWeek();
       const next = mkButton('Next ▸', 'data-nrl-next', 'nrl-title-btn-go');
       foot.appendChild(next);
       const go = mk('div', 'nrl-title-go');
@@ -1060,7 +1077,7 @@ export function showTitleFlow(root: HTMLElement, error?: string): Promise<TitleC
         const home = selected
           ? { town, region: selected.region, country: selected.country, lat: selected.lat, lon: selected.lon }
           : { town };
-        finish(s.slot, { mode: 'new', careerMode: 'league', destination, seed, clubName: name, ...(coach.ok ? { coachName: coach.name } : {}), difficulty, ...(veteran.checked ? { openAll: true } : {}), ...(cardWeek?.checked ? { cardWeek: true } : {}), colors: [primary, secondary],
+        finish(s.slot, { mode: 'new', careerMode: 'league', destination, seed, clubName: name, ...(coach.ok ? { coachName: coach.name } : {}), difficulty, ...(veteran.checked ? { openAll: true } : {}), ...(cardWeek.checked ? { cardWeek: true } : {}), colors: [primary, secondary],
           home, groundName: groundName.ok ? groundName.name : groundForTown(town || name, selected?.id ?? town) });
       };
       // Start waits for the town list, and says so while it does (#613).

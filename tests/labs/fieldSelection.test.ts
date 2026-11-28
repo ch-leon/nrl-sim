@@ -4,7 +4,7 @@ import { applyFieldLength, resetFieldSelection, type FieldSelectionDeps, type Fi
 import { setMatchSceneProbe, type MatchProbe, type SwitchResult } from '../../src/labs/devCareer';
 import { LABS_KEY, slotKey } from '../../src/core/storageKeys';
 import { __flushSaveMeta, __setStorage, __unlockSaves, save, setActiveSlot } from '../../src/core/save';
-import { createNewGame, getState, setState } from '../../src/core/state';
+import { createNewGame, getState, hasCareer, setState } from '../../src/core/state';
 
 const idle: MatchProbe = { held: false, parked: false, resumable: false, advancing: false, matchScene: false };
 let stored: Map<string, string>;
@@ -65,6 +65,17 @@ describe('applying the field experiment', () => {
     expect(applyFieldLength(80, d)).toMatchObject({ ok: false, why: expect.stringMatching(/couldn't be saved/) });
     expect(d.reload).not.toHaveBeenCalled();
     expect(fieldLengthPreference()).toBe(100);
+  });
+
+  it('the actual Apply action persists the field preference from the title', () => {
+    expect(hasCareer()).toBe(false);
+    const reload = vi.fn();
+    vi.stubGlobal('location', { search: '', reload });
+
+    expect(applyFieldLength(80)).toEqual({ ok: true });
+    expect(JSON.parse(stored.get(LABS_KEY)!).fieldLength).toBe(80);
+    expect([...stored.keys()]).toEqual([LABS_KEY]);
+    expect(reload).toHaveBeenCalledOnce();
   });
 
   it('the actual Apply action saves unsaved progress before the reload', () => {
