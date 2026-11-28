@@ -180,3 +180,56 @@ Only real soak problems retain its existing nonzero exit. Do not refresh a
 checked baseline to conceal a regression; inspect the report and leave balance
 retunes to follow-up work. This baseline is measurement evidence, not a target
 for how strong each persona should be.
+
+
+## Normal League and Card Week (#857)
+
+The existing Classic command and its baselines are unchanged. For a matched
+comparison use both of these commands with the same seeds, packs and difficulties:
+
+```bash
+npm run soak -- --personas all --career-mode league --pack au --difficulties normal --seasons 1 --seeds 1 --jobs 2 --json work/league-off.json
+npm run soak -- --personas all --card-week --pack au --difficulties normal --seasons 1 --seeds 1 --jobs 2 --json work/league-on.json
+```
+
+Both arms use the same normal slot, initial division, calendar and ordinary
+persona decisions. Annual choices retain the starting division to avoid comparing
+different grades after promotion. Each season starts and ends with a production
+slot save/import that must reload without repairs. These commands have their own
+JSON and Markdown outputs; Classic baselines and diary options do not apply.
+
+- Bots resolve opening picks (one keep), match picks (two) and Decrees (one),
+  using real pick and hand actions, skipping refused choices and passing only
+  when no suitable action can be taken. Decrees take effect on selection. The
+  min-maxer ranks visible player improvements, useful recovery, liquidity,
+  suitable traits, set plays and staff. Casual and newcomer prefer the first
+  available card. Careless evaluates visible value on a good roll and shuffles
+  on a slip. All slips use the existing persona mistake rates on a separate
+  seeded stream, so more card choices do not reshuffle the ordinary policy.
+- Before a match, min-maxer benches tired starters above 40, casual above 60,
+  newcomer above 80, and careless never rests anyone. A starter rests only
+  when there is a fit, fresher replacement; the bot can miss a change at its
+  usual mistake rate. If a legal fatigue recovery card can help a starter
+  above 60, it is played; a legal injury repair is used on the longest injury.
+  A card not immediately useful can be held. A full hand can be cleared to
+  leave room for the next pick.
+- Both arms try Skills Camp using the same preferred order; Card Week skips
+  anyone above that persona's rest threshold. They do not enter Open Cup or
+  the individual challenge editions in this baseline, so this is not evidence
+  about a calendar with all optional events switched on.
+- Saved fixture IDs pair kick-off and full-time observations; trials, League
+  rounds, League finals, other tournaments and forfeits remain separate.
+  Forfeits count in the saved League record, but never in the kick-off fatigue
+  denominator. Starter fatigue is measured after passive recovery, at the real
+  kick-off. Injuries are in-game own-player match injuries; hurt player-weeks
+  count squad members still injured after weekly treatment, not the sum of
+  estimated absence at the time the injuries happened. Cash at round 7 is after
+  that League fixture settles, not calendar week 7. Round-7 cash is null if
+  the career did not reach it.
+- The season row reports League wins/draws/losses, ladder, strikes, board
+  patience, injuries, hurt player-weeks, bonus entries, cards kept and played
+  by kind, recoveries, and distinct card IDs first reaching level III. Raw
+  rows include the calendar week and regular League rounds already completed
+  at each level III transition, to distinguish mid-season from a late upgrade.
+  Partial and sacked careers are visibly separate endpoints. The report does
+  not change any tuning or claim balance from a one-seed smoke run.

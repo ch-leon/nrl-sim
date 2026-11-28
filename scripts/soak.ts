@@ -13,6 +13,8 @@
 //                                        rating the wins ÷ games and the break-rule switches (N14.2)
 //   npm run soak -- --tune pace.extraPerStat=0.045   a match knob overridden by name for the whole run, as the
 //                                        balance harness names it (repeatable; #322)
+//   npm run soak -- --personas all --card-week   normal League career with the Card Week extension
+//   npm run soak -- --personas all --career-mode league   matched normal League control, no cards
 //   npm run soak -- --career-agency --jobs 4   fixed 44-seed, two-season AU Normal managed/idle gate
 //
 // Since the switch-over to the live match sim (BAK-207 Phase 4) every match the
@@ -43,10 +45,11 @@ import { DIFFICULTIES, type Difficulty } from '../src/config';
 import { applyTuning } from '../src/match/league/tuning';
 import { shardCases } from '../src/qa/shard';
 import { careerAgencyCases, careerAgencyMarkdown, careerAgencyReport } from '../src/qa/careerAgency';
+import { leaguePersonaMarkdown, runLeaguePersona, type LeaguePersonaResult } from '../src/qa/personas/league';
 
 const args = process.argv.slice(2).filter((a) => a !== '--');
 const agency = args.includes('--career-agency');
-if (agency && ['seasons', 'seeds', 'weeks', 'pack', 'personas', 'managed-only', 'difficulties', 'live-rivals', 'shard', 'tune'].some(name => args.includes(`--${name}`))) {
+if (agency && ['seasons', 'seeds', 'weeks', 'pack', 'personas', 'managed-only', 'difficulties', 'live-rivals', 'shard', 'tune', 'career-mode', 'card-week'].some(name => args.includes(`--${name}`))) {
   throw new Error('--career-agency uses the complete fixed two-season AU Normal cohort; tuning, sizing, mode, pack, difficulty and shard options cannot be combined with it');
 }
 const opt = (name: string, dflt: number): number => {
@@ -62,6 +65,14 @@ const str = (name: string): string | undefined => {
 const personaIds = str('personas');
 if (args.includes('--personas') && !personaIds) throw new Error('--personas requires all or comma-separated ids');
 const personaConfigs = personaIds ? (personaIds === 'all' ? PERSONAS : personaIds.split(',').map(personaById)) : undefined;
+const careerMode = str('career-mode');
+const cardWeek = args.includes('--card-week');
+if (args.includes('--career-mode') && careerMode !== 'league') throw new Error('--career-mode currently accepts league; omit it for Classic');
+const leaguePersonas = cardWeek || careerMode === 'league';
+if (leaguePersonas && !personaConfigs) throw new Error('--career-mode league and --card-week require --personas');
+if (leaguePersonas && ['baseline', 'write-baseline', 'diary'].some(name => args.includes(`--${name}`))) {
+  throw new Error('League persona observations have no Classic baseline or Classic diary');
+}
 for (const name of ['seasons', 'seeds', 'weeks', 'jobs']) {
   if (args.includes(`--${name}`) && (!Number.isInteger(opt(name, 0)) || opt(name, 0) < 1)) throw new Error(`--${name} must be a positive integer`);
 }
@@ -94,9 +105,9 @@ if (childIn) {
   for (const spec of specs) await preparePack(spec.pack ?? 'au');
   const done = [];
   for (const spec of specs) {
-    const result = runSoak(spec);
+    const result = spec.careerMode === 'league' ? await runLeaguePersona(spec) : runSoak(spec);
     const who = typeof spec.persona === 'string' ? spec.persona : spec.persona?.id;
-    if (who) console.error(`persona ${who} ${spec.difficulty ?? 'normal'} seed ${spec.seed}: ${result.problems.length} problems, ${Math.round(result.ms / 1000)}s`);
+    if (who) console.error(`persona ${who} ${spec.difficulty ?? 'normal'} seed ${spec.seed}: ${result.problems.length} problems, ${'ms' in result ? `${Math.round(result.ms / 1000)}s` : `${result.intervals} intervals`}`);
     done.push(result);
   }
   writeFileSync(out, JSON.stringify(done));
@@ -110,7 +121,7 @@ if (agency) specs.push(...careerAgencyCases());
 else for (let seed = 1; seed <= seeds; seed++) {
   if (personaConfigs) {
     for (const config of personaConfigs) for (const difficulty of difficulties ?? config.difficulties) {
-      specs.push({ seed: seed * 7919, seasons, mode: 'persona', persona: config.id, difficulty, pack, ...live, ...(str('weeks') ? { weeks: opt('weeks', 1) } : {}) });
+      specs.push({ seed: seed * 7919, seasons, mode: 'persona', persona: config.id, difficulty, pack, ...(leaguePersonas ? {careerMode:'league' as const, cardWeek} : {}), ...live, ...(str('weeks') ? { weeks: opt('weeks', 1) } : {}) });
     }
   } else if (difficulties) {
     for (const difficulty of difficulties) {
@@ -127,18 +138,18 @@ const selectedSpecs = shardCases(specs, shard);
 if (shard) console.log(`Soak case shard ${shard}: ${selectedSpecs.length} of ${specs.length} unchanged cases.`);
 
 /** Play the runs over `jobs` child processes (round-robin), and return the results in run order. */
-async function runInJobs(all: SoakOptions[], jobs: number): Promise<SoakResult[]> {
+async function runInJobs<T extends SoakResult | LeaguePersonaResult>(all: SoakOptions[], jobs: number): Promise<T[]> {
   const dir = mkdtempSync(join(tmpdir(), 'soak-'));
   try {
     const chunks = Array.from({ length: jobs }, (_, j) => all.map((o, i) => ({ o, i })).filter(({ i }) => i % jobs === j));
-    const outs = await Promise.all(chunks.map((chunk, j) => new Promise<{ i: number; r: SoakResult }[]>((resolve, reject) => {
+    const outs = await Promise.all(chunks.map((chunk, j) => new Promise<{ i: number; r: T }[]>((resolve, reject) => {
       const inFile = join(dir, `in-${j}.json`);
       const outFile = join(dir, `out-${j}.json`);
       writeFileSync(inFile, JSON.stringify(chunk.map(({ o }) => o)));
       const child = spawn('npx', ['vite-node', 'scripts/soak.ts', '--', '--child', inFile, '--out', outFile, ...tuneArgs], { stdio: ['ignore', 'ignore', 'inherit'] });
       child.on('exit', (code) => {
         if (code !== 0) return reject(new Error(`soak job ${j + 1} exited ${code}`));
-        const rs = JSON.parse(readFileSync(outFile, 'utf8')) as SoakResult[];
+        const rs = JSON.parse(readFileSync(outFile, 'utf8')) as T[];
         resolve(rs.map((r, k) => ({ i: chunk[k]!.i, r })));
       });
     })));
@@ -149,7 +160,26 @@ async function runInJobs(all: SoakOptions[], jobs: number): Promise<SoakResult[]
 }
 
 const jobs = Math.max(1, Math.min(opt('jobs', 1), selectedSpecs.length));
-const results: SoakResult[] = jobs > 1 ? await runInJobs(selectedSpecs, jobs) : selectedSpecs.map((o) => runSoak(o));
+if (leaguePersonas) {
+  const results: LeaguePersonaResult[] = [];
+  if (jobs > 1) results.push(...await runInJobs<LeaguePersonaResult>(selectedSpecs, jobs));
+  else for (const spec of selectedSpecs) results.push(await runLeaguePersona(spec));
+  const machinePath = jsonOut ?? 'work/league-personas.json';
+  const reportPath = str('report') ?? machinePath.replace(/\.json$/, '') + '.md';
+  if (machinePath === reportPath) throw new Error('--json and --report must be different files');
+  for (const path of [machinePath, reportPath]) mkdirSync(dirname(path), {recursive:true});
+  const report = leaguePersonaMarkdown(results);
+  writeFileSync(machinePath, JSON.stringify({
+    schema: 1, careerMode: 'league', cardWeek, pack, seasons, seeds,
+    ...(shard ? {shard} : {}), ...(str('weeks') ? {weeks: opt('weeks', 1)} : {}),
+    liveRivals, tuning, match: measuredMatch(), results,
+  }));
+  writeFileSync(reportPath, report);
+  console.log(report);
+  console.log(`\nWrote ${machinePath} and ${reportPath}`);
+  process.exit(results.some(r => r.problems.length) ? 1 : 0);
+}
+const results: SoakResult[] = jobs > 1 ? await runInJobs<SoakResult>(selectedSpecs, jobs) : selectedSpecs.map((o) => runSoak(o));
 
 if (personaConfigs) {
   const baselinePath = str('baseline') ?? 'src/qa/personas/baseline.json';

@@ -1,6 +1,6 @@
 import { discoveredFreeAgents } from '../../systems/playerCareer';
 // QA only. Decisions call the same system operations as the club screens and soak manager.
-import { getState, setState, type GameState, type Player, type PlayerStats } from '../../core/state';
+import { getState, setState, type Fixture, type GameState, type Player, type PlayerStats } from '../../core/state';
 import { ON_FIELD, SQUAD_CAP, WEEKS_PER_SEASON } from '../../config';
 import { makeRng } from '../../utils/rng';
 import { overallRating, POSITION_GROUPS, shownStats, type PositionGroup } from '../../data/player';
@@ -30,6 +30,8 @@ import { emptyWeekLog, type PersonaConfig, type SigningTally, type WeekLog } fro
 export interface SoakOperations {
   buildFirstFree(id: FacilityDefId): boolean;
   weeklyNet(s: GameState): number;
+  /** Structural League has no Classic fixture array. Supply the real calendar reader. */
+  nextMatch?(s: GameState, homeOnly?: boolean): Fixture | undefined;
 }
 /** Transparent utility estimate for visible card effects; no future deck or RNG peeking. */
 export function effectValue(e: EventEffect): number {
@@ -124,7 +126,7 @@ export function createPersonaManager(config: PersonaConfig, seed: number, ops: S
   };
   const opposition = (): TeamTactics | undefined => {
     const s = getState();
-    const f = s.league.fixtures.find(f => !f.result && (f.homeId === s.clubId || f.awayId === s.clubId));
+    const f = ops.nextMatch ? ops.nextMatch(s) : s.league.fixtures.find(f => !f.result && (f.homeId === s.clubId || f.awayId === s.clubId));
     const club = s.league.clubs.find(c => c.id === (f?.homeId === s.clubId ? f.awayId : f?.homeId));
     return club ? rivalMatchSheet(club, playerRivalContext(s)).tactics : undefined;
   };
@@ -163,7 +165,7 @@ export function createPersonaManager(config: PersonaConfig, seed: number, ops: S
         const built = s.facilities.find(f => f.defId === id);
         if (id === 'grandstand') {
           // Same sold-out gate trigger as the existing soak manager, supplied in the weekly net budget.
-          const home = s.league.fixtures.find(f => f.homeId === s.clubId && !f.result);
+          const home = ops.nextMatch ? ops.nextMatch(s, true) : s.league.fixtures.find(f => f.homeId === s.clubId && !f.result);
           if (!home || !homeGate(s, home).soldOut) continue;
         }
         if (s.money - FACILITY_CATALOG[id].cost < config.facilities.reserve) continue;
