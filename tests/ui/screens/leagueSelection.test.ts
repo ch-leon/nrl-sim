@@ -9,7 +9,11 @@ import { stubDocument, type StubNode } from '../stubDom';
 
 // Exercise the dialog's actual DOM and events with independently controlled
 // quotes and commit outcomes. The entry engine and store own their own tests.
-vi.mock('../../../src/systems/leagueEntry', () => ({ previewLeagueEntry: vi.fn() }));
+vi.mock('../../../src/systems/leagueEntry', () => {
+  const previewLeagueEntry = vi.fn();
+  return { previewLeagueEntry, previewLeagueChoices: (state: GameState, ids: readonly string[]) =>
+    new Map(ids.map(id => [id, previewLeagueEntry(state, id)])) };
+});
 vi.mock('../../../src/systems/leagueEntryCommit', () => ({ confirmLeagueEntry: vi.fn() }));
 
 const preview = vi.mocked(previewLeagueEntry);

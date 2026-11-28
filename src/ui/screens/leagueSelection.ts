@@ -3,7 +3,7 @@ import { annualCapQuote, FINANCE_TIERS, tierForRank } from '../../data/financeRu
 import type { CompetitionDefinition } from '../../data/competition';
 import type { LeagueMovement } from '../../data/leagueCareer';
 import type { ClubCommitmentQuote } from '../../data/leagueEntryReceipt';
-import { previewLeagueEntry, type LeagueEntryPreview, type LeaguePreviewResult } from '../../systems/leagueEntry';
+import { previewLeagueChoices, type LeagueEntryPreview, type LeaguePreviewResult } from '../../systems/leagueEntry';
 import { confirmLeagueEntry } from '../../systems/leagueEntryCommit';
 import { squadStrength } from '../../systems/rivals';
 import { fmtMoney } from '../../utils/money';
@@ -86,7 +86,7 @@ export function openLeagueSelection(options: LeagueSelectionOptions = {}): HTMLE
   function refresh(message = ''): void {
     snapshot = getState();
     const divisions = snapshot.competitions?.world?.divisions ?? [];
-    results = new Map(divisions.map(d => [d.id, previewLeagueEntry(snapshot, d.id)]));
+    results = previewLeagueChoices(snapshot, divisions.map(d => d.id));
     previews = [...results.values()].flatMap(r => r.ok ? [r.preview] : []);
     const first = previews[0];
     choices.hidden = detail.hidden = !first;

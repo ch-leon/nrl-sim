@@ -57,6 +57,21 @@ function drawFields(state: GameState, leagueId: string) {
 }
 
 export function previewLeagueEntry(state: GameState, leagueId: string): LeaguePreviewResult {
+  return previewWithKey(state, leagueId, () => canonicalLeagueJson(['league-entry-v1', leagueId, state]));
+}
+
+/** A dialog refresh uses one immutable snapshot for all its options. Reuse
+ * that snapshot's canonical JSON only within this synchronous call. Confirm
+ * still recomputes the full key against the current state. */
+export function previewLeagueChoices(state: GameState, leagueIds: readonly string[]): Map<string, LeaguePreviewResult> {
+  let snapshot: string | undefined;
+  return new Map(leagueIds.map(leagueId => [leagueId, previewWithKey(state, leagueId, () => {
+    snapshot ??= canonicalLeagueJson(state);
+    return `["league-entry-v1",${JSON.stringify(leagueId)},${snapshot}]`;
+  })]));
+}
+
+function previewWithKey(state: GameState, leagueId: string, key: () => string): LeaguePreviewResult {
   const c = state.competitions;
   const progress = c?.leagueCareer;
   if (state.sacked) return refusal('unavailable', 'League choice ended when the board dismissed you.');
@@ -80,7 +95,7 @@ export function previewLeagueEntry(state: GameState, leagueId: string): LeaguePr
     const quote = entryQuote(state, targetSeason, leagueId, fields, movements);
     const strengths = quote.opponents.map(o => o.strength);
     const preview: LeagueEntryPreview = {
-      leagueId, previewKey: canonicalLeagueJson(['league-entry-v1', leagueId, state]), phase: progress.phase, eligible: !!access,
+      leagueId, previewKey: key(), phase: progress.phase, eligible: !!access,
       sourceSeason: state.season, targetSeason, sourceCloseId: progress.close?.id ?? null, currentLeagueId: current.division.id,
       leagueName: league.name, rank: league.rank, requirement: requirement ? { leagueId: requirement.id, leagueName: requirement.name } : null,
       evidence: access?.earnedFrom ?? null, fieldIds: [...fields[leagueId]!], movements, definition: leagues[league.rank]!.definition,

@@ -17,7 +17,7 @@ import { activePack, preparePack, selectPack } from '../../src/content';
 import { AU_CAREER_PROFILE } from '../../src/content/career/au';
 import { UK_CAREER_PROFILE } from '../../src/content/career/uk';
 import { setupStructuralDivisionCareer } from '../../src/systems/divisionCareer';
-import { previewLeagueEntry, acceptLeagueEntry } from '../../src/systems/leagueEntry';
+import { previewLeagueEntry, previewLeagueChoices, acceptLeagueEntry } from '../../src/systems/leagueEntry';
 import { clearHeldWeek, clearTickHooks, clearSeasonHooks, withFastForward, advanceWeek } from '../../src/core/time';
 import { registerAllSystems } from '../../src/qa/soak';
 import { bus } from '../../src/core/events';
@@ -110,6 +110,21 @@ describe('League entry quotes and atomic candidates', () => {
     expect(started.competitions!.leagueCareer!.accepted).toMatchObject({ quote: p.quote, annualChanges: null });
     expect(acceptLeagueEntry(started, p)).toMatchObject({ ok: false, reason: 'unavailable' });
     expect(JSON.stringify(s)).toBe(bytes);
+  });
+
+  it.each(['au', 'uk'] as const)('batches %s quotes without changing keys, refusals or revalidation', async region => {
+    const fresh = await initial(region);
+    const changed = { ...fresh, rngSeed: fresh.rngSeed + 1 };
+    const closed = settleWithTitle(accept(fresh), true);
+    for (const snapshot of [fresh, changed, closed, { ...fresh, version: 0 as typeof fresh.version }]) {
+      const ids = [...snapshot.competitions!.world!.divisions.map(d => d.id), 'not-a-league'];
+      expect(previewLeagueChoices(snapshot, ids)).toEqual(new Map(ids.map(id => [id, previewLeagueEntry(snapshot, id)])));
+    }
+    const id = fresh.competitions!.world!.profile.startingDivisionId;
+    const choice = previewLeagueChoices(fresh, [id]).get(id);
+    if (!choice?.ok) throw new Error('Expected an eligible starting league');
+    expect(acceptLeagueEntry(fresh, choice.preview).ok).toBe(true);
+    expect(acceptLeagueEntry(changed, choice.preview)).toMatchObject({ ok: false, reason: 'stale' });
   });
 
   it('refuses malformed, unsupported and implicitly entered initial schedules without rewriting any snapshot', async () => {
