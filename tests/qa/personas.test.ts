@@ -9,6 +9,7 @@ import { preparePack, selectPack } from '../../src/content';
 import { TRAINING_FOCI, setSpendMode } from '../../src/systems/training';
 import { shownStats } from '../../src/data/player';
 import { PERSONAS, personaById } from '../../src/qa/personas';
+import { runLeaguePersona } from '../../src/qa/personas/league';
 import { createPersonaManager, effectValue } from '../../src/qa/personas/policy';
 import { measuredMatch } from '../../src/qa/soak';
 import { careerRoundTrip, observeCareer, type CareerMatch } from '../../src/qa/personas/metrics';
@@ -52,6 +53,26 @@ describe('AI personas (#534)', () => {
       expect(a.career?.cash).toHaveLength(5);
       expect(a.career?.seasons[0]?.completed).toBe(false);
     }
+  }, 30_000);
+
+  it('smoke: Card Week persona makes deterministic choices in a normal League slot', async () => {
+    const spec = { seed: 7919, seasons: 1, weeks: 6, mode: 'persona' as const, persona: 'min-maxer',
+      difficulty: 'normal' as const, pack: 'au' as const, careerMode: 'league' as const };
+    const withCards = await runLeaguePersona({ ...spec, cardWeek: true });
+    expect(withCards).toEqual(await runLeaguePersona({ ...spec, cardWeek: true }));
+    const withoutCards = await runLeaguePersona(spec);
+    for (const r of [withCards, withoutCards]) {
+      expect(r.problems).toEqual([]);
+      expect(r.intervals).toBe(6);
+      expect(r.saves).toEqual(['initial-choice', 'season-1-entry', 'season-1-partial']);
+      const fixtures = r.seasons[0]!.fixtures;
+      expect(new Set(fixtures.map(m => m.fixtureId)).size).toBe(fixtures.length);
+      expect(fixtures.some(m => m.kind === 'trial' && m.round === 1)).toBe(true);
+      expect(fixtures.some(m => m.kind === 'regular' && m.round === 1 && m.week !== 1)).toBe(true);
+    }
+    expect(Object.values(withCards.seasons[0]!.cardsKept).reduce((n,k) => n+k,0)).toBeGreaterThanOrEqual(5);
+    expect(Object.values(withCards.seasons[0]!.cardsPlayed).reduce((n,k) => n+k,0)).toBeGreaterThan(0);
+    expect(withoutCards.seasons[0]).toMatchObject({cardsKept:{}, cardsPlayed:{}, strikes:0, startersAbove60:0});
   }, 30_000);
 
   it('each starter plays real weeks; defaults stay shallow and min-maxer uses coach/playbook/tactics APIs', () => {

@@ -64,6 +64,9 @@ export interface SoakOptions {
    */
   weeks?: number;
   mode: SoakMode;
+  /** CLI opt-in. Omitted always means the unchanged Classic soak. */
+  careerMode?: 'league';
+  cardWeek?: boolean;
   /** Persona id (or a supplied config for policy experiments). Required in persona mode. */
   persona?: string | PersonaConfig;
   /** Start from a save of this version (built from the fresh game) instead of v-current. */
@@ -577,7 +580,7 @@ function seatTheCrowd(): void {
 }
 
 /** Build `defId` on the first free spot (top-left scan), paying its cost. */
-function buildFirstFree(defId: FacilityDefId): boolean {
+export function buildFirstFree(defId: FacilityDefId): boolean {
   const s = getState();
   if (!isFacilityOpen(s, defId)) return false;
   const def = FACILITY_CATALOG[defId];
