@@ -783,6 +783,28 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
       if (await page.locator('.nrl-mo-plan [data-fit]').count() !== 8 || !(await page.locator('[data-working], [data-preview-line]').count())) out.push('missing half-time fit or numbers');
       await page.screenshot({ path: join(OUT, `fit-half-time-${size}.png`) });
     }
+    // Keep a deterministic long, real surname in the plan's narrow cell. This
+    // probes layout only: it doesn't alter the match roster, stats or saved settings.
+    if (W === 667) {
+      const fullReason = await page.locator('.nrl-mo-plan [data-tactic="grind"] .nrl-fit-reason').evaluate((reason) => {
+        const root = document.documentElement;
+        const label = reason.textContent;
+        const size = root.dataset.textSize;
+        const scale = root.style.getPropertyValue('--nrl-text-scale');
+        try {
+          root.dataset.textSize = 'larger';
+          root.style.setProperty('--nrl-text-scale', '1.3');
+          reason.textContent = 'Bombscombe 70';
+          return reason.clientWidth > 0 && reason.scrollWidth <= reason.clientWidth + 1;
+        } finally {
+          reason.textContent = label;
+          if (size === undefined) delete root.dataset.textSize;
+          else root.dataset.textSize = size;
+          root.style.setProperty('--nrl-text-scale', scale);
+        }
+      });
+      if (!fullReason) out.push('long half-time fit reason clipped at Larger text');
+    }
     await textSize('normal');
     const at = await clock();
     await page.waitForTimeout(6000);

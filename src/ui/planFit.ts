@@ -14,5 +14,7 @@ export const PLAN_FIT_CSS = `
 .nrl-fit-stars { display: block; font-size: 0.75rem; color: var(--nrl-accent); letter-spacing: 0; }
 [data-fit][aria-pressed="true"] .nrl-fit-stars { color: inherit; }
 .nrl-fit-reason { display: block; max-width: 100%; font-family: var(--nrl-f-body); font-size: 0.6875rem; letter-spacing: 0; font-weight: 400; text-transform: none; }
+/* Long player names can need a second line in the narrow half-time attack row. */
+.nrl-mo-plan .nrl-fit-reason { white-space: normal; overflow-wrap: anywhere; }
 .nrl-lineup-plan .nrl-seg > .nrl-btn[data-fit], .nrl-mo-plan .nrl-seg > .nrl-btn[data-fit] { height: auto; min-height: 54px; padding: 4px 2px; }
 `;
