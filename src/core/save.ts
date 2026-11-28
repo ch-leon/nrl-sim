@@ -455,6 +455,8 @@ export const MIGRATIONS: readonly MigrationStep[] = [
     : old },
   // v42 adds recovery faces to the existing saved offer and hand. Old cards are kept verbatim.
   { from: 41, to: 42, run: old => old },
+  // Existing hires begin counting from their next League match; historical hires have no recorded match date.
+  { from: 42, to: 43, run: old => old },
   // v32 snapshots the agreement observed under v31 ID-only protection.
   // Already recorded exact terms keep their provenance, including queued terms.
   { from: 31, to: 32, run: old => {

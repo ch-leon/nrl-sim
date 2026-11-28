@@ -90,6 +90,17 @@ A saved offer keeps its faces even if the squad has since recovered. Playing
 a card rechecks who can benefit, and a refusal does not spend it or use a keep.
 Clearing fatigue updates the Lineup kick-off preview straight away.
 
+**Cards from staff.** After every third completed League match played with
+that hire, your Welfare Manager offers an eligible Recovery card and your
+Attack Coach can teach an unowned set play in his speciality. Each one replaces
+a card in the normal five-card match pick and is labelled with its source.
+Trials, Cups and forfeits do not count. If there is no eligible card, or the
+third match produces the Decree pick, the staff member tries again after the
+next played League match. Rerolls keep the exact card each staff member supplied,
+and the two-keeps limit and Recovery hand limit are unchanged. The timing is
+per appointment; existing staff in older saves start counting at their next
+played League match.
+
 **The card floor.** The club's best natural player at the card's position (his own
 position is the card's), by overall rating. With nobody there, the best man from a
 related position by his rating there (×0.92: centre and winger, the halves, the pack);
@@ -153,6 +164,7 @@ card.
 | `CARD_WEEK.PICKS.match.show` / `.keep` | `src/data/cards.ts` | 5 / 2 | Cards dealt and keeps allowed in each new match pick. |
 | `CARD_WEEK.PICKS.starter.show` / `.keep` | `src/data/cards.ts` | 5 / 1 | Cards dealt and keeps allowed in each new starter pick. |
 | `CARD_WEEK.PICKS.decree.show` / `.keep` | `src/data/cards.ts` | 3 / 1 | Decrees dealt and adopted in the season's Decree pick. |
+| `CARD_WEEK.STAFF_SUPPLY_MATCHES` | `src/data/cards.ts` | 3 | Played League matches per welfare or attack appointment before that staff member can supply a card. |
 | `CARD_WEEK.PLAYER_TRIES` | `src/data/cards.ts` | 6 | Generation tries for a player card's man to beat the floor before the card sits that pick out. |
 | `WEEKLY_FATIGUE.MIN` / `.MAX` | `src/data/cards.ts` | 0 / 100 | Bounds for each squad player's weekly fatigue. |
 | `WEEKLY_FATIGUE.LEAGUE_STARTER` / `.LEAGUE_BENCH` | `src/data/cards.ts` | 30 / 15 | Fatigue gained by a League starter or a used interchange. |

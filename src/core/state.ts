@@ -132,10 +132,11 @@ export type WeatherKind = 'clear' | 'rain' | 'wind';
 
 /** v30 adds player histories, v31 optional league progression, and v32 exact
  * protected agreements. v33 adds Open Cup entry and v34 optional Skills Camp records. v35 adds individual challenge checkpoints. v36 adds the optional card week (#846). Finance state migrates from v28; v27 requires a new career. */
-export const SAVE_VERSION = 42;
+export const SAVE_VERSION = 43;
 
 /** The hires the facilities don't cover (N14.5), and the attack coach who opens set plays to buy (#326). */
 export type StaffRole = 'assistantCoach' | 'analyst' | 'welfare' | 'attackCoach';
+export type StaffCardSource = Extract<StaffRole, 'welfare' | 'attackCoach'>;
 /** The attack coach's speciality: the family of set plays he opens to buy (#326, plan §2.2). */
 export type AttackCoachSpeciality = import('../data/plays').PlayFamily;
 export interface StaffMember {
@@ -145,6 +146,8 @@ export interface StaffMember {
   name: string;
   wage: number;
   hiredSeason: number;
+  /** Card Week League matches watched since hire or the last supplied card. */
+  cardSupplyMatches?: number;
   /** The attack coach's speciality (#326); absent on every other role. */
   speciality?: AttackCoachSpeciality;
 }
@@ -293,7 +296,7 @@ export interface EventDeckState {
  * Generated recruits get a durable ID on signing. A saved steal refers to the
  * real rival player. Staff and set-play card payloads name the hire and the play.
  */
-export type OfferedCard = { fromClubId?: string } & (
+export type OfferedCard = { fromClubId?: string; staffSource?: StaffCardSource } & (
   | { cardId: string; kind: 'player' | 'dilemma'; player: Player; salary: number; replacesId?: string; replacesName?: string }
   | { cardId: string; kind: 'staff'; name: string }
   | { cardId: string; kind: 'setPlay'; playId: import('../data/plays').PlayId }

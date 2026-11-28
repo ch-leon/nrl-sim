@@ -7,7 +7,7 @@
 // relative within the cards eligible for a pick. Money is in dollars.
 import type { AttackCoachSpeciality, Position, StaffRole } from '../core/state';
 import { POSITIONS } from './player';
-import { isBasePlayId } from './plays';
+import { isBasePlayId, type BasePlayId } from './plays';
 import type { TraitId } from './traits';
 
 export type CardTier = 'grey' | 'gold';
@@ -29,6 +29,7 @@ export const CARD_WEEK = {
   PLAYER_TRIES: 6,
   REROLL_BASE: 1_500,
   REROLL_STEP: 1_500,
+  STAFF_SUPPLY_MATCHES: 3,
   STAFF_WAGE_FACTOR: { 1: 1, 2: 0.75, 3: 0.5 },
   CASH_FACTOR: { 1: 1, 2: 1.5, 3: 2 },
   DILEMMA_MARGIN_STEP: 2,
@@ -52,6 +53,16 @@ export const CARD_WEEK = {
 
 /** The first save format that recognises recovery cards on an offer or in hand. */
 export const RECOVERY_CARD_SAVE_VERSION = 42;
+export const STAFF_CARD_SAVE_VERSION = 43;
+
+/** The ordinary set-play card keeps its existing upgrade chain. */
+const COACHED_PLAY_PREFIX = 'staff-play:';
+export function coachedPlayCardId(id: BasePlayId): string { return `${COACHED_PLAY_PREFIX}${id}`; }
+export function coachedPlayFromCardId(id: string): BasePlayId | undefined {
+  if (!id.startsWith(COACHED_PLAY_PREFIX)) return undefined;
+  const play = id.slice(COACHED_PLAY_PREFIX.length);
+  return isBasePlayId(play) ? play : undefined;
+}
 
 export const CARD_RECOVERY = {
   HAND_CAP: 2,
@@ -183,6 +194,9 @@ export function cardDefById(id: string): CardDef | undefined {
   }
   if (kind === 'steal-play' && !personId.length && isBasePlayId(key)) {
     return { id, kind: 'setPlay', title: 'Rival set play', tier: 'grey', weight: 0 };
+  }
+  if (kind === 'staff-play' && !personId.length && isBasePlayId(key)) {
+    return { id, kind: 'setPlay', title: 'Set play', tier: 'grey', weight: 0 };
   }
   return undefined;
 }

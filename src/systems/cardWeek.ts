@@ -20,7 +20,7 @@ import { bus } from '../core/events';
 import { registerLeagueRolloverHook, registerTickHook, TICK_ORDER, weekHeld } from '../core/time';
 import { saveIfChanged } from '../core/save';
 import { careerActionClock, elapsedInterval } from '../core/season';
-import { CARD_PASS, CARD_RECOVERY, CARD_WEEK, CARDS, DECREES, SIGNATURE_TRAIT, cardDefById, type CardDef, type CardKind, type CardTier } from '../data/cards';
+import { CARD_PASS, CARD_RECOVERY, CARD_WEEK, CARDS, DECREES, SIGNATURE_TRAIT, cardDefById, coachedPlayFromCardId, type CardDef, type CardKind, type CardTier } from '../data/cards';
 import { generatePlayerAround, overallRating, POSITIONS, shownStats } from '../data/player';
 import { PLAYS_BY_ID, PLAY_IDS, playsOfFamily, type PlayId } from '../data/plays';
 import { ROMAN, TRAITS, traitLevel, withTrait, type TraitLevel } from '../data/traits';
@@ -44,6 +44,7 @@ import { currentDecree } from './cardBonuses';
 import { weeklyWages } from './economy';
 import type { MatchEvent } from '../sim/events';
 import { applyRecoveryCard, recoveryCandidates, recoveryEffect, recoveryTargetViews } from './recoveryCards';
+import { advanceStaffCardCadence, coachedPlayCandidates, retainStaffCards, STAFF_CARD_SOURCE_LABEL, supplyStaffPick } from './cardWeekStaff';
 export { recoveryCandidates } from './recoveryCards';
 
 /** Is this a card-week career? */
@@ -219,6 +220,8 @@ function resolvePlayer(state: GameState, def: Extract<CardDef, { kind: 'player' 
 }
 
 function existingCardFace(state: GameState, def: CardDef): OfferedCard | undefined {
+  // A recovery card is a consumable, not an upgrade of the held face (which may be staff-marked).
+  if (def.kind === 'recovery') return undefined;
   const held = state.cardWeek?.hand.find(h => h.cardId === def.id);
   if (held) return held.offered;
   const active = activeCard(state, def.id);
@@ -234,13 +237,16 @@ function existingCardFace(state: GameState, def: CardDef): OfferedCard | undefin
 }
 
 /** Settle what a drawn card brings (pure, rolls `rng`), or null when it can't be offered after all. */
-function resolveCard(state: GameState, def: CardDef, rng: Rng): OfferedCard | null {
+function resolveCard(state: GameState, def: CardDef, rng: Rng, excludePlays: readonly PlayId[] = []): OfferedCard | null {
   const existing = existingCardFace(state, def);
-  if (existing) return existing;
+  if (existing) return existing.kind === 'setPlay' && excludePlays.includes(existing.playId) ? null : existing;
   switch (def.kind) {
     case 'player': case 'dilemma': return resolvePlayer(state, def, rng);
     case 'staff': return { cardId: def.id, kind: 'staff', name: randomName(rng, state.pack === 'uk' ? UK_NAMES : AU_PACK.names) };
-    case 'setPlay': return { cardId: def.id, kind: 'setPlay', playId: rng.pick(freePlayCandidates(state)) };
+    case 'setPlay': {
+      const plays = freePlayCandidates(state).filter(id => !excludePlays.includes(id));
+      return plays.length ? { cardId: def.id, kind: 'setPlay', playId: rng.pick(plays) } : null;
+    }
     case 'trait': case 'cash': case 'decree': return { cardId: def.id, kind: def.kind };
     case 'recovery': return { cardId: def.id, kind: 'recovery' };
   }
@@ -283,7 +289,8 @@ function pickWeighted(cards: readonly CardDef[], rng: Rng): CardDef | null {
  */
 export function drawOffer(
   state: GameState, kind: CardOffer['kind'] = 'match', waiting: readonly CardOffer[] = [],
-  { size = CARD_WEEK.PICKS[kind].show, exclude = [] }: { size?: number; exclude?: readonly string[] } = {},
+  { size = CARD_WEEK.PICKS[kind].show, exclude = [], excludePlays = [] }:
+    { size?: number; exclude?: readonly string[]; excludePlays?: readonly PlayId[] } = {},
 ): { offer: CardOffer | null; rng: number } {
   const cw = state.cardWeek;
   if (!cw) return { offer: null, rng: 0 };
@@ -304,7 +311,7 @@ export function drawOffer(
   const drawNext = (): void => {
     const def = pickWeighted(left, rng)!;
     left = left.filter((c) => c !== def);
-    const card = resolveCard(state, def, rng);
+    const card = resolveCard(state, def, rng, excludePlays);
     if (card) cards.push(card);
   };
   while (cards.length < size && left.length > 0) drawNext();
@@ -696,7 +703,7 @@ function applyCard(state: GameState, card: OfferedCard, level: TraitLevel, targe
       const playId = previous?.kind === 'setPlay' ? previous.playId : card.playId;
       if (!previous) {
         if (ownsPlay(s, playId)) return 'That play is already yours.';
-        if (!card.fromClubId) {
+        if (!card.fromClubId && card.staffSource !== 'attackCoach') {
           const problem = buyRefusal({ ...s, money: Number.MAX_SAFE_INTEGER }, playId);
           if (problem) return problem;
         }
@@ -833,13 +840,19 @@ export function cardWeekTick(state: GameState): GameState {
 
   const played = fixtures.filter(f => f.slot! <= state.week);
   const decree = played.length === CARD_WEEK.DECREE_MATCH;
+  const playedOnField = fixture.result!.decider !== 'forfeit';
+  const staff = playedOnField ? advanceStaffCardCadence(next.staff) : next.staff;
   const { offer, rng } = drawOffer(next, decree ? 'decree' : 'match', cw.offers);
-  if (!offer) return { ...next, cardWeek: settled };
+  if (!offer) return { ...next, staff, cardWeek: settled };
+  const supplied = !decree && playedOnField ? supplyStaffPick(staff, offer.cards, rng, (source, member) => source === 'welfare'
+    ? recoveryCandidates(next).map(def => ({ cardId: def.id, kind: 'recovery' }))
+    : coachedPlayCandidates(next, member))
+    : { staff, cards: offer.cards, rng };
   const expireAt = cw.owed >= CARD_WEEK.MAX_OWED ? cw.offers.findIndex(o => o.kind === 'match') : -1;
   const waiting = cw.offers.filter((_, i) => i !== expireAt);
-  return { ...next, cardWeek: {
-    ...settled, rng, owed: cw.owed + Number(expireAt < 0), grants: cw.grants + 1,
-    offers: [...waiting, { ...offer, grant: cw.grants + 1 }],
+  return { ...next, staff: supplied.staff, cardWeek: {
+    ...settled, rng: supplied.rng, owed: cw.owed + Number(expireAt < 0), grants: cw.grants + 1,
+    offers: [...waiting, { ...offer, cards: supplied.cards, grant: cw.grants + 1 }],
     history: expireAt >= 0 ? recordCard(cw, state, 'expired', 'expire') : cw.history,
   } };
 }
@@ -979,10 +992,12 @@ function cardFaceView(state: GameState, card: OfferedCard, index: number, level:
   const def = cardDefById(card.cardId);
   if (!def) return [];
   const current = upgrade ? existingCardFace(state, def) : undefined;
+  const staffSource = card.staffSource;
   if (current) card = { ...current, ...(card.fromClubId ? { fromClubId: card.fromClubId } : {}) };
   const view: CardFaceView = {
     index, cardId: def.id, kind: def.kind, title: def.title, tier: def.tier, level, upgrade, effect: effectLine(state, def, card, level),
-    ...(card.fromClubId ? { source: state.league.clubs.find(c => c.id === card.fromClubId)?.name ?? card.fromClubId } : {}),
+    ...(staffSource ? { source: STAFF_CARD_SOURCE_LABEL[staffSource] }
+      : card.fromClubId ? { source: state.league.clubs.find(c => c.id === card.fromClubId)?.name ?? card.fromClubId } : {}),
     hint: def.kind === 'decree' ? '' : `Good if ${GOOD_IF[def.kind]}`, refusal: null,
   };
   // The facts to choose with (#846 play-test), as applyCard would settle them today.
@@ -1138,6 +1153,7 @@ export function rerollRefusal(state: GameState, offer: CardOffer | undefined): s
   if (blocked) return blocked;
   if (!offer) return 'No pick is waiting.';
   if (offer.kind === 'decree') return 'Decree picks cannot be rerolled.';
+  if (offer.cards.every(card => card.staffSource)) return 'There are no other cards to reroll.';
   return state.money < rerollCost(state) ? 'The club cannot afford a reroll.' : null;
 }
 
@@ -1152,11 +1168,18 @@ export function rerollCard(state: GameState, grant?: number): GameState | string
   if (!cw || !offer) return 'No pick is waiting.';
   const cost = rerollCost(state);
   const paid = bookPlayerMovement(state, -cost, 'events', careerActionClock(state));
-  const draw = drawOffer(paid, offer.kind, [offer], { size: offer.cards.length, exclude: offer.keptCardIds });
+  const pinned = offer.cards.filter(card => card.staffSource);
+  const redraw = pinned.length ? { ...offer, cards: offer.cards.filter(card => !card.staffSource) } : offer;
+  const draw = drawOffer(paid, offer.kind, [redraw], {
+    size: redraw.cards.length,
+    exclude: [...offer.keptCardIds, ...pinned.map(card => card.cardId)],
+    excludePlays: [...pinned.flatMap(card => card.kind === 'setPlay' ? [card.playId] : []),
+      ...offer.keptCardIds.flatMap(id => coachedPlayFromCardId(id) ?? [])],
+  });
   if (!draw.offer) return 'There are no eligible cards to draw.';
   const rerolls = { season: state.season, week: state.week, count: (cost - CARD_WEEK.REROLL_BASE) / CARD_WEEK.REROLL_STEP + 1 };
   const { fromClubId: _legacySource, ...waiting } = offer;
-  const rerolled = { ...waiting, cards: draw.offer.cards };
+  const rerolled = { ...waiting, cards: pinned.length ? retainStaffCards(offer.cards, draw.offer.cards) : draw.offer.cards };
   return { ...paid, cardWeek: {
     ...cw, rng: draw.rng, rerolls, history: recordCard(cw, state, 'reroll', 'reroll'),
     offers: cw.offers.map((o, i) => i === at ? rerolled : o),
@@ -1210,7 +1233,7 @@ export function registerCardWeekSystem(): void {
     if (!s.cardWeek || s.sacked || deckWaitsForLeagueChoice(s)) return;
     const next = cardWeekTick(s);
     if (next === s) return;
-    setState({ cardWeek: next.cardWeek!, boardPatience: next.boardPatience, money: next.money, finance: next.finance });
+    setState({ cardWeek: next.cardWeek!, staff: next.staff, boardPatience: next.boardPatience, money: next.money, finance: next.finance });
     if (next.money !== s.money) bus.emit('money:changed', {
       delta: next.money - s.money, reason: 'Tight ship wage saving', balance: next.money, booked: true,
       stamp: { season: s.season, week: s.week },
