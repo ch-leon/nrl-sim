@@ -99,7 +99,7 @@ export function faceLines(face: CardFaceView): FaceLine[] {
   const out: FaceLine[] = [];
   if (face.floor) {
     out.push({ text: face.floor.line, tone: 'plain' });
-    if (face.floor.gap > 0) out.push({ text: `+${face.floor.gap} better`, tone: 'pos' });
+    if (face.floor.gap !== null && face.floor.gap > 0) out.push({ text: `+${face.floor.gap} better`, tone: 'pos' });
   }
   if (face.board) out.push({ text: face.board.line, tone: 'neg' });
   if (face.trait) {

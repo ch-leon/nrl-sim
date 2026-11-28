@@ -36,7 +36,7 @@ import { leagueEntryReceiptId } from '../../src/data/leagueCareer';
 import { AU_CAREER_PROFILE } from '../../src/content/career/au';
 import {
   activeCard, activeCardStaff, cardFloor, cardFloorMan, cardHandView, floorLine, expireSeasonDecree, cardOfferView, cardWeekTick, chooseCard, passCard, passPick, discardCard, playCard, playChosenCard, playPickCard, drawOffer, fillCardOffers, freePlayCandidates, lastMatchImpact, plantCard,
-  playedLeagueMatch, registerCardWeekSystem, rerollCard, rerollCost, rerollPick, startCardWeek, takeCard, traitTargets, type CardTake,
+  playedLeagueMatch, registerCardWeekSystem, rerollCard, rerollCost, rerollPick, startCardWeek, takeCard, traitTargets, type CardFaceView, type CardTake,
 } from '../../src/systems/cardWeek';
 import { capRoomFor, commitment, publishedCap } from '../../src/systems/cap';
 import { setupStructuralDivisionCareer } from '../../src/systems/divisionCareer';
@@ -1719,10 +1719,54 @@ describe('what a card face shows (#846 play-test)', () => {
     expect(view.floor!.gap).toBeGreaterThan(0);
   });
 
-  it('says nobody plays there when the floor came from a fallback', async () => {
-    const noProps = (await career(107)).squad.filter((p) => p.position !== 'prop');
-    expect(floorLine(noProps, 'prop', 60)).toEqual({ line: 'Nobody plays there now', gap: 60 - Math.round(cardFloor(noProps, 'prop')) });
+  it('says nobody plays there when the floor came from a fallback, and claims no gap over an unnamed man', async () => {
+    const s = await career(107);
+    const noProps = s.squad.filter((p) => p.position !== 'prop');
+    expect(floorLine(noProps, 'prop', 60)).toEqual({ line: 'Nobody plays there now', gap: null });
+    const props = new Set(s.squad.filter((p) => p.position === 'prop').map((p) => p.id));
+    const bare = { ...s, squad: noProps, lineup: { ...s.lineup, starters: s.lineup.starters.map((id) => (id && props.has(id) ? null : id)) } };
+    expect(face(bare, 'propSigning').view.floor).toEqual({ line: 'Nobody plays there now', gap: null });
   });
+
+  /** Take `id` into the hand `times` times (Level `times` in the hand). */
+  const heldAt = (s: GameState, id: string, times: number): GameState => {
+    let state = s;
+    for (let i = 0; i < times; i++) state = changed(takeCard(face(state, id).state, 0));
+    return state;
+  };
+  /** The face's rating and gap must be the man as he actually joins, against the floor before he does. */
+  const expectJoinedGap = (before: GameState, view: CardFaceView, out: CardTake) => {
+    const joined = Math.round(overallRating(out.joined!));
+    const floor = Math.round(cardFloor(before.squad, out.joined!.position));
+    expect(view.player!.rating).toBe(joined);
+    expect(view.floor!.gap).toBe(joined - floor);
+  };
+
+  for (const kind of ['dilemma', 'player'] as const) {
+    it(`a ${kind} card at Level II and III rates its man as he joins, held in the hand and on a pick`, async () => {
+      const s = { ...(await career(37)), boardPatience: 5, money: 10_000_000 };
+      const id = kind === 'dilemma' ? 'marqueeGamble' : signing(s);
+      for (const level of [2, 3] as const) {
+        // On a pick while the card is held at the level below.
+        const below = heldAt(s, id, level - 1);
+        const onPick = face(below, id);
+        expect(onPick.view.level).toBe(level);
+        expectJoinedGap(onPick.state, onPick.view, taken(playPickCard(onPick.state, 0)));
+        // Held in the hand at this level.
+        const held = heldAt(s, id, level);
+        const at = held.cardWeek!.hand.findIndex((h) => h.cardId === id);
+        const inHand = cardHandView(held).find((v) => v.cardId === id)!;
+        expect(inHand.level).toBe(level);
+        expectJoinedGap(held, inHand, taken(playCard(held, at)));
+      }
+      if (kind === 'dilemma') {
+        // The dilemma's margin step shows: Level III is two steps above Level I.
+        const one = face(s, id).view;
+        const three = cardHandView(heldAt(s, id, 3)).find((v) => v.cardId === id)!;
+        expect(three.floor!.gap! - one.floor!.gap!).toBeGreaterThanOrEqual(2 * CARD_WEEK.DILEMMA_MARGIN_STEP - 1);
+      }
+    });
+  }
 
   it('an upgrade of a man already here shows no floor: it would set him against himself', async () => {
     const s = await career(107);

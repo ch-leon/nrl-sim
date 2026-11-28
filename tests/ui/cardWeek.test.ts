@@ -677,6 +677,7 @@ describe('each kind of face (#846 play-test)', () => {
     const base = cardOfferView(plant(await fresh(), 'cashInjection')).cards[0]!;
     const lines = faceLines({ ...base, floor: { line: 'Your best prop now: A 60', gap: 0 } }).map((l) => l.text);
     expect(lines).toEqual(['Your best prop now: A 60']);
+    expect(faceLines({ ...base, floor: { line: 'Nobody plays there now', gap: null } }).map((l) => l.text)).toEqual(['Nobody plays there now']);
   });
 
   it('lists each target\'s step, a Level II card\'s too, and marks men the trait suits', async () => {
