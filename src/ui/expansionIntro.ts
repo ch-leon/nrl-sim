@@ -17,7 +17,11 @@ export function showExpansionIntro(): Promise<void> {
   setState({ settings: { ...state.settings, hintsSeen: [...(state.settings.hintsSeen ?? []), EXPANSION_INTRO_HINT] } });
   ensureStyles();
   return new Promise((resolve) => {
-    const finish = (): void => { card.remove(); resolve(); };
+    const finish = (): void => {
+      if (location.search.includes('?e2e')) performance.mark('nrl-739:intro-handler');
+      card.remove();
+      resolve();
+    };
     const work = button('Carry on ▸', finish, { class: 'nrl-btn-primary' });
     work.setAttribute('data-expansion-work', '');
     work.title = EXPANSION_COPY.work;
@@ -35,7 +39,15 @@ export function showExpansionIntro(): Promise<void> {
           el('div', { class: 'nrl-expansion-actions' }, skip, work)),
         el('div', { class: 'nrl-expansion-lines' }, ...expansionIntroLines(state, goals).map((text) => coachLine(text)))));
     mount(card);
+    if (location.search.includes('?e2e')) performance.mark('nrl-739:intro-mounted');
     work.focus();
+    if (location.search.includes('?e2e')) {
+      performance.mark('nrl-739:intro-focused');
+      requestAnimationFrame(() => performance.mark('nrl-739:intro-raf'));
+      work.addEventListener('pointerdown', (e) => {
+        if (e.isTrusted) performance.mark('nrl-739:intro-pointerdown');
+      }, { once: true });
+    }
   });
 }
 

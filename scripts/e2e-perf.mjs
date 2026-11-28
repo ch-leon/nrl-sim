@@ -349,20 +349,30 @@ async function run() {
   await setupStep(page, 2);
   await page.fill('[data-nrl-clubname]', 'Budget FC');
   await setupStep(page, 3);
+  const driverPhase=[];
+  const driverStart=performance.now();
   await timed('Start → grounds (textures painted, HUD up)', async () => {
     // Start is disabled ("Loading towns…") until the town list is in (#613); a DOM click before that does nothing.
     await page.waitForFunction(() => !document.querySelector('[data-nrl-start]')?.disabled);
+    driverPhase.push(['towns',Math.round(performance.now()-driverStart)]);
     await clickTimed('[data-nrl-start]');
+    driverPhase.push(['start',Math.round(performance.now()-driverStart)]);
     await page.locator('[data-nrl-league-selection]').waitFor({ timeout: 60000 });
+    driverPhase.push(['wait-league',Math.round(performance.now()-driverStart)]);
     await page.locator('[data-nrl-league-confirm]').click();
+    driverPhase.push(['confirm-click',Math.round(performance.now()-driverStart)]);
     await page.locator('[data-nrl-league-selection]').waitFor({ state: 'detached', timeout: 60000 });
+    driverPhase.push(['wait-league-detached',Math.round(performance.now()-driverStart)]);
     await page.locator('[data-expansion-work]').tap();
+    driverPhase.push(['intro-tap',Math.round(performance.now()-driverStart)]);
     await page.waitForFunction(() => document.querySelector('.nrl-dock') && window.__nrlGame?.scene.isActive('Grounds'));
+    driverPhase.push(['wait-grounds',Math.round(performance.now()-driverStart)]);
   });
   log('Startup phase marks:', JSON.stringify(await page.evaluate(() => {
     const marks=performance.getEntriesByType('mark').filter(p=>p.name.startsWith('nrl-739:'));
     return marks.map(({name,startTime})=>[name,Math.round(startTime-marks[0].startTime)]);
   })));
+  log('Startup driver phases (cumulative):', JSON.stringify(driverPhase));
   if (await page.locator('.nrl-tutorial-skip').count()) await page.locator('.nrl-tutorial-skip').tap();
   await wait(500);
   await timed('grounds frame rate (3 s)', async () => {
