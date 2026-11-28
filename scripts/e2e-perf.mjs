@@ -46,8 +46,9 @@ import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
 import { bundleSize, reportBundle } from './bundle-size.mjs';
+import { ADVANCE_PROMPTS, clubFinalsWeek, passAdvancePrompts, reachClubFixture } from './e2e-calendar.mjs';
 import { weeksAdvanced } from './e2e-week-count.mjs';
-import { setupStep } from './e2e-webkit/newClub.mjs';
+import { confirmStartingLeague, setupStep } from './e2e-webkit/newClub.mjs';
 
 const argv = process.argv.slice(2);
 const flag = (name, dflt) => (argv.includes(`--${name}`) ? argv[argv.indexOf(`--${name}`) + 1] : dflt);
@@ -69,6 +70,9 @@ const EXTERNAL = process.env.E2E_URL;
 const BASE = `${EXTERNAL ?? `http://localhost:${PORT}/`}?e2e`;
 const CHROMIUM = process.env.CHROMIUM_PATH ?? '/opt/pw-browsers/chromium';
 const W = 844, H = 390;
+// Title derives the career seed from Date.now(). Pin Date only; browser timers,
+// performance.now() and the simulation run normally.
+const CAREER_DATE = Date.parse('2026-11-27T00:00:00Z');
 /** The match plays this long between the hand-off and Skip while its frames are read (N15.3). */
 const MATCH_WATCH_MS = 15000;
 const MATCH_FRAME_MOMENT = `match play at ×4 (${MATCH_WATCH_MS / 1000} s): longest frame`;
@@ -260,13 +264,7 @@ async function advance(index, { probe = false } = {}) {
   await clickTimed('.nrl-hud-menu-toggle');
   const t0 = Date.now();
   await clickTimed('.nrl-hud-menu-item', { nth: index });
-  // A run past ×4 weeks asks first (#350 H3; src/core/advanceRules.ts targetSpan, weeks 25-27
-  // the finals). Cards are answered before each run, so there is no #338 ask.
-  const span = index === 0 ? 4 : index === 1 ? (before.week < 25 ? 25 - before.week : 27 - before.week + 25) : 27 - before.week + 1;
-  if (span > 4) {
-    await page.waitForSelector('[data-confirm-advance]');
-    await clickTimed('[data-confirm-advance]');
-  }
+  await passAdvancePrompts(page, (prompt) => prompt.tap(), before);
   let tapMs, label, probeMs = 0;
   // Read the progress line in the same breath as checking the run is still going.
   const running = probe ? await page.evaluate(() => (document.querySelector('.nrl-dock[data-advancing]') ? document.querySelector('.nrl-dock-advance-label')?.textContent?.trim() || 'running' : null)) : null;
@@ -329,6 +327,11 @@ async function run() {
     } catch { /* no Long Tasks API: the handler times still count */ }
   });
   page = await ctx.newPage();
+  await page.addInitScript((careerDate) => {
+    const now = Date.now;
+    Date.now = () => careerDate;
+    window.__nrlRestoreClock = () => { Date.now = now; delete window.__nrlRestoreClock; };
+  }, CAREER_DATE);
   page.setDefaultTimeout(60000);
   page.on('pageerror', (e) => result.errors.push(`pageerror: ${e.message}`));
   page.on('console', (m) => { if (m.type() === 'error') result.errors.push(`console: ${m.text()}`); });
@@ -342,6 +345,7 @@ async function run() {
     return `${t} ms since navigation start in-page`;
   });
   // The new club's Club and Start steps (SuperCOOKED 13, 14), outside the timings.
+  await page.evaluate(() => window.__nrlRestoreClock());
   await setupStep(page, 2);
   await page.fill('[data-nrl-clubname]', 'Budget FC');
   await setupStep(page, 3);
@@ -368,13 +372,65 @@ async function run() {
   });
   await page.screenshot({ path: join(OUT, 'grounds.png') });
 
-  // A week advance: the match week hands over to the match scene.
-  let tickMs = 0;
-  await timed('Advance Week → match scene (hand-off)', async () => {
-    tickMs = await clickTimed('.nrl-dock [data-hud="advance"]'); // PLAY WEEK
-    await page.waitForSelector('.nrl-mo-controls');
-    return `of which the tick itself ${tickMs} ms`;
+  // Walk to a scheduled club game instead of counting an idle week as a slow handoff.
+  const at = await reachClubFixture(page, async () => {
+    await answerCards();
+    const before = await state();
+    await clickTimed('.nrl-dock [data-hud="advance"]');
+    await passAdvancePrompts(page, (prompt) => prompt.tap(), before);
+    await page.waitForFunction((w) => window.__nrlState()?.week !== w, before.week, { timeout: 15000 });
+    summaryDue = true;
+    await toastsGone();
   });
+  await answerCards();
+  result.fixture = { id: at.fixture.id, week: at.week, opponent: at.opponent, weather: at.weather, seed: at.seed };
+
+  let ready = false;
+  await timed('Advance Week → match scene (hand-off)', async () => {
+    // In-page timing avoids the driver's next polling round trip. If an entry
+    // or decision reminder asks first, the commit is its Continue action, not
+    // opening the dialog. Measure through the first interactive control frame.
+    let selector = '.nrl-dock [data-hud="advance"]';
+    for (let i = 0; i < 5; i++) {
+      const driverStart = performance.now();
+      const read = await page.evaluate(({ selector, prompts }) => {
+        const button = document.querySelector(selector);
+        if (!button) throw new Error(`no advance control: ${selector}`);
+        const start = performance.now();
+        button.click();
+        const handler = Math.round(performance.now() - start);
+        return new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('no interactive match controls after the advance')), 15000);
+          function tick() {
+            const next = document.querySelector(prompts);
+            if (next) {
+              clearTimeout(timeout);
+              resolve({ handler, prompt: prompts.split(', ').find((s) => next.matches(s)) });
+              return;
+            }
+            const pause = document.querySelector('.nrl-mo-controls [data-pause]');
+            const box = pause?.getBoundingClientRect();
+            if (box?.width && box.height && pause.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2))) {
+              clearTimeout(timeout);
+              resolve({ handler, ms: Math.round(performance.now() - start) });
+              return;
+            }
+            requestAnimationFrame(tick);
+          }
+          requestAnimationFrame(tick);
+        });
+      }, { selector, prompts: ADVANCE_PROMPTS });
+      handlerMax = Math.max(handlerMax, read.handler);
+      if (read.prompt) { selector = read.prompt; continue; }
+      ready = true;
+      const driverReturn = Math.round(performance.now() - driverStart);
+      return { ms: read.ms, notes: `committing handler ${read.handler} ms; driver return ${driverReturn} ms` };
+    }
+    throw new Error('advance prompts did not reach a match');
+  });
+  if (!ready) throw new Error('first match handoff was not measured');
+  result.fixture.weather = (await state()).weather ?? 'clear';
+  log(`  (fixture ${at.fixture.id}, S${at.season} W${at.week}, ${at.opponent}, ${result.fixture.weather}, seed ${at.seed})`);
   await page.screenshot({ path: join(OUT, 'match.png') });
   // N15.3: the match as it plays (the default ×4) — the longest gap between two animation
   // frames, and how many went over 100 ms. Before Skip, so Skip now plays the rest from a
@@ -428,10 +484,13 @@ async function run() {
   result.timings['tick per week (×4 advances)'] = { ms: perWeek, notes: `${weekSum} weeks in ${msSum} ms` };
   log(`${String(perWeek).padStart(6)} ms  tick per week (×4 advances)`);
 
-  // To the finals, then to the season end: the last call carries the rollover.
+  // A League season's finals and rollover follow its saved calendar. Closing
+  // the final interval holds on the same week number until a league is chosen.
+  const firstFinalsWeek = clubFinalsWeek(await state());
+  const choosingLeague = (s) => s.competitions?.leagueCareer?.phase === 'next-season-choice';
   let guard = 0;
   let probed = false;
-  while ((await state()).week < 25 && guard++ < 30) {
+  while ((await state()).week < firstFinalsWeek && guard++ < 30) {
     await answerCards();
     await timed(`to finals (call ${guard})`, async () => {
       // The first call that runs more than a week also checks the page answers a tap mid-run.
@@ -444,18 +503,18 @@ async function run() {
     });
     await toastsGone();
   }
+  if ((await state()).week < firstFinalsWeek) throw new Error('did not reach the saved League finals');
   guard = 0;
   let rolloverCall = null;
-  while ((await state()).season === 1 && guard++ < 10) {
+  for (let before = await state(); before.season === 1 && !choosingLeague(before) && guard++ < 10; before = await state()) {
     await answerCards();
     const name = `to season end (call ${guard})`;
-    const before = await state();
     const ms = await timed(name, async () => {
       const a = await advance(2);
       return { ms: a.ms, notes: `${a.weeks} weeks` };
     });
     const after = await state();
-    if (after.season > before.season) rolloverCall = { ms, weeks: 27 - before.week + 1 };
+    if (choosingLeague(after)) rolloverCall = { ms, weeks: weeksAdvanced(before, after) };
     await toastsGone();
   }
   if (rolloverCall && perWeek) {
@@ -463,7 +522,20 @@ async function run() {
     result.timings['rollover (season end call minus its weeks)'] = { ms: est, notes: `${rolloverCall.ms} ms call, ${rolloverCall.weeks - 1} plain weeks before it` };
     log(`${String(est).padStart(6)} ms  rollover (season end call minus its weeks)`);
   }
+  if (choosingLeague(await state())) {
+    await timed('Choose league → season 2', async () => {
+      const review = page.locator('[data-review-choose-league]');
+      if (await review.count()) await review.tap();
+      else {
+        await clearDialogs();
+        await page.locator('.nrl-dock [data-hud="advance"]').tap();
+      }
+      await confirmStartingLeague(page);
+      await page.waitForFunction(() => window.__nrlState()?.season === 2);
+    });
+  }
   const s = await state();
+  if (s.season !== 2) throw new Error(`performance playthrough did not start season 2 (S${s.season} W${s.week})`);
   result.end = { season: s.season, week: s.week, money: s.money };
   await page.screenshot({ path: join(OUT, 'season-2.png') });
   await browser.close();
