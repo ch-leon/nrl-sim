@@ -308,6 +308,22 @@ export async function runLargeTextTargets(browser) {
         const scroll = await page.evaluate(() => [document.scrollingElement.scrollHeight > innerHeight + 1, document.scrollingElement.scrollWidth > innerWidth + 1]);
         if (scroll[0] || scroll[1]) out.push('the page scrolls');
         rec.notes.push(`${await page.locator('.nrl-lineup-body .nrl-pcard').count()} cards`);
+        if (W === 568 && size === 'larger') {
+          // #746: a locator tap would choose the centre. Send a touch at the
+          // right-hand sample, rounded outwards to a whole browser pixel.
+          const card = page.locator('.nrl-lineup-field .nrl-pcard[data-spot="s8"]');
+          await card.scrollIntoViewIfNeeded();
+          const p = await card.evaluate((el) => {
+            const r = el.getBoundingClientRect();
+            return { x: Math.ceil((r.left + r.right) / 2 + 21), y: Math.round((r.top + r.bottom) / 2), id: el.dataset.playerOpen };
+          });
+          await page.touchscreen.tap(p.x, p.y);
+          const player = page.locator('[data-player-page]');
+          if (!await player.waitFor({ timeout: 2000 }).then(() => true, () => false)
+              || await player.getAttribute('data-player-page') !== p.id) {
+            out.push(`right-edge touch at ${p.x},${p.y} did not open the intended player`);
+          }
+        }
         return out;
       });
       // #418: the decisions chip on the grounds.

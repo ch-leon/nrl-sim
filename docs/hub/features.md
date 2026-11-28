@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- The right edge of lineup cards responds to taps on small landscape phones without losing the pitch’s scroll cue ([#746](https://github.com/ch-leon/nrl-sim/issues/746)).
+
 - **Weekly fatigue in Card week.** League appearances add tiredness, bonus events can slow recovery, and tired players start with less energy and a higher injury risk. [Card week rules](../specs/846-card-week.md#weekly-fatigue).
 
 - **Card week deals five cards.** Keep up to two from each League match pick and one from each starter pick. A half-used match pick saves its remaining cards and keep. [Card week rules](../specs/846-card-week.md#rules).
