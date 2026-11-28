@@ -114,16 +114,22 @@ export function placeName(name: string): string {
   return words.length > 1 ? words.slice(0, -1).join(' ') : name;
 }
 
+type WeekFixtureState = Pick<GameState, 'league' | 'week'> & Partial<Pick<GameState, 'clubId' | 'season' | 'competitions'>>;
+
+function weekFixture(state: WeekFixtureState) {
+  const view = leagueSeasonView(state);
+  const clubId = state.clubId ?? 'player';
+  return { view, clubId, fixture: nextSeasonFixture(state, clubId, view) };
+}
+
 /**
  * The hub's next-match chip (#350 H1), two short lines that fit beside Advance
  * Week at 667px: "v Darwin" over "Away · 5th", the ladder place once a round is
  * in. The full name is in the label. Null with no match left this season. Pure —
  * extracted for unit testing without the DOM.
  */
-export function nextMatchChip(s: Pick<GameState, 'league' | 'week'> & Partial<Pick<GameState, 'clubId' | 'season' | 'competitions'>>): { opponent: string; detail: string; label: string } | null {
-  const view = leagueSeasonView(s);
-  const clubId = s.clubId ?? 'player';
-  const f = nextSeasonFixture(s, clubId);
+export function nextMatchChip(s: WeekFixtureState, preview = weekFixture(s)): { opponent: string; detail: string; label: string } | null {
+  const { view, clubId, fixture: f } = preview;
   if (!f) return null;
   const home = f.homeId === clubId;
   const opp = s.league.clubs.find((c) => c.id === (home ? f.awayId : f.homeId));
@@ -207,11 +213,9 @@ export function advanceFromClub(onAdvanceWeek?: () => void, onChooseLeague?: () 
 }
 
 /** PLAY WEEK's sub-line: "v Darwin · away", empty with no match left this season. Pure. */
-export function playWeekSub(s: Pick<GameState, 'league' | 'week'> & Partial<Pick<GameState, 'clubId' | 'season' | 'competitions'>>): string {
+export function playWeekSub(s: WeekFixtureState, preview?: ReturnType<typeof weekFixture>): string {
   if (leagueChoiceRequired(s)) return 'Choose a league before playing';
-  const view = leagueSeasonView(s);
-  const clubId = s.clubId ?? 'player';
-  const f = nextSeasonFixture(s, clubId);
+  const { view, clubId, fixture: f } = preview ?? weekFixture(s);
   if (!f) return view ? view.currentLabel : '';
   const home = f.homeId === clubId;
   const opp = s.league.clubs.find((c) => c.id === (home ? f.awayId : f.homeId));
@@ -487,9 +491,15 @@ export function createHud(opts: HudOpts = {}): Hud {
       document.createTextNode(` · S${s.season}`),
     );
     weekEl.setAttribute('aria-label', seasonWeekLabel(s));
-    const chipInfo = nextMatchChip(s);
-    advanceSub.textContent = playWeekSub(s);
-    advanceBtn.title = chipInfo?.label ?? '';
+    // The title and sub-line share one read-only fixture projection. While
+    // advancing, the sub-line is hidden and the button only shows progress.
+    if (advanceInProgress()) {
+      advanceBtn.title = '';
+    } else {
+      const preview = weekFixture(s);
+      advanceSub.textContent = playWeekSub(s, preview);
+      advanceBtn.title = nextMatchChip(s, preview)?.label ?? '';
+    }
     renderAdvancing(s);
     renderChip(s);
   }
@@ -522,8 +532,8 @@ export function createHud(opts: HudOpts = {}): Hud {
       cardN.textContent = String(picks);
       cardCount.textContent = cardChipLabel(picks);
     }
-    const list = opts.decisions?.(s) ?? [];
-    const on = !advanceInProgress() && list.length > 0 && !activeScreen();
+    const list = !advanceInProgress() && !activeScreen() ? opts.decisions?.(s) ?? [] : [];
+    const on = list.length > 0;
     chip.hidden = !on;
     chips.hidden = !on && !board && opportunities.length === 0 && picks === 0;
     if (!on) return;
@@ -538,7 +548,7 @@ export function createHud(opts: HudOpts = {}): Hud {
     actions.toggleAttribute('data-advancing', on);
     root.toggleAttribute('data-advancing', on);
     if (on) setMenuOpen(false);
-    const challenge = !weekHeld() && challengeAdvanceProblem(s);
+    const challenge = !on && !weekHeld() && challengeAdvanceProblem(s);
     advanceLabel.textContent = (on ? (s.competitions?.leagueCareer ? `Week ${s.week} of ${s.competitions.calendar!.slots.length}…` : advanceProgressLabel(s.week)) : playerMatchPending() ? `${RESUME_MATCH_LABEL} ▸` : leagueChoiceRequired(s) && !weekHeld() ? 'Choose league ▸' : challenge ? 'Contest ▸' : PLAY_WEEK_LABEL).toUpperCase();
     advanceSub.hidden = on;
     // #350 H1: a decision waiting shows on the button that would take its default.

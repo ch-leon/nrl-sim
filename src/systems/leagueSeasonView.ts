@@ -104,8 +104,8 @@ export function leagueSeasonView(state: LeagueReadState) {
 export type LeagueSeasonView = NonNullable<ReturnType<typeof leagueSeasonView>>;
 
 /** A bridge is for existing match/gate APIs, never a second saved fixture list. */
-export function nextSeasonFixture(state: LeagueReadState, clubId: string = state.clubId ?? 'player'): Fixture | undefined {
-  const view = leagueSeasonView(state);
+export function nextSeasonFixture(state: LeagueReadState, clubId: string = state.clubId ?? 'player',
+  view = leagueSeasonView(state)): Fixture | undefined {
   if (view) {
     if (view.choiceRequired || view.calendar.status !== 'active') return undefined;
     if (clubId === view.clubId) return view.next?.bridge;
