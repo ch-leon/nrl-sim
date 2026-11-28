@@ -22,10 +22,10 @@ import { saveIfChanged } from '../core/save';
 import { careerActionClock, elapsedInterval } from '../core/season';
 import { CARD_PASS, CARD_WEEK, CARDS, DECREES, SIGNATURE_TRAIT, cardDefById, type CardDef, type CardKind, type CardTier } from '../data/cards';
 import { generatePlayerAround, overallRating, POSITIONS, shownStats } from '../data/player';
-import { PLAYS_BY_ID, PLAY_IDS, type PlayId } from '../data/plays';
+import { PLAYS_BY_ID, PLAY_IDS, playsOfFamily, type PlayId } from '../data/plays';
 import { ROMAN, TRAITS, traitLevel, withTrait, type TraitLevel } from '../data/traits';
 import { randomName } from '../data/names';
-import { SQUAD_CAP, STAT_MAX } from '../config';
+import { BOARD, SQUAD_CAP, STAT_MAX } from '../config';
 import { makeRng, type Rng } from '../utils/rng';
 import { rivalPlayer, RIVAL_POSITION_MIN, withDerivedStrength } from './rivals';
 import { fmtMoney } from '../utils/money';
@@ -37,7 +37,7 @@ import { awayPlayerIds, campDisposalProblem } from './playerAssignments';
 import { rosterIntervalProblem } from './playerAssignmentCommit';
 import { admitGeneratedPeople, bookPlayerMovement, closeClubSpell, openClubSpell } from './playerCareer';
 import { buyRefusal, ownsPlay } from './playbook';
-import { appointFeeWaived, hireRefusal, staffWages, type StaffHire } from './staff';
+import { appointFeeWaived, ATTACK_COACHES, hireRefusal, newStaffMember, STAFF, STAFF_APPOINTMENT_PRICES, staffWages, type StaffHire } from './staff';
 import { emptyTally, foldEvents } from './stats';
 import { PLAYER_ID } from './fixtures';
 import { currentDecree } from './cardBonuses';
@@ -59,12 +59,24 @@ export function isCardWeekCareer(state: Pick<GameState, 'cardWeek'>): boolean {
  * it: at 0.8 fit he would push a card's man far above the club's real level.
  */
 export function cardFloor(squad: readonly Player[], position: Position): number {
-  const best = (players: readonly Player[], rate: (p: Player) => number): number | null =>
-    players.length ? Math.max(...players.map(rate)) : null;
-  return best(squad.filter((p) => p.position === position), overallRating)
-    ?? best(squad.filter((p) => positionFit(p.position, position) === FIT.related), (p) => effectiveRating(p, position))
-    ?? best(squad, (p) => effectiveRating(p, position))
-    ?? 0;
+  return cardFloorMan(squad, position).rating;
+}
+
+/** The card floor and the man who sets it; `natural` is false when it came from a fallback (nobody plays there). */
+export function cardFloorMan(squad: readonly Player[], position: Position): { rating: number; man: Player | null; natural: boolean } {
+  const best = (players: readonly Player[], rate: (p: Player) => number): { rating: number; man: Player } | null => {
+    let top: { rating: number; man: Player } | null = null;
+    for (const p of players) {
+      const r = rate(p);
+      if (!top || r > top.rating || (r === top.rating && p.id < top.man.id)) top = { rating: r, man: p };
+    }
+    return top;
+  };
+  const natural = best(squad.filter((p) => p.position === position), overallRating);
+  if (natural) return { ...natural, natural: true };
+  const other = best(squad.filter((p) => positionFit(p.position, position) === FIT.related), (p) => effectiveRating(p, position))
+    ?? best(squad, (p) => effectiveRating(p, position));
+  return other ? { ...other, natural: false } : { rating: 0, man: null, natural: false };
 }
 
 /** The position with the lowest card floor (the dilemma card's man plays there); ties go to the formation order. */
@@ -452,6 +464,13 @@ function recruitBenefit(before: Player, after: Player): string {
   return benefits.join(' and ');
 }
 
+/** The card man as he joins at card `level`: the dilemma's margin step per level above I, or a player card's signature trait (and rating past III). The face reads this too. */
+function recruitAtLevel(player: Player, kind: RecruitCard['kind'], level: TraitLevel): Player {
+  return kind === 'dilemma'
+    ? withRatingBonus(player, (level - 1) * CARD_WEEK.DILEMMA_MARGIN_STEP)
+    : withRecruitUpgrade(player, level - 1);
+}
+
 /** The card man joins (pure): any named replacement released first, then signed on for the rest of the season with no fee. */
 function joinPlayer(state: GameState, card: RecruitCard, level: TraitLevel): { state: GameState; money: Applied['money']; joined: Player; released?: string } | string {
   let s = state;
@@ -486,9 +505,7 @@ function joinPlayer(state: GameState, card: RecruitCard, level: TraitLevel): { s
     fresh = admitted.players[0]!;
   }
   // The offer's quoted salary still applies if a player develops while the pick waits.
-  const improved = card.kind === 'dilemma'
-    ? withRatingBonus(fresh, (level - 1) * CARD_WEEK.DILEMMA_MARGIN_STEP)
-    : withRecruitUpgrade(fresh, level - 1);
+  const improved = recruitAtLevel(fresh, card.kind, level);
   const signed = signForRestOfSeason({ ...improved, joinedSeason: clock.season }, clock.season, clock.week, clock.duration);
   const joined = openClubSpell({ ...signed, deal: { ...signed.deal!, salary: card.salary } }, s.clubId, clock,
     card.fromClubId ? 'transfer' : 'signing', 0);
@@ -868,8 +885,18 @@ export interface CardFaceView {
   effect: string;
   /** A player card's man (and the dilemma's). */
   player?: { name: string; position: Position; rating: number; salary: number; replacesName?: string; releaseCost?: number };
-  /** A trait card's squad members who could take it, with the level each would reach. */
-  targets?: { playerId: string; name: string; level: TraitLevel }[];
+  /** A trait card's squad members who could take it: the level he holds now (0 = none), the level he would reach, and whether the trait suits his position. */
+  targets?: { playerId: string; name: string; level: TraitLevel; current: 0 | 1 | 2 | 3; suited: boolean }[];
+  /** A player card (and the dilemma) whose man has not joined: the club's best there now, and his gap over him as he would join (null when nobody plays there). */
+  floor?: { line: string; gap: number | null };
+  /** The dilemma: board patience now and after playing it. */
+  board?: { from: number; to: number; max: number; line: string };
+  /** A trait card: what the trait does, and the positions it suits (null: any). */
+  trait?: { blurb: string; suits: Position[] | null };
+  /** A staff card: what the job does, his wage a week as paid at this level, the fee saved (0 on an upgrade) and an attack coach's plays. */
+  staff?: { blurb: string; wage: number; feeSaved: number; plays?: string[] };
+  /** A set play card: the play, what it is, and the price saved (0 on an upgrade). */
+  play?: { name: string; blurb: string; priceSaved: number };
   detail?: string;
   source?: string;
   level: TraitLevel;
@@ -877,6 +904,18 @@ export interface CardFaceView {
   hint: string;
   /** Why it can't be played now, or null. */
   refusal: string | null;
+}
+
+/**
+ * "Your best five-eighth now: Jai Smith 41" and the card man's gap over him; or "Nobody
+ * plays there now" with no gap (null), since the floor then comes from an unnamed man
+ * at another position.
+ */
+export function floorLine(squad: readonly Player[], position: Position, rating: number): { line: string; gap: number | null } {
+  const floor = cardFloorMan(squad, position);
+  return floor.natural && floor.man
+    ? { line: `Your best ${position} now: ${floor.man.name} ${Math.round(floor.rating)}`, gap: rating - Math.round(floor.rating) }
+    : { line: 'Nobody plays there now', gap: null };
 }
 
 /** The effect line on the face; the specific hire, recruit or play is also named. */
@@ -927,26 +966,56 @@ function cardFaceView(state: GameState, card: OfferedCard, index: number, level:
     ...(card.fromClubId ? { source: state.league.clubs.find(c => c.id === card.fromClubId)?.name ?? card.fromClubId } : {}),
     hint: def.kind === 'decree' ? '' : `Good if ${GOOD_IF[def.kind]}`, refusal: null,
   };
-  if (card.kind === 'staff') view.detail = card.name;
-  if (card.kind === 'setPlay') view.detail = PLAYS_BY_ID[card.playId].name;
+  // The facts to choose with (#846 play-test), as applyCard would settle them today.
+  const previous = activeCard(state, def.id);
+  if (card.kind === 'staff' && def.kind === 'staff') {
+    view.detail = card.name;
+    // The wage as applyCard sets it: the hire's wage (or the card hire's, on an upgrade) cut by the level's factor. Only a first hire waives a fee.
+    const base = previous?.kind === 'staff' ? previous.member : newStaffMember(state, hireOf(def), card.name);
+    const job = typeof def.role === 'string' ? STAFF[def.role] : ATTACK_COACHES[def.role.attackCoach];
+    view.staff = {
+      blurb: job.blurb, wage: Math.round(base.wage * CARD_WEEK.STAFF_WAGE_FACTOR[level]),
+      feeSaved: previous ? 0 : STAFF_APPOINTMENT_PRICES[typeof def.role === 'string' ? def.role : def.role.attackCoach],
+      ...(typeof def.role !== 'string' && !previous ? { plays: playsOfFamily(def.role.attackCoach).map((p) => p.name) } : {}),
+    };
+  }
+  if (card.kind === 'setPlay') {
+    const play = PLAYS_BY_ID[card.playId];
+    view.detail = play.name;
+    view.play = { name: play.name, blurb: play.blurb, priceSaved: previous ? 0 : play.price };
+  }
   if (card.kind === 'player' || card.kind === 'dilemma') {
     const clock = careerActionClock(state);
     const out = card.replacesId ? state.squad.find((p) => p.id === card.replacesId) : undefined;
+    // A man not yet here is rated as he would join at this level; an upgrade's man as he is now.
+    const here = state.squad.some(p => p.id === card.player.id);
+    const rating = Math.round(overallRating(here ? card.player : recruitAtLevel(card.player, card.kind, level)));
     view.player = {
-      name: card.player.name, position: card.player.position, rating: Math.round(overallRating(card.player)), salary: card.salary,
+      name: card.player.name, position: card.player.position, rating, salary: card.salary,
       ...(card.replacesName ? { replacesName: card.replacesName } : {}),
       ...(out ? { releaseCost: releaseTerms(out, clock.season, clock.week, clock.duration).payout } : {}),
     };
+    // An upgrade's man is already here: the floor would set him against himself.
+    if (!here) view.floor = floorLine(state.squad, card.player.position, rating);
+    if (def.kind === 'dilemma') {
+      // Every play of the dilemma, an upgrade too, costs its patience (applyCard).
+      const to = Math.max(0, Math.min(BOARD.MAX_PATIENCE, state.boardPatience + def.patience));
+      view.board = { from: state.boardPatience, to, max: BOARD.MAX_PATIENCE, line: `Board patience ${state.boardPatience} → ${to} of ${BOARD.MAX_PATIENCE}` };
+    }
   }
   if (def.kind === 'trait') {
-    const active = activeCard(state, def.id);
-    if (active?.kind === 'trait') {
-      view.detail = state.squad.find(p => p.id === active.playerId)?.name ?? '';
+    const fit = TRAITS[def.trait].fit;
+    view.trait = { blurb: TRAITS[def.trait].blurb, suits: fit ? [...fit] : null };
+    if (previous?.kind === 'trait') {
+      view.detail = state.squad.find(p => p.id === previous.playerId)?.name ?? '';
       view.effect = `Raises the trait to ${ROMAN[level]}.`;
-    } else view.targets = traitTargets(state, def.trait).map(t => ({
-      playerId: t.player.id, name: t.player.name,
-      level: Math.min(3, traitLevel(t.player.traits, def.trait) + level) as TraitLevel,
-    }));
+    } else view.targets = traitTargets(state, def.trait).map(t => {
+      const current = traitLevel(t.player.traits, def.trait);
+      return {
+        playerId: t.player.id, name: t.player.name, level: Math.min(3, current + level) as TraitLevel, current,
+        suited: !fit || fit.includes(t.player.position),
+      };
+    });
   }
   return [view];
 }
