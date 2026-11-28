@@ -15,7 +15,9 @@ export class BootScene extends Phaser.Scene {
   }
 
   create(): void {
+    if (location.search.includes('?e2e')) performance.mark('nrl-739:ground-art-begin');
     registerGroundsArt(this, getState().facilities ?? []);
+    if (location.search.includes('?e2e')) performance.mark('nrl-739:ground-art-ready');
     // Not while a match is on screen; stopped with the game.
     const cancel = paintFacilitiesWhenIdle(this, () => this.game.scene.isActive('Match'));
     this.game.events.once(Phaser.Core.Events.DESTROY, cancel);

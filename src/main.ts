@@ -167,6 +167,7 @@ async function boot(): Promise<void> {
     ? (playtest.fresh ? { mode: 'new' as const, careerMode: 'league', ...freshPlaytestLeagueStart(captureSlot(1).raw) } : { mode: 'continue' as const })
     : await showTitleFlow(uiRoot);
   // Rejection is not an empty career: stay at recovery instead of installing defaults.
+  if (location.search.includes('?e2e')) performance.mark('nrl-739:title-choice');
   let loaded = loadCareer();
   let freshGame = false;
   for (;;) {
@@ -188,6 +189,7 @@ async function boot(): Promise<void> {
     freshGame = !playtest;
     const clubName = choice.clubName ?? 'Cavehole Crushers';
     const loading = showLeagueLoading(uiRoot);
+    if (location.search.includes('?e2e')) performance.mark('nrl-739:load-overlay');
     let failure: string | undefined;
     try {
       await nextFrame();
@@ -206,7 +208,9 @@ async function boot(): Promise<void> {
         }
       } else {
         const { startLeagueCareer } = await import('./systems/leagueCareerSetup');
+        if (location.search.includes('?e2e')) performance.mark('nrl-739:setup-import');
         const result = await startLeagueCareer({ ...choice, clubName, seed }, choice.destination);
+        if (location.search.includes('?e2e')) performance.mark('nrl-739:career-installed');
         if (!result.ok) failure = result.message;
       }
     } catch {
@@ -270,7 +274,9 @@ async function boot(): Promise<void> {
   // The next fixture's match art, painted in a Worker during the week and uploaded in idle slices (N10.5).
   initMatchArtAhead({ textures: () => game?.textures ?? null, busy: () => game?.scene.isActive('Match') ?? false });
 
+  if (location.search.includes('?e2e')) performance.mark('nrl-739:phaser-begin');
   const g = new Phaser.Game(config);
+  if (location.search.includes('?e2e')) performance.mark('nrl-739:phaser-built');
   game = g;
   bindIndividualChallengeGame(g);
   // The iPhone app's lock-screen match ticker (docs/specs/ios.md §3). The build folds the
@@ -362,7 +368,9 @@ async function boot(): Promise<void> {
   // The dock (Broadcast Quiet): CLUB · SQUAD · LEAGUE · BUILD · OFFICE. Lineup
   // and Recruit are Squad's segments, the ladder is in League; the rest of the
   // club is Office's tiles, each with a status line.
+  if (location.search.includes('?e2e')) performance.mark('nrl-739:audio-begin');
   initAudio();
+  if (location.search.includes('?e2e')) performance.mark('nrl-739:audio-ready');
   const openSettings = initAudioUi();
   setMatchSettingsOpener(openSettings); // the pause sheet's Settings
   const nav = createNav({
@@ -503,6 +511,7 @@ async function boot(): Promise<void> {
   function onChooseLeague(): HTMLElement {
     const state = getState();
     if (state.sacked || weekHeld() || playerMatchPending() || !leagueChoiceRequired(state)) return uiRoot;
+    if (location.search.includes('?e2e')) performance.mark('nrl-739:league-dialog-begin');
     return openLeagueSelection({onConfirmed: () => { void startLeagueGuidance(); }});
   }
 
@@ -515,6 +524,7 @@ async function boot(): Promise<void> {
       for (const text of expansionIntroLines(state, state.objectives))
         bus.emit('ui:notify', { text, kind: 'info', quiet: true, from: 'coach' });
       await showExpansionIntro();
+      if (location.search.includes('?e2e')) performance.mark('nrl-739:intro-dismissed');
     }
     if (stateInstallation() === installation && !getState().sacked && !weekHeld()) startTutorial();
   }

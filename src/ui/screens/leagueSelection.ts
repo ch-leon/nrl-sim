@@ -46,7 +46,9 @@ export function openLeagueSelection(options: LeagueSelectionOptions = {}): HTMLE
     if (!content.isConnected || !selected?.eligible || confirming) return;
     const { leagueId, previewKey } = selected;
     confirming = true;
+    if (location.search.includes('?e2e')) performance.mark('nrl-739:league-confirm-begin');
     const result = confirmLeagueEntry({ leagueId, previewKey });
+    if (location.search.includes('?e2e')) performance.mark('nrl-739:league-confirm-ready');
     confirming = false;
     if (result.ok) {
       if (content.isConnected) closeModal();
@@ -163,6 +165,7 @@ export function openLeagueSelection(options: LeagueSelectionOptions = {}): HTMLE
     },
   });
   (selectedId ? cards.get(selectedId) ?? dismiss : dismiss).focus();
+  if (location.search.includes('?e2e')) performance.mark('nrl-739:league-dialog-ready');
   return backdrop;
 }
 

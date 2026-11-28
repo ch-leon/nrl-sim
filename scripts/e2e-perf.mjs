@@ -359,6 +359,10 @@ async function run() {
     await page.locator('[data-expansion-work]').tap();
     await page.waitForFunction(() => document.querySelector('.nrl-dock') && window.__nrlGame?.scene.isActive('Grounds'));
   });
+  log('Startup phase marks:', JSON.stringify(await page.evaluate(() => {
+    const marks=performance.getEntriesByType('mark').filter(p=>p.name.startsWith('nrl-739:'));
+    return marks.map(({name,startTime})=>[name,Math.round(startTime-marks[0].startTime)]);
+  })));
   if (await page.locator('.nrl-tutorial-skip').count()) await page.locator('.nrl-tutorial-skip').tap();
   await wait(500);
   await timed('grounds frame rate (3 s)', async () => {

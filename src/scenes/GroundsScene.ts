@@ -135,6 +135,7 @@ export class GroundsScene extends Phaser.Scene {
     // The last run's BuildFx is detached from the update loop: with it, the first
     // render would start a build animation (alpha 0) that never plays out.
     this.buildFx = undefined;
+    if (location.search.includes('?e2e')) performance.mark('nrl-739:ground-objects-begin');
     this.tiles = this.buildTileArray();
     this.renderGround();
     this.setupCamera();
@@ -142,6 +143,7 @@ export class GroundsScene extends Phaser.Scene {
     this.setupPlacement();
     this.setupTapToMove();
     this.renderFacilities();
+    if (location.search.includes('?e2e')) performance.mark('nrl-739:ground-objects-ready');
 
     // Register with the DOM ↔ scene bridge so build.ts can start placement mode.
     setActiveGroundsScene(this);
