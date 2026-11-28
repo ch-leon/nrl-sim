@@ -140,6 +140,12 @@ const LINEUP_CSS = `
   .nrl-pitch-cards > .nrl-pcard .nrl-pcard-body { padding: 3px 7px; }
   .nrl-side-cards > .nrl-pcard { min-height: 44px; }
 }
+/* At small touch sizes the native overlay scroll thumb can catch taps meant
+   for the rightmost card. The pitch still scrolls and keeps its existing fade. */
+@media (max-width: 760px) and (max-height: 400px) and (pointer: coarse) {
+  .nrl-lineup-field { scrollbar-width: none; }
+  .nrl-lineup-field::-webkit-scrollbar { display: none; }
+}
 /* The plan (#342): a bottom sheet over the dimmed Lineup, the half-time sheet's look (3r). */
 .nrl-dialog-region .nrl-modal.nrl-lineup-plan-modal {
   align-self: flex-end;
