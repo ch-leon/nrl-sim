@@ -668,7 +668,7 @@ export function writeSlot(slot: number, state: GameState, expectedOriginal?: str
 }
 
 function persistSlot(store: LocalSaveStore | null, slot: number, state: GameState, expectedOriginal: string | null | undefined,
-  options: {parkedMatch?: string | null; verifyPayload?: boolean; current?: () => boolean}): boolean {
+  options: {parkedMatch?: string | null; verifyPayload?: boolean; current?: () => boolean; encodedState?: string}): boolean {
   if (savesLocked) return false;
   if (!store) {
     console.warn('nrl-sim: no storage available, save skipped');
@@ -688,7 +688,7 @@ function persistSlot(store: LocalSaveStore | null, slot: number, state: GameStat
       // An upgraded/repaired state must never replace its only original bytes.
       if (approved.preserve) store.keepCorrupt(original, slot);
     }
-    const payload = JSON.stringify(state);
+    const payload = options.encodedState ?? JSON.stringify(state);
     const facts = { saveVersion: state.version, club: String(state.clubName), season: state.season, week: state.week };
     const meta = nextMeta(store.storedMeta(slot), payload, facts, store.deviceId(), Date.now());
     if (options.current && !options.current()) return false;
@@ -830,7 +830,10 @@ function persistIfChanged(state: GameState, verifyPayload = false): boolean {
       && stateInstallation() === installation && getStore() === store;
     const original = store.read(slot);
     if (!current()) return false;
-    if (original !== JSON.stringify(state) && !persistSlot(store, slot, state, original, {verifyPayload, current})) return false;
+    // The synchronous comparison and write use the same bytes. persistSlot
+    // still checks the original revision, destination and installation.
+    const encodedState = JSON.stringify(state);
+    if (original !== encodedState && !persistSlot(store, slot, state, original, {verifyPayload, current, encodedState})) return false;
     if (!current()) return false;
     lastSaved = state;
     return true;
