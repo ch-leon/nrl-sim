@@ -378,7 +378,16 @@ export function validateCompetitions(v: unknown, context: { pack: string; season
   const clubIds = new Set(context.clubIds);
   const instanceIds = new Set<string>();
   const fixtureIds = new Set<string>();
-  const slots = new Set<string>();
+  const bookings = new Map<number, Map<number, Set<string>>>();
+  const claim = <K>(index: Map<K, Map<number, Set<string>>>, group: K, slot: number, clubId: string): boolean => {
+    let bySlot = index.get(group);
+    if (!bySlot) index.set(group, bySlot = new Map());
+    let clubs = bySlot.get(slot);
+    if (!clubs) bySlot.set(slot, clubs = new Set());
+    if (clubs.has(clubId)) return false;
+    clubs.add(clubId);
+    return true;
+  };
   for (const raw of v.instances) {
     if (!record(raw) || !keys(raw, ['id', 'season', 'definition', 'entrantIds', 'tieOrder', 'status', 'stageId', 'fixtures', 'winnerId'])
       || !text(raw.id) || instanceIds.has(raw.id) || !integer(raw.season, 1, context.season)
@@ -398,7 +407,7 @@ export function validateCompetitions(v: unknown, context: { pack: string; season
     if (!noEntry && !validFieldSize(def, entrantIds.length)) return 'competition entrant count';
     if (raw.stageId !== null && !def.stages.some(s => s.id === raw.stageId)) return 'competition stage';
     if (!Array.isArray(raw.fixtures) || (noEntry && raw.fixtures.length > 0)) return 'competition fixtures';
-    const roundClubs = new Set<string>();
+    const roundClubs = new Map<string, Map<number, Set<string>>>();
     for (const value of raw.fixtures) {
       if (!record(value) || !keys(value, ['id', 'competitionId', 'stageId', 'round', 'slot', 'homeId', 'awayId', 'neutral', 'status', 'result'])
         || !text(value.id) || fixtureIds.has(value.id) || value.competitionId !== raw.id || !text(value.stageId)
@@ -415,26 +424,24 @@ export function validateCompetitions(v: unknown, context: { pack: string; season
       if (f.neutral !== (def.venues.rounds === 'neutral' || (isFinal && def.venues.final === 'neutral'))) return 'competition fixture venue';
       if ((f.status === 'completed') !== (f.result !== undefined) || (f.result !== undefined && !validResult(f.result, f, stage, def.drawnKnockout, tieOrder))) return 'competition fixture result';
       if (f.status !== 'cancelled') for (const clubId of [f.homeId, f.awayId]) {
-        const roundKey = JSON.stringify([f.stageId, f.round, clubId]);
-        if (roundClubs.has(roundKey)) return 'competition round booking';
-        roundClubs.add(roundKey);
-        if (f.slot !== undefined) {
-          const slotKey = JSON.stringify([raw.season, f.slot, clubId]);
-          if (slots.has(slotKey)) return 'competition slot booking';
-          slots.add(slotKey);
-        }
+        if (!claim(roundClubs, f.stageId, f.round, clubId)) return 'competition round booking';
+        if (f.slot !== undefined && !claim(bookings, raw.season as number, f.slot, clubId)) return 'competition slot booking';
       }
     }
     const fixtures = raw.fixtures as CompetitionFixture[];
-    const dates = new Map<number, number[]>();
+    const dates = new Map<number, { first: number; last: number }>();
     for (const f of fixtures) if (f.slot !== undefined && f.status !== 'cancelled') {
       const position = def.stages.findIndex(s => s.id === f.stageId) * (def.slotCount + 1) + f.round;
-      dates.set(position, [...(dates.get(position) ?? []), f.slot]);
+      const date = dates.get(position);
+      if (date) {
+        date.first = Math.min(date.first, f.slot);
+        date.last = Math.max(date.last, f.slot);
+      } else dates.set(position, { first: f.slot, last: f.slot });
     }
     let previous = 0;
     for (const [, assigned] of [...dates].sort(([a], [b]) => a - b)) {
-      if (Math.min(...assigned) <= previous) return 'competition fixture chronology';
-      previous = Math.max(...assigned);
+      if (assigned.first <= previous) return 'competition fixture chronology';
+      previous = assigned.last;
     }
     const knockout = fixtures.filter(f => f.status !== 'cancelled' && def.stages.find(s => s.id === f.stageId)!.kind === 'knockout');
     const eliminated = new Map<string, number>();
