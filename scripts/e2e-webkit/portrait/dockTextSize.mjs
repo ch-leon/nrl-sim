@@ -278,14 +278,23 @@ export async function runDockTextSize(browser) {
     // PLAY WEEK with a long opponent cuts no tab: its sub-line gives way, all of it (the next
     // opponent comes from the random town, so the real dock only sometimes draws a long one).
     // Drawn the way hud.ts draws them; the next state change puts the real one back.
-    for (const [name, label, sub, stop, cut] of [
+    for (const [name, label, sub, stop, cut, staff = false] of [
       ['larger-long-opponent', 'PLAY WEEK ▸', 'v Woolloomooloo · home', false, false],
       ['larger-resume', 'RESUME MATCH ▸<span class="nrl-hud-alert">3</span>', 'v Wentworthville Wanderers · away', false, true],
       ['larger-advancing', 'WEEK 27 OF 27…', '', true, true],
+      // #738 also failed with Staff & Board selected. Keep the same narrow viewport and
+      // long opponent regardless of the current career's draw, with no label cuts allowed.
+      ...(W === 667 && H === 375
+        ? [['larger-long-opponent-staff', 'PLAY WEEK ▸', 'v Woolloomooloo · away', false, false, true]]
+        : []),
     ]) {
       await step(name, async (rec) => {
         await home();
         await press('.nrl-nav [data-nav-more]');
+        if (staff) {
+          await press('.nrl-nav-sheet [data-screen="staff"]');
+          await page.waitForSelector('.nrl-screen-region[data-screen-key="staff"]');
+        }
         await page.evaluate(([label, sub, stop]) => {
           document.querySelector('.nrl-dock-advance-label').innerHTML = label;
           const s = document.querySelector('.nrl-dock-advance-sub');
@@ -295,6 +304,16 @@ export async function runDockTextSize(browser) {
           document.querySelector('.nrl-hud-stop').hidden = !stop;
         }, [label, sub, stop]);
         await page.waitForTimeout(300);
+        if (staff) {
+          await page.evaluate(() => document.fonts.ready.then(() => undefined));
+          if (await page.locator('.nrl-nav-sheet [data-screen="staff"]').getAttribute('aria-current') !== 'page') {
+            return ["Staff & Board's tile isn't marked"];
+          }
+          const menu = await page.locator('.nrl-hud-menu-toggle').boundingBox();
+          if (!menu || Math.round(menu.width * 100) < 4400 || Math.round(menu.height * 100) < 4400) {
+            return ['PLAY WEEK menu is missing or smaller than 44×44px'];
+          }
+        }
         const d = await dockProblems(page, 'office', safe, cut);
         rec.notes.push(d.note);
         return d.problems;
