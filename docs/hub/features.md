@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- The right edge of lineup cards responds to taps on small landscape phones without losing the pitch’s scroll cue ([#746](https://github.com/ch-leon/nrl-sim/issues/746)).
+
 - **Long names fit on the half-time tactics card.** Player names and ratings wrap on small phones rather than getting cut off.
 
 - **Fatigue at selection time.** Squad and Lineup show each player's weekly fatigue. Event booking reviews and bonus-match previews name the next League opponent and show how much energy the player is due to start with after recovery. [Card week rules](../specs/846-card-week.md#weekly-fatigue).
