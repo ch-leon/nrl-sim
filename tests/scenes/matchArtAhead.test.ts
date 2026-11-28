@@ -2,8 +2,10 @@
 // and kept by kit design until the match scene takes it.
 import { describe, it, expect, afterEach } from 'vitest';
 import { bus } from '../../src/core/events';
-import { createNewGame, getState } from '../../src/core/state';
-import { initLeague, PLAYER_ID } from '../../src/systems/fixtures';
+import { createNewGame, getState, loadState, setState } from '../../src/core/state';
+import { acceptLeagueEntry, previewLeagueEntry } from '../../src/systems/leagueEntry';
+import { leagueSlotState } from '../helpers/leagueSlot';
+import { getCurrentFixture, initLeague, PLAYER_ID } from '../../src/systems/fixtures';
 import { fixtureArtKey, fixtureArtBuffers, fixtureArtPieces, paintFixtureArt, type FixtureKits } from '../../src/art/match/fixtureArt';
 import type { GroundLook } from '../../src/art/match/stadium';
 import { groundForMatch } from '../../src/art/match/ground';
@@ -115,6 +117,52 @@ describe('the next fixture painted ahead (N10.5)', () => {
     expect(posted).toBe(1);
     expect(takeFixtureArt(key)).not.toBeNull();
     off();
+  }, 30_000);
+
+  it('prepares the actual scheduled League ground and strips, not the empty Classic schedule', async () => {
+    const opening = await leagueSlotState();
+    const preview = previewLeagueEntry(opening, opening.competitions!.leagueCareer!.access[0]!.leagueId);
+    if (!preview.ok) throw new Error(preview.message);
+    const active = acceptLeagueEntry(opening, preview.preview);
+    if (!active.ok) throw new Error(active.message);
+    loadState(opening);
+    stubWorker('paint');
+    const off = initMatchArtAhead({ textures: () => null, busy: () => false, schedule: () => {} });
+    const look = () => new Promise((r) => setTimeout(r, 0)); // the look is scheduled, not inside the tap
+    const expectedArt = () => {
+      const state = getState();
+      expect(state.league.fixtures).toEqual([]);
+      const fixture = getCurrentFixture(state, state.clubId)!;
+      expect(fixture.id).toBeTruthy();
+      const [home, away] = [fixture.homeId, fixture.awayId].map(id => {
+        const { colors } = state.league.clubs.find(club => club.id === id)!;
+        return { clubId: id, colors };
+      });
+      const kits = fixtureKits(home!, away!);
+      const ground = groundForMatch(state, fixture);
+      return { key: fixtureArtKey(offsetX, kits, ground), kits, ground };
+    };
+    try {
+      await look();
+      expect(posted).toBe(0); // league selection pending, not a playable fixture
+      loadState(active.state);
+      const first = expectedArt();
+      await look();
+      expect(posted).toBe(1); // itself started the exact painting before the match asks
+      const firstArt = await fixtureArtFor(offsetX, first.kits, first.ground);
+      expect(firstArt.key).toBe(first.key);
+      expect(posted).toBe(1); // scene's exact key reuses the initial painting
+      setState({ week: 4 }); // next scheduled fixture: different ground and/or strips
+      const next = expectedArt();
+      expect(next.key).not.toBe(first.key);
+      await look();
+      expect(posted).toBe(2);
+      await look();
+      expect(takeFixtureArt(first.key)).toBeNull();
+      expect(takeFixtureArt(next.key)?.key).toBe(next.key);
+    } finally {
+      off();
+    }
   }, 30_000);
 
   it('uploads the painting one texture per slice, never under a match; another fixture frees them', async () => {
