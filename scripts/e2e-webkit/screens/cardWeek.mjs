@@ -101,6 +101,80 @@ async function checkFatigueScreens(page, out) {
   log('ok weekly fatigue meters, trial and camp forecast at iPhone widths');
 }
 
+async function checkStaffSupplyPick(page, out, playerId) {
+  const seeded = await page.evaluate(id => {
+    const state = window.__nrlState();
+    const cw = state.cardWeek;
+    cw.weeklyFatigue[id] = 90;
+    const playId = 'block-play';
+    if (state.playbook.owned.includes(playId)) throw new Error('Staff UI fixture needs an unowned Block play');
+    const cards = [
+      { cardId: 'staff-play:block-play', kind: 'setPlay', playId, staffSource: 'attackCoach' },
+      { cardId: 'cashInjection', kind: 'cash' },
+      { cardId: 'lastLine', kind: 'trait' },
+      { cardId: 'playmaker', kind: 'trait' },
+      { cardId: 'iceBaths', kind: 'recovery', staffSource: 'welfare' },
+    ];
+    cw.owed = 1;
+    cw.offers = [{
+      kind: 'match', season: state.season, week: state.week, grant: ++cw.grants, keptCardIds: [], cards,
+    }];
+    return { grant: cw.grants, cards: cards.filter(card => card.staffSource) };
+  }, playerId);
+  await page.setViewportSize({ width: 667, height: 375 });
+  await openNav(page, 'cards');
+  await page.locator(`${CARDS} [data-cards-pick]`).tap();
+  const pick = page.locator(PICK);
+  assert.equal(await pick.getAttribute('data-card-grant'), String(seeded.grant));
+  const keeps = pick.locator('[data-card-keeps]');
+  assert.equal(await keeps.getAttribute('data-card-keeps'), '2');
+  const source = pick.locator('.nrl-card-source');
+  assert.deepEqual(await source.allTextContents(), ['From your Attack Coach', 'From your Welfare Manager']);
+  const coach = pick.locator('.nrl-card-face').filter({ hasText: 'From your Attack Coach' });
+  const welfare = pick.locator('.nrl-card-face').filter({ hasText: 'From your Welfare Manager' });
+  for (const [width, height] of [[667, 375], [375, 667]]) {
+    await page.setViewportSize({ width, height });
+    await checkPick(page, width < height);
+    for (const face of [coach, welfare]) {
+      const label = face.locator('.nrl-card-source');
+      await label.scrollIntoViewIfNeeded();
+      assert.ok(await label.evaluate(node => {
+        const { left, right } = node.getBoundingClientRect();
+        return left >= 0 && right <= innerWidth && node.scrollWidth <= node.clientWidth + 1;
+      }), 'Staff label fits in the visible card');
+    }
+    await page.screenshot({ animations: 'disabled', path: join(out, `${width}x${height}-staff-pick.png`) });
+  }
+  const reroll = pick.locator('[data-card-reroll]');
+  await reroll.tap();
+  const exposed = () => page.evaluate(() =>
+    window.__nrlState().cardWeek.offers[0].cards.filter(card => card.staffSource));
+  assert.deepEqual(await exposed(), seeded.cards, 'Reroll retains the exact two staff faces');
+  await coach.getByRole('button', { name: 'Take Set play' }).tap();
+  assert.equal(await keeps.getAttribute('data-card-keeps'), '1');
+  assert.deepEqual(await source.allTextContents(), ['From your Welfare Manager']);
+  assert.equal(await welfare.getByRole('button', { name: 'Take Ice baths' }).isDisabled(), true);
+  await reroll.tap();
+  assert.equal(await pick.locator('.nrl-card-face').count(), 4);
+  assert.deepEqual(await exposed(), [seeded.cards[1]]);
+  assert.equal(await page.evaluate(play => window.__nrlState().cardWeek.offers[0].cards
+    .some(card => card.kind === 'setPlay' && card.playId === play), seeded.cards[0].playId), false,
+  'The taught play must not reappear via the ordinary set-play face after the first keep');
+  await page.setViewportSize({ width: 667, height: 375 });
+  await page.reload();
+  await page.locator('[data-nrl-continue-1]').tap();
+  await page.waitForFunction(() => !!window.__nrlState?.()?.cardWeek);
+  await openNav(page, 'cards');
+  await page.locator(`${CARDS} [data-cards-pick]`).tap();
+  assert.equal(await keeps.getAttribute('data-card-keeps'), '1');
+  assert.deepEqual(await exposed(), [seeded.cards[1]]);
+  await welfare.getByRole('button', { name: 'Play Ice baths now' }).tap();
+  assert.equal(await page.evaluate(id => window.__nrlState().cardWeek.weeklyFatigue[id], playerId), 60);
+  assert.equal(await page.evaluate(() => window.__nrlState().cardWeek.hand.filter(card => card.offered.kind === 'recovery').length), 2);
+  assert.equal(await page.evaluate(() => window.__nrlState().cardWeek.owed), 0);
+  log('ok staff labels, full recovery hand, partial keep, reroll and reload in iPhone WebKit');
+}
+
 export async function runCardWeek(browser) {
   const out = join(OUT_ROOT, 'webkit', 'card-week');
   mkdirSync(out, { recursive: true });
@@ -325,6 +399,7 @@ export async function runCardWeek(browser) {
     const freshStarter = page.locator(`[data-player-open="${playerId}"]`);
     assert.match(await freshStarter.getAttribute('aria-label'), /fatigue 0.*Starts at 100% energy/i);
     log('ok recovery hand limit, targeted play and refreshed Lineup at iPhone widths');
+    await checkStaffSupplyPick(page, out, playerId);
     assert.deepEqual(errors, []);
     log('ok card week 667×375 and 375×667 at Larger text');
     return 0;
